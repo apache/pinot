@@ -29,6 +29,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -49,6 +50,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -161,6 +163,18 @@ public class MailboxSendOperatorTest {
     ArgumentCaptor<MseBlock.Eos> eosCaptor = ArgumentCaptor.forClass(MseBlock.Eos.class);
     verify(_exchange, times(1)).send(eosCaptor.capture(), anyList());
     assertTrue(eosCaptor.getValue().isSuccess(), "expected to send EOS block to exchange");
+  }
+
+  @Test
+  public void shouldConfirmSenderSortingOnlyForExplicitRuntimeSort() {
+    MailboxSendNode sendNode = mock(MailboxSendNode.class);
+    when(sendNode.hasExplicitSortInput()).thenReturn(true);
+
+    assertTrue(MailboxSendOperator.isSortedOnSender(mock(SortOperator.class), sendNode));
+    assertFalse(MailboxSendOperator.isSortedOnSender(_input, sendNode));
+
+    when(sendNode.hasExplicitSortInput()).thenReturn(false);
+    assertFalse(MailboxSendOperator.isSortedOnSender(mock(SortOperator.class), sendNode));
   }
 
   @Test

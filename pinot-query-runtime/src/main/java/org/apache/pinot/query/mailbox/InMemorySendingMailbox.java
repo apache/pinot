@@ -37,6 +37,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final String _id;
   private final MailboxService _mailboxService;
   private final long _deadlineMs;
+  private final boolean _sortedOnSender;
 
   private ReceivingMailbox _receivingMailbox;
 
@@ -51,10 +52,16 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
+    this(id, mailboxService, deadlineMs, statMap, false);
+  }
+
+  InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap, boolean sortedOnSender) {
     _id = id;
     _mailboxService = mailboxService;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
+    _sortedOnSender = sortedOnSender;
   }
 
   @Override
@@ -90,7 +97,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
+    ReceivingMailbox.ReceivingMailboxStatus status =
+        _receivingMailbox.offer(block, serializedStats, timeoutMs, _sortedOnSender);
     switch (status) {
       case SUCCESS:
         break;

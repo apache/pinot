@@ -23,6 +23,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -501,6 +502,38 @@ public class SortOperatorTest {
 
     assertTrue(operator instanceof TopNSortOperator, "a collation is honored regardless of the input operator type");
     assertBlockRows(operator.nextBlock(), new Object[]{1}, new Object[]{2});
+  }
+
+  @Test
+  public void shouldSkipSortWhenInputHasExactCollation() {
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new ColumnDataType[]{INT});
+    _input = mock(SortedMailboxMergeReceiveOperator.class);
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxMergeReceiveOperator) _input).getCollations()).thenReturn(collations);
+
+    SortOperator operator = getOperator(schema, collations, 10, 0);
+
+    assertTrue(operator instanceof LimitSortOperator, "an exact input collation needs no second sort");
+    assertBlockRows(operator.nextBlock(), new Object[]{1}, new Object[]{2});
+  }
+
+  @Test
+  public void shouldSortWhenInputCollationDiffers() {
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new ColumnDataType[]{INT});
+    _input = mock(SortedMailboxMergeReceiveOperator.class);
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    when(((SortedMailboxMergeReceiveOperator) _input).getCollations()).thenReturn(
+        List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST)));
+    List<RelFieldCollation> requestedCollations =
+        List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.FIRST));
+
+    SortOperator operator = getOperator(schema, requestedCollations, 10, 0);
+
+    assertTrue(operator instanceof TopNSortOperator, "a different input collation still requires sorting");
+    assertBlockRows(operator.nextBlock(), new Object[]{2}, new Object[]{1});
   }
 
   @Test
