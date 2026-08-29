@@ -198,8 +198,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws SocketException, UnknownHostException {
     switch (serviceRole) {
       case CONTROLLER:
+        // Tenant isolation is left unset so the controller starter's own default applies.
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
-            ControllerConf.ControllerMode.DUAL, true);
+            ControllerConf.ControllerMode.DUAL, null);
       case BROKER:
         return PinotConfigUtils
             .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT,

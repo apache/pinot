@@ -23,6 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -64,8 +65,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       // forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
 
-  // This can be set via the set method, or via config file input.
-  private boolean _tenantIsolation = true;
+  // This can be set via the set method, or via config file input. Left null when neither supplies a value, in which
+  // case the generated config does not pin the key and the controller starter's default applies.
+  @Nullable
+  private Boolean _tenantIsolation;
 
   @CommandLine.Option(names = {"-configOverride"}, required = false, split = ",")
   private Map<String, Object> _configOverrides = new HashMap<>();
@@ -98,7 +101,9 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     return _configFileName;
   }
 
-  public boolean isTenantIsolation() {
+  /// Returns the configured tenant isolation value, or `null` when it was never set.
+  @Nullable
+  public Boolean getTenantIsolation() {
     return _tenantIsolation;
   }
 
