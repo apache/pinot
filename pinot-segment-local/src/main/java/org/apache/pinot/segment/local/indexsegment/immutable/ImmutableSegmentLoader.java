@@ -96,13 +96,14 @@ public class ImmutableSegmentLoader {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, null);
   }
 
-  /// Loads the segment with specified IndexLoadingConfig.
-  /// This method modifies the segment like to convert segment format, add or remove indices.
-  /// Mostly used by UT cases to add some specific index for testing purpose.
+  /// Loads the segment with specified IndexLoadingConfig, honoring the (possibly tier-scoped)
+  /// `skipSegmentPreprocess` flag. Callers that need to unconditionally preprocess should use the explicit
+  /// `needPreprocess` overload instead.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, zkMetadata);
+    return load(indexDir, indexLoadingConfig, !indexLoadingConfig.isSkipSegmentPreprocess(),
+        segmentOperationsThrottlerSet, zkMetadata);
   }
 
   /// Loads the segment with specified IndexLoadingConfig.
