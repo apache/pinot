@@ -47,7 +47,12 @@ class BroadcastExchange extends BlockExchange {
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
-    super(sendingMailboxes, splitter, statsIndexChooser);
+    this(sendingMailboxes, splitter, statsIndexChooser, false);
+  }
+
+  protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, boolean sortedOnSender) {
+    super(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
   }
 
   @Override

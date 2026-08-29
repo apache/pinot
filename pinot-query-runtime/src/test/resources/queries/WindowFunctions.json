@@ -5852,5 +5852,64 @@
         ]
       }
     ]
+  },
+  "sorted_exchange_window_functions": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "part_col", "type": "STRING"},
+          {"name": "order_col", "type": "INT"},
+          {"name": "val_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["p1", 1, 10],
+          ["p1", 1, 20],
+          ["p1", 2, 30],
+          ["p1", 2, 40],
+          ["p2", 3, 50],
+          ["p2", 3, 60],
+          ["p2", 5, 70],
+          ["p2", 8, 80],
+          ["p3", 7, 90],
+          ["p4", -1, 100],
+          ["p4", 0, 110],
+          ["p4", 4, 120]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "PARTITION BY and ORDER BY on different keys, with duplicate order keys",
+        "sql": "SELECT part_col, order_col, RANK() OVER(PARTITION BY part_col ORDER BY order_col) FROM {tbl}"
+      },
+      {
+        "description": "PARTITION BY and ORDER BY on different keys, dense rank over duplicate order keys",
+        "sql": "SELECT part_col, order_col, DENSE_RANK() OVER(PARTITION BY part_col ORDER BY order_col) FROM {tbl}"
+      },
+      {
+        "description": "PARTITION BY and ORDER BY on different keys, descending",
+        "sql": "SELECT part_col, order_col, RANK() OVER(PARTITION BY part_col ORDER BY order_col DESC) FROM {tbl}"
+      },
+      {
+        "description": "Running aggregate whose frame ends at the last peer of the current row",
+        "sql": "SELECT part_col, order_col, SUM(val_col) OVER(PARTITION BY part_col ORDER BY order_col) FROM {tbl}"
+      },
+      {
+        "description": "ORDER BY only, so every sender sends to a single receiver",
+        "sql": "SELECT order_col, RANK() OVER(ORDER BY order_col) FROM {tbl}"
+      },
+      {
+        "description": "ORDER BY only, descending, running aggregate",
+        "sql": "SELECT order_col, SUM(val_col) OVER(ORDER BY order_col DESC) FROM {tbl}"
+      },
+      {
+        "description": "Filter that leaves most senders with nothing to send",
+        "sql": "SELECT part_col, order_col, RANK() OVER(PARTITION BY part_col ORDER BY order_col) FROM {tbl} WHERE part_col = 'p3'"
+      },
+      {
+        "description": "Filter that leaves every sender with nothing to send",
+        "sql": "SELECT part_col, order_col, RANK() OVER(PARTITION BY part_col ORDER BY order_col) FROM {tbl} WHERE part_col = 'nope'"
+      }
+    ]
   }
 }

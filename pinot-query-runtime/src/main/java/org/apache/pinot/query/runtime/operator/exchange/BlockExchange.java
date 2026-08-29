@@ -43,6 +43,7 @@ public abstract class BlockExchange implements AutoCloseable {
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
   private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
+  private final boolean _sortedOnSender;
 
   protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
       (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());
@@ -58,16 +59,25 @@ public abstract class BlockExchange implements AutoCloseable {
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
       RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, statsIndexChooser, hashFunction, false);
+  }
+
+  /// Creates an exchange and records whether every data block it sends belongs to a stream sorted by the exchange
+  /// collation. The confirmation is carried by mailbox implementations that support it, allowing a new receiver to
+  /// distinguish a new sorting sender from an older sender that ignored the plan flag.
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction, boolean sortedOnSender) {
     switch (distributionType) {
       case SINGLETON:
-        return new SingletonExchange(sendingMailboxes, splitter, statsIndexChooser);
+        return new SingletonExchange(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
       case HASH_DISTRIBUTED:
         return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys, hashFunction), splitter,
-            statsIndexChooser);
+            statsIndexChooser, sortedOnSender);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(sendingMailboxes, splitter, statsIndexChooser);
+        return new RandomExchange(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(sendingMailboxes, splitter, statsIndexChooser);
+        return new BroadcastExchange(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -81,11 +91,23 @@ public abstract class BlockExchange implements AutoCloseable {
     return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction);
   }
 
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      List<Integer> keys, BlockSplitter splitter, String hashFunction, boolean sortedOnSender) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction,
+        sortedOnSender);
+  }
+
   protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    this(sendingMailboxes, splitter, statsIndexChooser, false);
+  }
+
+  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, boolean sortedOnSender) {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
     _statsIndexChooser = statsIndexChooser;
+    _sortedOnSender = sortedOnSender;
   }
 
   /// API to send a block to the destination mailboxes.
@@ -152,15 +174,23 @@ public abstract class BlockExchange implements AutoCloseable {
     }
 
     if (sendingMailbox.isLocal()) {
-      sendingMailbox.send(block);
+      sendBlock(sendingMailbox, block, _sortedOnSender);
     } else {
       Iterator<? extends MseBlock.Data> splits = _splitter.split(block, MAX_MAILBOX_CONTENT_SIZE_BYTES);
       while (splits.hasNext()) {
-        sendingMailbox.send(splits.next());
+        sendBlock(sendingMailbox, splits.next(), _sortedOnSender);
       }
     }
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
+    }
+  }
+
+  private static void sendBlock(SendingMailbox sendingMailbox, MseBlock.Data block, boolean sortedOnSender) {
+    if (sortedOnSender) {
+      sendingMailbox.send(block, true);
+    } else {
+      sendingMailbox.send(block);
     }
   }
 

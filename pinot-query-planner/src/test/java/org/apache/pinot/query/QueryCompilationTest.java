@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
@@ -1257,6 +1258,23 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */";
     assertTrue(findWindowInputSendNode(_queryEnvironment.planQuery(partitionAndOrder)).isPrePartitioned(),
         "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
+  }
+
+  /// Sender-sorted exchanges must express their ordering as an operator in the sending fragment. The send node's
+  /// flag is only metadata for the matching receive, so it is not enough without a SortNode using the same collation.
+  @Test
+  public void testOrderedWindowSenderHasExplicitMatchingSortInput() {
+    String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+
+    assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
+    assertTrue(sendNode.hasExplicitSortInput(),
+        "The sender sort flag must be backed by a matching SortNode directly below MailboxSendNode");
+    assertEquals(sendNode.getInputs().size(), 1);
+    assertTrue(sendNode.getInputs().get(0) instanceof SortNode);
+    SortNode sortNode = (SortNode) sendNode.getInputs().get(0);
+    assertEquals(sortNode.getCollations(), sendNode.getCollations());
+    assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
   }
 
   /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
