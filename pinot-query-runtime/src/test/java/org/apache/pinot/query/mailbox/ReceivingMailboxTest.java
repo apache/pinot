@@ -135,6 +135,20 @@ public class ReceivingMailboxTest {
   }
 
   @Test
+  public void shouldPreserveSenderSortConfirmation() {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
+    receivingMailbox.registeredReader(_reader);
+
+    assertEquals(receivingMailbox.offer(DATA_BLOCK, List.of(), 10, true),
+        ReceivingMailbox.ReceivingMailboxStatus.SUCCESS);
+    ReceivingMailbox.MseBlockWithStats read = receivingMailbox.poll();
+
+    assertNotNull(read);
+    assertSame(read.getBlock(), DATA_BLOCK);
+    assertTrue(read.isSortedOnSender());
+  }
+
+  @Test
   public void lateEosRead() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);

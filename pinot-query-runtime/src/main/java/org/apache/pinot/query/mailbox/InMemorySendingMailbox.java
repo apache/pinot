@@ -64,17 +64,22 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Data data) {
+    send(data, false);
+  }
+
+  @Override
+  public void send(MseBlock.Data data, boolean sortedOnSender) {
     QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
-    sendPrivate(data, List.of());
+    sendPrivate(data, List.of(), sortedOnSender);
   }
 
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
-    sendPrivate(block, serializedStats);
+    sendPrivate(block, serializedStats, false);
     _isTerminated = true;
   }
 
-  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats) {
+  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats, boolean sortedOnSender) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("Mailbox {} already terminated, ignoring block {}", _id, block);
       return;
@@ -84,7 +89,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
+    ReceivingMailbox.ReceivingMailboxStatus status =
+        _receivingMailbox.offer(block, serializedStats, timeoutMs, sortedOnSender);
     switch (status) {
       case SUCCESS:
         break;

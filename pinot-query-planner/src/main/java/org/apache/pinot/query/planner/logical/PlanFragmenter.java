@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -185,6 +186,16 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
     // Create a new context for the next PlanFragment with MailboxSendNode as the root node.
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, new Context(senderPlanFragmentId));
+    if (node.isSortOnSender()) {
+      Preconditions.checkState(!node.getCollations().isEmpty(),
+          "Sender sorting requires a non-empty exchange collation");
+      // Ordering belongs to an explicit operator in the sender fragment. MailboxSendOperator only preserves and
+      // transports this output; ServerPlanRequestVisitor keeps this SortNode above the V1 leaf boundary.
+      // SortOperator applies the broker response limit when fetch is absent. This internal sort must retain every
+      // sender row, so use the largest representable fetch with a zero effective offset.
+      nextPlanFragmentRoot = new SortNode(senderPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), null,
+          List.of(nextPlanFragmentRoot), node.getCollations(), Integer.MAX_VALUE, -1);
+    }
     PinotRelExchangeType exchangeType = node.getExchangeType();
     RelDistribution.Type distributionType = node.getDistributionType();
     List<Integer> keys = node.getKeys();

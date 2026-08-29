@@ -89,7 +89,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     }
     try {
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
+      boolean sortedOnSender = Boolean.parseBoolean(mailboxContent.getMetadataOrDefault(
+          ChannelUtils.MAILBOX_METADATA_SORTED_ON_SENDER, Boolean.FALSE.toString()));
+      ReceivingMailbox.ReceivingMailboxStatus status =
+          _mailbox.offerRaw(_mailboxBuffers, timeoutMs, sortedOnSender);
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)

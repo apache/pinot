@@ -48,6 +48,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _distributionType;
   protected final List<String> _mailboxIds;
+  /// One stream per sender, in the same order as [#_mailboxIds].
+  ///
+  /// [#_multiConsumer] drops the streams that emitted their EOS from the list it was given, so this is a separate,
+  /// stable list. It is meant for subclasses that read a specific sender rather than whichever one is ready, like
+  /// [SortedMailboxMergeReceiveOperator] merging already sorted senders.
+  protected final List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> _asyncStreams;
   protected final BlockingMultiStreamConsumer.OfMseBlock _multiConsumer;
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
@@ -68,7 +74,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
           MailboxIdUtils.toMailboxIds(requestId, senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
               context.getWorkerId());
       int numMailboxes = _mailboxIds.size();
-      List<ReadMailboxAsyncStream> asyncStreams = new ArrayList<>(numMailboxes);
+      List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncStreams = new ArrayList<>(numMailboxes);
       _receivingStats = new ArrayList<>(numMailboxes);
       for (String mailboxId : _mailboxIds) {
         ReceivingMailbox receivingMailbox = _mailboxService.getReceivingMailbox(mailboxId);
@@ -77,11 +83,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
+      _asyncStreams = List.copyOf(asyncStreams);
       _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams, senderStageId);
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
       _receivingStats = List.of();
+      _asyncStreams = List.of();
       _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of(), senderStageId);
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
