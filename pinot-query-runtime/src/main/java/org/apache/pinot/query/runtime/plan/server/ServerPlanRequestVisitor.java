@@ -259,8 +259,17 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
-    if (visit(node.getInputs().get(0), context)) {
-      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    PlanNode input = node.getInputs().get(0);
+    if (node.hasExplicitSortInput()) {
+      // Keep the sender SortNode in the MSE op-chain. Pushing it into the V1 request would sort each physical request
+      // independently; a hybrid or logical-table leaf can execute several such requests and interleave their output,
+      // which is not one sorted mailbox stream.
+      PlanNode sortInput = input.getInputs().get(0);
+      if (visit(sortInput, context)) {
+        context.setLeafStageBoundaryNode(sortInput);
+      }
+    } else if (visit(input, context)) {
+      context.setLeafStageBoundaryNode(input);
     }
     return null;
   }

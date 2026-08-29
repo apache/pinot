@@ -215,11 +215,17 @@ public class MailboxService {
   //  reach multiple GiB and re-trigger OutOfDirectMemoryError at large fan-outs.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
+    return getSendingMailbox(hostname, port, mailboxId, deadlineMs, statMap, false);
+  }
+
+  /// Returns a sending mailbox that records whether the complete stream is sorted by its exchange collation.
+  public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap, boolean sortedOnSender) {
     if (_hostname.equals(hostname) && _port == port) {
-      return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
+      return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap, sortedOnSender);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
+          _maxInboundMessageSize, _grpcSenderBackpressureEnabled, sortedOnSender);
     }
   }
 

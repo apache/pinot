@@ -27,9 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// A [SortOperator] that only applies `offset` and `fetch`, used when the
-/// [org.apache.pinot.query.planner.plannode.SortNode] carries no collation at all - a plain `LIMIT`, where any
-/// `fetch` rows after skipping `offset` are a correct answer.
+/// A [SortOperator] that only applies `offset` and `fetch`, used for a plain `LIMIT` or when the input already
+/// advertises the exact collation requested by the
+/// [org.apache.pinot.query.planner.plannode.SortNode].
 ///
 /// It therefore assumes nothing about the input. Blocks are forwarded as they arrive, with the first `offset` rows
 /// skipped and at most `fetch` rows emitted in total, after which the input is early-terminated. Nothing is

@@ -120,13 +120,13 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(List.of()));
       } else {
         // Only ORDER BY
-        // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key.
-        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
-        // operator - see the comment at the transformTo call.
+        // Sort each sender explicitly and merge the sorted mailbox streams at the receiver. The Sort retained above
+        // the exchange is the semantic ordering boundary and becomes a streaming limit when the merge receiver
+        // advertises this exact collation.
         // TODO: Revisit whether we should use hash distribution
         exchange =
-            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, false,
-                false);
+            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, true,
+                true);
       }
     } else {
       // All other variants
@@ -141,18 +141,16 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
-        // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys.
-        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
-        // operator - see the comment at the transformTo call.
+        // Sort each sender explicitly and merge the sorted mailbox streams at the receiver. Hashing on the partition
+        // keys sends every row of a partition to the same receiver, so the merged stream orders each partition.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, false, false, prePartitioned);
+            windowGroup.orderKeys, true, true, prePartitioned);
       }
     }
     // WindowAggregateOperator requires its input ordered on the ORDER BY keys and does no ordering of its own, so
-    // where the exchange carries a collation the ordering has to be established above it. Place an explicit Sort
-    // rather than asking the receive operator to sort: SortOperator is the operator that knows fetch/offset, and
-    // SortedMailboxReceiveOperator is deprecated. The Sort carries no fetch, so it keeps every row - the same
-    // semantics as the unbounded list the receive operator used.
+    // where the exchange carries a collation the ordering has to be established above it. Keep an explicit Sort as
+    // the semantic boundary. A confirmed merge receiver advertises the exact collation, allowing SortOperator to
+    // stream through it; a legacy receiver still performs the full sort.
     // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
     // exchange. PinotSortExchangeCopyRule does not either: it declines when there is no fetch.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
