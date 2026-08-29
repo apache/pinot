@@ -307,4 +307,25 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
       Assert.assertEquals(rows.get(i).get(0).asLong(), NUM_TOTAL_DOCS);
     }
   }
+
+  /// Regression coverage for the PostgreSQL `::` cast binding to the whole expression on its left instead of just
+  /// the literal, which made a bytea constant unusable as the right operand of a comparison.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testPostgreSqlByteaLiteralAsPredicateOperand(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (String byteaLiteral : List.of("'\\x" + FIXED_HEX_STRING_VALUE + "'::bytea",
+        "CAST('\\x" + FIXED_HEX_STRING_VALUE + "' AS BYTEA)", "X'" + FIXED_HEX_STRING_VALUE + "'")) {
+      String query = String.format("SELECT count(*) FROM %s WHERE %s = %s", getTableName(), FIXED_BYTES,
+          byteaLiteral);
+      JsonNode rows = postQuery(query).get("resultTable").get("rows");
+      Assert.assertEquals(rows.get(0).get(0).asLong(), NUM_TOTAL_DOCS, query);
+
+      // Same literal on the right of a compound predicate, where the accumulated expression list is non-empty.
+      query = String.format("SELECT count(*) FROM %s WHERE %s IS NOT NULL AND %s = %s", getTableName(), FIXED_BYTES,
+          FIXED_BYTES, byteaLiteral);
+      rows = postQuery(query).get("resultTable").get("rows");
+      Assert.assertEquals(rows.get(0).get(0).asLong(), NUM_TOTAL_DOCS, query);
+    }
+  }
 }
