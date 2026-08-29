@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.operator.match;
 
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
 /// Resolution of the two MATCH_RECOGNIZE resource limits.
@@ -35,8 +37,8 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 ///
 /// Highest precedence first, mirroring `maxRowsInWindow`:
 /// 1. the per node hint, read from the `matchOptions` hint of the plan node;
-/// 2. the query option, e.g. `SET maxRowsInMatch = 50000`;
-/// 3. the server cluster config, e.g. `pinot.query.match.max.rows`, which `QueryRunner` folds into the
+/// 2. the query option, e.g. `SET maxRowsInMatchPartition = 50000`;
+/// 3. the server cluster config, e.g. `pinot.query.match.max.rows.per.partition`, which `QueryRunner` folds into the
 ///    op chain metadata under the query option key when the query did not set one;
 /// 4. the default declared here.
 ///
@@ -48,49 +50,48 @@ public final class MatchLimits {
 
   /// Hint namespace on the MATCH_RECOGNIZE plan node.
   public static final String MATCH_HINT_OPTIONS = "matchOptions";
-  /// Hint key for [#MAX_ROWS_IN_MATCH].
-  public static final String MAX_ROWS_IN_MATCH_HINT = "max_rows_in_match";
-  /// Hint key for [#MAX_STEPS_PER_MATCH_ATTEMPT].
+  /// Hint key for [QueryOptionKey#MAX_ROWS_IN_MATCH_PARTITION].
+  public static final String MAX_ROWS_IN_MATCH_PARTITION_HINT = "max_rows_in_match_partition";
+  /// Hint key for [QueryOptionKey#MAX_STEPS_PER_MATCH_ATTEMPT].
   public static final String MAX_STEPS_PER_MATCH_ATTEMPT_HINT = "max_steps_per_match_attempt";
 
-  /// Query option capping the number of rows buffered for a single MATCH_RECOGNIZE partition. A match cannot span
-  /// partitions, so this also caps the number of rows in one match.
-  public static final String MAX_ROWS_IN_MATCH = "maxRowsInMatch";
-  /// Query option capping the number of automaton transitions explored while looking for a match that starts at one
-  /// particular row. It bounds the backtracking of an ambiguous pattern such as `(A|B)*(A|B)*`.
-  public static final String MAX_STEPS_PER_MATCH_ATTEMPT = "maxStepsPerMatchAttempt";
-
-  /// Server config key backing [#MAX_ROWS_IN_MATCH].
-  public static final String KEY_OF_MAX_ROWS_IN_MATCH = "pinot.query.match.max.rows";
-  /// Server config key backing [#MAX_STEPS_PER_MATCH_ATTEMPT].
+  /// Server config key backing [QueryOptionKey#MAX_ROWS_IN_MATCH_PARTITION].
+  public static final String KEY_OF_MAX_ROWS_IN_MATCH_PARTITION = "pinot.query.match.max.rows.per.partition";
+  /// Server config key backing [QueryOptionKey#MAX_STEPS_PER_MATCH_ATTEMPT].
   public static final String KEY_OF_MAX_STEPS_PER_MATCH_ATTEMPT = "pinot.query.match.max.steps.per.attempt";
 
-  public static final int DEFAULT_MAX_ROWS_IN_MATCH = 1_000_000;
+  public static final int DEFAULT_MAX_ROWS_IN_MATCH_PARTITION = 1_000_000;
   /// A linear, non-backtracking match costs a small constant number of automaton transitions per row - measured at 2
   /// for `(A A)+`, 3 for `A+` and 5 for `(A|B)+` - so this budget has to dominate that constant
-  /// times [#DEFAULT_MAX_ROWS_IN_MATCH], or a partition that the row limit explicitly admits would be rejected
-  /// as if its PATTERN were ambiguous. At the previous value of one million steps, `PATTERN (A+)` could not span
-  /// a partition of more than 333,332 rows even though [#DEFAULT_MAX_ROWS_IN_MATCH] sanctions three times that.
+  /// times [#DEFAULT_MAX_ROWS_IN_MATCH_PARTITION], or a partition that the row limit explicitly admits would be
+  /// rejected as if its PATTERN were ambiguous. At the previous value of one million steps, `PATTERN (A+)` could not
+  /// span a partition of more than 333,332 rows even though [#DEFAULT_MAX_ROWS_IN_MATCH_PARTITION] sanctions three
+  /// times that.
   /// The factor of 16 leaves headroom for realistic linear patterns while still capping a catastrophically
   /// backtracking one well below a query timeout: 16M transitions is a fraction of a second of matcher work, so
   /// cancellation latency is unchanged in practice.
-  public static final long DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT = 16L * DEFAULT_MAX_ROWS_IN_MATCH;
+  public static final long DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT = 16L * DEFAULT_MAX_ROWS_IN_MATCH_PARTITION;
 
-  public static int getMaxRowsInMatch(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {
-    String value = resolve(opChainMetadata, nodeHint, MAX_ROWS_IN_MATCH_HINT, MAX_ROWS_IN_MATCH);
-    return value != null ? parsePositiveInt(MAX_ROWS_IN_MATCH, value) : DEFAULT_MAX_ROWS_IN_MATCH;
+  public static int getMaxRowsInMatchPartition(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {
+    String hintValue = resolveHint(nodeHint, MAX_ROWS_IN_MATCH_PARTITION_HINT);
+    if (hintValue != null) {
+      return parsePositiveInt(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, hintValue);
+    }
+    Integer optionValue = QueryOptionsUtils.getMaxRowsInMatchPartition(opChainMetadata);
+    return optionValue != null ? optionValue : DEFAULT_MAX_ROWS_IN_MATCH_PARTITION;
   }
 
   public static long getMaxStepsPerMatchAttempt(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {
-    String value =
-        resolve(opChainMetadata, nodeHint, MAX_STEPS_PER_MATCH_ATTEMPT_HINT, MAX_STEPS_PER_MATCH_ATTEMPT);
-    return value != null ? parsePositiveLong(MAX_STEPS_PER_MATCH_ATTEMPT, value)
-        : DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT;
+    String hintValue = resolveHint(nodeHint, MAX_STEPS_PER_MATCH_ATTEMPT_HINT);
+    if (hintValue != null) {
+      return parsePositiveLong(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, hintValue);
+    }
+    Long optionValue = QueryOptionsUtils.getMaxStepsPerMatchAttempt(opChainMetadata);
+    return optionValue != null ? optionValue : DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT;
   }
 
   @Nullable
-  private static String resolve(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, String hintKey,
-      String queryOptionKey) {
+  private static String resolveHint(PlanNode.NodeHint nodeHint, String hintKey) {
     Map<String, String> matchOptions = nodeHint.getHintOptions().get(MATCH_HINT_OPTIONS);
     if (matchOptions != null) {
       String hintValue = matchOptions.get(hintKey);
@@ -98,7 +99,7 @@ public final class MatchLimits {
         return hintValue;
       }
     }
-    return opChainMetadata.get(queryOptionKey);
+    return null;
   }
 
   private static int parsePositiveInt(String name, String value) {

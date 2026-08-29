@@ -96,8 +96,10 @@ public interface RexExpression {
       return _index;
     }
 
-    /// Ordinal of the pattern variable, i.e. the index into the enclosing `MatchNode`'s symbol table. This is
-    /// the authoritative identification of the variable.
+    /// Ordinal of the pattern variable, i.e. the index into the enclosing `MatchNode`'s symbol table, or
+    /// [#UNIVERSAL_SYMBOL_ORDINAL] for an unqualified reference spanning every row of the match. The universal
+    /// sentinel is the only legal negative wire value; [#UNRESOLVED_SYMBOL_ORDINAL] is planner-local only.
+    /// This ordinal is the authoritative identification of the variable.
     public int getSymbolOrdinal() {
       return _symbolOrdinal;
     }

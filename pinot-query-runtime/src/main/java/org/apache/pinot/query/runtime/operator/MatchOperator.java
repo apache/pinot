@@ -19,14 +19,12 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -37,10 +35,10 @@ import org.apache.pinot.query.runtime.operator.match.MatchTape;
 import org.apache.pinot.query.runtime.operator.match.PartitionMatcher;
 import org.apache.pinot.query.runtime.operator.match.PatternNfa;
 import org.apache.pinot.query.runtime.operator.match.PatternToNfaCompiler;
-import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,16 +60,16 @@ import org.slf4j.LoggerFactory;
 /// operator therefore buffers one partition at a time and releases it at each boundary, and never reads
 /// [MatchNode#getCollations()]: the ordering has already been established below it.
 ///
-/// The grouping half of that assumption is verified rather than trusted: if a partition key reappears after its
-/// partition was closed, the operator fails instead of silently splitting one partition into two and reporting matches
-/// that do not exist. The ordering half is not re-checked per row, because an exchange that grouped correctly but
-/// sorted incorrectly is not a failure mode the exchange can produce - losing the sort loses the grouping too, which
-/// the reappearance check already catches.
+/// The grouping half of that assumption is verified rather than trusted. Partition keys are compared directly on the
+/// incoming rows and must be monotonically increasing, so a key that reappears after its partition was closed fails
+/// without retaining every previously seen key. The ordering half is not re-checked per row, because an exchange that
+/// grouped correctly but sorted incorrectly is not a failure mode the exchange can produce - losing the sort loses the
+/// grouping too, which the partition-key order check already catches.
 ///
 /// ## Guardrails throw, they never truncate
 ///
-/// [MatchLimits#MAX_ROWS_IN_MATCH] bounds the rows buffered for a partition and
-/// [MatchLimits#MAX_STEPS_PER_MATCH_ATTEMPT] bounds the backtracking of one match attempt. Both raise an error,
+/// [QueryOptionKey#MAX_ROWS_IN_MATCH_PARTITION] bounds the rows buffered for a partition and
+/// [QueryOptionKey#MAX_STEPS_PER_MATCH_ATTEMPT] bounds the backtracking of one match attempt. Both raise an error,
 /// because a truncated pattern result is a wrong result that nothing in the response would flag.
 ///
 /// ## Not supported yet
@@ -81,24 +79,28 @@ import org.slf4j.LoggerFactory;
 public class MatchOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MatchOperator.class);
   private static final String EXPLAIN_NAME = "MATCH_RECOGNIZE";
+  static final int MAX_OUTPUT_ROWS_PER_BLOCK = 1024;
 
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
   private final ColumnDataType[] _resultStoredTypes;
   private final int[] _partitionKeys;
+  private final int[] _partitionComparisonKeys;
   private final List<PatternSymbol> _patternSymbols;
   private final MatchExpression[] _measures;
   private final PartitionMatcher _matcher;
   private final MatchNode.AfterMatchSkipMode _skipMode;
   private final int _skipToSymbolOrdinal;
-  private final int _maxRowsInMatch;
+  private final int _maxRowsInMatchPartition;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  private final Set<Key> _closedPartitionKeys = new HashSet<>();
   private List<Object[]> _partitionRows = new ArrayList<>();
-  private List<Object[]> _outputRows = new ArrayList<>();
   @Nullable
-  private Key _currentPartitionKey;
+  private List<Object[]> _inputRows;
+  private int _inputRowIndex;
+  private boolean _matchingPartition;
+  private int _scanStart;
+  private long _matchNumber;
   @Nullable
   private MseBlock.Eos _inputEos;
   private int _numRows;
@@ -118,7 +120,18 @@ public class MatchOperator extends MultiStageOperator {
     _partitionKeys = new int[partitionKeys.size()];
     for (int i = 0; i < _partitionKeys.length; i++) {
       _partitionKeys[i] = partitionKeys.get(i);
+      ColumnDataType partitionKeyType = inputSchema.getColumnDataType(_partitionKeys[i]);
+      if (partitionKeyType.isArray()) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "MATCH_RECOGNIZE PARTITION BY requires single-value columns, but column '"
+                + inputSchema.getColumnName(_partitionKeys[i]) + "' has type " + partitionKeyType);
+      }
     }
+    // Calcite exposes the exchange distribution as an ImmutableBitSet, so the rule below this operator sorts
+    // partition fields by input ordinal. Preserve SQL declaration order in _partitionKeys for the output schema, but
+    // validate monotonic input against the order the exchange actually produces.
+    _partitionComparisonKeys = _partitionKeys.clone();
+    Arrays.sort(_partitionComparisonKeys);
     _patternSymbols = node.getPatternSymbols();
     List<MatchNode.Measure> measures = node.getMeasures();
     _measures = new MatchExpression[measures.size()];
@@ -134,10 +147,12 @@ public class MatchOperator extends MultiStageOperator {
     _skipToSymbolOrdinal = node.getAfterMatchSkipToSymbolOrdinal();
 
     PatternNfa nfa = PatternToNfaCompiler.compile(node.getPattern());
-    _maxRowsInMatch = MatchLimits.getMaxRowsInMatch(context.getOpChainMetadata(), node.getNodeHint());
+    _maxRowsInMatchPartition =
+        MatchLimits.getMaxRowsInMatchPartition(context.getOpChainMetadata(), node.getNodeHint());
     long maxStepsPerMatchAttempt =
         MatchLimits.getMaxStepsPerMatchAttempt(context.getOpChainMetadata(), node.getNodeHint());
-    _matcher = new PartitionMatcher(nfa, _patternSymbols, inputSchema, maxStepsPerMatchAttempt);
+    _matcher = new PartitionMatcher(nfa, _patternSymbols, inputSchema, maxStepsPerMatchAttempt,
+        this::checkTerminationAndSampleUsage);
   }
 
   @Override
@@ -175,85 +190,145 @@ public class MatchOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    while (_outputRows.isEmpty()) {
-      if (_inputEos != null) {
-        return _inputEos;
+    List<Object[]> outputRows = new ArrayList<>(MAX_OUTPUT_ROWS_PER_BLOCK);
+    while (outputRows.size() < MAX_OUTPUT_ROWS_PER_BLOCK) {
+      if (_matchingPartition) {
+        emitMatches(outputRows);
+        continue;
       }
-      MseBlock block = _input.nextBlock();
-      if (block.isData()) {
-        consumeBlock((MseBlock.Data) block);
-      } else {
-        _inputEos = (MseBlock.Eos) block;
-        if (_inputEos.isError()) {
+
+      if (_inputRows != null) {
+        consumeInputRowsUntilPartitionBoundary();
+        continue;
+      }
+
+      if (_inputEos != null) {
+        if (outputRows.isEmpty()) {
           return _inputEos;
         }
-        closeCurrentPartition();
+        break;
+      }
+
+      MseBlock block = _input.nextBlock();
+      if (block.isData()) {
+        _inputRows = ((MseBlock.Data) block).asRowHeap().getRows();
+        _inputRowIndex = 0;
+        continue;
+      }
+
+      _inputEos = (MseBlock.Eos) block;
+      if (_inputEos.isError()) {
+        return _inputEos;
+      }
+      if (!_partitionRows.isEmpty()) {
+        startMatchingPartition();
       }
     }
-    List<Object[]> rows = _outputRows;
-    _outputRows = new ArrayList<>();
-    return new RowHeapDataBlock(rows, _resultSchema);
+    return new RowHeapDataBlock(outputRows, _resultSchema);
   }
 
-  /// Buffers the rows of one input block, matching and releasing a partition as soon as its last row went by.
-  private void consumeBlock(MseBlock.Data block) {
-    for (Object[] row : block.asRowHeap().getRows()) {
-      Key partitionKey = AggregationUtils.extractRowKey(row, _partitionKeys);
-      if (_currentPartitionKey == null) {
-        openPartition(partitionKey);
-      } else if (!_currentPartitionKey.equals(partitionKey)) {
-        closeCurrentPartition();
-        openPartition(partitionKey);
+  /// Consumes rows without allocating extracted keys. A boundary row stays in the input block until the preceding
+  /// partition has been fully matched and emitted.
+  private void consumeInputRowsUntilPartitionBoundary() {
+    assert _inputRows != null;
+    while (_inputRowIndex < _inputRows.size()) {
+      Object[] row = _inputRows.get(_inputRowIndex);
+      if (!_partitionRows.isEmpty()) {
+        int comparison = comparePartitionKeys(_partitionRows.get(0), row);
+        if (comparison > 0) {
+          throw QueryErrorCode.QUERY_EXECUTION.asException(
+              "MATCH_RECOGNIZE input is not grouped by partition key in ascending order: partition "
+                  + partitionKeyToString(row) + " appeared after " + partitionKeyToString(_partitionRows.get(0)));
+        }
+        if (comparison < 0) {
+          startMatchingPartition();
+          return;
+        }
       }
-      if (_partitionRows.size() >= _maxRowsInMatch) {
+      if (_partitionRows.size() >= _maxRowsInMatchPartition) {
         throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
-            "MATCH_RECOGNIZE partition exceeds the maximum of " + _maxRowsInMatch
+            "MATCH_RECOGNIZE partition exceeds the maximum of " + _maxRowsInMatchPartition
                 + " rows. Partition on a column with more distinct values, or raise the '"
-                + MatchLimits.MAX_ROWS_IN_MATCH + "' query option.");
+                + QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION + "' query option.");
       }
       _partitionRows.add(row);
+      _inputRowIndex++;
       _numRows++;
       checkTerminationAndSampleUsagePeriodically(_numRows, EXPLAIN_NAME);
     }
+    _inputRows = null;
   }
 
-  private void openPartition(Key partitionKey) {
-    if (!_closedPartitionKeys.add(partitionKey)) {
-      // The sort exchange below this operator guarantees that the rows of a partition arrive contiguously. If they
-      // did not, matching each fragment on its own would report matches that do not exist in the real partition.
-      throw QueryErrorCode.QUERY_EXECUTION.asException(
-          "MATCH_RECOGNIZE input is not grouped by partition key: partition " + partitionKey
-              + " reappeared after it was closed.");
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private int comparePartitionKeys(Object[] leftRow, Object[] rightRow) {
+    for (int partitionKey : _partitionComparisonKeys) {
+      Object left = leftRow[partitionKey];
+      Object right = rightRow[partitionKey];
+      if (left == null) {
+        if (right == null) {
+          continue;
+        }
+        return 1;
+      }
+      if (right == null) {
+        return -1;
+      }
+      if (!(left instanceof Comparable)) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "MATCH_RECOGNIZE PARTITION BY value is not sortable: " + left.getClass().getName());
+      }
+      final int comparison;
+      try {
+        comparison = ((Comparable) left).compareTo(right);
+      } catch (ClassCastException e) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "MATCH_RECOGNIZE PARTITION BY values have incompatible types: " + left.getClass().getName() + " and "
+                + right.getClass().getName());
+      }
+      if (comparison != 0) {
+        return comparison;
+      }
     }
-    _currentPartitionKey = partitionKey;
+    return 0;
   }
 
-  private void closeCurrentPartition() {
-    if (!_partitionRows.isEmpty()) {
-      matchPartition();
-      _partitionRows = new ArrayList<>();
+  private String partitionKeyToString(Object[] row) {
+    StringBuilder builder = new StringBuilder("[");
+    for (int i = 0; i < _partitionKeys.length; i++) {
+      if (i > 0) {
+        builder.append(", ");
+      }
+      builder.append(row[_partitionKeys[i]]);
     }
-    _currentPartitionKey = null;
+    return builder.append(']').toString();
   }
 
-  /// Scans the buffered partition, emitting one row per match and advancing the scan position per the
-  /// `AFTER MATCH SKIP` mode.
-  private void matchPartition() {
+  private void startMatchingPartition() {
+    _matchingPartition = true;
+    _scanStart = 0;
+    _matchNumber = 0;
+  }
+
+  /// Resumes scanning the buffered partition until it is exhausted or the current output block is full.
+  private void emitMatches(List<Object[]> outputRows) {
     List<Object[]> rows = _partitionRows;
     int numPartitionRows = rows.size();
     MatchTape tape = _matcher.getTape();
-    long matchNumber = 0;
-    int scanStart = 0;
-    while (scanStart < numPartitionRows) {
+    while (_scanStart < numPartitionRows && outputRows.size() < MAX_OUTPUT_ROWS_PER_BLOCK) {
       checkTerminationAndSampleUsage();
-      int endPos = _matcher.match(rows, scanStart, matchNumber + 1);
+      int endPos = _matcher.match(rows, _scanStart, _matchNumber + 1);
       if (endPos == PartitionMatcher.NO_MATCH) {
-        scanStart++;
+        _scanStart++;
         continue;
       }
-      matchNumber++;
-      _outputRows.add(buildOutputRow(rows, tape));
-      scanStart = nextScanStart(scanStart, endPos, tape);
+      _matchNumber++;
+      outputRows.add(buildOutputRow(rows, tape));
+      _scanStart = nextScanStart(_scanStart, endPos, tape);
+    }
+    if (_scanStart >= numPartitionRows) {
+      _matcher.releasePartition();
+      _partitionRows = new ArrayList<>();
+      _matchingPartition = false;
     }
   }
 

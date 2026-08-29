@@ -24,6 +24,8 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
+import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.validate.MatchRecognizeValidator.UnsupportedMatchRecognizeException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -275,6 +277,46 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
     RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(
         "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts ALL ROWS PER MATCH PATTERN (A) DEFINE A AS A.col3 > 0)"));
     assertTrue(e.getMessage().contains("ALL ROWS PER MATCH is not supported yet"), e.getMessage());
+  }
+
+  @Test(dataProvider = "physicalOptimizerOptions")
+  public void testPhysicalOptimizerIsRejectedWithAnActionableMessage(String options, String expectedMode) {
+    RuntimeException e = expectThrows(RuntimeException.class,
+        () -> _queryEnvironment.compile(options + String.format(QUERY_TEMPLATE, "")));
+    assertTrue(e.getMessage().contains("MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
+        + expectedMode), e.getMessage());
+    assertTrue(e.getMessage().contains("usePhysicalOptimizer=false"), e.getMessage());
+  }
+
+  @DataProvider(name = "physicalOptimizerOptions")
+  public Object[][] physicalOptimizerOptions() {
+    return new Object[][]{
+        new Object[]{"SET usePhysicalOptimizer=true; ", ""},
+        new Object[]{"SET usePhysicalOptimizer=true; SET useLiteMode=true; ", " in lite mode"}
+    };
+  }
+
+  @Test
+  public void testPhysicalOptimizerQueryOptionCanOptBackIntoTheSupportedPlanner() {
+    try (CompiledQuery ignored = _queryEnvironment.compile(
+        "SET usePhysicalOptimizer=false; SET useLiteMode=true; " + String.format(QUERY_TEMPLATE, ""))) {
+      assertNotNull(ignored);
+    }
+  }
+
+  @Test
+  public void testPhysicalOptimizerBrokerDefaultAndQueryOverride() {
+    QueryEnvironment physicalOptimizerByDefault = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS,
+        SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    RuntimeException e = expectThrows(RuntimeException.class,
+        () -> physicalOptimizerByDefault.compile(String.format(QUERY_TEMPLATE, "")));
+    assertTrue(e.getMessage().contains("MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"),
+        e.getMessage());
+
+    try (CompiledQuery ignored = physicalOptimizerByDefault.compile(
+        "SET usePhysicalOptimizer=false; " + String.format(QUERY_TEMPLATE, ""))) {
+      assertNotNull(ignored);
+    }
   }
 
   private static void assertAfterOption(SqlMatchRecognize match, SqlMatchRecognize.AfterOption expected) {

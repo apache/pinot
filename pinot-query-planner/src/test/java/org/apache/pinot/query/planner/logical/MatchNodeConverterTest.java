@@ -106,10 +106,10 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
         + "PATTERN (A*) DEFINE A AS A.col3 > 0)").getPattern();
     RowPattern reluctant = planMatch("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
         + "PATTERN (A*?) DEFINE A AS A.col3 > 0)").getPattern();
-    assertTrue(((RowPattern.Quantify) greedy).isGreedy());
-    assertFalse(((RowPattern.Quantify) reluctant).isGreedy());
-    assertEquals(((RowPattern.Quantify) greedy).getMinRepeat(), 0);
-    assertEquals(((RowPattern.Quantify) greedy).getMaxRepeat(), RowPattern.Quantify.UNBOUNDED);
+    assertTrue(((RowPattern.Quantifier) greedy).isGreedy());
+    assertFalse(((RowPattern.Quantifier) reluctant).isGreedy());
+    assertEquals(((RowPattern.Quantifier) greedy).getMinRepeat(), 0);
+    assertEquals(((RowPattern.Quantifier) greedy).getMaxRepeat(), RowPattern.Quantifier.UNBOUNDED);
   }
 
   @Test
@@ -252,6 +252,30 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(match.getPartitionKeys(), List.of(2, 0));
   }
 
+  @Test
+  public void testMultiValuePartitionKeyIsRejectedDuringPlanning() {
+    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
+        "SELECT * FROM e MATCH_RECOGNIZE (PARTITION BY mcol1 ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+            + "PATTERN (A) DEFINE A AS A.col3 > 0)"));
+    assertTrue(e.getMessage().contains("multi-value or ARRAY PARTITION BY columns: 'mcol1'"), e.getMessage());
+  }
+
+  @Test(dataProvider = "multiValueAggregateFunctions")
+  public void testMultiValueAggregateOperandIsRejectedDuringPlanning(String function) {
+    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
+        "SELECT * FROM e MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts MEASURES " + function
+            + "(A.mcol2) AS value PATTERN (A) DEFINE A AS A.col3 > 0)"));
+    assertTrue(e.getMessage().contains("applies aggregate '" + function + "' to a multi-value or ARRAY operand"),
+        e.getMessage());
+  }
+
+  @DataProvider(name = "multiValueAggregateFunctions")
+  public Object[][] multiValueAggregateFunctions() {
+    return new Object[][]{
+        new Object[]{"SUM"}, new Object[]{"MIN"}, new Object[]{"MAX"}, new Object[]{"AVG"}, new Object[]{"COUNT"}
+    };
+  }
+
   /// A pattern variable named after the row source alias makes an unqualified column reference bind to that variable
   /// instead of to the SQL:2016 universal row pattern variable, silently changing both measure values and which rows
   /// match. The information is gone by the time the RexNodes are built, so it has to be rejected on the SqlNode side.
@@ -304,7 +328,7 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     MatchNode match = planMatch(
         "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A{1," + atTheCap
             + "}) DEFINE A AS A.col3 > 0)");
-    assertEquals(((RowPattern.Quantify) match.getPattern()).getMaxRepeat(), atTheCap);
+    assertEquals(((RowPattern.Quantifier) match.getPattern()).getMaxRepeat(), atTheCap);
   }
 
   /// Covers [PlanNodeToRelConverter#visitMatch]: the anchors move back into `strictStart` / `strictEnd`, the pattern
@@ -324,7 +348,7 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
             new PatternSymbol("B", null));
     RowPattern pattern = new RowPattern.Concat(
         List.of(RowPattern.AnchorStart.INSTANCE, new RowPattern.Symbol(0),
-            new RowPattern.Quantify(new RowPattern.Symbol(1), 2, 3, false), RowPattern.AnchorEnd.INSTANCE));
+            new RowPattern.Quantifier(new RowPattern.Symbol(1), 2, 3, false), RowPattern.AnchorEnd.INSTANCE));
     List<MatchNode.Measure> measures =
         List.of(new MatchNode.Measure("ev", new RexExpression.PatternFieldRef(1, 1, "B")));
     MatchNode match = new MatchNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(input), symbols, pattern, measures,

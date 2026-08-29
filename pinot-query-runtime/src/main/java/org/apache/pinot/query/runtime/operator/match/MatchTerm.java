@@ -20,11 +20,13 @@ package org.apache.pinot.query.runtime.operator.match;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -65,6 +67,7 @@ public interface MatchTerm {
     private final int _columnIndex;
     private final ColumnDataType _resultType;
     private final ColumnDataType _storedType;
+    private final boolean _requiresConversion;
 
     /// @param symbolOrdinal pattern variable to navigate, or
     ///        [org.apache.pinot.query.planner.logical.RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL]
@@ -74,8 +77,9 @@ public interface MatchTerm {
     /// @param physicalDelta rows to move in the partition afterwards; negative for `PREV`, positive for
     ///        `NEXT`, zero when there is no physical step
     /// @param columnIndex column to read, as an index into the input row of the MATCH_RECOGNIZE node
+    /// @param sourceType type of that input column; values already use its stored representation
     public Navigation(int symbolOrdinal, boolean fromEnd, int logicalOffset, int physicalDelta, int columnIndex,
-        ColumnDataType resultType) {
+        ColumnDataType sourceType, ColumnDataType resultType) {
       _symbolOrdinal = symbolOrdinal;
       _fromEnd = fromEnd;
       _logicalOffset = logicalOffset;
@@ -83,6 +87,7 @@ public interface MatchTerm {
       _columnIndex = columnIndex;
       _resultType = resultType;
       _storedType = resultType.getStoredType();
+      _requiresConversion = sourceType.getStoredType() != _storedType;
     }
 
     @Override
@@ -98,15 +103,15 @@ public interface MatchTerm {
       if (rowIndex == MatchTape.NO_ROW) {
         return null;
       }
-      rowIndex += _physicalDelta;
+      long physicalRowIndex = (long) rowIndex + _physicalDelta;
       List<Object[]> rows = tape.getPartitionRows();
-      if (rowIndex < 0 || rowIndex >= rows.size()) {
+      if (physicalRowIndex < 0 || physicalRowIndex >= rows.size()) {
         return null;
       }
-      Object value = rows.get(rowIndex)[_columnIndex];
+      Object value = rows.get((int) physicalRowIndex)[_columnIndex];
       // The declared type of the navigation may be wider than the column's (e.g. BIG_DECIMAL for a DOUBLE column),
       // and the enclosing operand compares against that declared type.
-      return value != null ? TypeUtils.convert(value, _storedType) : null;
+      return value != null && _requiresConversion ? TypeUtils.convert(value, _storedType) : value;
     }
   }
 
@@ -162,6 +167,7 @@ public interface MatchTerm {
     private final TransformOperand _argument;
     private final ColumnDataType _resultType;
     private final ColumnDataType _storedType;
+    private final boolean _requiresResultConversion;
 
     /// @param argument the aggregated expression evaluated against an input row, or `null` for `COUNT(*)`,
     ///        which counts rows rather than values
@@ -171,6 +177,16 @@ public interface MatchTerm {
       _argument = argument;
       _resultType = resultType;
       _storedType = resultType.getStoredType();
+      if (argument != null && argument.getResultType().isArray()) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "Multi-value operand type '" + argument.getResultType() + "' is not supported for " + kind
+                + " in a MATCH_RECOGNIZE MEASURES clause. Reduce the array to a scalar before aggregating it.");
+      }
+      if ((kind == Kind.SUM || kind == Kind.AVG) && !_storedType.isNumber()) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "MATCH_RECOGNIZE " + kind + " requires a numeric result type, got: " + resultType + ".");
+      }
+      _requiresResultConversion = argument != null && argument.getResultType().getStoredType() != _storedType;
     }
 
     @Override
@@ -181,76 +197,158 @@ public interface MatchTerm {
     @Nullable
     @Override
     public Object evaluate(MatchTape tape) {
+      if (_kind == Kind.COUNT && _argument == null
+          && _symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
+        return (long) tape.getLength();
+      }
       IntArrayList rows = tape.rowsOf(_symbolOrdinal);
-      List<Object[]> partitionRows = tape.getPartitionRows();
       if (_kind == Kind.COUNT && _argument == null) {
         return (long) rows.size();
       }
-      long count = 0;
-      Object accumulator = null;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
-        if (value == null) {
-          continue;
-        }
-        count++;
-        // COUNT only needs the tally; accumulate() has no COUNT case and would throw.
-        if (_kind != Kind.COUNT) {
-          accumulator = accumulate(accumulator, value);
-        }
-      }
-      if (_kind == Kind.COUNT) {
-        return count;
-      }
-      if (count == 0) {
-        return null;
-      }
-      Object result = _kind == Kind.AVG ? divide(accumulator, count) : accumulator;
-      return TypeUtils.convert(result, _storedType);
-    }
-
-    private Object accumulate(@Nullable Object accumulator, Object value) {
+      List<Object[]> partitionRows = tape.getPartitionRows();
       switch (_kind) {
+        case COUNT:
+          return countNonNull(rows, partitionRows);
         case MIN:
-          return accumulator == null || compare(value, accumulator) < 0 ? value : accumulator;
         case MAX:
-          return accumulator == null || compare(value, accumulator) > 0 ? value : accumulator;
+          return evaluateExtremum(rows, partitionRows);
         case SUM:
         case AVG:
-          return add(accumulator, value);
+          return evaluateSumOrAverage(rows, partitionRows);
         default:
           throw new IllegalStateException("Unexpected MATCH_RECOGNIZE aggregate: " + _kind);
       }
     }
 
+    private long countNonNull(IntArrayList rows, List<Object[]> partitionRows) {
+      long count = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+        if (value != null) {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    @Nullable
+    private Object evaluateExtremum(IntArrayList rows, List<Object[]> partitionRows) {
+      Object extremum = null;
+      for (int i = 0; i < rows.size(); i++) {
+        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+        if (value == null) {
+          continue;
+        }
+        if (extremum == null || (_kind == Kind.MIN ? compare(value, extremum) < 0 : compare(value, extremum) > 0)) {
+          extremum = value;
+        }
+      }
+      if (extremum == null || !_requiresResultConversion) {
+        return extremum;
+      }
+      return TypeUtils.convert(extremum, _storedType);
+    }
+
+    @Nullable
+    private Object evaluateSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+      switch (_storedType) {
+        case INT:
+        case LONG:
+          return evaluateIntegralSumOrAverage(rows, partitionRows);
+        case FLOAT:
+        case DOUBLE:
+          return evaluateFloatingPointSumOrAverage(rows, partitionRows);
+        case BIG_DECIMAL:
+          return evaluateDecimalSumOrAverage(rows, partitionRows);
+        default:
+          throw QueryErrorCode.QUERY_EXECUTION.asException(
+              "MATCH_RECOGNIZE " + _kind + " requires a numeric result type, got: " + _resultType + ".");
+      }
+    }
+
+    @Nullable
+    private Object evaluateIntegralSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+      long sum = 0;
+      long count = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+        if (value != null) {
+          sum += numericValue(value).longValue();
+          count++;
+        }
+      }
+      if (count == 0) {
+        return null;
+      }
+      long result = _kind == Kind.AVG ? sum / count : sum;
+      if (_storedType == ColumnDataType.INT) {
+        return (int) result;
+      }
+      return result;
+    }
+
+    @Nullable
+    private Object evaluateFloatingPointSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+      double sum = 0;
+      long count = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+        if (value != null) {
+          sum += numericValue(value).doubleValue();
+          count++;
+        }
+      }
+      if (count == 0) {
+        return null;
+      }
+      double result = _kind == Kind.AVG ? sum / count : sum;
+      if (_storedType == ColumnDataType.FLOAT) {
+        return (float) result;
+      }
+      return result;
+    }
+
+    @Nullable
+    private Object evaluateDecimalSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+      BigDecimal sum = BigDecimal.ZERO;
+      long count = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+        if (value != null) {
+          sum = sum.add(toBigDecimal(numericValue(value)));
+          count++;
+        }
+      }
+      if (count == 0) {
+        return null;
+      }
+      return _kind == Kind.AVG ? sum.divide(BigDecimal.valueOf(count), MathContext.DECIMAL128) : sum;
+    }
+
+    private Number numericValue(Object value) {
+      if (value instanceof Number) {
+        return (Number) value;
+      }
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "MATCH_RECOGNIZE " + _kind + " requires scalar numeric values, got: " + value.getClass().getName() + ".");
+    }
+
+    private static BigDecimal toBigDecimal(Number value) {
+      if (value instanceof BigDecimal) {
+        return (BigDecimal) value;
+      }
+      if (value instanceof BigInteger) {
+        return new BigDecimal((BigInteger) value);
+      }
+      if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+        return BigDecimal.valueOf(value.longValue());
+      }
+      return BigDecimal.valueOf(value.doubleValue());
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static int compare(Object left, Object right) {
       return ((Comparable) left).compareTo(right);
-    }
-
-    /// Accumulates without losing precision: exactly for `BIG_DECIMAL` and for the integral types, and in
-    /// `double` otherwise, which is what the declared result type of the aggregate already implies.
-    private Object add(@Nullable Object accumulator, Object value) {
-      switch (_storedType) {
-        case BIG_DECIMAL:
-          BigDecimal decimal = value instanceof BigDecimal ? (BigDecimal) value
-              : BigDecimal.valueOf(((Number) value).doubleValue());
-          return accumulator == null ? decimal : ((BigDecimal) accumulator).add(decimal);
-        case INT:
-        case LONG:
-          long longValue = ((Number) value).longValue();
-          return accumulator == null ? longValue : (Long) accumulator + longValue;
-        default:
-          double doubleValue = ((Number) value).doubleValue();
-          return accumulator == null ? doubleValue : (Double) accumulator + doubleValue;
-      }
-    }
-
-    private static Object divide(Object sum, long count) {
-      if (sum instanceof BigDecimal) {
-        return ((BigDecimal) sum).divide(BigDecimal.valueOf(count), MathContext.DECIMAL128);
-      }
-      return ((Number) sum).doubleValue() / count;
     }
 
     /// The aggregate functions supported inside MEASURES. Anything else is rejected at operator construction time

@@ -62,7 +62,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 /// A query with no `PARTITION BY` is rejected, because hashing on zero keys sends the entire table to one worker.
 /// Set the [QueryOptionKey#ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY] query option to opt into that plan.
 ///
-/// TODO: Support sender-side sorting so the receiver can k-way merge already sorted streams instead of re-sorting.
+/// TODO(#19395): Support sender-side sorting so the receiver can k-way merge already sorted streams instead of
+/// re-sorting.
 public class PinotMatchExchangeNodeInsertRule extends RelOptRule {
   public static final PinotMatchExchangeNodeInsertRule INSTANCE =
       new PinotMatchExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);

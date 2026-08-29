@@ -51,6 +51,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   private static final String SYMBOL_COLUMN = "symbolCol";
   private static final String SEQ_COLUMN = "seqCol";
   private static final String PRICE_COLUMN = "priceCol";
+  private static final String NULLABLE_PRICE_COLUMN = "nullablePriceCol";
 
   /// Symbols in ascending order, which is also the order every query below sorts its output by.
   private static final String[] SYMBOLS = {"AAPL", "AMZN", "GOOG", "MSFT", "NFLX"};
@@ -302,6 +303,43 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
+  /// Source NULLs retain SQL semantics when null handling is enabled. With null handling disabled Pinot exposes the
+  /// INT dimension default instead, so DEFINE and aggregates intentionally produce different results.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testStoredNullSemantics(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String nullDefinitionQuery = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES COUNT(*) AS null_count"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+)"
+        + " DEFINE A AS A.nullablePriceCol IS NULL"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows("SET enableNullHandling=true; " + nullDefinitionQuery, new Object[][]{
+        {"GOOG", 3}, {"MSFT", 1}
+    });
+    assertMatchRows("SET enableNullHandling=false; " + nullDefinitionQuery, new Object[][]{});
+
+    String nullAggregateQuery = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES COUNT(A.nullablePriceCol) AS value_count, COUNT(*) AS all_count,"
+        + " SUM(A.nullablePriceCol) AS value_sum"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+)"
+        + " DEFINE A AS A.seqCol > 0"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows("SET enableNullHandling=true; " + nullAggregateQuery, new Object[][]{
+        {"AAPL", 7, 7, 62}, {"AMZN", 5, 5, 75}, {"GOOG", 0, 3, null}, {"MSFT", 2, 3, 13},
+        {"NFLX", 8, 8, 36}
+    });
+    assertMatchRows("SET enableNullHandling=false; " + nullAggregateQuery, new Object[][]{
+        {"AAPL", 7, 7, 62}, {"AMZN", 5, 5, 75},
+        {"GOOG", 3, 3, 3L * FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT},
+        {"MSFT", 3, 3, 13L + FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT}, {"NFLX", 8, 8, 36}
+    });
+  }
+
   /// PARTITION BY genuinely isolates matches. The `^` and `$` anchors are relative to the partition, so
   /// each must match exactly once per symbol; if partitioning leaked they would match once for the whole table.
   @Test(dataProvider = "useV2QueryEngine")
@@ -349,7 +387,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
 
   /// A multi-column PARTITION BY whose source order is not ascending input-column order.
   ///
-  /// The Pinot schema is a `TreeMap`, so the input columns are `priceCol(0), seqCol(1), symbolCol(2)`
+  /// The Pinot schema is a `TreeMap`, so the partition columns are `priceCol(1)` and `symbolCol(3)`
   /// and `PARTITION BY symbolCol, priceCol` is therefore in **descending** index order. Calcite's
   /// `Match#getPartitionKeys()` is an `ImmutableBitSet`, which loses that order, while the output row type
   /// keeps it - so an engine that read the partition keys off the bit set would write `priceCol`'s Integer into
@@ -378,6 +416,27 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         {"NFLX", 1, 1}, {"NFLX", 2, 1}, {"NFLX", 3, 1}, {"NFLX", 4, 1}, {"NFLX", 5, 1}, {"NFLX", 6, 1},
         {"NFLX", 7, 1}, {"NFLX", 8, 1}
     });
+  }
+
+  /// Opting into a missing PARTITION BY executes one globally ordered match, not one partial match per worker.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testWithoutPartitionByExecutesGlobally(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SET allowMatchRecognizeWithoutPartitionBy=true; SELECT * FROM " + getTableName()
+        + " MATCH_RECOGNIZE ("
+        + " ORDER BY symbolCol, seqCol"
+        + " MEASURES COUNT(*) AS row_count, FIRST(A.symbolCol) AS first_symbol,"
+        + " LAST(A.symbolCol) AS last_symbol"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+)"
+        + " DEFINE A AS A.seqCol > 0"
+        + ") AS mr";
+    JsonNode response = assertMatchRows(query, new Object[][]{
+        {getCountStarResult(), "AAPL", "NFLX"}
+    });
+    assertEquals(response.get("numServersQueried").asInt(), 2,
+        "The global MATCH_RECOGNIZE regression must execute across both server workers");
   }
 
   /// Every deferred construct is rejected during planning with a message that names it, rather than producing a wrong
@@ -526,7 +585,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
 
   /// Asserts the full result set of `query`, cell by cell. `null` expects a SQL NULL, a [String]
   /// expects a string, a [Double] expects an approximate double and any other [Number] an exact integer.
-  private void assertMatchRows(String query, Object[][] expected)
+  private JsonNode assertMatchRows(String query, Object[][] expected)
       throws Exception {
     JsonNode response = postQuery(query);
     QueryAssert.assertThat(response).hasNoExceptions();
@@ -553,6 +612,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         }
       }
     }
+    return response;
   }
 
   private void assertPlanningError(String query, String expectedMessage)
@@ -568,9 +628,11 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   @Override
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
+        .setEnableColumnBasedNullHandling(true)
         .addSingleValueDimension(SYMBOL_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SEQ_COLUMN, FieldSpec.DataType.INT)
         .addSingleValueDimension(PRICE_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(NULLABLE_PRICE_COLUMN, FieldSpec.DataType.INT)
         .build();
   }
 
@@ -592,13 +654,17 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
+    org.apache.avro.Schema nullableIntSchema = org.apache.avro.Schema.createUnion(List.of(
+        org.apache.avro.Schema.create(org.apache.avro.Schema.Type.NULL),
+        org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT)));
     avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(SYMBOL_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(SEQ_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null, null),
         new org.apache.avro.Schema.Field(PRICE_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null, null)
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null, null),
+        new org.apache.avro.Schema.Field(NULLABLE_PRICE_COLUMN, nullableIntSchema, null, null)
     ));
 
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
@@ -613,6 +679,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
           record.put(SYMBOL_COLUMN, SYMBOLS[s]);
           record.put(SEQ_COLUMN, i + 1);
           record.put(PRICE_COLUMN, prices[i]);
+          boolean nullablePriceIsNull = SYMBOLS[s].equals("GOOG") || SYMBOLS[s].equals("MSFT") && i == 1;
+          record.put(NULLABLE_PRICE_COLUMN, nullablePriceIsNull ? null : prices[i]);
           writers.get(rowIndex++ % getNumAvroFiles()).append(record);
         }
       }

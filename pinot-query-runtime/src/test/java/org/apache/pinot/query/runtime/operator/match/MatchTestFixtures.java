@@ -80,8 +80,8 @@ public final class MatchTestFixtures {
     return new RowPattern.Alternate(Arrays.asList(children));
   }
 
-  public static RowPattern quantify(RowPattern child, int minRepeat, int maxRepeat, boolean greedy) {
-    return new RowPattern.Quantify(child, minRepeat, maxRepeat, greedy);
+  public static RowPattern quantifier(RowPattern child, int minRepeat, int maxRepeat, boolean greedy) {
+    return new RowPattern.Quantifier(child, minRepeat, maxRepeat, greedy);
   }
 
   /// Rows of a single partition, one per character of `labels`. The `value` column is the row index, so
