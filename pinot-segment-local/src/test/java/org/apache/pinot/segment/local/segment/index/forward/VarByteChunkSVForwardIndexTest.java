@@ -23,6 +23,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -36,10 +40,13 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.fail;
 
 
@@ -78,6 +85,77 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
   public void testWithGZIPCompression()
       throws Exception {
     test(ChunkCompressionType.GZIP);
+  }
+
+  /// Covers selective MAP reads through the legacy V2/V3 reader for both compressed and pass-through chunks. These
+  /// formats are still selected for existing segments and do not share the V4/V5/V6 reader implementation.
+  @Test
+  public void testMapSelectiveRead()
+      throws Exception {
+    for (ChunkCompressionType compressionType
+        : new ChunkCompressionType[]{ChunkCompressionType.SNAPPY, ChunkCompressionType.PASS_THROUGH}) {
+      for (int writerVersion : new int[]{2, 3}) {
+        testMapSelectiveRead(compressionType, writerVersion);
+      }
+    }
+  }
+
+  private void testMapSelectiveRead(ChunkCompressionType compressionType, int writerVersion)
+      throws Exception {
+    int numDocs = 5;
+    List<Map<String, Object>> maps = new ArrayList<>(numDocs);
+    byte[][] frames = new byte[numDocs][];
+    int longestEntry = 0;
+    for (int i = 0; i < numDocs; i++) {
+      Map<String, Object> map = new LinkedHashMap<>();
+      map.put("k8s.workload.name", "workload-" + i);
+      map.put("k8s.workload.kind", "Deployment");
+      map.put("host_logical_cpus", i);
+      maps.add(map);
+      frames[i] = MapUtils.serializeMap(map);
+      longestEntry = Math.max(longestEntry, frames[i].length);
+    }
+
+    File outFile = Files.createTempFile(getClass().getSimpleName() + "-map-v" + writerVersion, ".fwd").toFile();
+    try {
+      try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType,
+          numDocs, 2, longestEntry, writerVersion)) {
+        for (byte[] frame : frames) {
+          writer.putBytes(frame);
+        }
+      }
+
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
+          VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.MAP);
+          ChunkReaderContext context = reader.createContext()) {
+        // The inherited fallback returns the same values after materializing the whole map, so also pin the methods
+        // that must own the selective implementation.
+        assertSame(reader.getClass()
+                .getMethod("getMapEntryValue", int.class, ChunkReaderContext.class, PreparedMapKey.class)
+                .getDeclaringClass(),
+            VarByteChunkSVForwardIndexReader.class);
+        assertSame(reader.getClass()
+                .getMethod("getMapEntryValueAsString", int.class, ChunkReaderContext.class, PreparedMapKey.class)
+                .getDeclaringClass(),
+            VarByteChunkSVForwardIndexReader.class);
+        PreparedMapKey workloadName = new PreparedMapKey("k8s.workload.name");
+        PreparedMapKey cpus = new PreparedMapKey("host_logical_cpus");
+        PreparedMapKey absent = new PreparedMapKey("k8s.workload.namf");
+        for (int i = 0; i < numDocs; i++) {
+          Map<String, Object> expected = maps.get(i);
+          Assert.assertEquals(reader.getMap(i, context), expected);
+          Assert.assertEquals(reader.getMapEntryValue(i, context, workloadName), expected.get("k8s.workload.name"));
+          Assert.assertEquals(reader.getMapEntryValueAsString(i, context, workloadName),
+              expected.get("k8s.workload.name"));
+          Assert.assertEquals(reader.getMapEntryValue(i, context, cpus), expected.get("host_logical_cpus"));
+          Assert.assertEquals(reader.getMapEntryValueAsString(i, context, cpus), String.valueOf(i));
+          Assert.assertNull(reader.getMapEntryValue(i, context, absent));
+          Assert.assertNull(reader.getMapEntryValueAsString(i, context, absent));
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(outFile);
+    }
   }
 
   /// This test writes [#NUM_ENTRIES] using [VarByteChunkForwardIndexWriter]. It then reads
