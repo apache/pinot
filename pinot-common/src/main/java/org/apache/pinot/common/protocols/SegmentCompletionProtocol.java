@@ -153,16 +153,30 @@ public class SegmentCompletionProtocol {
   public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
 
   public enum ReasonCode {
-    ROW_LIMIT(REASON_ROW_LIMIT),
-    TIME_LIMIT(REASON_TIME_LIMIT),
-    END_OF_PARTITION_GROUP(REASON_END_OF_PARTITION_GROUP),
-    FORCE_COMMIT_MESSAGE_RECEIVED(REASON_FORCE_COMMIT_MESSAGE_RECEIVED),
-    INDEX_CAPACITY_THRESHOLD_BREACHED(REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+    ROW_LIMIT(100, REASON_ROW_LIMIT),
+    TIME_LIMIT(110, REASON_TIME_LIMIT),
+    END_OF_PARTITION_GROUP(120, REASON_END_OF_PARTITION_GROUP),
+    FORCE_COMMIT_MESSAGE_RECEIVED(130, REASON_FORCE_COMMIT_MESSAGE_RECEIVED),
+    INDEX_CAPACITY_THRESHOLD_BREACHED(140, REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
 
+    private static final Map<Integer, ReasonCode> BY_ID = new HashMap<>();
+
+    static {
+      for (ReasonCode value : values()) {
+        BY_ID.put(value.getId(), value);
+      }
+    }
+
+    private final int _id;
     private final String _reason;
 
-    ReasonCode(String reason) {
+    ReasonCode(int id, String reason) {
+      _id = id;
       _reason = reason;
+    }
+
+    public int getId() {
+      return _id;
     }
 
     public String getReason() {
@@ -178,12 +192,16 @@ public class SegmentCompletionProtocol {
       if (reasonCode == null) {
         return null;
       }
-      for (ReasonCode value : values()) {
-        if (value.name().equals(reasonCode) || value.getReason().equals(reasonCode)) {
-          return value;
-        }
+      try {
+        return fromCode(Integer.parseInt(reasonCode));
+      } catch (NumberFormatException e) {
+        return null;
       }
-      return null;
+    }
+
+    @Nullable
+    public static ReasonCode fromCode(int reasonCode) {
+      return BY_ID.get(reasonCode);
     }
 
     @Nullable
@@ -252,7 +270,7 @@ public class SegmentCompletionProtocol {
         params.put(PARAM_REASON, _params.getReason());
       }
       if (_params.getReasonCode() != null) {
-        params.put(PARAM_REASON_CODE, _params.getReasonCode().name());
+        params.put(PARAM_REASON_CODE, String.valueOf(_params.getReasonCode().getId()));
       }
       if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
@@ -341,7 +359,7 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withReasonCode(String reasonCode) {
+      public Params withReasonCode(@Nullable String reasonCode) {
         ReasonCode parsedReasonCode = ReasonCode.fromCode(reasonCode);
         if (parsedReasonCode != null) {
           return withReasonCode(parsedReasonCode);
@@ -349,7 +367,7 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withReasonCode(ReasonCode reasonCode) {
+      public Params withReasonCode(@Nullable ReasonCode reasonCode) {
         _reasonCode = reasonCode;
         if (reasonCode != null && _reason == null) {
           _reason = reasonCode.getReason();

@@ -95,7 +95,7 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
         SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE),
-        SegmentCompletionProtocol.ReasonCode.ROW_LIMIT.name());
+        String.valueOf(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT.getId()));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS), "1000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS), "2000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC), "3000");
@@ -153,10 +153,19 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(params.getReason(), "customReason");
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
 
+    params = new SegmentCompletionProtocol.Request.Params()
+        .withReasonCode(String.valueOf(SegmentCompletionProtocol.ReasonCode.TIME_LIMIT.getId()));
+    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
+
     params = new SegmentCompletionProtocol.Request.Params().withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
-        .withReasonCode("FUTURE_REASON_CODE");
+        .withReasonCode("999");
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+
+    params = new SegmentCompletionProtocol.Request.Params().withReasonCode("999");
+    Assert.assertNull(params.getReason());
+    Assert.assertNull(params.getReasonCode());
 
     params = new SegmentCompletionProtocol.Request.Params().withReasonCode("FUTURE_REASON_CODE");
     Assert.assertNull(params.getReason());
