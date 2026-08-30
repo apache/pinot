@@ -55,6 +55,7 @@ import static org.testng.Assert.assertTrue;
 ///
 /// All three columns get identical values so query outputs must match exactly across filters, aggregations,
 /// GROUP BY, DISTINCT, IN, and REGEXP_LIKE predicates.
+/// Additional INT/LONG columns exercise V7 codec pipelines through the same shared cluster.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TABLE_NAME = "RawForwardIndexWithDictionaryTest";
@@ -65,6 +66,9 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
   private static final String RAW_DICT_INT_DIMENSION = "rawDictIntDim";
   private static final String RAW_DICT_INV_INT_DIMENSION = "rawDictInvIntDim";
   private static final String RAW_DICT_RANGE_INT_DIMENSION = "rawDictRangeIntDim";
+  private static final String CODEC_INT_DIMENSION = "codecIntDim";
+  private static final String CODEC_LONG_DIMENSION = "codecLongDim";
+  private static final long CODEC_LONG_BASE = (long) Integer.MAX_VALUE + 1;
   private static final String METRIC_COLUMN = "metric";
   private static final int ROW_COUNT = 1000;
   private static final int UNIQUE_DIMENSION_VALUES = 20;
@@ -108,6 +112,8 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         .addSingleValueDimension(RAW_DICT_INT_DIMENSION, FieldSpec.DataType.INT)
         .addSingleValueDimension(RAW_DICT_INV_INT_DIMENSION, FieldSpec.DataType.INT)
         .addSingleValueDimension(RAW_DICT_RANGE_INT_DIMENSION, FieldSpec.DataType.INT)
+        .addSingleValueDimension(CODEC_INT_DIMENSION, FieldSpec.DataType.INT)
+        .addSingleValueDimension(CODEC_LONG_DIMENSION, FieldSpec.DataType.LONG)
         .addMetric(METRIC_COLUMN, FieldSpec.DataType.LONG)
         .addDateTime(TIMESTAMP_FIELD_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
@@ -124,6 +130,8 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         .requiredInt(RAW_DICT_INT_DIMENSION)
         .requiredInt(RAW_DICT_INV_INT_DIMENSION)
         .requiredInt(RAW_DICT_RANGE_INT_DIMENSION)
+        .requiredInt(CODEC_INT_DIMENSION)
+        .requiredLong(CODEC_LONG_DIMENSION)
         .requiredLong(METRIC_COLUMN)
         .requiredLong(TIMESTAMP_FIELD_NAME)
         .endRecord();
@@ -145,6 +153,8 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         record.put(RAW_DICT_INT_DIMENSION, intValue);
         record.put(RAW_DICT_INV_INT_DIMENSION, intValue);
         record.put(RAW_DICT_RANGE_INT_DIMENSION, intValue);
+        record.put(CODEC_INT_DIMENSION, intValue);
+        record.put(CODEC_LONG_DIMENSION, CODEC_LONG_BASE + i);
         record.put(METRIC_COLUMN, random.nextInt(10_000));
         record.put(TIMESTAMP_FIELD_NAME, currentTimeMillis + i);
         fileWriter.append(record);
@@ -178,7 +188,34 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
     FieldConfig rawDictRangeInt =
         new FieldConfig(RAW_DICT_RANGE_INT_DIMENSION, FieldConfig.EncodingType.RAW, null, null, null, null,
             dictionaryIndex.deepCopy(), null, null);
-    return List.of(rawDictString, rawDictInvString, rawDictInt, rawDictInvInt, rawDictRangeInt);
+    return List.of(rawDictString, rawDictInvString, rawDictInt, rawDictInvInt, rawDictRangeInt,
+        codecFieldConfig(CODEC_INT_DIMENSION, "DELTA,T64,LZ4"),
+        codecFieldConfig(CODEC_LONG_DIMENSION, "ZSTD(3)"));
+  }
+
+  private static FieldConfig codecFieldConfig(String column, String codecSpec) {
+    ObjectNode forward = JsonUtils.newObjectNode().put("codecSpec", codecSpec).put("targetDocsPerChunk", 128);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+  }
+
+  /// Exercises persisted INT/LONG pipelines through ingestion and both query engines, across chunk boundaries.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCodecPipelineQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode response = postQuery("SELECT " + CODEC_INT_DIMENSION + ", " + CODEC_LONG_DIMENSION + " FROM "
+        + getTableName() + " WHERE " + CODEC_INT_DIMENSION + " = 7 ORDER BY " + CODEC_LONG_DIMENSION + " LIMIT 1000");
+    assertTrue(response.path("exceptions").isEmpty(), response.toString());
+    JsonNode rows = response.path("resultTable").path("rows");
+    assertEquals(rows.size(), ROW_COUNT / UNIQUE_DIMENSION_VALUES);
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i).get(0).asInt(), 7);
+      assertEquals(rows.get(i).get(1).asLong(), CODEC_LONG_BASE + 7 + (long) i * UNIQUE_DIMENSION_VALUES);
+    }
+    assertEquals(scalarLong("SELECT SUM(" + CODEC_INT_DIMENSION + ") FROM " + getTableName()),
+        (long) ROW_COUNT * (UNIQUE_DIMENSION_VALUES - 1) / 2);
   }
 
   @Override

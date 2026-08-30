@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
@@ -45,6 +46,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnSta
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -66,6 +68,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -86,7 +89,7 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 /// that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
 /// majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
 /// operations are:
-/// 1. Change compression type for a raw column
+/// 1. Change compression type or codecSpec for a raw column, including legacy/V7 transitions
 /// 2. Enable dictionary
 /// 3. Disable dictionary
 /// 4. Disable forward index
@@ -100,6 +103,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   // This should contain a list of all indexes that need to be rewritten if the dictionary is enabled or disabled
   private static final List<IndexType<?, ?, ?>> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
+  private final Map<String, CodecPipelineExecutor> _configuredCodecExecutors = new HashMap<>();
 
   /// Re-enable operations are split by target encoding so the intent is explicit at the operation level: a
   /// `forwardIndex.disabled` column being re-enabled may want to come back as either dict-encoded or raw,
@@ -108,7 +112,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   /// and the test assertions specific.
   protected enum Operation {
     DISABLE_FORWARD_INDEX, ENABLE_DICT_FORWARD_INDEX, ENABLE_RAW_FORWARD_INDEX, DISABLE_DICTIONARY,
-    ENABLE_DICTIONARY, CHANGE_INDEX_COMPRESSION_TYPE
+    ENABLE_DICTIONARY, REWRITE_FORWARD_INDEX
   }
 
   @VisibleForTesting
@@ -146,7 +150,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       boolean needsShapeMetadata = operations.contains(Operation.ENABLE_DICT_FORWARD_INDEX)
           || operations.contains(Operation.ENABLE_RAW_FORWARD_INDEX)
-          || operations.contains(Operation.CHANGE_INDEX_COMPRESSION_TYPE)
+          || operations.contains(Operation.REWRITE_FORWARD_INDEX)
           || (operations.contains(Operation.DISABLE_DICTIONARY) && !forwardIndexDisabledColumns.contains(column)
           && isForwardIndexDictionaryEncoded(column));
       if (needsShapeMetadata) {
@@ -214,8 +218,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
               throw new IllegalStateException(String.format("Forward index was not created for column: %s", column));
             }
             break;
-          case CHANGE_INDEX_COMPRESSION_TYPE:
-            rewriteForwardIndexForCompressionChange(column, segmentWriter);
+          case REWRITE_FORWARD_INDEX:
+            rewriteForwardIndex(column, segmentWriter);
             break;
           default:
             throw new IllegalStateException("Unsupported operation for column " + column);
@@ -405,17 +409,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
     }
 
-    // 3. Compression-type change (only when no encoding change happened).
-    if (ops.isEmpty() && existingFwdEncoding != null && existingFwdEncoding == newFwdEncoding
-        && existingHasDict == desiredDict) {
-      if (existingFwdEncoding == EncodingType.RAW) {
-        // TODO: Also check if raw index version needs to be changed
-        if (shouldChangeRawCompressionType(column, segmentReader)) {
-          ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
-        }
-      } else if (shouldChangeDictIdCompressionType(column, segmentReader)) {
-        ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
+    // 3. Raw format/codec change. Adding or removing a standalone dictionary preserves a RAW
+    // forward index, so codec reconciliation must run independently of dictionary operations.
+    // Encoding conversions recreate the forward index with the new config and need no second rewrite.
+    if (existingFwdEncoding == EncodingType.RAW && newFwdEncoding == EncodingType.RAW) {
+      // TODO: Also check if raw index version needs to be changed
+      if (shouldRewriteRawForwardIndex(column, segmentReader)) {
+        ops.add(Operation.REWRITE_FORWARD_INDEX);
       }
+    } else if (ops.isEmpty() && existingFwdEncoding == EncodingType.DICTIONARY
+        && newFwdEncoding == EncodingType.DICTIONARY && shouldChangeDictIdCompressionType(column, segmentReader)) {
+      ops.add(Operation.REWRITE_FORWARD_INDEX);
     }
 
     return ops;
@@ -513,24 +517,44 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     return true;
   }
 
-  private boolean shouldChangeRawCompressionType(String column, SegmentDirectory.Reader segmentReader)
+  private boolean shouldRewriteRawForwardIndex(String column, SegmentDirectory.Reader segmentReader)
       throws Exception {
-    // The compression type for an existing segment can only be determined by reading the forward index header.
+    // The persisted compression type / codec spec can only be determined from the forward-index header.
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     ChunkCompressionType existingCompressionType;
+    String existingCodecSpec;
 
-    // Get the forward index reader factory and create a reader
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
-        _fieldIndexConfigs.get(column), existingColMetadata)) {
-      existingCompressionType = fwdIndexReader.getCompressionType();
-      Preconditions.checkState(existingCompressionType != null,
-          "Existing compressionType cannot be null for raw forward index column=" + column);
+    PinotDataBuffer forwardIndexBuffer = segmentReader.getIndexFor(column, StandardIndexes.forward());
+    if (FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(forwardIndexBuffer)) {
+      existingCompressionType = null;
+      existingCodecSpec = FixedByteChunkSVForwardIndexReaderV7.readCodecSpec(forwardIndexBuffer);
+    } else {
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
+          _fieldIndexConfigs.get(column), existingColMetadata)) {
+        existingCompressionType = fwdIndexReader.getCompressionType();
+        existingCodecSpec = null;
+      }
     }
 
-    // Get the new compression type.
-    ChunkCompressionType newCompressionType =
-        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getChunkCompressionType();
+    ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    String newCodecSpec = newConfig.getCodecSpec();
+    if (newCodecSpec != null) {
+      CodecPipelineExecutor configuredExecutor = _configuredCodecExecutors.computeIfAbsent(column,
+          ignored -> CodecPipelineExecutor.create(newCodecSpec, existingColMetadata.getDataType().getStoredType()));
+      String canonicalNewSpec = configuredExecutor.getCanonicalSpec();
+      return !canonicalNewSpec.equals(existingCodecSpec);
+    }
+
+    // Removing codecSpec always means leaving V7. Even without an explicit compressionCodec, the
+    // creator rewrites to the column's legacy default, which restores rollback compatibility.
+    if (existingCodecSpec != null) {
+      return true;
+    }
+
+    Preconditions.checkState(existingCompressionType != null,
+        "Legacy raw forward index for column=%s returned null ChunkCompressionType", column);
+    ChunkCompressionType newCompressionType = newConfig.getChunkCompressionType();
 
     // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
     // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
@@ -560,7 +584,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     return existingCompressionType != newCompressionType;
   }
 
-  private void rewriteForwardIndexForCompressionChange(String column, SegmentDirectory.Writer segmentWriter)
+  private void rewriteForwardIndex(String column, SegmentDirectory.Writer segmentWriter)
       throws Exception {
     ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     boolean isSingleValue = columnMetadata.isSingleValue();

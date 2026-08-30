@@ -442,7 +442,7 @@ public class ForwardIndexHandlerCompressionStatsTest {
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, createIndexLoadingConfig());
       assertEquals(handler.computeOperations(writer),
-          Map.of(DICT_INT_MV_COL, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+          Map.of(DICT_INT_MV_COL, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
       handler.updateIndices(writer);
       handler.postUpdateIndicesCleanup(writer);
     }
