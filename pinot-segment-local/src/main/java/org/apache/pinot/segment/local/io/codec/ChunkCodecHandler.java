@@ -27,55 +27,54 @@ import java.nio.ByteBuffer;
 ///
 /// All implementations are expected to be stateless and thread-safe.
 ///
-/// Buffer contract for all methods:
+/// Buffer contract for [#encode()] and [#decode()]:
 ///
-/// - [#encode()] and [#decode()]: `src` is ready for read (position=0);
-///       the returned buffer is ready for read and owned by the caller.
-/// - [#decodeInto()]: implementations must treat `dst` as freshly cleared
-///       (calling `dst.clear()` internally is recommended as a defensive first step);
-///       `dst` is flipped (position=0, limit=decoded bytes) on return.
+/// - `src` supplies the readable range from its current position to its limit. Typed codecs
+///       interpret values in persisted `BIG_ENDIAN` order. Implementations may advance its
+///       position or change its byte order; callers that need to reuse it must preserve its state
+///       or pass a duplicate.
+/// - `dst` is writable, uses `BIG_ENDIAN` byte order, and does not overlap `src`. Implementations
+///       clear it before writing and leave it ready for read (position=0, limit=output bytes) on
+///       successful return. Its position and limit are unspecified after failure.
+/// - Both buffers remain caller-owned: implementations must not retain or release them. The
+///       destination capacity bounds the output; callers requiring a tighter bound must pass a
+///       capacity-limited view, because clearing the buffer discards its previous limit.
+/// - Heap input is supported, but JNI codecs may copy it into a temporary direct buffer. Use
+///       direct input on hot paths to avoid that allocation.
 ///
 /// @param <O> typed [CodecOptions] for this codec
 interface ChunkCodecHandler<O extends CodecOptions> extends CodecDefinition<O> {
 
-  /// Encodes `src` and returns the encoded bytes ready for read.
-  ///
-  /// **Position contract:** implementations may consume `src` (advance its position).
-  /// Callers that need to re-read `src` after this call must pass `src.duplicate()`.
-  ///
-  /// @param options parsed options for this codec invocation
-  /// @param ctx     column context (data type, etc.)
-  /// @param src     unencoded data, ready for read
-  /// @return encoded buffer ready for read; caller owns this buffer
-  ByteBuffer encode(O options, CodecContext ctx, ByteBuffer src) throws IOException;
-
-  /// Decodes `src` and returns the decoded bytes ready for read.
-  ///
-  /// **Position contract:** implementations may consume `src` (advance its position).
-  /// Callers that need to re-read `src` after this call must pass `src.duplicate()`.
+  /// Encodes `src` into caller-owned `dst`, without allocating an output buffer.
+  /// Encoding callers must supply a direct destination to support all registered codecs.
   ///
   /// @param options parsed options for this codec invocation
   /// @param ctx     column context
-  /// @param src     encoded data, ready for read
-  /// @return decoded buffer ready for read; caller owns this buffer
-  ByteBuffer decode(O options, CodecContext ctx, ByteBuffer src) throws IOException;
+  /// @param src     unencoded data, ready for read
+  /// @param dst     direct output buffer with at least [#maxEncodedSize(CodecOptions, CodecContext, int)]
+  ///                bytes of capacity
+  void encode(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException;
 
-  /// Decodes `src` directly into `dst`, avoiding an extra allocation.
-  /// Implementations must treat `dst` as freshly cleared and flip it before returning.
+  /// Decodes `src` into caller-owned `dst`, without allocating an output buffer.
   ///
   /// Callers must ensure `dst` is a direct [ByteBuffer] when
-  /// [#requiresDirectDstBuffer()] returns `true`.
+  /// [#requiresDirectDecodeDstBuffer()] returns `true`.
   ///
   /// @param options parsed options for this codec invocation
   /// @param ctx     column context
   /// @param src     encoded data, ready for read
   /// @param dst     output buffer; must be direct when required; must have sufficient capacity
-  void decodeInto(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException;
+  void decode(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException;
 
   /// Returns an upper bound on the encoded byte count for an input of `inputSize` bytes.
-  int maxEncodedSize(O options, int inputSize);
+  ///
+  /// @param options   parsed options for this codec invocation
+  /// @param ctx       column context
+  /// @param inputSize unencoded input size in bytes
+  int maxEncodedSize(O options, CodecContext ctx, int inputSize);
 
-  /// Returns `true` if [#decodeInto()] requires `dst` to be a direct
+  /// Returns `true` if [#decode()] requires `dst` to be a direct
   /// [ByteBuffer] (e.g. codecs that delegate to JNI libraries with direct-buffer-only APIs).
-  boolean requiresDirectDstBuffer();
+  /// This requirement applies only to decoding; encoding callers always supply a direct buffer.
+  boolean requiresDirectDecodeDstBuffer();
 }
