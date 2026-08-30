@@ -610,7 +610,7 @@ public class SegmentCompletionTest {
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
         .withSegmentName(_segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
-        .withReasonCode("FUTURE_REASON_CODE");
+        .withReasonCode("999");
     response = _segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
   }
@@ -622,7 +622,7 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds = 10L;
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
         .withSegmentName(_segmentNameStr)
-        .withReasonCode("FUTURE_REASON_CODE");
+        .withReasonCode("999");
     response = _segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
   }
