@@ -225,6 +225,10 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   /// Returns the structurally normalized codec specification, or `null` for the legacy compression path.
+  ///
+  /// Any non-null specification selects the V7 on-disk format. Before enabling it, upgrade every component that may
+  /// build or read segments. Before rolling those components back, remove the specification and rewrite affected V7
+  /// forward indexes into a legacy format.
   @Nullable
   public String getCodecSpec() {
     return _codecSpec;
