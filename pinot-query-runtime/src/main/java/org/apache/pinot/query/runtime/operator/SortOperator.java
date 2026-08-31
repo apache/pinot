@@ -117,7 +117,8 @@ public abstract class SortOperator extends MultiStageOperator {
     }
     if (numRowsToKeep == Integer.MAX_VALUE) {
       // Nothing bounds the result, so a bounded heap cannot be used and every row has to be buffered and sorted.
-      return new FullSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations);
+      return new FullSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
+          defaultHolderCapacity);
     }
     return new TopNSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
         defaultHolderCapacity);
