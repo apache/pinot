@@ -133,8 +133,10 @@ public class CombinePlanNode implements PlanNode {
       // Streaming flushes partial aggregates, so it needs an aggregation above to merge them back together.
       // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.
       int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
-      if (flushThreshold > 0 && QueryContextUtils.isAggregationQuery(_queryContext)
-          && _queryContext.getGroupByExpressions() != null && !_queryContext.isServerReturnFinalResult()
+      if (flushThreshold > 0
+          && QueryContextUtils.isAggregationQuery(_queryContext)
+          && _queryContext.getGroupByExpressions() != null
+          && !_queryContext.isServerReturnFinalResult()
           && !_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
         return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, flushThreshold);
       }
