@@ -44,7 +44,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -116,22 +115,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   public void tearDown()
       throws IOException {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-
-    // Test dropping all segments one by one
-    List<String> segments = listSegments(realtimeTableName);
-    assertFalse(segments.isEmpty());
-    for (String segment : segments) {
-      dropSegment(realtimeTableName, segment);
-    }
-    // NOTE: There is a delay to remove the segment from property store
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        return listSegments(realtimeTableName).isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
-
+    // Public segment delete rejects CONSUMING replicas. Table drop is the supported cleanup.
     dropRealtimeTable(realtimeTableName);
     stopServer();
     stopBroker();
