@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -207,7 +208,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   private int updateHeader(int row, int numValues) {
-    assert (numValues <= _maxNumberOfMultiValuesPerRow);
+    if (numValues > _maxNumberOfMultiValuesPerRow) {
+      Preconditions.checkArgument(numValues <= _maxNumberOfMultiValuesPerRow,
+          "Row %s has %s multi-values, exceeding the maximum of %s", row, numValues,
+          _maxNumberOfMultiValuesPerRow);
+    }
     _numValues += numValues;
     int newStartIndex = _prevRowStartIndex + _prevRowLength;
     if (newStartIndex + numValues > _currentCapacity) {
@@ -220,6 +225,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _prevRowStartIndex = newStartIndex;
     _prevRowLength = numValues;
     return newStartIndex;
+  }
+
+  /// Returns the maximum number of values allowed in a single row.
+  public int getMaxNumberOfMultiValuesPerRow() {
+    return _maxNumberOfMultiValuesPerRow;
   }
 
   public int getMaxChunkCapacity() {
