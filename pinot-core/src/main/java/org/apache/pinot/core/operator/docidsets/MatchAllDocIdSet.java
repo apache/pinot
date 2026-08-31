@@ -42,6 +42,7 @@ public final class MatchAllDocIdSet implements BlockDocIdSet {
 
   @Override
   public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
-    return docIds;
+    // MatchAllDocIdIterator stops at numDocs, so the candidate set has to be bounded the same way
+    return NotDocIdSet.bound(docIds, _numDocs);
   }
 }

@@ -24,6 +24,7 @@ import java.util.OptionalInt;
 import java.util.Random;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
@@ -128,6 +129,83 @@ public class AndDocIdSetPushdownTest {
       BlockDocIdSet withPushdown = randomTree(new Random(seed), 3, true);
       BlockDocIdSet withoutPushdown = randomTree(new Random(seed), 3, false);
       assertEquals(collectDocIds(withPushdown), collectDocIds(withoutPushdown), ERROR_MESSAGE + ", iteration: " + i);
+    }
+  }
+
+  /// The candidate set can carry document ids beyond numDocs, because `BitmapDocIdIterator#getDocIds()` hands out the
+  /// raw bitmap while its `next()` stops at numDocs. An AND cannot introduce such ids, but a NOT can, so the bound has
+  /// to survive the push-down.
+  @Test
+  public void testNotDoesNotEmitDocumentIdsBeyondNumDocs() {
+    int numDocs = 100;
+    // The candidate bitmap deliberately reaches past numDocs, as a live mutable-segment bitmap can
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    candidates.add(0L, 150L);
+    BlockDocIdSet child = new BitmapDocIdSet(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs);
+
+    ImmutableRoaringBitmap docIds = new NotDocIdSet(child, numDocs).applyAnd(candidates);
+
+    assertTrue(docIds.isEmpty() || docIds.last() < numDocs,
+        "NOT must not emit document ids at or beyond numDocs, but emitted " + docIds.last());
+    assertEquals(docIds.getCardinality(), numDocs - 3);
+    // The iterator path is the reference implementation: both must agree
+    assertEquals(docIds.toArray(), collectDocIds(new AndDocIdSet(
+        List.of(new BitmapDocIdSet(candidates, numDocs), new NotDocIdSet(
+            new BitmapDocIdSet(MutableRoaringBitmap.bitmapOf(1, 2, 3), numDocs), numDocs)), null, false)));
+  }
+
+  @Test
+  public void testMatchAllDoesNotEmitDocumentIdsBeyondNumDocs() {
+    int numDocs = 100;
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    candidates.add(0L, 150L);
+
+    ImmutableRoaringBitmap docIds = new MatchAllDocIdSet(numDocs).applyAnd(candidates);
+
+    assertEquals(docIds.getCardinality(), numDocs);
+    assertTrue(docIds.last() < numDocs);
+  }
+
+  /// The OR short-circuits once every candidate is matched. The branches it skips were never evaluated, so nothing
+  /// closes the iterators they built in their constructors.
+  @Test
+  public void testShortCircuitedOrBranchesAreReleased() {
+    ImmutableRoaringBitmap candidates = range(0, 100);
+    // The first branch matches every candidate, so the second is never evaluated
+    ReleaseTrackingDocIdSet skipped = new ReleaseTrackingDocIdSet(range(0, 100));
+    BlockDocIdSet or =
+        new OrDocIdSet(List.of(new BitmapDocIdSet(range(0, 100), NUM_DOCS), skipped), NUM_DOCS);
+
+    or.applyAnd(candidates);
+
+    assertTrue(skipped.isReleased(), "A branch skipped by the short-circuit must still be released");
+  }
+
+  private static final class ReleaseTrackingDocIdSet implements BlockDocIdSet {
+    private final ImmutableRoaringBitmap _docIds;
+    private boolean _released;
+
+    private ReleaseTrackingDocIdSet(ImmutableRoaringBitmap docIds) {
+      _docIds = docIds;
+    }
+
+    private boolean isReleased() {
+      return _released;
+    }
+
+    @Override
+    public BlockDocIdIterator iterator() {
+      return new RangelessBitmapDocIdIterator(_docIds);
+    }
+
+    @Override
+    public long getNumEntriesScannedInFilter() {
+      return 0L;
+    }
+
+    @Override
+    public void release() {
+      _released = true;
     }
   }
 

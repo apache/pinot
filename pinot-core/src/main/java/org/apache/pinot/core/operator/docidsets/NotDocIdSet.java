@@ -50,12 +50,34 @@ public class NotDocIdSet implements BlockDocIdSet {
   }
 
   @Override
+  public void release() {
+    _childDocIdSet.release();
+  }
+
+  @Override
   public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
       return new MutableRoaringBitmap();
     }
+    // NOTE: The candidate set can carry document ids beyond numDocs, because BitmapDocIdIterator#getDocIds() hands out
+    //       the raw bitmap while its next() stops at numDocs. An intersection cannot introduce such ids, but a
+    //       complement can, so the bound NotDocIdIterator applies has to be applied here too.
+    ImmutableRoaringBitmap boundedDocIds = bound(docIds, _numDocs);
+    if (boundedDocIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
     // Within the candidate set, NOT(child) is the candidates the child does not match, so the child only has to be
     // evaluated on the candidates: (NOT child) AND docIds == docIds MINUS (child AND docIds).
-    return ImmutableRoaringBitmap.andNot(docIds, _childDocIdSet.applyAnd(docIds));
+    return ImmutableRoaringBitmap.andNot(boundedDocIds, _childDocIdSet.applyAnd(boundedDocIds));
+  }
+
+  /// Drops the document ids that are not below `numDocs`, without copying when there are none.
+  static ImmutableRoaringBitmap bound(ImmutableRoaringBitmap docIds, int numDocs) {
+    if (docIds.isEmpty() || docIds.last() < numDocs) {
+      return docIds;
+    }
+    MutableRoaringBitmap boundedDocIds = docIds.toMutableRoaringBitmap();
+    boundedDocIds.remove(numDocs, 0x1_0000_0000L);
+    return boundedDocIds;
   }
 }

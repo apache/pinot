@@ -163,20 +163,41 @@ public final class OrDocIdSet implements BlockDocIdSet {
       return docIdsToReturn;
     }
     int numCandidates = docIds.getCardinality();
+    int numDocIdSets = docIdSets.size();
     ImmutableRoaringBitmap remainingDocIds = docIds;
-    for (BlockDocIdSet docIdSet : docIdSets) {
-      ImmutableRoaringBitmap matchingDocIds = docIdSet.applyAnd(remainingDocIds);
+    for (int i = 0; i < numDocIdSets; i++) {
+      ImmutableRoaringBitmap matchingDocIds = docIdSets.get(i).applyAnd(remainingDocIds);
       if (matchingDocIds.isEmpty()) {
         continue;
       }
       docIdsToReturn.or(matchingDocIds);
       if (docIdsToReturn.getCardinality() == numCandidates) {
-        // Every candidate is already matched, the remaining branches cannot add anything
+        // Every candidate is already matched, so the remaining branches cannot add anything. They still have to be
+        // released: their iterators were built eagerly and hold forward-index reader contexts.
+        releaseFrom(docIdSets, i + 1);
         break;
       }
-      remainingDocIds = ImmutableRoaringBitmap.andNot(remainingDocIds, matchingDocIds);
+      if (i < numDocIdSets - 1) {
+        remainingDocIds = ImmutableRoaringBitmap.andNot(remainingDocIds, matchingDocIds);
+      }
     }
     return docIdsToReturn;
+  }
+
+  private static void releaseFrom(List<BlockDocIdSet> docIdSets, int fromIndex) {
+    for (int i = fromIndex; i < docIdSets.size(); i++) {
+      docIdSets.get(i).release();
+    }
+  }
+
+  @Override
+  public void release() {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    if (docIdSets != null) {
+      for (BlockDocIdSet docIdSet : docIdSets) {
+        docIdSet.release();
+      }
+    }
   }
 
   @Override
