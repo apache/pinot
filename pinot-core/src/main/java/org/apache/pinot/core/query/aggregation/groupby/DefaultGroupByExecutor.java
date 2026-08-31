@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -170,13 +171,23 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
   }
 
-  /// Mirrors fixed-width result holders off-heap. The holder type and default value are discovered through a
+  /// Mirrors fixed-width result holders off-heap. Functions with a dedicated off-heap state holder (e.g.
+  /// `DISTINCT_COUNT_ULL`) supply it through [AggregationFunction#createOffHeapGroupByResultHolder] and are
+  /// consulted first. For the rest, the holder type and default value are discovered through a
   /// zero-capacity probe (aggregation functions choose both — createGroupByResultHolder must stay side-effect-free
   /// for the probe to be safe), and any non-fixed-width holder (object holders, dummy
   /// holders, custom implementations) is recreated on-heap with the real initial capacity. Off-heap holders are
   /// registered on the resource tracker, which releases them when the group key generator is closed.
   private static GroupByResultHolder createOffHeapCapableResultHolder(AggregationFunction<?, ?> function,
       int initialCapacity, int maxCapacity, ResourceTrackingGroupKeyGenerator resourceTracker) {
+    GroupByResultHolder offHeapStateHolder = function.createOffHeapGroupByResultHolder(initialCapacity, maxCapacity);
+    if (offHeapStateHolder != null) {
+      Preconditions.checkState(offHeapStateHolder instanceof AutoCloseable,
+          "createOffHeapGroupByResultHolder must return an AutoCloseable holder, got: %s",
+          offHeapStateHolder.getClass().getName());
+      resourceTracker.register((AutoCloseable) offHeapStateHolder);
+      return offHeapStateHolder;
+    }
     GroupByResultHolder probe = function.createGroupByResultHolder(0, maxCapacity);
     GroupByResultHolder holder;
     if (probe.getClass() == DoubleGroupByResultHolder.class) {
