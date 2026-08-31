@@ -115,27 +115,6 @@ public class SortOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
-  @Test
-  public void shouldConsumeAndSkipSortInputOneBlockWithTwoRowsInputSorted() {
-    // Given:
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
-    // Purposefully setting input as unsorted order for validation but 'isInputSorted' should only be true if actually
-    // sorted
-    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
-    SortOperator operator = getOperator(schema, collations);
-
-    // When:
-    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-
-    // Then:
-    assertEquals(resultRows.size(), 2);
-    assertEquals(resultRows.get(0), new Object[]{2});
-    assertEquals(resultRows.get(1), new Object[]{1});
-    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
-  }
 
   @Test
   public void shouldConsumeAndSortOnNonZeroIdxCollation() {
@@ -214,11 +193,9 @@ public class SortOperatorTest {
   }
 
   @Test
-  public void shouldOffsetSortInputOneBlockWithThreeRowsInputSorted() {
+  public void shouldApplyOffsetToSortedResult() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
-    // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
@@ -253,11 +230,9 @@ public class SortOperatorTest {
   }
 
   @Test
-  public void shouldOffsetLimitSortInputOneBlockWithThreeRowsInputSorted() {
+  public void shouldApplyOffsetAndLimitToSortedResult() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
-    // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
@@ -330,29 +305,6 @@ public class SortOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
-  @Test
-  public void shouldConsumeAndSortTwoInputBlocksWithOneRowEachInputSorted() {
-    // Given:
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
-    // Set input rows as sorted since input is expected to be sorted
-    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1})).thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
-    SortOperator operator = getOperator(schema, collations);
-
-    // When:
-    // The input is already sorted, so blocks are forwarded as they arrive rather than buffered until EOS.
-    List<Object[]> firstBlock = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-    List<Object[]> secondBlock = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-
-    // Then:
-    assertEquals(firstBlock.size(), 1);
-    assertEquals(firstBlock.get(0), new Object[]{1});
-    assertEquals(secondBlock.size(), 1);
-    assertEquals(secondBlock.get(0), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
-  }
 
   @Test
   public void shouldBreakTiesUsingSecondCollationKey() {
@@ -532,16 +484,23 @@ public class SortOperatorTest {
     assertEquals(operator.toExplainString(), "SORT_FULL");
   }
 
+  /// A SortedMailboxReceiveOperator input gets no special treatment: it is sorted again. Skipping the sort would save
+  /// one pass, but only for plans built by a broker that predates PinotSortExchangeNodeInsertRule dropping
+  /// sort-on-receiver, and the type test that used to enable it never checked that the input was ordered on *this*
+  /// collation. Re-sorting an already sorted stream is correct, so the cheaper invariant wins: SORT_LIMIT is chosen
+  /// only when there is no collation to honor.
   @Test
-  public void shouldUseSortedInputWhenInputIsAlreadySorted() {
+  public void shouldSortAgainWhenInputIsASortedMailboxReceive() {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     _input = mock(SortedMailboxReceiveOperator.class);
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
 
     SortOperator operator = getOperator(schema, collations, 10, 0);
 
-    assertTrue(operator instanceof LimitSortOperator, "an ordered input only needs limit/offset applied");
-    assertEquals(operator.toExplainString(), "SORT_LIMIT");
+    assertTrue(operator instanceof TopNSortOperator, "a collation is honored regardless of the input operator type");
+    assertBlockRows(operator.nextBlock(), new Object[]{1}, new Object[]{2});
   }
 
   @Test
@@ -561,13 +520,11 @@ public class SortOperatorTest {
   /// A sorted input must not be buffered at all: the consumer sees rows from the first input block before the input
   /// has reached EOS. This is what makes SORT_LIMIT the only implementation that does not break the pipeline.
   @Test
-  public void shouldStreamSortedInputWithoutWaitingForEos() {
+  public void shouldStreamWithoutWaitingForEos() {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
         .thenReturn(block(schema, new Object[]{3})).thenReturn(SuccessMseBlock.INSTANCE);
-    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
-    SortOperator operator = getOperator(schema, collations, 10, 0);
+    SortOperator operator = getOperator(schema, List.of(), 10, 0);
 
     assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows().size(), 2);
     assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows().size(), 1);
@@ -579,13 +536,11 @@ public class SortOperatorTest {
   @Test
   public void shouldApplyOffsetAndFetchAcrossStreamedBlocks() {
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
         .thenReturn(block(schema, new Object[]{3}, new Object[]{4}, new Object[]{5}))
         .thenReturn(SuccessMseBlock.INSTANCE);
-    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     // OFFSET 3 swallows the whole first block and one row of the second; LIMIT 1 then stops after a single row.
-    SortOperator operator = getOperator(schema, collations, 1, 3);
+    SortOperator operator = getOperator(schema, List.of(), 1, 3);
 
     List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
