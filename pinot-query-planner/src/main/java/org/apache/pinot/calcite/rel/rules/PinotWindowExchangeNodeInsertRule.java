@@ -79,7 +79,16 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     }
     // This rule leaves a Sort over the exchange when the window needs ordered input (see onMatch), so that shape also
     // means the window has already been processed. Without this the rule re-fires on its own output forever.
-    return !(input instanceof Sort && PinotRuleUtils.isExchange(((Sort) input).getInput()));
+    //
+    // The shape has to match exactly. A Sort that orders by something else, or that trims, belongs to another part of
+    // the plan - treating it as this rule's own output would leave the window with neither its exchange nor the
+    // ordering it requires, because WindowAggregateOperator does no ordering of its own.
+    if (!(input instanceof Sort) || window.groups.size() != 1) {
+      return true;
+    }
+    Sort sort = (Sort) input;
+    return !(PinotRuleUtils.isExchange(sort.getInput()) && sort.fetch == null && sort.offset == null
+        && sort.getCollation().equals(window.groups.get(0).orderKeys));
   }
 
   @Override
