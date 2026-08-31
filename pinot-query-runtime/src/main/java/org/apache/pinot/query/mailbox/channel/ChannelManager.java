@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
@@ -106,7 +105,7 @@ public class ChannelManager {
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .sslContext(_clientSslContext);
-            return decorate(channelBuilder).build();
+            return watchState(decorate(channelBuilder).build(), k.getLeft(), k.getRight());
           }
       );
     } else {
@@ -118,9 +117,37 @@ public class ChannelManager {
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .usePlaintext();
-            return decorate(channelBuilder).build();
+            return watchState(decorate(channelBuilder).build(), k.getLeft(), k.getRight());
           });
     }
+  }
+
+  /// Logs at WARN when `channel` leaves `READY`, and returns it.
+  ///
+  /// Keep-alive makes a silent peer *detectable*; this is what makes it **legible**. Without it the only
+  /// record of the failure is the absence of one: the startup lines say what was configured, and a
+  /// channel that later dropped looks exactly like a channel that never had a problem. The transition is
+  /// the moment worth reading in a log, because it is when a peer stopped answering — every mailbox send
+  /// queued behind it has already been failing for one keep-alive interval by then.
+  ///
+  /// Re-arms itself, which is how one callback follows a channel for its whole life; gRPC's
+  /// `notifyWhenStateChanged` is single-shot. Stops on shutdown, so a terminated channel cannot keep
+  /// re-registering.
+  private ManagedChannel watchState(ManagedChannel channel, String hostname, int port) {
+    ConnectivityState state = channel.getState(false);
+    channel.notifyWhenStateChanged(state, () -> {
+      if (channel.isShutdown()) {
+        return;
+      }
+      ConnectivityState next = channel.getState(false);
+      if (state == ConnectivityState.READY && next != ConnectivityState.READY) {
+        LOGGER.warn("Mailbox channel to {}:{} left READY for {}; sends to that peer will fail until it "
+            + "reconnects. If keep-alive reported it, the peer stopped answering about one keep-alive "
+            + "interval ago.", hostname, port, next);
+      }
+      watchState(channel, hostname, port);
+    });
+    return channel;
   }
 
   /// Resets the connection backoff for the channel to the given server if the channel is in
@@ -141,8 +168,12 @@ public class ChannelManager {
     return _keepAliveConfig.configure(builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS));
   }
 
-  @VisibleForTesting
-  GrpcKeepAliveConfig getKeepAliveConfig() {
+  /// The keep-alive policy applied to every channel this manager hands out.
+  ///
+  /// Public because the assertion that matters spans packages: a test of [MailboxService] has to show
+  /// that the policy resolved from config reached the transport, and no assertion on parsed values can
+  /// show that. Returns an immutable record, so exposing it grants no control over the manager.
+  public GrpcKeepAliveConfig getKeepAliveConfig() {
     return _keepAliveConfig;
   }
 

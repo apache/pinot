@@ -243,6 +243,14 @@ public class MailboxService {
   /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
   /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
   /// from this service.
+  /// The channel manager these mailboxes send through. Exposed so a test can assert that the policy
+  /// resolved from config actually reaches the transport, which no assertion on the parsed values can
+  /// show.
+  @VisibleForTesting
+  ChannelManager getChannelManager() {
+    return _channelManager;
+  }
+
   @VisibleForTesting
   public long getMailboxClientUsedDirectMemoryBytes() {
     return _channelManager.usedDirectMemoryBytes();
