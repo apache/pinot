@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -110,6 +111,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -147,6 +149,29 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final String DATA_CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
   private static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
 
+  private static String matchingUploadUrl(String prefix) {
+    return argThat(url -> isValidUploadUrl(url, prefix));
+  }
+
+  private static boolean isValidUploadUrl(String url, String prefix) {
+    if (url == null || !url.startsWith(prefix)) {
+      return false;
+    }
+    try {
+      UUID.fromString(url.substring(prefix.length()));
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  private static UUID getUploadId(String url) {
+    String uploadIdParameter = "uploadId=";
+    int uploadIdIndex = url.lastIndexOf(uploadIdParameter);
+    Preconditions.checkArgument(uploadIdIndex >= 0, "Upload URL does not contain an upload ID: %s", url);
+    return UUID.fromString(url.substring(uploadIdIndex + uploadIdParameter.length()));
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {
@@ -177,6 +202,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   private CommittingSegmentDescriptor createCommittingSegmentDescriptor(String segmentName) {
     return createCommittingSegmentDescriptor(segmentName, NEXT_OFFSET);
+  }
+
+  @Test
+  public void testDeepStoreUploadIdsAreAttemptScoped() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    URI serverUri = URI.create("http://server:8098/segments/test_REALTIME/segment");
+    UUID uploadId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    String stableUrl = segmentManager.getUploadUrl(serverUri, "uploadCommittedSegment", uploadId);
+    Assert.assertEquals(segmentManager.getUploadUrl(serverUri, "uploadCommittedSegment", uploadId), stableUrl);
+    Assert.assertNotEquals(segmentManager.getUploadUrl(serverUri, "uploadCommittedSegment"),
+        segmentManager.getUploadUrl(serverUri, "uploadCommittedSegment"));
+    Assert.assertTrue(isValidUploadUrl(stableUrl,
+        serverUri + "/uploadCommittedSegment?uploadTimeoutMs=-1&uploadId="));
   }
 
   /// Test cases for new table being created, and initial segments setup that follows.
@@ -1540,7 +1579,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
     String serverUploadRequestUrl0 =
-        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance0, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1&uploadId=", instance0, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
     // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
     // with a random UUID
@@ -1550,8 +1589,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl0,
-        serverAdminAuthProvider)).thenReturn(tempSegmentFileLocation.getPath());
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(matchingUploadUrl(serverUploadRequestUrl0),
+        eq(serverAdminAuthProvider))).thenReturn(tempSegmentFileLocation.getPath());
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1566,10 +1605,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
     String serverUploadRequestUrl1 =
-        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance1, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1&uploadId=", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1,
-        serverAdminAuthProvider)).thenThrow(new HttpErrorStatusException("failed to upload segment",
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(matchingUploadUrl(serverUploadRequestUrl1),
+        eq(serverAdminAuthProvider))).thenThrow(new HttpErrorStatusException("failed to upload segment",
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
@@ -1611,10 +1650,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
-    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl0,
-        serverAdminAuthProvider);
-    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl1,
-        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl0), eq(serverAdminAuthProvider));
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl1), eq(serverAdminAuthProvider));
   }
 
   /// Test cases for fixing LLC segment by uploading to segment store if missing
@@ -1671,7 +1710,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
     String serverUploadRequestUrl0 =
-        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance0, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1&uploadId=", instance0, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
     // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
     // with a random UUID
@@ -1684,8 +1723,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0,
-        serverAdminAuthProvider))
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl0), eq(serverAdminAuthProvider)))
         .thenReturn(
           new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L, 43210L,
               tempSegmentFileLocation.getPath()));
@@ -1703,10 +1742,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
     String serverUploadRequestUrl1 =
-        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance1, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1&uploadId=", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1,
-        serverAdminAuthProvider))
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl1), eq(serverAdminAuthProvider)))
         .thenThrow(
           new HttpErrorStatusException("failed to upload segment",
               Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
@@ -1750,10 +1789,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
-    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl0,
-        serverAdminAuthProvider);
-    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl1,
-        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl0), eq(serverAdminAuthProvider));
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(
+        matchingUploadUrl(serverUploadRequestUrl1), eq(serverAdminAuthProvider));
   }
 
   @Test
@@ -1808,8 +1847,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     instanceConfig0.getRecord().setIntField(Instance.ADMIN_PORT_KEY, adminPort);
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
-    String serverUploadRequestUrl0 =
-        String.format("http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1", instance0, adminPort,
+    String serverUploadRequestUrl0 = String.format(
+        "http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1&uploadId=", instance0, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
     // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
     // with a random UUID
@@ -1835,7 +1874,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     uploadedCustomMap.put("segmentFileKey", "segmentFileValue");
     segmentZKMetadataCopy.setCustomMap(uploadedCustomMap);
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl0, serverAdminAuthProvider)).thenReturn(segmentZKMetadataCopy);
+        matchingUploadUrl(serverUploadRequestUrl0), eq(serverAdminAuthProvider))).thenReturn(segmentZKMetadataCopy);
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1849,11 +1888,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     instanceConfig1.getRecord().setIntField(Instance.ADMIN_PORT_KEY, adminPort);
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
-    String serverUploadRequestUrl1 =
-        String.format("http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1", instance1, adminPort,
+    String serverUploadRequestUrl1 = String.format(
+        "http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1&uploadId=", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl1, serverAdminAuthProvider))
+        matchingUploadUrl(serverUploadRequestUrl1), eq(serverAdminAuthProvider)))
         .thenThrow(
           new HttpErrorStatusException("failed to upload segment",
               Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
@@ -1903,9 +1942,27 @@ public class PinotLLCRealtimeSegmentManagerTest {
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
     verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl0, serverAdminAuthProvider);
+        matchingUploadUrl(serverUploadRequestUrl0), eq(serverAdminAuthProvider));
     verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl1, serverAdminAuthProvider);
+        matchingUploadUrl(serverUploadRequestUrl1), eq(serverAdminAuthProvider));
+
+    ArgumentCaptor<String> metadataUploadUrlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(segmentManager._mockedFileUploadDownloadClient, times(2)).uploadLLCToSegmentStoreWithZKMetadata(
+        metadataUploadUrlCaptor.capture(), eq(serverAdminAuthProvider));
+    String failedMetadataUploadUrl = metadataUploadUrlCaptor.getAllValues().stream()
+        .filter(url -> url.startsWith(serverUploadRequestUrl1))
+        .findFirst()
+        .orElseThrow();
+    ArgumentCaptor<String> llcUploadUrlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(
+        llcUploadUrlCaptor.capture(), eq(serverAdminAuthProvider));
+    ArgumentCaptor<String> basicUploadUrlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(
+        basicUploadUrlCaptor.capture(), eq(serverAdminAuthProvider));
+
+    UUID fallbackUploadId = getUploadId(failedMetadataUploadUrl);
+    assertEquals(getUploadId(llcUploadUrlCaptor.getValue()), fallbackUploadId);
+    assertEquals(getUploadId(basicUploadUrlCaptor.getValue()), fallbackUploadId);
   }
 
   @Test

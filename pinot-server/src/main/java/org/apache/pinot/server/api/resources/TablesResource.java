@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Utf8;
 import io.swagger.annotations.Api;
@@ -95,6 +96,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
@@ -143,6 +145,8 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
+  // A restarted server uses a different key so an upload accepted by the old process cannot overwrite its retry.
+  private static final String SEGMENT_UPLOAD_NAMESPACE = UUID.randomUUID().toString();
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
   private static final String SEGMENT_UPLOAD_DIR = "segmentUploadDir";
 
@@ -857,6 +861,8 @@ public class TablesResource {
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @ApiParam(value = "Optional controller attempt UUID; reuse only for retries of the same upload request")
+      @Nullable @QueryParam("uploadId") UUID uploadId,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
@@ -891,11 +897,17 @@ public class TablesResource {
     File segmentTarFile = null;
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
-      return uploadSegment(segmentTarFile, tableNameWithType, segmentName, timeoutMs);
+      return uploadSegment(segmentTarFile, tableNameWithType, segmentName,
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(), timeoutMs, uploadId);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  public String uploadLLCSegment(String realtimeTableName, String segmentName, int timeoutMs, HttpHeaders headers)
+      throws Exception {
+    return uploadLLCSegment(realtimeTableName, segmentName, timeoutMs, null, headers);
   }
 
   /// Upload a low level consumer segment to segment store and return the segment download url, crc and
@@ -930,6 +942,8 @@ public class TablesResource {
       String realtimeTableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @ApiParam(value = "Optional controller attempt UUID; reuse only for retries of the same upload request")
+      @Nullable @QueryParam("uploadId") UUID uploadId,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableNameWithType = DatabaseUtils.translateTableName(realtimeTableNameWithType, headers);
@@ -963,7 +977,8 @@ public class TablesResource {
     File segmentTarFile = null;
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
-      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName,
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(), timeoutMs, uploadId);
       return new TableLLCSegmentUploadResponse(
           segmentName,
           Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
@@ -973,6 +988,12 @@ public class TablesResource {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  public TableLLCSegmentUploadResponse uploadLLCSegmentV2(String realtimeTableNameWithType, String segmentName,
+      int timeoutMs, HttpHeaders headers)
+      throws Exception {
+    return uploadLLCSegmentV2(realtimeTableNameWithType, segmentName, timeoutMs, null, headers);
   }
 
   /// Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
@@ -1002,7 +1023,10 @@ public class TablesResource {
       @ApiParam(value = "Name of the real-time table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs, @Context HttpHeaders headers)
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @ApiParam(value = "Optional controller attempt UUID; reuse only for retries of the same upload request")
+      @Nullable @QueryParam("uploadId") UUID uploadId,
+      @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
     segmentName = URIUtils.decode(segmentName);
@@ -1038,7 +1062,8 @@ public class TablesResource {
     File segmentTarFile = null;
     try {
       segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
-      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableName, segmentName, timeoutMs);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableName, segmentName,
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(), timeoutMs, uploadId);
 
       // Fetch existing segment ZK Metadata
       SegmentZKMetadata segmentZKMetadata =
@@ -1058,6 +1083,12 @@ public class TablesResource {
     }
   }
 
+  public String uploadCommittedSegment(String realtimeTableName, String segmentName, int timeoutMs,
+      HttpHeaders headers)
+      throws Exception {
+    return uploadCommittedSegment(realtimeTableName, segmentName, timeoutMs, null, headers);
+  }
+
   /// Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
   private File createSegmentTarFile(TableDataManager tableDataManager, String segmentName)
       throws IOException {
@@ -1074,14 +1105,19 @@ public class TablesResource {
   }
 
   /// Uploads a segment tar file to the segment store and returns the segment download url.
-  private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName, int timeoutMs) {
-    SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
+  private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName,
+      String segmentVersion, int timeoutMs, @Nullable UUID requestUploadId) {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    SegmentUploader segmentUploader = instanceDataManager.getSegmentUploader();
+    UUID uploadId = getSegmentUploadId(SEGMENT_UPLOAD_NAMESPACE, instanceDataManager.getInstanceId(), segmentName,
+        segmentVersion, requestUploadId);
     URI segmentDownloadUrl;
     if (timeoutMs <= 0) {
       // Use default timeout if passed timeout is not positive
-      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), uploadId);
     } else {
-      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
+      segmentDownloadUrl =
+          segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs, uploadId);
     }
     if (segmentDownloadUrl == null) {
       throw new WebApplicationException(
@@ -1089,6 +1125,16 @@ public class TablesResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     return segmentDownloadUrl.toString();
+  }
+
+  /// Derives a server-scoped upload identity for one controller attempt. A missing request ID preserves legacy
+  /// behavior by creating a fresh identity for each request.
+  @VisibleForTesting
+  static UUID getSegmentUploadId(String processNamespace, String instanceId, String segmentName,
+      String segmentVersion, @Nullable UUID requestUploadId) {
+    UUID uploadAttemptId = requestUploadId != null ? requestUploadId : UUID.randomUUID();
+    UUID producerId = SegmentCompletionUtils.generateUploadId(processNamespace, instanceId, uploadAttemptId.toString());
+    return SegmentCompletionUtils.generateUploadId(producerId.toString(), segmentName, segmentVersion);
   }
 
   @GET

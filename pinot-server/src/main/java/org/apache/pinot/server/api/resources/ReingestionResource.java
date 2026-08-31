@@ -199,14 +199,15 @@ public class ReingestionResource {
     }
 
     // Generate a jobId for tracking
-    String jobId = UUID.randomUUID().toString();
+    UUID reingestionBuildId = UUID.randomUUID();
+    String jobId = reingestionBuildId.toString();
     ReingestionJob job = new ReingestionJob(jobId, segmentName);
 
     // Kick off the actual work asynchronously
     _reingestionExecutor.submit(() -> {
       try {
         _runningJobs.put(jobId, job);
-        doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig,
+        doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig, reingestionBuildId,
             tableDataManager.getSegmentBuildSemaphore());
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
@@ -224,7 +225,7 @@ public class ReingestionResource {
   /// The actual re-ingestion logic, moved into a separate method for clarity.
   /// This is essentially the old synchronous logic you had in reingestSegment.
   private void doReingestSegment(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Semaphore segmentBuildSemaphore)
+      IndexLoadingConfig indexLoadingConfig, UUID reingestionBuildId, @Nullable Semaphore segmentBuildSemaphore)
       throws Exception {
     String segmentName = segmentZKMetadata.getSegmentName();
     try (StatelessRealtimeSegmentWriter writer = new StatelessRealtimeSegmentWriter(segmentZKMetadata,
@@ -241,7 +242,8 @@ public class ReingestionResource {
 
       ServerSegmentCompletionProtocolHandler protocolHandler =
           new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), realtimeTableName);
-      protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
+      protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile,
+          reingestionBuildId);
 
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     }
