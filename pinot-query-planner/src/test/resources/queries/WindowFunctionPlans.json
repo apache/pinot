@@ -1232,9 +1232,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1245,9 +1246,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1259,9 +1261,10 @@
           "Execution Plan",
           "\nLogicalProject(sum=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1272,9 +1275,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1285,9 +1289,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1 DESC] aggs [DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[DESC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1298,9 +1303,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1313,9 +1319,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1328,9 +1335,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1343,9 +1351,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2], col2=[$1])",
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1358,9 +1367,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2], col2=[$1])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1373,9 +1383,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], row_number=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1388,9 +1399,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], rank=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1403,9 +1415,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], dense_rank=[$2])",
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1416,9 +1429,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], avg=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1430,9 +1444,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], row_number=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1444,9 +1459,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], rank=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1457,9 +1473,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1472,9 +1489,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
           "\n      LogicalWindow(window#0=[window(order by [0 DESC] aggs [MIN($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$0], dir0=[DESC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1488,9 +1506,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
           "\n        LogicalWindow(window#0=[window(order by [1] aggs [AVG($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1504,9 +1523,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1520,9 +1540,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1536,9 +1557,10 @@
           "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
           "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
           "\n        LogicalWindow(window#0=[window(order by [0 DESC] aggs [MIN($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$0], dir0=[DESC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1552,9 +1574,10 @@
           "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
           "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col3=[$2])",
           "\n        LogicalWindow(window#0=[window(order by [0 DESC] aggs [DENSE_RANK()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$0], dir0=[DESC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1565,9 +1588,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1578,9 +1602,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1591,10 +1616,11 @@
           "Execution Plan",
           "\nLogicalProject(col2=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1604,10 +1630,11 @@
         "output": [
           "Execution Plan",
           "\nLogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK()])])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col2=[$1])",
-          "\n      LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n  LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n      LogicalProject(col2=[$1])",
+          "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1618,10 +1645,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1632,10 +1660,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1646,10 +1675,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1660,9 +1690,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [AVG($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1673,9 +1704,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1686,9 +1718,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1699,9 +1732,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1712,9 +1746,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1726,9 +1761,10 @@
           "Execution Plan",
           "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1739,9 +1775,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1752,9 +1789,10 @@
           "Execution Plan",
           "\nLogicalProject(col3=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1765,9 +1803,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], avg=[$2], min=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1778,9 +1817,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], dense_rank=[$2], min=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), MIN($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1791,9 +1831,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), MIN($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1804,9 +1845,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1819,9 +1861,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), AVG($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[DESC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1834,9 +1877,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [RANK(), AVG($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[DESC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1850,9 +1894,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n        LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), MIN($1)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1866,9 +1911,10 @@
           "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), AVG($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[DESC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1882,9 +1928,10 @@
           "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3], col2=[$1])",
           "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [DENSE_RANK(), RANK()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[DESC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1895,9 +1942,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), MAX($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1909,9 +1957,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1922,9 +1971,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col2=[$1], EXPR$0=[REVERSE($0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1935,10 +1985,11 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [AVG($1), COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1949,10 +2000,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MIN($1), MAX($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n          LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1963,10 +2015,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n          LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1977,9 +2030,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [2] aggs [AVG($1), COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1990,9 +2044,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK(), COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2718,9 +2773,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2731,9 +2787,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2744,9 +2801,10 @@
           "Execution Plan",
           "\nLogicalProject(avg=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2757,9 +2815,10 @@
           "Execution Plan",
           "\nLogicalProject(row_number=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2770,9 +2829,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2783,9 +2843,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2796,9 +2857,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2809,9 +2871,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], avg=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2822,9 +2885,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2837,9 +2901,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2852,9 +2917,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col2=[$1], EXPR$1=[$2], col1=[$0])",
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2867,9 +2933,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col2=[$1], EXPR$1=[$2], col1=[$0])",
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2883,9 +2950,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3])",
           "\n        LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2899,9 +2967,10 @@
           "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
           "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2915,9 +2984,10 @@
           "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
           "\n      LogicalProject(col2=[$1], EXPR$1=[$2], col1=[$0])",
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2928,9 +2998,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [COUNT($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[2]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[SUBSTR($0, 0, 2)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2941,10 +3012,11 @@
           "Execution Plan",
           "\nLogicalProject(col2=[$1], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2955,10 +3027,11 @@
           "Execution Plan",
           "\nLogicalProject(col2=[$1], EXPR$1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          LogicalFilter(condition=[SEARCH($2, Sarg[(10..500]])])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2969,10 +3042,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [AVG($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2983,10 +3057,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2997,10 +3072,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3011,9 +3087,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [AVG($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2], $1=[REVERSE($1)], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col3=[$2], $1=[REVERSE($1)], $2=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3024,9 +3101,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3037,9 +3115,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3050,9 +3129,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3063,9 +3143,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($1), DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3077,9 +3158,10 @@
           "Execution Plan",
           "\nLogicalProject(max=[$3], count=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3090,9 +3172,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3103,9 +3186,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3116,9 +3200,10 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], avg=[$3], min=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3129,9 +3214,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), MIN($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3142,9 +3228,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3157,9 +3244,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), AVG($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3172,9 +3260,10 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [RANK(), DENSE_RANK()])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3188,9 +3277,10 @@
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), MIN($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3204,9 +3294,10 @@
           "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), AVG($2)])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3220,9 +3311,10 @@
           "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
           "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4], col2=[$1])",
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [DENSE_RANK(), RANK()])])",
-          "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          LogicalSort(sort0=[$2], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3233,9 +3325,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4], EXPR$2=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), MAX($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE($0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3246,10 +3339,11 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [AVG($2), COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3260,10 +3354,11 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3274,10 +3369,11 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK(), DENSE_RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3288,10 +3384,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4], EXPR$2=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2), MAX($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n          LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3302,10 +3399,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], EXPR$0=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
+          "\n          LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3316,9 +3414,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$4], EXPR$1=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {3} order by [2] aggs [AVG($1), COUNT($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[3]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)], $3=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[3]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)], $3=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3329,9 +3428,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [AVG($0), RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3361,11 +3461,12 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [2 DESC, 0] aggs [AVG($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], sort1=[$0], dir0=[DESC], dir1=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3375,12 +3476,13 @@
         "output": [
           "Execution Plan",
           "\nLogicalWindow(window#0=[window(order by [1 DESC, 0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n  LogicalSort(sort0=[$1], sort1=[$0], dir0=[DESC], dir1=[ASC])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3390,12 +3492,13 @@
         "output": [
           "Execution Plan",
           "\nLogicalWindow(window#0=[window(order by [1 DESC, 0] aggs [DENSE_RANK(), RANK()])])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n  LogicalSort(sort0=[$1], sort1=[$0], dir0=[DESC], dir1=[ASC])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$2])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3406,11 +3509,12 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2 DESC, 0] aggs [MAX($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
-          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], sort1=[$0], dir0=[DESC], dir1=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3422,9 +3526,10 @@
           "\nLogicalProject(col1=[$0], rownum=[$3])",
           "\n  LogicalFilter(condition=[<($3, 5)])",
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3436,9 +3541,10 @@
           "\nLogicalProject(col1=[$0], rank=[$3], dense_rank=[$4])",
           "\n  LogicalFilter(condition=[<($4, 5)])",
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] aggs [RANK(), DENSE_RANK()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3450,9 +3556,10 @@
           "\nLogicalProject(row_number=[$2], col2=[$0], col3=[$1])",
           "\n  LogicalFilter(condition=[<=($2, 10)])",
           "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      LogicalSort(sort0=[$1], dir0=[DESC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3463,11 +3570,12 @@
           "Execution Plan",
           "\nLogicalFilter(condition=[=($2, 1)])",
           "\n  LogicalWindow(window#0=[window(order by [1 DESC] aggs [RANK()])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
-          "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[DESC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3479,17 +3587,18 @@
           "\nLogicalProject(row_number=[$2], col2=[$0], col3=[$1])",
           "\n  LogicalFilter(condition=[=($2, 1)])",
           "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
-          "\n            PinotLogicalExchange(distribution=[hash[0]])",
-          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n                LogicalFilter(condition=[>($2, 100)])",
-          "\n                  PinotLogicalTableScan(table=[[default, a]])",
-          "\n            PinotLogicalExchange(distribution=[hash[0]])",
-          "\n              LogicalProject(col2=[$1])",
-          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n                  PinotLogicalTableScan(table=[[default, b]])",
+          "\n      LogicalSort(sort0=[$1], dir0=[DESC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                  LogicalFilter(condition=[>($2, 100)])",
+          "\n                    PinotLogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col2=[$1])",
+          "\n                  LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n                    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -3501,17 +3610,18 @@
           "\nLogicalProject(dense_rank=[$2], col2=[$0], col3=[$1])",
           "\n  LogicalFilter(condition=[>($2, 15)])",
           "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] aggs [DENSE_RANK()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
-          "\n            PinotLogicalExchange(distribution=[hash[0]])",
-          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n                LogicalFilter(condition=[>($2, 100)])",
-          "\n                  PinotLogicalTableScan(table=[[default, a]])",
-          "\n            PinotLogicalExchange(distribution=[hash[0]])",
-          "\n              LogicalProject(col2=[$1])",
-          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n                  PinotLogicalTableScan(table=[[default, b]])",
+          "\n      LogicalSort(sort0=[$1], dir0=[DESC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                  LogicalFilter(condition=[>($2, 100)])",
+          "\n                    PinotLogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col2=[$1])",
+          "\n                  LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n                    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -3522,9 +3632,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LAG($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3535,9 +3646,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LEAD($1, 2)])], constants=[[2]])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3548,10 +3660,11 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [AVG($1)])], constants=[[5, 10]])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalFilter(condition=[>=($2, 0)])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          LogicalFilter(condition=[>=($2, 0)])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3562,9 +3675,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$1])",
           "\n  LogicalWindow(window#0=[window(order by [0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($0)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3575,9 +3689,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [1, 0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3588,9 +3703,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [FIRST_VALUE($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3602,9 +3718,10 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [LAST_VALUE($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3621,11 +3738,13 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalWindow(window#0=[window(partition {1} order by [2] aggs [MIN($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalWindow(window#0=[window(partition {1} order by [2] aggs [MIN($2)])])",
+          "\n          LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3636,11 +3755,12 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($1)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1)])])",
-          "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$1], dir0=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1)])])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3668,9 +3788,10 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3681,11 +3802,13 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0, 1] aggs [MIN($2)])])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalWindow(window#0=[window(order by [1, 0] aggs [SUM($2)])])",
-          "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC])",
+          "\n      PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n        LogicalWindow(window#0=[window(order by [1, 0] aggs [SUM($2)])])",
+          "\n          LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n            PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
