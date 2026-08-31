@@ -103,6 +103,16 @@ public interface BlockDocIdSet {
         new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator}));
   }
 
+  /// Releases a DocIdSet that will not be evaluated, e.g. an OR branch a short-circuit skipped past.
+  ///
+  /// Scan-based DocIdSets build their iterator in the constructor, and that iterator holds a
+  /// `ForwardIndexReaderContext` -- a direct ByteBuffer for a chunk-compressed column. Evaluation normally releases it
+  /// because the iterator closes itself on reaching EOF, so a DocIdSet that is never evaluated has to be released
+  /// explicitly. Calling this instead of evaluating never reads any data.
+  default void release() {
+    iterator().close();
+  }
+
   /// Materializes the document ids remaining in the given iterator.
   static MutableRoaringBitmap collect(BlockDocIdIterator docIdIterator) {
     RoaringBitmapWriter<MutableRoaringBitmap> bitmapWriter =

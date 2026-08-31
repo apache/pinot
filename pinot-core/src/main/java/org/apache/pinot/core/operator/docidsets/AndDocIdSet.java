@@ -196,11 +196,15 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
       // Hand the matching document ids to the composite children, so that a scan-based predicate nested inside one of
       // them (typically under an OR) is only evaluated on the documents that can still match this AND.
-      for (BlockDocIdSet restrictableDocIdSet : restrictableDocIdSets) {
+      for (int i = 0; i < numRestrictableDocIdSets; i++) {
         if (docIds.isEmpty()) {
+          // Nothing can match any more, but the remaining children still hold reader contexts
+          for (int j = i; j < numRestrictableDocIdSets; j++) {
+            restrictableDocIdSets.get(j).release();
+          }
           break;
         }
-        docIds = restrictableDocIdSet.applyAnd(docIds);
+        docIds = restrictableDocIdSets.get(i).applyAnd(docIds);
       }
       RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
       if (numRemainingDocIdIterators == 0) {
@@ -240,8 +244,11 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BlockDocIdSet> docIdSets = _docIdSets;
     Preconditions.checkState(docIdSets != null, "applyAnd() called on an already consumed AndDocIdSet");
     if (docIds.isEmpty()) {
-      // Publish the stats state before dropping the children, so that a concurrent reader never sees it disappear
-      _scanBasedDocIdSets.set(List.of());
+      // No child is evaluated, so none of them will close its own iterator
+      for (BlockDocIdSet docIdSet : docIdSets) {
+        docIdSet.release();
+      }
+      _scanBasedDocIdSets.set(docIdSets);
       _docIdSets = null;
       return new MutableRoaringBitmap();
     }
@@ -266,6 +273,16 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
+  }
+
+  @Override
+  public void release() {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    if (docIdSets != null) {
+      for (BlockDocIdSet docIdSet : docIdSets) {
+        docIdSet.release();
+      }
+    }
   }
 
   @Override
