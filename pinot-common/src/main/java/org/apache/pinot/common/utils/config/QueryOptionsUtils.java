@@ -549,6 +549,12 @@ public class QueryOptionsUtils {
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
   }
 
+  @Nullable
+  public static Integer getStreamingDistinctFlushThreshold(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }

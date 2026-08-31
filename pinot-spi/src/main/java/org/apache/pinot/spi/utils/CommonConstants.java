@@ -546,6 +546,17 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.group.by.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = -1;
+
+    /// Default flush threshold for the streaming distinct leaf-stage operator on MSE. When positive, the broker
+    /// injects this value as the `streamingDistinctFlushThreshold` query option for MSE queries that do not already
+    /// specify it, opting the cluster into the streaming distinct behavior by default. Setting the query option
+    /// explicitly (including to `0` to disable) always wins over the broker default.
+    ///
+    /// See [Request.QueryOptionKey#STREAMING_DISTINCT_FLUSH_THRESHOLD] for the conditions a query must meet before
+    /// the threshold takes effect; queries that do not meet them are unaffected by this default.
+    public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
+        "pinot.broker.mse.streaming.distinct.flush.threshold";
+    public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -796,6 +807,27 @@ public class CommonConstants {
 
         /// Flush threshold for streaming group-by on MSE leaf stages.
         public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
+
+        /// Flush threshold for streaming distinct on MSE leaf stages. When positive, the leaf flushes its
+        /// accumulated distinct values downstream once they reach this count and starts a fresh table, bounding
+        /// server memory and pushing the residual de-duplication into the partitioned intermediate stage.
+        ///
+        /// The value is also a feature gate, so it is a silent no-op unless ALL of the following hold. Setting it
+        /// produces no error and no diagnostic when they do not:
+        ///
+        /// - the query is a DISTINCT query (an MSE aggregate with no aggregate calls; a group-by with real
+        ///   aggregations uses [#STREAMING_GROUP_BY_FLUSH_THRESHOLD] instead)
+        /// - it has no ORDER BY — an ordered distinct already keeps a bounded top-LIMIT heap
+        /// - the leaf-stage LIMIT is strictly greater than this threshold — a smaller LIMIT already bounds the
+        ///   table and gives the early-termination short-circuit, which streaming would throw away
+        /// - the leaf is not returning final results (the `is_partitioned_by_group_by_keys` and
+        ///   `is_leaf_return_final_result` hints), because then no stage above the leaf is guaranteed to
+        ///   de-duplicate across flush windows
+        ///
+        /// NOTE: This relies on a downstream stage de-duplicating the partial flushes, which is what the MSE hash
+        /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
+        /// there is no such stage and the client would observe duplicate rows across flush windows.
+        public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";

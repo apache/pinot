@@ -338,6 +338,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setStreamingGroupByFlushThreshold(streamingGroupByFlushThreshold);
       }
     }
+
+    // Set distinct query options. NOTE: This is intentionally outside the group-by block above, because DISTINCT is a
+    // separate query class from aggregation (see QueryContextUtils.isDistinctQuery).
+    if (QueryContextUtils.isDistinctQuery(queryContext)) {
+      // Set streamingDistinctFlushThreshold
+      Integer streamingDistinctFlushThreshold = QueryOptionsUtils.getStreamingDistinctFlushThreshold(queryOptions);
+      if (streamingDistinctFlushThreshold != null) {
+        queryContext.setStreamingDistinctFlushThreshold(streamingDistinctFlushThreshold);
+      }
+    }
   }
 
   @Override
