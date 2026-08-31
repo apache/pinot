@@ -904,7 +904,6 @@ public class ReplicaGroupSelectorTest {
 
     assertEquals(result.segmentToInstanceMap(), Map.of(STRICT_SEGMENT0, STRICT_RG0_SERVER_A));
     assertEquals(result.optionalSegmentToInstanceMap(), Map.of(newSegment, STRICT_RG1_SERVER_D));
-    assertTrue(result.unavailableSegments().isEmpty());
   }
 
   @Test

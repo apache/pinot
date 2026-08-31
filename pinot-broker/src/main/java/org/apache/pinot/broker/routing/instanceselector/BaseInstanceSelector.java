@@ -23,7 +23,6 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -517,23 +516,22 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getQueryOptions() != null)
             ? brokerRequest.getPinotQuery().getQueryOptions() : Map.of();
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
-    // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
-    // the state.
+    // Copy the volatile reference so that the segment-to-instance map and unavailable segments have a consistent view
+    // of the state.
     SegmentStates segmentStates = _segmentStates;
     InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
-    List<String> mappingUnavailable = mapping.unavailableSegments();
 
-    if (unavailableSegments.isEmpty() && mappingUnavailable.isEmpty()) {
+    if (unavailableSegments.isEmpty()) {
       return new SelectionResult(mapping, List.of(), 0);
     } else {
-      Set<String> unavailableSegmentsForRequest = new LinkedHashSet<>(mappingUnavailable);
+      List<String> unavailableSegmentsForRequest = new ArrayList<>();
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      return new SelectionResult(mapping, new ArrayList<>(unavailableSegmentsForRequest), 0);
+      return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
     }
   }
 

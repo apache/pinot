@@ -88,17 +88,10 @@ public interface InstanceSelector {
   }
 
   /// Holds the result of an instance selection: `segmentToInstanceMap` maps each segment to its selected server
-  /// instance, `optionalSegmentToInstanceMap` maps segments not yet fully online that the server may skip, and
-  /// `unavailableSegments` lists segments that have candidates but could not be routed. These unavailable segments are
-  /// merged into the query's unavailable-segment list and surfaced as a `BROKER_SEGMENT_UNAVAILABLE` error.
+  /// instance, and `optionalSegmentToInstanceMap` maps segments not yet fully online that the server may skip.
   record InstanceMapping(Map<String, String> segmentToInstanceMap,
-      Map<String, String> optionalSegmentToInstanceMap,
-      List<String> unavailableSegments) {
-    static final InstanceMapping EMPTY = new InstanceMapping(Map.of(), Map.of(), List.of());
-
-    public InstanceMapping(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap) {
-      this(segmentToInstanceMap, optionalSegmentToInstanceMap, List.of());
-    }
+      Map<String, String> optionalSegmentToInstanceMap) {
+    static final InstanceMapping EMPTY = new InstanceMapping(Map.of(), Map.of());
   }
 
   class SelectionResult {
