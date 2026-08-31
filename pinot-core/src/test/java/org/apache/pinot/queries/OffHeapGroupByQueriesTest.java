@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.queries;
 
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
@@ -41,10 +43,12 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -52,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -130,8 +135,17 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
   private static final String AN_STR = "anStr";
   private static final String NS_METRIC = "nsMetric";
 
+  // Star-tree segment columns: pre-aggregated DISTINCTCOUNTULL(stValInt) per stDim, plus a raw BYTES column
+  // carrying pre-serialized ULLs (the input shape the star-tree feeds through StarTreeGroupByExecutor)
+  private static final String ST_SEGMENT_NAME = "testStarTreeSegment";
+  private static final int NUM_ST_RECORDS = 5_000;
+  private static final String ST_DIM = "stDim";           // cardinality 20
+  private static final String ST_VAL_INT = "stValInt";    // cardinality 500
+  private static final String ST_ULL_BYTES = "stUllBytes";
+
   private IndexSegment _mainSegment;
   private IndexSegment _nullSegment;
+  private IndexSegment _starTreeSegment;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
   private long _directBufferBaseline;
@@ -157,8 +171,10 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
     buildMainSegment();
     buildNullSegment();
+    buildStarTreeSegment();
     _mainSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
     _nullSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, NULL_SEGMENT_NAME), ReadMode.mmap);
+    _starTreeSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, ST_SEGMENT_NAME), ReadMode.mmap);
     useMainSegment();
 
     // Warm-up off-heap query, then capture the direct-buffer baseline (see class doc for why the baseline is
@@ -174,6 +190,7 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
       throws Exception {
     _mainSegment.destroy();
     _nullSegment.destroy();
+    _starTreeSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
@@ -185,6 +202,11 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
   private void useNullSegment() {
     _indexSegment = _nullSegment;
     _indexSegments = Arrays.asList(_nullSegment, _nullSegment);
+  }
+
+  private void useStarTreeSegment() {
+    _indexSegment = _starTreeSegment;
+    _indexSegments = Arrays.asList(_starTreeSegment, _starTreeSegment);
   }
 
   private void buildMainSegment()
@@ -252,6 +274,39 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
       values[i] = stringPrefix != null ? stringPrefix + value : value;
     }
     return values;
+  }
+
+  /// Builds a small segment with a star-tree on `stDim -> DISTINCTCOUNTULL(stValInt)` (stored pre-aggregated as
+  /// serialized ULL BYTES) plus a raw BYTES column carrying per-row serialized ULLs.
+  private void buildStarTreeSegment()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(ST_DIM, DataType.STRING)
+        .addSingleValueDimension(ST_VAL_INT, DataType.INT)
+        .addSingleValueDimension(ST_ULL_BYTES, DataType.BYTES)
+        .build();
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of(ST_DIM), null, List.of("distinctCountULL__" + ST_VAL_INT), null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of(ST_ULL_BYTES))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+
+    Random random = new Random(RANDOM_SEED);
+    List<GenericRow> records = new ArrayList<>(NUM_ST_RECORDS);
+    for (int i = 0; i < NUM_ST_RECORDS; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(ST_DIM, "st_" + random.nextInt(20));
+      record.putValue(ST_VAL_INT, random.nextInt(500));
+      UltraLogLog ull = UltraLogLog.create(CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
+      int numValues = 1 + random.nextInt(3);
+      for (int j = 0; j < numValues; j++) {
+        UltraLogLogUtils.hashObject((long) random.nextInt(2000)).ifPresent(ull::add);
+      }
+      record.putValue(ST_ULL_BYTES, ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull));
+      records.add(record);
+    }
+    buildSegment(tableConfig, schema, records, ST_SEGMENT_NAME, false);
   }
 
   private void buildNullSegment()
@@ -451,6 +506,74 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
     for (String column : columns) {
       testQuery("SELECT " + column + ", " + aggregations(METRIC) + " FROM testTable GROUP BY " + column
           + " LIMIT 100000");
+    }
+  }
+
+  /// DISTINCTCOUNTULL group-by state moves off-heap (OffHeapUltraLogLogGroupByResultHolder) when the input is a
+  /// raw (no-dictionary) column; dictionary-encoded inputs keep the on-heap dict-id bitmap through the holder's
+  /// delegate. Both modes must produce byte-identical ULL states, so even the serialized RAWULL output compares
+  /// exactly.
+  @Test
+  public void testDistinctCountULL() {
+    // Raw input values -> off-heap register slots, across group-key generator variants
+    testQuery("SELECT dLowStr, DISTINCTCOUNTULL(rawInt) FROM testTable GROUP BY dLowStr LIMIT 100000");
+    testQuery("SELECT dHighStr, DISTINCTCOUNTULL(rawString) FROM testTable GROUP BY dHighStr LIMIT 100000");
+    testQuery("SELECT rawInt, DISTINCTCOUNTULL(rawDouble) FROM testTable GROUP BY rawInt LIMIT 100000");
+    // NOTE: no rawBytes input — a single-value BYTES input is always interpreted as pre-serialized ULLs
+    testQuery("SELECT rawString, DISTINCTCOUNTULL(rawLong), DISTINCTCOUNTULL(rawFloat) FROM testTable"
+        + " GROUP BY rawString LIMIT 100000");
+    // Explicit precision argument (non-default slot sizes)
+    testQuery("SELECT dLowStr, DISTINCTCOUNTULL(rawInt, 8), DISTINCTCOUNTULL(rawInt, 14) FROM testTable"
+        + " GROUP BY dLowStr LIMIT 100000");
+    // Dictionary-encoded input -> heap dict-id bitmap through the holder's delegate
+    testQuery("SELECT dLowStr, DISTINCTCOUNTULL(dInt), DISTINCTCOUNTULL(dHighStr) FROM testTable GROUP BY dLowStr"
+        + " LIMIT 100000");
+    // MV input values (dict-encoded -> delegate; the raw MV value path is covered by the unit tests)
+    testQuery("SELECT dLowStr, DISTINCTCOUNTULL(mvInt) FROM testTable GROUP BY dLowStr LIMIT 100000");
+    // MV group keys: SV raw input over int[] group keys (setValueForGroupKeys), and MV input over MV keys
+    testQuery("SELECT mvInt, DISTINCTCOUNTULL(rawInt) FROM testTable GROUP BY mvInt LIMIT 100000");
+    testQuery("SELECT mvInt, DISTINCTCOUNTULL(mvStr) FROM testTable GROUP BY mvInt LIMIT 100000");
+    // Serialized (RAWULL) final results compare exactly because the states are byte-identical
+    testQuery("SELECT dLowStr, DISTINCTCOUNTRAWULL(rawString) FROM testTable GROUP BY dLowStr LIMIT 100000");
+    // Order-by + trim path extracts every group's ULL through TableResizer
+    testOrderedQuery("SELECT dHighStr, DISTINCTCOUNTULL(rawInt) FROM testTable GROUP BY dHighStr"
+        + " ORDER BY DISTINCTCOUNTULL(rawInt) DESC, dHighStr LIMIT 10");
+    // Filtered aggregation shares the generator between the filtered and unfiltered holders
+    testQuery("SELECT dLowStr, DISTINCTCOUNTULL(rawInt) FILTER (WHERE dInt < 100), COUNT(*) FROM testTable"
+        + " GROUP BY dLowStr LIMIT 100000");
+    // Null handling: forEachNotNull must skip null stretches identically in both modes
+    useNullSegment();
+    try {
+      testQuery("SET enableNullHandling=true; SELECT nfStr, DISTINCTCOUNTULL(nmInt) FROM testTable GROUP BY nfStr"
+          + " LIMIT 1000");
+      testQuery("SET enableNullHandling=true; SELECT nmInt, DISTINCTCOUNTULL(nfLong), DISTINCTCOUNTULL(anStr)"
+          + " FROM testTable GROUP BY nmInt LIMIT 1000");
+    } finally {
+      useMainSegment();
+    }
+  }
+
+  /// Pre-serialized-ULL BYTES input: the one group-by mode where the function must read back a LIVE mutable
+  /// object per row (get-merge or adopt via setValueForKey), which the off-heap holder serves through its heap
+  /// delegate. Covered twice: through a raw BYTES column of serialized ULLs, and through a star-tree whose
+  /// pre-aggregated `distinctCountULL__stValInt` column feeds StarTreeGroupByExecutor with the same shape.
+  @Test
+  public void testDistinctCountULLSerializedBytesAndStarTree() {
+    useStarTreeSegment();
+    try {
+      // Plain BYTES branch through the ordinary executor
+      testQuery("SELECT stDim, DISTINCTCOUNTULL(stUllBytes) FROM testTable GROUP BY stDim LIMIT 1000");
+      // Star-tree path: pre-aggregated ULL BYTES through StarTreeGroupByExecutor in both modes
+      String starTreeQuery = "SELECT stDim, DISTINCTCOUNTULL(stValInt) FROM testTable GROUP BY stDim LIMIT 1000";
+      testQuery(starTreeQuery);
+      // Prove the star-tree actually served the query (fully pre-aggregated at maxLeafRecords=1, so far fewer
+      // docs than rows are scanned) — otherwise the star-tree leg of this test is vacuous
+      for (BrokerResponseNative response : runBothModes(starTreeQuery)) {
+        assertTrue(response.getNumDocsScanned() < NUM_ST_RECORDS,
+            "Expected the star-tree to serve the query, but numDocsScanned=" + response.getNumDocsScanned());
+      }
+    } finally {
+      useMainSegment();
     }
   }
 
