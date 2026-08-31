@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -79,6 +80,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.helix.core.ConsumingSegmentDeletionException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.TableMetadataReader;
@@ -145,6 +147,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotSegmentRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
+  private static final String CONSUMING_SEGMENT_DELETE_NOTE =
+      "Realtime segment deletion is rejected while any target has a CONSUMING replica. Pause the table, poll "
+          + "/tables/{tableName}/pauseStatus until consumingSegments is empty, then retry.";
 
   @Inject
   ControllerConf _controllerConf;
@@ -514,7 +519,7 @@ public class PinotSegmentRestletResource {
   @Path("/segments/{tableName}/{segmentName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete a segment", notes = "Delete a segment")
+  @ApiOperation(value = "Delete a segment", notes = CONSUMING_SEGMENT_DELETE_NOTE)
   public SuccessResponse deleteSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -535,7 +540,8 @@ public class PinotSegmentRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete the list of segments provided in the queryParam else all segments",
-      notes = "Delete the list of segments provided in the queryParam else all segments")
+      notes = "Delete the list of segments provided in the queryParam else all segments. "
+          + CONSUMING_SEGMENT_DELETE_NOTE)
   public SuccessResponse deleteMultipleSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
@@ -575,7 +581,7 @@ public class PinotSegmentRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete the segments in the JSON array payload",
-      notes = "Delete the segments in the JSON array payload")
+      notes = "Delete the segments in the JSON array payload. " + CONSUMING_SEGMENT_DELETE_NOTE)
   public SuccessResponse deleteSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
@@ -605,7 +611,8 @@ public class PinotSegmentRestletResource {
       + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
       + " from the table. The value is false by default.",
       // TODO: more and more filters can be added later on, like excludeErrorSegments, excludeConsumingSegments, etc.
-      notes = "List all segments")
+      notes = "The OFFLINE and REALTIME parts of a hybrid table are deleted independently. "
+          + CONSUMING_SEGMENT_DELETE_NOTE)
   public SuccessResponse deleteSegmentsWithTimeWindow(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -645,8 +652,12 @@ public class PinotSegmentRestletResource {
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
       @Nullable String retentionPeriod) {
-    PinotResourceManagerResponse response =
-        _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
+    PinotResourceManagerResponse response;
+    try {
+      response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
+    } catch (ConsumingSegmentDeletionException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST, e);
+    }
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),
@@ -958,9 +969,10 @@ public class PinotSegmentRestletResource {
           + "For each segment provided, it identifies the partition and deletes all segments "
           + "with sequence numbers >= the provided segment in that partition. "
           + "When force flag is true, it bypasses checks for pauseless being enabled and table being paused. "
+          + "The force flag does not bypass CONSUMING segment protection. "
           + "The retention period controls how long deleted segments are retained before permanent removal. "
           + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
-          + "Use 0d or -1d for immediate deletion without retention.")
+          + "Use 0d or -1d for immediate deletion without retention. " + CONSUMING_SEGMENT_DELETE_NOTE)
   public String deleteSegmentsFromSequenceNum(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
@@ -1010,6 +1022,7 @@ public class PinotSegmentRestletResource {
 
     Map<String, Object> response = new HashMap<>();
     Map<Integer, Object> partitionDetails = new HashMap<>();
+    Set<String> segmentsToDelete = new TreeSet<>();
 
     for (Integer partitionID : partitionToOldestSegment.keySet()) {
       Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
@@ -1024,14 +1037,18 @@ public class PinotSegmentRestletResource {
 
       partitionDetails.put(partitionID, partitionInfo);
 
-      // Only perform actual deletion if dryRun is false
       if (!dryRun) {
         LOGGER.info(
-            "Deleting {} segments from segment: {} to segment: {} for partition: {}. Segments being deleted are: {}",
+            "Selected {} segments from segment: {} to segment: {} for partition: {}. Segments selected are: {}",
             segmentsToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID,
             segmentsToDeleteForPartition);
-        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDeleteForPartition), null);
+        segmentsToDelete.addAll(segmentsToDeleteForPartition);
       }
+    }
+
+    // Delete all selected partitions as one batch so a blocked segment cannot leave earlier partitions deleted.
+    if (!dryRun && !segmentsToDelete.isEmpty()) {
+      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDelete), null);
     }
 
     response.put("tableName", tableNameWithType);
@@ -1102,7 +1119,7 @@ public class PinotSegmentRestletResource {
 
   @VisibleForTesting
   Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments, Set<String> idealStateSegmentsSet) {
-    Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
+    Map<Integer, LLCSegmentName> partitionToOldestSegment = new TreeMap<>();
 
     for (String segment : segments) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
