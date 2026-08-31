@@ -30,16 +30,16 @@ github:
     merge: false
     rebase: false
   collaborators:
-    - noob-se7en
-    - J-HowHuang
-    - shauryachats
-    - 9aman
+    - Akanksha-kedia
     - deepthi912
-    - abhishekbafna
-    - raghavyadav01
-    - rhodo
-    - lnbest0707-uber
+    - J-HowHuang
+    - suvodeep-pyne
+    - hongkunxu
     - shounakmk219
+    - jadami10
+    - arunkumarucet
+    - dang-stripe
+    - jineshparakh
   rulesets:
     - name: "Default Branch Protection"
       type: branch
