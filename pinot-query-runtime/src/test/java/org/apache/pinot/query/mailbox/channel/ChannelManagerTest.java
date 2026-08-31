@@ -24,6 +24,7 @@ import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -41,7 +42,8 @@ public class ChannelManagerTest {
   public void testResetConnectBackoffNoOpForUnknownChannel() {
     ChannelManager channelManager = new ChannelManager(null, 4_000_000, Duration.ofDays(365),
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        GrpcKeepAliveConfig.DISABLED);
     // Should return false and not throw when no channel exists for the given host/port
     assertFalse(channelManager.resetConnectBackoff("unknown-host", 12345));
   }
@@ -50,7 +52,8 @@ public class ChannelManagerTest {
   public void testResetConnectBackoffNoOpWhenNotInTransientFailure() {
     ChannelManager channelManager = new ChannelManager(null, 4_000_000, Duration.ofDays(365),
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        GrpcKeepAliveConfig.DISABLED);
     // Create a channel by calling getChannel
     ManagedChannel channel = channelManager.getChannel("localhost", 12345);
     try {
@@ -70,7 +73,8 @@ public class ChannelManagerTest {
       throws Exception {
     ChannelManager channelManager = new ChannelManager(null, 4_000_000, Duration.ofDays(365),
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        GrpcKeepAliveConfig.DISABLED);
 
     ManagedChannel mockChannel = mock(ManagedChannel.class);
     when(mockChannel.getState(false)).thenReturn(ConnectivityState.TRANSIENT_FAILURE);
@@ -94,7 +98,7 @@ public class ChannelManagerTest {
   public void testConstructorRejectsZeroWriteBufferLowWaterMark() {
     new ChannelManager(null, 4_000_000, Duration.ofDays(365),
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
-        0);
+        0, GrpcKeepAliveConfig.DISABLED);
   }
 
   /// Pins the eager `new WriteBufferWaterMark(low, high)` invariant: when `low > high`, Netty's own
@@ -105,6 +109,40 @@ public class ChannelManagerTest {
   public void testConstructorRejectsLowWatermarkAboveHighWatermark() {
     new ChannelManager(null, 4_000_000, Duration.ofDays(365),
         32 * 1024 * 1024,  // high
-        64 * 1024 * 1024); // low > high
+        64 * 1024 * 1024, // low > high
+        GrpcKeepAliveConfig.DISABLED);
+  }
+
+  /// Pins that the manager hands its keep-alive policy to every channel it builds.
+  ///
+  /// gRPC exposes nothing on a built `ManagedChannel` to read the keep-alive settings back, so this asserts the
+  /// policy the manager holds; that the policy reaches the transport is covered end to end by
+  /// [MailboxChannelKeepAliveTest].
+  @Test
+  public void testKeepAliveConfigRetained() {
+    GrpcKeepAliveConfig keepAlive = new GrpcKeepAliveConfig(30_000, 5_000, true);
+    ChannelManager channelManager = new ChannelManager(null, 4_000_000, Duration.ofDays(365),
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES, keepAlive);
+    assertSame(channelManager.getKeepAliveConfig(), keepAlive);
+    // Building a channel with keep-alive enabled must not throw: gRPC rejects a non-positive keepAliveTime, and the
+    // enabled check that prevents that lives in GrpcKeepAliveConfig rather than at this call site.
+    ManagedChannel channel = channelManager.getChannel("localhost", 12346);
+    try {
+      assertSame(channelManager.getChannel("localhost", 12346), channel);
+    } finally {
+      channel.shutdownNow();
+    }
+  }
+
+  /// A disabled policy must leave the builder alone rather than passing `-1` to gRPC, which throws.
+  @Test
+  public void testDisabledKeepAliveStillBuildsChannel() {
+    ChannelManager channelManager = new ChannelManager(null, 4_000_000, Duration.ofDays(365),
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        GrpcKeepAliveConfig.DISABLED);
+    ManagedChannel channel = channelManager.getChannel("localhost", 12347);
+    channel.shutdownNow();
   }
 }

@@ -2571,6 +2571,68 @@ public class CommonConstants {
     public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
     public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
 
+    /// gRPC keep-alive time for mailbox channels, in milliseconds. Values &gt; 0 enable keep-alive pings on the
+    /// server-to-server (and server-to-broker) data channels, so that a peer that stopped answering *without*
+    /// closing its socket transitions the channel out of `READY` instead of being sent to forever.
+    ///
+    /// The failure this addresses is a peer whose host is hung or unreachable one-way: no `RST` is ever received, so
+    /// gRPC keeps the cached channel `READY`, every mailbox send parks until the query deadline, and — because gRPC
+    /// only re-resolves DNS when a transport is dropped — a peer that has come back at a new address is never
+    /// reached again. The symptom is every multi-stage query timing out while the leaf stages complete in
+    /// milliseconds, for as long as the channel is cached, which is indefinitely by default (see
+    /// [#KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS]).
+    ///
+    /// Defaults are chosen to be safe against a peer running an older version, whose mailbox server enforces
+    /// Netty's gRPC defaults (`permitKeepAliveTime` = 5 minutes, `permitKeepAliveWithoutCalls` = false) and answers
+    /// a faster ping with `GOAWAY(ENHANCE_YOUR_CALM)`. Operators wanting faster detection must lower
+    /// [#KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS] on every peer first.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_TIME_MS = "pinot.query.runner.channel.keep.alive.time.ms";
+    public static final int DEFAULT_CHANNEL_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// gRPC keep-alive timeout for mailbox channels, in milliseconds: how long a keep-alive ping may go unanswered
+    /// before the transport is declared dead. Only applies when keep-alive is enabled.
+    ///
+    /// Sized to survive a long stop-the-world pause on a loaded peer. A ping unanswered for a few seconds is a GC
+    /// pause, not a dead host, and dropping the transport there would fail healthy in-flight queries.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_TIMEOUT_MS =
+        "pinot.query.runner.channel.keep.alive.timeout.ms";
+    public static final int DEFAULT_CHANNEL_KEEP_ALIVE_TIMEOUT_MS = 30_000;
+
+    /// Whether to send gRPC keep-alive pings on mailbox channels even when there are no active calls. Default is
+    /// `false` because Netty's default gRPC server rejects pings-without-calls with `GOAWAY(ENHANCE_YOUR_CALM)`;
+    /// enabling it requires [#KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS] on every peer.
+    ///
+    /// Leaving this off does not blind the ping to a dead peer. The ping deadline is anchored to the last data
+    /// *received* on the transport, not to stream boundaries, so a channel whose streams keep dying at their query
+    /// deadline still accumulates it; the ping is merely deferred until a stream is open again, and then fires at
+    /// once. The difference the two settings make is who pays for the recovery: with pings-without-calls off, the
+    /// transport is torn down by the next query to open a stream, and that query fails; with it on, the tear-down
+    /// happens in the background between queries and no query sees the dead channel at all.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.runner.channel.keep.alive.without.calls";
+    public static final boolean DEFAULT_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the mailbox server
+    /// ([org.apache.pinot.query.mailbox.channel.GrpcMailboxServer]) will accept. Pings arriving more frequently than
+    /// this are counted as "bad pings"; once the server's internal threshold is exceeded it sends
+    /// `GOAWAY(ENHANCE_YOUR_CALM)` with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Lowering
+    /// [#KEY_OF_CHANNEL_KEEP_ALIVE_TIME_MS] for faster detection of a silent peer requires this to be less than or
+    /// equal to the configured client keep-alive time **on every instance the channel may reach**, otherwise those
+    /// peers will tear the mailbox channel down. A non-positive value leaves Netty's gRPC server default in place.
+    public static final String KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.runner.mailbox.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the mailbox server permits client gRPC keep-alive pings when there are no active RPCs on the
+    /// connection. Defaults to `false` to match Netty's gRPC server default. Must be set to `true` on every peer if
+    /// [#KEY_OF_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] is enabled, otherwise those peers will close idle channels with
+    /// `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.runner.mailbox.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
+
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;

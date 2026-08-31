@@ -41,6 +41,7 @@ import org.apache.pinot.core.instance.context.ControllerContext;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -131,11 +132,13 @@ public class MailboxService {
     int writeBufferLowWaterMarkBytes = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+    GrpcKeepAliveConfig keepAliveConfig = GrpcKeepAliveConfig.forMailboxChannels(config);
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
-        writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes);
+        writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes, keepAliveConfig);
     _accessControlFactory = accessControlFactory;
     registerMailboxClientGauges();
-    LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
+    LOGGER.info("Initialized MailboxService with hostname: {}, port: {}, channel {}", hostname, port,
+        keepAliveConfig);
   }
 
   /// Registers gauges exposing the memory used by the gRPC client allocator
@@ -240,6 +243,14 @@ public class MailboxService {
   /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
   /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
   /// from this service.
+  /// The channel manager these mailboxes send through. Exposed so a test can assert that the policy
+  /// resolved from config actually reaches the transport, which no assertion on the parsed values can
+  /// show.
+  @VisibleForTesting
+  ChannelManager getChannelManager() {
+    return _channelManager;
+  }
+
   @VisibleForTesting
   public long getMailboxClientUsedDirectMemoryBytes() {
     return _channelManager.usedDirectMemoryBytes();

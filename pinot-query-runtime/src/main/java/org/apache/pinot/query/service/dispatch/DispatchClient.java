@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.google.common.base.Preconditions;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
@@ -27,7 +26,6 @@ import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -35,6 +33,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
@@ -59,15 +58,15 @@ class DispatchClient {
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
-    this(host, port, tlsConfig, null, KeepAliveConfig.DISABLED);
+    this(host, port, tlsConfig, null, GrpcKeepAliveConfig.DISABLED);
   }
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext) {
-    this(host, port, tlsConfig, sslContext, KeepAliveConfig.DISABLED);
+    this(host, port, tlsConfig, sslContext, GrpcKeepAliveConfig.DISABLED);
   }
 
   DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
-      KeepAliveConfig keepAliveConfig) {
+      GrpcKeepAliveConfig keepAliveConfig) {
     // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
     // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port)
@@ -81,49 +80,8 @@ class DispatchClient {
     }
     // Enable gRPC keep-alive when configured so that a silently unreachable peer transitions the channel out of READY,
     // which lets the broker's FailureDetector exclude it from routing.
-    if (keepAliveConfig.isEnabled()) {
-      channelBuilder.keepAliveTime(keepAliveConfig.getTimeMs(), TimeUnit.MILLISECONDS)
-          .keepAliveTimeout(keepAliveConfig.getTimeoutMs(), TimeUnit.MILLISECONDS)
-          .keepAliveWithoutCalls(keepAliveConfig.isWithoutCalls());
-    }
-    _channel = channelBuilder.build();
+    _channel = keepAliveConfig.configure(channelBuilder).build();
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
-  }
-
-  /// Immutable gRPC keep-alive configuration for broker dispatch channels. Keep-alive is disabled when `timeMs` is not
-  /// positive.
-  static final class KeepAliveConfig {
-    static final KeepAliveConfig DISABLED = new KeepAliveConfig(-1, 30_000, false);
-
-    private final int _timeMs;
-    private final int _timeoutMs;
-    private final boolean _withoutCalls;
-
-    KeepAliveConfig(int timeMs, int timeoutMs, boolean withoutCalls) {
-      if (timeMs > 0) {
-        Preconditions.checkArgument(timeoutMs > 0,
-            "keepAliveTimeoutMs must be positive when keep-alive is enabled, got: %s", timeoutMs);
-      }
-      _timeMs = timeMs;
-      _timeoutMs = timeoutMs;
-      _withoutCalls = withoutCalls;
-    }
-
-    boolean isEnabled() {
-      return _timeMs > 0;
-    }
-
-    int getTimeMs() {
-      return _timeMs;
-    }
-
-    int getTimeoutMs() {
-      return _timeoutMs;
-    }
-
-    boolean isWithoutCalls() {
-      return _withoutCalls;
-    }
   }
 
   public ManagedChannel getChannel() {
