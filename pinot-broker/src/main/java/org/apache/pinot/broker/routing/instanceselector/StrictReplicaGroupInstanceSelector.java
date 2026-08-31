@@ -61,8 +61,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
     if (_adaptiveServerSelector != null && _priorityPoolInstanceSelector != null) {
       if (ctx.isUseFixedReplica()) {
-        throw new IllegalArgumentException(
-            "useFixedReplica cannot be used when adaptive routing is enabled for StrictReplicaGroupInstanceSelector");
+        // Fixed-replica routing configured on the broker or table disables adaptive routing in InstanceSelectorFactory.
+        // This fixed replica config can still be set per query, in which case we'll prefer that over adaptive routing.
+        return selectServers(segments, requestId, segmentStates, null, ctx);
       }
       if (QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
         // This option intentionally fans segments across replica groups, so preserve the non-adaptive behavior.

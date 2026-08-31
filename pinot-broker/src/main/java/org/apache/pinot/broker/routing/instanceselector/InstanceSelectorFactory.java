@@ -115,6 +115,11 @@ public class InstanceSelectorFactory {
                   tableNameWithType);
               effectiveAdaptiveServerSelector = null;
             }
+            if (useFixedReplica && effectiveAdaptiveServerSelector != null) {
+              LOGGER.warn("Disabling adaptive routing for StrictReplicaGroupInstanceSelector table {} using fixed "
+                  + "replica routing", tableNameWithType);
+              effectiveAdaptiveServerSelector = null;
+            }
             instanceSelector = new StrictReplicaGroupInstanceSelector();
             break;
           }

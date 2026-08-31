@@ -67,7 +67,6 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 /// Tests for [ReplicaGroupInstanceSelector] and [StrictReplicaGroupInstanceSelector], including adaptive server
@@ -479,6 +478,38 @@ public class ReplicaGroupSelectorTest {
     assertNotNull(instanceSelector._priorityPoolInstanceSelector);
   }
 
+  @Test
+  public void testStrictReplicaGroupAdaptiveDisabledByFixedReplicaBrokerConfig() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    PinotConfiguration brokerConfig = new PinotConfiguration(Map.of(
+        CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA, "true"));
+    StrictReplicaGroupInstanceSelector instanceSelector =
+        buildStrictReplicaGroupArSelector(hybridSelector, mock(BrokerMetrics.class), brokerConfig);
+
+    assertNull(instanceSelector._adaptiveServerSelector);
+    assertNull(instanceSelector._priorityPoolInstanceSelector);
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
+    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
+        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
+  }
+
+  @Test
+  public void testStrictReplicaGroupAdaptiveDisabledByFixedReplicaTableConfig() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector,
+        mock(BrokerMetrics.class), new PinotConfiguration(Map.of()), true);
+
+    assertNull(instanceSelector._adaptiveServerSelector);
+    assertNull(instanceSelector._priorityPoolInstanceSelector);
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
+    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
+        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
+  }
+
   // --- Strict replica group adaptive routing tests ---
 
   // Topology: 2 replica groups, 3 segments
@@ -539,7 +570,13 @@ public class ReplicaGroupSelectorTest {
 
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig) {
-    RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
+    return buildStrictReplicaGroupArSelector(hybridSelector, brokerMetrics, brokerConfig, null);
+  }
+
+  private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig, Boolean useFixedReplica) {
+    RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        useFixedReplica);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testUpsertTable")
         .setRoutingConfig(routingConfig).build();
     // Ideal state: mirrors the topology above
@@ -722,16 +759,17 @@ public class ReplicaGroupSelectorTest {
   }
 
   @Test
-  public void testStrictReplicaGroupAdaptiveRejectsFixedReplicaQueryOption() {
+  public void testStrictReplicaGroupAdaptiveSupportsFixedReplicaQueryOption() {
     HybridSelector hybridSelector = mock(HybridSelector.class);
     StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
 
     Map<String, String> queryOptions = Map.of(
         CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA, "true");
-    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-        () -> instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions));
-    assertTrue(exception.getMessage().contains("useFixedReplica cannot be used"));
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions);
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
+    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
+        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
   }
 
   @Test
