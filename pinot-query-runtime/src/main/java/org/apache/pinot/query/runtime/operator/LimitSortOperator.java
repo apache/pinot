@@ -27,13 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// A [SortOperator] that only applies `offset` and `fetch`, because no ordering work is needed: either the input is
-/// already ordered on the collation, or the [org.apache.pinot.query.planner.plannode.SortNode] carries no collation at
-/// all (a plain `LIMIT`).
+/// A [SortOperator] that only applies `offset` and `fetch`, used when the
+/// [org.apache.pinot.query.planner.plannode.SortNode] carries no collation at all - a plain `LIMIT`, where any
+/// `fetch` rows after skipping `offset` are a correct answer.
 ///
-/// Nothing is sorted and nothing is buffered. Input blocks are forwarded as they arrive, with the first `offset` rows
-/// skipped and at most `fetch` rows emitted in total, after which the input is early-terminated. This is the only
-/// [SortOperator] that does not break the pipeline: a consumer sees the first rows before the input has finished.
+/// It therefore assumes nothing about the input. Blocks are forwarded as they arrive, with the first `offset` rows
+/// skipped and at most `fetch` rows emitted in total, after which the input is early-terminated. Nothing is
+/// accumulated across blocks: the only state is two counters, so peak memory is one input block. This is the only
+/// [SortOperator] that does not break the pipeline - a consumer sees rows before the input has finished.
 public class LimitSortOperator extends SortOperator {
   private static final String EXPLAIN_NAME = "SORT_LIMIT";
   private static final Logger LOGGER = LoggerFactory.getLogger(LimitSortOperator.class);

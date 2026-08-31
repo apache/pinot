@@ -38,9 +38,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// input can promise and on whether the fetch bounds the result. Rather than branching inside one operator, the
 /// [#create] factory picks one of three implementations, each of which reports itself in the explain plan:
 ///
-///   - [LimitSortOperator] (`SORT_LIMIT`) - the input is already ordered on the collation, or there is no
-///     collation at all. Nothing is sorted and nothing is buffered: blocks stream through with `offset` rows skipped
-///     and at most `fetch` rows emitted.
+///   - [LimitSortOperator] (`SORT_LIMIT`) - there is no collation, so no ordering is required at all. Nothing is
+///     sorted and nothing is accumulated: blocks stream through with `offset` rows skipped and at most `fetch` rows
+///     emitted.
 ///   - [TopNSortOperator] (`SORT_TOP_N`) - the result is bounded by `fetch` (or by the broker response limit), so a
 ///     bounded max-heap of `fetch + offset` entries is enough. Peak memory is the bound, not the input size.
 ///   - [FullSortOperator] (`SORT_FULL`) - no bound is available, so every row is buffered and sorted once. This is the
@@ -112,7 +112,7 @@ public abstract class SortOperator extends MultiStageOperator {
     int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
-    if (collations.isEmpty() || isAlreadySorted(input)) {
+    if (collations.isEmpty()) {
       return new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);
     }
     if (numRowsToKeep == Integer.MAX_VALUE) {
@@ -121,16 +121,6 @@ public abstract class SortOperator extends MultiStageOperator {
     }
     return new TopNSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
         defaultHolderCapacity);
-  }
-
-  /// Whether `input` already emits rows ordered on the receiver's collation, in which case this operator only has to
-  /// apply `offset` and `fetch`.
-  ///
-  /// The only operator that promises this today is the deprecated [SortedMailboxReceiveOperator], which sorts
-  /// internally. Once no planner marks a mailbox receive as sorted-on-receiver this check can be replaced by a flag on
-  /// [SortNode], which is what it was before it became a type test.
-  private static boolean isAlreadySorted(MultiStageOperator input) {
-    return input instanceof SortedMailboxReceiveOperator;
   }
 
   @Override
