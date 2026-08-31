@@ -111,7 +111,14 @@ public class ServerPlanRequestUtils {
     pinotQuery.setExplain(explain);
 
     if (MapUtils.isNotEmpty(rowFilters)) {
-      pinotQuery.setQueryOptions(rowFilters);
+      // Merge, never replace: the plan visitor may already have stamped SERVER_RETURN_FINAL_RESULT[_KEY_UNPARTITIONED]
+      // here, and updateQueryOptions() below does not restore them. Copy the map, it belongs to the caller.
+      Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+      if (queryOptions != null) {
+        queryOptions.putAll(rowFilters);
+      } else {
+        pinotQuery.setQueryOptions(new HashMap<>(rowFilters));
+      }
     }
 
     List<InstanceRequest> instanceRequests;

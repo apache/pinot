@@ -48,6 +48,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.assertj.core.api.Assertions;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
@@ -370,6 +371,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
           .contains(expectedError);
     }
+  }
+
+  /// RLS filters are stamped onto the leaf's query options, which is also the only place the planner records that the
+  /// leaf must finalize its aggregates (`is_partitioned_by_group_by_keys` makes the aggregate `AggType.DIRECT`, so no
+  /// stage above it can finalize anything). Stamping must merge, not replace: dropping the flag makes the leaf emit a
+  /// raw `IntOpenHashSet` into a column typed `INT`. Table b lives on a single server, so one row per group.
+  @Test
+  public void testDirectAggregateWithRowLevelSecurityFilter() {
+    String sql = "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, DISTINCTCOUNT(col3) FROM b "
+        + "GROUP BY col1 ORDER BY col1";
+    Map<String, String> rlsFilters = Map.of(RlsUtils.buildRlsFilterKey("b"), "col3 > 1");
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false, rlsFilters);
+    Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    // The RLS filter keeps only the two rows with col3 = 42.
+    compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar", 1}, new Object[]{"bob", 1}), true);
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
