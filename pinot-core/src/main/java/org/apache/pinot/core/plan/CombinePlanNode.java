@@ -130,10 +130,12 @@ public class CombinePlanNode implements PlanNode {
         // Use streaming operator only for non-empty selection-only query
         return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       }
+      // Streaming flushes partial aggregates, so it needs an aggregation above to merge them back together.
+      // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.
       int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
       if (flushThreshold > 0 && QueryContextUtils.isAggregationQuery(_queryContext)
-          && _queryContext.getGroupByExpressions() != null) {
-        // Use streaming group-by operator for MSE leaf stages with flush threshold
+          && _queryContext.getGroupByExpressions() != null && !_queryContext.isServerReturnFinalResult()
+          && !_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
         return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, flushThreshold);
       }
     }
