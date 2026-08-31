@@ -34,10 +34,15 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 /// every segment in a partition any replica that is unavailable for any old segment in that partition. Consequently,
 /// all same-partition segments have identical, ordered candidate identities.
 ///
-/// Adaptive routing preserves that guarantee without explicit partition or mirror-set metadata. The inherited
-/// selector takes one ranking snapshot for the query and deterministically chooses the best candidate from each
-/// segment's ordered list. Identical filtered candidate lists, the same ranking snapshot, and deterministic list-order
-/// tie-breaking therefore produce identical selections for every segment in a partition. Different partitions may
+/// Adaptive routing relies on two parent-selector contracts:
+/// - [#selectWithContext(List, int, SegmentStates, ServerSelectionContext)] obtains one ranking snapshot before
+///   iterating the query's segments; it must not re-rank per segment.
+/// - [#selectServers(List, int, SegmentStates, Map, ServerSelectionContext)] resolves equal-ranked candidates using
+///   its strictly-less-than (`rank < bestRank`) comparison. It consequently retains the first candidate in the shared
+///   ordered candidate list.
+///
+/// Since same-partition old segments have identical ordered candidates, these contracts ensure they select the same
+/// instance. Changing either contract requires revisiting strict replica-group routing. Different partitions may
 /// independently choose different replicas.
 ///
 /// New segments do not exclude a candidate when that segment is unavailable; they remain optional so that the broker or
@@ -61,6 +66,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
       if (QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
         // This option intentionally fans segments across replica groups, so preserve the non-adaptive behavior.
+        // This contradicts the behaviour specified by StrictReplicaGroup, so we should eventually reject / ignore
+        // this combination.
         return selectServers(segments, requestId, segmentStates, null, ctx);
       }
     }
