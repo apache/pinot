@@ -54,6 +54,18 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 ///   - [#accumulateAndSort] reproduces FullSortOperator: append every row to an ArrayList, then sort once.
 ///   - [#accumulateAndSortNotPreSized] is the same, from a default-capacity list, to isolate what pre-sizing buys.
 ///
+/// Results at the time of writing (3 forks x 10 iterations, 3-column rows), for orientation only - re-run rather
+/// than trust these:
+///
+/// | input          | rows | sort   | heap   | speedup |
+/// |----------------|------|--------|--------|---------|
+/// | random         | 10K  | 0.70ms | 1.09ms | 1.6x    |
+/// | random         | 1M   | 302ms  | 590ms  | 2.0x    |
+/// | 64 sorted runs | 10K  | 0.23ms | 0.91ms | 4.0x    |
+/// | 64 sorted runs | 1M   | 82ms   | 369ms  | 4.5x    |
+///
+/// The sort allocates 1.2x (1M rows) to 1.7x (10K rows) what the heap does: the merge buffer is the difference.
+///
 /// Two input distributions are measured, because the shape of the input is what decides whether the comparison is
 /// close. RANDOM is the neutral case. SORTED_RUNS is what a receive stage actually sees once the senders sort - the
 /// concatenation of one sorted run per sender - and TimSort detects such runs while a heap cannot.

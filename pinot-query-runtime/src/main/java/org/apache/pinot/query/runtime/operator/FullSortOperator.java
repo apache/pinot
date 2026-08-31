@@ -38,18 +38,8 @@ import org.slf4j.LoggerFactory;
 ///
 /// A single sort of a list beats feeding an unbounded [java.util.PriorityQueue], which is what this operator
 /// replaced: the heap pays `O(n log n)` sifting on the way in and again on the way out, and cannot exploit
-/// pre-sorted input at all. Measured by `BenchmarkMseSortImplementations` over 3-column rows:
-///
-/// | input           | rows | sort   | heap   | speedup |
-/// |-----------------|------|--------|--------|---------|
-/// | random          | 10K  | 0.70ms | 1.09ms | 1.6x    |
-/// | random          | 1M   | 302ms  | 590ms  | 2.0x    |
-/// | 64 sorted runs  | 10K  | 0.23ms | 0.91ms | 4.0x    |
-/// | 64 sorted runs  | 1M   | 82ms   | 369ms  | 4.5x    |
-///
-/// The sorted-runs rows are the case that matters: once the sender-side sort is pushed down, a receive stage sees
-/// one sorted run per sender, and TimSort detects those runs. The trade is allocation - the merge buffer costs
-/// 1.2x (1M rows) to 1.7x (10K rows) what the heap allocates.
+/// pre-sorted input at all. It is faster on every shape measured, and it allocates more, because the merge buffer
+/// costs what the heap does not. `BenchmarkMseSortImplementations` in `pinot-perf` measures both.
 public class FullSortOperator extends SortOperator {
   private static final String EXPLAIN_NAME = "SORT_FULL";
   private static final Logger LOGGER = LoggerFactory.getLogger(FullSortOperator.class);
