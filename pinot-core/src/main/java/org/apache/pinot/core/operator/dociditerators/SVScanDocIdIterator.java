@@ -143,6 +143,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
+  public int matchDocIds(int[] docIds, int limit) {
+    _numEntriesScanned += limit;
+    // matchValues already compacts the matching document ids to the front of the array
+    return _valueMatcher.matchValues(limit, docIds);
+  }
+
+  @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
   }
