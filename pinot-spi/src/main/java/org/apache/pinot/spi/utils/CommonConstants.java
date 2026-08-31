@@ -434,6 +434,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+
+    // When enabled, once Helix converges at startup the broker opens a Netty channel to every routable
+    // server for both table types -- including the TLS handshake when broker->server TLS is on -- so the
+    // first real query does not pay the blocking connect on its critical path. While this runs the
+    // broker reports STARTING (readiness is withheld) so no traffic is routed until reachable servers
+    // are connected; the wait is bounded by CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS. On by
+    // default; set to false to restore the pure lazy-connect path, whose behaviour is then unchanged.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED =
+        "pinot.broker.startup.preconnect.enabled";
+    public static final boolean DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED = true;
+    // Upper bound on the whole pre-connect step so a slow or unreachable server cannot delay it
+    // indefinitely; channels not connected within the budget fall back to the lazy path.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS =
+        "pinot.broker.startup.preconnect.timeoutMs";
+    public static final long DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS = 30_000L;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     // Config for number of threads to use for Broker reduce-phase.

@@ -156,19 +156,36 @@ public class QueryRouter {
     }
   }
 
-  /// Connects to the given server, returns `true` if the server is successfully connected.
+  /// Connects the OFFLINE channel to the given server, returns `true` if it is successfully connected.
+  ///
+  /// Unchanged in behaviour: this is the reachability probe the failure detector already used (it
+  /// opened the OFFLINE channel), now expressed as a one-line delegation. It deliberately opens a
+  /// single channel rather than every channel the server may need. Callers that want the server fully
+  /// connected -- startup pre-connect, for instance -- should use [#connect(ServerInstance, TableType)]
+  /// for each table type instead.
   public boolean connect(ServerInstance serverInstance) {
+    return connect(serverInstance, TableType.OFFLINE);
+  }
+
+  /// Connects the channel used for the given table type, returns `true` if it is successfully
+  /// connected.
+  ///
+  /// [ServerRoutingInstance] includes the table type in its `equals`/`hashCode`, so OFFLINE and
+  /// REALTIME map to **separate** channels for the same physical server. Connecting only one of them
+  /// leaves the other to be established lazily by the first query that needs it -- under the per-channel
+  /// lock, on the query thread.
+  public boolean connect(ServerInstance serverInstance, TableType tableType) {
     try {
       if (_serverChannelsTls != null) {
         _serverChannelsTls.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS));
       } else {
         _serverChannels.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY));
       }
       return true;
     } catch (Exception e) {
-      LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      LOGGER.debug("Failed to connect to server: {} for table type: {}", serverInstance, tableType, e);
       return false;
     }
   }

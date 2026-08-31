@@ -36,6 +36,7 @@ import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.SslHandler;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -236,11 +237,45 @@ public class ServerChannels {
 
     void connectWithoutLocking()
         throws InterruptedException {
+      // Lazy query path: open the TCP connection only, exactly as before this feature existed. Any TLS
+      // handshake is left to proceed asynchronously so the channel lock is released as soon as the socket
+      // is up, keeping the first query's critical section short.
+      if (_channel == null || !_channel.isActive()) {
+        _channel = _bootstrap.connect().sync().channel();
+      }
+    }
+
+    /// Like [#connectWithoutLocking()] but additionally waits out the TLS handshake and records the
+    /// establish latency. Used only by startup pre-connect ([#connect()]), so paying the handshake -- and
+    /// the longer critical section it implies -- never touches the lazy query path. Runs under the channel
+    /// lock, like its sibling.
+    void connectAndAwaitHandshakeWithoutLocking()
+        throws InterruptedException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
-        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
-            System.currentTimeMillis() - startTime);
+        awaitTlsHandshake(_channel);
+        long connectTimeMs = System.currentTimeMillis() - startTime;
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS, connectTimeMs);
+        _brokerMetrics.addTimedValue(BrokerTimer.NETTY_CONNECTION_CONNECT_TIME, connectTimeMs,
+            TimeUnit.MILLISECONDS);
+      }
+    }
+
+    /// Blocks until the TLS handshake on a freshly-connected channel completes.
+    ///
+    /// `bootstrap.connect().sync()` returns once the TCP connection is up; the client-mode [SslHandler]
+    /// then drives the handshake asynchronously on the event loop. Awaiting its future here pays the
+    /// handshake -- two round trips plus certificate validation -- on the connecting thread rather than
+    /// on the first query that writes to the channel. On a plaintext channel there is no [SslHandler] in
+    /// the pipeline and this is a no-op. The calling thread is never an event-loop thread, so this
+    /// cannot deadlock. A failed handshake propagates as an unchecked exception, which the caller
+    /// treats exactly like a failed connect.
+    private void awaitTlsHandshake(Channel channel)
+        throws InterruptedException {
+      SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+      if (sslHandler != null) {
+        sslHandler.handshakeFuture().sync();
       }
     }
 
@@ -271,7 +306,7 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking();
+          connectAndAwaitHandshakeWithoutLocking();
         } finally {
           _channelLock.unlock();
         }
