@@ -59,7 +59,6 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
-import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.MultiColumnRealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
@@ -166,7 +165,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private final MultiValueRowLimit[] _multiValueRowLimits;
+  private final MultiValueLimit[] _multiValueLimits;
   private final IdMap<FixedIntArray> _recordIdMap;
   private final int _numKeyColumns;
   // Cache the physical (non-virtual) field specs
@@ -311,7 +310,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Initialize for each column
     boolean hasColumnWithReuseMutableTextIndex = false;
-    List<MultiValueRowLimit> multiValueRowLimits = new ArrayList<>();
+    List<MultiValueLimit> multiValueLimits = new ArrayList<>();
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
 
@@ -330,21 +329,27 @@ public class MutableSegmentImpl implements MutableSegment {
           Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
       VectorIndexConfig vectorIndexConfig = indexConfigs.getConfig(StandardIndexes.vector());
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
-      MutableIndexContext context =
-          MutableIndexContext.builder()
-              .withFieldSpec(fieldSpec)
-              .withMemoryManager(_memoryManager)
-              .withDictionary(isDictionary)
-              .withCapacity(_capacity)
-              .offHeap(_offHeap)
-              .withSegmentName(_segmentName)
-              .withEstimatedCardinality(_statsHistory.getEstimatedCardinality(column))
-              .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
-              .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
-              .withMaxNumMultiValuesPerRowOverride(
-                  vectorIndexConfig.isEnabled() ? vectorIndexConfig.getVectorDimension() : 0)
-              .withConsumerDir(_consumerDir)
-              .withFixedLengthBytes(fixedByteSize).build();
+      MutableIndexContext.Builder contextBuilder = MutableIndexContext.builder()
+          .withFieldSpec(fieldSpec)
+          .withMemoryManager(_memoryManager)
+          .withDictionary(isDictionary)
+          .withCapacity(_capacity)
+          .offHeap(_offHeap)
+          .withSegmentName(_segmentName)
+          .withEstimatedCardinality(_statsHistory.getEstimatedCardinality(column))
+          .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
+          .withAvgNumMultiValues(config.getAvgNumMultiValues())
+          .withConsumerDir(_consumerDir)
+          .withFixedLengthBytes(fixedByteSize);
+      if (vectorIndexConfig.isEnabled()) {
+        // A vector column holds one value per dimension, which may exceed the default cap
+        contextBuilder.withMaxNumMultiValues(vectorIndexConfig.getVectorDimension());
+      }
+      MutableIndexContext context = contextBuilder.build();
+
+      if (!fieldSpec.isSingleValueField()) {
+        multiValueLimits.add(new MultiValueLimit(column, context.getMaxNumMultiValues()));
+      }
 
       // Partition info
       PartitionFunction partitionFunction = null;
@@ -411,14 +416,6 @@ public class MutableSegmentImpl implements MutableSegment {
       String sourceColumn = columnAggregatorPair.getLeft();
       ValueAggregator valueAggregator = columnAggregatorPair.getRight();
 
-      // Capture the row cap from the concrete writer before a SameValue wrapper hides the type.
-      MutableIndex unwrappedForwardIndex = mutableIndexes.get(StandardIndexes.forward());
-      if (!fieldSpec.isSingleValueField()
-          && unwrappedForwardIndex instanceof FixedByteMVMutableForwardIndex fixedByteMVIndex) {
-        multiValueRowLimits.add(
-            new MultiValueRowLimit(column, fixedByteMVIndex.getMaxNumberOfMultiValuesPerRow()));
-      }
-
       // TODO this can be removed after forward index contents no longer depends on text index configs
       // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
       // already created MutableIndex with a SameValue implementation. This optimization can only be done when
@@ -453,7 +450,7 @@ public class MutableSegmentImpl implements MutableSegment {
               nullValueVector, sourceColumn, valueAggregator));
     }
     _hasColumnWithReuseMutableTextIndex = hasColumnWithReuseMutableTextIndex;
-    _multiValueRowLimits = multiValueRowLimits.toArray(MultiValueRowLimit[]::new);
+    _multiValueLimits = multiValueLimits.toArray(new MultiValueLimit[0]);
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
     _dedupTimeColumn =
@@ -657,12 +654,12 @@ public class MutableSegmentImpl implements MutableSegment {
     int numDocsIndexed = _numDocsIndexed;
     if (isUpsertEnabled()) {
       // Validate the incoming row before partial-upsert strategies can copy or expand oversized MV values.
-      validateLengthOfMVColumns(row);
+      validateNumMultiValues(row);
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       if (_isPartialUpsert) {
         // Strategies such as APPEND and UNION can produce a merged row that is larger than the incoming row.
-        validateLengthOfMVColumns(updatedRow);
+        validateNumMultiValues(updatedRow);
       }
       trackMismatchedPartition(mismatchedPartitionIndexContainer, mismatchedPartition, mismatchedPartitionValue);
 
@@ -708,7 +705,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // Validate before dedup or partition tracking so a rejected row cannot leave metadata state behind.
-    validateLengthOfMVColumns(row);
+    validateNumMultiValues(row);
     trackMismatchedPartition(mismatchedPartitionIndexContainer, mismatchedPartition, mismatchedPartitionValue);
 
     if (isDedupEnabled()) {
@@ -824,21 +821,21 @@ public class MutableSegmentImpl implements MutableSegment {
     return new ComparisonColumns(comparisonValues, comparableIndex);
   }
 
-  /// @param row
-  /// @throws UnsupportedOperationException if the length of an MV column exceeds the maximum number of values allowed
-  /// in a single row of the forward index
-  private void validateLengthOfMVColumns(GenericRow row)
-      throws UnsupportedOperationException {
-    for (int i = 0; i < _multiValueRowLimits.length; i++) {
-      MultiValueRowLimit rowLimit = _multiValueRowLimits[i];
-      Object value = row.getValue(rowLimit._column);
-      if (value == null) {
-        continue;
-      }
-      Object[] values = (Object[]) value;
-      if (values.length > rowLimit._maxNumberOfMultiValuesPerRow) {
-        throw new UnsupportedOperationException("MV column '" + rowLimit._column + "' has " + values.length
-            + " values, exceeding the maximum of " + rowLimit._maxNumberOfMultiValuesPerRow + " values per row.");
+  /// Validates that no multi-value column in the row holds more values than its forward index can store in a single
+  /// multi-value entry. Must run before any column of the row is indexed so that a rejected row leaves no partial
+  /// state behind.
+  ///
+  /// @throws IllegalStateException if a multi-value column exceeds its maximum number of values
+  private void validateNumMultiValues(GenericRow row) {
+    for (MultiValueLimit limit : _multiValueLimits) {
+      Object value = row.getValue(limit._column);
+      if (value != null) {
+        int numValues = ((Object[]) value).length;
+        if (numValues > limit._maxNumMultiValues) {
+          throw new IllegalStateException(
+              String.format("Number of values: %d in MV column: %s exceeds the maximum allowed: %d", numValues,
+                  limit._column, limit._maxNumMultiValues));
+        }
       }
     }
   }
@@ -998,9 +995,6 @@ public class MutableSegmentImpl implements MutableSegment {
             MutableIndex mutableIndex = indexEntry.getValue();
             mutableIndex.add(values, dictIds, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
-          } catch (IllegalArgumentException e) {
-            // Row-limit violations must fail the document. Other index errors stay fail-soft (#16316).
-            throw e;
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
@@ -1693,15 +1687,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /// Immutable fixed-byte MV column descriptor used by the per-record length validation hot path.
-  private static final class MultiValueRowLimit {
-    private final String _column;
-    private final int _maxNumberOfMultiValuesPerRow;
-
-    private MultiValueRowLimit(String column, int maxNumberOfMultiValuesPerRow) {
-      _column = column;
-      _maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
-    }
+  /// Per-column cap on the number of values in a multi-value entry, as configured on the mutable index context.
+  private record MultiValueLimit(String _column, int _maxNumMultiValues) {
   }
 
   private class IndexContainer implements Closeable {
