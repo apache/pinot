@@ -33,6 +33,7 @@ public class MutableIndexContext {
   private final int _estimatedColSize;
   private final int _estimatedCardinality;
   private final int _avgNumMultiValues;
+  private final int _maxNumMultiValuesPerRowOverride;
   private final String _segmentName;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final File _consumerDir;
@@ -40,6 +41,13 @@ public class MutableIndexContext {
   public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
       PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
       int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
+    this(fieldSpec, fixedLengthBytes, hasDictionary, segmentName, memoryManager, capacity, offHeap, estimatedColSize,
+        estimatedCardinality, avgNumMultiValues, 0, consumerDir);
+  }
+
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
+      PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
+      int estimatedCardinality, int avgNumMultiValues, int maxNumMultiValuesPerRowOverride, File consumerDir) {
     _fieldSpec = fieldSpec;
     _fixedLengthBytes = fixedLengthBytes;
     _hasDictionary = hasDictionary;
@@ -50,6 +58,7 @@ public class MutableIndexContext {
     _estimatedColSize = estimatedColSize;
     _estimatedCardinality = estimatedCardinality;
     _avgNumMultiValues = avgNumMultiValues;
+    _maxNumMultiValuesPerRowOverride = maxNumMultiValuesPerRowOverride;
     _consumerDir = consumerDir;
   }
 
@@ -93,6 +102,11 @@ public class MutableIndexContext {
     return _avgNumMultiValues;
   }
 
+  /// Returns the configured maximum number of values for one MV row, or 0 when the index default should be used.
+  public int getMaxNumMultiValuesPerRowOverride() {
+    return _maxNumMultiValuesPerRowOverride;
+  }
+
   public File getConsumerDir() {
     return _consumerDir;
   }
@@ -112,6 +126,7 @@ public class MutableIndexContext {
     private int _estimatedColSize;
     private int _estimatedCardinality;
     private int _avgNumMultiValues;
+    private int _maxNumMultiValuesPerRowOverride;
     private File _consumerDir;
 
     public Builder withMemoryManager(PinotDataBufferMemoryManager memoryManager) {
@@ -159,6 +174,11 @@ public class MutableIndexContext {
       return this;
     }
 
+    public Builder withMaxNumMultiValuesPerRowOverride(int maxNumMultiValuesPerRowOverride) {
+      _maxNumMultiValuesPerRowOverride = maxNumMultiValuesPerRowOverride;
+      return this;
+    }
+
     public Builder withConsumerDir(File consumerDir) {
       _consumerDir = consumerDir;
       return this;
@@ -172,7 +192,7 @@ public class MutableIndexContext {
     public MutableIndexContext build() {
       return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _fixedLengthBytes, _hasDictionary,
           Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager), _capacity, _offHeap,
-          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
+          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _maxNumMultiValuesPerRowOverride, _consumerDir);
     }
   }
 }

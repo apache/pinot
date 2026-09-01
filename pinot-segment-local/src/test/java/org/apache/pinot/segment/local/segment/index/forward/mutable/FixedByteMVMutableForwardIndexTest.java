@@ -71,6 +71,39 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
     }
   }
 
+  @Test
+  public void testRejectMultiValuesExceedingMaxPerRow()
+      throws Exception {
+    int maxNumberOfMultiValuesPerRow = 5;
+    FixedByteMVMutableForwardIndex readerWriter =
+        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, 10, Integer.BYTES, _memoryManager,
+            "RejectMultiValuesExceedingMaxPerRow", true, FieldSpec.DataType.INT);
+    try {
+      Assert.expectThrows(IllegalArgumentException.class,
+          () -> readerWriter.setIntMV(0, new int[maxNumberOfMultiValuesPerRow + 1]));
+      Assert.assertEquals(getNumValues(readerWriter), 0);
+      Assert.assertEquals(readerWriter.getNumValuesMV(0), 0);
+    } finally {
+      readerWriter.close();
+    }
+  }
+
+  @Test
+  public void testAcceptMultiValuesAtMaxPerRow()
+      throws Exception {
+    int maxNumberOfMultiValuesPerRow = 5;
+    FixedByteMVMutableForwardIndex readerWriter =
+        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, 10, Integer.BYTES, _memoryManager,
+            "AcceptMultiValuesAtMaxPerRow", true, FieldSpec.DataType.INT);
+    try {
+      int[] values = new int[]{1, 2, 3, 4, 5};
+      readerWriter.setIntMV(0, values);
+      Assert.assertEquals(readerWriter.getIntMV(0), values);
+    } finally {
+      readerWriter.close();
+    }
+  }
+
   public void testIntArray(final long seed, boolean isDictionaryEncoded)
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
