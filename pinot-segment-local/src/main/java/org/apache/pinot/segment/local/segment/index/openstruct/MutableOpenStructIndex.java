@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader;
@@ -42,6 +43,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -253,6 +256,49 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       }
     }
     return result;
+  }
+
+  /// Returns a columnar snapshot of this index over `[0, numDocs)`, for the seal path to hand
+  /// straight to the segment's OPEN_STRUCT index creator. The key-column map is read once so the
+  /// snapshot is stable even if the consuming thread allocates a new key afterwards.
+  public OpenStructColumnarSource asColumnarSource(int numDocs) {
+    Map<String, MutableKeyColumn> keyColumns = _keyColumns;
+    return new OpenStructColumnarSource() {
+      @Override
+      public int getNumDocs() {
+        return numDocs;
+      }
+
+      @Override
+      public Set<String> getKeys() {
+        return keyColumns.keySet();
+      }
+
+      @Override
+      public DataType getStoredType(String key) {
+        return keyColumns.get(key).getStoredType();
+      }
+
+      @Override
+      public void forEachPresentValue(String key, PresentValueConsumer consumer) {
+        MutableKeyColumn column = keyColumns.get(key);
+        // ThreadSafeMutableRoaringBitmap#getMutableRoaringBitmap() already clones under its own
+        // monitor, so the copy returned here is safe to iterate even though the consuming thread
+        // may still be adding docIds; this snapshot is bounded at numDocs regardless.
+        MutableRoaringBitmap presence = column.getPresenceBitmap().getMutableRoaringBitmap();
+        IntIterator iterator = presence.getIntIterator();
+        while (iterator.hasNext()) {
+          int docId = iterator.next();
+          if (docId >= numDocs) {
+            return;
+          }
+          Object value = column.getValue(docId);
+          if (value != null) {
+            consumer.accept(docId, value);
+          }
+        }
+      }
+    };
   }
 
   @Override

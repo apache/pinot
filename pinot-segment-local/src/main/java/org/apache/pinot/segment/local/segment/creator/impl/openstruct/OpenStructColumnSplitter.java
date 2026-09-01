@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +59,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -70,6 +73,7 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +89,18 @@ import org.slf4j.LoggerFactory;
 public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpenStructColumnSplitter.class);
+
+  /// Documents scattered per pass in [#writeSparseJsonColumn]. Each pass holds one LinkedHashMap
+  /// per document carrying at least one sparse key, so this caps that transient heap: at roughly
+  /// 150-200 bytes for a one-or-two-entry map, 64k documents peak near 10-13 MB whatever the
+  /// segment size, where scattering a 5M-document column in a single pass peaks in the hundreds of
+  /// MB on a live server's commit path. The window's own reference array (64k refs, 512 KB) is
+  /// allocated once and reused. Cost of windowing is one sweep over the sparse key list per window
+  /// — 77 sweeps for a 5M-document column — because the presence iterators are carried across
+  /// windows and need no repositioning; so a larger window buys nothing measurable, and a smaller
+  /// one only multiplies that sweep.
+  @VisibleForTesting
+  static final int SPARSE_SCATTER_WINDOW_SIZE = 64 * 1024;
 
   private final File _indexDir;
   private final String _columnName;
@@ -142,9 +158,98 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   }
 
   @Override
+  public boolean supportsColumnarAdd() {
+    return true;
+  }
+
+  /// Ingests a columnar source directly, skipping the per-doc map rebuild and the type
+  /// re-resolution and re-coercion in [#addMap]. The source's values are already coerced to the
+  /// key's stored type, and its stored type is resolved by the same rules addMap applies, so the
+  /// accumulated state is identical to feeding the same data one map at a time.
+  ///
+  /// Must be the only ingestion method called on a given splitter, and only once: mixing it with
+  /// [#add(Map, int)] or calling it twice would clobber [#_numDocs] while appending to the same
+  /// per-key value lists.
+  @Override
+  public void addColumnar(OpenStructColumnarSource source)
+      throws IOException {
+    Preconditions.checkState(_numDocs == 0,
+        "addColumnar must be the only ingestion method used on a splitter, and can only be called "
+            + "once; this splitter has already accumulated %s doc(s)", _numDocs);
+    for (String key : source.getKeys()) {
+      // The mutable index drops ignored keys during consumption and meters them itself, so a key
+      // reaching here should never be ignored. Skip defensively without counting: counting again
+      // would double-report against the mutable index's own OPEN_STRUCT_IGNORED_KEY_DROPS.
+      if (_config.isIgnoredKey(key)) {
+        continue;
+      }
+      DataType storedType = source.getStoredType(key);
+      // Only consulted for keys with no declared child spec, matching addMap; for those the
+      // mutable column's stored type is exactly what addMap would have inferred.
+      boolean hasDeclaredType = _childFieldSpecs.containsKey(key);
+      // A fresh consumer per key: it registers this key's state lazily on the first present value
+      // (matching addMap, which never registers a key in _presenceBitmaps/_values until it
+      // actually sees one -- registering eagerly for a key with zero present docs would make
+      // classify() treat it as a configured dense key with an empty bitmap, which addMap would
+      // never do), then caches the bitmap and value list as fields so every later value for the
+      // same key costs one null check instead of three map lookups.
+      source.forEachPresentValue(key,
+          new LazyKeyStateConsumer(key, storedType, hasDeclaredType, _presenceBitmaps, _values, _inferredTypes));
+    }
+    _numDocs = source.getNumDocs();
+  }
+
+  @Override
   public void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("OPEN_STRUCT index is single-value only");
+  }
+
+  /// Present-value consumer used by [#addColumnar] to accumulate one key's state with a single
+  /// null check per value instead of three map lookups. On the first `accept` call for its key it
+  /// registers (or reuses) that key's presence bitmap and value list in the splitter's shared
+  /// per-key maps, and records the inferred type when the key has no declared child spec -- the
+  /// same lazy registration [#addMap] performs on a key's first present value. Every subsequent
+  /// call reuses the cached bitmap and list fields directly, without touching the shared maps
+  /// again. Not thread-safe and not reusable across keys: a fresh instance is created per key
+  /// per [#addColumnar] call, and its fields are only ever touched by the single thread driving
+  /// that call.
+  private static final class LazyKeyStateConsumer implements OpenStructColumnarSource.PresentValueConsumer {
+    private final String _key;
+    private final DataType _storedType;
+    private final boolean _hasDeclaredType;
+    private final Map<String, RoaringBitmap> _presenceBitmaps;
+    private final Map<String, List<Object>> _values;
+    private final Map<String, DataType> _inferredTypes;
+
+    private RoaringBitmap _presence;
+    private List<Object> _keyValues;
+    private boolean _initialized;
+
+    private LazyKeyStateConsumer(String key, DataType storedType, boolean hasDeclaredType,
+        Map<String, RoaringBitmap> presenceBitmaps, Map<String, List<Object>> values,
+        Map<String, DataType> inferredTypes) {
+      _key = key;
+      _storedType = storedType;
+      _hasDeclaredType = hasDeclaredType;
+      _presenceBitmaps = presenceBitmaps;
+      _values = values;
+      _inferredTypes = inferredTypes;
+    }
+
+    @Override
+    public void accept(int docId, Object value) {
+      if (!_initialized) {
+        _presence = _presenceBitmaps.computeIfAbsent(_key, k -> new RoaringBitmap());
+        _keyValues = _values.computeIfAbsent(_key, k -> new ArrayList<>());
+        if (!_hasDeclaredType) {
+          _inferredTypes.putIfAbsent(_key, _storedType);
+        }
+        _initialized = true;
+      }
+      _presence.add(docId);
+      _keyValues.add(value);
+    }
   }
 
   /// Returns the resolved dense-key set after [#seal()] or [#classify()].
@@ -383,9 +488,19 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // (absent docs are also marked in the null vector below).
     AbstractColumnStatisticsCollector statsCollector =
         StatsCollectorUtil.createStatsCollector(childFieldSpec, null);
+    // Step the presence bitmap with a cursor rather than probing it per doc. values is already in
+    // presence-ordinal order, so the ordinal the loop already tracks is the same cursor. Documents
+    // are still visited in ascending order, which the collector's sortedness tracking relies on.
+    PeekableIntIterator statsIterator = presence.getIntIterator();
+    int nextPresentDocId = statsIterator.hasNext() ? statsIterator.next() : -1;
     int statsOrdinal = 0;
     for (int docId = 0; docId < _numDocs; docId++) {
-      statsCollector.collect(presence.contains(docId) ? values.get(statsOrdinal++) : defaultValue);
+      if (docId == nextPresentDocId) {
+        statsCollector.collect(values.get(statsOrdinal++));
+        nextPresentDocId = statsIterator.hasNext() ? statsIterator.next() : -1;
+      } else {
+        statsCollector.collect(defaultValue);
+      }
     }
     statsCollector.seal();
 
@@ -418,16 +533,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         .add(StandardIndexes.forward(), forwardBuilder.build())
         .build();
 
-    int dictElementSize = writeColumnIndexes(materializedCol, storedType, presence, values,
-        defaultValue, statsCollector, useDictionary, fieldIndexConfigs, childFieldSpec);
-
+    // The null vector marks exactly the docs the index walk sees as absent, so it is filled inside
+    // that walk rather than in a third pass of its own over every doc.
+    int dictElementSize;
     NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, materializedCol);
     try {
-      for (int docId = 0; docId < _numDocs; docId++) {
-        if (!presence.contains(docId)) {
-          nullCreator.setNull(docId);
-        }
-      }
+      dictElementSize = writeColumnIndexes(materializedCol, storedType, presence, values,
+          defaultValue, statsCollector, useDictionary, fieldIndexConfigs, childFieldSpec, nullCreator);
       nullCreator.seal();
     } finally {
       nullCreator.close();
@@ -466,12 +578,14 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   }
 
   /// Writes the dictionary (when used) plus all vetted, enabled indexes for a materialized child column through
-  /// the standard index-creator family, driven from a single per-doc loop. Returns the dictionary element size in
+  /// the standard index-creator family, driven from a single per-doc loop that also fills the caller's null
+  /// vector for absent docs. Returns the dictionary element size in
   /// bytes (0 when raw-encoded), for column metadata. The dictionary is built separately because its build
   /// lifecycle is CUSTOM and it supplies the dictIds the per-row creators consume.
   private int writeColumnIndexes(String materializedCol, DataType storedType, RoaringBitmap presence,
       List<Object> values, Object defaultValue, AbstractColumnStatisticsCollector statsCollector,
-      boolean useDictionary, FieldIndexConfigs fieldIndexConfigs, FieldSpec childFieldSpec)
+      boolean useDictionary, FieldIndexConfigs fieldIndexConfigs, FieldSpec childFieldSpec,
+      NullValueVectorCreator nullCreator)
       throws IOException {
     int dictElementSize = 0;
     SegmentDictionaryCreator dictCreator = null;
@@ -503,9 +617,18 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           }
         }
 
+        PeekableIntIterator presenceIterator = presence.getIntIterator();
+        int nextPresentDocId = presenceIterator.hasNext() ? presenceIterator.next() : -1;
         int ordinal = 0;
         for (int docId = 0; docId < _numDocs; docId++) {
-          Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
+          Object value;
+          if (docId == nextPresentDocId) {
+            value = values.get(ordinal++);
+            nextPresentDocId = presenceIterator.hasNext() ? presenceIterator.next() : -1;
+          } else {
+            value = defaultValue;
+            nullCreator.setNull(docId);
+          }
           int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
           for (IndexCreator creator : creators) {
             creator.add(value, dictId);
@@ -559,16 +682,73 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     String sparseCol = OpenStructNaming.sparseColumnName(_columnName);
     int maxLen = 1;
     String[] jsonPerDoc = new String[_numDocs];
-    for (int docId = 0; docId < _numDocs; docId++) {
-      Map<String, Object> sparseEntries = new LinkedHashMap<>();
-      for (String key : sparseKeys) {
-        RoaringBitmap presence = _presenceBitmaps.get(key);
-        if (presence != null && presence.contains(docId)) {
-          int ordinal = presence.rank(docId) - 1;
-          sparseEntries.put(key, _values.get(key).get(ordinal));
+
+    // Scatter each key's values into per-doc buckets by walking its presence bitmap once, rather
+    // than asking every key whether it is present at every doc. The per-doc form cost
+    // numDocs * numSparseKeys probes plus a rank() on each hit, and rank() is the expensive half.
+    //
+    // Scattering the whole column at once would hold one LinkedHashMap per document live, so the
+    // walk is windowed instead: each window is scattered, serialized, and released before the next
+    // one starts, capping the live maps at O(window) rather than O(numDocs). The per-key presence
+    // iterators and value ordinals are hoisted out of the window loop and carried across windows —
+    // an iterator bounded by peekNext() is left standing on the first docId of the next window, and
+    // each key's ordinal must keep counting the values it has consumed so far, since values is
+    // indexed by presence ordinal over the whole column, not per window.
+    //
+    // Within a window, keys are visited in sparseKeys order and appended into LinkedHashMaps, so
+    // each doc's JSON key order is identical to the per-doc build this replaces — the JSON string
+    // is the forward index content, so that ordering is load-bearing, not cosmetic.
+    int numSparseKeys = sparseKeys.size();
+    PeekableIntIterator[] presenceIterators = new PeekableIntIterator[numSparseKeys];
+    @SuppressWarnings("unchecked")
+    List<Object>[] valuesPerKey = new List[numSparseKeys];
+    int[] ordinalPerKey = new int[numSparseKeys];
+    for (int keyIndex = 0; keyIndex < numSparseKeys; keyIndex++) {
+      RoaringBitmap presence = _presenceBitmaps.get(sparseKeys.get(keyIndex));
+      if (presence == null) {
+        continue;
+      }
+      presenceIterators[keyIndex] = presence.getIntIterator();
+      valuesPerKey[keyIndex] = _values.get(sparseKeys.get(keyIndex));
+    }
+
+    // The max keeps the stride positive for a zero-document column (reachable when every key was
+    // registered before any document was counted), which the loop below would otherwise never
+    // advance past if its guard ever stopped short-circuiting.
+    int windowSize = Math.min(SPARSE_SCATTER_WINDOW_SIZE, Math.max(_numDocs, 1));
+    @SuppressWarnings("unchecked")
+    Map<String, Object>[] entriesInWindow = new Map[windowSize];
+    for (int windowStart = 0; windowStart < _numDocs; windowStart += windowSize) {
+      int windowEnd = Math.min(windowStart + windowSize, _numDocs);
+      for (int keyIndex = 0; keyIndex < numSparseKeys; keyIndex++) {
+        PeekableIntIterator it = presenceIterators[keyIndex];
+        if (it == null) {
+          continue;
+        }
+        String key = sparseKeys.get(keyIndex);
+        List<Object> keyValues = valuesPerKey[keyIndex];
+        // peekNext() rather than next() at the window edge: consuming the first docId of the next
+        // window here would drop it from that window's output entirely.
+        while (it.hasNext() && it.peekNext() < windowEnd) {
+          int docId = it.next();
+          int slot = docId - windowStart;
+          Map<String, Object> sparseEntries = entriesInWindow[slot];
+          if (sparseEntries == null) {
+            sparseEntries = new LinkedHashMap<>();
+            entriesInWindow[slot] = sparseEntries;
+          }
+          sparseEntries.put(key, keyValues.get(ordinalPerKey[keyIndex]++));
         }
       }
-      if (!sparseEntries.isEmpty()) {
+
+      for (int docId = windowStart; docId < windowEnd; docId++) {
+        int slot = docId - windowStart;
+        Map<String, Object> sparseEntries = entriesInWindow[slot];
+        if (sparseEntries == null) {
+          continue;
+        }
+        // Release as we go, and leave the slot clean for the window that reuses this array.
+        entriesInWindow[slot] = null;
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;

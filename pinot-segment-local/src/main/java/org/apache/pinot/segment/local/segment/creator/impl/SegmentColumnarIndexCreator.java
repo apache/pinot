@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -124,7 +127,8 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     if (fieldSpec.getDataType() == FieldSpec.DataType.OPEN_STRUCT) {
       DataSource dataSource = segment.getDataSourceNullable(columnName);
       if (dataSource instanceof OpenStructDataSource) {
-        indexOpenStructColumn(columnName, (OpenStructDataSource) dataSource, numDocs, sortedDocIds, validDocIds);
+        indexOpenStructColumn(columnName, (OpenStructDataSource) dataSource, numDocs, sortedDocIds, validDocIds,
+            _colIndexes.get(columnName).getIndexCreators());
       }
       return;
     }
@@ -151,10 +155,37 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     }
   }
 
-  private void indexOpenStructColumn(String columnName, OpenStructDataSource dataSource, int numDocs,
-      @Nullable int[] sortedDocIds, @Nullable RoaringBitmap validDocIds)
+  /// Feeds one OPEN_STRUCT column's documents to `creators`, choosing between the columnar
+  /// hand-off and the per-document path. Takes the creator list as a parameter rather than reading
+  /// `_colIndexes`, so the dispatch decision — the one place here where a mistake writes a wrong
+  /// segment rather than a slow one — is reachable from a test without standing up a full segment
+  /// build.
+  @VisibleForTesting
+  static void indexOpenStructColumn(String columnName, OpenStructDataSource dataSource, int numDocs,
+      @Nullable int[] sortedDocIds, @Nullable RoaringBitmap validDocIds, List<IndexCreator> creators)
       throws IOException {
-    List<IndexCreator> creators = _colIndexes.get(columnName).getIndexCreators();
+    // The columnar hand-off writes documents in source order with none filtered out, so it is only
+    // valid when nothing renumbers or filters them. Sorted builds and commit-time compaction fall
+    // back to the per-doc path below.
+    if (sortedDocIds == null && validDocIds == null) {
+      OpenStructColumnarSource columnarSource = dataSource.getColumnarSource();
+      if (columnarSource != null && supportsColumnarAdd(creators)) {
+        if (columnarSource.getNumDocs() == numDocs) {
+          for (IndexCreator creator : creators) {
+            ((ColumnarOpenStructIndexCreator) creator).addColumnar(columnarSource);
+          }
+          return;
+        }
+        // A numDocs mismatch between the columnar snapshot and the segment's own document count is a
+        // consistency concern, not a corrupt-input condition: the two are read at different times
+        // through different objects, so falling back to the per-document path (which is always
+        // correct) is preferable to throwing. It is also a condition believed unreachable in
+        // practice, so it is logged at WARN rather than DEBUG: silently taking the multi-fold
+        // slower per-document path in production, with no signal, is worse than a noisy log line.
+        LOGGER.warn("OPEN_STRUCT '{}': columnar source numDocs ({}) does not match segment numDocs ({}); "
+            + "falling back to the per-document path", columnName, columnarSource.getNumDocs(), numDocs);
+      }
+    }
     if (sortedDocIds != null) {
       for (int docId : sortedDocIds) {
         if (validDocIds == null || validDocIds.contains(docId)) {
@@ -168,6 +199,22 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
         }
       }
     }
+  }
+
+  /// Whether every creator for this column can consume a columnar source. Checked before feeding
+  /// any of them: a creator that had already accepted the source could not be rewound if a later
+  /// one refused.
+  private static boolean supportsColumnarAdd(List<IndexCreator> creators) {
+    if (creators.isEmpty()) {
+      return false;
+    }
+    for (IndexCreator creator : creators) {
+      if (!(creator instanceof ColumnarOpenStructIndexCreator)
+          || !((ColumnarOpenStructIndexCreator) creator).supportsColumnarAdd()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static void indexOpenStructDoc(OpenStructDataSource dataSource, int docId, List<IndexCreator> creators)
