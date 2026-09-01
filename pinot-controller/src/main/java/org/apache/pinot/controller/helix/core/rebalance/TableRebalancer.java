@@ -2428,17 +2428,32 @@ public class TableRebalancer {
   /// so with `batchSizePerServer` enabled and strict replica group routing the segments are grouped more coarsely than
   /// the rebalance groups them, which changes the pacing of the moves but not the bounds themselves.
   ///
-  /// @return server to the most bytes it would be pushed over its bound by, empty when the rebalance can complete
-  ///         within the bound of every server
-  public static Map<String, Long> getServersForcedOverDiskBudget(Map<String, Map<String, String>> currentAssignment,
+  /// @return `null` when the replay could not be finished, which establishes nothing and must not be read as safe;
+  ///         an empty map when the rebalance was replayed to the target assignment inside every server's bound; and
+  ///         otherwise the servers that would be pushed over their bound, mapped to the bytes they would go over by
+  @Nullable
+  public static Map<String, Long> getServersForcedOverDiskBudget(
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      int minAvailableReplicas, boolean enableStrictReplicaGroup, int batchSizePerServer,
+      @Nullable TableSizeReader.TableSubTypeSizeDetails tableSizeDetails, Logger tableRebalanceLogger) {
+    return getServersForcedOverDiskBudget(currentAssignment, targetAssignment, minAvailableReplicas,
+        enableStrictReplicaGroup, batchSizePerServer, tableSizeDetails, tableRebalanceLogger,
+        MAX_DISK_BUDGET_REPLAY_STEPS);
+  }
+
+  /// @param maxSteps how many steps to replay before giving up, so that the giving-up path can be tested without
+  ///                 building an assignment that genuinely needs tens of thousands of steps
+  @Nullable
+  @VisibleForTesting
+  static Map<String, Long> getServersForcedOverDiskBudget(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       int batchSizePerServer, @Nullable TableSizeReader.TableSubTypeSizeDetails tableSizeDetails,
-      Logger tableRebalanceLogger) {
+      Logger tableRebalanceLogger, int maxSteps) {
     DiskUsageBudget diskUsageBudget = DiskUsageBudget.create(currentAssignment, tableSizeDetails);
     Object2IntOpenHashMap<String> segmentPartitionIdMap = new Object2IntOpenHashMap<>();
     Map<String, Long> serverToBytesOverBudget = new TreeMap<>();
     Map<String, Map<String, String>> assignment = currentAssignment;
-    for (int step = 1; step <= MAX_DISK_BUDGET_REPLAY_STEPS; step++) {
+    for (int step = 1; step <= maxSteps; step++) {
       if (assignment.equals(targetAssignment)) {
         return serverToBytesOverBudget;
       }
@@ -2450,12 +2465,14 @@ public class TableRebalancer {
                 batchSizePerServer, segmentPartitionIdMap, DEFAULT_PARTITION_ID_FETCHER, new NoOpRiskAssessor(),
                 tableRebalanceLogger, diskUsageBudget);
       } catch (Exception e) {
+        // What was found up to here is incomplete, so it cannot be reported as a rebalance that holds the bound
         tableRebalanceLogger.warn("Caught exception while replaying the rebalance to check the low disk mode disk "
-            + "usage, reporting what was found up to step {}", step, e);
-        return serverToBytesOverBudget;
+            + "usage at step {}, cannot tell whether the disk budget can be held", step, e);
+        return null;
       }
       if (nextAssignment.equals(assignment)) {
-        // The rebalance cannot progress at all, with or without the bounds. Nothing more to find
+        // The rebalance cannot progress at all, with or without the bounds, so there is nothing further to find and
+        // whatever was found so far is the whole answer
         return serverToBytesOverBudget;
       }
       getServerToAddedBytes(assignment, nextAssignment, diskUsageBudget).forEach((server, addedBytes) -> {
@@ -2466,9 +2483,9 @@ public class TableRebalancer {
       });
       assignment = nextAssignment;
     }
-    tableRebalanceLogger.warn("Gave up replaying the rebalance to check the low disk mode disk usage after {} steps",
-        MAX_DISK_BUDGET_REPLAY_STEPS);
-    return serverToBytesOverBudget;
+    tableRebalanceLogger.warn("Gave up replaying the rebalance to check the low disk mode disk usage after {} steps, "
+        + "cannot tell whether the disk budget can be held", maxSteps);
+    return null;
   }
 
   /// Returns the bytes each server is assigned on top of what it already hosts.

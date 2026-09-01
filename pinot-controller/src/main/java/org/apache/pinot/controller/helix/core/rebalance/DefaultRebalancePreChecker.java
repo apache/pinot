@@ -337,13 +337,20 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // cannot progress at all within those bounds it relaxes them for a step rather than stalling. Replay the rebalance
     // to find out whether it has to, instead of assuming lowDiskMode always avoids the transient usage
     Map<String, Long> serversForcedOverBudget = getServersForcedOverDiskBudget(preCheckContext);
+    String unsafeDuringRebalance =
+        getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold);
+    if (serversForcedOverBudget == null) {
+      // The replay could not be finished due to exception or step limit, so nothing was established. This is expected
+      // to be rare.
+      return RebalancePreCheckerResult.error(unsafeDuringRebalance + ". Whether lowDiskMode can avoid it for this "
+          + "target assignment could not be established, see the controller log. Treat the transient disk usage above "
+          + "as unsafe");
+    }
     if (!serversForcedOverBudget.isEmpty()) {
-      return RebalancePreCheckerResult.error(
-          getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold)
-              + ". lowDiskMode cannot avoid it for this target assignment: the rebalance cannot make progress without "
-              + "going over the disk these servers start with, by up to " + formatBytesOverBudget(
-              serversForcedOverBudget) + ". Rebalance to a target assignment that frees up space on them first, or "
-              + "add capacity");
+      return RebalancePreCheckerResult.error(unsafeDuringRebalance
+          + ". lowDiskMode cannot avoid it for this target assignment: the rebalance cannot make progress without "
+          + "going over the disk these servers start with, by up to " + formatBytesOverBudget(serversForcedOverBudget)
+          + ". Rebalance to a target assignment that frees up space on them first, or add capacity");
     }
     return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance." + serversGoingOver + " lowDiskMode "
         + "avoids that transient disk usage by deleting segments before adding the new ones");
@@ -359,6 +366,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   /// because the argument does not cover every later step, and going over a server's disk silently is worse than
   /// reporting a rebalance as unsafe.
   @VisibleForTesting
+  @Nullable
   protected Map<String, Long> getServersForcedOverDiskBudget(PreCheckContext preCheckContext) {
     Map<String, Map<String, String>> currentAssignment = preCheckContext.getCurrentAssignment();
     Map<String, Map<String, String>> targetAssignment = preCheckContext.getTargetAssignment();
@@ -370,7 +378,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     int minAvailableReplicas = TableRebalancer.getMinAvailableReplicas(currentAssignment, targetAssignment,
         segmentsToMove, rebalanceConfig.getMinAvailableReplicas(), tableRebalanceLogger);
     if (minAvailableReplicas == TableRebalancer.ILLEGAL_MIN_AVAILABLE_REPLICAS) {
-      // The rebalance is going to fail on the config before it moves anything
+      // The rebalance is going to fail on the config before it moves anything, so the disk it would use is moot
       return Map.of();
     }
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null

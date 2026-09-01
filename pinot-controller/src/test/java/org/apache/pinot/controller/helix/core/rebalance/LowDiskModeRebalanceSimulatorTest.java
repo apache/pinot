@@ -97,22 +97,20 @@ public class LowDiskModeRebalanceSimulatorTest {
             scenario._name + ": went outside the budget while segments were being added" + result.report());
         continue;
       }
-      Set<String> reported = TableRebalancer.getServersForcedOverDiskBudget(scenario._currentAssignment,
-          scenario._targetAssignment, scenario._minAvailableReplicas, scenario._enableStrictReplicaGroup,
-          scenario._batchSizePerServer, toTableSizeDetails(scenario._segmentSizeBytes),
-          LoggerFactory.getLogger(getClass())).keySet();
-      // Asserting what the pre-check reports, and not only that it agrees with the rebalance, is what makes this fail
-      // when a change starts giving the budget up on a shape that used to hold: the equality on its own passes a
-      // rebalance that goes over and says so.
-      if (scenario._withinBudget) {
-        assertEquals(reported, Set.of(),
-            scenario._name + ": the pre-check says the budget cannot be held for a shape that it should"
-                + result.report());
-      } else {
-        assertTrue(!reported.isEmpty(), scenario._name + ": expected the pre-check to report a server, so that the "
-            + "case where it does is covered. If a change made this shape hold, clear its withinBudget flag"
-            + result.report());
-      }
+      Map<String, Long> serversForcedOverBudget = TableRebalancer.getServersForcedOverDiskBudget(
+          scenario._currentAssignment, scenario._targetAssignment, scenario._minAvailableReplicas,
+          scenario._enableStrictReplicaGroup, scenario._batchSizePerServer,
+          toTableSizeDetails(scenario._segmentSizeBytes), LoggerFactory.getLogger(getClass()));
+      // A replay that could not be finished establishes nothing, so it must never reach the assertions below as if it
+      // had found the rebalance safe
+      assertTrue(serversForcedOverBudget != null, scenario._name + ": the replay could not be finished" + result
+          .report());
+      assertEquals(serversForcedOverBudget.isEmpty(), scenario._withinBudget,
+          scenario._name + ": unexpected replay result " + serversForcedOverBudget + result.report());
+      Set<String> reported = serversForcedOverBudget.keySet();
+      // Asserting the outcome above, and not only that it agrees with the rebalance, is what makes this fail when a
+      // change starts giving the budget up on a shape that used to hold: agreement on its own passes a rebalance that
+      // goes over and says so. If a change made the known-over shape hold, clear its withinBudget flag.
       assertEquals(result._serversOverBudget, reported,
           scenario._name + ": the servers that went over the budget are not the ones the pre-check named"
               + result.report());
@@ -131,6 +129,26 @@ public class LowDiskModeRebalanceSimulatorTest {
             scenario._name + ": split a group of segments across instances" + result.report());
       }
     }
+  }
+
+  /// A replay that does not reach the target assignment has established nothing, and must say so rather than return
+  /// the same "no server goes over" answer as a replay that completed. Driven by capping the steps rather than by
+  /// building an assignment that genuinely needs tens of thousands of them.
+  @Test
+  public void testReplayThatRunsOutOfStepsIsInconclusiveRatherThanSafe() {
+    Scenario scenario = scenarios().stream().filter(s -> s._injectAtStep == 0).findFirst().orElseThrow();
+    for (int maxSteps : List.of(1, 2)) {
+      assertEquals(TableRebalancer.getServersForcedOverDiskBudget(scenario._currentAssignment,
+              scenario._targetAssignment, scenario._minAvailableReplicas, scenario._enableStrictReplicaGroup,
+              scenario._batchSizePerServer, toTableSizeDetails(scenario._segmentSizeBytes),
+              LoggerFactory.getLogger(getClass()), maxSteps), null,
+          "a replay capped at " + maxSteps + " steps cannot have established that the budget holds");
+    }
+    // The same replay run to completion does establish it, so the result above is about the cap and nothing else
+    assertEquals(TableRebalancer.getServersForcedOverDiskBudget(scenario._currentAssignment,
+        scenario._targetAssignment, scenario._minAvailableReplicas, scenario._enableStrictReplicaGroup,
+        scenario._batchSizePerServer, toTableSizeDetails(scenario._segmentSizeBytes),
+        LoggerFactory.getLogger(getClass())), Map.of());
   }
 
   // ---------------------------------------------------------------------------------------------------------------
