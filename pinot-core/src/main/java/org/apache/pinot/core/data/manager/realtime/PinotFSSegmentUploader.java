@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -243,17 +244,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       }
 
       KeyedUpload completedUpload = getCompletedUpload(uploadId);
+      Callable<URI> operation;
       if (completedUpload != null) {
         completedUpload.validateInput(segmentName);
-        removeCompletedUpload(uploadId, completedUpload);
-      }
-
-      KeyedUpload newUpload = new KeyedUpload(segmentName);
-      _activeKeyedUploads.put(uploadId, newUpload);
-      Callable<URI> operation;
-      if (completedUpload == null) {
-        operation = copyFromSnapshot(segmentFile, destUri, rawTableName);
-      } else {
+        URI completedLocation = peekCompletedLocation(completedUpload);
         URI nextDestUri;
         try {
           nextDestUri = getSegmentUri(segmentName,
@@ -261,17 +255,22 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         } catch (URISyntaxException e) {
           throw new IllegalStateException(e);
         }
-        File nextSnapshot = snapshotLocalFile(segmentFile);
-        boolean ownsNextSnapshot = nextSnapshot != segmentFile;
-        Callable<URI> nextGenerationUploadTask = () -> uploadSegmentFile(nextSnapshot, nextDestUri, rawTableName);
+        removeCompletedUpload(uploadId, completedUpload);
+        // Existence check stays on the worker so a hung PinotFS.exists is bounded by the caller timeout.
+        // Snapshot only after the object is gone so a cheap reuse does not copy the whole tar.
         operation = () -> {
-          try {
-            return reuseOrUploadNextGeneration(completedUpload, nextGenerationUploadTask);
-          } finally {
-            deleteSnapshot(nextSnapshot, ownsNextSnapshot);
+          Boolean stillPresent = objectExistsOrUnknown(completedLocation);
+          if (stillPresent == null || stillPresent) {
+            return completedLocation;
           }
+          return copyFromSnapshot(segmentFile, nextDestUri, rawTableName).call();
         };
+      } else {
+        operation = copyFromSnapshot(segmentFile, destUri, rawTableName);
       }
+
+      KeyedUpload newUpload = new KeyedUpload(segmentName);
+      _activeKeyedUploads.put(uploadId, newUpload);
       startKeyedOperation(uploadId, newUpload, operation, completedUpload);
       return newUpload._future;
     } finally {
@@ -292,6 +291,32 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         deleteSnapshot(snapshot, ownsSnapshot);
       }
     };
+  }
+
+  private static URI peekCompletedLocation(KeyedUpload completedUpload) {
+    if (!completedUpload._future.isDone()) {
+      throw new IllegalStateException("Completed upload future is still pending");
+    }
+    try {
+      return completedUpload._future.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while reading a completed upload URI", e);
+    } catch (ExecutionException e) {
+      throw new IllegalStateException("Completed upload future failed", e.getCause());
+    }
+  }
+
+  @Nullable
+  private Boolean objectExistsOrUnknown(URI completedLocation) {
+    try {
+      PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
+      return pinotFS.exists(completedLocation);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to verify completed segment upload at {}. Will not start another upload: {}",
+          completedLocation, e.getMessage());
+      return null;
+    }
   }
 
   private static File snapshotLocalFile(File segmentFile) {
@@ -361,36 +386,6 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       } finally {
         uploadLock.unlock();
       }
-    }
-  }
-
-  @Nullable
-  private URI reuseOrUploadNextGeneration(KeyedUpload completedUpload, Callable<URI> nextGenerationUploadTask) {
-    URI completedLocation;
-    try {
-      completedLocation = completedUpload._future.get();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return null;
-    } catch (Exception e) {
-      return null;
-    }
-    try {
-      PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-      if (pinotFS.exists(completedLocation)) {
-        return completedLocation;
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Failed to verify completed segment upload at {}. Will not start another upload: {}",
-          completedLocation, e.getMessage());
-      return null;
-    }
-    try {
-      return nextGenerationUploadTask.call();
-    } catch (Exception e) {
-      LOGGER.warn("Failed to start a new segment upload generation after {} was consumed: {}", completedLocation,
-          e.getMessage());
-      return null;
     }
   }
 
