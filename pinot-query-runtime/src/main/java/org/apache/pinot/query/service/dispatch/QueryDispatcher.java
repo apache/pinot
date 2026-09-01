@@ -694,10 +694,8 @@ public class QueryDispatcher {
   }
 
 
-  /**
-   * Extracts the maximum observed latency per instance from consulted stages' stats.
-   * Takes the maximum when the same server appears in multiple consulted stages.
-   */
+  /// Extracts the maximum observed latency per instance from consulted stages' stats.
+  /// Takes the maximum when the same server appears in multiple consulted stages.
   @VisibleForTesting
   static Map<String, Long> extractMaxTimingsPerInstance(QueryResult result,
       AdaptiveRoutingStageClassification classification, long requestId,

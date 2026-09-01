@@ -47,21 +47,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Unit tests for upstream timing extraction via {@link AdaptiveRoutingStageClassification#classify} and
- * {@link QueryDispatcher#extractMaxTimingsPerInstance}.
- *
- * <p>Each test constructs a {@link QueryDispatcher.QueryResult} with hand-crafted
- * {@code UPSTREAM_SERVER_RESPONSE_TIMES_MS} stats and a matching {@link DispatchableSubPlan},
- * then asserts that {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} is (or is not)
- * called with the expected arguments.
- *
- * <p>Two kinds of stages are consulted: direct pure-leaf receivers ({@code stagesReceivingFromLeaves},
- * including stage 0 when only leaves send to it), and SINGLETON leaf stages themselves
- * ({@code singletonLeafStageIds}). All other stages — including receivers of SINGLETON leaf stages —
- * are excluded to prevent SINGLETON cascade contamination.
- * See {@link AdaptiveRoutingStageClassification} for details.
- */
+/// Unit tests for upstream timing extraction via {@link AdaptiveRoutingStageClassification#classify} and
+/// {@link QueryDispatcher#extractMaxTimingsPerInstance}.
+///
+/// <p>Each test constructs a {@link QueryDispatcher.QueryResult} with hand-crafted
+/// {@code UPSTREAM_SERVER_RESPONSE_TIMES_MS} stats and a matching {@link DispatchableSubPlan},
+/// then asserts that {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} is (or is not)
+/// called with the expected arguments.
+///
+/// <p>Two kinds of stages are consulted: direct pure-leaf receivers ({@code stagesReceivingFromLeaves},
+/// including stage 0 when only leaves send to it), and SINGLETON leaf stages themselves
+/// ({@code singletonLeafStageIds}). All other stages — including receivers of SINGLETON leaf stages —
+/// are excluded to prevent SINGLETON cascade contamination.
+/// See {@link AdaptiveRoutingStageClassification} for details.
 public class QueryDispatcherApplyUpstreamTimingsTest {
 
   private static final long REQUEST_ID = 42L;
@@ -69,10 +67,8 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
   private static final ResultTable EMPTY_RESULT =
       new ResultTable(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}), List.of());
 
-  /**
-   * Mirrors the 3-step sequence in QueryDispatcher's finally block: classify -> extract -> record.
-   * Returns the classification so tests can inspect _trackedServers.
-   */
+  /// Mirrors the 3-step sequence in QueryDispatcher's finally block: classify -> extract -> record.
+  /// Returns the classification so tests can inspect _trackedServers.
   private static AdaptiveRoutingStageClassification applyUpstreamTimingsFromStats(QueryDispatcher.QueryResult result,
       DispatchableSubPlan plan, ServerRoutingStatsManager statsManager, long requestId,
       Set<String> recordedInstanceIds) {
@@ -98,10 +94,8 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds a QueryResult whose stage-1 stats contain a MAILBOX_RECEIVE operator with
-   * UPSTREAM_SERVER_RESPONSE_TIMES_MS set to {@code encoded}.
-   */
+  /// Builds a QueryResult whose stage-1 stats contain a MAILBOX_RECEIVE operator with
+  /// UPSTREAM_SERVER_RESPONSE_TIMES_MS set to {@code encoded}.
   private static QueryDispatcher.QueryResult resultWithStage1Timing(String encoded) {
     StatMap<BaseMailboxReceiveOperator.StatKey> receiveStats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
@@ -164,9 +158,7 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     return fragment;
   }
 
-  /**
-   * Wraps one or more fragments into a {@link DispatchableSubPlan} mock.
-   */
+  /// Wraps one or more fragments into a {@link DispatchableSubPlan} mock.
   private static DispatchableSubPlan planWith(DispatchablePlanFragment... fragments) {
     DispatchableSubPlan plan = mock(DispatchableSubPlan.class);
     TreeSet<DispatchablePlanFragment> fragmentSet = new TreeSet<>(Comparator.comparingInt(System::identityHashCode));
@@ -449,16 +441,14 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
   }
 
 
-  /**
-   * Covers the relay/intermediate-server contamination case (e.g. a SINGLETON relay stage-1 server
-   * like {@code 055f50e85c4876db1} that waits for a slow upstream and therefore has an inflated
-   * wall-clock elapsed time).  The intermediate server must NOT be in {@code _trackedServers} so
-   * the caller's finally block records it at -1 (not at wall-clock).
-   *
-   * <p>Topology: leaf (stage 2) sends non-SINGLETON to stage 1 (intermediate relay). Stage 1's
-   * UPSTREAM_SERVER_RESPONSE_TIMES_MS gives accurate leaf timings. The relay server runs only the
-   * intermediate stage ({@code nonLeafFragment}) and must NOT have a real latency recorded for it.
-   */
+  /// Covers the relay/intermediate-server contamination case (e.g. a SINGLETON relay stage-1 server
+  /// like {@code 055f50e85c4876db1} that waits for a slow upstream and therefore has an inflated
+  /// wall-clock elapsed time).  The intermediate server must NOT be in {@code _trackedServers} so
+  /// the caller's finally block records it at -1 (not at wall-clock).
+  ///
+  /// <p>Topology: leaf (stage 2) sends non-SINGLETON to stage 1 (intermediate relay). Stage 1's
+  /// UPSTREAM_SERVER_RESPONSE_TIMES_MS gives accurate leaf timings. The relay server runs only the
+  /// intermediate stage ({@code nonLeafFragment}) and must NOT have a real latency recorded for it.
   @Test
   public void testIntermediateRelayServerNotInTrackedServers() {
     QueryServerInstance leafServer = new QueryServerInstance("leaf-instance", "host-leaf", 9000, MAILBOX_PORT);

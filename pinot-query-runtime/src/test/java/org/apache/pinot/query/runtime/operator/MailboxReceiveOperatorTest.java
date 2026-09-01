@@ -302,17 +302,15 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
-  /**
-   * Verifies that {@link BaseMailboxReceiveOperator#copyStatMaps()} includes per-sender timing for
-   * senders whose EOS arrived before the query was cancelled or timed out, even when {@code onEos()}
-   * was never called (because a slow sender never completed).
-   *
-   * <p>This is the timeout path fix: fast-server timings are "trapped" in
-   * {@code _multiConsumer._senderElapsedMs} until {@code onEos()} fires, but on timeout
-   * {@code onEos()} never fires.  {@code copyStatMaps()} must flush the partial map so that
-   * {@code applyUpstreamTimingsFromStats} can exempt those fast servers from the full elapsed-time
-   * penalty in the {@code finally} block.
-   */
+  /// Verifies that {@link BaseMailboxReceiveOperator#copyStatMaps()} includes per-sender timing for
+  /// senders whose EOS arrived before the query was cancelled or timed out, even when {@code onEos()}
+  /// was never called (because a slow sender never completed).
+  ///
+  /// <p>This is the timeout path fix: fast-server timings are "trapped" in
+  /// {@code _multiConsumer._senderElapsedMs} until {@code onEos()} fires, but on timeout
+  /// {@code onEos()} never fires.  {@code copyStatMaps()} must flush the partial map so that
+  /// {@code applyUpstreamTimingsFromStats} can exempt those fast servers from the full elapsed-time
+  /// penalty in the {@code finally} block.
   @Test
   public void copyStatMapsIncludesPartialTimingWhenSlowSenderNeverCompletes() {
     // mailbox 1 (fast sender): returns EOS immediately.

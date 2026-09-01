@@ -377,18 +377,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
           _senderStageId, senderKey, elapsedMs);
     }
 
-    /**
-     * Returns the per-sender timing map (senderKey -> max elapsedMs since consumer construction).
-     * May be empty if no timing data was collected.
-     */
+    /// Returns the per-sender timing map (senderKey -> max elapsedMs since consumer construction).
+    /// May be empty if no timing data was collected.
     public Map<String, Long> getSenderElapsedMs() {
       return Collections.unmodifiableMap(_senderElapsedMs);
     }
 
-    /**
-     * Returns per-sender timing with pending (non-completing) senders injected at the current
-     * wall-clock elapsed time. Completed senders retain their actual measured latency.
-     */
+    /// Returns per-sender timing with pending (non-completing) senders injected at the current
+    /// wall-clock elapsed time. Completed senders retain their actual measured latency.
     public Map<String, Long> getSenderElapsedMsIncludingPending() {
       if (_streamIdToSenderKey.isEmpty()) {
         return Collections.unmodifiableMap(_senderElapsedMs);

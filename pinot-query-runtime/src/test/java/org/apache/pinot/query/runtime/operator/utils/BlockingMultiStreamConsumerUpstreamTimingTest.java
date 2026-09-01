@@ -42,9 +42,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests per-sender elapsed-time tracking in {@link BlockingMultiStreamConsumer.OfMseBlock}.
- */
+/// Tests per-sender elapsed-time tracking in {@link BlockingMultiStreamConsumer.OfMseBlock}.
 public class BlockingMultiStreamConsumerUpstreamTimingTest {
 
   @SuppressWarnings("unchecked")
@@ -68,12 +66,10 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
     return OperatorTestUtil.getOpChainContext(mailboxService, Long.MAX_VALUE, stageMetadata);
   }
 
-  /**
-   * Covers: per-sender tracking, max-dedup for duplicate sender keys, and no-op for unmapped streams.
-   *
-   * <p>Three streams: A (fast), A-worker1 (slow, same sender key as A), and C (no sender key mapping).
-   * Verifies: A gets max of both workers (700ms), C produces no entry.
-   */
+  /// Covers: per-sender tracking, max-dedup for duplicate sender keys, and no-op for unmapped streams.
+  ///
+  /// <p>Three streams: A (fast), A-worker1 (slow, same sender key as A), and C (no sender key mapping).
+  /// Verifies: A gets max of both workers (700ms), C produces no entry.
   @Test
   public void testPerSenderElapsedTimeWithMaxDedupAndUnmappedStream() {
     AtomicLong clock = new AtomicLong(0L);
@@ -120,10 +116,8 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
     }
   }
 
-  /**
-   * Full timeout: no senders complete. getSenderElapsedMsIncludingPending() injects elapsed time for all.
-   * Does not call readMseBlockBlocking() — simulates the state at cancel time when no EOS arrived.
-   */
+  /// Full timeout: no senders complete. getSenderElapsedMsIncludingPending() injects elapsed time for all.
+  /// Does not call readMseBlockBlocking() — simulates the state at cancel time when no EOS arrived.
   @Test
   public void testIncludingPendingFullTimeout() {
     AtomicLong clock = new AtomicLong(0L);
@@ -162,10 +156,8 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
     }
   }
 
-  /**
-   * All senders complete normally. getSenderElapsedMsIncludingPending matches getSenderElapsedMs
-   * even when called later (putIfAbsent is a no-op for already-recorded senders).
-   */
+  /// All senders complete normally. getSenderElapsedMsIncludingPending matches getSenderElapsedMs
+  /// even when called later (putIfAbsent is a no-op for already-recorded senders).
   @Test
   public void testIncludingPendingAllComplete() {
     AtomicLong clock = new AtomicLong(0L);

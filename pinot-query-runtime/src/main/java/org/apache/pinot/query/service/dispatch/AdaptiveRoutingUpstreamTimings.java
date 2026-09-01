@@ -25,20 +25,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Holds per-upstream-sender timing data for adaptive routing, encoded for transport via StatMap STRING keys.
- *
- * <p>Format: {@code "key1=elapsedMs1;key2=elapsedMs2"}
- * <ul>
- *   <li>Entries are separated by {@code ';'}</li>
- *   <li>Key and value are separated by {@code '='}</li>
- *   <li>Keys are of the form {@code "hostname|mailboxPort"} (pipe cannot appear in DNS names or port numbers)</li>
- *   <li>elapsedMs values are non-negative longs</li>
- * </ul>
- *
- * <p>This encoding is used in
- * {@link org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator.StatKey#UPSTREAM_SERVER_RESPONSE_TIMES_MS}.
- */
+/// Holds per-upstream-sender timing data for adaptive routing, encoded for transport via StatMap STRING keys.
+///
+/// <p>Format: {@code "key1=elapsedMs1;key2=elapsedMs2"}
+/// <ul>
+///   <li>Entries are separated by {@code ';'}</li>
+///   <li>Key and value are separated by {@code '='}</li>
+///   <li>Keys are of the form {@code "hostname|mailboxPort"} (pipe cannot appear in DNS names or port numbers)</li>
+///   <li>elapsedMs values are non-negative longs</li>
+/// </ul>
+///
+/// <p>This encoding is used in
+/// {@link org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator}'s
+/// {@code StatKey#UPSTREAM_SERVER_RESPONSE_TIMES_MS}.
 public class AdaptiveRoutingUpstreamTimings {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveRoutingUpstreamTimings.class);
@@ -51,19 +50,15 @@ public class AdaptiveRoutingUpstreamTimings {
   private AdaptiveRoutingUpstreamTimings() {
   }
 
-  /**
-   * Returns the key used to identify a sender in the timing map, given its hostname and mailbox port.
-   * <p>The {@code '|'} separator is chosen because it cannot appear in DNS hostnames or port numbers.
-   */
+  /// Returns the key used to identify a sender in the timing map, given its hostname and mailbox port.
+  /// <p>The {@code '|'} separator is chosen because it cannot appear in DNS hostnames or port numbers.
   public static String senderKey(String hostname, int mailboxPort) {
     return hostname + "|" + mailboxPort;
   }
 
-  /**
-   * Encode a map of senderKey -> elapsedMs into a string.
-   *
-   * @return encoded string, or {@code null} if the map is empty (null = absent in StatMap)
-   */
+  /// Encode a map of senderKey -> elapsedMs into a string.
+  ///
+  /// @return encoded string, or {@code null} if the map is empty (null = absent in StatMap)
   @Nullable
   public static String encode(Map<String, Long> timings) {
     if (timings.isEmpty()) {
@@ -79,9 +74,7 @@ public class AdaptiveRoutingUpstreamTimings {
     return sb.toString();
   }
 
-  /**
-   * Decode a string (possibly null) into a mutable map of senderKey -> elapsedMs.
-   */
+  /// Decode a string (possibly null) into a mutable map of senderKey -> elapsedMs.
   public static Map<String, Long> decode(@Nullable String encoded) {
     Map<String, Long> result = new HashMap<>();
     if (encoded == null || encoded.isEmpty()) {
@@ -109,10 +102,8 @@ public class AdaptiveRoutingUpstreamTimings {
     return result;
   }
 
-  /**
-   * Merge two encoded timing strings, taking the max elapsedMs per senderKey.
-   * Either or both arguments may be null (treated as empty).
-   */
+  /// Merge two encoded timing strings, taking the max elapsedMs per senderKey.
+  /// Either or both arguments may be null (treated as empty).
   @Nullable
   public static String mergeEncodings(@Nullable String enc1, @Nullable String enc2) {
     Map<String, Long> merged = decode(enc1);

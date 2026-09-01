@@ -268,12 +268,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.reset(failingQueryServer);
   }
 
-  /**
-   * When no indirect timing is extracted (e.g. reduce phase fails before stats propagate), the
-   * finally block must still decrement in-flight for all submitted servers. With no known timings
-   * and no cancel attempted, all servers fall into Tier 4 (no timing data, server responsive)
-   * and get -1 (decrement only, no EMA update) rather than the contaminated wall-clock.
-   */
+  /// When no indirect timing is extracted (e.g. reduce phase fails before stats propagate), the
+  /// finally block must still decrement in-flight for all submitted servers. With no known timings
+  /// and no cancel attempted, all servers fall into Tier 4 (no timing data, server responsive)
+  /// and get -1 (decrement only, no EMA update) rather than the contaminated wall-clock.
   @Test
   public void testFallbackLatencyIsMinusOneWhenNoIndirectTimings()
       throws Exception {
@@ -508,15 +506,13 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  /**
-   * Simulates the SIGSTOP scenario: one server hangs on submit AND does not respond to cancel
-   * (TCP connection alive, server frozen). With the fix, {@code incrementedServers} is populated
-   * before {@code submit()}, so {@code recordPerServerLatencies} marks the unresponsive server
-   * degraded via Tier 3 with {@code latency = elapsedMs > 0} — the EMA is updated correctly.
-   *
-   * <p>A fake clock pins {@code elapsedMs} to 1000 ms regardless of wall-clock time.
-   * A short cancel timeout (100 ms) keeps the test fast.
-   */
+  /// Simulates the SIGSTOP scenario: one server hangs on submit AND does not respond to cancel
+  /// (TCP connection alive, server frozen). With the fix, {@code incrementedServers} is populated
+  /// before {@code submit()}, so {@code recordPerServerLatencies} marks the unresponsive server
+  /// degraded via Tier 3 with {@code latency = elapsedMs > 0} — the EMA is updated correctly.
+  ///
+  /// <p>A fake clock pins {@code elapsedMs} to 1000 ms regardless of wall-clock time.
+  /// A short cancel timeout (100 ms) keeps the test fast.
   @Test
   public void testDispatchTimeoutRecordsElapsedLatency() throws Exception {
     AtomicLong fakeClockMs = new AtomicLong(1_000L);
@@ -577,14 +573,12 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  /**
-   * Reproduces the bug where runReducer returns a QueryResult with processingException (e.g. EXECUTION_TIMEOUT
-   * from a mailbox receive timeout), and the old code called cancel() instead of cancelWithStats(). This left
-   * cancelOutcome == NONE, causing all servers to fall into Tier 4 (latency=-1) — a no-op for the EMA.
-   *
-   * After the fix (cancelWithStats on the processingException path), servers that don't respond to the cancel
-   * get Tier 3 (latency=elapsedMs), which is > 0 and actually updates the EMA.
-   */
+  /// Reproduces the bug where runReducer returns a QueryResult with processingException (e.g. EXECUTION_TIMEOUT
+  /// from a mailbox receive timeout), and the old code called cancel() instead of cancelWithStats(). This left
+  /// cancelOutcome == NONE, causing all servers to fall into Tier 4 (latency=-1) — a no-op for the EMA.
+  ///
+  /// After the fix (cancelWithStats on the processingException path), servers that don't respond to the cancel
+  /// get Tier 3 (latency=elapsedMs), which is > 0 and actually updates the EMA.
   @Test
   public void testProcessingExceptionPathRecordsElapsedLatencyNotMinusOne()
       throws Exception {
@@ -653,7 +647,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  /** Creates a local {@link QueryDispatcher} wired to the shared query servers with an injected clock. */
+  /// Creates a local {@link QueryDispatcher} wired to the shared query servers with an injected clock.
   private QueryDispatcher newDispatcher(LongSupplier clock) {
     return new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
         Duration.ofSeconds(1), clock);

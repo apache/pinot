@@ -159,9 +159,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     LOGGER.debug("==[UPSTREAM_TIMING]== stage {} onEos: merged sender timings", _senderStageId);
   }
 
-  /**
-   * Encodes per-sender elapsed-time data and merges it into {@code target}.
-   */
+  /// Encodes per-sender elapsed-time data and merges it into {@code target}.
   private void mergeSenderTimingsInto(StatMap<StatKey> target, Map<String, Long> senderElapsedMs) {
     if (!senderElapsedMs.isEmpty()) {
       String encoded = AdaptiveRoutingUpstreamTimings.encode(senderElapsedMs);
@@ -188,11 +186,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
-  /**
-   * Builds a map from stream ID to sender key (hostname|mailboxPort) for per-sender elapsed-time tracking.
-   * Iterates {@link MailboxInfos} and {@code asyncStreams} in parallel (same order as
-   * {@link MailboxIdUtils#toMailboxIds}), mapping each stream's ID to its server's sender key.
-   */
+  /// Builds a map from stream ID to sender key (hostname|mailboxPort) for per-sender elapsed-time tracking.
+  /// Iterates {@link MailboxInfos} and {@code asyncStreams} in parallel (same order as
+  /// {@link MailboxIdUtils#toMailboxIds}), mapping each stream's ID to its server's sender key.
   private static Map<Object, String> buildStreamIdToSenderKey(MailboxInfos mailboxInfos,
       List<? extends AsyncStream<?>> asyncStreams) {
     Map<Object, String> streamIdToSenderKey = new HashMap<>(asyncStreams.size());

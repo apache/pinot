@@ -33,29 +33,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Classifies a query plan's stages for upstream timing extraction.
- *
- * <p>Two kinds of stages are consulted:
- * <ul>
- *   <li><b>Pure leaf receivers</b>: stages that directly receive from a non-SINGLETON leaf.</li>
- *   <li><b>SINGLETON leaf stages receiving from another leaf</b>: a leaf stage that both scans a
- *       dim table and receives all upstream data via a SINGLETON exchange, but ONLY when its upstream
- *       sender stage is also a leaf.</li>
- * </ul>
- *
- * <p>Only pure leaf servers (non-SINGLETON) are eligible for EMA updates. Intermediate and
- * SINGLETON leaf servers are excluded because their timings reflect cascade delays from upstream
- * rather than their own scan performance.
- */
+/// Classifies a query plan's stages for upstream timing extraction.
+///
+/// <p>Two kinds of stages are consulted:
+/// <ul>
+///   <li><b>Pure leaf receivers</b>: stages that directly receive from a non-SINGLETON leaf.</li>
+///   <li><b>SINGLETON leaf stages receiving from another leaf</b>: a leaf stage that both scans a
+///       dim table and receives all upstream data via a SINGLETON exchange, but ONLY when its upstream
+///       sender stage is also a leaf.</li>
+/// </ul>
+///
+/// <p>Only pure leaf servers (non-SINGLETON) are eligible for EMA updates. Intermediate and
+/// SINGLETON leaf servers are excluded because their timings reflect cascade delays from upstream
+/// rather than their own scan performance.
 final class AdaptiveRoutingStageClassification {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveRoutingStageClassification.class);
 
-  /** Maps "hostname|mailboxPort" -> instanceId for all known servers. */
+  /// Maps "hostname|mailboxPort" -> instanceId for all known servers.
   final Map<String, String> _senderKeyToInstanceId;
-  /** Stage IDs whose UPSTREAM_SERVER_RESPONSE_TIMES_MS we trust. */
+  /// Stage IDs whose UPSTREAM_SERVER_RESPONSE_TIMES_MS we trust.
   final Set<Integer> _trustedStageIds;
-  /** Instance IDs of pure leaf servers eligible for EMA updates in the fallback path. */
+  /// Instance IDs of pure leaf servers eligible for EMA updates in the fallback path.
   final Set<String> _trackedServers;
 
   private AdaptiveRoutingStageClassification(Map<String, String> senderKeyToInstanceId, Set<Integer> trustedStageIds,
@@ -65,13 +63,11 @@ final class AdaptiveRoutingStageClassification {
     _trackedServers = trackedServers;
   }
 
-  /**
-   * Derives trusted stages and tracked servers from pre-computed roles set at planning time.
-   *
-   * <p>For pure leaves: their receivers are trusted (unless also receiving from a non-leaf).
-   * For SINGLETON leaf trusted: the stage itself is trusted.
-   * Contamination filter: any stage that receives from a non-leaf is excluded from trusted.
-   */
+  /// Derives trusted stages and tracked servers from pre-computed roles set at planning time.
+  ///
+  /// <p>For pure leaves: their receivers are trusted (unless also receiving from a non-leaf).
+  /// For SINGLETON leaf trusted: the stage itself is trusted.
+  /// Contamination filter: any stage that receives from a non-leaf is excluded from trusted.
   static AdaptiveRoutingStageClassification classify(DispatchableSubPlan plan) {
     Map<String, String> senderKeyToInstanceId = new HashMap<>();
     Set<Integer> trustedStageIds = new HashSet<>();
