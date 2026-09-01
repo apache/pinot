@@ -300,8 +300,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
-    if (_segmentUploader instanceof PinotFSSegmentUploader pinotFSSegmentUploader) {
-      pinotFSSegmentUploader.close();
+    if (_segmentUploader != null) {
+      _segmentUploader.close();
     }
     // shutdown logical table metadata cache
     _logicalTableMetadataCache.shutdown();

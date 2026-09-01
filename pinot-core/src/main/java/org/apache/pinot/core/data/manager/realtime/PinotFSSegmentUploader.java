@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 /// PinotFS within a configurable timeout period. Calls for one segment build join the same active upload and reuse its
 /// temporary URI while it exists. Once the controller consumes that URI, the same build advances to a fresh generation
 /// instead of rewriting a location that an earlier controller request may still be moving.
-public class PinotFSSegmentUploader implements SegmentUploader, AutoCloseable {
+public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
   private static final int MAX_COMPLETED_KEYED_UPLOADS = 10_000;
