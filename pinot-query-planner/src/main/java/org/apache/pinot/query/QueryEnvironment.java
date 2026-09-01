@@ -105,7 +105,9 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -560,7 +562,19 @@ public class QueryEnvironment {
           _envConfig.defaultUseJoinReorder())) {
         int maxJoins = QueryOptionsUtils.getJoinReorderMaxJoins(plannerContext.getOptions(),
             _envConfig.defaultJoinReorderMaxJoins());
-        optimized = JoinReorderOptimizer.maybeReorder(optimized, maxJoins);
+        // Read before the call: the diagnostics the feedback entry reports each cost a full-tree
+        // metadata walk, so the optimizer only computes them when someone is listening.
+        boolean feedback = QueryOptionsUtils.isJoinReorderFeedback(plannerContext.getOptions());
+        JoinReorderOptimizer.Result reorderResult =
+            JoinReorderOptimizer.maybeReorder(optimized, maxJoins, feedback);
+        optimized = reorderResult.plan();
+        if (feedback) {
+          // Published here rather than inside the optimizer so the optimizer owns no response
+          // concern. The sink is propagated by reference across the compile/plan executors, so a
+          // write from this planning thread is visible when the broker assembles the response.
+          QueryThreadContext.addResponseBrokerMetadata(Request.JOIN_REORDER_RESPONSE_KEY,
+              reorderResult.toJson());
+        }
       }
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);

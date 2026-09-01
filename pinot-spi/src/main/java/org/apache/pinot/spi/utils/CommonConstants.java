@@ -838,6 +838,12 @@ public class CommonConstants {
       public static final String LANGUAGE = "language";
       public static final String QUERY = "query";
 
+      /// Key of the `responseMetadata` entry describing what the cost-based join-reorder phase
+      /// did, attached when [QueryOptionKey#JOIN_REORDER_FEEDBACK] is set. Declared here rather
+      /// than inlined at the publish site because it is permanent public surface: it is the name
+      /// clients read out of the response.
+      public static final String JOIN_REORDER_RESPONSE_KEY = "joinReorder";
+
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         /// Broker-internal marker set on the rewritten server-side PinotQuery after a FULL_REWRITE
@@ -959,6 +965,18 @@ public class CommonConstants {
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         public static final String USE_JOIN_REORDER = "useJoinReorder";
+
+        /// When `true`, the broker attaches a `joinReorder` entry to the response's
+        /// `responseMetadata` describing what the cost-based join-reorder phase did for THIS
+        /// query — applied or skipped, why, and the estimated cost either side.
+        ///
+        /// Has no effect unless [#USE_JOIN_REORDER] is also on (or enabled by broker config): the
+        /// entry is attached by the reorder phase, which does not run when the feature is off.
+        ///
+        /// A query option rather than a config so it can be turned on for a single suspect query
+        /// in production, without a log-level change or a restart. Off by default: the entry is
+        /// diagnostic and should not be paid for by every query.
+        public static final String JOIN_REORDER_FEEDBACK = "joinReorderFeedback";
         /// Maximum number of joins that the cost-based join-reordering phase will handle.
         /// Plans with more joins than this cap are left unchanged.
         public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";

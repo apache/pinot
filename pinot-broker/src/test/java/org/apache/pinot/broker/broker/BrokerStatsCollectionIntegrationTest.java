@@ -37,6 +37,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -214,5 +215,38 @@ public class BrokerStatsCollectionIntegrationTest extends ControllerTest {
     _brokerStarter.stop();
     stopController();
     stopZk();
+  }
+
+  /// The wire that this whole slice exists to create: statistics collected from ZooKeeper must
+  /// reach the Calcite planner as the row count it estimates with.
+  ///
+  /// Every other test of the planner side injects a mock statistics provider, so a break anywhere
+  /// between the broker's stats manager and `PinotTable.getStatistic()` -- the provider not being
+  /// constructed, not reaching `QueryEnvironment.Config`, a raw-versus-suffixed table name
+  /// mismatch -- would leave them all green while the feature silently did nothing in production.
+  ///
+  /// Asserts on the estimate NUMBER rather than on plan shape, so it does not become a plan-pinning
+  /// test that has to be regenerated whenever an unrelated rule changes.
+  @Test
+  public void testCollectedStatisticsReachThePlannerAsRowCounts()
+      throws Exception {
+    BrokerTableStatsManager statsManager = _brokerStarter.getStatsManager();
+    assertNotNull(statsManager);
+    TestUtils.waitForCondition(aVoid -> {
+      TableStatistics s = statsManager.getTableStats(OFFLINE_TABLE_NAME);
+      return s != null && s.getRowCount() == (long) NUM_OFFLINE_SEGMENTS * DOCS_PER_SEGMENT;
+    }, 30_000L, "Statistics never reached the store");
+
+    // INCLUDING ALL ATTRIBUTES makes Calcite print the row count it used for each node. The
+    // default level (DIGEST_ATTRIBUTES) hides it.
+    String sql = "SET useMultistageEngine=true; EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITHOUT "
+        + "IMPLEMENTATION FOR SELECT " + TIME_COLUMN_NAME + " FROM " + RAW_TABLE_NAME;
+    String response = sendPostRequest("http://localhost:" + BROKER_QUERY_PORT + "/query/sql",
+        JsonUtils.objectToString(Map.of("sql", sql)));
+
+    long expected = (long) NUM_OFFLINE_SEGMENTS * DOCS_PER_SEGMENT;
+    assertTrue(response.contains("rowcount = " + expected + ".0"),
+        "The planner should estimate " + expected + " rows for " + RAW_TABLE_NAME + " from the "
+            + "collected statistics; instead the plan was:\n" + response);
   }
 }

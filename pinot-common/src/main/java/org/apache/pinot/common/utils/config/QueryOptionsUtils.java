@@ -726,6 +726,11 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /// Whether the caller asked for join-reorder feedback in the response metadata.
+  public static boolean isJoinReorderFeedback(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.JOIN_REORDER_FEEDBACK));
+  }
+
   public static int getJoinReorderMaxJoins(Map<String, String> queryOptions, int defaultValue) {
     String option = queryOptions.get(QueryOptionKey.JOIN_REORDER_MAX_JOINS);
     return option != null ? checkedParseIntPositive(QueryOptionKey.JOIN_REORDER_MAX_JOINS, option) : defaultValue;

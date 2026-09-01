@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
@@ -34,16 +41,21 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -120,6 +132,36 @@ public class JoinReorderOptimizerTest {
         + sql;
   }
 
+  /// Runs the gates against the plan this SQL compiles to, with feedback collection on so the
+  /// reason and counts are populated. Compiled with the phase OFF so the input tree is the one the
+  /// gates would really see.
+  private static JoinReorderOptimizer.Result gateResult(QueryEnvironment env, String sql, int maxJoins) {
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(sql, false))) {
+      return JoinReorderOptimizer.maybeReorder(compiled.getRelNode(), maxJoins, true);
+    }
+  }
+
+  /// Compiles inside a query thread context and returns the published `joinReorder` response entry,
+  /// or `null` if the phase never published one.
+  ///
+  /// @param useJoinReorder `null` leaves the option unset, exercising the shipped default
+  @Nullable
+  private static JsonNode feedbackFor(QueryEnvironment env, String sql, @Nullable Boolean useJoinReorder) {
+    StringBuilder prefixed = new StringBuilder();
+    if (useJoinReorder != null) {
+      prefixed.append("SET ").append(QueryOptionKey.USE_JOIN_REORDER)
+          .append("='").append(useJoinReorder).append("';\n");
+    }
+    prefixed.append("SET ").append(QueryOptionKey.JOIN_REORDER_FEEDBACK).append("='true';\n").append(sql);
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      try (QueryEnvironment.CompiledQuery compiled = env.compile(prefixed.toString())) {
+        compiled.getRelNode();
+      }
+      return QueryThreadContext.get().getExecutionContext().getResponseMetadata()
+          .get(Request.JOIN_REORDER_RESPONSE_KEY);
+    }
+  }
+
   private static String compileToPlan(QueryEnvironment env, String sql, boolean useJoinReorder) {
     try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(sql, useJoinReorder))) {
       return RelOptUtil.toString(compiled.getRelNode());
@@ -182,15 +224,152 @@ public class JoinReorderOptimizerTest {
             + "disabled=" + disabledTopRows + " enabled=" + enabledTopRows);
   }
 
-  /// Option disabled (the default) must leave the plan exactly as it is today.
+  /// The shipped default must leave the plan exactly as it is today.
+  ///
+  /// Asserted through the feedback channel rather than by comparing two plan strings: the phase
+  /// either ran or it did not, and only the response entry says which. Comparing an off-plan to
+  /// another off-plan proves nothing but that compilation is deterministic, and would still pass
+  /// if the gate were inverted.
   @Test
-  public void testDisabledLeavesPlanUnchanged() {
+  public void testPhaseDoesNotRunUnlessEnabled() {
     QueryEnvironment env = buildEnv(statsProvider());
-    // Compile twice with the option off: identical input ⇒ identical plan, and the reorder phase
-    // is never invoked (default-off semantics).
-    String first = compileToPlan(env, PESSIMAL_JOIN_SQL, false);
-    String second = compileToPlan(env, PESSIMAL_JOIN_SQL, false);
-    assertEquals(first, second, "Default-off plan must be deterministic and unchanged");
+    assertNull(feedbackFor(env, PESSIMAL_JOIN_SQL, false),
+        "The phase must not run when useJoinReorder is off");
+    assertNull(feedbackFor(env, PESSIMAL_JOIN_SQL, null),
+        "The phase must not run when useJoinReorder is absent — off is the shipped default");
+    assertNotNull(feedbackFor(env, PESSIMAL_JOIN_SQL, true),
+        "The phase must run when useJoinReorder is on, or the two assertions above prove nothing");
+  }
+
+  /// The feedback entry must reach the response metadata through the real publish path, under the
+  /// key clients read. Everything else about feedback is asserted on [JoinReorderOptimizer.Result]
+  /// directly, which cannot catch a broken or misnamed publish.
+  @Test
+  public void testFeedbackReachesResponseMetadata() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    JsonNode entry = feedbackFor(env, PESSIMAL_JOIN_SQL, true);
+    assertNotNull(entry, "No " + Request.JOIN_REORDER_RESPONSE_KEY + " entry was published");
+    assertEquals(entry.get("outcome").asText(), "APPLIED");
+    assertEquals(entry.get("numJoins").asInt(), 2);
+  }
+
+  /// Feedback must be opt-in: the diagnostics it reports each cost a full-tree metadata walk.
+  @Test
+  public void testNoFeedbackEntryUnlessRequested() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      String sql = "SET " + QueryOptionKey.USE_JOIN_REORDER + "='true';\n" + PESSIMAL_JOIN_SQL;
+      try (QueryEnvironment.CompiledQuery compiled = env.compile(sql)) {
+        compiled.getRelNode();
+      }
+      assertNull(QueryThreadContext.get().getExecutionContext().getResponseMetadata()
+          .get(Request.JOIN_REORDER_RESPONSE_KEY));
+    }
+  }
+
+  /// A two-table join has exactly one join: there is an order but no choice of order, so the
+  /// reported reason must say so rather than claim the plan has no joins.
+  @Test
+  public void testSingleJoinReportsTooFewJoins() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    JoinReorderOptimizer.Result result =
+        gateResult(env, "SELECT fact.val FROM fact JOIN dim1 ON fact.id = dim1.id", 10);
+    assertEquals(result.skipReason(), JoinReorderOptimizer.SkipReason.TOO_FEW_JOINS);
+    // Pin the emitted string: it is public surface once a release ships it.
+    assertEquals(result.toJson().get("reason").asText(), "TOO_FEW_JOINS");
+    assertEquals(result.toJson().get("numJoins").asInt(), 1,
+        "The count must be the real number of joins, not zero");
+  }
+
+  @DataProvider(name = "gates")
+  public Object[][] gates() {
+    String threeWay = "SELECT fact.val FROM fact JOIN dim1 ON fact.id = dim1.id "
+        + "JOIN dim2 ON fact.val = dim2.id";
+    return new Object[][]{
+        {"SELECT fact.val FROM fact LEFT JOIN dim1 ON fact.id = dim1.id "
+            + "JOIN dim2 ON fact.val = dim2.id", 10, true,
+            JoinReorderOptimizer.SkipReason.NON_INNER_JOIN},
+        {"SELECT /*+ joinOptions(join_strategy='hash') */ fact.val FROM fact "
+            + "JOIN dim1 ON fact.id = dim1.id JOIN dim2 ON fact.val = dim2.id", 10, true,
+            JoinReorderOptimizer.SkipReason.HINTED_JOIN},
+        {threeWay, 1, true, JoinReorderOptimizer.SkipReason.TOO_MANY_JOINS},
+        {threeWay, 10, false, JoinReorderOptimizer.SkipReason.UNKNOWN_ROW_COUNT},
+    };
+  }
+
+  /// Each gate must report its own reason. Asserting the reason rather than plan-string equality
+  /// matters because an unchanged plan is also what a phase that ran and happened to pick the same
+  /// order looks like.
+  @Test(dataProvider = "gates")
+  public void testGateReportsItsOwnReason(String sql, int maxJoins, boolean withStats,
+      JoinReorderOptimizer.SkipReason expected) {
+    QueryEnvironment env = buildEnv(withStats ? statsProvider() : NoOpStatisticsProvider.INSTANCE);
+    assertEquals(gateResult(env, sql, maxJoins).skipReason(), expected);
+  }
+
+  /// The gate requires EVERY leaf to have a known row count, not merely one of them. Mixed
+  /// known/guessed cardinalities are the case the phase must refuse: reordering a 1,000,000-row
+  /// table against a Calcite default guess compares a real number to a fabricated one.
+  @Test
+  public void testMixedKnownAndUnknownStatsSkipsPhase() {
+    PinotStatisticsProvider partial = mock(PinotStatisticsProvider.class);
+    when(partial.getTableStatistics(FACT)).thenReturn(
+        TableStatistics.builder().rowCount(FACT_ROWS, StatConfidence.EXACT).build());
+    // dim1 and dim2 have no statistics at all — the mock returns null for them.
+    QueryEnvironment env = buildEnv(partial);
+    assertEquals(gateResult(env, PESSIMAL_JOIN_SQL, 10).skipReason(),
+        JoinReorderOptimizer.SkipReason.UNKNOWN_ROW_COUNT,
+        "One known table among three must not satisfy the all-leaves gate");
+  }
+
+  /// A join carrying correlation state must disqualify the phase.
+  ///
+  /// The shape has to be constructed rather than compiled from SQL: Pinot decorrelates before the
+  /// optimize phase, and the `LogicalCorrelate`s that survive put an `Uncollect` under a
+  /// `Correlate` rather than a `Join`, so no query is known to produce a correlated `Join` here.
+  /// That is exactly why the gate needs a test — the invariant that keeps it unreachable lives in
+  /// another rule, and if it ever changes, `MultiJoin` would silently drop the correlation because
+  /// it has no `variablesSet` component to put it in.
+  @Test
+  public void testCorrelatedJoinSkipsPhase() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, false))) {
+      Join topJoin = findTopJoin(compiled.getRelNode());
+      assertNotNull(topJoin, "Fixture must produce a join tree");
+      // Same tree, but the top join now declares a correlation variable.
+      RelNode correlated = LogicalJoin.create(topJoin.getLeft(), topJoin.getRight(), topJoin.getHints(),
+          topJoin.getCondition(), Set.of(new CorrelationId(0)), topJoin.getJoinType());
+
+      JoinReorderOptimizer.Result result = JoinReorderOptimizer.maybeReorder(correlated, 10, true);
+      assertEquals(result.skipReason(), JoinReorderOptimizer.SkipReason.CORRELATED_JOIN);
+      assertEquals(result.plan(), correlated, "A skipped phase must return the original tree");
+    }
+  }
+
+  /// A `Correlate` must NOT disqualify the phase. It is a BiRel, never matched by
+  /// `JoinToMultiJoinRule`, so it stays an opaque factor whose binder travels with the input it
+  /// binds — and CROSS JOIN UNNEST is a common Pinot shape that would lose reordering for nothing.
+  /// Guards against "fix the correlation gate" being over-applied to `Correlate` itself.
+  @Test
+  public void testCorrelateItselfDoesNotDisqualify() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    JoinReorderOptimizer.Result result = gateResult(env, PESSIMAL_JOIN_SQL, 10);
+    assertNull(result.skipReason(), "Baseline fixture must be eligible");
+    assertTrue(result.isApplied());
+  }
+
+  /// LOW confidence is not usable for costing, so a LOW-confidence row count must read as unknown
+  /// rather than as a number.
+  @Test
+  public void testLowConfidenceStatsSkipPhase() {
+    PinotStatisticsProvider lowConfidence = mock(PinotStatisticsProvider.class);
+    for (Map.Entry<String, Long> e : Map.of(FACT, FACT_ROWS, DIM1, DIM1_ROWS, DIM2, DIM2_ROWS).entrySet()) {
+      when(lowConfidence.getTableStatistics(e.getKey())).thenReturn(
+          TableStatistics.builder().rowCount(e.getValue(), StatConfidence.LOW).build());
+    }
+    QueryEnvironment env = buildEnv(lowConfidence);
+    assertEquals(gateResult(env, PESSIMAL_JOIN_SQL, 10).skipReason(),
+        JoinReorderOptimizer.SkipReason.UNKNOWN_ROW_COUNT);
   }
 
   /// An outer join anywhere in the tree disqualifies the whole phase: plan must be unchanged.
@@ -223,7 +402,7 @@ public class JoinReorderOptimizerTest {
         "Absent statistics must cause the reorder phase to be skipped");
   }
 
-  /// The reorder phase must never throw: [JoinReorderOptimizer#maybeReorder(RelNode, int)]
+  /// The reorder phase must never throw: [JoinReorderOptimizer#maybeReorder(RelNode, int, boolean)]
   /// catches any internal error and returns the original (un-reordered) plan. We cover the try/catch
   /// with a direct unit call using a [RelNode] that throws while the phase inspects it — this
   /// is the documented fallback path. (Simulating a failure end-to-end is not possible because
@@ -234,9 +413,14 @@ public class JoinReorderOptimizerTest {
     RelNode exploding = mock(RelNode.class);
     when(exploding.getInputs()).thenThrow(new RuntimeException("boom"));
     // maybeReorder must swallow the error and return the exact same instance it was given.
-    assertEquals(JoinReorderOptimizer.maybeReorder(exploding, CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS),
-        exploding,
-        "A failing reorder must fall back to the original plan instance");
+    JoinReorderOptimizer.Result result =
+        JoinReorderOptimizer.maybeReorder(exploding, CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS, true);
+    assertEquals(result.plan(), exploding, "A failing reorder must fall back to the original plan instance");
+    // The failure must also be reportable, not just survivable: an operator asking why their query
+    // did not reorder needs to see ERROR rather than an absent answer.
+    assertFalse(result.isApplied());
+    assertEquals(result.skipReason(), JoinReorderOptimizer.SkipReason.ERROR);
+    assertEquals(result.toJson().get("reason").asText(), "ERROR");
   }
 
   // --------------------------------------------------------------------------
@@ -356,5 +540,124 @@ public class JoinReorderOptimizerTest {
       }
     }
     return null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Observability: EXPLAIN attributes and response-metadata feedback
+  // --------------------------------------------------------------------------
+
+  /// EXPLAIN must be able to show the row-count estimates the optimizer actually used. Without
+  /// them there is no way to tell a good plan chosen from good statistics apart from a good plan
+  /// chosen by luck -- or to notice that a join estimate is orders of magnitude wrong.
+  @Test
+  public void testExplainIncludingAllAttributesShowsRowCounts() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    String plan = explain(env, "EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITHOUT IMPLEMENTATION FOR "
+        + PESSIMAL_JOIN_SQL);
+    assertTrue(plan.contains("rowcount"), "EXPLAIN ... INCLUDING ALL ATTRIBUTES must expose row "
+        + "count estimates, got:\n" + plan);
+
+    // The default level stays terse, so this is opt-in rather than noise on every EXPLAIN.
+    String terse = explain(env, "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR " + PESSIMAL_JOIN_SQL);
+    assertFalse(terse.contains("rowcount"), "The default EXPLAIN level should stay terse");
+  }
+
+  /// The feedback entry is what an operator reads to answer "why did my query not reorder?", so
+  /// its shape is a contract: outcome always present, reason only when skipped, and estimates
+  /// only when the phase actually ran.
+  @Test
+  public void testFeedbackJsonForSkippedPhase() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    RelNode anyPlan;
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, false))) {
+      anyPlan = compiled.getRelNode();
+    }
+    ObjectNode json = JoinReorderOptimizer.Result
+        .skipped(anyPlan, JoinReorderOptimizer.SkipReason.HINTED_JOIN, 3).toJson();
+
+    assertEquals(json.get("outcome").asText(), "SKIPPED");
+    assertEquals(json.get("reason").asText(), "HINTED_JOIN");
+    assertEquals(json.get("numJoins").asInt(), 3);
+    // No cost on a skip: emitting zeros here would read as a real estimate of zero.
+    assertFalse(json.has("estimatedCostBefore"), "A skipped phase must not report a cost");
+    assertFalse(json.has("estimatedCostAfter"), "A skipped phase must not report a cost");
+  }
+
+  @Test
+  public void testFeedbackJsonForAppliedPhase() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    RelNode anyPlan;
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, true))) {
+      anyPlan = compiled.getRelNode();
+    }
+    ObjectNode json = JoinReorderOptimizer.Result
+        .applied(anyPlan, 2, 1000.0, 250.0, 7L, true).toJson();
+
+    assertEquals(json.get("outcome").asText(), "APPLIED");
+    assertFalse(json.has("reason"), "An applied phase has no skip reason");
+    assertTrue(json.get("planChanged").asBoolean());
+    // Both costs are reported so a miscalibrated cost model is detectable after the fact by
+    // comparing what the optimizer predicted against what the query actually cost. Cumulative
+    // cost, not the root row count: the root hides the intermediate joins that reordering moves
+    // (a COUNT(*) root is 1.0 whatever happens underneath).
+    assertEquals(json.get("estimatedCostBefore").asDouble(), 1000.0, 1e-9);
+    assertEquals(json.get("estimatedCostAfter").asDouble(), 250.0, 1e-9);
+  }
+
+  /// Calcite may decline to give a cumulative cost. That must show up as an absent field rather
+  /// than a -1 that a consumer would chart as a real value.
+  @Test
+  public void testUnavailableCostIsOmittedRatherThanReportedAsSentinel() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    RelNode anyPlan;
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, true))) {
+      anyPlan = compiled.getRelNode();
+    }
+    ObjectNode json = JoinReorderOptimizer.Result.applied(anyPlan, 2, -1, -1, 3L, false).toJson();
+    assertEquals(json.get("outcome").asText(), "APPLIED");
+    assertFalse(json.has("estimatedCostBefore"), "An unavailable cost must be omitted, not sent as -1");
+    assertFalse(json.has("estimatedCostAfter"), "An unavailable cost must be omitted, not sent as -1");
+  }
+
+  @Test
+  public void testFeedbackIsOffUnlessRequested() {
+    assertFalse(QueryOptionsUtils.isJoinReorderFeedback(Map.of()));
+    assertFalse(QueryOptionsUtils.isJoinReorderFeedback(Map.of("joinReorderFeedback", "false")));
+    assertTrue(QueryOptionsUtils.isJoinReorderFeedback(Map.of("joinReorderFeedback", "true")));
+  }
+
+  /// Drives the REAL cost computation rather than constructing a `Result` with literal values.
+  ///
+  /// This is the test the previous implementation lacked, and lacking it is why a broken field
+  /// shipped: the JSON-shape tests below build `Result.applied(plan, 2, 1000.0, 250.0, ...)` with
+  /// hardcoded numbers, so they never call the estimator and passed while production reported 1.0.
+  ///
+  /// `COUNT(*)` is the discriminator. Its ROOT row count is 1 however large the joins beneath it
+  /// are, so a field sourced from the root is indistinguishable from a broken one. Cumulative cost
+  /// aggregates the subtree and must therefore dwarf it.
+  @Test
+  public void testReportedCostReflectsTheSubtreeNotTheRootRowCount() {
+    QueryEnvironment env = buildEnv(statsProvider());
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(
+        withOption("SELECT COUNT(*) FROM fact, dim1, dim2 "
+            + "WHERE fact.id = dim1.id AND fact.val = dim2.id", true))) {
+      RelNode plan = compiled.getRelNode();
+
+      // Establish the trap this test exists to catch: the root really does report ~1 row.
+      double rootRows = plan.getCluster().getMetadataQuery().getRowCount(plan);
+      assertTrue(rootRows < 100, "A COUNT(*) root should report a tiny row count, got " + rootRows);
+
+      ObjectNode json = JoinReorderOptimizer.maybeReorder(plan, 10, true).toJson();
+      assertEquals(json.get("outcome").asText(), "APPLIED",
+          "Expected the phase to run for this plan; got " + json);
+      assertTrue(json.has("estimatedCostBefore"), "An applied phase must report a cost: " + json);
+
+      double cost = json.get("estimatedCostBefore").asDouble();
+      // The fact table alone is 1M rows, so any subtree-aware cost must be at least that. The old
+      // root-row-count implementation returned 1.0 here and would fail this assertion.
+      assertTrue(cost >= FACT_ROWS, "Cost should reflect the joined subtree (>= " + FACT_ROWS
+          + "), got " + cost + " -- a value near the root row count (" + rootRows
+          + ") means the cost is being read from the root again");
+    }
   }
 }
