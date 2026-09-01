@@ -88,7 +88,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   ///
   /// 1. One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
   ///    distribution type specified in the [MailboxSendNode].
-  /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges.
+  /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges. It copies
+  ///    blocks that carry aggregation intermediate results so that no two receiver stages share them.
   ///
   /// @see BlockExchange#asSendingMailbox(String)
   private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
