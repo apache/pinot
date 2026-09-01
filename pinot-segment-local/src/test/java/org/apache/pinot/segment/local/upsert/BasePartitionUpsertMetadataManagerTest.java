@@ -61,7 +61,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -101,6 +104,48 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertFalse(upsertMetadataManager.isPreloading());
       upsertMetadataManager.stop();
     }
+  }
+
+  @Test
+  public void testPrepareRunsBeforeUpdatingFirstRecord() {
+    PartialUpsertHandler partialUpsertHandler = mock(PartialUpsertHandler.class);
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    GenericRow record = new GenericRow();
+    record.putValue("pk", "pk1");
+    when(upsertContext.getPartialUpsertHandlerSupplier()).thenReturn(() -> partialUpsertHandler);
+    doAnswer(invocation -> {
+      ((GenericRow) invocation.getArgument(0)).putValue("structured", "prepared");
+      return null;
+    }).when(partialUpsertHandler).prepare(record);
+    PreparingPartitionUpsertMetadataManager upsertMetadataManager =
+        new PreparingPartitionUpsertMetadataManager("testTable_REALTIME", 0, upsertContext);
+
+    GenericRow updatedRecord = upsertMetadataManager.updateRecord(record, mock(RecordInfo.class));
+
+    assertSame(updatedRecord, record);
+    assertTrue(upsertMetadataManager.wasUpdateAttempted());
+    assertTrue(upsertMetadataManager.wasPreparedBeforeUpdate());
+    verify(partialUpsertHandler).prepare(record);
+  }
+
+  @Test
+  public void testPrepareFailurePreventsRecordUpdate() {
+    PartialUpsertHandler partialUpsertHandler = mock(PartialUpsertHandler.class);
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    GenericRow record = new GenericRow();
+    record.putValue("pk", "pk1");
+    IllegalArgumentException prepareFailure = new IllegalArgumentException("invalid structured value");
+    when(upsertContext.getPartialUpsertHandlerSupplier()).thenReturn(() -> partialUpsertHandler);
+    doThrow(prepareFailure).when(partialUpsertHandler).prepare(record);
+    PreparingPartitionUpsertMetadataManager upsertMetadataManager =
+        new PreparingPartitionUpsertMetadataManager("testTable_REALTIME", 0, upsertContext);
+
+    IllegalArgumentException thrown = expectThrows(IllegalArgumentException.class,
+        () -> upsertMetadataManager.updateRecord(record, mock(RecordInfo.class)));
+
+    assertSame(thrown, prepareFailure);
+    assertFalse(upsertMetadataManager.wasUpdateAttempted());
+    verify(partialUpsertHandler).prepare(record);
   }
 
   @Test
@@ -1138,6 +1183,30 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void clearPrevKeyToRecordLocation() {
+    }
+  }
+
+  private static class PreparingPartitionUpsertMetadataManager extends DummyPartitionUpsertMetadataManager {
+    private boolean _updateAttempted;
+    private boolean _preparedBeforeUpdate;
+
+    private PreparingPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
+      super(tableNameWithType, partitionId, context);
+    }
+
+    @Override
+    protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
+      _updateAttempted = true;
+      _preparedBeforeUpdate = "prepared".equals(record.getValue("structured"));
+      return record;
+    }
+
+    private boolean wasUpdateAttempted() {
+      return _updateAttempted;
+    }
+
+    private boolean wasPreparedBeforeUpdate() {
+      return _preparedBeforeUpdate;
     }
   }
 }

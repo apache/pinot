@@ -117,6 +117,32 @@ public class PartialUpsertHandlerTest {
   }
 
   @Test
+  public void testPrepareDelegatesToCustomPartialUpsertMerger() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(List.of("pk")).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPartialUpsertMergerClass("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
+    PartialUpsertMerger customMerger = mock(PartialUpsertMerger.class);
+
+    try (MockedStatic<PartialUpsertMergerFactory> partialUpsertMergerFactory = mockStatic(
+        PartialUpsertMergerFactory.class)) {
+      when(PartialUpsertMergerFactory.getPartialUpsertMerger(List.of("pk"), List.of("hoursSinceEpoch"),
+          upsertConfig)).thenReturn(customMerger);
+      PartialUpsertHandler handler = new PartialUpsertHandler(createTableConfig(schema, upsertConfig), schema,
+          List.of("hoursSinceEpoch"), upsertConfig);
+      GenericRow newRecord = new GenericRow();
+      newRecord.putValue("pk", "pk1");
+      newRecord.putValue("hoursSinceEpoch", 1L);
+
+      handler.prepare(newRecord);
+
+      verify(customMerger).prepare(newRecord);
+    }
+  }
+
+  @Test
   public void testPostUpsertTransformRunsAfterMerge() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("pk",
             FieldSpec.DataType.STRING)
