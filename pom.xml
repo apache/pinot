@@ -184,7 +184,7 @@
 
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.2</avro.version>
-    <bson.version>5.10.0</bson.version>
+    <bson.version>5.11.0</bson.version>
     <parquet.version>1.18.0</parquet.version>
     <orc.version>1.9.9</orc.version>
     <hive.version>4.2.1</hive.version>
