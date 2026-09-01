@@ -216,6 +216,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     for (int i = 0; i < numDocs; i++) {
       sortedDocIds[i] = i;
     }
+    boolean bufferOwnershipTransferred = false;
     try {
       long offset = 0;
       for (int i = 0; i < numDocs; i++) {
@@ -225,12 +226,13 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
           offset += Integer.BYTES;
         }
       }
+      final PinotDataBuffer segmentRecordBuffer = dataBuffer;
       it.unimi.dsi.fastutil.Arrays.quickSort(0, numDocs, (i1, i2) -> {
         long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
         long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
         for (int i = 0; i < _numDimensions; i++) {
-          int dimension1 = dataBuffer.getInt(offset1 + (long) i * Integer.BYTES);
-          int dimension2 = dataBuffer.getInt(offset2 + (long) i * Integer.BYTES);
+          int dimension1 = segmentRecordBuffer.getInt(offset1 + (long) i * Integer.BYTES);
+          int dimension2 = segmentRecordBuffer.getInt(offset2 + (long) i * Integer.BYTES);
           if (dimension1 != dimension2) {
             return dimension1 - dimension2;
           }
@@ -241,40 +243,60 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         sortedDocIds[i1] = sortedDocIds[i2];
         sortedDocIds[i2] = temp;
       });
+
+      // Reading dims from the buffer (already filled sequentially) instead of re-fetching from the
+      // segment avoids random-order page decodes on the aggregation walk. Ownership transfers to
+      // the iterator, which closes the buffer on completion.
+      bufferOwnershipTransferred = true;
+      return new Iterator<Record>() {
+        boolean _hasNext = true;
+        Record _currentRecord = getSegmentRecordWithBufferDims(sortedDocIds[0], segmentRecordBuffer);
+        int _docId = 1;
+
+        @Override
+        public boolean hasNext() {
+          return _hasNext;
+        }
+
+        @Override
+        public Record next() {
+          Record next = mergeSegmentRecord(null, _currentRecord);
+          while (_docId < numDocs) {
+            Record record = getSegmentRecordWithBufferDims(sortedDocIds[_docId++], segmentRecordBuffer);
+            if (!Arrays.equals(record._dimensions, next._dimensions)) {
+              _currentRecord = record;
+              return next;
+            } else {
+              next = mergeSegmentRecord(next, record);
+            }
+          }
+          _hasNext = false;
+          closeSegmentRecordBuffer(segmentRecordBuffer);
+          return next;
+        }
+      };
     } finally {
-      dataBuffer.close();
-      if (_segmentRecordFile.exists()) {
-        FileUtils.forceDelete(_segmentRecordFile);
+      // Only close here if the iterator did not take ownership (i.e. exception before the return).
+      if (!bufferOwnershipTransferred) {
+        closeSegmentRecordBuffer(dataBuffer);
       }
     }
+  }
 
-    // Create an iterator for aggregated records
-    return new Iterator<Record>() {
-      boolean _hasNext = true;
-      Record _currentRecord = getSegmentRecord(sortedDocIds[0]);
-      int _docId = 1;
-
-      @Override
-      public boolean hasNext() {
-        return _hasNext;
+  // Best-effort close + delete of the segment-record file; matches the previous finally-block behavior.
+  private void closeSegmentRecordBuffer(PinotDataBuffer buffer) {
+    try {
+      buffer.close();
+    } catch (IOException ignored) {
+      // best-effort; buffer would be reclaimed by JVM shutdown at worst
+    }
+    if (_segmentRecordFile.exists()) {
+      try {
+        FileUtils.forceDelete(_segmentRecordFile);
+      } catch (IOException ignored) {
+        // best-effort
       }
-
-      @Override
-      public Record next() {
-        Record next = mergeSegmentRecord(null, _currentRecord);
-        while (_docId < numDocs) {
-          Record record = getSegmentRecord(sortedDocIds[_docId++]);
-          if (!Arrays.equals(record._dimensions, next._dimensions)) {
-            _currentRecord = record;
-            return next;
-          } else {
-            next = mergeSegmentRecord(next, record);
-          }
-        }
-        _hasNext = false;
-        return next;
-      }
-    };
+    }
   }
 
   @Override
