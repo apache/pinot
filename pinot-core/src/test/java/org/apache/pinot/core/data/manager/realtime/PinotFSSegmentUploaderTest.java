@@ -160,6 +160,44 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
+  public void testTimedOutCallerCanDeleteSourceWhileUploadContinues()
+      throws Exception {
+    SingleFlightPinotFS.reset();
+    UUID uploadId = UUID.fromString("00000000-0000-0000-0000-000000000021");
+    CountDownLatch retryJoined = new CountDownLatch(1);
+    File sourceFile = File.createTempFile("timeout-delete-source", ".tar");
+    FileUtils.write(sourceFile, "timeout-delete-payload", StandardCharsets.UTF_8);
+    ExecutorService retryExecutor = Executors.newSingleThreadExecutor();
+    try (PinotFSSegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("singleflight://root", 25, _serverMetrics, null, Duration.ofHours(1),
+            ignored -> retryJoined.countDown())) {
+      Assert.assertNull(segmentUploader.uploadSegment(sourceFile, _llcSegmentName, uploadId));
+      Assert.assertTrue(SingleFlightPinotFS.awaitUploadStarted());
+      File copiedSource = SingleFlightPinotFS.getLastSrc();
+      Assert.assertNotNull(copiedSource);
+      Assert.assertNotEquals(copiedSource.getAbsolutePath(), sourceFile.getAbsolutePath());
+      Assert.assertEquals(copiedSource.getName(), sourceFile.getName());
+      Assert.assertTrue(copiedSource.isFile());
+      Assert.assertTrue(sourceFile.delete());
+      Assert.assertTrue(copiedSource.isFile());
+
+      CompletableFuture<URI> retry = CompletableFuture.supplyAsync(
+          () -> segmentUploader.uploadSegment(_file, _llcSegmentName, TIMEOUT_IN_MS * 10, uploadId), retryExecutor);
+      Assert.assertTrue(retryJoined.await(5, TimeUnit.SECONDS));
+      SingleFlightPinotFS.finishUpload();
+      URI segmentUri = retry.get(5, TimeUnit.SECONDS);
+      Assert.assertTrue(SegmentCompletionUtils.isTmpFile(segmentUri.toString()));
+      Assert.assertEquals(SingleFlightPinotFS.getCopyCount(), 1);
+      Assert.assertFalse(copiedSource.exists());
+      Assert.assertFalse(copiedSource.getParentFile().exists());
+    } finally {
+      SingleFlightPinotFS.finishUpload();
+      retryExecutor.shutdownNow();
+      FileUtils.deleteQuietly(sourceFile);
+    }
+  }
+
+  @Test
   public void testTimedOutRetryJoinsInFlightUpload()
       throws Exception {
     SingleFlightPinotFS.reset();
@@ -734,12 +772,18 @@ public class PinotFSSegmentUploaderTest {
     private static final Map<URI, Boolean> UPLOADS = new ConcurrentHashMap<>();
     private static volatile CountDownLatch _uploadStarted = new CountDownLatch(1);
     private static volatile CountDownLatch _finishUpload = new CountDownLatch(1);
+    private static volatile File _lastSrc;
 
     private static void reset() {
       COPY_COUNT.set(0);
       UPLOADS.clear();
+      _lastSrc = null;
       _uploadStarted = new CountDownLatch(1);
       _finishUpload = new CountDownLatch(1);
+    }
+
+    private static File getLastSrc() {
+      return _lastSrc;
     }
 
     private static boolean awaitUploadStarted()
@@ -767,6 +811,7 @@ public class PinotFSSegmentUploaderTest {
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
+      _lastSrc = srcFile;
       COPY_COUNT.incrementAndGet();
       _uploadStarted.countDown();
       if (!_finishUpload.await(5, TimeUnit.SECONDS)) {

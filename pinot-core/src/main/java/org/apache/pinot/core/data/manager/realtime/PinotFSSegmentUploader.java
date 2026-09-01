@@ -28,6 +28,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -43,6 +45,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -175,13 +178,9 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
       return null;
     }
-    Callable<URI> uploadTask = () -> uploadSegmentFile(segmentFile, destUri, rawTableName);
-    Callable<URI> nextGenerationUploadTask = () -> uploadSegmentFile(segmentFile,
-        getSegmentUri(segmentName, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())),
-        rawTableName);
     Future<URI> future = keyedUploadId != null
-        ? getOrStartKeyedUpload(keyedUploadId, segmentName, uploadTask, nextGenerationUploadTask)
-        : _executorService.submit(uploadTask);
+        ? getOrStartKeyedUpload(keyedUploadId, segmentName, segmentFile, destUri, rawTableName)
+        : _executorService.submit(copyFromSnapshot(segmentFile, destUri, rawTableName));
     try {
       URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
       LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
@@ -231,8 +230,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         tmpSegmentFileName));
   }
 
-  private Future<URI> getOrStartKeyedUpload(UUID uploadId, LLCSegmentName segmentName, Callable<URI> uploadTask,
-      Callable<URI> nextGenerationUploadTask) {
+  private Future<URI> getOrStartKeyedUpload(UUID uploadId, LLCSegmentName segmentName, File segmentFile, URI destUri,
+      String rawTableName) {
     Lock uploadLock = _keyedUploadLocks.getUnchecked(uploadId);
     uploadLock.lock();
     try {
@@ -251,13 +250,73 @@ public class PinotFSSegmentUploader implements SegmentUploader {
 
       KeyedUpload newUpload = new KeyedUpload(segmentName);
       _activeKeyedUploads.put(uploadId, newUpload);
-      startKeyedOperation(uploadId, newUpload,
-          completedUpload == null ? uploadTask
-              : () -> reuseOrUploadNextGeneration(completedUpload, nextGenerationUploadTask), completedUpload);
+      Callable<URI> operation;
+      if (completedUpload == null) {
+        operation = copyFromSnapshot(segmentFile, destUri, rawTableName);
+      } else {
+        URI nextDestUri;
+        try {
+          nextDestUri = getSegmentUri(segmentName,
+              SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName()));
+        } catch (URISyntaxException e) {
+          throw new IllegalStateException(e);
+        }
+        File nextSnapshot = snapshotLocalFile(segmentFile);
+        boolean ownsNextSnapshot = nextSnapshot != segmentFile;
+        Callable<URI> nextGenerationUploadTask = () -> uploadSegmentFile(nextSnapshot, nextDestUri, rawTableName);
+        operation = () -> {
+          try {
+            return reuseOrUploadNextGeneration(completedUpload, nextGenerationUploadTask);
+          } finally {
+            deleteSnapshot(nextSnapshot, ownsNextSnapshot);
+          }
+        };
+      }
+      startKeyedOperation(uploadId, newUpload, operation, completedUpload);
       return newUpload._future;
     } finally {
       uploadLock.unlock();
     }
+  }
+
+  /// Copy on the caller thread so a timed-out waiter can delete its tar while the upload continues.
+  /// Keep the original file name so PinotFS implementations that parse LLC names from the source
+  /// still see the same basename.
+  private Callable<URI> copyFromSnapshot(File segmentFile, URI destUri, String rawTableName) {
+    File snapshot = snapshotLocalFile(segmentFile);
+    boolean ownsSnapshot = snapshot != segmentFile;
+    return () -> {
+      try {
+        return uploadSegmentFile(snapshot, destUri, rawTableName);
+      } finally {
+        deleteSnapshot(snapshot, ownsSnapshot);
+      }
+    };
+  }
+
+  private static File snapshotLocalFile(File segmentFile) {
+    if (!segmentFile.isFile()) {
+      return segmentFile;
+    }
+    File snapshotDir = null;
+    try {
+      snapshotDir = Files.createTempDirectory("pinot-upload-").toFile();
+      File snapshot = new File(snapshotDir, segmentFile.getName());
+      Files.copy(segmentFile.toPath(), snapshot.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      return snapshot;
+    } catch (IOException e) {
+      FileUtils.deleteQuietly(snapshotDir);
+      throw new IllegalStateException("Failed to snapshot segment file " + segmentFile, e);
+    }
+  }
+
+  private static void deleteSnapshot(File snapshot, boolean ownsSnapshot) {
+    if (!ownsSnapshot) {
+      return;
+    }
+    File parent = snapshot.getParentFile();
+    FileUtils.deleteQuietly(snapshot);
+    FileUtils.deleteQuietly(parent);
   }
 
   private void startKeyedOperation(UUID uploadId, KeyedUpload keyedUpload, Callable<URI> operation,
