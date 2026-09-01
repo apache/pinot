@@ -20,6 +20,7 @@ package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -40,7 +41,7 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     END_TIME, CREATION_TIME;
 
     public static AgeField fromConfig(@Nullable String value) {
-      if (value == null || value.isEmpty()) {
+      if (StringUtils.isEmpty(value)) {
         return END_TIME;
       }
       String normalized = value.trim();
@@ -83,18 +84,19 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     switch (_ageField) {
       case CREATION_TIME:
         referenceMs = segmentZKMetadata.getCreationTime();
-        // creationTime may be absent for very old segments predating the field; skip rather than throw
-        // so a partially-populated table doesn't fail every tier evaluation.
+        // Segments predating the creationTime field return a non-positive value; treat as aged so they
+        // qualify for the tier rather than failing evaluation.
         if (referenceMs <= 0) {
-          return false;
+          return true;
         }
         break;
       case END_TIME:
-      default:
         referenceMs = segmentZKMetadata.getEndTimeMs();
         Preconditions.checkState(referenceMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", referenceMs,
             segmentZKMetadata.getSegmentName(), tableNameWithType);
         break;
+      default:
+        throw new IllegalStateException("Unhandled segmentAgeField: " + _ageField);
     }
     return (System.currentTimeMillis() - referenceMs) > _segmentAgeMillis;
   }

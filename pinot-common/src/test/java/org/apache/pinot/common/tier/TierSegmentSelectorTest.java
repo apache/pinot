@@ -117,14 +117,14 @@ public class TierSegmentSelectorTest {
         TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
     Assert.assertTrue(byCreation1m.selectSegment(tableNameWithType, zk));
 
-    // Missing creationTime (legacy segment) with CREATION_TIME reference → skipped gracefully, no throw.
+    // Segments predating the creationTime field (value <= 0) are treated as aged and qualify for the tier.
     SegmentZKMetadata legacy = new SegmentZKMetadata("legacy_segment");
     legacy.setStartTime(now - TimeUnit.DAYS.toMillis(30));
     legacy.setEndTime(now - TimeUnit.DAYS.toMillis(29));
     legacy.setTimeUnit(TimeUnit.MILLISECONDS);
     legacy.setStatus(Status.DONE);
     // creationTime not set — defaults to -1
-    Assert.assertFalse(byCreation1m.selectSegment(tableNameWithType, legacy));
+    Assert.assertTrue(byCreation1m.selectSegment(tableNameWithType, legacy));
 
     // Consuming segments never match regardless of reference field.
     SegmentZKMetadata consuming = new SegmentZKMetadata("myTable__0__1__" + now);
