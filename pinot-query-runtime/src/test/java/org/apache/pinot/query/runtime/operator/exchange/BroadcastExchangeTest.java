@@ -63,8 +63,11 @@ public class BroadcastExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    // In-memory mailboxes take blocks whole and hand them to the receiver by reference
     Mockito.when(_mailbox1.isLocal()).thenReturn(true);
     Mockito.when(_mailbox2.isLocal()).thenReturn(true);
+    Mockito.when(_mailbox1.deliversByReference()).thenReturn(true);
+    Mockito.when(_mailbox2.deliversByReference()).thenReturn(true);
     _aggFunction = mockFunnelAggFunction();
   }
 
@@ -89,7 +92,7 @@ public class BroadcastExchangeTest {
   // getAggFunctions() is deprecated, but the copy must preserve it for downstream serialization, so assert on it
   @SuppressWarnings("deprecation")
   @Test
-  public void shouldCopyBlocksWithObjectColumnsForAllLocalDestinationsButOne() {
+  public void shouldCopyBlocksWithObjectColumnsForAllByReferenceDestinationsButOne() {
     // Given:
     PriorityQueue<FunnelStepEvent> stepEvents = stepEvents(new FunnelStepEvent(1000L, 0),
         new FunnelStepEvent(2000L, 1));
@@ -124,16 +127,16 @@ public class BroadcastExchangeTest {
   }
 
   @Test
-  public void shouldSendOriginalBlockToRemoteDestinationsBeforeTheLocalOne() {
-    // Given: a remote destination between two local ones
-    SendingMailbox remoteMailbox = Mockito.mock(SendingMailbox.class);
+  public void shouldSendOriginalBlockToOtherDestinationsBeforeTheByReferenceOne() {
+    // Given: a destination that reads the block within send, between two that deliver it by reference
+    SendingMailbox remoteMailbox = remoteMailbox();
     RowHeapDataBlock block = funnelBlock(stepEvents(new FunnelStepEvent(1000L, 0)));
 
     // When:
     route(block, remoteMailbox, _mailbox1, _mailbox2);
 
-    // Then: the remote destination serializes the original, the first local destination receives the original by
-    // reference after all other reads of it, and the extra local destination receives a copy
+    // Then: the remote destination serializes the original, the first by-reference destination receives the original
+    // after all other reads of it, and the extra by-reference destination receives a copy
     assertSame(capturedBlock(remoteMailbox), block);
     assertSame(capturedBlock(_mailbox1), block);
     assertNotSame(capturedBlock(_mailbox2), block);
@@ -144,11 +147,51 @@ public class BroadcastExchangeTest {
   }
 
   @Test
+  public void shouldNotCopyBlocksForSpoolStagesWithoutByReferenceWorkers() {
+    // Given: two receiver stages of a multi-send (spool) node, each fanning out to workers on other servers
+    SendingMailbox remoteMailbox1 = remoteMailbox();
+    SendingMailbox remoteMailbox2 = remoteMailbox();
+    RowHeapDataBlock block = funnelBlock(stepEvents(new FunnelStepEvent(1000L, 0)));
+
+    // When:
+    route(block, spoolStageMailbox(remoteMailbox1), spoolStageMailbox(remoteMailbox2));
+
+    // Then: no copies are made, because every worker of both stages serializes the block
+    Mockito.verify(_aggFunction, Mockito.never()).serializeIntermediateResult(Mockito.any());
+    assertSame(capturedBlock(remoteMailbox1), block);
+    assertSame(capturedBlock(remoteMailbox2), block);
+  }
+
+  @Test
+  public void shouldCopyBlocksForSpoolStagesWithAByReferenceWorker() {
+    // Given: two receiver stages of a multi-send (spool) node. The second one has a worker on this server, next to
+    // a worker on another server
+    SendingMailbox remoteMailbox = remoteMailbox();
+    RowHeapDataBlock block = funnelBlock(stepEvents(new FunnelStepEvent(1000L, 0)));
+
+    // When:
+    route(block, spoolStageMailbox(_mailbox1), spoolStageMailbox(remoteMailbox, _mailbox2));
+
+    // Then: one copy is made, because a single by-reference worker makes the whole stage share the block
+    Mockito.verify(_aggFunction, Mockito.times(1)).serializeIntermediateResult(Mockito.any());
+    assertSame(capturedBlock(_mailbox1), block);
+    MseBlock.Data copiedBlock = capturedBlock(_mailbox2);
+    assertNotSame(copiedBlock, block);
+    // Within that stage the copy is shared again: only one of its workers keeps a reference to it
+    assertSame(capturedBlock(remoteMailbox), copiedBlock);
+    // The original block reaches its receiver last, after every other destination has read it
+    InOrder inOrder = Mockito.inOrder(remoteMailbox, _mailbox2, _mailbox1);
+    inOrder.verify(remoteMailbox).send(Mockito.any(MseBlock.Data.class));
+    inOrder.verify(_mailbox2).send(Mockito.any(MseBlock.Data.class));
+    inOrder.verify(_mailbox1).send(Mockito.any(MseBlock.Data.class));
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   public void shouldShareBlocksWithObjectColumnsWithRemoteOnlyDestinations() {
     // Given: only remote destinations, which serialize the block instead of delivering it by reference
-    SendingMailbox remoteMailbox1 = Mockito.mock(SendingMailbox.class);
-    SendingMailbox remoteMailbox2 = Mockito.mock(SendingMailbox.class);
+    SendingMailbox remoteMailbox1 = remoteMailbox();
+    SendingMailbox remoteMailbox2 = remoteMailbox();
     RowHeapDataBlock block = funnelBlock(stepEvents(new FunnelStepEvent(1000L, 0)));
 
     // When:
@@ -253,6 +296,20 @@ public class BroadcastExchangeTest {
   private static void route(MseBlock.Data block, SendingMailbox... destinations) {
     List<SendingMailbox> destinationList = List.of(destinations);
     new BroadcastExchange(destinationList, BlockSplitter.NO_OP).route(destinationList, block);
+  }
+
+  /// Wraps the mailboxes of one receiver stage the way a multi-send (spool) node does: an inner exchange per stage,
+  /// exposed to the outer exchange as a single sending mailbox.
+  private static SendingMailbox spoolStageMailbox(SendingMailbox... innerMailboxes) {
+    return new BroadcastExchange(List.of(innerMailboxes), BlockSplitter.NO_OP).asSendingMailbox("1");
+  }
+
+  /// A mailbox to a worker on another server. It reads the block within send instead of giving it to the receiver.
+  private static SendingMailbox remoteMailbox() {
+    SendingMailbox mailbox = Mockito.mock(SendingMailbox.class);
+    Mockito.when(mailbox.isLocal()).thenReturn(false);
+    Mockito.when(mailbox.deliversByReference()).thenReturn(false);
+    return mailbox;
   }
 
   private static MseBlock.Data capturedBlock(SendingMailbox mailbox) {
