@@ -97,7 +97,8 @@ public class MutableSegmentImplMVLengthValidationTest implements PinotBuffersAft
           () -> mutableSegment.index(createRow(createValues(MAX_MULTI_VALUES_PER_ROW + 1, 10)), null));
       Assert.assertTrue(exception.getMessage().contains(MV_COLUMN));
       Assert.assertTrue(exception.getMessage().contains(Integer.toString(MAX_MULTI_VALUES_PER_ROW + 1)));
-      Assert.assertTrue(exception.getMessage().contains(Integer.toString(MAX_MULTI_VALUES_PER_ROW)));
+      Assert.assertTrue(exception.getMessage().contains("exceeding the maximum of " + MAX_MULTI_VALUES_PER_ROW),
+          exception.getMessage());
       Assert.assertEquals(mutableSegment.getNumDocsIndexed(), 1);
       assertValues(dataSource, forwardIndex, 0, firstValues);
 

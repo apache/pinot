@@ -411,6 +411,14 @@ public class MutableSegmentImpl implements MutableSegment {
       String sourceColumn = columnAggregatorPair.getLeft();
       ValueAggregator valueAggregator = columnAggregatorPair.getRight();
 
+      // Capture the row cap from the concrete writer before a SameValue wrapper hides the type.
+      MutableIndex unwrappedForwardIndex = mutableIndexes.get(StandardIndexes.forward());
+      if (!fieldSpec.isSingleValueField()
+          && unwrappedForwardIndex instanceof FixedByteMVMutableForwardIndex fixedByteMVIndex) {
+        multiValueRowLimits.add(
+            new MultiValueRowLimit(column, fixedByteMVIndex.getMaxNumberOfMultiValuesPerRow()));
+      }
+
       // TODO this can be removed after forward index contents no longer depends on text index configs
       // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
       // already created MutableIndex with a SameValue implementation. This optimization can only be done when
@@ -438,12 +446,6 @@ public class MutableSegmentImpl implements MutableSegment {
               (OpenStructIndexConfig) openStructConfig, _memoryManager, _capacity);
           mutableIndexes.put(StandardIndexes.openStruct(), openStructIndex);
         }
-      }
-
-      MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
-      if (!fieldSpec.isSingleValueField() && forwardIndex instanceof FixedByteMVMutableForwardIndex fixedByteMVIndex) {
-        multiValueRowLimits.add(
-            new MultiValueRowLimit(column, fixedByteMVIndex.getMaxNumberOfMultiValuesPerRow()));
       }
 
       _indexContainerMap.put(column,
@@ -829,7 +831,11 @@ public class MutableSegmentImpl implements MutableSegment {
       throws UnsupportedOperationException {
     for (int i = 0; i < _multiValueRowLimits.length; i++) {
       MultiValueRowLimit rowLimit = _multiValueRowLimits[i];
-      Object[] values = (Object[]) row.getValue(rowLimit._column);
+      Object value = row.getValue(rowLimit._column);
+      if (value == null) {
+        continue;
+      }
+      Object[] values = (Object[]) value;
       if (values.length > rowLimit._maxNumberOfMultiValuesPerRow) {
         throw new UnsupportedOperationException("MV column '" + rowLimit._column + "' has " + values.length
             + " values, exceeding the maximum of " + rowLimit._maxNumberOfMultiValuesPerRow + " values per row.");
@@ -992,6 +998,9 @@ public class MutableSegmentImpl implements MutableSegment {
             MutableIndex mutableIndex = indexEntry.getValue();
             mutableIndex.add(values, dictIds, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
+          } catch (IllegalArgumentException e) {
+            // Row-limit violations must fail the document. Other index errors stay fail-soft (#16316).
+            throw e;
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
