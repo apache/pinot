@@ -1428,12 +1428,18 @@ public final class TableConfigUtils {
 
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
+    Map<String, String> partialUpsertMergerConfigs = upsertConfig.getPartialUpsertMergerConfigs();
 
-    // check if partialUpsertMergerClass is provided then partialUpsertStrategies should be empty
+    // A custom row merger owns the complete merge and cannot be combined with built-in column strategies. Custom
+    // merger configs have no consumer when the class is absent, so reject that likely configuration mistake.
     if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
       Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
           "If partialUpsertMergerClass is provided then partialUpsertStrategies should be empty");
-    } else if (MapUtils.isNotEmpty(partialUpsertStrategies)) {
+    } else {
+      Preconditions.checkState(MapUtils.isEmpty(partialUpsertMergerConfigs),
+          "partialUpsertMergerConfigs can only be provided with partialUpsertMergerClass");
+    }
+    if (StringUtils.isBlank(partialUpsertMergerClass) && MapUtils.isNotEmpty(partialUpsertStrategies)) {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       // validate partial upsert column mergers
       for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
@@ -1486,7 +1492,8 @@ public final class TableConfigUtils {
 
   /// Validates that critical upsert configuration fields are not changed during table config update.
   /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn, partialUpsertMergerClass, and
+  /// partialUpsertMergerConfigs.
   ///
   /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
   /// not validated here — they may be added, removed, or changed on existing tables.
@@ -1503,8 +1510,19 @@ public final class TableConfigUtils {
     if (existingUpsertEnabled != newUpsertEnabled) {
       if (existingUpsertEnabled) {
         LOGGER.info("upsertConfig is removed from existing upsert table: {}", newConfig.getTableName());
+        UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
+        if (existingUpsertConfig != null
+            && StringUtils.isNotBlank(existingUpsertConfig.getPartialUpsertMergerClass())) {
+          violations.add(String.format("upsertConfig.partialUpsertMergerClass (%s -> null)",
+              existingUpsertConfig.getPartialUpsertMergerClass()));
+        }
       } else {
         LOGGER.info("upsertConfig is added to existing non-upsert table: {}", newConfig.getTableName());
+        UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+        if (newUpsertConfig != null && StringUtils.isNotBlank(newUpsertConfig.getPartialUpsertMergerClass())) {
+          violations.add(String.format("upsertConfig.partialUpsertMergerClass (null -> %s)",
+              newUpsertConfig.getPartialUpsertMergerClass()));
+        }
       }
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
@@ -1550,6 +1568,18 @@ public final class TableConfigUtils {
       if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
         violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
             existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getPartialUpsertMergerClass(),
+          newUpsertConfig.getPartialUpsertMergerClass())) {
+        violations.add(String.format("upsertConfig.partialUpsertMergerClass (%s -> %s)",
+            existingUpsertConfig.getPartialUpsertMergerClass(), newUpsertConfig.getPartialUpsertMergerClass()));
+      }
+      Map<String, String> existingMergerConfigs = existingUpsertConfig.getPartialUpsertMergerConfigs();
+      Map<String, String> newMergerConfigs = newUpsertConfig.getPartialUpsertMergerConfigs();
+      if (!(MapUtils.isEmpty(existingMergerConfigs) && MapUtils.isEmpty(newMergerConfigs))
+          && !Objects.equals(existingMergerConfigs, newMergerConfigs)) {
+        violations.add(String.format("upsertConfig.partialUpsertMergerConfigs (%s -> %s)",
+            existingMergerConfigs, newMergerConfigs));
       }
     }
   }

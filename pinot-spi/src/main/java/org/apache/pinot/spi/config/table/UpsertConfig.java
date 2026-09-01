@@ -72,6 +72,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Class name for custom row merger implementation")
   private String _partialUpsertMergerClass;
 
+  @JsonPropertyDescription("Custom configs for the partial upsert row merger")
+  @Nullable
+  private Map<String, String> _partialUpsertMergerConfigs;
+
   /// When two records have the same primary key, the comparison column(s) si used to determine the latest record. If
   /// not configured, the time column is used.
   /// When multiple comparison columns are configured, the latest record is determined by the first non-null value for
@@ -210,6 +214,15 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setPartialUpsertMergerClass(@Nullable String partialUpsertMergerClass) {
     _partialUpsertMergerClass = partialUpsertMergerClass;
+  }
+
+  @Nullable
+  public Map<String, String> getPartialUpsertMergerConfigs() {
+    return _partialUpsertMergerConfigs;
+  }
+
+  public void setPartialUpsertMergerConfigs(@Nullable Map<String, String> partialUpsertMergerConfigs) {
+    _partialUpsertMergerConfigs = partialUpsertMergerConfigs;
   }
 
   @Nullable
