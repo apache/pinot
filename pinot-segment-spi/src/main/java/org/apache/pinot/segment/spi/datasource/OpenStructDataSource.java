@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -119,6 +120,15 @@ public interface OpenStructDataSource extends DataSource {
     default void close()
         throws IOException {
     }
+  }
+
+  /// Returns a columnar view of this column when one is available, letting the segment build feed
+  /// an [OpenStructColumnarSource] straight to the index creator instead of calling
+  /// [#getMapValue(int)] per document. Returns `null` when this implementation has no columnar
+  /// form to offer, in which case callers use the per-document path.
+  @Nullable
+  default OpenStructColumnarSource getColumnarSource() {
+    return null;
   }
 
   /// Whether the per-key dictionary's contents correspond exactly to the values readable from
