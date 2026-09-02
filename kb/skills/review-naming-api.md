@@ -13,6 +13,9 @@ Severity:
 - New enum values — check against SQL / Parquet / Arrow conventions (see C1.2).
 - New `@Path` routes or `@JsonProperty` names — confirm kebab-case for URL, camelCase for JSON, consistent with neighbors.
 - Inline fully-qualified class names — flag (CLAUDE.md convention).
+- Qualified `Assert.` or `Mockito.` method calls in test files — apply C7.21.
+- `FieldSpec.DataType` or `DataSchema.ColumnDataType` outside import declarations — apply C7.22.
+- Multiline ternary expressions — verify C7.23 formatting.
 - New public classes without class-level Javadoc — flag (CLAUDE.md convention).
 - License headers on new files — flag missing.
 

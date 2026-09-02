@@ -133,6 +133,8 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Flush threshold for streaming distinct (0 = disabled)
+  private int _streamingDistinctFlushThreshold;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -496,6 +498,14 @@ public class QueryContext {
 
   public void setStreamingGroupByFlushThreshold(int streamingGroupByFlushThreshold) {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
+  }
+
+  public int getStreamingDistinctFlushThreshold() {
+    return _streamingDistinctFlushThreshold;
+  }
+
+  public void setStreamingDistinctFlushThreshold(int streamingDistinctFlushThreshold) {
+    _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
   }
 
   public boolean isNullHandlingEnabled() {

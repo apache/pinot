@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
+import org.apache.pinot.core.operator.streaming.StreamingDistinctCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
@@ -130,15 +131,35 @@ public class CombinePlanNode implements PlanNode {
         // Use streaming operator only for non-empty selection-only query
         return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       }
-      // Streaming flushes partial aggregates, so it needs an aggregation above to merge them back together.
+      // Streaming flushes partial results, so it needs an aggregation above to merge them back together.
       // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.
-      int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
-      if (flushThreshold > 0
+      boolean leafReturnsFinalResult =
+          _queryContext.isServerReturnFinalResult() || _queryContext.isServerReturnFinalResultKeyUnpartitioned();
+      int groupByFlushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
+      if (groupByFlushThreshold > 0
           && QueryContextUtils.isAggregationQuery(_queryContext)
           && _queryContext.getGroupByExpressions() != null
-          && !_queryContext.isServerReturnFinalResult()
-          && !_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
-        return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, flushThreshold);
+          && !leafReturnsFinalResult) {
+        return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, groupByFlushThreshold);
+      }
+      int distinctFlushThreshold = _queryContext.getStreamingDistinctFlushThreshold();
+      if (distinctFlushThreshold > 0 && QueryContextUtils.isDistinctQuery(_queryContext)
+          // With ORDER BY, the DistinctTable keeps a bounded top-LIMIT heap instead of accumulating every value, so
+          // it is already memory-bounded and streaming would only ship more rows.
+          && _queryContext.getOrderByExpressions() == null
+          // NOTE: The planner pushes LIMIT (plus OFFSET) into the leaf aggregate for any distinct query that has
+          // one -- see PinotAggregateExchangeNodeInsertRule#isGroupTrimmingEnabled, which is unconditionally on for
+          // aggregates with no aggregate calls. So the leaf table is normally bounded at LIMIT already, and this
+          // feature is for the case where that LIMIT is far larger than the memory we want to spend.
+          //
+          // This branch DOES give up the cross-segment early exit: DistinctResultsBlockMerger#isQuerySatisfied can
+          // only fire once the accumulated table reaches LIMIT, and flushing empties it well before that, so every
+          // segment gets scanned. That is the deliberate trade -- a lower memory ceiling for more scan work. When
+          // LIMIT is at or below the threshold there is no memory to save, so the short-circuit wins instead.
+          && _queryContext.getLimit() > distinctFlushThreshold
+          && !leafReturnsFinalResult) {
+        return new StreamingDistinctCombineOperator(operators, _queryContext, _executorService,
+            distinctFlushThreshold);
       }
     }
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {

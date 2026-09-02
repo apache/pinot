@@ -35,7 +35,10 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// Class for generating group keys (groupId-stringKey pair) for a given list of dictionary encoded group-by columns.
@@ -43,6 +46,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 /// The maximum number of possible group keys is the cardinality product of all the group-by columns.
 ///
 /// The raw key is generated from the dictionary ids of the group-by columns.
+///
+/// With null handling enabled, a column that can produce a null reserves one further dictionary id, one past its
+/// last real id, to stand for it, so its cardinality counts one more than the dictionary holds. A null then composes
+/// into the raw key like any other value and is read back out as SQL `NULL`. A column read from a segment that tracks
+/// no nulls reserves nothing, and neither does any column when null handling is disabled, which leaves the
+/// cardinalities, the raw key arithmetic and the block reads exactly as they are without this.
 ///
 /// - If the maximum number of possible group keys is less than a threshold (10K), directly use the raw key as the
 ///   group id. (ARRAY_BASED)
@@ -86,12 +95,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int[] _cardinalities;
   private final boolean[] _isSingleValueColumn;
   private final Dictionary[] _dictionaries;
-
+  // Dictionary id standing for a null value in each group-by column, or -1 for a column that produces none. Reserving
+  // the id one past the column's last real id is what keeps nulls apart from the column's default null value, which is
+  // the value a null row is physically stored as. Null when no column reserves one at all.
+  @Nullable
+  private final int[] _nullDictIds;
   // The first dimension is the index of group-by column
   // Reusable buffer for single-value column dictionary ids
   private final int[][] _singleValueDictIds;
+  // Reusable buffers holding a block's dictionary ids with the null rows rewritten, filled in on the first block of
+  // a column that actually contains nulls, and null whenever no column reserves a null dictionary id
+  @Nullable
+  private final int[][] _nullReplacedSingleValueDictIds;
   // Reusable buffer for multi-value column dictionary ids
   private final int[][][] _multiValueDictIds;
+  @Nullable
+  private final int[][][] _nullReplacedMultiValueDictIds;
 
   private final Object[][] _internedDictionaryValues;
 
@@ -103,7 +122,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   ///        matching row becomes a group, so the predicate size does not bound the group count.
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
-      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
+      boolean nullHandlingEnabled, @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
 
@@ -112,6 +131,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _singleValueDictIds = new int[_numGroupByExpressions][];
     _multiValueDictIds = new int[_numGroupByExpressions][][];
+    int[] nullDictIds = nullHandlingEnabled ? new int[_numGroupByExpressions] : null;
+    boolean anyNullDictId = false;
     // no need to intern dictionary values when there is only one group by expression because
     // only one call will be made to the dictionary to extract each raw value.
     _internedDictionaryValues = _numGroupByExpressions > 1 ? new Object[_numGroupByExpressions][] : null;
@@ -123,6 +144,24 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       _dictionaries[i] = columnContext.getDictionary();
       assert _dictionaries[i] != null;
       int cardinality = _dictionaries[i].length();
+      if (nullDictIds != null) {
+        // Reserve an id unless the column is known to produce no null. A column read straight from a segment says so
+        // through its null value vector, which is the same vector a query reads nulls from. A transform exposes no
+        // data source to consult and can still hand out a null bitmap of its own, so it always reserves one.
+        //
+        // This decides nullability once, from one project operator, while a shared generator can be handed blocks
+        // from others: FilteredGroupByOperator builds a single generator for every filtered aggregation. Those
+        // operators must therefore agree on which group-by columns can produce a null. They do today, because a
+        // star-tree is only chosen for a null handling query when no column it touches holds a null.
+        DataSource dataSource = columnContext.getDataSource();
+        boolean tracksNulls = dataSource == null || dataSource.getNullValueVector() != null;
+        if (tracksNulls) {
+          nullDictIds[i] = cardinality++;
+          anyNullDictId = true;
+        } else {
+          nullDictIds[i] = -1;
+        }
+      }
       _cardinalities[i] = cardinality;
       if (_internedDictionaryValues != null && cardinality < MAX_DICTIONARY_INTERN_TABLE_SIZE) {
         _internedDictionaryValues[i] = new Object[cardinality];
@@ -135,6 +174,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
       _isSingleValueColumn[i] = columnContext.isSingleValue();
+    }
+    if (anyNullDictId) {
+      _nullDictIds = nullDictIds;
+      _nullReplacedSingleValueDictIds = new int[_numGroupByExpressions][];
+      _nullReplacedMultiValueDictIds = new int[_numGroupByExpressions][][];
+    } else {
+      _nullDictIds = null;
+      _nullReplacedSingleValueDictIds = null;
+      _nullReplacedMultiValueDictIds = null;
     }
     // An IN/EQ predicate on a group-by column bounds the number of distinct groups, so it can shrink the group id
     // upper bound (and thus the result holder sizes). It must not influence the holder type selection though: raw
@@ -227,25 +275,89 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      BlockValSet blockValueSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
-      _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
+      _singleValueDictIds[i] = getSingleValueDictIds(valueBlock.getBlockValueSet(_groupByExpressions[i]), i, numDocs);
     }
-    _rawKeyHolder.processSingleValue(valueBlock.getNumDocs(), groupKeys);
+    _rawKeyHolder.processSingleValue(numDocs, groupKeys);
   }
 
   @Override
   public void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
+    int numDocs = valueBlock.getNumDocs();
     for (int i = 0; i < _numGroupByExpressions; i++) {
       BlockValSet blockValueSet = valueBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_isSingleValueColumn[i]) {
-        _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
+        _singleValueDictIds[i] = getSingleValueDictIds(blockValueSet, i, numDocs);
       } else {
-        _multiValueDictIds[i] = blockValueSet.getDictionaryIdsMV();
+        _multiValueDictIds[i] = getMultiValueDictIds(blockValueSet, i, numDocs);
       }
     }
-    _rawKeyHolder.processMultiValue(valueBlock.getNumDocs(), groupKeys);
+    _rawKeyHolder.processMultiValue(numDocs, groupKeys);
+  }
+
+  /// Returns the block's single-value dictionary ids, with every null row moved onto the column's reserved null
+  /// dictionary id so that nulls form one group of their own.
+  ///
+  /// The block owns the array it hands out and shares it with everything else reading that column in this block, so
+  /// the ids are copied before being rewritten rather than replaced in place. Returns the block's own array untouched
+  /// when the column reserves no null dictionary id or the block holds no null.
+  private int[] getSingleValueDictIds(BlockValSet blockValSet, int index, int numDocs) {
+    int[] dictIds = blockValSet.getDictionaryIdsSV();
+    if (_nullDictIds == null || _nullDictIds[index] < 0) {
+      return dictIds;
+    }
+    int nullDictId = _nullDictIds[index];
+    RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (nullBitmap == null || nullBitmap.isEmpty()) {
+      return dictIds;
+    }
+    assert _nullReplacedSingleValueDictIds != null;
+    int[] nullReplacedDictIds = _nullReplacedSingleValueDictIds[index];
+    if (nullReplacedDictIds == null || nullReplacedDictIds.length < numDocs) {
+      nullReplacedDictIds = new int[numDocs];
+      _nullReplacedSingleValueDictIds[index] = nullReplacedDictIds;
+    }
+    System.arraycopy(dictIds, 0, nullReplacedDictIds, 0, numDocs);
+    PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
+    while (nullIterator.hasNext()) {
+      nullReplacedDictIds[nullIterator.next()] = nullDictId;
+    }
+    return nullReplacedDictIds;
+  }
+
+  /// Returns the block's multi-value dictionary ids, with every null row replaced by a single entry holding the
+  /// column's reserved null dictionary id, so the row contributes one null group instead of being read as the
+  /// column's default null value.
+  ///
+  /// Only the outer array is copied: the rows that are not null are handed on pointing at the arrays the block
+  /// already gave out. Returns the block's own array untouched when the column reserves no null dictionary id or the
+  /// block holds no null.
+  private int[][] getMultiValueDictIds(BlockValSet blockValSet, int index, int numDocs) {
+    int[][] dictIds = blockValSet.getDictionaryIdsMV();
+    if (_nullDictIds == null || _nullDictIds[index] < 0) {
+      return dictIds;
+    }
+    int nullDictId = _nullDictIds[index];
+    RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (nullBitmap == null || nullBitmap.isEmpty()) {
+      return dictIds;
+    }
+    assert _nullReplacedMultiValueDictIds != null;
+    int[][] nullReplacedDictIds = _nullReplacedMultiValueDictIds[index];
+    if (nullReplacedDictIds == null || nullReplacedDictIds.length < numDocs) {
+      nullReplacedDictIds = new int[numDocs][];
+      _nullReplacedMultiValueDictIds[index] = nullReplacedDictIds;
+    }
+    System.arraycopy(dictIds, 0, nullReplacedDictIds, 0, numDocs);
+    PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
+    while (nullIterator.hasNext()) {
+      // A fresh array per row rather than one shared between them: a raw key holder writes its group ids back over
+      // the array it is handed for a row whose only group-by column is this one
+      nullReplacedDictIds[nullIterator.next()] = new int[]{nullDictId};
+    }
+    return nullReplacedDictIds;
   }
 
   @Override
@@ -600,7 +712,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private Object[] getKeys(int rawKey) {
     // Specialize single group-by column case
     if (_numGroupByExpressions == 1) {
-      return new Object[]{_dictionaries[0].getInternal(rawKey)};
+      return new Object[]{
+          _nullDictIds == null || rawKey != _nullDictIds[0] ? _dictionaries[0].getInternal(rawKey) : null
+      };
     } else {
       Object[] groupKeys = new Object[_numGroupByExpressions];
       for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -612,7 +726,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
+  @Nullable
   private Object getRawValue(int dictionaryIndex, int dictId) {
+    if (_nullDictIds != null && dictId == _nullDictIds[dictionaryIndex]) {
+      return null;
+    }
     Dictionary dictionary = _dictionaries[dictionaryIndex];
     Object[] table = _internedDictionaryValues[dictionaryIndex];
     if (table == null) {
