@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -31,6 +33,10 @@ import org.apache.pinot.segment.local.startree.v2.builder.OffHeapSingleTreeBuild
 import org.apache.pinot.segment.local.startree.v2.builder.OffHeapSingleTreeBuilder.VariableSizeRecordOffsets;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -133,6 +139,76 @@ public class OffHeapSingleTreeBuilderTest {
     File segmentRecordFile = findSegmentRecordFile(segmentDir);
     assertFalse(segmentRecordFile != null && segmentRecordFile.exists(),
         "segment.record file should not exist when build() was never called: " + segmentRecordFile);
+  }
+
+  /// Builds the same segment twice — once with OFF_HEAP and once with ON_HEAP — then compares the
+  /// resulting star-trees by grouping star-tree records by dim tuple and summing the aggregate
+  /// column. Directly regressions-tests dim-read parity: if the buffer read returned wrong bytes,
+  /// OFF_HEAP would aggregate metrics under the wrong dim tuples and the maps would diverge.
+  @Test
+  public void testOffHeapProducesSameStarTreeAsOnHeap()
+      throws Exception {
+    buildTestSegment();
+    File sourceSegmentDir = INDEX_DIR.listFiles()[0];
+    List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs();
+
+    File offHeapDir = new File(TEMP_DIR, "offHeapCopy");
+    File onHeapDir = new File(TEMP_DIR, "onHeapCopy");
+    FileUtils.copyDirectory(sourceSegmentDir, offHeapDir);
+    FileUtils.copyDirectory(sourceSegmentDir, onHeapDir);
+
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, offHeapDir,
+        MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+      builder.build();
+    }
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, onHeapDir,
+        MultipleTreesBuilder.BuildMode.ON_HEAP)) {
+      builder.build();
+    }
+
+    Map<String, Long> offHeapByDim = readStarTreeAggregatedByDim(offHeapDir);
+    Map<String, Long> onHeapByDim = readStarTreeAggregatedByDim(onHeapDir);
+    assertEquals(offHeapByDim, onHeapByDim,
+        "OFF_HEAP and ON_HEAP star-trees disagree on aggregate-by-dim: "
+            + "off=" + offHeapByDim + ", on=" + onHeapByDim);
+  }
+
+  /// Iterates every star-tree record, resolves dim dict-ids to values, and returns a
+  /// `(stringCol|intCol) -> sum(longCol)` map. Star nodes (dim value = STAR) fold into their own
+  /// bucket, so the map is a canonical view of the tree independent of internal doc order.
+  private Map<String, Long> readStarTreeAggregatedByDim(File segmentDir)
+      throws Exception {
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+    try {
+      StarTreeV2 tree = segment.getStarTrees().get(0);
+      int numDocs = tree.getMetadata().getNumDocs();
+
+      ForwardIndexReader<ForwardIndexReaderContext> stringReader =
+          (ForwardIndexReader<ForwardIndexReaderContext>) tree.getDataSource("stringCol").getForwardIndex();
+      Dictionary stringDict = tree.getDataSource("stringCol").getDictionary();
+      ForwardIndexReader<ForwardIndexReaderContext> intReader =
+          (ForwardIndexReader<ForwardIndexReaderContext>) tree.getDataSource("intCol").getForwardIndex();
+      Dictionary intDict = tree.getDataSource("intCol").getDictionary();
+      // Aggregate columns are keyed by AggregationFunctionColumnPair.toColumnName() ("sum__longCol").
+      ForwardIndexReader<ForwardIndexReaderContext> aggReader =
+          (ForwardIndexReader<ForwardIndexReaderContext>) tree.getDataSource("sum__longCol").getForwardIndex();
+
+      Map<String, Long> byDim = new TreeMap<>();
+      try (ForwardIndexReaderContext stringCtx = stringReader.createContext();
+          ForwardIndexReaderContext intCtx = intReader.createContext();
+          ForwardIndexReaderContext aggCtx = aggReader.createContext()) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          int stringDictId = stringReader.getDictId(docId, stringCtx);
+          int intDictId = intReader.getDictId(docId, intCtx);
+          String stringVal = stringDictId == -1 ? "*" : stringDict.getStringValue(stringDictId);
+          String intVal = intDictId == -1 ? "*" : String.valueOf(intDict.getIntValue(intDictId));
+          byDim.merge(stringVal + "|" + intVal, aggReader.getLong(docId, aggCtx), Long::sum);
+        }
+      }
+      return byDim;
+    } finally {
+      segment.destroy();
+    }
   }
 
   private void buildTestSegment()
