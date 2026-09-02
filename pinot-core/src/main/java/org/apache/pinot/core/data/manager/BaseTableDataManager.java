@@ -1994,13 +1994,26 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return initSegmentDirectory(indexDir, segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
   }
 
-  /// Whether [ImmutableSegmentLoader#preprocess] is needed for the segment at `indexDir`.
+  /// Whether [ImmutableSegmentLoader#preprocess] is needed for the segment at `indexDir`. Uses the default
+  /// (non-tier-aware) [SegmentDirectoryLoader] so the check never physically moves the segment across tiers.
   protected boolean computeNeedPreprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
-    try (SegmentDirectory segmentDirectory = initSegmentDirectory(indexDir, localMetadata.getName(),
-        localMetadata.getCrc(), indexLoadingConfig, zkMetadata)) {
+    SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(indexLoadingConfig.getSchema())
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setTableDataDir(indexLoadingConfig.getTableDataDir())
+        .setSegmentName(localMetadata.getName())
+        .setSegmentCrc(localMetadata.getCrc())
+        .setSegmentTier(indexLoadingConfig.getSegmentTier())
+        .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+        .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .build();
+    try (SegmentDirectory segmentDirectory =
+        SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), loaderContext)) {
       return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
     }
   }
