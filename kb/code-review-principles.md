@@ -951,7 +951,8 @@ public class JsonFunctionTest extends CustomDataQueryClusterIntegrationTest { ..
 Prefer before-and-after results with enough methodology to reproduce the comparison. A one-off benchmark class does
 not need to be checked in unless it provides durable regression coverage or reusable benchmark value. Do not require
 a disposable harness in the repository when representative results and methodology are available.
-- Trigger: Any PR claiming a performance improvement without benchmark results
+- Trigger: Any PR making a performance-sensitive change without representative before-and-after results and
+  reproducible methodology
 
 **C6.11 — Core concurrent data structures require dedicated concurrent tests**
 - Trigger: Any PR adding or modifying concurrent data structures
