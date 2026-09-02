@@ -86,6 +86,115 @@ public class TierSegmentSelectorTest {
   }
 
   @Test
+  public void testTimeBasedSegmentSelectorWithCreationTimeAgeField() {
+    long now = System.currentTimeMillis();
+    String segmentName = "segment_1";
+    String tableNameWithType = "myTable_OFFLINE";
+
+    // A segment whose *data* is 2 years old (endTime long in the past) but was created 5 minutes ago —
+    // e.g. batch ingest of historical Iceberg data. The endTime-based default would match any tier
+    // with any age threshold, defeating tier lifecycle intent. The creationTime-based selector should
+    // treat this as a 5-minute-old segment.
+    SegmentZKMetadata zk = new SegmentZKMetadata(segmentName);
+    zk.setStartTime(now - TimeUnit.DAYS.toMillis(730));
+    zk.setEndTime(now - TimeUnit.DAYS.toMillis(729));
+    zk.setTimeUnit(TimeUnit.MILLISECONDS);
+    zk.setCreationTime(now - TimeUnit.MINUTES.toMillis(5));
+    zk.setStatus(Status.DONE);
+
+    // Default (END_TIME): historical data → matches ANY sane threshold.
+    TimeBasedTierSegmentSelector byEndTime = new TimeBasedTierSegmentSelector("30m");
+    Assert.assertTrue(byEndTime.selectSegment(tableNameWithType, zk));
+
+    // creationTime with 30m threshold: segment created 5m ago → NOT matched.
+    TimeBasedTierSegmentSelector byCreation30m = new TimeBasedTierSegmentSelector("30m",
+        TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    Assert.assertEquals(byCreation30m.getAgeField(), TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    Assert.assertFalse(byCreation30m.selectSegment(tableNameWithType, zk));
+
+    // creationTime with 1m threshold: created 5m ago > 1m → matched.
+    TimeBasedTierSegmentSelector byCreation1m = new TimeBasedTierSegmentSelector("1m",
+        TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    Assert.assertTrue(byCreation1m.selectSegment(tableNameWithType, zk));
+
+    // Segments predating the creationTime field (value <= 0) are treated as aged and qualify for the tier.
+    SegmentZKMetadata legacy = new SegmentZKMetadata("legacy_segment");
+    legacy.setStartTime(now - TimeUnit.DAYS.toMillis(30));
+    legacy.setEndTime(now - TimeUnit.DAYS.toMillis(29));
+    legacy.setTimeUnit(TimeUnit.MILLISECONDS);
+    legacy.setStatus(Status.DONE);
+    // creationTime not set — defaults to -1
+    Assert.assertTrue(byCreation1m.selectSegment(tableNameWithType, legacy));
+
+    // Consuming segments never match regardless of reference field.
+    SegmentZKMetadata consuming = new SegmentZKMetadata("myTable__0__1__" + now);
+    consuming.setStatus(Status.IN_PROGRESS);
+    consuming.setCreationTime(now - TimeUnit.HOURS.toMillis(1));
+    Assert.assertFalse(byCreation1m.selectSegment("myTable_REALTIME", consuming));
+  }
+
+  @Test
+  public void testTimeBasedSegmentSelectorWithStartTimeAgeField() {
+    long now = System.currentTimeMillis();
+    String tableNameWithType = "myTable_OFFLINE";
+
+    // Segment covers a 1-day range 8 days ago: startTime 8d ago, endTime 7d ago.
+    SegmentZKMetadata zk = new SegmentZKMetadata("segment_start");
+    zk.setStartTime(now - TimeUnit.DAYS.toMillis(8));
+    zk.setEndTime(now - TimeUnit.DAYS.toMillis(7));
+    zk.setTimeUnit(TimeUnit.MILLISECONDS);
+    zk.setStatus(Status.DONE);
+
+    // startTime with 7d threshold: startTime is 8d ago > 7d → matched.
+    TimeBasedTierSegmentSelector byStart7d = new TimeBasedTierSegmentSelector("7d",
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(byStart7d.getAgeField(), TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertTrue(byStart7d.selectSegment(tableNameWithType, zk));
+
+    // startTime with 10d threshold: startTime is 8d ago < 10d → NOT matched.
+    TimeBasedTierSegmentSelector byStart10d = new TimeBasedTierSegmentSelector("10d",
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertFalse(byStart10d.selectSegment(tableNameWithType, zk));
+  }
+
+  @Test
+  public void testAgeFieldParsing() {
+    // Default / null / empty → END_TIME (backward compatible).
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig(null),
+        TimeBasedTierSegmentSelector.AgeField.END_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig(""),
+        TimeBasedTierSegmentSelector.AgeField.END_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("endTime"),
+        TimeBasedTierSegmentSelector.AgeField.END_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("END_TIME"),
+        TimeBasedTierSegmentSelector.AgeField.END_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("end_time"),
+        TimeBasedTierSegmentSelector.AgeField.END_TIME);
+
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("startTime"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("START_TIME"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("start_time"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("creationTime"),
+        TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("CREATION_TIME"),
+        TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("creation_time"),
+        TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+
+    // Unknown value → clear error message so operators spot the typo.
+    try {
+      TimeBasedTierSegmentSelector.AgeField.fromConfig("pushTime");
+      Assert.fail("Expected IllegalArgumentException for unsupported value");
+    } catch (IllegalArgumentException expected) {
+      Assert.assertTrue(expected.getMessage().contains("pushTime"));
+    }
+  }
+
+  @Test
   public void testRealTimeConsumingSegmentShouldNotBeRelocated() {
 
     long now = System.currentTimeMillis();
