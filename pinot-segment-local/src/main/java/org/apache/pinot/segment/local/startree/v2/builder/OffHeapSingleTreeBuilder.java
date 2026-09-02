@@ -381,6 +381,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
 
   @Override
   public void close() {
+    // Order matters: release the mmap view before closing the writer and deleting the backing file.
     try {
       super.close();
     } catch (Exception e) {
