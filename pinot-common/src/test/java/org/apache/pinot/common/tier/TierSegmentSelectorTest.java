@@ -134,6 +134,30 @@ public class TierSegmentSelectorTest {
   }
 
   @Test
+  public void testTimeBasedSegmentSelectorWithStartTimeAgeField() {
+    long now = System.currentTimeMillis();
+    String tableNameWithType = "myTable_OFFLINE";
+
+    // Segment covers a 1-day range 8 days ago: startTime 8d ago, endTime 7d ago.
+    SegmentZKMetadata zk = new SegmentZKMetadata("segment_start");
+    zk.setStartTime(now - TimeUnit.DAYS.toMillis(8));
+    zk.setEndTime(now - TimeUnit.DAYS.toMillis(7));
+    zk.setTimeUnit(TimeUnit.MILLISECONDS);
+    zk.setStatus(Status.DONE);
+
+    // startTime with 7d threshold: startTime is 8d ago > 7d → matched.
+    TimeBasedTierSegmentSelector byStart7d = new TimeBasedTierSegmentSelector("7d",
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(byStart7d.getAgeField(), TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertTrue(byStart7d.selectSegment(tableNameWithType, zk));
+
+    // startTime with 10d threshold: startTime is 8d ago < 10d → NOT matched.
+    TimeBasedTierSegmentSelector byStart10d = new TimeBasedTierSegmentSelector("10d",
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertFalse(byStart10d.selectSegment(tableNameWithType, zk));
+  }
+
+  @Test
   public void testAgeFieldParsing() {
     // Default / null / empty → END_TIME (backward compatible).
     Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig(null),
@@ -146,6 +170,13 @@ public class TierSegmentSelectorTest {
         TimeBasedTierSegmentSelector.AgeField.END_TIME);
     Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("end_time"),
         TimeBasedTierSegmentSelector.AgeField.END_TIME);
+
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("startTime"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("START_TIME"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
+    Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("start_time"),
+        TimeBasedTierSegmentSelector.AgeField.START_TIME);
 
     Assert.assertEquals(TimeBasedTierSegmentSelector.AgeField.fromConfig("creationTime"),
         TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);

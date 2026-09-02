@@ -31,6 +31,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 ///   - `endTime` (default, backward-compatible): uses `SegmentZKMetadata#getEndTimeMs()`, the segment's
 ///     max data timestamp. Suitable when segment age tracks data recency, e.g. streaming ingest where
 ///     endTime is close to wall-clock now.
+///   - `startTime`: uses `SegmentZKMetadata#getStartTimeMs()`, the segment's min data timestamp.
+///     Suitable when segment age should track the oldest data in the segment.
 ///   - `creationTime`: uses `SegmentZKMetadata#getCreationTime()`, when the segment file was built.
 ///     Suitable when segment age should track ingestion recency, e.g. batch ingest of historical data
 ///     where endTime lies far in the past regardless of when the segment was created.
@@ -38,7 +40,7 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
 
   /// Which timestamp field on [SegmentZKMetadata] is compared against the age threshold.
   public enum AgeField {
-    END_TIME, CREATION_TIME;
+    END_TIME, START_TIME, CREATION_TIME;
 
     public static AgeField fromConfig(@Nullable String value) {
       if (StringUtils.isEmpty(value)) {
@@ -48,11 +50,14 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
       if ("endtime".equalsIgnoreCase(normalized) || "end_time".equalsIgnoreCase(normalized)) {
         return END_TIME;
       }
+      if ("starttime".equalsIgnoreCase(normalized) || "start_time".equalsIgnoreCase(normalized)) {
+        return START_TIME;
+      }
       if ("creationtime".equalsIgnoreCase(normalized) || "creation_time".equalsIgnoreCase(normalized)) {
         return CREATION_TIME;
       }
       throw new IllegalArgumentException(
-          "Unsupported segmentAgeField: '" + value + "'. Expected 'endTime' or 'creationTime'.");
+          "Unsupported segmentAgeField: '" + value + "'. Expected 'endTime', 'startTime' or 'creationTime'.");
     }
   }
 
@@ -93,6 +98,11 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
       case END_TIME:
         referenceMs = segmentZKMetadata.getEndTimeMs();
         Preconditions.checkState(referenceMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", referenceMs,
+            segmentZKMetadata.getSegmentName(), tableNameWithType);
+        break;
+      case START_TIME:
+        referenceMs = segmentZKMetadata.getStartTimeMs();
+        Preconditions.checkState(referenceMs > 0, "Invalid startTimeMs: %s for segment: %s of table: %s", referenceMs,
             segmentZKMetadata.getSegmentName(), tableNameWithType);
         break;
       default:
