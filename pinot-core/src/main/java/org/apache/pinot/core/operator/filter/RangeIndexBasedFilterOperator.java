@@ -182,8 +182,41 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     return _rangeIndexReader.isExact();
   }
 
+  /// The index counts the documents whose stored value satisfies the predicate. A null row stores the column's default
+  /// null value, so the null rows are either all among those documents or all outside them, depending on whether that
+  /// value satisfies the predicate: the index's count is kept, and the null rows are subtracted when it does.
   @Override
   public int getNumMatchingDocs() {
+    int numMatchingDocs = getNumMatchingDocsFromIndex();
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+    if (nullBitmap != null && matchesDefaultNullValue()) {
+      numMatchingDocs -= nullBitmap.getCardinality();
+    }
+    return numMatchingDocs;
+  }
+
+  /// Returns whether the predicate holds for the column's default null value, the value a null row is stored under.
+  private boolean matchesDefaultNullValue() {
+    Object defaultNullValue = _dataSource.getDataSourceMetadata().getFieldSpec().getDefaultNullValue();
+    if (_predicateEvaluator.isDictionaryBased()) {
+      int dictId = _dataSource.getDictionary().indexOf(FieldSpec.getStringValue(defaultNullValue));
+      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
+    }
+    switch (_parameterType) {
+      case INT:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).intValue());
+      case LONG:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).longValue());
+      case FLOAT:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).floatValue());
+      case DOUBLE:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).doubleValue());
+      default:
+        throw unsupportedDataType(_parameterType);
+    }
+  }
+
+  private int getNumMatchingDocsFromIndex() {
     switch (_parameterType) {
       case INT:
         if (_predicateEvaluator instanceof IntValue) {
@@ -225,7 +258,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    return new BitmapCollection(_numDocs, false, getMatchingDocIds());
+    return new BitmapCollection(_numDocs, false, getMatchingDocIds()).excludingNulls(getNullBitmap());
   }
 
   @Override

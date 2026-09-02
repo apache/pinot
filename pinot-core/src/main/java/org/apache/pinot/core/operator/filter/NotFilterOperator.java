@@ -23,7 +23,9 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 
 
 public class NotFilterOperator extends BaseFilterOperator {
@@ -61,13 +63,37 @@ public class NotFilterOperator extends BaseFilterOperator {
     return _filterOperator.getTrues();
   }
 
+  /// NOT of UNKNOWN is UNKNOWN: a negation is UNKNOWN exactly where its child is.
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return _filterOperator.getNulls();
+  }
+
+  /// A negation is not false where its child is not true.
+  @Override
+  protected BlockDocIdSet getNotFalses() {
+    BlockDocIdSet childTrues = _filterOperator.getTrues();
+    if (childTrues instanceof MatchAllDocIdSet) {
+      return EmptyDocIdSet.getInstance();
+    }
+    if (childTrues instanceof EmptyDocIdSet) {
+      return new MatchAllDocIdSet(_numDocs);
+    }
+    return new NotDocIdSet(childTrues, _numDocs);
+  }
+
+  /// The complement of the child's count is its false documents only when none is UNKNOWN. Otherwise the count comes
+  /// from the child's bitmaps, which know the UNKNOWN documents and keep them out of the inversion.
   @Override
   public boolean canOptimizeCount() {
-    return _filterOperator.canOptimizeCount();
+    return _filterOperator.mayHaveNulls() ? _filterOperator.canProduceBitmaps() : _filterOperator.canOptimizeCount();
   }
 
   @Override
   public int getNumMatchingDocs() {
+    if (_filterOperator.mayHaveNulls()) {
+      return getBitmaps().getCardinality();
+    }
     return _numDocs - _filterOperator.getNumMatchingDocs();
   }
 
@@ -79,6 +105,11 @@ public class NotFilterOperator extends BaseFilterOperator {
   @Override
   public BitmapCollection getBitmaps() {
     return _filterOperator.getBitmaps().invert();
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    return _filterOperator.mayHaveNulls();
   }
 
   public BaseFilterOperator getChildFilterOperator() {

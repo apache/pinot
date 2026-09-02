@@ -347,6 +347,11 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  protected BlockDocIdSet getNotFalses() {
+    return _delegate.getNotFalses();
+  }
+
+  @Override
   public boolean canOptimizeCount() {
     return _delegate.canOptimizeCount();
   }
@@ -364,6 +369,11 @@ public class MapFilterOperator extends BaseFilterOperator {
   @Override
   public BitmapCollection getBitmaps() {
     return _delegate.getBitmaps();
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    return _delegate.mayHaveNulls();
   }
 
   @Override

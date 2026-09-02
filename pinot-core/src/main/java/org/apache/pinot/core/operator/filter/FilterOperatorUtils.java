@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterOperatorUtils {
@@ -61,21 +63,46 @@ public class FilterOperatorUtils {
     BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator, int numDocs);
   }
 
+  /// Returns the null rows of the column in this segment, or `null` when there is none.
+  ///
+  /// A column reports nulls through its null value vector, which is absent when the segment has none for the column
+  /// and can also be present but empty. Under null handling these are the rows a predicate on the column is UNKNOWN
+  /// over, and the reason a verdict of always true or always false over the column's values does not cover every row.
+  /// A consuming segment hands out a copy of its vector on each read, so callers read it once and keep the result.
+  @Nullable
+  public static ImmutableRoaringBitmap getNullBitmap(DataSource dataSource) {
+    NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+    if (nullValueVector != null) {
+      ImmutableRoaringBitmap nullBitmap = nullValueVector.getNullBitmap();
+      if (!nullBitmap.isEmpty()) {
+        return nullBitmap;
+      }
+    }
+    return null;
+  }
+
+  /// Returns whether the column holds any null value in this segment, see [#getNullBitmap].
+  public static boolean hasNulls(DataSource dataSource) {
+    return getNullBitmap(dataSource) != null;
+  }
+
   public static class DefaultImplementation implements Implementation {
     @Override
     public BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
         DataSource dataSource, int numDocs) {
+      // The evaluator's verdicts are over the column's real values. With null handling enabled a null row is UNKNOWN
+      // under either verdict, so it is selected by neither the predicate nor its negation: the leaf has to carry the
+      // null rows for the negation to leave them out, instead of collapsing to a constant that knows nothing of them.
       if (predicateEvaluator.isAlwaysFalse()) {
+        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        if (nullBitmap != null) {
+          return new BitmapBasedFilterOperator(new MutableRoaringBitmap(), false, numDocs, nullBitmap);
+        }
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        if (queryContext.isNullHandlingEnabled()) {
-          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
-          if (nullValueVectorReader != null) {
-            ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
-            if (nullBitmap != null && !nullBitmap.isEmpty()) {
-              return new BitmapBasedFilterOperator(nullBitmap, true, numDocs);
-            }
-          }
+        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        if (nullBitmap != null) {
+          return new BitmapBasedFilterOperator(nullBitmap, true, numDocs, nullBitmap);
         }
         return new MatchAllFilterOperator(numDocs);
       }
