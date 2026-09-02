@@ -29,6 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -48,6 +49,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -83,8 +85,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -649,6 +654,62 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+  }
+
+  @Test
+  public void testOffloadRemovesSegmentMetadataBeforeReleasingConsumerSemaphore()
+      throws Exception {
+    // Use a fresh coordinator. Other tests release the shared semaphore without acquiring it, which inflates permits.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      // MutableSegmentImpl.offload() removes the segment from the upsert/dedup metadata managers. For partial upsert in
+      // PROTECTED mode that is where the primary keys are reverted to their previous locations, so it has to run while
+      // the consumer semaphore is still held. Otherwise the next consuming segment replays against un-reverted state.
+      AtomicInteger permitsWhenMetadataRemoved = new AtomicInteger(-1);
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doAnswer(invocation -> {
+        permitsWhenMetadataRemoved.set(semaphore.availablePermits());
+        return null;
+      }).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.offload();
+
+      verify(realtimeSegment).offload();
+      Assert.assertEquals(permitsWhenMetadataRemoved.get(), 0,
+          "Segment metadata must be removed while the consumer semaphore is still held");
+      Assert.assertEquals(semaphore.availablePermits(), 1, "Consumer semaphore must be released after offload");
+      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+    }
+  }
+
+  @Test
+  public void testOffloadReleasesConsumerSemaphoreWhenMetadataRemovalFails()
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doThrow(new RuntimeException("metadata removal failed")).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      try {
+        segmentDataManager.offload();
+        Assert.fail("Expected the metadata removal failure to propagate");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "metadata removal failed");
+      }
+      // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
+      Assert.assertEquals(semaphore.availablePermits(), 1,
+          "Consumer semaphore must be released even when metadata removal fails");
     }
   }
 
@@ -1417,6 +1478,14 @@ public class RealtimeSegmentDataManagerTest {
 
     public RealtimeTableDataManager getTableDataManager() {
       return _tableDataManager;
+    }
+
+    /// Replaces the mutable segment so tests can observe or fail its offload().
+    public void setRealtimeSegment(MutableSegmentImpl realtimeSegment)
+        throws Exception {
+      Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+      realtimeSegmentField.setAccessible(true);
+      realtimeSegmentField.set(this, realtimeSegment);
     }
 
     public String getStopReason() {

@@ -1764,9 +1764,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
-    closeStreamConsumer();
-    cleanupMetrics();
-    _realtimeSegment.offload();
+    // Remove this segment's upsert/dedup metadata BEFORE releasing the consumer semaphore. For partial upsert in
+    // PROTECTED consistency mode, offload() reverts the primary keys owned by this consuming segment to their previous
+    // record locations. If the semaphore is released first, the next consuming segment of the partition can start
+    // replaying while primary keys still point to this mutable segment, and merge against the un-reverted state.
+    // NOTE: This only closes the gap for policies that hold the semaphore until offload, i.e. DISALLOW_ALWAYS (the
+    // default for partial upsert without pauseless). ALLOW_DURING_BUILD_ONLY and ALLOW_ALWAYS release it earlier from
+    // buildSegmentInternal() / downloadSegmentAndReplace() by design, so overlap there needs a separate mechanism.
+    // The semaphore is released in a finally block so a failure in metadata removal cannot stall the partition.
+    try {
+      _realtimeSegment.offload();
+    } finally {
+      closeStreamConsumer();
+      cleanupMetrics();
+    }
   }
 
   @Override
