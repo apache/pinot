@@ -74,13 +74,13 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
   @Test
   public void testRejectMultiValuesExceedingMaxPerRow()
       throws Exception {
-    int maxNumberOfMultiValuesPerRow = 5;
+    int maxNumMultiValues = 5;
     FixedByteMVMutableForwardIndex readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, 10, Integer.BYTES, _memoryManager,
+        new FixedByteMVMutableForwardIndex(maxNumMultiValues, 2, 10, Integer.BYTES, _memoryManager,
             "RejectMultiValuesExceedingMaxPerRow", true, FieldSpec.DataType.INT);
     try {
       Assert.expectThrows(IllegalArgumentException.class,
-          () -> readerWriter.setIntMV(0, new int[maxNumberOfMultiValuesPerRow + 1]));
+          () -> readerWriter.setIntMV(0, new int[maxNumMultiValues + 1]));
       Assert.assertEquals(getNumValues(readerWriter), 0);
       Assert.assertEquals(readerWriter.getNumValuesMV(0), 0);
     } finally {
@@ -91,9 +91,9 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
   @Test
   public void testAcceptMultiValuesAtMaxPerRow()
       throws Exception {
-    int maxNumberOfMultiValuesPerRow = 5;
+    int maxNumMultiValues = 5;
     FixedByteMVMutableForwardIndex readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, 10, Integer.BYTES, _memoryManager,
+        new FixedByteMVMutableForwardIndex(maxNumMultiValues, 2, 10, Integer.BYTES, _memoryManager,
             "AcceptMultiValuesAtMaxPerRow", true, FieldSpec.DataType.INT);
     try {
       int[] values = new int[]{1, 2, 3, 4, 5};
@@ -108,24 +108,24 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.BYTES;
-    int maxNumberOfMultiValuesPerRow = 2000;
+    int valueSizeInBytes = Integer.BYTES;
+    int maxNumMultiValues = 2000;
     readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes, _memoryManager,
+        new FixedByteMVMutableForwardIndex(maxNumMultiValues, 2, rows / 2, valueSizeInBytes, _memoryManager,
             "IntArray", isDictionaryEncoded, FieldSpec.DataType.INT);
     int valuesAdded = 0;
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
-      data[i] = new int[r.nextInt(maxNumberOfMultiValuesPerRow)];
+      data[i] = new int[r.nextInt(maxNumMultiValues)];
       for (int j = 0; j < data[i].length; j++) {
         data[i][j] = r.nextInt();
       }
       readerWriter.setIntMV(i, data[i]);
       valuesAdded += data[i].length;
     }
-    int[] ret = new int[maxNumberOfMultiValuesPerRow];
+    int[] ret = new int[maxNumMultiValues];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getIntMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
@@ -139,11 +139,11 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.BYTES;
+    int valueSizeInBytes = Integer.BYTES;
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
     readerWriter = new FixedByteMVMutableForwardIndex(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
-        columnSizeInBytes, _memoryManager, "IntArrayFixedSize", isDictionaryEncoded, FieldSpec.DataType.INT);
+        valueSizeInBytes, _memoryManager, "IntArrayFixedSize", isDictionaryEncoded, FieldSpec.DataType.INT);
     int valuesAdded = 0;
 
     Random r = new Random(seed);
@@ -169,19 +169,19 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
   public void testWithZeroSize(long seed, boolean isDictionaryEncoded)
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
-    final int maxNumberOfMultiValuesPerRow = 5;
+    final int maxNumMultiValues = 5;
     int rows = 1000;
-    int columnSizeInBytes = Integer.BYTES;
+    int valueSizeInBytes = Integer.BYTES;
     Random r = new Random(seed);
     readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
+        new FixedByteMVMutableForwardIndex(maxNumMultiValues, 3, r.nextInt(rows) + 1, valueSizeInBytes,
             _memoryManager, "ZeroSize", isDictionaryEncoded, FieldSpec.DataType.INT);
     int valuesAdded = 0;
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
       if (r.nextInt() > 0) {
-        data[i] = new int[r.nextInt(maxNumberOfMultiValuesPerRow)];
+        data[i] = new int[r.nextInt(maxNumMultiValues)];
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextInt();
         }
@@ -193,7 +193,7 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
         valuesAdded += data[i].length;
       }
     }
-    int[] ret = new int[maxNumberOfMultiValuesPerRow];
+    int[] ret = new int[maxNumMultiValues];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getIntMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
@@ -204,11 +204,11 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
   }
 
   private FixedByteMVMutableForwardIndex createReaderWriter(FieldSpec.DataType dataType, Random r, int rows,
-      int maxNumberOfMultiValuesPerRow, boolean isDictionaryEncoded) {
-    final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
-    final int rowCountPerChunk = r.nextInt(rows) + 1;
+      int maxNumMultiValues, boolean isDictionaryEncoded) {
+    final int avgNumMultiValues = r.nextInt(maxNumMultiValues) + 1;
+    final int numRowsPerChunk = r.nextInt(rows) + 1;
 
-    return new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, avgMultiValueCount, rowCountPerChunk,
+    return new FixedByteMVMutableForwardIndex(maxNumMultiValues, avgNumMultiValues, numRowsPerChunk,
         dataType.size(), _memoryManager, "ReaderWriter", isDictionaryEncoded, dataType);
   }
 
@@ -229,15 +229,15 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
-    final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
+    final int maxNumMultiValues = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumberOfMultiValuesPerRow, isDictionaryEncoded);
+        createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumMultiValues, isDictionaryEncoded);
     int valuesAdded = 0;
 
     long[][] data = new long[rows][];
     for (int i = 0; i < rows; i++) {
       if (r.nextInt() > 0) {
-        data[i] = new long[r.nextInt(maxNumberOfMultiValuesPerRow)];
+        data[i] = new long[r.nextInt(maxNumMultiValues)];
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextLong();
         }
@@ -249,7 +249,7 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
         valuesAdded += data[i].length;
       }
     }
-    long[] ret = new long[maxNumberOfMultiValuesPerRow];
+    long[] ret = new long[maxNumMultiValues];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getLongMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
@@ -271,15 +271,15 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
-    final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
+    final int maxNumMultiValues = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumberOfMultiValuesPerRow, isDictoinaryEncoded);
+        createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumMultiValues, isDictoinaryEncoded);
     int valuesAdded = 0;
 
     float[][] data = new float[rows][];
     for (int i = 0; i < rows; i++) {
       if (r.nextInt() > 0) {
-        data[i] = new float[r.nextInt(maxNumberOfMultiValuesPerRow)];
+        data[i] = new float[r.nextInt(maxNumMultiValues)];
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextFloat();
         }
@@ -291,7 +291,7 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
         valuesAdded += data[i].length;
       }
     }
-    float[] ret = new float[maxNumberOfMultiValuesPerRow];
+    float[] ret = new float[maxNumMultiValues];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getFloatMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
@@ -313,15 +313,15 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
-    final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
+    final int maxNumMultiValues = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumberOfMultiValuesPerRow, isDictonaryEncoded);
+        createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumMultiValues, isDictonaryEncoded);
     int valuesAdded = 0;
 
     double[][] data = new double[rows][];
     for (int i = 0; i < rows; i++) {
       if (r.nextInt() > 0) {
-        data[i] = new double[r.nextInt(maxNumberOfMultiValuesPerRow)];
+        data[i] = new double[r.nextInt(maxNumMultiValues)];
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextDouble();
         }
@@ -333,7 +333,7 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
         valuesAdded += data[i].length;
       }
     }
-    double[] ret = new double[maxNumberOfMultiValuesPerRow];
+    double[] ret = new double[maxNumMultiValues];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getDoubleMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
