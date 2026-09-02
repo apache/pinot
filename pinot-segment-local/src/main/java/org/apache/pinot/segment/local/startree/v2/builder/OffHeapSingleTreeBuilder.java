@@ -380,15 +380,49 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    super.close();
+  public void close() {
+    safeSuperClose();
     releaseSegmentRecordBuffer();
-    if (_starTreeRecordBuffer != null) {
-      _starTreeRecordBuffer.close();
+    releaseStarTreeRecordBuffer();
+    releaseStarTreeRecordOutputStream();
+    releaseStarTreeRecordFile();
+  }
+
+  private void safeSuperClose() {
+    try {
+      super.close();
+    } catch (Exception e) {
+      LOGGER.warn("super.close() failed", e);
     }
-    _starTreeRecordOutputStream.close();
-    FileUtils.forceDelete(_starTreeRecordFile);
+  }
+
+  private void releaseStarTreeRecordBuffer() {
+    if (_starTreeRecordBuffer != null) {
+      try {
+        _starTreeRecordBuffer.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to close star-tree record buffer", e);
+      }
+      _starTreeRecordBuffer = null;
+    }
+  }
+
+  private void releaseStarTreeRecordOutputStream() {
+    try {
+      _starTreeRecordOutputStream.close();
+    } catch (IOException e) {
+      LOGGER.warn("Failed to close star-tree record output stream", e);
+    }
+  }
+
+  private void releaseStarTreeRecordFile() {
+    if (_starTreeRecordFile.exists()) {
+      try {
+        FileUtils.forceDelete(_starTreeRecordFile);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to delete star-tree record file: {}", _starTreeRecordFile, e);
+      }
+    }
   }
 
   /// Per-record offsets within the star-tree record file. [#addRecord] is invoked once per appended record with the
