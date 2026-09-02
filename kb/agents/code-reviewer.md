@@ -67,6 +67,9 @@ Priority order when principles collide: Production Safety > Backward Compatibili
 
 ## Output
 
+Follow the review-delivery rules in `kb/code-review-principles.md`. In plain-text review surfaces, use the consolidated
+report below.
+
 Start by listing what you're reviewing (files, diff summary, dispatched sub-reviewers). Then emit a consolidated report in this shape:
 
 ```
