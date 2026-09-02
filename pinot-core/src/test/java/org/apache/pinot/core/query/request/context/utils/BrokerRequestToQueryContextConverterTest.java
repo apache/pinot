@@ -520,6 +520,15 @@ public class BrokerRequestToQueryContextConverterTest {
 
   @Test
   public void testFilteredAggregations() {
+    // The FILTER clause must be honored no matter which clause references the aggregation.
+    assertTrue(QueryContextConverterUtils.getQueryContext(
+            "SELECT foo, COUNT(*) FROM testTable GROUP BY foo HAVING COUNT(*) FILTER(WHERE bar > 5) > 0")
+        .hasFilteredAggregations());
+    assertTrue(QueryContextConverterUtils.getQueryContext(
+        "SELECT foo FROM testTable GROUP BY foo ORDER BY COUNT(*) FILTER(WHERE bar > 5)").hasFilteredAggregations());
+    assertFalse(QueryContextConverterUtils.getQueryContext(
+        "SELECT foo, COUNT(*) FROM testTable GROUP BY foo HAVING COUNT(*) > 0").hasFilteredAggregations());
+
     {
       String query =
           "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";

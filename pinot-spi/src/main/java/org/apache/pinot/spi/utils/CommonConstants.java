@@ -977,6 +977,9 @@ public class CommonConstants {
         // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
+        // NOTE: Aggregations are counted here no matter whether they are referenced in the SELECT list, the HAVING
+        //       clause or the ORDER-BY clause, so a query that projects no aggregation but orders by (or filters on)
+        //       a filtered one is also covered.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
 
         // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
