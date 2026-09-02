@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,12 @@ public class ChannelManager {
   /// (including TLS negotiation) before sending any message, which increases the latency of the first query sent after
   /// a period of inactivity. In order to achieve that, we set the idle timeout to a very large value by default.
   private final Duration _idleTimeout;
+  /// Transport-level liveness policy for every channel this manager hands out.
+  ///
+  /// The idle timeout above cannot substitute for it. A channel that is being used is never idle, so on a cluster
+  /// that keeps serving queries the idle timeout never fires — and it is disabled by default anyway. Keep-alive is
+  /// the only mechanism here that a peer which stopped answering without closing its socket cannot outlive.
+  private final GrpcKeepAliveConfig _keepAliveConfig;
   private final int _maxInboundMessageSize;
   /// Buffer allocator configured to prefer direct (off-heap) buffers for better performance.
   /// Using a single allocator instance across all channels allows for better memory pooling and reduces fragmentation.
@@ -71,11 +78,13 @@ public class ChannelManager {
   ///                                     unwritable; it becomes writable again only when the queue drains below this
   ///                                     low watermark. Must satisfy `0 < low ≤ high`; validated eagerly here so
   ///                                     misconfiguration surfaces at startup rather than on the first query.
+  /// @param keepAliveConfig gRPC keep-alive policy applied to every channel; see [GrpcKeepAliveConfig]
   public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout,
-      int writeBufferHighWaterMarkBytes, int writeBufferLowWaterMarkBytes) {
+      int writeBufferHighWaterMarkBytes, int writeBufferLowWaterMarkBytes, GrpcKeepAliveConfig keepAliveConfig) {
     _clientSslContext = clientSslContext;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    _keepAliveConfig = keepAliveConfig;
     Preconditions.checkArgument(writeBufferLowWaterMarkBytes > 0,
         "writeBufferLowWaterMarkBytes must be positive, got: %s", writeBufferLowWaterMarkBytes);
     // The `low <= high` (and `low >= 0`) invariant is also checked by Netty's WriteBufferWaterMark constructor; by
@@ -96,7 +105,7 @@ public class ChannelManager {
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .sslContext(_clientSslContext);
-            return decorate(channelBuilder).build();
+            return watchState(decorate(channelBuilder).build(), k.getLeft(), k.getRight());
           }
       );
     } else {
@@ -108,9 +117,37 @@ public class ChannelManager {
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
                 .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .usePlaintext();
-            return decorate(channelBuilder).build();
+            return watchState(decorate(channelBuilder).build(), k.getLeft(), k.getRight());
           });
     }
+  }
+
+  /// Logs at WARN when `channel` leaves `READY`, and returns it.
+  ///
+  /// Keep-alive makes a silent peer *detectable*; this is what makes it **legible**. Without it the only
+  /// record of the failure is the absence of one: the startup lines say what was configured, and a
+  /// channel that later dropped looks exactly like a channel that never had a problem. The transition is
+  /// the moment worth reading in a log, because it is when a peer stopped answering — every mailbox send
+  /// queued behind it has already been failing for one keep-alive interval by then.
+  ///
+  /// Re-arms itself, which is how one callback follows a channel for its whole life; gRPC's
+  /// `notifyWhenStateChanged` is single-shot. Stops on shutdown, so a terminated channel cannot keep
+  /// re-registering.
+  private ManagedChannel watchState(ManagedChannel channel, String hostname, int port) {
+    ConnectivityState state = channel.getState(false);
+    channel.notifyWhenStateChanged(state, () -> {
+      if (channel.isShutdown()) {
+        return;
+      }
+      ConnectivityState next = channel.getState(false);
+      if (state == ConnectivityState.READY && next != ConnectivityState.READY) {
+        LOGGER.warn("Mailbox channel to {}:{} left READY for {}; sends to that peer will fail until it "
+            + "reconnects. If keep-alive reported it, the peer stopped answering about one keep-alive "
+            + "interval ago.", hostname, port, next);
+      }
+      watchState(channel, hostname, port);
+    });
+    return channel;
   }
 
   /// Resets the connection backoff for the channel to the given server if the channel is in
@@ -128,7 +165,16 @@ public class ChannelManager {
   }
 
   private NettyChannelBuilder decorate(NettyChannelBuilder builder) {
-    return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
+    return _keepAliveConfig.configure(builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS));
+  }
+
+  /// The keep-alive policy applied to every channel this manager hands out.
+  ///
+  /// Public because the assertion that matters spans packages: a test of [MailboxService] has to show
+  /// that the policy resolved from config reached the transport, and no assertion on parsed values can
+  /// show that. Returns an immutable record, so exposing it grants no control over the manager.
+  public GrpcKeepAliveConfig getKeepAliveConfig() {
+    return _keepAliveConfig;
   }
 
   /// Bytes of direct (off-heap) memory currently pinned by the shared gRPC

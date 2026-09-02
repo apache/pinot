@@ -37,6 +37,11 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
+  // TODO: Make the maximum number of multi-values configurable, and also enforce it when creating the immutable forward
+  //       index, which currently accepts any number of values per entry.
+  /// Default maximum number of values in a single multi-value entry of the mutable forward index.
+  public static final int DEFAULT_MAX_NUM_MULTI_VALUES = 1000;
+
   private static int _defaultRawIndexWriterVersion = 4;
   private static String _defaultTargetMaxChunkSize = "1MB";
   private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;

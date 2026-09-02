@@ -114,6 +114,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   /// Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
   /// ser/de dispatches.
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
+    return queryRunner(sql, trace, Map.of());
+  }
+
+  /// Same as [#queryRunner(String, boolean)], but adds metadata the broker stamps outside the SQL text, e.g. the
+  /// `rlsFilters-<table>` entries carrying row-level-security filters.
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace,
+      Map<String, String> extraRequestMetadata) {
     long startTimeMs = System.currentTimeMillis();
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
@@ -141,6 +148,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     requestMetadataMap.put(QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
     requestMetadataMap.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, Long.toString(extraPassiveTimeoutMs));
     requestMetadataMap.putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    requestMetadataMap.putAll(extraRequestMetadata);
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
     if (trace) {
