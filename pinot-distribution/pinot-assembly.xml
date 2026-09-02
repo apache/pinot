@@ -46,24 +46,8 @@
     </file>
     <!-- Start Include Pinot Plugins-->
     <!-- Start Include Pinot Stream Ingestion Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-3.0/target/pinot-kafka-3.0-${project.version}.jar</source>
-      <destName>plugins/pinot-stream-ingestion/pinot-kafka-3.0/pinot-kafka-3.0-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}.jar</source>
-      <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-pulsar/target/pinot-pulsar-${project.version}.jar</source>
-      <destName>plugins/pinot-stream-ingestion/pinot-pulsar/pinot-pulsar-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/target/pinot-batch-ingestion-standalone-${project.version}.jar</source>
-      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/pinot-batch-ingestion-standalone-${project.version}.jar</destName>
-    </file>
     <file>
       <source>
         ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/target/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
@@ -82,120 +66,254 @@
     </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->
     <!-- Start Include Pinot File System Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-adls/target/pinot-adls-${project.version}.jar</source>
-      <destName>plugins/pinot-file-system/pinot-adls/pinot-adls-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-gcs/target/pinot-gcs-${project.version}.jar</source>
-      <destName>plugins/pinot-file-system/pinot-gcs/pinot-gcs-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}.jar</source>
-      <destName>plugins/pinot-file-system/pinot-hdfs/pinot-hdfs-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}.jar</source>
-      <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot File System Plugins-->
     <!-- Start Include Pinot Environment Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target/pinot-azure-${project.version}.jar</source>
-      <destName>plugins/pinot-environment/pinot-azure/pinot-azure-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Environment Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-avro/pinot-avro-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-clp-log/target/pinot-clp-log-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-clp-log/pinot-clp-log-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target/pinot-csv-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-csv/pinot-csv-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target/pinot-json-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-json/pinot-json-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-bson/target/pinot-bson-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-bson/pinot-bson-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-orc/pinot-orc-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target/pinot-parquet-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-parquet/pinot-parquet-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target/pinot-thrift-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-thrift/pinot-thrift-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target/pinot-protobuf-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-protobuf/pinot-protobuf-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-protobuf/target/pinot-confluent-protobuf-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-confluent-protobuf/pinot-confluent-protobuf-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-json/target/pinot-confluent-json-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-confluent-json/pinot-confluent-json-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-arrow/target/pinot-arrow-${project.version}.jar</source>
-      <destName>plugins/pinot-input-format/pinot-arrow/pinot-arrow-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Input Format Plugins-->
     <!-- Start Include Pinot Minion Tasks Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar</source>
-      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Minion Tasks Plugins-->
     <!-- Start Include Pinot Metrics Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}.jar</source>
-      <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}.jar</destName>
-    </file>
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target/pinot-dropwizard-${project.version}.jar</source>
-      <destName>plugins/pinot-metrics/pinot-dropwizard/pinot-dropwizard-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Metrics Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}.jar</source>
-      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Segment Writer Plugins-->
     <!-- Start Include Pinot Segment Uploader Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}.jar</source>
-      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- Start Include Pinot Time Series Plugins -->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/target/pinot-timeseries-m3ql-${project.version}.jar</source>
-      <destName>plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/pinot-timeseries-m3ql-${project.version}.jar</destName>
-    </file>
     <!-- End Include Pinot Time Series Plugins -->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
+    <!--
+      Each plugin ships its thin module jar plus pinot-plugin.classpath, the list of shared-store
+      jars it needs (one distribution-relative path per line). PluginManager still identifies a
+      plugin by the directory its jar sits in, and the index is what lets PLUGINS_INCLUDE and the
+      Spark ingestion launcher select one plugin's dependencies out of the shared store.
+    -->
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-3.0/target</directory>
+      <outputDirectory>plugins/pinot-stream-ingestion/pinot-kafka-3.0</outputDirectory>
+      <includes>
+        <include>pinot-kafka-3.0-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target</directory>
+      <outputDirectory>plugins/pinot-stream-ingestion/pinot-kinesis</outputDirectory>
+      <includes>
+        <include>pinot-kinesis-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-pulsar/target</directory>
+      <outputDirectory>plugins/pinot-stream-ingestion/pinot-pulsar</outputDirectory>
+      <includes>
+        <include>pinot-pulsar-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/target</directory>
+      <outputDirectory>plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone</outputDirectory>
+      <includes>
+        <include>pinot-batch-ingestion-standalone-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-file-system/pinot-adls/target</directory>
+      <outputDirectory>plugins/pinot-file-system/pinot-adls</outputDirectory>
+      <includes>
+        <include>pinot-adls-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-file-system/pinot-gcs/target</directory>
+      <outputDirectory>plugins/pinot-file-system/pinot-gcs</outputDirectory>
+      <includes>
+        <include>pinot-gcs-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target</directory>
+      <outputDirectory>plugins/pinot-file-system/pinot-hdfs</outputDirectory>
+      <includes>
+        <include>pinot-hdfs-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target</directory>
+      <outputDirectory>plugins/pinot-file-system/pinot-s3</outputDirectory>
+      <includes>
+        <include>pinot-s3-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target</directory>
+      <outputDirectory>plugins/pinot-environment/pinot-azure</outputDirectory>
+      <includes>
+        <include>pinot-azure-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-avro</outputDirectory>
+      <includes>
+        <include>pinot-avro-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-clp-log/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-clp-log</outputDirectory>
+      <includes>
+        <include>pinot-clp-log-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-confluent-avro</outputDirectory>
+      <includes>
+        <include>pinot-confluent-avro-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-csv</outputDirectory>
+      <includes>
+        <include>pinot-csv-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-json</outputDirectory>
+      <includes>
+        <include>pinot-json-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-bson/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-bson</outputDirectory>
+      <includes>
+        <include>pinot-bson-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-orc</outputDirectory>
+      <includes>
+        <include>pinot-orc-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-parquet</outputDirectory>
+      <includes>
+        <include>pinot-parquet-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-thrift</outputDirectory>
+      <includes>
+        <include>pinot-thrift-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-protobuf</outputDirectory>
+      <includes>
+        <include>pinot-protobuf-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-protobuf/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-confluent-protobuf</outputDirectory>
+      <includes>
+        <include>pinot-confluent-protobuf-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-json/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-confluent-json</outputDirectory>
+      <includes>
+        <include>pinot-confluent-json-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-input-format/pinot-arrow/target</directory>
+      <outputDirectory>plugins/pinot-input-format/pinot-arrow</outputDirectory>
+      <includes>
+        <include>pinot-arrow-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target</directory>
+      <outputDirectory>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks</outputDirectory>
+      <includes>
+        <include>pinot-minion-builtin-tasks-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target</directory>
+      <outputDirectory>plugins/pinot-metrics/pinot-yammer</outputDirectory>
+      <includes>
+        <include>pinot-yammer-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target</directory>
+      <outputDirectory>plugins/pinot-metrics/pinot-dropwizard</outputDirectory>
+      <includes>
+        <include>pinot-dropwizard-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target</directory>
+      <outputDirectory>plugins/pinot-segment-writer/pinot-segment-writer-file-based</outputDirectory>
+      <includes>
+        <include>pinot-segment-writer-file-based-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target</directory>
+      <outputDirectory>plugins/pinot-segment-uploader/pinot-segment-uploader-default</outputDirectory>
+      <includes>
+        <include>pinot-segment-uploader-default-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/target</directory>
+      <outputDirectory>plugins/pinot-timeseries-lang/pinot-timeseries-m3ql</outputDirectory>
+      <includes>
+        <include>pinot-timeseries-m3ql-${project.version}.jar</include>
+        <include>pinot-plugin.classpath</include>
+      </includes>
+    </fileSet>
     <!--
       Shared plugin dependency store. A plugin's runtime dependencies are copied here instead of
       being bundled into a per-plugin fat jar, so a library used by several plugins is stored once,

@@ -138,6 +138,26 @@
                   <includeScope>runtime</includeScope>
                 </configuration>
               </execution>
+              <execution>
+                <!--
+                  Record which jars in the shared store belong to this plugin, one
+                  distribution-relative path per line. The store itself cannot answer that
+                  question, and several consumers need it: the launcher when PLUGINS_INCLUDE
+                  selects a subset of plugins, and LaunchSparkDataIngestionJobCommand when
+                  -pluginsToLoad / -pluginsToExclude decide what to ship to the executors.
+                -->
+                <id>plugin-classpath-index</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>build-classpath</goal>
+                </goals>
+                <configuration>
+                  <outputFile>${project.build.directory}/pinot-plugin.classpath</outputFile>
+                  <includeScope>runtime</includeScope>
+                  <prefix>plugin-libs</prefix>
+                  <pathSeparator>&#10;</pathSeparator>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
         </plugins>

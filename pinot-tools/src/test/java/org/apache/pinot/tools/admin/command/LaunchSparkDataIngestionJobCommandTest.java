@@ -19,14 +19,85 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.tools.admin.command.LaunchSparkDataIngestionJobCommand.SparkType;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
+/// accepts newline-separated entries so the format can change without breaking the Spark submit.
 public class LaunchSparkDataIngestionJobCommandTest {
+  private File _tempDir;
+  private LocalPinotFS _fs;
+  private LaunchSparkDataIngestionJobCommand _command;
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    _tempDir = Files.createTempDirectory("plugin-index-test").toFile();
+    _fs = new LocalPinotFS();
+    _command = new LaunchSparkDataIngestionJobCommand();
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteQuietly(_tempDir);
+  }
+
+  private String writeIndex(String name, String content)
+      throws Exception {
+    File f = new File(_tempDir, name);
+    Files.write(f.toPath(), content.getBytes(StandardCharsets.UTF_8));
+    return f.getAbsolutePath();
+  }
+
+  @Test
+  public void testReadsColonSeparatedIndexAsWrittenByBuildClasspath()
+      throws Exception {
+    String idx = writeIndex("colon.classpath",
+        "plugin-libs/jackson-core-2.22.2.jar:plugin-libs/jackson-databind-2.22.2.jar");
+    assertEquals(_command.readPluginClasspathIndex(_fs, idx),
+        List.of("plugin-libs/jackson-core-2.22.2.jar", "plugin-libs/jackson-databind-2.22.2.jar"));
+  }
+
+  @Test
+  public void testReadsNewlineSeparatedIndex()
+      throws Exception {
+    String idx = writeIndex("newline.classpath",
+        "plugin-libs/a-1.jar\nplugin-libs/b-2.jar\n");
+    assertEquals(_command.readPluginClasspathIndex(_fs, idx), List.of("plugin-libs/a-1.jar", "plugin-libs/b-2.jar"));
+  }
+
+  @Test
+  public void testSkipsBlankAndWhitespaceEntries()
+      throws Exception {
+    String idx = writeIndex("blanks.classpath", "  plugin-libs/a-1.jar  ::\n\n plugin-libs/b-2.jar \n");
+    assertEquals(_command.readPluginClasspathIndex(_fs, idx), List.of("plugin-libs/a-1.jar", "plugin-libs/b-2.jar"));
+  }
+
+  @Test
+  public void testEmptyIndexYieldsNoDependencies()
+      throws Exception {
+    assertTrue(_command.readPluginClasspathIndex(_fs, writeIndex("empty.classpath", "")).isEmpty());
+  }
+
+  /// A plugin that ships no index at all - an old-format plugin keeping its jars beside it - must
+  /// not fail the submit; its own jars have already been added by the directory walk.
+  @Test
+  public void testMissingIndexIsToleratedAndYieldsNoDependencies() {
+    String missing = new File(_tempDir, "does-not-exist.classpath").getAbsolutePath();
+    assertTrue(_command.readPluginClasspathIndex(_fs, missing).isEmpty());
+
 
   /// `shouldLoadPlugin` skips any plugin directory whose name contains "spark", so that only the
   /// ingestion plugin for the selected Spark version is re-included, by comparing the directory
@@ -58,5 +129,6 @@ public class LaunchSparkDataIngestionJobCommandTest {
       }
     }
     return null;
+}
   }
 }
