@@ -58,6 +58,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -74,6 +75,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   private static final int[][] MV_GROUP_KEY_BUFFER = new int[NUM_GROUPS][];
   private static final String FILTER_COLUMN = "docId";
   private static final String[] SV_COLUMNS = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
+  /// Null in every row, so the only dictionary id it contributes to a group key is the reserved null id.
+  private static final String NULL_COLUMN = "n1";
   private static final String[] MV_COLUMNS = {"m1", "m2"};
 
   private final long _randomSeed = System.currentTimeMillis();
@@ -95,6 +98,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     for (int i = 0; i < UNIQUE_ROWS; i++) {
       GenericRow row = new GenericRow();
       row.putValue(FILTER_COLUMN, i);
+      row.putValue(NULL_COLUMN, null);
       for (String svColumn : SV_COLUMNS) {
         row.putValue(svColumn, value);
         value += 1 + _random.nextInt(MAX_STEP_LENGTH);
@@ -117,6 +121,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     // Create an index segment with the random values
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(FILTER_COLUMN, DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(NULL_COLUMN, DataType.INT, true));
     for (String singleValueColumn : SV_COLUMNS) {
       schema.addField(new DimensionFieldSpec(singleValueColumn, DataType.INT, true));
     }
@@ -128,6 +133,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR_PATH);
+    // Writes the null value vector that a generator reads a column's nullability from
+    config.setDefaultNullHandlingEnabled(true);
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -140,11 +147,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int docId2 = docId1 + 1 + _random.nextInt(50);
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query =
-        String.format("SELECT COUNT(*) FROM testTable WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1,
-            docId2, StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
+        String.format("SELECT COUNT(*) FROM testTable WHERE %s IN (%d, %d) GROUP BY %s, %s, %s", FILTER_COLUMN,
+            docId1, docId2, NULL_COLUMN, StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
     List<ExpressionContext> expressions = new ArrayList<>();
+    expressions.add(ExpressionContext.forIdentifier(NULL_COLUMN));
     for (String column : SV_COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));
     }
@@ -166,7 +174,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
@@ -175,6 +183,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+
+    dictionaryBasedGroupKeyGenerator.close();
   }
 
   @Test
@@ -186,7 +196,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -211,7 +221,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -236,7 +246,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -264,6 +274,77 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     }
   }
 
+  /// A column that can hold a null reserves one dictionary id beyond the ones its dictionary holds, which is what
+  /// lets a null take a group of its own. Every row of [#NULL_COLUMN] is null, so its dictionary holds the single
+  /// default null value and the reserved id brings the column's cardinality to two.
+  @Test
+  public void testArrayBasedNullHandling() {
+    String[] groupByColumns = {NULL_COLUMN};
+
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
+            Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, true, null);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), 2, _errorMessage);
+
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
+    assertNullGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 1);
+    dictionaryBasedGroupKeyGenerator.close();
+  }
+
+  /// The reserved id has to survive being folded into a long raw key alongside other columns' ids.
+  @Test
+  public void testLongMapBasedNullHandling() {
+    // Cardinality product larger than Integer.MAX_VALUE but smaller than Long.MAX_VALUE
+    String[] groupByColumns = {NULL_COLUMN, "s1", "s2", "s3", "s4", "s5"};
+
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
+            Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, true, null);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
+
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
+    assertNullGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().size(), 0);
+  }
+
+  /// The same, for the holder that keeps the ids as an array because their product does not fit into a long.
+  @Test
+  public void testArrayMapBasedNullHandling() {
+    // Cardinality product larger than Long.MAX_VALUE
+    String[] groupByColumns = {NULL_COLUMN, "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
+
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
+            Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, true, null);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
+
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
+    assertNullGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
+  }
+
+  /// Asserts that the generator produced the given number of distinct keys and that every one of them reads the
+  /// all-null column back as SQL NULL rather than as the value stored for a null row.
+  private void assertNullGroupKeys(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator, int numUniqueKeys) {
+    int count = 0;
+    Set<List<Object>> groupKeySet = new HashSet<>();
+    while (groupKeyIterator.hasNext()) {
+      count++;
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      assertNull(groupKey._keys[0], _errorMessage);
+      groupKeySet.add(Arrays.asList(groupKey._keys));
+    }
+    assertEquals(count, numUniqueKeys, _errorMessage);
+    assertEquals(groupKeySet.size(), numUniqueKeys, _errorMessage);
+  }
+
   @Test
   public void testArrayBasedMultiValue() {
     // Cardinality product (100 - 1,000) smaller than arrayBasedThreshold
@@ -273,7 +354,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
 
@@ -294,7 +375,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -321,7 +402,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -347,7 +428,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns),
             Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT,
-            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, null);
+            Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
@@ -371,7 +452,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     // NOTE: arrayBasedThreshold must be smaller or equal to numGroupsLimit
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
         new DictionaryBasedGroupKeyGenerator(_projectOperator, getExpressions(groupByColumns), numGroupsLimit,
-            numGroupsLimit, null);
+            numGroupsLimit, false, null);
     assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit, _errorMessage);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
@@ -439,6 +520,26 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(count, numUniqueKeys, _errorMessage);
     assertEquals(idSet.size(), numUniqueKeys, _errorMessage);
     assertEquals(groupKeySet.size(), numUniqueKeys, _errorMessage);
+  }
+
+  /// A map that grew past the caching threshold is rebuilt at its initial capacity instead of being kept as an
+  /// oversized cleared table, and must come back fully usable with group ids starting over.
+  @Test
+  public void testIntGroupIdMapClearAndTrim() {
+    DictionaryBasedGroupKeyGenerator.IntGroupIdMap map = new DictionaryBasedGroupKeyGenerator.IntGroupIdMap();
+    // Above the caching threshold of 0.75 * 2^20 entries
+    int numEntries = 800_000;
+    for (int i = 0; i < numEntries; i++) {
+      assertEquals(map.getGroupId(i, Integer.MAX_VALUE), i);
+    }
+    assertEquals(map.size(), numEntries);
+
+    map.clearAndTrim();
+
+    assertEquals(map.size(), 0);
+    assertEquals(map.getGroupId(123, Integer.MAX_VALUE), 0);
+    assertEquals(map.getGroupId(123, Integer.MAX_VALUE), 0);
+    assertEquals(map.size(), 1);
   }
 
   @Test
