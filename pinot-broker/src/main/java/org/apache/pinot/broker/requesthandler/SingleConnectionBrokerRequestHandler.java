@@ -121,7 +121,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   @Override
   public int preConnectServers(long deadlineMs) {
     return new ServerPreConnector(() -> _routingManager.getRoutableServerInstanceMap().values(),
-        _queryRouter::connect).preConnect(deadlineMs);
+        _queryRouter::preConnect).preConnect(deadlineMs);
   }
 
   @Override

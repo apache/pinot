@@ -589,6 +589,28 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  /// Startup pre-connect over a **real** broker-to-server TLS channel. This cluster runs the server with
+  /// `netty.enabled=false` and `nettytls.enabled=true`, so every single-stage channel the broker opens
+  /// carries an `SslHandler` -- which is the case pre-connect exists for, and the one no plaintext test
+  /// can reach.
+  ///
+  /// The assertion is the channel count rather than a log line because `preConnectServers` awaits the
+  /// handshake and reports a channel as connected only once it has completed: a handshake that failed,
+  /// timed out, or was never awaited would show up here as a short count. Pre-connect swallows its own
+  /// failures by design, so without this the TLS path could break silently and every other assertion in
+  /// this class would still pass.
+  ///
+  /// Connecting an already-open channel is a no-op that still counts, so the expected count holds
+  /// regardless of channels the preceding tests' queries already opened lazily.
+  @Test
+  public void testPreConnectOpensTlsChannelsToEveryServer() {
+    int expectedChannels = _serverStarters.size() * TableType.values().length;
+    int connected = _brokerStarters.get(0).getBrokerRequestHandler()
+        .preConnectServers(System.currentTimeMillis() + 30_000L);
+    Assert.assertEquals(connected, expectedChannels,
+        "Pre-connect should complete the TLS handshake for every (server, table type) channel");
+  }
+
   @Test
   public void testLogicalTableTlsRouting()
       throws Exception {

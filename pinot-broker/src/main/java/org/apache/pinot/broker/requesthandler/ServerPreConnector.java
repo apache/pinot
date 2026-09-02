@@ -30,7 +30,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -44,12 +43,14 @@ import org.slf4j.LoggerFactory;
 /// path.
 ///
 /// `ServerRoutingInstance` identity includes the table type, so OFFLINE and REALTIME are **separate**
-/// channels to the same physical server; both are connected here. Connecting an already-active channel
-/// is a no-op, so this is safe to call more than once.
+/// channels to the same physical server; both are connected here. Connecting only the table types a
+/// server serves today would leave a table added later cold, since pre-connect is one-shot at startup.
+/// Connecting an already-active channel is a no-op, so this is safe to call more than once.
 ///
-/// Bounded on two axes so it can never stall startup: a capped thread pool, and a per-channel wait
-/// clamped to the caller's deadline. A server that is unreachable or itself restarting is logged and
-/// skipped -- the existing lazy-connect path still serves it. This class is stateless and thread-safe.
+/// Bounded on three axes so it can never stall startup: a capped thread pool, a per-channel connect
+/// bound derived from the remaining budget, and a per-channel wait clamped to the caller's deadline. A
+/// server that is unreachable or itself restarting is logged and skipped -- the existing lazy-connect
+/// path still serves it. This class is stateless and thread-safe.
 ///
 /// It takes its dependencies as functions rather than concrete `RoutingManager`/`QueryRouter` types so
 /// the parallelism, budget and failure handling can be unit-tested without a live broker.
@@ -61,19 +62,30 @@ public class ServerPreConnector {
   /// the core count even on a 2- or 4-vCPU broker: each task is blocking connect + TLS handshake (mostly
   /// network wait, with the actual I/O on Netty's event loop), and this runs during startup before any
   /// query load, so the threads are almost entirely parked rather than contending for CPU.
+  ///
+  /// It is a throughput cap, not a safety bound: with more channels than threads the surplus queues
+  /// behind the workers, so the budget alone must not be what stops a stuck connect. That is why
+  /// [ChannelConnector] takes a per-channel timeout.
   @VisibleForTesting
   static final int MAX_CONNECT_THREADS = 16;
 
+  /// Opens one broker-to-server channel. Implementations must bound their own wait by `timeoutMs` and
+  /// must not throw; the return value reports whether the channel is connected.
+  @FunctionalInterface
+  public interface ChannelConnector {
+    boolean connect(ServerInstance serverInstance, TableType tableType, long timeoutMs);
+  }
+
   private final Supplier<Collection<ServerInstance>> _routableServersSupplier;
-  private final BiPredicate<ServerInstance, TableType> _connectFn;
+  private final ChannelConnector _connector;
 
   /// @param routableServersSupplier supplies the servers to connect, evaluated once per [#preConnect]
   ///     call after the caller has ensured routing is built
-  /// @param connectFn opens the channel for one (server, table type) and returns whether it succeeded
+  /// @param connector opens the channel for one (server, table type) within a timeout
   public ServerPreConnector(Supplier<Collection<ServerInstance>> routableServersSupplier,
-      BiPredicate<ServerInstance, TableType> connectFn) {
+      ChannelConnector connector) {
     _routableServersSupplier = routableServersSupplier;
-    _connectFn = connectFn;
+    _connector = connector;
   }
 
   /// Opens a channel to every routable server, for both table types, in parallel, bounded by
@@ -92,14 +104,16 @@ public class ServerPreConnector {
     ExecutorService executor = Executors.newFixedThreadPool(Math.min(channelCount, MAX_CONNECT_THREADS),
         new ThreadFactoryBuilder().setNameFormat("broker-preconnect-%d").setDaemon(true).build());
     // A completion service hands channels back in the order they finish, not the order submitted, so a
-    // slow or unreachable server never blocks the counting of faster ones ahead of the shared deadline
-    // -- no head-of-line blocking, and no under-count of channels that already connected in parallel.
+    // slow or unreachable server never delays the counting of faster ones that finished behind it. This
+    // removes head-of-line blocking from the *counting* only: with more channels than workers the surplus
+    // still queues for a worker, which is what the per-channel timeout bounds.
     CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executor);
     int connected = 0;
     try {
       for (ServerInstance server : servers) {
         for (TableType tableType : TableType.values()) {
-          completionService.submit(() -> _connectFn.test(server, tableType));
+          completionService.submit(
+              () -> _connector.connect(server, tableType, Math.max(0L, deadlineMs - System.currentTimeMillis())));
         }
       }
       for (int i = 0; i < channelCount; i++) {
@@ -128,8 +142,14 @@ public class ServerPreConnector {
     } finally {
       executor.shutdownNow();
     }
-    LOGGER.info("Broker pre-connected {}/{} channel(s) across {} server(s) in {} ms", connected,
-        channelCount, servers.size(), System.currentTimeMillis() - startMs);
+    long elapsedMs = System.currentTimeMillis() - startMs;
+    if (connected < channelCount) {
+      LOGGER.warn("Broker pre-connected only {}/{} channel(s) across {} server(s) in {} ms; the rest fall back to the "
+          + "lazy connect path", connected, channelCount, servers.size(), elapsedMs);
+    } else {
+      LOGGER.info("Broker pre-connected {}/{} channel(s) across {} server(s) in {} ms", connected, channelCount,
+          servers.size(), elapsedMs);
+    }
     return connected;
   }
 }

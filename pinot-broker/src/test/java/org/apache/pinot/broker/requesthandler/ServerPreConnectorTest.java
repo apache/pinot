@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.Test;
@@ -55,7 +56,7 @@ public class ServerPreConnectorTest {
     Set<Integer> serversSeen = ConcurrentHashMap.newKeySet();
     AtomicInteger calls = new AtomicInteger();
 
-    int connected = new ServerPreConnector(() -> servers, (server, tableType) -> {
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
       calls.incrementAndGet();
       tableTypesSeen.add(tableType);
       serversSeen.add(System.identityHashCode(server));
@@ -72,7 +73,7 @@ public class ServerPreConnectorTest {
   @Test
   public void emptyServerListReturnsZeroWithoutConnecting() {
     AtomicInteger calls = new AtomicInteger();
-    int connected = new ServerPreConnector(List::of, (server, tableType) -> {
+    int connected = new ServerPreConnector(List::of, (server, tableType, timeoutMs) -> {
       calls.incrementAndGet();
       return true;
     }).preConnect(farDeadline());
@@ -85,7 +86,7 @@ public class ServerPreConnectorTest {
   public void deadlineAlreadyPassedReturnsZeroWithoutConnecting() {
     List<ServerInstance> servers = mockServers(2);
     AtomicInteger calls = new AtomicInteger();
-    int connected = new ServerPreConnector(() -> servers, (server, tableType) -> {
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
       calls.incrementAndGet();
       return true;
     }).preConnect(System.currentTimeMillis() - 1);
@@ -99,7 +100,7 @@ public class ServerPreConnectorTest {
     List<ServerInstance> servers = mockServers(4);
     // OFFLINE succeeds, REALTIME fails: exactly one successful channel per server.
     int connected = new ServerPreConnector(() -> servers,
-        (server, tableType) -> tableType == TableType.OFFLINE).preConnect(farDeadline());
+        (server, tableType, timeoutMs) -> tableType == TableType.OFFLINE).preConnect(farDeadline());
 
     assertEquals(connected, 4);
   }
@@ -109,7 +110,7 @@ public class ServerPreConnectorTest {
     List<ServerInstance> servers = mockServers(5);
     AtomicInteger attempts = new AtomicInteger();
     // Every REALTIME attempt throws; the method must not propagate it and must still connect OFFLINE.
-    int connected = new ServerPreConnector(() -> servers, (server, tableType) -> {
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
       attempts.incrementAndGet();
       if (tableType == TableType.REALTIME) {
         throw new RuntimeException("connect blew up");
@@ -128,7 +129,7 @@ public class ServerPreConnectorTest {
     // the connects, and must not throw.
     long budgetMs = 400L;
     long startMs = System.currentTimeMillis();
-    int connected = new ServerPreConnector(() -> servers, (server, tableType) -> {
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
       try {
         Thread.sleep(5_000L);
       } catch (InterruptedException e) {
@@ -143,5 +144,50 @@ public class ServerPreConnectorTest {
     // Comfortably below the 5s connect: proves the budget bounded the wait rather than blocking on
     // the slow connects.
     assertTrue(elapsedMs < 3_000L, "preConnect took " + elapsedMs + " ms, expected it to honor the budget");
+  }
+
+  /// The thread pool is a throughput cap, not a safety bound, so each connect has to carry its own
+  /// deadline-derived timeout. Without it a channel queued behind a stuck worker could outlive the
+  /// budget entirely.
+  @Test
+  public void passesRemainingBudgetToEachConnect() {
+    List<ServerInstance> servers = mockServers(2);
+    long budgetMs = 5_000L;
+    AtomicLong maxTimeoutSeen = new AtomicLong(Long.MIN_VALUE);
+    AtomicLong minTimeoutSeen = new AtomicLong(Long.MAX_VALUE);
+
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
+      maxTimeoutSeen.accumulateAndGet(timeoutMs, Math::max);
+      minTimeoutSeen.accumulateAndGet(timeoutMs, Math::min);
+      return true;
+    }).preConnect(System.currentTimeMillis() + budgetMs);
+
+    assertEquals(connected, 4);
+    assertTrue(maxTimeoutSeen.get() <= budgetMs,
+        "connect timeout " + maxTimeoutSeen.get() + " ms must never exceed the budget " + budgetMs + " ms");
+    assertTrue(minTimeoutSeen.get() >= 0, "connect timeout must never be negative");
+  }
+
+  /// A connector may legitimately be handed a zero timeout when the budget runs out mid-flight. It must
+  /// be treated as "no budget", never as "wait forever" -- Netty reads
+  /// `ChannelOption.CONNECT_TIMEOUT_MILLIS <= 0` as *no* connect timeout, so a zero leaking through to
+  /// the bootstrap would park a worker indefinitely, which is the opposite of what the bound is for.
+  @Test
+  public void connectTimeoutIsNeverNegative() {
+    List<ServerInstance> servers = mockServers(8);
+    AtomicLong minTimeoutSeen = new AtomicLong(Long.MAX_VALUE);
+
+    new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
+      minTimeoutSeen.accumulateAndGet(timeoutMs, Math::min);
+      try {
+        Thread.sleep(20L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      return true;
+    }).preConnect(System.currentTimeMillis() + 50L);
+
+    assertTrue(minTimeoutSeen.get() >= 0,
+        "connect timeout " + minTimeoutSeen.get() + " ms must never be negative");
   }
 }

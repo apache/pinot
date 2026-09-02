@@ -204,11 +204,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// Whether startup pre-connect is enabled, and its budget. Read once in `start()`.
   private boolean _preConnectEnabled;
   private long _preConnectTimeoutMs;
-  /// Gates readiness when pre-connect is enabled: readiness reports STARTING until this is true, so a
-  /// broker is only Ready once it has connected to its servers (or the budget expired). Always flips
-  /// true, even on failure, so a rolling restart is never stalled by a broker held not-ready forever.
-  /// When pre-connect is disabled no gate callback is registered and this is irrelevant.
-  private volatile boolean _preConnectComplete;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -689,18 +684,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
         _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
-    // Read the pre-connect config before registering the status handler: the handler adds the readiness
-    // gate only when pre-connect is enabled, and the gate must be in place before the handler is
-    // registered so there is no window where readiness is granted un-gated. This is single-stage (SSE)
-    // only; multi-stage uses a separate gRPC transport and is unaffected by this flag.
+    // Only the Netty single-stage transport has broker-to-server channels to open; the gRPC single-stage
+    // handler, the multi-stage engine and the time-series path all use different transports and are
+    // unaffected by this flag.
     _preConnectEnabled = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED,
         Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED);
     _preConnectTimeoutMs = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS,
         Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS);
     registerServiceStatusHandler();
-    startPreConnect();
-
-    _isStarting = false;
+    if (_preConnectEnabled) {
+      // Startup is not finished until the broker-to-server channels are open, so `_isStarting` stays set
+      // and the existing lifecycle callback keeps reporting STARTING -- no query is routed here before the
+      // connect and TLS handshake have been paid. "Still pre-connecting" is not a new kind of statement,
+      // it is the same one, so it reuses the same flag rather than a second parallel gate. The flag was
+      // set before the status handler was registered, so there is structurally no window in which
+      // readiness is granted un-gated. The pre-connect thread clears it when it finishes.
+      startPreConnect();
+    } else {
+      _isStarting = false;
+    }
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
@@ -892,49 +894,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
             _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup)));
 
-    List<ServiceStatus.ServiceStatusCallback> callbacks = new ArrayList<>(3);
-    callbacks.add(new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown));
-    callbacks.add(_helixConvergenceCallback);
-    if (_preConnectEnabled) {
-      // The readiness gate. Reports STARTING (not a new status value) until pre-connect completes:
-      // callers throughout the codebase test for GOOD, and a new enum constant would be visible to older
-      // mixed-version peers. MultipleCallbackServiceStatusCallback surfaces the first non-GOOD callback,
-      // so this composes without touching the Helix or lifecycle callbacks. This gates the existing
-      // readiness endpoint (getBrokerHealth -> ServiceStatus), which the Kubernetes startupProbe polls:
-      // the pod stays out of the Service until this reports GOOD, and while the startupProbe is failing
-      // Kubernetes does not run the liveness probe, so a warming pod is never killed. No health-endpoint
-      // or probe change is required.
-      callbacks.add(new ServiceStatus.ServiceStatusCallback() {
-        @Override
-        public ServiceStatus.Status getServiceStatus() {
-          return _preConnectComplete ? ServiceStatus.Status.GOOD : ServiceStatus.Status.STARTING;
-        }
-
-        @Override
-        public String getStatusDescription() {
-          return _preConnectComplete ? ServiceStatus.STATUS_DESCRIPTION_NONE
-              : "Pre-connecting broker-to-server channels";
-        }
-      });
-    }
     ServiceStatus.setServiceStatusCallback(_instanceId,
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(callbacks));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
+            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown),
+            _helixConvergenceCallback)));
   }
 
-  /// Runs startup server pre-connect on a background thread and opens the readiness gate
-  /// ([#_preConnectComplete]) when it finishes. Asynchronous so `start()` still returns promptly -- the
-  /// gate is enforced through `ServiceStatus`, not by blocking startup. The flag is set in a `finally`
-  /// so the gate opens even if pre-connect throws or is interrupted: readiness held open indefinitely
-  /// would stall a rolling restart, a worse failure than serving a broker whose channels are not yet
-  /// warm. When disabled this is a no-op and readiness behaves exactly as before.
+  /// Runs startup server pre-connect on a background thread and ends startup ([#_isStarting]) when it
+  /// finishes. Asynchronous so `start()` still returns promptly -- readiness is withheld through
+  /// `ServiceStatus`, not by blocking startup. The flag is cleared in a `finally` so startup ends even if
+  /// pre-connect throws or is interrupted: readiness withheld indefinitely would stall a rolling restart,
+  /// a worse failure than serving a broker whose channels are not yet warm.
+  ///
+  /// Only called when pre-connect is enabled; otherwise `start()` ends startup itself and readiness
+  /// behaves exactly as before.
   private void startPreConnect() {
-    if (!_preConnectEnabled) {
-      return;
-    }
     _preConnectThread = new Thread(() -> {
       // Set once Helix converges. Both the budget and the duration metric are measured from here, not
-      // from thread start, so the deliberately unbounded convergence wait is charged against neither:
-      // readiness is already withheld until convergence by the Helix callbacks, so it costs nothing.
+      // from thread start, so the deliberately unbounded convergence wait is charged against neither: the
+      // Helix callbacks withhold readiness until convergence anyway, so it costs nothing.
       long preConnectStartMs = 0L;
       try {
         long threadStartMs = System.currentTimeMillis();
@@ -943,15 +921,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         LOGGER.info("Helix converged after {} ms; pre-connecting server channels",
             preConnectStartMs - threadStartMs);
         int connected = _brokerRequestHandler.preConnectServers(preConnectStartMs + _preConnectTimeoutMs);
-        LOGGER.info("Startup server pre-connect opened {} channel(s); opening readiness", connected);
+        LOGGER.info("Startup server pre-connect opened {} channel(s); ending startup", connected);
       } catch (InterruptedException e) {
         // Normal on shutdown; stopPreConnect() interrupts us.
         Thread.currentThread().interrupt();
-        LOGGER.info("Startup server pre-connect interrupted before completion; opening readiness");
+        LOGGER.info("Startup server pre-connect interrupted before completion; ending startup");
       } catch (Throwable t) {
-        LOGGER.warn("Startup server pre-connect threw; opening readiness anyway", t);
+        LOGGER.warn("Startup server pre-connect threw; ending startup anyway", t);
       } finally {
-        _preConnectComplete = true;
+        _isStarting = false;
         // Record the duration only if convergence was reached, so the metric measures the pre-connect work
         // itself and never the (unbounded) convergence wait -- e.g. when shutdown interrupts the wait.
         if (preConnectStartMs > 0L) {

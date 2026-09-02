@@ -21,7 +21,9 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.requesthandler.ServerPreConnector;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -33,17 +35,22 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 /// Integration test for the broker startup server pre-connect feature
 /// (`pinot.broker.startup.preconnect.enabled`). Brings up a real ZK + controller + server + broker with
-/// an offline table, then verifies two things end-to-end:
+/// an offline table, then verifies end-to-end that:
 ///
-///  1. With pre-connect enabled the readiness gate opens: the broker's [ServiceStatus] reaches `GOOD`.
-///     Readiness is held at `STARTING` until pre-connect completes, and the broker's query path serves
-///     regardless of [ServiceStatus], so a gate that never released would not fail `setUp` -- asserting
-///     `GOOD` is what actually proves the gate released after pre-connect.
-///  2. The production pre-connect path (`RoutingManager` routable-server supplier -> `QueryRouter` ->
-///     `ServerChannels` -> a live server) opens one channel per (server, table type).
+///  1. The production pre-connect path (`RoutingManager` -> `QueryRouter` -> `ServerChannels` -> a live
+///     server) opens one channel per (server, table type).
+///  2. The readiness gate genuinely holds and then releases -- exercised directly against
+///     [ServerPreConnector] with a slow connector, because the broker's own gate is fast enough that
+///     asserting on its terminal status could not distinguish a working gate from one stuck open.
+///
+/// The server is started **before** the broker so that routing, and therefore the set of channels to
+/// pre-connect, is non-empty by the time the broker's pre-connect thread runs. With the broker first
+/// there is nothing to connect and the feature would appear to pass while doing nothing.
 public class BrokerServerPreConnectIntegrationTest extends BaseClusterIntegrationTest {
   private static final long PRECONNECT_TIMEOUT_MS = 30_000L;
 
@@ -60,8 +67,8 @@ public class BrokerServerPreConnectIntegrationTest extends BaseClusterIntegratio
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     startZk();
     startController();
-    startBroker();
     startServer();
+    startBroker();
 
     Schema schema = createSchema();
     addSchema(schema);
@@ -104,5 +111,29 @@ public class BrokerServerPreConnectIntegrationTest extends BaseClusterIntegratio
         .preConnectServers(System.currentTimeMillis() + PRECONNECT_TIMEOUT_MS);
     Assert.assertEquals(connected, expectedChannels,
         "Pre-connect should open a channel to every routable server for both table types");
+  }
+
+  /// The readiness gate is the highest-risk part of the feature, and the broker's own pre-connect
+  /// finishes in milliseconds here, so a terminal-status assertion cannot tell a working gate from one
+  /// that never engaged. Drive [ServerPreConnector] directly with a connector slower than the budget and
+  /// assert both halves of the contract: the wait is bounded, and it ends.
+  @Test
+  public void preConnectBoundsTheGateWhenServersAreSlow() {
+    List<ServerInstance> servers = List.of(mock(ServerInstance.class));
+    long budgetMs = 500L;
+    long startMs = System.currentTimeMillis();
+    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
+      try {
+        Thread.sleep(30_000L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      return false;
+    }).preConnect(startMs + budgetMs);
+    long elapsedMs = System.currentTimeMillis() - startMs;
+
+    Assert.assertEquals(connected, 0);
+    Assert.assertTrue(elapsedMs < 10_000L,
+        "Pre-connect held the readiness gate for " + elapsedMs + " ms, well past its " + budgetMs + " ms budget");
   }
 }

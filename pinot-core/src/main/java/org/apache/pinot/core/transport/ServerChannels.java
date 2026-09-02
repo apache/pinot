@@ -37,6 +37,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -142,17 +143,40 @@ public class ServerChannels {
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
-    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+    ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
+    // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
+    serverChannel._openedByQuery = true;
+    serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
+  /// Whether this broker has sent, or tried to send, a single-stage query to the given server.
+  ///
+  /// Deliberately **not** "is there an entry in the channel map". Startup pre-connect opens channels
+  /// before any query, so a plain `containsKey` would flip true for every reachable server merely because
+  /// pre-connect ran. `SingleConnectionBrokerRequestHandler#retryUnhealthyServer` uses this to decide
+  /// whether the single-stage transport has any opinion on a server's health at all -- it reports
+  /// `UNKNOWN` when it does not -- so on a cluster serving only multi-stage queries the answer has to stay
+  /// `false`, exactly as it was before pre-connect existed. Otherwise a server that multi-stage can reach
+  /// over gRPC but single-stage cannot reach over Netty would be voted `UNHEALTHY` and dropped from
+  /// routing by a transport that never carries its queries.
   public boolean hasChannel(ServerRoutingInstance serverRoutingInstance) {
-    return _serverToChannelMap.containsKey(serverRoutingInstance);
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    return serverChannel != null && serverChannel._openedByQuery;
   }
 
   public void connect(ServerRoutingInstance serverRoutingInstance)
       throws InterruptedException, TimeoutException {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
+  }
+
+  /// Opens a channel ahead of query traffic, awaiting the TLS handshake so that neither the connect nor
+  /// the handshake lands on the first query's critical path. Both waits are bounded by `timeoutMs`.
+  ///
+  /// The channel is entered into the same map the query path uses, so the first query reuses it rather
+  /// than connecting again -- but it is not marked query-carrying, so [#hasChannel] is unaffected.
+  public void preConnect(ServerRoutingInstance serverRoutingInstance, long timeoutMs)
+      throws InterruptedException, TimeoutException {
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).preConnect(timeoutMs);
   }
 
   public void shutDown() {
@@ -172,6 +196,11 @@ public class ServerChannels {
     // lock to protect channel as requests must be written into channel sequentially
     final ReentrantLock _channelLock = new ReentrantLock();
     Channel _channel;
+    // Set once a query has been sent, or attempted, through this channel; startup pre-connect leaves it
+    // false. Read by hasChannel(), which the failure detector uses to decide whether the single-stage
+    // transport has any opinion on this server's health. Volatile: written on a query thread, read on the
+    // failure-detector retry thread.
+    volatile boolean _openedByQuery;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -235,47 +264,90 @@ public class ServerChannels {
       }
     }
 
+    /// Lazy query path: opens the TCP connection only. Any TLS handshake is left to proceed
+    /// asynchronously so the channel lock is released as soon as the socket is up, keeping the first
+    /// query's critical section short. Startup pre-connect uses [#preConnectWithoutLocking(long)]
+    /// instead, which additionally pays the handshake.
     void connectWithoutLocking()
-        throws InterruptedException {
-      // Lazy query path: open the TCP connection only, exactly as before this feature existed. Any TLS
-      // handshake is left to proceed asynchronously so the channel lock is released as soon as the socket
-      // is up, keeping the first query's critical section short.
-      if (_channel == null || !_channel.isActive()) {
-        _channel = _bootstrap.connect().sync().channel();
-      }
-    }
-
-    /// Like [#connectWithoutLocking()] but additionally waits out the TLS handshake and records the
-    /// establish latency. Used only by startup pre-connect ([#connect()]), so paying the handshake -- and
-    /// the longer critical section it implies -- never touches the lazy query path. Runs under the channel
-    /// lock, like its sibling.
-    void connectAndAwaitHandshakeWithoutLocking()
         throws InterruptedException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
-        awaitTlsHandshake(_channel);
-        long connectTimeMs = System.currentTimeMillis() - startTime;
-        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS, connectTimeMs);
-        _brokerMetrics.addTimedValue(BrokerTimer.NETTY_CONNECTION_CONNECT_TIME, connectTimeMs,
-            TimeUnit.MILLISECONDS);
+        recordConnectTime(System.currentTimeMillis() - startTime);
       }
     }
 
-    /// Blocks until the TLS handshake on a freshly-connected channel completes.
+    /// Like [#connectWithoutLocking()] but additionally waits out the TLS handshake, and bounds both
+    /// waits by `timeoutMs`.
+    ///
+    /// Used only by startup pre-connect ([#preConnect(long)]), never by the lazy query path or by the
+    /// failure detector's reconnect probe ([#connect()]) -- both of those keep the shorter critical
+    /// section they had before this feature existed.
+    ///
+    /// `_channel` is assigned only after the handshake succeeds. Netty fails the handshake promise
+    /// *before* it closes the channel (`SslHandler#setHandshakeFailure` calls `Promise#tryFailure` and
+    /// only then `SslUtils#handleHandshakeFailure` -> `ctx.close()`, which is itself asynchronous), so a
+    /// channel assigned up front would briefly still report `isActive()`, and a query written into it
+    /// would fail.
+    void preConnectWithoutLocking(long timeoutMs)
+        throws InterruptedException, TimeoutException {
+      if (_channel != null && _channel.isActive()) {
+        return;
+      }
+      if (timeoutMs <= 0) {
+        // No budget left. Must return before touching CONNECT_TIMEOUT_MILLIS: Netty only schedules its
+        // connect-timeout task when the value is > 0, so passing 0 would mean "wait forever".
+        throw new TimeoutException("No pre-connect budget left for server: " + _serverRoutingInstance);
+      }
+      long startTime = System.currentTimeMillis();
+      // The shared bootstrap leaves ChannelOption.CONNECT_TIMEOUT_MILLIS at Netty's 30s default, which is
+      // the whole pre-connect budget -- one server whose SYN is dropped rather than refused would consume
+      // it alone and occupy a worker for the entire startup. Clone the bootstrap so the tighter bound
+      // applies to pre-connect only and the query path is untouched.
+      Channel channel = _bootstrap.clone()
+          .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) Math.min(timeoutMs, Integer.MAX_VALUE))
+          .connect().sync().channel();
+      try {
+        awaitTlsHandshake(channel, Math.max(0L, timeoutMs - (System.currentTimeMillis() - startTime)));
+      } catch (Throwable t) {
+        channel.close();
+        throw t;
+      }
+      _channel = channel;
+      recordConnectTime(System.currentTimeMillis() - startTime);
+    }
+
+    private void recordConnectTime(long connectTimeMs) {
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS, connectTimeMs);
+      _brokerMetrics.addTimedValue(BrokerTimer.NETTY_CONNECTION_CONNECT_LATENCY_MS, connectTimeMs,
+          TimeUnit.MILLISECONDS);
+    }
+
+    /// Blocks until the TLS handshake on a freshly-connected channel completes, for at most `timeoutMs`.
     ///
     /// `bootstrap.connect().sync()` returns once the TCP connection is up; the client-mode [SslHandler]
     /// then drives the handshake asynchronously on the event loop. Awaiting its future here pays the
     /// handshake -- two round trips plus certificate validation -- on the connecting thread rather than
     /// on the first query that writes to the channel. On a plaintext channel there is no [SslHandler] in
-    /// the pipeline and this is a no-op. The calling thread is never an event-loop thread, so this
-    /// cannot deadlock. A failed handshake propagates as an unchecked exception, which the caller
-    /// treats exactly like a failed connect.
-    private void awaitTlsHandshake(Channel channel)
-        throws InterruptedException {
+    /// the pipeline and this is a no-op. The calling thread is never an event-loop thread, so this cannot
+    /// deadlock.
+    ///
+    /// The wait is bounded by the caller's remaining budget rather than by [SslHandler]'s own
+    /// `handshakeTimeoutMillis`, which defaults to 10s and is not set on this pipeline -- otherwise a
+    /// single hung TLS peer could outlive the pre-connect budget.
+    private void awaitTlsHandshake(Channel channel, long timeoutMs)
+        throws InterruptedException, TimeoutException {
       SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
-      if (sslHandler != null) {
-        sslHandler.handshakeFuture().sync();
+      if (sslHandler == null) {
+        return;
+      }
+      Future<Channel> handshakeFuture = sslHandler.handshakeFuture();
+      if (!handshakeFuture.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+        throw new TimeoutException("Timed out waiting for the TLS handshake to server: " + _serverRoutingInstance);
+      }
+      if (!handshakeFuture.isSuccess()) {
+        throw new RuntimeException("Failed the TLS handshake to server: " + _serverRoutingInstance,
+            handshakeFuture.cause());
       }
     }
 
@@ -302,11 +374,30 @@ public class ServerChannels {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }
 
+    /// Opens the TCP connection, as the failure detector's reconnect probe
+    /// (`SingleConnectionBrokerRequestHandler#retryUnhealthyServer`) has always done. Deliberately does
+    /// **not** await the TLS handshake: this runs at steady state under live traffic, and holding
+    /// `_channelLock` across a handshake would make concurrent queries to a recovering server queue
+    /// behind it -- the very serialization startup pre-connect exists to remove.
     void connect()
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
-          connectAndAwaitHandshakeWithoutLocking();
+          connectWithoutLocking();
+        } finally {
+          _channelLock.unlock();
+        }
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
+    }
+
+    /// Startup pre-connect: opens the connection and pays the TLS handshake, bounded by `timeoutMs`.
+    void preConnect(long timeoutMs)
+        throws InterruptedException, TimeoutException {
+      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        try {
+          preConnectWithoutLocking(timeoutMs);
         } finally {
           _channelLock.unlock();
         }
