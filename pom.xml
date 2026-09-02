@@ -175,6 +175,8 @@
     <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
 
     <!-- Configuration for Packaging -->
+    <!-- Only used by artifacts loaded into a foreign JVM (clients, Spark connector,
+         Spark / Hadoop batch ingestion), which relocate in their own poms. -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
     <!-- Keep these enabled by default; fastdev can disable them for incremental builds. -->
@@ -2894,6 +2896,17 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
       </plugin>
+      <!--
+        This shared configuration deliberately declares no <relocations>. Relocating here bought
+        no isolation: every module relocated to the same ${shade.prefix}, and the launcher puts
+        lib/* ahead of the plugin jars on the classpath, so a plugin's relocated copy always lost
+        to the distribution's copy of the same class. It only cost build time and made stack
+        traces and CVE scans harder to read.
+
+        Relocation is still correct for artifacts loaded by a JVM we do not control - the
+        java/jdbc client drivers, the Spark connector, and the Spark / Hadoop batch ingestion
+        jars - so those modules declare <relocations> themselves.
+      -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -2964,20 +2977,6 @@
               </excludes>
             </filter>
           </filters>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.scala-lang</pattern>
-              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
-            </relocation>
-          </relocations>
         </configuration>
       </plugin>
       <!-- Include apache LICENSE, NOTICE files for jar resource bundle -->

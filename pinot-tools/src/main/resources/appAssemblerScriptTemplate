@@ -162,6 +162,14 @@ if [ -n "$PLUGINS_CLASSPATH" ] ; then
   CLASSPATH=$CLASSPATH:$PLUGINS_CLASSPATH
 fi
 
+# Shared plugin dependency store. Plugins ship as a thin jar plus their dependencies in
+# plugin-libs/, where a library needed by several plugins is stored once, instead of each plugin
+# bundling its own copy into a fat jar. Appended after the plugin jars so the effective classpath
+# matches the old fat-jar layout. Absent from custom layouts, hence the directory check.
+if [ -d "$BASEDIR"/plugin-libs ] ; then
+  CLASSPATH=$CLASSPATH:"$BASEDIR"/plugin-libs/*
+fi
+
 # For Cygwin, switch paths to Windows format before running java
 if $cygwin; then
   [ -n "$CLASSPATH" ] && CLASSPATH=`cygpath --path --windows "$CLASSPATH"`

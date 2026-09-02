@@ -111,6 +111,39 @@
       </build>
     </profile>
     <profile>
+      <!--
+        Collect each plugin's runtime dependencies into target/plugin-libs so the distribution
+        assembly can place them all in the shared plugin-libs/ directory. Plugins no longer bundle
+        their dependencies into a fat jar, so this is how those jars reach the tarball. Scoped to
+        bin-dist because only a binary distribution build needs it; a plain `mvn install` pays
+        nothing.
+      -->
+      <id>bin-dist</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>collect-plugin-libs</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>copy-dependencies</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.directory}/plugin-libs</outputDirectory>
+                  <!-- compile + runtime; `provided` deps such as pinot-spi stay out, they are
+                       already in lib/pinot-all.jar -->
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
       <id>use-provided-hadoop</id>
       <activation>
         <property>
