@@ -1997,16 +1997,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return initSegmentDirectory(indexDir, segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
   }
 
-  /// Opens a [SegmentDirectory] at `indexDir`, delegates to [ImmutableSegmentLoader#needPreprocess], and returns
-  /// the result. Empty segments return `false`. Used by cold-download / replace-consuming callers so they can
-  /// decide whether the expensive [ImmutableSegmentLoader#preprocess] call is needed before invoking `load(...)`.
+  /// Opens a [SegmentDirectory] at `indexDir` and delegates to [ImmutableSegmentLoader#needPreprocess].
+  /// Used by cold-download / replace-consuming callers so they can decide whether the expensive
+  /// [ImmutableSegmentLoader#preprocess] call is needed before invoking `load(...)`.
   protected boolean computeNeedPreprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
-    if (localMetadata.getTotalDocs() == 0) {
-      return false;
-    }
     try (SegmentDirectory segmentDirectory = initSegmentDirectory(indexDir, localMetadata.getName(),
         localMetadata.getCrc(), indexLoadingConfig, zkMetadata)) {
       return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
