@@ -266,6 +266,44 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testAddRecordSkipsExpiredMetadata()
+      throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(100);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add record for key 0 with comparison value 1000
+    ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
+    upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(0), 0, Integer.valueOf(1000), false));
+    checkRecordLocationForTTL(recordLocationMap, 0, segment0, 0, 1000, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 1000.0);
+
+    // Add record for key 1 with comparison value 1200 to advance watermark past TTL for key 0
+    // Threshold becomes 1200 - 100 = 1100; key 0's value 1000 < 1100 -> expired
+    upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(1), 1, Integer.valueOf(1200), false));
+    assertEquals(upsertMetadataManager.getWatermark(), 1200.0);
+
+    // Add new record for key 0 with comparison value 900 (lower than the expired entry's 1000)
+    // Without the fix, this would be rejected as out-of-order. With the fix, it should be accepted.
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment1 = mockMutableSegment(2, validDocIds1, null);
+    boolean result = upsertMetadataManager.addRecord(segment1,
+        new RecordInfo(makePrimaryKey(0), 0, Integer.valueOf(900), false));
+    assertTrue(result, "Record should be accepted when existing metadata is expired");
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 900, HashFunction.NONE);
+
+    // Verify the new record is queryable and the old record is invalidated
+    assertTrue(validDocIds1.contains(0), "New doc should be in validDocIds of new segment");
+    assertFalse(validDocIds0.contains(0), "Old doc should be removed from old segment's validDocIds");
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
   public void testManageWatermark()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
