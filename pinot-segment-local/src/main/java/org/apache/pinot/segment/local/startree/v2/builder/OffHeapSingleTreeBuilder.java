@@ -382,54 +382,16 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   public void close()
       throws IOException {
-    // Order matters: release the mmap view before closing the writer and deleting the backing file.
-    // Each step runs regardless of prior failures; the first exception is thrown, subsequent ones
-    // attached as suppressed. Mirrors BaseSingleTreeBuilder#createForwardIndexes.
-    Throwable primary = null;
     try {
       super.close();
-    } catch (Throwable t) {
-      primary = t;
-    }
-    try {
+    } finally {
       releaseSegmentRecordBuffer();
-    } catch (Throwable t) {
-      primary = addSuppressed(primary, t);
     }
-    try {
-      if (_starTreeRecordBuffer != null) {
-        _starTreeRecordBuffer.close();
-        _starTreeRecordBuffer = null;
-      }
-    } catch (Throwable t) {
-      primary = addSuppressed(primary, t);
+    if (_starTreeRecordBuffer != null) {
+      _starTreeRecordBuffer.close();
     }
-    try {
-      _starTreeRecordOutputStream.close();
-    } catch (Throwable t) {
-      primary = addSuppressed(primary, t);
-    }
-    try {
-      if (_starTreeRecordFile.exists()) {
-        FileUtils.forceDelete(_starTreeRecordFile);
-      }
-    } catch (Throwable t) {
-      primary = addSuppressed(primary, t);
-    }
-    if (primary instanceof IOException) {
-      throw (IOException) primary;
-    }
-    if (primary != null) {
-      throw new IOException(primary);
-    }
-  }
-
-  private static Throwable addSuppressed(Throwable primary, Throwable next) {
-    if (primary == null) {
-      return next;
-    }
-    primary.addSuppressed(next);
-    return primary;
+    _starTreeRecordOutputStream.close();
+    FileUtils.forceDelete(_starTreeRecordFile);
   }
 
   /// Per-record offsets within the star-tree record file. [#addRecord] is invoked once per appended record with the
