@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -34,13 +35,12 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/// Per-key {@link DataSource} accessor for sealed OPEN_STRUCT segments. Dense keys get
-/// materialized DataSources; sparse keys get virtual [SparseKeyDataSource]s backed by the
-/// shared blob parser. Manifest-absent keys return null (definitively absent).
+/// Per-key [DataSource] accessor for sealed OPEN_STRUCT segments. Dense keys get materialized DataSources; sparse keys
+/// get virtual [SparseKeyDataSource]s backed by the shared blob parser; keys absent from the segment (no sparse blob,
+/// or not listed in the sparse manifest) resolve to an all-null [NullDataSource].
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
@@ -92,27 +92,17 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   }
 
   @Override
-  @Nullable
   public DataSource getDataSource(String key) {
     DataSource ds = _perKeyDataSources.get(key);
     if (ds != null) {
       return ds;
     }
-    if (_sparseBlobReader == null) {
-      return null;
+    if (_sparseBlobReader == null || (_sparseKeys != null && !_sparseKeys.contains(key))) {
+      // Definitively absent: no sparse blob, or the sparse manifest does not list the key
+      return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
-    if (_sparseKeys != null && !_sparseKeys.contains(key)) {
-      return null;
-    }
-    return _sparseKeyDataSourceCache.computeIfAbsent(key, this::buildSparseKeyDataSource);
-  }
-
-  private DataSource buildSparseKeyDataSource(String key) {
-    FieldSpec childSpec = _fieldSpec.getChildFieldSpec(key);
-    if (childSpec == null) {
-      childSpec = new DimensionFieldSpec(key, FieldSpec.DataType.STRING, true);
-    }
-    return new SparseKeyDataSource(childSpec, _sparseBlobReader);
+    return _sparseKeyDataSourceCache.computeIfAbsent(key,
+        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader));
   }
 
   @Override
@@ -133,10 +123,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   }
 
   @Override
-  @Nullable
   public DataSourceMetadata getDataSourceMetadata(String key) {
-    DataSource ds = getDataSource(key);
-    return ds != null ? ds.getDataSourceMetadata() : null;
+    return getDataSource(key).getDataSourceMetadata();
   }
 
   @Override
