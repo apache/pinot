@@ -381,22 +381,12 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
 
   @Override
   public void close() {
-    safeSuperClose();
-    releaseSegmentRecordBuffer();
-    releaseStarTreeRecordBuffer();
-    releaseStarTreeRecordOutputStream();
-    releaseStarTreeRecordFile();
-  }
-
-  private void safeSuperClose() {
     try {
       super.close();
     } catch (Exception e) {
       LOGGER.warn("super.close() failed", e);
     }
-  }
-
-  private void releaseStarTreeRecordBuffer() {
+    releaseSegmentRecordBuffer();
     if (_starTreeRecordBuffer != null) {
       try {
         _starTreeRecordBuffer.close();
@@ -405,17 +395,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       }
       _starTreeRecordBuffer = null;
     }
-  }
-
-  private void releaseStarTreeRecordOutputStream() {
     try {
       _starTreeRecordOutputStream.close();
     } catch (IOException e) {
       LOGGER.warn("Failed to close star-tree record output stream", e);
     }
-  }
-
-  private void releaseStarTreeRecordFile() {
     if (_starTreeRecordFile.exists()) {
       try {
         FileUtils.forceDelete(_starTreeRecordFile);
