@@ -380,34 +380,56 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     // Order matters: release the mmap view before closing the writer and deleting the backing file.
+    // Each step runs regardless of prior failures; the first exception is thrown, subsequent ones
+    // attached as suppressed. Mirrors BaseSingleTreeBuilder#createForwardIndexes.
+    Throwable primary = null;
     try {
       super.close();
-    } catch (Exception e) {
-      LOGGER.warn("super.close() failed", e);
+    } catch (Throwable t) {
+      primary = t;
     }
-    releaseSegmentRecordBuffer();
-    if (_starTreeRecordBuffer != null) {
-      try {
+    try {
+      releaseSegmentRecordBuffer();
+    } catch (Throwable t) {
+      primary = addSuppressed(primary, t);
+    }
+    try {
+      if (_starTreeRecordBuffer != null) {
         _starTreeRecordBuffer.close();
-      } catch (IOException e) {
-        LOGGER.warn("Failed to close star-tree record buffer", e);
+        _starTreeRecordBuffer = null;
       }
-      _starTreeRecordBuffer = null;
+    } catch (Throwable t) {
+      primary = addSuppressed(primary, t);
     }
     try {
       _starTreeRecordOutputStream.close();
-    } catch (IOException e) {
-      LOGGER.warn("Failed to close star-tree record output stream", e);
+    } catch (Throwable t) {
+      primary = addSuppressed(primary, t);
     }
-    if (_starTreeRecordFile.exists()) {
-      try {
+    try {
+      if (_starTreeRecordFile.exists()) {
         FileUtils.forceDelete(_starTreeRecordFile);
-      } catch (IOException e) {
-        LOGGER.warn("Failed to delete star-tree record file: {}", _starTreeRecordFile, e);
       }
+    } catch (Throwable t) {
+      primary = addSuppressed(primary, t);
     }
+    if (primary instanceof IOException) {
+      throw (IOException) primary;
+    }
+    if (primary != null) {
+      throw new IOException(primary);
+    }
+  }
+
+  private static Throwable addSuppressed(Throwable primary, Throwable next) {
+    if (primary == null) {
+      return next;
+    }
+    primary.addSuppressed(next);
+    return primary;
   }
 
   /// Per-record offsets within the star-tree record file. [#addRecord] is invoked once per appended record with the
