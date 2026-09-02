@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -116,8 +117,9 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
 
   @Override
   public Map<String, DataSource> getDataSources() {
+    Map<String, MutableKeyColumn> snapshot = _index.getKeyColumns();
     Map<String, DataSource> result = new HashMap<>();
-    for (String key : _index.getKeys()) {
+    for (String key : snapshot.keySet()) {
       DataSource ds = getDataSource(key);
       if (ds != null) {
         result.put(key, ds);
@@ -144,6 +146,11 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
   @Nullable
   public Map<String, Object> getMapValue(int docId) {
     return _index.getMapValue(docId);
+  }
+
+  @Override
+  public OpenStructColumnarSource getColumnarSource() {
+    return _index.asColumnarSource(_numDocs);
   }
 
   private static class MutableOpenStructDataSourceMetadata implements DataSourceMetadata {

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -36,6 +39,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Per-key {@link DataSource} accessor for sealed OPEN_STRUCT segments. Dense keys get
@@ -150,6 +154,62 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Nullable
   public JsonIndexReader getSparseJsonIndex() {
     return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Nullable
+  @Override
+  public Map<String, Object> getMapValue(int docId) {
+    Map<String, Object> result = null;
+
+    for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
+      Object value = readValue(entry.getKey(), entry.getValue(), docId);
+      if (value != null) {
+        if (result == null) {
+          result = new HashMap<>();
+        }
+        result.put(entry.getKey(), value);
+      }
+    }
+
+    if (_sparseDataSource != null) {
+      Object sparseValue = readValue(_fieldSpec.getName(), _sparseDataSource, docId);
+      if (sparseValue instanceof String) {
+        String json = (String) sparseValue;
+        if (!json.isEmpty()) {
+          try {
+            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+            if (result == null) {
+              result = new HashMap<>();
+            }
+            result.putAll(sparseMap);
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// Reads the value of `key` at `docId`, or `null` when the doc is null or the column has no
+  /// forward index. Delegates the null-vector check and the dictionary/raw per-type read dispatch to
+  /// [PinotSegmentColumnReader] rather than re-deriving them here, so this path cannot drift from the
+  /// reader every other column read in the engine already goes through. OPEN_STRUCT child columns are
+  /// always single-valued, hence the 0 maxNumValuesPerMVEntry.
+  @Nullable
+  private static Object readValue(String key, DataSource dataSource, int docId) {
+    ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
+    if (fwdReader == null) {
+      return null;
+    }
+    try (PinotSegmentColumnReader reader = new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
+        dataSource.getNullValueVector(), 0)) {
+      return reader.isNull(docId) ? null : reader.getValue(docId);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to read value from OPEN_STRUCT key forward index", e);
+    }
   }
 
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {

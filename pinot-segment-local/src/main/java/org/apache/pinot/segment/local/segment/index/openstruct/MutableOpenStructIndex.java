@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.creator.OpenStructColumnarSource;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader;
@@ -42,6 +43,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,12 +66,20 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
 
-  // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
+  // Volatile copy-on-write: the writer (consuming thread) creates a fresh HashMap copy and publishes
+  // atomically via volatile write (see allocateKeyColumn). Readers see a consistent snapshot of the
+  // entire map. ConcurrentHashMap is NOT appropriate here — it would allow readers to observe
+  // partially-updated state during a put. Single-writer is guaranteed by the Pinot consuming thread
+  // model (one thread per partition).
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
   // Single-writer (see #index), but close() may run on a different thread, so volatile for
   // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
   // ignored key of every consumed row.
   private volatile long _ignoredKeyDropCount;
+  // Batched for the same reason as _ignoredKeyDropCount: keep a metered-value call, which rebuilds
+  // the metric name and hits the registry, off the per-row consuming path. Flushed in close().
+  private volatile long _typeCoercionFailureCount;
+  private volatile long _typeInferenceFailureCount;
 
   public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
@@ -119,7 +130,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
         // does not allocate a column that was never usable.
         DataType resolvedType = resolveStoredType(key, rawValue, null);
-        Object coerced = tryCoerce(key, rawValue, resolvedType);
+        Object coerced = tryCoerce(key, rawValue,
+            ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType());
         if (coerced == null) {
           continue;
         }
@@ -128,10 +140,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      // Re-resolve against the established type so a later unmappable value on a STRING key is
-      // metered too; for any other established type this is a no-op returning that type.
-      DataType storedType = resolveStoredType(key, rawValue, keyCol.getStoredType());
-      Object coerced = tryCoerce(key, rawValue, storedType);
+      if (keyCol.needsInferenceCheck()) {
+        meterIfUninferable(rawValue);
+      }
+      Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
       if (coerced == null) {
         continue;
       }
@@ -160,14 +172,19 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
                 + " Falling back to STRING.",
             _openStructColumn, key, rawValue.getClass().getName());
       }
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
-      }
+      _typeInferenceFailureCount++;
       return DataType.STRING;
     }
     return establishedType != null ? establishedType : inferred;
+  }
+
+  /// Counts an inference failure for a value on a STRING-fallback key. This is the metering-only
+  /// half of [#resolveStoredType]: on the established path that method always returns the key's
+  /// own stored type, so the return value is unused and only the side effect matters.
+  private void meterIfUninferable(Object rawValue) {
+    if (OpenStructTypeInference.inferDataType(rawValue) == null) {
+      _typeInferenceFailureCount++;
+    }
   }
 
   /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures
@@ -176,18 +193,12 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// "null"-shaped raw value would also return null — but callers gate on rawValue != null before
   /// reaching here.
   @Nullable
-  private Object tryCoerce(String key, Object rawValue, DataType storedType) {
+  private Object tryCoerce(String key, Object rawValue, PinotDataType destType) {
     try {
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
-      PinotDataType destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        // Column-granular for the same reason as the inference meter above.
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
-      }
+      _typeCoercionFailureCount++;
       return null;
     }
   }
@@ -202,8 +213,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     // true) rather than the real child spec, so mirroring that exactly is what keeps a doc's
     // resolved value identical before and after seal.
     Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
-    MutableKeyColumn newCol =
-        new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity, allocationContext);
+    boolean needsInferenceCheck = !_childFieldSpecs.containsKey(key) && storedType == DataType.STRING;
+    MutableKeyColumn newCol = new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity,
+        allocationContext, needsInferenceCheck);
     Map<String, MutableKeyColumn> updated = new HashMap<>(_keyColumns);
     updated.put(key, newCol);
     _keyColumns = updated;
@@ -244,6 +256,49 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       }
     }
     return result;
+  }
+
+  /// Returns a columnar snapshot of this index over `[0, numDocs)`, for the seal path to hand
+  /// straight to the segment's OPEN_STRUCT index creator. The key-column map is read once so the
+  /// snapshot is stable even if the consuming thread allocates a new key afterwards.
+  public OpenStructColumnarSource asColumnarSource(int numDocs) {
+    Map<String, MutableKeyColumn> keyColumns = _keyColumns;
+    return new OpenStructColumnarSource() {
+      @Override
+      public int getNumDocs() {
+        return numDocs;
+      }
+
+      @Override
+      public Set<String> getKeys() {
+        return keyColumns.keySet();
+      }
+
+      @Override
+      public DataType getStoredType(String key) {
+        return keyColumns.get(key).getStoredType();
+      }
+
+      @Override
+      public void forEachPresentValue(String key, PresentValueConsumer consumer) {
+        MutableKeyColumn column = keyColumns.get(key);
+        // ThreadSafeMutableRoaringBitmap#getMutableRoaringBitmap() already clones under its own
+        // monitor, so the copy returned here is safe to iterate even though the consuming thread
+        // may still be adding docIds; this snapshot is bounded at numDocs regardless.
+        MutableRoaringBitmap presence = column.getPresenceBitmap().getMutableRoaringBitmap();
+        IntIterator iterator = presence.getIntIterator();
+        while (iterator.hasNext()) {
+          int docId = iterator.next();
+          if (docId >= numDocs) {
+            return;
+          }
+          Object value = column.getValue(docId);
+          if (value != null) {
+            consumer.accept(docId, value);
+          }
+        }
+      }
+    };
   }
 
   @Override
@@ -290,15 +345,30 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Override
   public void close()
       throws IOException {
-    if (_ignoredKeyDropCount > 0) {
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
-      }
-    }
+    flushMeters();
     for (MutableKeyColumn keyCol : _keyColumns.values()) {
       keyCol.close();
+    }
+  }
+
+  /// Emits the batched ingestion counters. Counters accumulate per row on the consuming path and
+  /// are flushed once here, mirroring what [OpenStructColumnSplitter] does at seal time.
+  private void flushMeters() {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null) {
+      return;
+    }
+    if (_ignoredKeyDropCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+    }
+    if (_typeCoercionFailureCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _typeCoercionFailureCount);
+    }
+    if (_typeInferenceFailureCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, _typeInferenceFailureCount);
     }
   }
 }

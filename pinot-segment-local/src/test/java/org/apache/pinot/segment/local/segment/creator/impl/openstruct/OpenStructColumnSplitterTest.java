@@ -36,8 +36,10 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -219,7 +221,17 @@ public class OpenStructColumnSplitterTest {
     }
     s.seal();
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
-    assertTrue(s.getMaterializedColumnMetadata().containsKey(sparseCol));
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(sparseCol);
+    assertNotNull(props);
+
+    // Regression: the sparse column's metadata used to omit several properties ColumnMetadataImpl.
+    // fromPropertiesConfiguration() reads via config.getInt() with no default (e.g. CARDINALITY). This branch's
+    // reader still tolerates a missing bitsPerElement/lengthOfEachEntry/maxNumberOfMultiValues via UNAVAILABLE
+    // defaults, but the sibling early-release branch's stricter reader throws NoSuchElementException on the same
+    // gap, so keep this column on the standard addColumnMetadataInfo() path and verify it round-trips cleanly.
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(props, 10, sparseCol);
+    assertEquals(metadata.getFieldSpec().getDataType(), DataType.STRING);
+    assertFalse(metadata.hasDictionary());
   }
 
   @Test
@@ -564,6 +576,111 @@ public class OpenStructColumnSplitterTest {
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
     File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     assertFalse(indexFile.exists());
+  }
+
+  @Test
+  public void testSparseValuesLandOnTheirOwnDocs()
+      throws Exception {
+    // maxDenseKeys = 0 forces every key into the sparse tier; sparseJsonIndex = true lets the
+    // written content be read back and asserted per key.
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, true, null, null);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
+    // Interleave which keys are present per doc, and give each key different values on different
+    // docs, so an off-by-one in any key's value ordinal shows up as a value on the wrong doc.
+    s.add(Map.of("b", "b0", "a", "a0"), 0);
+    s.add(Map.of("c", "c1", "a", "a1"), 1);
+    s.add(Map.of("b", "b2"), 2);
+    s.add(Map.of(), 3);
+    s.seal();
+
+    String sparseCol = OpenStructNaming.sparseColumnName("metrics");
+    File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(indexFile.exists());
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+      ImmutableJsonIndexReader reader = new ImmutableJsonIndexReader(buffer, 4);
+      assertMatches(reader, "a", "a0", 0);
+      assertMatches(reader, "a", "a1", 1);
+      assertMatches(reader, "b", "b0", 0);
+      assertMatches(reader, "b", "b2", 2);
+      assertMatches(reader, "c", "c1", 1);
+    }
+
+    // The JSON index above is inherently key-order-independent, so it cannot catch a regression in
+    // per-document key ordering. Read the raw sparse forward-index column directly for doc 0 (which
+    // carries two sparse keys, "a" and "b") and assert the exact serialised JSON string, so the
+    // scatter's key-iteration order is enforced byte-for-byte, not just its per-key value placement.
+    File fwdIndexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    assertTrue(fwdIndexFile.exists());
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fwdIndexFile);
+        VarByteChunkForwardIndexReaderV4 fwdReader =
+            new VarByteChunkForwardIndexReaderV4(buffer, DataType.STRING, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = fwdReader.createContext()) {
+      assertEquals(fwdReader.getString(0, context), "{\"a\":\"a0\",\"b\":\"b0\"}");
+    }
+  }
+
+  /// The sparse scatter walks documents in windows to cap how many per-document maps are live at
+  /// once, so every key's value ordinal has to keep counting across window boundaries: resetting it
+  /// per window would pair a later document with an earlier document's value, and consuming the
+  /// first docId of the next window while bounding a window would drop that value entirely. This
+  /// case derives its document count from [OpenStructColumnSplitter]'s
+  /// `SPARSE_SCATTER_WINDOW_SIZE` so it keeps crossing a window boundary even if that constant
+  /// changes.
+  @Test
+  public void testSparseValuesSurviveScatterWindowBoundaries()
+      throws Exception {
+    int windowSize = OpenStructColumnSplitter.SPARSE_SCATTER_WINDOW_SIZE;
+    int numDocs = windowSize + 4096;
+    // Straddle the boundary from both sides, and place one document carrying both keys exactly on
+    // it, so a dropped or misordered boundary document shows up as a wrong value or wrong key order.
+    Set<Integer> aDocs = Set.of(0, windowSize - 1, windowSize, windowSize + 1, numDocs - 1);
+    Set<Integer> bDocs = Set.of(1, windowSize, numDocs - 1);
+
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, 0, null, null, null, true, null, null);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
+    for (int d = 0; d < numDocs; d++) {
+      Map<String, Object> row = new HashMap<>();
+      if (aDocs.contains(d)) {
+        row.put("a", "a" + d);
+      }
+      if (bDocs.contains(d)) {
+        row.put("b", "b" + d);
+      }
+      s.add(row, d);
+    }
+    s.seal();
+
+    String sparseCol = OpenStructNaming.sparseColumnName("metrics");
+    File fwdIndexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    assertTrue(fwdIndexFile.exists());
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fwdIndexFile);
+        VarByteChunkForwardIndexReaderV4 fwdReader =
+            new VarByteChunkForwardIndexReaderV4(buffer, DataType.STRING, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = fwdReader.createContext()) {
+      for (int d = 0; d < numDocs; d++) {
+        StringBuilder expected = new StringBuilder();
+        if (aDocs.contains(d)) {
+          expected.append("\"a\":\"a").append(d).append('"');
+        }
+        if (bDocs.contains(d)) {
+          if (expected.length() > 0) {
+            expected.append(',');
+          }
+          expected.append("\"b\":\"b").append(d).append('"');
+        }
+        // Documents with no sparse entry store the empty placeholder, not an empty JSON object.
+        String expectedJson = expected.length() == 0 ? "" : "{" + expected + "}";
+        assertEquals(fwdReader.getString(d, context), expectedJson, "Wrong sparse content at docId " + d);
+      }
+    }
+  }
+
+  private static void assertMatches(ImmutableJsonIndexReader reader, String key, String value, int expectedDocId) {
+    MutableRoaringBitmap matched = reader.getMatchingDocIds(FilterContext.forPredicate(
+        new EqPredicate(ExpressionContext.forIdentifier(key), value)));
+    assertEquals(matched.getCardinality(), 1, key + "=" + value + " matched " + matched);
+    assertTrue(matched.contains(expectedDocId), key + "=" + value + " should be on doc " + expectedDocId);
   }
 
   /// The inferred type of a key is cached on first sighting, so counting inference failures inside
