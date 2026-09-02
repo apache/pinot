@@ -493,8 +493,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
+    // Gate preprocess() behind needPreprocess() so the cold-download path honors (possibly tier-scoped)
+    // skipSegmentPreprocess and skips preprocess when the just-downloaded tar is already consistent with the
+    // table config / schema (e.g. a pauseless-realtime replica downloading a tar the committer preprocessed).
+    boolean needPreprocess = computeNeedPreprocess(indexDir, indexLoadingConfig, zkMetadata);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, needPreprocess,
+        _segmentOperationsThrottlerSet, zkMetadata);
     addSegment(immutableSegment, zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
@@ -1201,7 +1205,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+      boolean needPreprocess = computeNeedPreprocess(indexDir, indexLoadingConfig, zkMetadata);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, needPreprocess,
           _segmentOperationsThrottlerSet, zkMetadata);
       addSegment(segment, zkMetadata);
 
@@ -1987,6 +1992,33 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
+    File indexDir =
+        getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
+    return initSegmentDirectory(indexDir, segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
+  }
+
+  /// Opens a [SegmentDirectory] at `indexDir`, delegates to [ImmutableSegmentLoader#needPreprocess], and returns
+  /// the result. Empty segments return `false`. Used by cold-download / replace-consuming callers so they can
+  /// decide whether the expensive [ImmutableSegmentLoader#preprocess] call is needed before invoking `load(...)`.
+  protected boolean computeNeedPreprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
+      @Nullable SegmentZKMetadata zkMetadata)
+      throws Exception {
+    SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
+    if (localMetadata.getTotalDocs() == 0) {
+      return false;
+    }
+    try (SegmentDirectory segmentDirectory = initSegmentDirectory(indexDir, localMetadata.getName(),
+        localMetadata.getCrc(), indexLoadingConfig, zkMetadata)) {
+      return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
+    }
+  }
+
+  /// Overload that opens a [SegmentDirectory] rooted at the caller-supplied `indexDir`. Used by cold-download and
+  /// replace-consuming paths where the segment lives at a caller-known location (e.g. the just-extracted download
+  /// directory) rather than the tier-resolved [#getSegmentDataDir] path.
+  protected SegmentDirectory initSegmentDirectory(File indexDir, String segmentName, String segmentCrc,
+      IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
+      throws Exception {
     SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
         .setReadMode(indexLoadingConfig.getReadMode())
         .setTableConfig(indexLoadingConfig.getTableConfig())
@@ -2001,8 +2033,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    File indexDir =
-        getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
     return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
   }
 

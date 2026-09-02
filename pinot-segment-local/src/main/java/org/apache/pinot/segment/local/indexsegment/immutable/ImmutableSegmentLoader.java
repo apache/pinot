@@ -96,18 +96,13 @@ public class ImmutableSegmentLoader {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, null);
   }
 
-  /// Loads the segment with specified IndexLoadingConfig, honoring the (possibly tier-scoped)
-  /// `skipSegmentPreprocess` flag. Callers that need to unconditionally preprocess should use the explicit
-  /// `needPreprocess` overload instead.
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
-    // Only mirror the skip flag rather than calling needPreprocess(segmentDirectory, indexLoadingConfig): on this
-    // cold-download path a fresh segment almost always has pending handler work (indexes to build), so the smart
-    // check would open the SegmentDirectory and walk handlers just to return true. Warm-load and reload paths in
-    // BaseTableDataManager already use the full needPreprocess(...) where the smart check pays off.
-    return load(indexDir, indexLoadingConfig, !indexLoadingConfig.isSkipSegmentPreprocess(),
-        segmentOperationsThrottlerSet, zkMetadata);
+    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, zkMetadata);
   }
 
   /// Loads the segment with specified IndexLoadingConfig.
