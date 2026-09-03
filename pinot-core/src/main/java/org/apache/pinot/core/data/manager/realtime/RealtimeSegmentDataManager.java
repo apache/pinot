@@ -1927,7 +1927,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setContinueOnError(ingestionConfig != null && ingestionConfig.isContinueOnError());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

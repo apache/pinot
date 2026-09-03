@@ -113,6 +113,7 @@ import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -163,6 +164,9 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _dropRecordOnPartitionMismatch;
   private final boolean _defaultNullHandlingEnabled;
+  /// Honors [IngestionConfig#isContinueOnError]. When false, exceptions from dictionary / row / index writes
+  /// propagate instead of being fail-soft substituted.
+  private final boolean _continueOnError;
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -259,6 +263,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _dropRecordOnPartitionMismatch = config.isDropRecordOnPartitionMismatch();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
+    _continueOnError = config.isContinueOnError();
     _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -717,8 +722,10 @@ public class MutableSegmentImpl implements MutableSegment {
             recordIncompleteRow();
           }
         } catch (Exception e) {
-          // In-place rollup already has a complete prior row; meter and keep previous metric values.
-          recordIndexingError("AGGREGATE_METRICS", e);
+          // In-place rollup already has a complete prior row. When continueOnError is disabled, rethrow so
+          // strict ingestion fails the index call. Already-written metrics on this docId are not rolled back
+          // (apply-then-write is per-metric); a two-phase rewrite is left as a follow-up.
+          recordOrThrowIndexingError("AGGREGATE_METRICS", e);
           recordIncompleteRow();
         }
         canTakeMore = true;
@@ -836,6 +843,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   /// @return {@code true} if any column required a default/fallback while updating dictionaries
+  /// @throws RuntimeException when dictionary indexing fails and [IngestionConfig#isContinueOnError] is false
   private boolean updateDictionary(GenericRow row) {
     boolean hadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -864,10 +872,10 @@ public class MutableSegmentImpl implements MutableSegment {
         indexContainer._minValue = dictionary.getMinVal();
         indexContainer._maxValue = dictionary.getMaxVal();
       } catch (Exception e) {
-        // Do not abort the row mid-dictionary: remaining columns still get a chance, and addNewRow will fill
-        // defaults for this column if dict ids are unset (Integer.MIN_VALUE / null).
+        // Do not abort the row mid-dictionary when continueOnError is enabled: remaining columns still get a
+        // chance, and addNewRow will fill defaults for this column if dict ids are unset (Integer.MIN_VALUE / null).
+        recordOrThrowIndexingError("DICTIONARY", e);
         hadError = true;
-        recordIndexingError("DICTIONARY", e);
         // Error sentinels, kept only if even the default cannot be indexed below. For MV columns the sentinel is a
         // null array, which is distinct from an empty array (a row that legitimately carries no values).
         indexContainer._dictId = Integer.MIN_VALUE;
@@ -898,12 +906,14 @@ public class MutableSegmentImpl implements MutableSegment {
     return hadError;
   }
 
-  /// Indexes a new physical row. Fail-soft (issue #16316): every physical column must end up with a forward-index
-  /// (or OPEN_STRUCT) entry for [docId] so seal/query lengths stay aligned with [_numDocsIndexed]. On forward-index
-  /// failure the column is completed with the field default/null instead of being left blank. Secondary index
-  /// failures are still metered and swallowed. Aggregation path failures also fall back to a default initial value.
+  /// Indexes a new physical row. When [IngestionConfig#isContinueOnError] is true, fail-soft (issue #16316): every
+  /// physical column must end up with a forward-index (or OPEN_STRUCT) entry for [docId] so seal/query lengths stay
+  /// aligned with [_numDocsIndexed]. On forward-index failure the column is completed with the field default/null
+  /// instead of being left blank. Secondary index failures are metered and swallowed. Aggregation path failures also
+  /// fall back to a default initial value. When continueOnError is false, indexing exceptions propagate.
   ///
   /// @return {@code true} if any column required a default/fallback while indexing
+  /// @throws RuntimeException when a column/index write fails and [IngestionConfig#isContinueOnError] is false
   private boolean addNewRow(int docId, GenericRow row) {
     boolean rowHadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -919,8 +929,8 @@ public class MutableSegmentImpl implements MutableSegment {
         }
       } catch (Exception e) {
         // Last-resort complete-the-row so a single bad column cannot leave a half-written docId.
+        recordOrThrowIndexingError("ROW", e);
         rowHadError = true;
-        recordIndexingError("ROW", e);
         try {
           indexDefaultNullColumn(docId, indexContainer);
         } catch (Exception fallbackError) {
@@ -933,8 +943,8 @@ public class MutableSegmentImpl implements MutableSegment {
       try {
         _multiColumnTextIndex.add(_multiColumnValues);
       } catch (Exception e) {
+        recordOrThrowIndexingError("MULTI_COLUMN_TEXT", e);
         rowHadError = true;
-        recordIndexingError("MULTI_COLUMN_TEXT", e);
       } finally {
         Collections.fill(_multiColumnValues, null);
       }
@@ -984,7 +994,7 @@ public class MutableSegmentImpl implements MutableSegment {
       indexContainer._valuesInfo.updateSVNumValues();
       return true;
     } catch (Exception e) {
-      recordIndexingError(StandardIndexes.forward(), e);
+      recordOrThrowIndexingError(StandardIndexes.forward(), e);
       indexDefaultAggregatedValue(docId, indexContainer);
       return false;
     }
@@ -1020,7 +1030,7 @@ public class MutableSegmentImpl implements MutableSegment {
           try {
             openStructIndex.add(value, -1, docId);
           } catch (Exception e) {
-            recordIndexingError(StandardIndexes.openStruct(), e);
+            recordOrThrowIndexingError(StandardIndexes.openStruct(), e);
             return false;
           }
         }
@@ -1040,7 +1050,7 @@ public class MutableSegmentImpl implements MutableSegment {
             indexContainer._nullValueVector.setNull(docId);
           }
         } catch (Exception e) {
-          recordIndexingError("DICTIONARY", e);
+          recordOrThrowIndexingError("DICTIONARY", e);
           return false;
         }
       }
@@ -1057,8 +1067,8 @@ public class MutableSegmentImpl implements MutableSegment {
             forwardWritten = true;
           }
         } catch (Exception e) {
+          recordOrThrowIndexingError(indexType, e);
           hadError = true;
-          recordIndexingError(indexType, e);
           // Forward-index failure is a row-level integrity issue: complete with default rather than skip.
           if (indexType.equals(StandardIndexes.forward())) {
             try {
@@ -1131,7 +1141,7 @@ public class MutableSegmentImpl implements MutableSegment {
             indexContainer._nullValueVector.setNull(docId);
           }
         } catch (Exception e) {
-          recordIndexingError("DICTIONARY", e);
+          recordOrThrowIndexingError("DICTIONARY", e);
           return false;
         }
       }
@@ -1149,8 +1159,8 @@ public class MutableSegmentImpl implements MutableSegment {
             forwardWritten = true;
           }
         } catch (Exception e) {
+          recordOrThrowIndexingError(indexType, e);
           hadError = true;
-          recordIndexingError(indexType, e);
           if (indexType.equals(StandardIndexes.forward())) {
             try {
               Object[] defaultValues = (Object[]) getDefaultNullValueForIndexing(fieldSpec);
@@ -1315,6 +1325,31 @@ public class MutableSegmentImpl implements MutableSegment {
       );
       _indexCapacityThresholdBreached = true;
     }
+  }
+
+  /// When [#_continueOnError] is false, rethrows so strict ingestion fails the index operation. When true,
+  /// records the error metric and returns so the caller can complete the row with defaults.
+  private void recordOrThrowIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {
+    if (!_continueOnError) {
+      throw wrapIndexingException(indexType.getPrettyName(), exception);
+    }
+    recordIndexingError(indexType, exception);
+  }
+
+  /// When [#_continueOnError] is false, rethrows so strict ingestion fails the index operation. When true,
+  /// records the error metric and returns so the caller can complete the row with defaults.
+  private void recordOrThrowIndexingError(String indexType, Exception exception) {
+    if (!_continueOnError) {
+      throw wrapIndexingException(indexType, exception);
+    }
+    recordIndexingError(indexType, exception);
+  }
+
+  private static RuntimeException wrapIndexingException(String indexType, Exception exception) {
+    if (exception instanceof RuntimeException runtimeException) {
+      return runtimeException;
+    }
+    return new RuntimeException("Failed to index value with " + indexType, exception);
   }
 
   private void recordIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {

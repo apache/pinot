@@ -194,7 +194,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         .setConsumerDir(_resourceDataDir.getAbsolutePath())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setContinueOnError(ingestionConfig != null && ingestionConfig.isContinueOnError());
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
