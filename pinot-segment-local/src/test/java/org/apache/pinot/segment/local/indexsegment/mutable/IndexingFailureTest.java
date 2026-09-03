@@ -354,15 +354,24 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     MutableSegmentImpl segment = createSegment(schema, Set.of(), Set.of(INT_COL, STRING_COL), serverMetrics, false);
     try {
       expectThrows(Exception.class, () -> segment.index(badJsonRow(), METADATA));
-      assertEquals(segment.getNumDocsIndexed(), 0);
-      verify(serverMetrics, never()).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
-          eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), anyLong());
+      // The row is published before the strict rethrow so inverted/forward lengths stay aligned.
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      GenericRow published = segment.getRecord(0, new GenericRow());
+      assertEquals(published.getValue(INT_COL), 7);
+      assertEquals(published.getValue(STRING_COL), "bad-json-row");
+      verify(serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+          eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
 
       segment.index(goodRow(8, "ok"), METADATA);
-      assertEquals(segment.getNumDocsIndexed(), 1);
-      GenericRow result = segment.getRecord(0, new GenericRow());
+      assertEquals(segment.getNumDocsIndexed(), 2);
+      GenericRow result = segment.getRecord(1, new GenericRow());
       assertEquals(result.getValue(INT_COL), 8);
       assertEquals(result.getValue(STRING_COL), "ok");
+      // The published bad row keeps its own inverted bits; the next row must not reuse docId 0.
+      assertEquals(segment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
+          ImmutableRoaringBitmap.bitmapOf(0));
+      assertEquals(segment.getDataSource(INT_COL).getInvertedIndex().getDocIds(1),
+          ImmutableRoaringBitmap.bitmapOf(1));
     } finally {
       segment.destroy();
     }
