@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
@@ -48,6 +49,14 @@ public class QueryLogger {
 
   private static final String FINGERPRINT_FAILED_QUERY_REDACTED = "FINGERPRINT_FAILED_QUERY_REDACTED";
   private static final String FULLY_REDACTED = "REDACTED";
+
+  /// Runs of CR/LF in a query are collapsed to a single space before it is logged, so that one
+  /// logged query occupies one physical log line. Clients routinely submit pretty-printed SQL, and
+  /// logging it verbatim turns a single log event into one line per line of SQL as soon as anything
+  /// downstream splits on newlines -- a container runtime, a log shipper, a file tailer. Those
+  /// continuation lines carry no logger name or level, so they cannot be filtered, sampled or
+  /// attributed, and a multiline log collector will attach them to whatever record preceded them.
+  private static final Pattern QUERY_NEWLINES = Pattern.compile("[\\r\\n]+");
 
   public enum SqlRedactionMode {
     // Log the full SQL query text as-is.
@@ -201,8 +210,16 @@ public class QueryLogger {
         return queryFingerprint != null ? queryFingerprint.getFingerprint() : FINGERPRINT_FAILED_QUERY_REDACTED;
       case NONE:
       default:
-        return query;
+        return toSingleLine(query);
     }
+  }
+
+  /// Collapses CR/LF runs so the query occupies a single log line. Only line breaks are touched:
+  /// indentation and spacing within a line are left alone, so the logged text stays as close to
+  /// what the client sent as a single-line rendering allows.
+  @Nullable
+  private static String toSingleLine(@Nullable String query) {
+    return query == null ? null : QUERY_NEWLINES.matcher(query).replaceAll(" ");
   }
 
   private boolean shouldForceLog(@Nullable QueryLogParams params) {
