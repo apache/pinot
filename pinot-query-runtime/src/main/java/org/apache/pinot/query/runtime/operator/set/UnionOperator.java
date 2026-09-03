@@ -46,7 +46,7 @@ public class UnionOperator extends SetOperator {
   public UnionOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> inputOperators, DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
-    validateEqualityAndHashingSupported(dataSchema, "UNION DISTINCT");
+    validateNoRawVariantValues(dataSchema, "UNION DISTINCT");
   }
 
   @Override

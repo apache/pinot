@@ -341,6 +341,9 @@ public class VariantGetTransformFunctionTest {
 
   @Test
   public void testFactoryRegistrations() {
+    assertEquals(new ParseJsonToVariantTransformFunction().getName(), "parseJsonToVariant");
+    assertEquals(new ParseJsonToVariantTransformFunction.Try().getName(), "tryParseJsonToVariant");
+
     Map<String, Class<? extends TransformFunction>> functions = TransformFunctionFactory.getAllFunctions();
     assertSame(functions.get(TransformFunctionFactory.canonicalize("variant_get")),
         VariantGetTransformFunction.class);

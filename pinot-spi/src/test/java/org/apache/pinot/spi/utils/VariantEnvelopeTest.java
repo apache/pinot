@@ -146,15 +146,16 @@ public class VariantEnvelopeTest {
   }
 
   @Test
-  public void testDirectProducerAllocation() {
-    byte[] envelope = VariantEnvelope.allocate(METADATA.length, VALUE.length);
+  public void testDirectProducerAllocationIsExplicitlyUnfilled() {
+    byte[] envelope = VariantEnvelope.allocateUnfilled(METADATA.length, VALUE.length);
+    assertTrue(VariantEnvelope.isEnvelope(envelope), "The initialized outer header is valid before payload fill");
     System.arraycopy(METADATA, 0, envelope, VariantEnvelope.HEADER_SIZE, METADATA.length);
     System.arraycopy(VALUE, 0, envelope, VariantEnvelope.HEADER_SIZE + METADATA.length, VALUE.length);
 
     assertEquals(envelope, VERSION_ONE_FROZEN);
-    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocate(-1, 0));
-    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocate(0, -1));
-    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocate(Integer.MAX_VALUE, 0));
+    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocateUnfilled(-1, 0));
+    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocateUnfilled(0, -1));
+    assertThrows(IllegalArgumentException.class, () -> VariantEnvelope.allocateUnfilled(Integer.MAX_VALUE, 0));
   }
 
   @Test
