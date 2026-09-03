@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -234,11 +234,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
             _inferredTypes.putIfAbsent(key, valueType);
           }
         }
-        if (!_presenceBitmaps.containsKey(key)) {
-          _presenceBitmaps.put(key, new RoaringBitmap());
-          _values.put(key, new ArrayList<>());
-        }
-        _presenceBitmaps.get(key).add(_numDocs);
+        RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
+        List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
+        bitmap.add(_numDocs);
         Object coerced;
         try {
           PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
@@ -246,10 +244,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           coerced = destType.convert(rawValue, sourceType);
         } catch (Exception e) {
           _coercionFailuresPerKey.merge(key, 1L, Long::sum);
-          _presenceBitmaps.get(key).remove(_numDocs);
+          bitmap.remove(_numDocs);
           continue;
         }
-        _values.get(key).add(coerced);
+        values.add(coerced);
       }
     }
     _numDocs++;
@@ -561,7 +559,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     String sparseCol = OpenStructNaming.sparseColumnName(_columnName);
     int maxLen = 1;
     String[] jsonPerDoc = new String[_numDocs];
-    int nonNullCount = 0;
     for (int docId = 0; docId < _numDocs; docId++) {
       Map<String, Object> sparseEntries = new LinkedHashMap<>();
       for (String key : sparseKeys) {
@@ -575,13 +572,19 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;
-          maxLen = Math.max(maxLen, json.getBytes(StandardCharsets.UTF_8).length);
-          nonNullCount++;
+          maxLen = Math.max(maxLen, Utf8.encodedLength(json));
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse entries for docId " + docId, e);
         }
       }
     }
+
+    // Absent docs store "" in the raw forward index (see loop below) and are flagged in the null vector, so feed
+    // the same placeholder through the stats collector and record it as the default null value. Collected inside
+    // the write loop rather than in a pass of its own: it needs the exact same per-doc branch.
+    DimensionFieldSpec sparseFieldSpec = new DimensionFieldSpec(sparseCol, DataType.STRING, true);
+    String defaultValue = "";
+    AbstractColumnStatisticsCollector statsCollector = StatsCollectorUtil.createStatsCollector(sparseFieldSpec, null);
 
     SingleValueVarByteRawIndexCreator fwdCreator = new SingleValueVarByteRawIndexCreator(
         _indexDir, ChunkCompressionType.LZ4, sparseCol, _numDocs, DataType.STRING, maxLen);
@@ -592,11 +595,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         if (jsonPerDoc[docId] != null) {
+          statsCollector.collect(jsonPerDoc[docId]);
           fwdCreator.putString(jsonPerDoc[docId]);
           if (jsonCreator != null) {
             jsonCreator.add(jsonPerDoc[docId]);
           }
         } else {
+          statsCollector.collect(defaultValue);
           fwdCreator.putString("");
           nullCreator.setNull(docId);
           if (jsonCreator != null) {
@@ -617,22 +622,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
 
+    statsCollector.seal();
+
     PropertiesConfiguration props = new PropertiesConfiguration();
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.DATA_TYPE),
-        DataType.STRING.name());
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
-        FieldSpec.FieldType.DIMENSION.name());
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED), true);
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
-        _numDocs);
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.CARDINALITY),
-        nonNullCount);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES),
-        _numDocs);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), false);
+    // Route through the same metadata writer as dense child columns (BaseSegmentCreator.addColumnMetadataInfo) so
+    // this raw, no-dictionary column carries every property ColumnMetadataImpl.fromPropertiesConfiguration()
+    // expects, instead of a hand-rolled subset that can silently drift from what the reader requires.
+    BaseSegmentCreator.addColumnMetadataInfo(props, sparseCol, statsCollector, _numDocs, sparseFieldSpec,
+        false /* hasDictionary */, 0 /* dictionaryElementSize */, FieldConfig.EncodingType.RAW,
+        false /* autoGenerated */);
     props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, "hasNullValue"), true);
     props.setProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(sparseCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
