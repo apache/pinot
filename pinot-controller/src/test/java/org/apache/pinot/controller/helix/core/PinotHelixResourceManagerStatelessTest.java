@@ -1900,6 +1900,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       assertTrue(exception.getMessage().contains("showing 1 of 1"), exception.getMessage());
       assertTrue(exception.getMessage().contains("/tables/{tableName}/pauseStatus"), exception.getMessage());
       assertTrue(exception.getMessage().contains("consumingSegments is empty"), exception.getMessage());
+      assertTrue(exception.getMessage().contains("force=true"), exception.getMessage());
 
       IdealState unchangedIdealState = _helixResourceManager.getTableIdealState(tableNameWithType);
       assertNotNull(unchangedIdealState);
@@ -1927,6 +1928,52 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, tableNameWithType, onlineSegment);
       ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, tableNameWithType, consumingSegment);
       dropResourceIfPresent(tableNameWithType);
+    }
+  }
+
+  @Test
+  public void testForceDeleteConsumingSegments()
+      throws Exception {
+    String tableNameWithType = "forceDeleteConsuming_REALTIME";
+    String offlineTable = "forceDeleteConsuming_OFFLINE";
+    String onlineSegment = "onlineSegment";
+    String consumingSegment = "consumingSegment";
+    String offlineSegment = "offlineSegment";
+    addIdealStateResource(tableNameWithType, Map.of(
+        onlineSegment, Map.of("Server_1", SegmentStateModel.ONLINE),
+        consumingSegment, Map.of("Server_1", SegmentStateModel.CONSUMING)));
+    addIdealStateResource(offlineTable, Map.of(offlineSegment, Map.of("Server_1", SegmentStateModel.ONLINE)));
+
+    SegmentDeletionManager mockDeletionManager = mock(SegmentDeletionManager.class);
+    SegmentDeletionManager originalDeletionManager = replaceSegmentDeletionManager(mockDeletionManager);
+    try {
+      ConsumingSegmentDeletionException exception = expectThrows(ConsumingSegmentDeletionException.class,
+          () -> _helixResourceManager.deleteSegments(tableNameWithType,
+              Arrays.asList(onlineSegment, consumingSegment)));
+      assertEquals(exception.getBlockingSegments(), List.of(consumingSegment));
+      assertTrue(_helixResourceManager.getTableIdealState(tableNameWithType).getPartitionSet()
+          .containsAll(List.of(onlineSegment, consumingSegment)));
+      verify(mockDeletionManager, never()).deleteSegments(eq(tableNameWithType), anyCollection(),
+          nullable(TableConfig.class));
+
+      PinotResourceManagerResponse forceResponse = _helixResourceManager.deleteSegments(tableNameWithType,
+          Arrays.asList(onlineSegment, consumingSegment), null, true);
+      assertTrue(forceResponse.isSuccessful(), forceResponse.getMessage());
+      IdealState afterForce = _helixResourceManager.getTableIdealState(tableNameWithType);
+      assertNotNull(afterForce);
+      assertFalse(afterForce.getPartitionSet().contains(onlineSegment));
+      assertFalse(afterForce.getPartitionSet().contains(consumingSegment));
+      verify(mockDeletionManager).deleteSegments(eq(tableNameWithType),
+          eq(Arrays.asList(onlineSegment, consumingSegment)), nullable(TableConfig.class));
+
+      PinotResourceManagerResponse offlineResponse =
+          _helixResourceManager.deleteSegments(offlineTable, List.of(offlineSegment), null, true);
+      assertTrue(offlineResponse.isSuccessful(), offlineResponse.getMessage());
+      assertFalse(_helixResourceManager.getTableIdealState(offlineTable).getPartitionSet().contains(offlineSegment));
+    } finally {
+      replaceSegmentDeletionManager(originalDeletionManager);
+      dropResourceIfPresent(tableNameWithType);
+      dropResourceIfPresent(offlineTable);
     }
   }
 

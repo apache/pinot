@@ -305,9 +305,25 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
   /// @throws PinotAdminException If the request fails
   public String deleteSegment(String tableName, String segmentName, String retentionPeriod)
       throws PinotAdminException {
+    return deleteSegment(tableName, segmentName, retentionPeriod, false);
+  }
+
+  /// Deletes a specific segment.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentName Name of the segment
+  /// @param retentionPeriod Retention period for the segment (optional)
+  /// @param force when true, delete realtime segments even if a replica is still CONSUMING
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
+  public String deleteSegment(String tableName, String segmentName, String retentionPeriod, boolean force)
+      throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (retentionPeriod != null) {
       queryParams.put("retention", retentionPeriod);
+    }
+    if (force) {
+      queryParams.put("force", "true");
     }
 
     JsonNode response = _transport.executeDelete(_controllerAddress,
@@ -333,6 +349,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
   public String deleteMultipleSegments(String tableName, String tableType, String segmentNames,
       String retentionPeriod)
       throws PinotAdminException {
+    return deleteMultipleSegments(tableName, tableType, segmentNames, retentionPeriod, false);
+  }
+
+  /// Deletes multiple segments, optionally forcing deletion of CONSUMING realtime replicas.
+  public String deleteMultipleSegments(String tableName, String tableType, String segmentNames,
+      String retentionPeriod, boolean force)
+      throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (tableType == null) {
       org.apache.pinot.spi.config.table.TableType inferred = org.apache.pinot.spi.utils.builder.TableNameBuilder
@@ -351,6 +374,9 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     if (retentionPeriod != null) {
       queryParams.put("retention", retentionPeriod);
     }
+    if (force) {
+      queryParams.put("force", "true");
+    }
 
     JsonNode response = _transport.executeDelete(_controllerAddress, "/segments/" + tableName,
         queryParams.isEmpty() ? null : queryParams, _headers);
@@ -360,8 +386,14 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
   public String deleteMultipleSegments(String tableName, String tableType, List<String> segments,
       String retentionPeriod)
       throws PinotAdminException {
+    return deleteMultipleSegments(tableName, tableType, segments, retentionPeriod, false);
+  }
+
+  public String deleteMultipleSegments(String tableName, String tableType, List<String> segments,
+      String retentionPeriod, boolean force)
+      throws PinotAdminException {
     String segmentNames = (segments == null || segments.isEmpty()) ? null : String.join(",", segments);
-    return deleteMultipleSegments(tableName, tableType, segmentNames, retentionPeriod);
+    return deleteMultipleSegments(tableName, tableType, segmentNames, retentionPeriod, force);
   }
 
   /// Deletes segments specified in JSON array payload.
@@ -372,8 +404,17 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
   /// @throws PinotAdminException If the request fails
   public String deleteSegments(String tableName, String segmentDeleteRequest)
       throws PinotAdminException {
+    return deleteSegments(tableName, segmentDeleteRequest, false);
+  }
+
+  /// Deletes segments specified in JSON array payload.
+  ///
+  /// @param force when true, delete realtime segments even if a replica is still CONSUMING
+  public String deleteSegments(String tableName, String segmentDeleteRequest, boolean force)
+      throws PinotAdminException {
+    Map<String, String> queryParams = force ? Map.of("force", "true") : null;
     JsonNode response = _transport.executePost(_controllerAddress, "/segments/" + tableName + "/delete",
-        segmentDeleteRequest, null, _headers);
+        segmentDeleteRequest, queryParams, _headers);
     return response.toString();
   }
 

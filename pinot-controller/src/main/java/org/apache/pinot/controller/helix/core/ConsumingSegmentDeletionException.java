@@ -21,7 +21,8 @@ package org.apache.pinot.controller.helix.core;
 import java.util.List;
 
 
-/// Thrown when a public deletion request targets a realtime segment with a `CONSUMING` replica in IdealState.
+/// Thrown when a public deletion request targets a realtime segment with a `CONSUMING` replica in IdealState
+/// and the caller did not set `force=true`.
 ///
 /// The full, immutable blocked-segment list is retained for programmatic callers, while the exception message bounds
 /// both the number and length of displayed names so an accidental delete-all request cannot create an unbounded HTTP
@@ -73,6 +74,7 @@ public class ConsumingSegmentDeletionException extends RuntimeException {
     return "Cannot delete " + blockedCount + " segment(s) from realtime table: " + tableNameWithType
         + " because at least one replica is in CONSUMING state. Blocking segments (showing " + displayedCount
         + " of " + blockedCount + "): " + displayedSegments + ". Pause the table, poll "
-        + "/tables/{tableName}/pauseStatus until consumingSegments is empty, then retry the deletion.";
+        + "/tables/{tableName}/pauseStatus until consumingSegments is empty, then retry the deletion. "
+        + "To recover a table, retry with force=true to delete CONSUMING segments.";
   }
 }

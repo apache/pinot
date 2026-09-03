@@ -148,8 +148,12 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotSegmentRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
   private static final String CONSUMING_SEGMENT_DELETE_NOTE =
-      "Realtime segment deletion is rejected while any target has a CONSUMING replica. Pause the table, poll "
-          + "/tables/{tableName}/pauseStatus until consumingSegments is empty, then retry.";
+      "Realtime segment deletion is rejected while any target has a CONSUMING replica unless force=true. "
+          + "Prefer pausing the table and polling /tables/{tableName}/pauseStatus until consumingSegments is empty, "
+          + "then retry. Use force=true only to recover a table by deleting CONSUMING segments.";
+  private static final String FORCE_DELETE_CONSUMING_PARAM =
+      "Force deletion of realtime segments that still have a CONSUMING replica. Default is false. "
+          + "Use only for table recovery; prefer pausing consumption first.";
 
   @Inject
   ControllerConf _controllerConf;
@@ -526,11 +530,13 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
-      @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
+      @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = FORCE_DELETE_CONSUMING_PARAM, defaultValue = "false")
+      @QueryParam("force") @DefaultValue("false") boolean force, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
-    deleteSegmentsInternal(tableNameWithType, List.of(segmentName), retentionPeriod);
+    deleteSegmentsInternal(tableNameWithType, List.of(segmentName), retentionPeriod, force);
     return new SuccessResponse("Segment deleted");
   }
 
@@ -550,7 +556,9 @@ public class PinotSegmentRestletResource {
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod,
       @ApiParam(value = "Segment names to be deleted if not provided deletes all segments by default",
-          allowMultiple = true) @QueryParam("segments") List<String> segments, @Context HttpHeaders headers) {
+          allowMultiple = true) @QueryParam("segments") List<String> segments,
+      @ApiParam(value = FORCE_DELETE_CONSUMING_PARAM, defaultValue = "false")
+      @QueryParam("force") @DefaultValue("false") boolean force, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
@@ -560,11 +568,11 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     if (segments.isEmpty()) {
       deleteSegmentsInternal(tableNameWithType,
-          _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod);
+          _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod, force);
       return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
     } else {
       int numSegments = segments.size();
-      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
+      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod, force);
       if (numSegments <= 5) {
         return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
       } else {
@@ -587,14 +595,16 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
-      @QueryParam("retention") String retentionPeriod, List<String> segments, @Context HttpHeaders headers) {
+      @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = FORCE_DELETE_CONSUMING_PARAM, defaultValue = "false")
+      @QueryParam("force") @DefaultValue("false") boolean force, List<String> segments, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     int numSegments = segments.size();
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
     }
     String tableNameWithType = getExistingTable(tableName, segments.get(0));
-    deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
+    deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod, force);
     if (numSegments <= 5) {
       return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
     } else {
@@ -629,7 +639,9 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
-      @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
+      @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = FORCE_DELETE_CONSUMING_PARAM, defaultValue = "false")
+      @QueryParam("force") @DefaultValue("false") boolean force, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (Strings.isNullOrEmpty(startTimestampStr) || Strings.isNullOrEmpty(endTimestampStr)) {
       throw new ControllerApplicationException(LOGGER, "start and end timestamp must by non empty", Status.BAD_REQUEST);
@@ -645,16 +657,16 @@ public class PinotSegmentRestletResource {
         continue;
       }
       String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
+      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod, force);
     }
     return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableName);
   }
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
-      @Nullable String retentionPeriod) {
+      @Nullable String retentionPeriod, boolean force) {
     PinotResourceManagerResponse response;
     try {
-      response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
+      response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod, force);
     } catch (ConsumingSegmentDeletionException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST, e);
     }
@@ -969,7 +981,8 @@ public class PinotSegmentRestletResource {
           + "For each segment provided, it identifies the partition and deletes all segments "
           + "with sequence numbers >= the provided segment in that partition. "
           + "When force flag is true, it bypasses checks for pauseless being enabled and table being paused. "
-          + "The force flag does not bypass CONSUMING segment protection. "
+          + "The force flag does not bypass CONSUMING segment protection; use DELETE /segments/{tableName} with "
+          + "force=true to recover a table by deleting CONSUMING segments. "
           + "The retention period controls how long deleted segments are retained before permanent removal. "
           + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
           + "Use 0d or -1d for immediate deletion without retention. " + CONSUMING_SEGMENT_DELETE_NOTE)
@@ -1048,7 +1061,7 @@ public class PinotSegmentRestletResource {
 
     // Delete all selected partitions as one batch so a blocked segment cannot leave earlier partitions deleted.
     if (!dryRun && !segmentsToDelete.isEmpty()) {
-      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDelete), null);
+      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDelete), null, false);
     }
 
     response.put("tableName", tableNameWithType);

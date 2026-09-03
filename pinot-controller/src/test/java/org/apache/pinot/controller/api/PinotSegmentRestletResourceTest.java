@@ -254,6 +254,14 @@ public class PinotSegmentRestletResourceTest {
         .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1"), null);
     assertTrue(reply.contains("Deleted segments: [segment1] from table: offlineTableName1_OFFLINE"));
 
+    // force=true is a no-op extra for OFFLINE tables and must still succeed.
+    URI forceOfflineUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/"
+        + TEST_RAW_OFFLINE_TABLE_NAME + "/segment2?force=true");
+    SimpleHttpResponse forceOfflineResponse =
+        ControllerTest.getHttpClient().sendDeleteRequest(forceOfflineUri, Map.of());
+    assertEquals(forceOfflineResponse.getStatusCode(), 200, forceOfflineResponse.getResponse());
+    assertFalse(resourceManager.getTableIdealState(offlineTableName).getPartitionSet().contains("segment2"));
+
     // case 2: delete all remaining segments
     reply = adminClient.getSegmentClient()
         .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of(),
@@ -293,6 +301,7 @@ public class PinotSegmentRestletResourceTest {
           singleDeleteException.getMessage());
       assertTrue(singleDeleteException.getMessage().contains("consumingSegments is empty"),
           singleDeleteException.getMessage());
+      assertTrue(singleDeleteException.getMessage().contains("force=true"), singleDeleteException.getMessage());
 
       URI batchDeleteUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + rawTableName
           + "?type=REALTIME&segments=" + completedSegment + "&segments=" + consumingSegment);
@@ -358,6 +367,32 @@ public class PinotSegmentRestletResourceTest {
       } finally {
         replaceSegmentDeletionManager(resourceManager, originalDeletionManager);
       }
+
+      String forceOnlineSegment = "forceOnlineSegment";
+      String forceConsumingSegment = "forceConsumingSegment";
+      HelixHelper.updateIdealState(TEST_INSTANCE.getHelixManager(), realtimeTableName, idealState -> {
+        String server = idealState.getInstanceStateMap(consumingSegment).keySet().iterator().next();
+        idealState.getRecord().setMapField(forceOnlineSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.ONLINE)));
+        idealState.getRecord().setMapField(forceConsumingSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.CONSUMING)));
+        return idealState;
+      });
+
+      URI mixedForceUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + rawTableName
+          + "?type=REALTIME&segments=" + forceOnlineSegment + "&segments=" + forceConsumingSegment + "&force=true");
+      SimpleHttpResponse mixedForceResponse =
+          ControllerTest.getHttpClient().sendDeleteRequest(mixedForceUri, Map.of());
+      assertEquals(mixedForceResponse.getStatusCode(), 200, mixedForceResponse.getResponse());
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .contains(forceOnlineSegment));
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .contains(forceConsumingSegment));
+
+      String forceSingleResponse =
+          adminClient.getSegmentClient().deleteSegment(realtimeTableName, consumingSegment, null, true);
+      assertTrue(forceSingleResponse.contains("Segment deleted"), forceSingleResponse);
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet().contains(consumingSegment));
 
       // Dropping a realtime table remains the supported unconditional cleanup path.
       resourceManager.deleteRealtimeTable(rawTableName, "0d");

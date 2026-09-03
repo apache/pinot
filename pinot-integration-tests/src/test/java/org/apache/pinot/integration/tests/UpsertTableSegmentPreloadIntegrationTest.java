@@ -115,7 +115,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   public void tearDown()
       throws IOException {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    // Public segment delete rejects CONSUMING replicas. Table drop is the supported cleanup.
+    // Public segment delete rejects CONSUMING replicas unless force=true. Table drop remains the cleanup path.
     dropRealtimeTable(realtimeTableName);
     stopServer();
     stopBroker();
