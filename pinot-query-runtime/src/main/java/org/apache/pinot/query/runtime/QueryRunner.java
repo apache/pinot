@@ -54,7 +54,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.LeafOperator;
+import org.apache.pinot.query.runtime.operator.ExplainableOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
@@ -608,8 +608,10 @@ public class QueryRunner {
 
     Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
     BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
-      if (operator instanceof LeafOperator) {
-        leafNodes.put(node, ((LeafOperator) operator).explain());
+      // Any leaf-stage operator that can describe itself contributes its explain subtree, so EXPLAIN
+      // reflects what actually executes instead of the pre-execution plan.
+      if (operator instanceof ExplainableOperator) {
+        leafNodes.put(node, ((ExplainableOperator) operator).explain());
       }
     };
     // compile OpChain
