@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -106,6 +107,23 @@ public final class RelToPlanNodeConverter {
   private final boolean _caseSensitive;
   // When true, UNNEST output is pruned to drop input (passthrough) columns not referenced downstream. Default off.
   private final boolean _pruneUnnestColumns;
+  /// Whether to capture estimated row counts at all. Off unless the query asked for them: obtaining
+  /// an estimate walks Calcite's metadata handlers, which is real work on a path that otherwise never
+  /// touches them, and the result would be discarded unread for every query that did not request it.
+  private final boolean _captureEstimatedRowCounts;
+  /// Row count the optimizer estimated for each converted node, captured here because it is the last
+  /// point at which both the [RelNode] (which carries the estimate) and the [PlanNode] (which the
+  /// runtime reports stats against) are in hand.
+  ///
+  /// Identity-keyed on purpose: [BasePlanNode] defines structural `equals`/`hashCode`, so a hash map
+  /// would merge distinct nodes that happen to look alike (the branches of a `UNION ALL`, say) and
+  /// attribute one branch's estimate to another.
+  ///
+  /// [PlanFragmenter] keeps these keys valid for every node it rewrites in place, but *not* for
+  /// exchanges: it discards each [org.apache.pinot.query.planner.plannode.ExchangeNode] and builds a
+  /// fresh mailbox pair in its place. [PinotLogicalQueryPlanner] copies the estimates across that
+  /// boundary once fragmentation is done.
+  private final IdentityHashMap<PlanNode, Double> _estimatedRowCounts = new IdentityHashMap<>();
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction) {
@@ -119,10 +137,17 @@ public final class RelToPlanNodeConverter {
 
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns) {
+    this(tracker, hashFunction, caseSensitive, pruneUnnestColumns, false);
+  }
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction, boolean caseSensitive, boolean pruneUnnestColumns,
+      boolean captureEstimatedRowCounts) {
     _tracker = tracker;
     _hashFunction = hashFunction;
     _caseSensitive = caseSensitive;
     _pruneUnnestColumns = pruneUnnestColumns;
+    _captureEstimatedRowCounts = captureEstimatedRowCounts;
   }
 
   /// Converts a [RelNode] into its serializable counterpart.
@@ -176,7 +201,37 @@ public final class RelToPlanNodeConverter {
     if (_tracker != null) {
       _tracker.trackCreation(node, result);
     }
+    if (_captureEstimatedRowCounts) {
+      recordEstimatedRowCount(node, result);
+    }
     return result;
+  }
+
+  /// Records what the optimizer estimated this node would produce.
+  ///
+  /// Nothing is recorded when no estimate can be had. [RelMetadataQuery#getRowCount] is itself
+  /// nullable — `RelMdRowCount` returns null for a `Minus` whose inputs are all unestimated, and for
+  /// a join whose selectivity cannot be guessed — and it can throw if a metadata handler misbehaves.
+  /// Either way a missing entry renders as an absent field, which is the honest answer; storing the
+  /// null would put one behind a `Map<PlanNode, Double>` that callers unbox.
+  ///
+  /// Kept at DEBUG rather than WARN deliberately: this runs per node, and a broken handler on a
+  /// high-QPS broker would otherwise flood the log.
+  private void recordEstimatedRowCount(RelNode relNode, PlanNode planNode) {
+    try {
+      Double estimate = relNode.getCluster().getMetadataQuery().getRowCount(relNode);
+      if (estimate != null) {
+        _estimatedRowCounts.put(planNode, estimate);
+      }
+    } catch (RuntimeException e) {
+      LOGGER.debug("Could not estimate row count for {}", relNode.getRelTypeName(), e);
+    }
+  }
+
+  /// Estimated row counts by plan node, for comparison against the actual counts the runtime
+  /// reports. Identity-keyed; empty when capture was off or nothing could be estimated.
+  public IdentityHashMap<PlanNode, Double> getEstimatedRowCounts() {
+    return _estimatedRowCounts;
   }
 
   private UnnestNode convertLogicalUncollect(Uncollect node) {
