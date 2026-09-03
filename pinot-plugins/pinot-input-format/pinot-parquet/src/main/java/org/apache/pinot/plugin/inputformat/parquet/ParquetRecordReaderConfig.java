@@ -25,7 +25,8 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /// Three settings, all default `false`:
 /// - `useParquetAvroRecordReader` — force the parquet-avro reader.
 /// - `useParquetNativeRecordReader` — force the native parquet reader. When neither flag is set, the dispatcher
-///   auto-detects via the file's `avro.schema` metadata (Avro reader if present, native otherwise).
+///   auto-detects via the file's `avro.schema` metadata (Avro reader if present, native otherwise). Set this flag for
+///   VARIANT files that also carry Avro schema metadata so that the native reader retains the physical VARIANT type.
 /// - `extractRawTimeValues` — opt out of TIMESTAMP / DATE / TIME conversion at the extractor boundary,
 ///   surfacing the raw underlying integer in the column's declared unit instead of the contract Java type.
 ///   DECIMAL and UUID always convert. See [ParquetAvroRecordExtractor] / [ParquetNativeRecordExtractor] for

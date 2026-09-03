@@ -170,6 +170,20 @@ public class CanonicalDdlEmitterTest {
         "BYTES column at natural default must not emit a DEFAULT clause; got:\n" + emitted);
   }
 
+  @Test
+  public void variantTypeEmitsWithoutReservedNullSentinelDefault() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("payload", DataType.VARIANT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("events").build();
+
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertTrue(emitted.contains("payload VARIANT DIMENSION"), emitted);
+    assertFalse(emitted.contains("DEFAULT"),
+        "VARIANT's reserved SQL-null sentinel must not be emitted as a user default:\n" + emitted);
+  }
+
   /// Regression: BigDecimal.toString() can emit scientific notation (1E+30) which Calcite's
   /// Literal() rule does not accept. The fix routes BIG_DECIMAL defaults through toPlainString().
   @Test

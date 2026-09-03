@@ -210,15 +210,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
     validateColumn(columnIndex);
 
     String val = _resultSet.getString(_currentRow, columnIndex - 1);
-    if (checkIsNull(val)) {
+    if (checkIsNull(columnIndex, val)) {
       return null;
     }
 
     return val;
   }
 
-  private boolean checkIsNull(String val) {
-    if (val == null || val.toLowerCase().contentEquals(NULL_STRING)) {
+  private boolean checkIsNull(int columnIndex, String val) {
+    if (val == null || (getColumnType(columnIndex) != ColumnDataType.VARIANT
+        && val.equalsIgnoreCase(NULL_STRING))) {
       _wasNull = true;
       return true;
     }

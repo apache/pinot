@@ -154,6 +154,13 @@ public class PinotEvaluateLiteralRule {
         operand -> operand instanceof RexLiteral || (operand instanceof RexCall && ((RexCall) operand).getOperands()
             .stream().allMatch(op -> op instanceof RexLiteral)));
 
+    // Calcite does not support RexLiteral values with SqlTypeName.VARIANT. Keep these calls in the plan so that
+    // Pinot can evaluate them at runtime; otherwise constant folding parseJson(...) fails while trying to construct
+    // a VARIANT literal and prevents valid compositions such as variantGet(parseJson(...), ...).
+    if (rexCall.getType().getSqlTypeName() == SqlTypeName.VARIANT) {
+      return rexCall;
+    }
+
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
     Object[] arguments = new Object[numArguments];

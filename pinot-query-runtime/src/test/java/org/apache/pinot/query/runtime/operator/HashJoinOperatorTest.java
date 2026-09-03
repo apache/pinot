@@ -42,7 +42,9 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
@@ -282,6 +284,26 @@ public class HashJoinOperatorTest {
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{4, "CC"});
     assertTrue(operator.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void shouldRejectRawVariantRightKeyForSemiJoin() {
+    assertRawVariantRightKeyRejected(JoinRelType.SEMI);
+  }
+
+  @Test
+  public void shouldRejectRawVariantRightKeyForAntiJoin() {
+    assertRawVariantRightKeyRejected(JoinRelType.ANTI);
+  }
+
+  @Test
+  public void shouldPreserveLegacyConstructorForSemiJoin() {
+    assertLegacyConstructorSupports(JoinRelType.SEMI);
+  }
+
+  @Test
+  public void shouldPreserveLegacyConstructorForAntiJoin() {
+    assertLegacyConstructorSupports(JoinRelType.ANTI);
   }
 
   @Test
@@ -735,8 +757,9 @@ public class HashJoinOperatorTest {
             new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
 
     // Composite key join on columns 1 and 2 (string_col and double_col)
-    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.SEMI,
-            List.of(1, 2), List.of(1, 2), List.of());
+    HashJoinOperator operator =
+        getOperator(compositeSchema, compositeSchema, resultSchema, JoinRelType.SEMI, List.of(1, 2), List.of(1, 2),
+            List.of(), PlanNode.NodeHint.EMPTY);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
@@ -771,8 +794,9 @@ public class HashJoinOperatorTest {
             new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
 
     // Composite key join on columns 1 and 2 (string_col and double_col)
-    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.ANTI,
-            List.of(1, 2), List.of(1, 2), List.of());
+    HashJoinOperator operator =
+        getOperator(compositeSchema, compositeSchema, resultSchema, JoinRelType.ANTI, List.of(1, 2), List.of(1, 2),
+            List.of(), PlanNode.NodeHint.EMPTY);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
@@ -872,7 +896,14 @@ public class HashJoinOperatorTest {
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       PlanNode.NodeHint nodeHint) {
-    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
+    return getOperator(leftSchema, leftSchema, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
+        nodeHint);
+  }
+
+  private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema rightSchema, DataSchema resultSchema,
+      JoinRelType joinType, List<Integer> leftKeys, List<Integer> rightKeys,
+      List<RexExpression> nonEquiConditions, PlanNode.NodeHint nodeHint) {
+    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput, rightSchema,
         new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions,
             JoinNode.JoinStrategy.HASH));
   }
@@ -880,14 +911,36 @@ public class HashJoinOperatorTest {
   private HashJoinOperator getOperator(DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       PlanNode.NodeHint nodeHint) {
-    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA, _rightInput,
-        new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions,
-            JoinNode.JoinStrategy.HASH));
+    return getOperator(DEFAULT_CHILD_SCHEMA, DEFAULT_CHILD_SCHEMA, resultSchema, joinType, leftKeys, rightKeys,
+        nonEquiConditions, nodeHint);
   }
 
   private HashJoinOperator getOperator(DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
     return getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
         PlanNode.NodeHint.EMPTY);
+  }
+
+  private void assertRawVariantRightKeyRejected(JoinRelType joinType) {
+    DataSchema rightSchema = new DataSchema(new String[]{"variant_col"},
+        new ColumnDataType[]{ColumnDataType.VARIANT});
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(rightSchema).buildWithEos();
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> getOperator(DEFAULT_CHILD_SCHEMA, rightSchema, DEFAULT_CHILD_SCHEMA, joinType, List.of(0), List.of(0),
+            List.of(), PlanNode.NodeHint.EMPTY));
+    assertTrue(exception.getMessage().contains("Raw VARIANT values do not support JOIN keys"));
+  }
+
+  private void assertLegacyConstructorSupports(JoinRelType joinType) {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
+    JoinNode joinNode =
+        new JoinNode(-1, DEFAULT_CHILD_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), joinType, List.of(0), List.of(0),
+            List.of(), JoinNode.JoinStrategy.HASH);
+
+    assertNotNull(new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA,
+        _rightInput, joinNode));
   }
 }

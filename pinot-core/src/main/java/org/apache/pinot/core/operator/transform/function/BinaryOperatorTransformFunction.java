@@ -108,6 +108,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _rightTransformFunction = arguments.get(1);
     DataType leftDataType = _leftTransformFunction.getResultMetadata().getDataType();
     DataType rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
+    Preconditions.checkArgument(leftDataType.supportsOrdering() && rightDataType.supportsOrdering(),
+        "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
     _leftStoredType = leftDataType.getStoredType();
     _rightStoredType = rightDataType.getStoredType();
 

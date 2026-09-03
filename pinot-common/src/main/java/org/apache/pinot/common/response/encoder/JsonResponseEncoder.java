@@ -148,6 +148,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
       case STRING:
       case JSON:
       case BYTES:
+      case VARIANT:
       case UUID:
       case OBJECT:
         return jsonValue.textValue();

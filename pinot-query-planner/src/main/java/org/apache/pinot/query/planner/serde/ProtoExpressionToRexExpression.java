@@ -182,6 +182,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.BYTES;
       case UUID:
         return ColumnDataType.UUID;
+      case VARIANT:
+        return ColumnDataType.VARIANT;
       case INT_ARRAY:
         return ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:
@@ -208,6 +210,10 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.OBJECT;
       case UNKNOWN:
         return ColumnDataType.UNKNOWN;
+      case UNRECOGNIZED:
+        throw new IllegalArgumentException(
+            "Unrecognized query-plan ColumnDataType received from a peer node. Upgrade all brokers and servers "
+                + "before querying columns whose logical type was introduced by the newer node.");
       default:
         throw new IllegalStateException("Unsupported proto ColumnDataType: " + dataType);
     }
