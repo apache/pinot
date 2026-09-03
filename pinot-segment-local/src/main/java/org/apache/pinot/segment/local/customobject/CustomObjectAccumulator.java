@@ -66,9 +66,12 @@ public abstract class CustomObjectAccumulator<T> {
   }
 
   /// Forces the item T in internal state to be merged with all pending items in the accumulator state
-  /// and returns the result.  This should not result in the accumulator state being updated or cleared.
+  /// and returns the result.
   /// @return T result of the merge.
   public abstract T getResult();
+
+  /// Merges the pending items into the internal state and clears them, without building a result.
+  protected abstract void flush();
 
   /// Merges another accumulator with this one, by extracting the result from "other".
   /// @param other the custom object accumulator to merge.
@@ -96,8 +99,7 @@ public abstract class CustomObjectAccumulator<T> {
     _numInputs += 1;
 
     if (_accumulator.size() >= _threshold) {
-      getResult();
-      _accumulator.clear();
+      flush();
     }
   }
 }

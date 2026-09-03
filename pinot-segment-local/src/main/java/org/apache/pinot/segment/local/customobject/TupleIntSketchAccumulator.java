@@ -60,24 +60,12 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
   }
 
   @Override
-  public TupleSketch<IntegerSummary> getResult() {
-    return unionAll();
-  }
-
-  private TupleSketch<IntegerSummary> unionAll() {
+  protected void flush() {
+    if (_accumulator == null || _accumulator.isEmpty()) {
+      return;
+    }
     if (_union == null) {
       _union = new TupleUnion<>(_nominalEntries, _setOperations);
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult();
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1) {
-      return _accumulator.get(0);
     }
 
     // Performance optimization: ensure that the minimum Theta is used for "early stop".
@@ -94,7 +82,25 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
+  }
 
+  @Override
+  public TupleSketch<IntegerSummary> getResult() {
+    if (_union == null) {
+      _union = new TupleUnion<>(_nominalEntries, _setOperations);
+    }
+    // Return the default update "gadget" sketch as a compact sketch
+    if (isEmpty()) {
+      return _union.getResult();
+    }
+    // Corner-case: the parameters are not strictly respected when there is a single sketch.
+    // This single sketch might have been the result of a previously accumulated union and
+    // would already have the parameters set.  The sketch is returned as-is without adjusting
+    // nominal entries which requires an additional union operation.
+    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
+      return _accumulator.get(0);
+    }
+    flush();
     return _union.getResult();
   }
 }
