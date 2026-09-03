@@ -100,6 +100,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
