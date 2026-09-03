@@ -21,6 +21,7 @@ package org.apache.pinot.sql.ddl.reverse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -134,6 +135,9 @@ final class SchemaEmitter {
     boolean atNaturalDefault;
     if (defaultValue == null || naturalDefault == null) {
       atNaturalDefault = (defaultValue == null && naturalDefault == null);
+    } else if (spec.getDataType() == DataType.VARIANT) {
+      // This compares schema metadata (the reserved SQL-null sentinel), not Variant values.
+      atNaturalDefault = Arrays.equals((byte[]) defaultValue, (byte[]) naturalDefault);
     } else if (spec.getDataType() == DataType.BIG_DECIMAL && defaultValue instanceof BigDecimal
         && naturalDefault instanceof BigDecimal) {
       atNaturalDefault = ((BigDecimal) defaultValue).compareTo((BigDecimal) naturalDefault) == 0;
@@ -185,6 +189,8 @@ final class SchemaEmitter {
         return "JSON";
       case BYTES:
         return "BYTES";
+      case VARIANT:
+        return "VARIANT";
       default:
         // Fall back to the enum name for types we don't have a canonical short name for
         // (LIST, MAP, STRUCT, UNKNOWN). These are not yet expressible in DDL but emitting the

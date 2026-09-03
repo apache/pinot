@@ -29,6 +29,8 @@ import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 public class IntersectOperatorTest {
 
@@ -146,5 +148,16 @@ public class IntersectOperatorTest {
       result = intersectOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
+  }
+
+  @Test
+  public void testRejectsVariantSetOperations() {
+    DataSchema schema = new DataSchema(new String[]{"payload"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.VARIANT});
+    List<MultiStageOperator> inputs = List.of(mock(MultiStageOperator.class), mock(MultiStageOperator.class));
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> new IntersectOperator(OperatorTestUtil.getTracingContext(), inputs, schema));
+    Assert.assertTrue(exception.getMessage().contains("INTERSECT/EXCEPT does not support raw VARIANT"));
   }
 }
