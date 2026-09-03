@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
+import org.apache.pinot.query.planner.validation.VariantTypeValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -152,12 +153,13 @@ public class PinotDispatchPlanner {
     }
   }
 
-  /// Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
+  /// Runs validations on the plan.
   private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
     boolean isIntermediateStage =
         context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
     rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
+    rootPlanNode.visit(VariantTypeValidationVisitor.INSTANCE, null);
     for (PlanFragment child : planFragment.getChildren()) {
       runValidations(child, context);
     }

@@ -77,6 +77,7 @@ public class ParquetNativeRecordReader implements RecordReader {
     try {
       schema = parquetFileReader.getFooter().getFileMetaData().getSchema();
       ParquetNativeRecordExtractorConfig extractorConfig = new ParquetNativeRecordExtractorConfig();
+      extractorConfig.setParquetSchema(schema);
       if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
         extractorConfig.setExtractRawTimeValues(
             ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());

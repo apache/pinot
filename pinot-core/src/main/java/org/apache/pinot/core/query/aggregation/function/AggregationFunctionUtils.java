@@ -55,6 +55,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
@@ -148,6 +149,51 @@ public class AggregationFunctionUtils {
       return finalResult1;
     }
     return aggregationFunction.mergeFinalResult(finalResult1, finalResult2);
+  }
+
+  /// Rejects raw VARIANT aggregate operands based on their logical result type.
+  ///
+  /// VARIANT is physically stored as BYTES, so checking the stored type would accidentally enable byte equality,
+  /// ordering, hashing, or sketch serialization semantics. COUNT is the deliberately narrow exception because it only
+  /// observes SQL nullness and never consumes the encoded value.
+  public static void validateRawVariantAggregationInputs(AggregationFunction<?, ?>[] aggregationFunctions,
+      BaseProjectOperator<?> projectOperator) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
+        continue;
+      }
+      for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
+        ColumnContext columnContext = projectOperator.getResultColumnContext(inputExpression);
+        if (columnContext != null && !columnContext.getDataType().supportsDirectAggregation()) {
+          throw rawVariantUnsupported(aggregationFunction);
+        }
+      }
+    }
+  }
+
+  private static void validateRawVariantIdentifierInputs(AggregationFunction<?, ?>[] aggregationFunctions,
+      SegmentContext segmentContext, QueryContext queryContext) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
+        continue;
+      }
+      for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
+        if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
+          FieldSpec.DataType dataType =
+              segmentContext.getIndexSegment().getDataSource(inputExpression.getIdentifier(), queryContext.getSchema())
+                  .getDataSourceMetadata().getDataType();
+          if (!dataType.supportsDirectAggregation()) {
+            throw rawVariantUnsupported(aggregationFunction);
+          }
+        }
+      }
+    }
+  }
+
+  private static IllegalArgumentException rawVariantUnsupported(AggregationFunction<?, ?> aggregationFunction) {
+    return new IllegalArgumentException(
+        "Aggregation function " + aggregationFunction.getType().getName()
+            + " does not support raw VARIANT values; extract a typed path with variantGet first");
   }
 
   /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
@@ -350,6 +396,9 @@ public class AggregationFunctionUtils {
       _functions = functions;
       _projectOperator = projectOperator;
       _useStarTree = useStarTree;
+      if (!useStarTree) {
+        validateRawVariantAggregationInputs(functions, projectOperator);
+      }
     }
 
     public AggregationFunction[] getFunctions() {
@@ -383,6 +432,10 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    // Star-tree project operators expose pre-aggregated columns instead of the original logical operands, so validate
+    // direct identifiers before attempting the star-tree path. Function and literal operands cannot use star-tree and
+    // are validated against the regular project operator after fallback.
+    validateRawVariantIdentifierInputs(aggregationFunctions, segmentContext, queryContext);
     /// Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
     /// sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
     if (queryContext.isGroupingSets()) {
