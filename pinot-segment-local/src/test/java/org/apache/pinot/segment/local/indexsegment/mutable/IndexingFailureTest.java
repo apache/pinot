@@ -334,13 +334,17 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     MutableSegmentImpl segment = createSegment(schema, Set.of(), Set.of(INT_COL, STRING_COL), serverMetrics, false);
     try {
       expectThrows(Exception.class, () -> segment.index(badDictionaryRow(), METADATA));
-      assertEquals(segment.getNumDocsIndexed(), 0);
-      verify(serverMetrics, never()).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
-          eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), anyLong());
+      // Strict mode still publishes the completed fallback row so upsert/dedup metadata cannot
+      // point at an unpublished docId (#16316 alignment).
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue(INT_COL),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+      verify(serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+          eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
 
       segment.index(goodRow(1, "ok"), METADATA);
-      assertEquals(segment.getNumDocsIndexed(), 1);
-      assertEquals(segment.getRecord(0, new GenericRow()).getValue(INT_COL), 1);
+      assertEquals(segment.getNumDocsIndexed(), 2);
+      assertEquals(segment.getRecord(1, new GenericRow()).getValue(INT_COL), 1);
     } finally {
       segment.destroy();
     }

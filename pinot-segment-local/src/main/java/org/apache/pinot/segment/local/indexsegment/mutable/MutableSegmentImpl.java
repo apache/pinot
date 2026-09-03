@@ -850,7 +850,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   /// @return {@code true} if any column required a default/fallback while updating dictionaries
-  /// @throws RuntimeException when dictionary indexing fails and `continueOnError` is false
+  /// When `continueOnError` is false, dictionary failures are stashed and rethrown after the row is published.
   private boolean updateDictionary(GenericRow row) {
     boolean hadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -879,9 +879,11 @@ public class MutableSegmentImpl implements MutableSegment {
         indexContainer._minValue = dictionary.getMinVal();
         indexContainer._maxValue = dictionary.getMaxVal();
       } catch (Exception e) {
-        // Do not abort the row mid-dictionary when continueOnError is enabled: remaining columns still get a
-        // chance, and addNewRow will fill defaults for this column if dict ids are unset (Integer.MIN_VALUE / null).
-        recordOrThrowIndexingError("DICTIONARY", e);
+        // Do not abort the row mid-dictionary: remaining columns still get a chance, and addNewRow will fill
+        // defaults for this column if dict ids are unset (Integer.MIN_VALUE / null). When continueOnError is
+        // false the exception is stashed and rethrown after the caller publishes the docId so upsert/dedup
+        // metadata never points at an unpublished row.
+        recordOrDeferIndexingError("DICTIONARY", e);
         hadError = true;
         // Error sentinels, kept only if even the default cannot be indexed below. For MV columns the sentinel is a
         // null array, which is distinct from an empty array (a row that legitimately carries no values).

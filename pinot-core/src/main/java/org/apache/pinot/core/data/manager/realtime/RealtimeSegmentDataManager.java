@@ -734,6 +734,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
               _segmentLogger.error(errorMessage, e);
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+              // index() may publish-then-throw when continueOnError is false; refresh capacity from the segment.
+              canTakeMore = _realtimeSegment.canAddMore();
             }
           }
         }
