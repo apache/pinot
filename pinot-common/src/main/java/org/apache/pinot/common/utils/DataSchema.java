@@ -207,11 +207,11 @@ public class DataSchema {
   /// Resolves a [ColumnDataType] token read off the wire, turning the raw [IllegalArgumentException] from
   /// [ColumnDataType#valueOf] into a message that names the mixed-version cause.
   ///
-  /// Rolling-upgrade limitation: once a node on this build emits a `UUID` token, an older peer that does not know
-  /// the [ColumnDataType#UUID] constant fails here. There is no version-negotiation shim or fallback to `BYTES`
-  /// today, so brokers and servers must be upgraded atomically (or UUID columns kept out of queries) until the
-  /// whole cluster is on this build. Rolling back to a pre-UUID build is likewise unsafe while UUID-typed query
-  /// results are in flight. No existing (non-UUID) column is affected.
+  /// Rolling-upgrade limitation: once a node emits a token introduced by a newer build, an older peer that does not
+  /// know that [ColumnDataType] fails here. There is no version-negotiation shim or fallback to the stored type today,
+  /// so columns using a newly introduced logical type must stay out of queries until every broker and server has been
+  /// upgraded. Rolling back is likewise unsafe while results of that logical type are in flight. Existing column types
+  /// are unaffected because their wire names remain unchanged.
   private static ColumnDataType parseColumnDataType(String name) {
     try {
       return ColumnDataType.valueOf(name);
@@ -327,6 +327,14 @@ public class DataSchema {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
+    // VARIANT is a logical type backed by BYTES. Its nonempty PVAR envelope distinguishes a Variant null from the
+    // empty SQL-null placeholder.
+    VARIANT(BYTES, NullValuePlaceHolder.INTERNAL_BYTES) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.VARIANT);
       }
     },
     // UUID is a logical type backed by BYTES; keep it directly after BYTES. ColumnDataType is serialized by name (not
@@ -465,6 +473,56 @@ public class DataSchema {
       return _storedColumnDataType;
     }
 
+    public boolean supportsEquality() {
+      if (isArray() || this == OBJECT) {
+        return false;
+      }
+      return toCapabilityDataType().supportsEquality();
+    }
+
+    public boolean supportsHashing() {
+      if (isArray() || this == OBJECT) {
+        return false;
+      }
+      return toCapabilityDataType().supportsHashing();
+    }
+
+    public boolean supportsOrdering() {
+      if (isArray() || this == OBJECT) {
+        return false;
+      }
+      return toCapabilityDataType().supportsOrdering();
+    }
+
+    public boolean supportsMinMax() {
+      if (isArray() || this == OBJECT) {
+        return false;
+      }
+      return toCapabilityDataType().supportsMinMax();
+    }
+
+    public boolean supportsDirectAggregation() {
+      return toCapabilityDataType().supportsDirectAggregation();
+    }
+
+    public boolean supportsPatternMatching() {
+      if (isArray() || this == MAP || this == OBJECT) {
+        return false;
+      }
+      return toCapabilityDataType().supportsPatternMatching();
+    }
+
+    private DataType toCapabilityDataType() {
+      switch (this) {
+        case MAP:
+          return DataType.MAP;
+        case OBJECT:
+          return DataType.OPEN_STRUCT;
+        default:
+          return toDataType();
+      }
+    }
+
     public boolean isNumber() {
       return NUMERIC_TYPES.contains(this);
     }
@@ -522,6 +580,8 @@ public class DataSchema {
         case BYTES:
         case BYTES_ARRAY:
           return DataType.BYTES;
+        case VARIANT:
+          return DataType.VARIANT;
         case UUID:
         case UUID_ARRAY:
           return DataType.UUID;
@@ -541,13 +601,14 @@ public class DataSchema {
     /// - Query response
     ///
     /// Internal value type is used within the storage and query engine, where value is always of the stored type. For
-    /// BYTES type, we use a wrapper class [ByteArray] to make it comparable.
+    /// BYTES and VARIANT types, we use a wrapper class [ByteArray] as their internal representation.
     ///
     /// The conversion applies to the following types:
     ///
     /// - BOOLEAN: boolean -> int
     /// - TIMESTAMP: Timestamp -> long
     /// - BYTES: byte\[\] -> ByteArray
+    /// - VARIANT: byte\[\] -> ByteArray
     /// - BOOLEAN_ARRAY: boolean\[\] -> int\[\]
     /// - TIMESTAMP_ARRAY: Timestamp\[\] -> long\[\]
     /// - UUID: UUID/String/byte\[\]/ByteArray -> ByteArray
@@ -559,6 +620,7 @@ public class DataSchema {
         case TIMESTAMP:
           return ((Timestamp) value).getTime();
         case BYTES:
+        case VARIANT:
           return new ByteArray((byte[]) value);
         case UUID:
           return new ByteArray(UuidUtils.toBytes(value));
@@ -613,6 +675,7 @@ public class DataSchema {
     /// - BOOLEAN: int -> boolean
     /// - TIMESTAMP: long -> Timestamp
     /// - BYTES: ByteArray -> byte\[\]
+    /// - VARIANT: ByteArray -> byte\[\]
     /// - BOOLEAN_ARRAY: int\[\] -> boolean\[\]
     /// - TIMESTAMP_ARRAY: long\[\] -> Timestamp\[\]
     /// - BYTES_ARRAY: ByteArray\[\] -> byte\[\]\[\]
@@ -625,6 +688,7 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((long) value);
         case BYTES:
+        case VARIANT:
           return ((ByteArray) value).getBytes();
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
@@ -663,6 +727,7 @@ public class DataSchema {
         case JSON:
           return value.toString();
         case BYTES:
+        case VARIANT:
           return ((ByteArray) value).getBytes();
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
@@ -706,6 +771,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
+        case VARIANT:
+          return VariantUtils.variantToJson((byte[]) value);
         case UUID:
           return formatUuid(value);
         case BIG_DECIMAL_ARRAY:
@@ -743,6 +810,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case VARIANT:
+          return VariantUtils.variantToJson(((ByteArray) value).getBytes());
         case UUID:
           return UuidUtils.toString((ByteArray) value);
         case MAP:
@@ -1071,6 +1140,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case VARIANT:
+          return VARIANT;
         case UUID:
           return UUID;
         case MAP:
@@ -1135,6 +1206,8 @@ public class DataSchema {
           return PinotDataType.JSON;
         case BYTES:
           return PinotDataType.BYTES;
+        case VARIANT:
+          return PinotDataType.VARIANT;
         case UUID:
           return PinotDataType.UUID;
         case MAP:

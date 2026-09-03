@@ -123,6 +123,10 @@ public final class Schema implements Serializable {
   public static void validate(FieldType fieldType, DataType dataType) {
     switch (fieldType) {
       case DIMENSION:
+        if (dataType == DataType.VARIANT) {
+          break;
+        }
+        // fall through
       case TIME:
       case DATE_TIME:
         switch (dataType) {
@@ -591,7 +595,7 @@ public final class Schema implements Serializable {
   /// The following validations are performed:
   ///
   /// - For dimension, time, date time fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
-  ///   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES
+  ///   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES. VARIANT is supported only for dimension fields.
   /// - For metric fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES
   ///
   /// Note: multi-value compatibility checks (e.g. rejecting MV JSON columns) live in

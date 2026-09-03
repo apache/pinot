@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.VARIANT;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
@@ -45,6 +46,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class SortOperatorTest {
@@ -612,6 +614,16 @@ public class SortOperatorTest {
         .getBoolean(SortOperator.StatKey.REQUIRE_SORT));
     assertFalse(getOperator(schema, List.of(), 10, 0).copyStatMaps()
         .getBoolean(SortOperator.StatKey.REQUIRE_SORT));
+  }
+
+  @Test
+  public void shouldRejectRawVariantCollation() {
+    DataSchema schema = new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{VARIANT});
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
+
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> getOperator(schema, collations));
+    assertTrue(exception.getMessage().contains("ORDER BY does not support raw VARIANT"));
   }
 
   private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations, int fetch, int offset) {

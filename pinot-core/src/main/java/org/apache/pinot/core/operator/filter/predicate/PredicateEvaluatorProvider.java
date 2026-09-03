@@ -67,6 +67,45 @@ public class PredicateEvaluatorProvider {
   private static PredicateEvaluator buildEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext, @Nullable DataSource dataSource) {
     try {
+      boolean predicateSupported;
+      switch (predicate.getType()) {
+        case EQ:
+        case NOT_EQ:
+          predicateSupported = dataType.supportsEquality();
+          break;
+        case IN:
+        case NOT_IN:
+          predicateSupported = dataType.supportsEquality() && dataType.supportsHashing();
+          break;
+        case RANGE:
+          predicateSupported = dataType.supportsOrdering();
+          break;
+        case REGEXP_LIKE:
+          predicateSupported = dataType.supportsPatternMatching();
+          break;
+        default:
+          predicateSupported = true;
+          break;
+      }
+      if (!predicateSupported) {
+        String operation;
+        switch (predicate.getType()) {
+          case IN:
+          case NOT_IN:
+            operation = "IN";
+            break;
+          case EQ:
+          case NOT_EQ:
+          case RANGE:
+            operation = "comparison";
+            break;
+          default:
+            operation = predicate.getType().name();
+            break;
+        }
+        throw new IllegalArgumentException(
+            "Raw VARIANT values do not support " + operation + "; extract a typed path with variantGet first");
+      }
       if (dictionary != null) {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
