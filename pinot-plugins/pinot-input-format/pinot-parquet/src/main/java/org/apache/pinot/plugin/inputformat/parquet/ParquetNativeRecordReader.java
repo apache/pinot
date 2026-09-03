@@ -61,23 +61,59 @@ public class ParquetNativeRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
-    _dataFilePath = new Path(parquetFile.getAbsolutePath());
-    _hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
-    ParquetNativeRecordExtractorConfig extractorConfig = new ParquetNativeRecordExtractorConfig();
-    if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
-      extractorConfig.setExtractRawTimeValues(
-          ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
+    Path dataFilePath = new Path(parquetFile.getAbsolutePath());
+    Configuration hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
+    ParquetReadOptions parquetReadOptions =
+        ParquetReadOptions.builder().withMetadataFilter(ParquetMetadataConverter.NO_FILTER).build();
+
+    ParquetFileReader previousReader = _parquetFileReader;
+    ParquetFileReader parquetFileReader =
+        ParquetFileReader.open(HadoopInputFile.fromPath(dataFilePath, hadoopConf), parquetReadOptions);
+    MessageType schema;
+    ParquetNativeRecordExtractor recordExtractor;
+    MessageColumnIO columnIO;
+    PageReadStore pageReadStore;
+    org.apache.parquet.io.RecordReader<Group> parquetRecordReader;
+    try {
+      schema = parquetFileReader.getFooter().getFileMetaData().getSchema();
+      ParquetNativeRecordExtractorConfig extractorConfig = new ParquetNativeRecordExtractorConfig();
+      if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
+        extractorConfig.setExtractRawTimeValues(
+            ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
+      }
+      recordExtractor = new ParquetNativeRecordExtractor();
+      recordExtractor.init(fieldsToRead, extractorConfig);
+
+      columnIO = new ColumnIOFactory().getColumnIO(schema);
+      pageReadStore = parquetFileReader.readNextRowGroup();
+      parquetRecordReader = pageReadStore != null
+          ? columnIO.getRecordReader(pageReadStore, new GroupRecordConverter(schema)) : null;
+    } catch (IOException | RuntimeException e) {
+      try {
+        parquetFileReader.close();
+      } catch (IOException closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
     }
-    _recordExtractor = new ParquetNativeRecordExtractor();
-    _recordExtractor.init(fieldsToRead, extractorConfig);
 
-    _parquetReadOptions = ParquetReadOptions.builder().withMetadataFilter(ParquetMetadataConverter.NO_FILTER).build();
-
-    _parquetFileReader =
-        ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf), _parquetReadOptions);
-    _schema = _parquetFileReader.getFooter().getFileMetaData().getSchema();
-    _columnIO = new ColumnIOFactory().getColumnIO(_schema);
-    init();
+    // Publish the fully initialized replacement before cleaning up the old reader. If old-reader cleanup fails, the
+    // caller sees the failure but this instance remains attached to the usable replacement instead of stale,
+    // partially closed state.
+    _dataFilePath = dataFilePath;
+    _hadoopConf = hadoopConf;
+    _parquetReadOptions = parquetReadOptions;
+    _parquetFileReader = parquetFileReader;
+    _schema = schema;
+    _recordExtractor = recordExtractor;
+    _columnIO = columnIO;
+    _pageReadStore = pageReadStore;
+    _parquetRecordReader = parquetRecordReader;
+    _nextRecord = null;
+    _currentPageIdx = 0;
+    if (previousReader != null) {
+      previousReader.close();
+    }
   }
 
   private void init()
@@ -122,9 +158,11 @@ public class ParquetNativeRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RecordFetchException("Failed to read next Parquet native record", e);
     }
+    // The physical reader has consumed the row. Advance before logical extraction so continueOnError callers can
+    // recover from malformed values without retrying the same row or leaving hasNext() stuck at end-of-file.
+    _currentPageIdx++;
     // Data parsing: extract into GenericRow.
     _recordExtractor.extract(_nextRecord, reuse);
-    _currentPageIdx++;
     return reuse;
   }
 
@@ -140,6 +178,8 @@ public class ParquetNativeRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    _parquetFileReader.close();
+    if (_parquetFileReader != null) {
+      _parquetFileReader.close();
+    }
   }
 }
