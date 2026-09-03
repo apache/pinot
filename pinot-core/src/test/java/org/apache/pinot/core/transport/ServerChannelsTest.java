@@ -25,6 +25,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -49,6 +50,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class ServerChannelsTest {
@@ -82,7 +84,6 @@ public class ServerChannelsTest {
           new ServerRoutingInstance("localhost", dummyServer.getAddress().getPort(), TableType.REALTIME);
       ServerChannels serverChannels =
           new ServerChannels(queryRouter, nettyConfig, null, ThreadAccountantUtils.getNoOpAccountant());
-      serverChannels.connect(serverRoutingInstance);
 
       final long requestId = System.currentTimeMillis();
 
@@ -95,6 +96,37 @@ public class ServerChannelsTest {
       serverChannels.shutDown();
     } finally {
       dummyServer.stop(0);
+    }
+  }
+
+  /// Connecting is bounded by the caller's timeout. Without that bound a connect to a host that drops packets -- the
+  /// host the failure detector pings -- would block for Netty's 30 s default. 192.0.2.1 is reserved for
+  /// documentation (RFC 5737) and routes nowhere: depending on the network the connect either hangs, which the timeout
+  /// must cut short, or fails at once.
+  @Test
+  public void testConnectIsBoundedByTheCallerTimeout()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      InstanceRequest instanceRequest = new InstanceRequest();
+      instanceRequest.setRequestId(1L);
+      instanceRequest.setQuery(new BrokerRequest());
+      long timeoutMs = 500L;
+      long startTimeMs = System.currentTimeMillis();
+      try {
+        serverChannels.sendRequest("dummy_table_name", mock(AsyncQueryResponse.class),
+            new ServerRoutingInstance("192.0.2.1", 8098, TableType.OFFLINE), instanceRequest, timeoutMs);
+        fail("Connecting to an unroutable address must fail");
+      } catch (Exception e) {
+        // A network that rejects the address fails the connect at once. One that drops the packets must hit the bound.
+        if (System.currentTimeMillis() - startTimeMs >= timeoutMs) {
+          assertTrue(e instanceof TimeoutException, "A hanging connect must end in the caller's timeout, got: " + e);
+        }
+      }
+      assertTrue(System.currentTimeMillis() - startTimeMs < 5_000L, "The connect must be bounded by the timeout");
+    } finally {
+      serverChannels.shutDown();
     }
   }
 
