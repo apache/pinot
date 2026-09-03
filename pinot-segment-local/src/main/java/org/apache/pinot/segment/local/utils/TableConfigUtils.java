@@ -774,8 +774,7 @@ public final class TableConfigUtils {
       FieldSpec fieldSpec = schema.getFieldSpecFor(dimension);
       Preconditions.checkState(fieldSpec.isSingleValueField(),
           "Metrics aggregation cannot be enabled with multi-value dimension column: %s", dimension);
-      Preconditions.checkState(
-          fieldSpec.getDataType().supportsEquality() && fieldSpec.getDataType().supportsHashing(),
+      Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
           "Metrics aggregation cannot use VARIANT dimension column as an aggregation key: %s", dimension);
     }
 
@@ -1084,7 +1083,7 @@ public final class TableConfigUtils {
       if (comparisonColumns != null) {
         for (String column : comparisonColumns) {
           Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
-          Preconditions.checkState(schema.getFieldSpecFor(column).getDataType().supportsOrdering(),
+          Preconditions.checkState(schema.getFieldSpecFor(column).getDataType() != DataType.VARIANT,
               "VARIANT column cannot be used as an upsert comparison column: %s", column);
         }
       }
@@ -1842,8 +1841,7 @@ public final class TableConfigUtils {
     if (CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns())) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(primaryKeyColumn);
-        Preconditions.checkState(fieldSpec == null
-                || (fieldSpec.getDataType().supportsEquality() && fieldSpec.getDataType().supportsHashing()),
+        Preconditions.checkState(fieldSpec == null || fieldSpec.getDataType() != DataType.VARIANT,
             "VARIANT column cannot be used as a primary key: %s", primaryKeyColumn);
       }
     }
@@ -1907,7 +1905,7 @@ public final class TableConfigUtils {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
         Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
-        Preconditions.checkState(fieldSpec.getDataType().supportsOrdering(),
+        Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
             "Cannot sort on VARIANT column: %s", column);
       }
     }
@@ -1922,7 +1920,7 @@ public final class TableConfigUtils {
           Preconditions.checkState(fieldSpec != null, "Failed to find partition column: %s in schema", column);
           Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
               column);
-          Preconditions.checkState(fieldSpec.getDataType().supportsHashing(),
+          Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
               "Cannot partition on VARIANT column: %s", column);
         }
       }
@@ -2049,9 +2047,7 @@ public final class TableConfigUtils {
   /// `timestampIndexColumns` holds the TIMESTAMP-index derived columns (e.g. `$ts$DAY`) declared via
   /// [TimestampConfig#getGranularities()]. These are materialized as dictionary-encoded single-value TIMESTAMP
   /// columns at segment generation time (see [TimestampIndexUtils#applyTimestampIndex(TableConfig, Schema)]), so
-  /// they can be absent from the schema at config-validation time and are accepted without a schema lookup. When a
-  /// declared derived name is already present in the schema, it is validated normally so a user column with a
-  /// colliding name cannot bypass type, encoding, or cardinality checks.
+  /// they are absent from the schema at config-validation time and are accepted here without a schema lookup.
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
       Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema, Set<String> timestampIndexColumns) {
     Set<String> dimensionColumns = new HashSet<>();
@@ -2060,7 +2056,8 @@ public final class TableConfigUtils {
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
       assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
       for (String dimension : dimensionsSplitOrder) {
-        if (timestampIndexColumns.contains(dimension) && schema.getFieldSpecFor(dimension) == null) {
+        if (timestampIndexColumns.contains(dimension)) {
+          validateTimestampIndexColumnDoesNotHideVariant(dimension, schema);
           dimensionColumns.add(dimension);
           continue;
         }
@@ -2150,7 +2147,8 @@ public final class TableConfigUtils {
       }
 
       for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
-        if (timestampIndexColumns.contains(column) && schema.getFieldSpecFor(column) == null) {
+        if (timestampIndexColumns.contains(column)) {
+          validateTimestampIndexColumnDoesNotHideVariant(column, schema);
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -2163,7 +2161,8 @@ public final class TableConfigUtils {
       }
 
       for (String column : dimensionColumns) {
-        if (timestampIndexColumns.contains(column) && schema.getFieldSpecFor(column) == null) {
+        if (timestampIndexColumns.contains(column)) {
+          validateTimestampIndexColumnDoesNotHideVariant(column, schema);
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -2171,6 +2170,12 @@ public final class TableConfigUtils {
             "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
       }
     }
+  }
+
+  private static void validateTimestampIndexColumnDoesNotHideVariant(String column, Schema schema) {
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec == null || fieldSpec.getDataType() != DataType.VARIANT,
+        "Star-tree index cannot be created on VARIANT column: %s", column);
   }
 
   private static void sanitize(TableConfig tableConfig) {
