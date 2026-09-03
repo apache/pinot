@@ -87,8 +87,15 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
     long currentSegmentCrc = getSegmentCrc(tableNameWithType, segmentName);
     if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
-      LOGGER.info("Segment CRC does not match, skip the task. Original CRC: {}, current CRC: {}", originalSegmentCrc,
+      String skipMessage = String.format(
+          "Skipped: ZK CRC changed since task generation. Original CRC: %s, current CRC: %s", originalSegmentCrc,
           currentSegmentCrc);
+      LOGGER.info("Segment CRC does not match, skip the task. Table: {}, segment: {}. {}", tableNameWithType,
+          segmentName, skipMessage);
+      _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.CRC_SKIP_ZK_CHANGED, 1L);
+      if (_eventObserver != null) {
+        _eventObserver.notifyProgress(pinotTaskConfig, skipMessage);
+      }
       return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
           .build();
     }
