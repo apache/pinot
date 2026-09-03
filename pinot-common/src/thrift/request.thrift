@@ -60,4 +60,8 @@ struct InstanceRequest {
   6: optional list<string> optionalSegments;
   7: optional string cid;
   8: optional list<TableSegmentsInfo> tableSegmentsInfoList;
+  // Liveness check sent by the broker after a query times out. A server that understands it replies straight away
+  // without running anything; an older server ignores the field and answers it as an ordinary query, once the queries
+  // queued ahead of it have run.
+  9: optional bool ping;
 }
