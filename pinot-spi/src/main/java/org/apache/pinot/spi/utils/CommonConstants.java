@@ -1172,7 +1172,8 @@ public class CommonConstants {
         // Do not detect any failure
         NO_OP,
 
-        // Detect connection failures
+        // Detect connection failures, and servers that leave consecutive requests unanswered while staying
+        // connected (see CONFIG_OF_CONSECUTIVE_TIMEOUT_THRESHOLD; set it to <= 0 for connection failures only)
         CONNECTION,
 
         // Use the custom failure detector of the configured class name
@@ -1191,6 +1192,14 @@ public class CommonConstants {
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETRIES = 10;
+
+      /// Number of consecutive requests a server must leave unanswered before it is marked unhealthy. This is the
+      /// only way to detect a server that keeps its connection open but stops serving, since that raises no
+      /// connection failure. Any response resets the count, so only a server answering nothing at all reaches the
+      /// threshold. Set to `<= 0` to detect connection failures only.
+      public static final String CONFIG_OF_CONSECUTIVE_TIMEOUT_THRESHOLD =
+          "pinot.broker.failure.detector.consecutive.timeout.threshold";
+      public static final int DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD = 5;
     }
 
     // Configs related to AdaptiveServerSelection.

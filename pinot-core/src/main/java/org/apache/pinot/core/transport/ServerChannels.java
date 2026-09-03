@@ -24,6 +24,8 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -66,7 +68,12 @@ import org.slf4j.LoggerFactory;
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
-  private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
+  /// Kept short: a TCP connect to a healthy server in the same datacenter completes in well under a millisecond, so
+  /// a longer deadline only buys a slower "no" -- and the single failure-detector retry thread probes serially, so
+  /// every second here is head-of-line blocking for the next unhealthy server.
+  private static final long PROBE_CONNECT_TIMEOUT_MS = 2_000L;
+  /// Backstop only; Netty's own connect deadline should be the one that fires.
+  private static final long PROBE_AWAIT_TIMEOUT_MS = PROBE_CONNECT_TIMEOUT_MS + 1_000L;
 
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
   private static final ThreadLocal<TSerializer> THREAD_LOCAL_T_SERIALIZER = ThreadLocal.withInitial(() -> {
@@ -149,9 +156,42 @@ public class ServerChannels {
     return _serverToChannelMap.containsKey(serverRoutingInstance);
   }
 
-  public void connect(ServerRoutingInstance serverRoutingInstance)
-      throws InterruptedException, TimeoutException {
-    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
+  /// Tests whether the server still accepts connections, by establishing a **fresh** TCP connection and closing it
+  /// again.
+  ///
+  /// The freshness is the point. The pooled channel stays established long after a server stops serving, because
+  /// nothing closes it when the peer's node disappears without a FIN or an RST, so reusing it reports every
+  /// wedged-but-connected server as healthy. The throwaway channel also uses a bare pipeline, so the probe neither
+  /// takes the pooled channel's lock nor fires `channelInactive` on [DataTableHandler] (which would mark the
+  /// server down).
+  public boolean probeConnection(ServerRoutingInstance serverRoutingInstance) {
+    ChannelFuture future = newBootstrap(serverRoutingInstance)
+        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) PROBE_CONNECT_TIMEOUT_MS)
+        .handler(new ChannelInitializer<SocketChannel>() {
+          @Override
+          protected void initChannel(SocketChannel ch) {
+          }
+        }).connect();
+    // Close on every outcome. Netty makes the connect promise uncancellable, so cancel() cannot release the channel,
+    // and leaking one would leave a file descriptor registered on the query event loop.
+    future.addListener(ChannelFutureListener.CLOSE);
+    try {
+      if (future.await(PROBE_AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS) && future.isSuccess()) {
+        return true;
+      }
+      LOGGER.debug("Failed to probe server: {}", serverRoutingInstance, future.cause());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.debug("Interrupted while probing server: {}", serverRoutingInstance);
+    }
+    return false;
+  }
+
+  /// Bootstraps a connection to the given server with the transport this instance selected. Callers add the
+  /// pipeline and any options of their own.
+  private Bootstrap newBootstrap(ServerRoutingInstance serverRoutingInstance) {
+    return new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
+        .group(_eventLoopGroup).channel(_channelClass);
   }
 
   public void shutDown() {
@@ -174,8 +214,7 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
-      _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .option(ChannelOption.ALLOCATOR, _bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
+      _bootstrap = newBootstrap(serverRoutingInstance).option(ChannelOption.ALLOCATOR, _bufAllocatorWithLimits)
           .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
@@ -265,19 +304,6 @@ public class ServerChannels {
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
-    }
-
-    void connect()
-        throws InterruptedException, TimeoutException {
-      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-        try {
-          connectWithoutLocking();
-        } finally {
-          _channelLock.unlock();
-        }
-      } else {
-        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
-      }
     }
   }
 }

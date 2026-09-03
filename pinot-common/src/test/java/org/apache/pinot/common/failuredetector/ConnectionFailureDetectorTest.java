@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.failuredetector;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -39,6 +41,8 @@ import static org.testng.Assert.assertTrue;
 public class ConnectionFailureDetectorTest {
   private static final String INSTANCE_ID = "Server_localhost_1234";
   private static final String HOST_NAME = "localhost";
+
+  private static final String OTHER_INSTANCE_ID = "Server_localhost_5678";
 
   private BrokerMetrics _brokerMetrics;
   private FailureDetector _failureDetector;
@@ -177,6 +181,103 @@ public class ConnectionFailureDetectorTest {
     assertEquals(_unhealthyServerRetrier._retryUnhealthyServerCalled, 8);
   }
 
+  /// A server that leaves requests unanswered while staying connected is only ejected once it has missed
+  /// [Broker.FailureDetector#DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD] consecutive requests. This pins the shipped
+  /// default: lowering it would make the broker quicker to eject a slow-but-healthy replica.
+  @Test
+  public void testTimeoutDetectionUsesConfiguredThreshold() {
+    int threshold = Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD;
+    assertTrue(threshold > 1, "The default must require more than one unanswered request");
+
+    for (int i = 0; i < threshold - 1; i++) {
+      _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+      verify(Set.of(), 0, 0);
+    }
+
+    _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    verify(Set.of(INSTANCE_ID), 1, 0);
+  }
+
+  /// The count is consecutive, not cumulative: any response from the server discards it, so timeouts on either
+  /// side of a successful response can never be summed into an ejection.
+  @Test
+  public void testResponseResetsConsecutiveTimeoutCount() {
+    int threshold = Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD;
+    for (int i = 0; i < threshold - 1; i++) {
+      _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    }
+    verify(Set.of(), 0, 0);
+
+    _failureDetector.notifyServerResponded(INSTANCE_ID);
+
+    for (int i = 0; i < threshold - 1; i++) {
+      _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    }
+    verify(Set.of(), 0, 0);
+  }
+
+  /// A response is not the only way a count is cleared: the retrier marking the server healthy again clears it too,
+  /// so a server that has genuinely recovered starts from a clean slate.
+  @Test
+  public void testMarkServerHealthyClearsTimeoutCount() {
+    int threshold = Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD;
+    for (int i = 0; i < threshold; i++) {
+      _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    }
+    verify(Set.of(INSTANCE_ID), 1, 0);
+
+    _failureDetector.markServerHealthy(INSTANCE_ID, HOST_NAME);
+    verify(Set.of(), 1, 1);
+
+    // The full threshold has to be reached again, so a single further unanswered request changes nothing.
+    _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    verify(Set.of(), 1, 1);
+  }
+
+  /// Several servers going silent at once are all ejected. There is no cap: a shared cause makes servers fail
+  /// together, and the caller only attributes a timeout to a sole non-responder, so a shared cause accuses nobody.
+  /// Independent servers each going silent while their peers serve is the case that should shed all of them.
+  @Test
+  public void testEveryServerThatGoesSilentIsEjected() {
+    int threshold = Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD;
+    for (int i = 0; i < threshold; i++) {
+      _failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+      _failureDetector.notifyServerNotResponded(OTHER_INSTANCE_ID, HOST_NAME);
+    }
+    assertEquals(_failureDetector.getUnhealthyServers(), Set.of(INSTANCE_ID, OTHER_INSTANCE_ID));
+    assertEquals(_unhealthyServerNotifier._notifiedServers, List.of(INSTANCE_ID, OTHER_INSTANCE_ID));
+  }
+
+  /// A threshold of zero or less disables timeout-based detection, leaving only connection-failure detection --
+  /// the escape hatch for operators who do not want the new behaviour.
+  @Test
+  public void testNonPositiveThresholdDisablesTimeoutDetection() {
+    FailureDetector failureDetector = newFailureDetector(0);
+    for (int i = 0; i < Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD * 2; i++) {
+      failureDetector.notifyServerNotResponded(INSTANCE_ID, HOST_NAME);
+    }
+    assertEquals(failureDetector.getUnhealthyServers(), Set.of());
+
+    // Connection-failure detection still works.
+    failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
+    assertEquals(failureDetector.getUnhealthyServers(), Set.of(INSTANCE_ID));
+  }
+
+  /// Builds an extra detector with its own metrics registry, so that it does not share the gauge with the one built
+  /// by [#setUp()]. Not started: no caller here needs the retry thread.
+  private FailureDetector newFailureDetector(int consecutiveTimeoutThreshold) {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.Type.CONNECTION.name());
+    config.setProperty(Broker.FailureDetector.CONFIG_OF_CONSECUTIVE_TIMEOUT_THRESHOLD, consecutiveTimeoutThreshold);
+    FailureDetector failureDetector =
+        FailureDetectorFactory.getFailureDetector(config, new BrokerMetrics(new NoopPinotMetricsRegistry()));
+    failureDetector.registerHealthyServerNotifier(instanceId -> {
+    });
+    failureDetector.registerUnhealthyServerNotifier(instanceId -> {
+    });
+    return failureDetector;
+  }
+
   private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
       int expectedNotifyHealthyServerCalled) {
     assertEquals(_failureDetector.getUnhealthyServers(), expectedUnhealthyServers);
@@ -202,11 +303,12 @@ public class ConnectionFailureDetectorTest {
   }
 
   private static class UnhealthyServerNotifier implements Consumer<String> {
+    final List<String> _notifiedServers = new ArrayList<>();
     int _notifyUnhealthyServerCalled = 0;
 
     @Override
     public void accept(String instanceId) {
-      assertEquals(instanceId, INSTANCE_ID);
+      _notifiedServers.add(instanceId);
       _notifyUnhealthyServerCalled++;
     }
   }
