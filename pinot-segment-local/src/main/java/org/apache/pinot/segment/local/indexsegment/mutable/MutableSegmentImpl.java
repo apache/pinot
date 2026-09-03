@@ -913,14 +913,12 @@ public class MutableSegmentImpl implements MutableSegment {
     return hadError;
   }
 
-  /// Indexes a new physical row. When `continueOnError` is true, fail-soft (issue #16316): every physical column must
-  /// end up with a forward-index (or OPEN_STRUCT) entry for [docId] so seal/query lengths stay aligned with
-  /// [_numDocsIndexed]. On forward-index failure the column is completed with the field default/null instead of being
-  /// left blank. Secondary index failures are metered and swallowed. Aggregation path failures also fall back to a
-  /// default initial value. When continueOnError is false, indexing exceptions propagate.
+  /// Indexes a new physical row. Always completes the row so seal/query lengths stay aligned with [_numDocsIndexed]
+  /// (issue #16316). On forward-index failure the column is completed with the field default/null. Secondary index
+  /// and aggregation-path failures are metered and, when `continueOnError` is false, stashed for
+  /// [#throwPendingRowIndexingExceptionIfStrict] after the caller publishes the docId.
   ///
   /// @return {@code true} if any column required a default/fallback while indexing
-  /// @throws RuntimeException when a column/index write fails and `continueOnError` is false
   private boolean addNewRow(int docId, GenericRow row) {
     boolean rowHadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
