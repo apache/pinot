@@ -26,12 +26,10 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -66,6 +64,11 @@ import org.roaringbitmap.RoaringBitmap;
 ///
 /// All the logic is maintained internally, and to the outside world, the group ids are always int type, and are
 /// bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
+///
+/// When IN/EQ predicates on the group-by expressions prove an upper bound of the number of distinct groups smaller
+/// than the cardinality product (see optimizeMaxInitialResultHolderCapacity), the bound shrinks
+/// globalGroupIdUpperBound but never the raw key space, so a map based holder is used even when the bound is below
+/// the ARRAY_BASED threshold.
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   // NOTE: map size = map capacity (power of 2) * load factor
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
@@ -114,6 +117,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
+  /// @param groupByExpressionSizesFromPredicates IN/EQ predicate sizes for the group-by expressions, used to bound
+  ///        the number of distinct groups. Sizes for multi-value expressions are ignored: every value inside a
+  ///        matching row becomes a group, so the predicate size does not bound the group count.
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
       boolean nullHandlingEnabled, @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
@@ -130,7 +136,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     // no need to intern dictionary values when there is only one group by expression because
     // only one call will be made to the dictionary to extract each raw value.
     _internedDictionaryValues = _numGroupByExpressions > 1 ? new Object[_numGroupByExpressions][] : null;
-    Map<ExpressionContext, Integer> cardinalityMap = new HashMap<>(_numGroupByExpressions);
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -158,7 +163,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
       _cardinalities[i] = cardinality;
-      cardinalityMap.put(groupByExpression, cardinality);
       if (_internedDictionaryValues != null && cardinality < MAX_DICTIONARY_INTERN_TABLE_SIZE) {
         _internedDictionaryValues[i] = new Object[cardinality];
       }
@@ -180,35 +184,40 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       _nullReplacedSingleValueDictIds = null;
       _nullReplacedMultiValueDictIds = null;
     }
-    if (groupByExpressionSizesFromPredicates != null) {
-      Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
-          cardinalityMap);
-      if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
-        longOverflow = false;
-        cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
-      }
-    }
+    // An IN/EQ predicate on a group-by column bounds the number of distinct groups, so it can shrink the group id
+    // upper bound (and thus the result holder sizes). It must not influence the holder type selection though: raw
+    // keys are mixed-radix products over the FULL dictionary cardinalities regardless of the filter, so the
+    // int/long/array-map decision (raw key range) has to be based on the full cardinality product.
+    long optimizedGroupCountUpperBound = groupByExpressionSizesFromPredicates != null
+        ? getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates) : Long.MAX_VALUE;
+    int cappedNumGroupsLimit = (int) Math.min(numGroupsLimit, optimizedGroupCountUpperBound);
     // NOTE: We need to clean up the thread-local map before using it in case RawKeyHolder.close() is not called
     //       for the previous segment
     // TODO: Ensure RawKeyHolder.close()
     if (longOverflow) {
       // ArrayMapBasedHolder
-      _globalGroupIdUpperBound = numGroupsLimit;
+      _globalGroupIdUpperBound = cappedNumGroupsLimit;
       Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
       clearAndTrim(groupIdMap);
       _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         // LongMapBasedHolder
-        _globalGroupIdUpperBound = numGroupsLimit;
+        _globalGroupIdUpperBound = cappedNumGroupsLimit;
         Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
         clearAndTrim(groupIdMap);
         _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
-        _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
+        _globalGroupIdUpperBound = (int) Math.min(cardinalityProduct, cappedNumGroupsLimit);
         // arrayBaseHolder fails with ArrayIndexOutOfBoundsException if numGroupsLimit < cardinalityProduct
-        // because array doesn't fit all (potentially unsorted) values
-        if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct) {
+        // because array doesn't fit all (potentially unsorted) values.
+        // ArrayBasedHolder uses the raw key directly as the group id, so it is only valid when the group id space
+        // covers the full cardinality product; when the predicate-based optimization proves a smaller upper bound,
+        // fall back to IntMapBasedHolder which maps the sparse raw keys onto dense group ids. This deliberately
+        // trades a hash lookup per row for smaller result holders, which is what the opt-in
+        // optimizeMaxInitialResultHolderCapacity query option asks for.
+        if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct
+            || optimizedGroupCountUpperBound < cardinalityProduct) {
           // IntMapBasedHolder
           IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
           groupIdMap.clearAndTrim();
@@ -220,20 +229,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  private Pair<Boolean, Long> getOptimizedGroupByCardinality(Map<ExpressionContext, Integer> groupByExpressionSizes,
-      Map<ExpressionContext, Integer> columnCardinalityMap) {
-    long maxInitialResultHolderCapacity = 1L;
-    for (Map.Entry<ExpressionContext, Integer> entry : columnCardinalityMap.entrySet()) {
-      Integer cardinality = entry.getValue();
-      Integer size = groupByExpressionSizes.get(entry.getKey());
-      int minSize = size != null ? Math.min(size, cardinality) : cardinality;
-      if (maxInitialResultHolderCapacity > Long.MAX_VALUE / minSize) {
-        return Pair.of(false, null);
-      } else {
-        maxInitialResultHolderCapacity *= minSize;
+  /// Returns the upper bound of the number of distinct groups derived from the IN/EQ predicate sizes on the group-by
+  /// expressions, or [Long#MAX_VALUE] if the bound overflows long (i.e. no usable bound). Multi-value expressions
+  /// always contribute their full cardinality: every value inside a matching row becomes a group, so the predicate
+  /// size does not bound their group count. Iterating the expression array (rather than a deduplicated map) keeps
+  /// the bound comparable to the cardinality product when the same expression appears multiple times.
+  private long getOptimizedGroupByCardinality(Map<ExpressionContext, Integer> groupByExpressionSizes) {
+    long groupCountUpperBound = 1L;
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      Integer size = _isSingleValueColumn[i] ? groupByExpressionSizes.get(_groupByExpressions[i]) : null;
+      int minSize = size != null ? Math.min(size, _cardinalities[i]) : _cardinalities[i];
+      if (minSize <= 0 || groupCountUpperBound > Long.MAX_VALUE / minSize) {
+        return Long.MAX_VALUE;
       }
+      groupCountUpperBound *= minSize;
     }
-    return Pair.of(true, maxInitialResultHolderCapacity);
+    return groupCountUpperBound;
   }
 
   private static void clearAndTrim(Long2IntOpenHashMap map) {
