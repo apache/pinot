@@ -341,6 +341,32 @@ public class VariantTableConfigValidationTest {
     assertInvalid(tableConfig, schema, "Star-tree index cannot be created on VARIANT column");
   }
 
+  @Test
+  public void testDeclaredNonVariantTimestampDerivedNameRemainsValidForStarTree() {
+    String timestampColumn = "eventTime";
+    String derivedColumn = "$eventTime$DAY";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(ID_COLUMN, DataType.STRING)
+        .addDateTime(timestampColumn, DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
+        .addSingleValueDimension(derivedColumn, DataType.STRING)
+        .addSingleValueDimension(VARIANT_COLUMN, DataType.VARIANT)
+        .build();
+    FieldConfig timestampFieldConfig = new FieldConfig.Builder(timestampColumn)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of(derivedColumn), null, List.of("COUNT__*"), null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(timestampFieldConfig, rawVariantFieldConfig()))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+
+    assertValid(tableConfig, schema);
+  }
+
   private static FieldConfig rawVariantFieldConfig() {
     return new FieldConfig.Builder(VARIANT_COLUMN)
         .withEncodingType(EncodingType.RAW)
