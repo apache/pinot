@@ -24,9 +24,9 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/// The type matrix is inherited from [AvroRecordExtractor]; the only override is the INT96 timestamp
-/// (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) → `Timestamp`
-/// (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils#convertInt96ToEpochNanos].
+/// Extends [AvroRecordExtractor] with Parquet-specific conversions:
+/// - INT96 (surfaced by parquet-avro as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) becomes `Timestamp`,
+///   or `Long` epoch nanos when `extractRawTimeValues` is `true`.
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;
   private static final String INT96_DOC = "INT96 represented as byte[12]";

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -219,6 +220,20 @@ public class PinotDataTypeTest {
     assertEquals(BYTES.convert("AAE=", JSON), new byte[]{0, 1});
     assertEquals(BYTES.convert(new Byte[]{0, 1}, BYTE_ARRAY), new byte[]{0, 1});
     assertEquals(BYTES.convert(new String[]{"0001"}, STRING_ARRAY), new byte[]{0, 1});
+  }
+
+  @Test
+  public void testVariant() {
+    byte[] envelope =
+        VariantEnvelope.encode(ByteBuffer.wrap(new byte[]{1, 2}), ByteBuffer.wrap(new byte[]{3, 4}));
+
+    assertEquals(VARIANT.convert(envelope, BYTES), envelope);
+    assertEquals(VARIANT.toInternal(envelope), envelope);
+    assertEquals(BYTES.convert(envelope, VARIANT), envelope);
+    assertThrows(IllegalArgumentException.class, () -> VARIANT.convert(new byte[0], BYTES));
+    assertThrows(IllegalArgumentException.class, () -> VARIANT.convert(new byte[]{1, 2, 3}, BYTES));
+    assertThrows(UnsupportedOperationException.class, () -> VARIANT.toString(envelope));
+    assertThrows(UnsupportedOperationException.class, () -> VARIANT.toInt(envelope));
   }
 
   @Test

@@ -66,7 +66,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
       @Nullable PartitionFunction partitionFunction) {
     _fieldSpec = fieldSpec;
     _storedType = fieldSpec.getDataType().getStoredType();
-    _sorted = fieldSpec.isSingleValueField();
+    // PVAR envelope byte ordering is not semantic VARIANT ordering. Never advertise a VARIANT column as sorted even
+    // when its physical bytes happen to be monotonic.
+    _sorted = fieldSpec.isSingleValueField() && fieldSpec.getDataType().supportsOrdering();
     _fieldConfig = fieldConfig;
     _partitionFunction = partitionFunction;
     _partitions = partitionFunction != null ? new HashSet<>() : null;

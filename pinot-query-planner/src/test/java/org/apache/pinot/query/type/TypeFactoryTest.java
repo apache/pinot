@@ -112,6 +112,10 @@ public class TypeFactoryTest {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARBINARY);
           break;
         }
+        case VARIANT: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARIANT);
+          break;
+        }
         case BIG_DECIMAL: {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DECIMAL);
           break;
@@ -184,7 +188,8 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
-    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON
+        || dataType == FieldSpec.DataType.VARIANT) {
       return;
     }
     TypeFactory typeFactory = new TypeFactory();
@@ -205,7 +210,8 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
-    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON
+        || dataType == FieldSpec.DataType.VARIANT) {
       return;
     }
     TypeFactory typeFactory = new TypeFactory();
@@ -229,7 +235,8 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
-    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON
+        || dataType == FieldSpec.DataType.VARIANT) {
       return;
     }
     TypeFactory typeFactory = new TypeFactory();
@@ -259,6 +266,7 @@ public class TypeFactoryTest {
         .addSingleValueDimension("STRING_COL", FieldSpec.DataType.STRING)
         .addSingleValueDimension("UUID_COL", FieldSpec.DataType.UUID)
         .addSingleValueDimension("BYTES_COL", FieldSpec.DataType.BYTES)
+        .addSingleValueDimension("VARIANT_COL", FieldSpec.DataType.VARIANT)
         .addSingleValueDimension("JSON_COL", FieldSpec.DataType.JSON)
         .addMultiValueDimension("INT_ARRAY_COL", FieldSpec.DataType.INT)
         .addMultiValueDimension("LONG_ARRAY_COL", FieldSpec.DataType.LONG)
@@ -303,6 +311,9 @@ public class TypeFactoryTest {
           break;
         case "BYTES_COL":
           Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARBINARY));
+          break;
+        case "VARIANT_COL":
+          Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARIANT));
           break;
         case "INT_ARRAY_COL":
           Assert.assertEquals(field.getType(),

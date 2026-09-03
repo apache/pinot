@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -112,6 +113,11 @@ public abstract class SortOperator extends MultiStageOperator {
     int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
+    // Every implementation below orders by the collation, so the ordering capability is checked once here.
+    for (RelFieldCollation collation : collations) {
+      Preconditions.checkArgument(dataSchema.getColumnDataType(collation.getFieldIndex()).supportsOrdering(),
+          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+    }
     if (collations.isEmpty()) {
       return new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);
     }

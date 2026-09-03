@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.NotInPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -31,7 +36,9 @@ import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -41,6 +48,23 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PredicateEvaluatorProviderTest {
+
+  @Test
+  public void rawVariantPredicatesProvideActionableErrors() {
+    ExpressionContext column = ExpressionContext.forIdentifier("payload");
+    for (Predicate predicate : List.of(
+        new EqPredicate(column, "{}"),
+        new NotEqPredicate(column, "{}"),
+        new RangePredicate(column, "[1\t\t2]"),
+        new InPredicate(column, List.of("{}", "[]")),
+        new NotInPredicate(column, List.of("{}", "[]")))) {
+      BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
+          () -> PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, DataType.VARIANT, null));
+      String message = exception.getCause().getMessage();
+      assertTrue(message.contains("Raw VARIANT values do not support"));
+      assertTrue(message.contains("extract a typed path with variantGet first"));
+    }
+  }
 
   /// RAW forward index with dictionary but no inverted/range/sorted index — the planner must drop the dictionary so
   /// that the scan-based filter operator receives a raw-value evaluator. Otherwise, the scan iterator would call
