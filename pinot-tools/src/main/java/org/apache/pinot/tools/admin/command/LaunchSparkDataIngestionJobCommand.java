@@ -134,6 +134,21 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     _propertyFile = propertyFile;
   }
 
+  @VisibleForTesting
+  void setSparkVersion(SparkType sparkVersion) {
+    _sparkVersion = sparkVersion;
+  }
+
+  @VisibleForTesting
+  void setPluginsToLoad(List<String> pluginsToLoad) {
+    _pluginsToLoad = pluginsToLoad;
+  }
+
+  @VisibleForTesting
+  void setPluginsToExclude(List<String> pluginsToExclude) {
+    _pluginsToExclude = pluginsToExclude;
+  }
+
   public void setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
   }
@@ -260,36 +275,45 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   private void addDepsJarToDistributedCache(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
-    if (depsJarDir != null) {
-      URI depsJarDirURI = URI.create(depsJarDir);
-      if (depsJarDirURI.getScheme() == null) {
-        depsJarDirURI = new File(depsJarDir).toURI();
+    for (String jar : resolveDepsJars(depsJarDir)) {
+      addJarFilePath(sparkLauncher, extraClassPath, jar);
+    }
+  }
+
+  /// Works out which jars under the Pinot installation should be shipped to the executors, honouring
+  /// [#shouldLoadPlugin]. A plugin is identified by the directory its jar sits in, so the shared
+  /// dependency store is a special case: every jar in it has the same parent directory and belongs
+  /// to no single plugin, and adding it wholesale would ignore `-pluginsToLoad` and
+  /// `-pluginsToExclude` entirely. Those jars are therefore reached only through the
+  /// `pinot-plugin.classpath` index of a plugin that was selected.
+  @VisibleForTesting
+  List<String> resolveDepsJars(String depsJarDir)
+      throws IOException {
+    Set<String> resolved = new LinkedHashSet<>();
+    if (depsJarDir == null) {
+      return new ArrayList<>(resolved);
+    }
+    URI depsJarDirURI = URI.create(depsJarDir);
+    if (depsJarDirURI.getScheme() == null) {
+      depsJarDirURI = new File(depsJarDir).toURI();
+    }
+    PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
+    for (String file : pinotFS.listFiles(depsJarDirURI, true)) {
+      if (pinotFS.isDirectory(URI.create(file))) {
+        continue;
       }
-      PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
-      String[] files = pinotFS.listFiles(depsJarDirURI, true);
-      Set<String> added = new LinkedHashSet<>();
-      for (String file : files) {
-        if (pinotFS.isDirectory(URI.create(file))) {
-          continue;
+      String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
+      if (file.endsWith(".jar")) {
+        if (!SHARED_PLUGIN_LIBS_DIR.equals(parentDir) && shouldLoadPlugin(parentDir)) {
+          resolved.add(file);
         }
-        String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
-        if (file.endsWith(".jar")) {
-          // Shared-store jars are deliberately skipped here: the directory says nothing about
-          // which plugin needs them, so shipping it wholesale would ignore -pluginsToLoad and
-          // -pluginsToExclude. They arrive through the indexes handled below.
-          if (!SHARED_PLUGIN_LIBS_DIR.equals(parentDir) && shouldLoadPlugin(parentDir) && added.add(file)) {
-            addJarFilePath(sparkLauncher, extraClassPath, file);
-          }
-        } else if (PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file)) && shouldLoadPlugin(parentDir)) {
-          for (String dep : readPluginClasspathIndex(pinotFS, file)) {
-            String depFile = depsJarDir.endsWith("/") ? depsJarDir + dep : depsJarDir + "/" + dep;
-            if (added.add(depFile)) {
-              addJarFilePath(sparkLauncher, extraClassPath, depFile);
-            }
-          }
+      } else if (PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file)) && shouldLoadPlugin(parentDir)) {
+        for (String dep : readPluginClasspathIndex(pinotFS, file)) {
+          resolved.add(depsJarDir.endsWith("/") ? depsJarDir + dep : depsJarDir + "/" + dep);
         }
       }
     }
+    return new ArrayList<>(resolved);
   }
 
   /// Reads a plugin's shared-store dependency list. A plugin with no index (an old-format plugin
