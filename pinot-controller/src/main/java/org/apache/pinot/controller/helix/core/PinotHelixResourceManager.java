@@ -1112,8 +1112,9 @@ public class PinotHelixResourceManager {
   /// For realtime tables, the whole batch is also rejected when any target has a `CONSUMING` replica in IdealState.
   /// Callers that need to recover a table by deleting CONSUMING segments must use
   /// [#deleteSegments(String, List, String, boolean)] with `force=true`.
-  /// That validation and the IdealState removal happen in one versioned updater, so concurrent state transitions are
-  /// revalidated before a retry can remove anything.
+  /// The default path runs that CONSUMING check and IdealState removal in one versioned updater, so concurrent
+  /// state transitions are revalidated before a retry can remove anything. `force=true` skips only the CONSUMING
+  /// check and uses the unguarded IdealState remover; lineage exclusivity still applies.
   ///
   /// @param tableNameWithType Table name with type suffix
   /// @param segmentNames List of names of segment to be deleted

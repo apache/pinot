@@ -160,6 +160,17 @@ public class LineageDeleteExclusionTest {
   }
 
   @Test
+  public void testForceDoesNotBypassLineageLock() {
+    addSegments("forceA1", "forceB1");
+    writeLineageEntry("e1", List.of("forceA1"), List.of("forceB1"), LineageEntryState.IN_PROGRESS);
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of("forceA1"), null, true);
+    assertFalse(response.isSuccessful());
+    assertTrue(response.getMessage().contains("forceA1"));
+    assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("forceA1"));
+  }
+
+  @Test
   public void testBypassOverloadAllowsBlockedSegments() {
     addSegments("byA1", "byB1");
     writeLineageEntry("e1", List.of("byA1"), List.of("byB1"),

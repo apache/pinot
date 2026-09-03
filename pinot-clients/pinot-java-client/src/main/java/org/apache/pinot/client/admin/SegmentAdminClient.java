@@ -422,6 +422,17 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
   public String deleteSegmentsByTimeWindow(String tableName, String tableType, long startTimestampMs,
       long endTimestampMs, boolean excludeOverlapping, boolean excludeReplacedSegments, String retentionPeriod)
       throws PinotAdminException {
+    return deleteSegmentsByTimeWindow(tableName, tableType, startTimestampMs, endTimestampMs, excludeOverlapping,
+        excludeReplacedSegments, retentionPeriod, false);
+  }
+
+  /// Deletes segments in a time window.
+  ///
+  /// @param force when true, delete realtime segments even if a replica is still CONSUMING
+  public String deleteSegmentsByTimeWindow(String tableName, String tableType, long startTimestampMs,
+      long endTimestampMs, boolean excludeOverlapping, boolean excludeReplacedSegments, String retentionPeriod,
+      boolean force)
+      throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("startTimestamp", String.valueOf(startTimestampMs));
     queryParams.put("endTimestamp", String.valueOf(endTimestampMs));
@@ -432,6 +443,9 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     }
     if (retentionPeriod != null) {
       queryParams.put("retention", retentionPeriod);
+    }
+    if (force) {
+      queryParams.put("force", "true");
     }
 
     JsonNode response = _transport.executeDelete(_controllerAddress, "/segments/" + tableName + "/choose",
