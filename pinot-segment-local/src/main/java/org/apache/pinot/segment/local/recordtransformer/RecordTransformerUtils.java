@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -155,25 +156,25 @@ public class RecordTransformerUtils {
 
   private static void addSourceFieldDataTypeTransformer(TableConfig tableConfig, @Nullable Schema schema,
       List<RecordTransformer> transformers, boolean preComplexTypeTransform) {
-    Map<String, PinotDataType> dataTypes = new HashMap<>();
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    if (ingestionConfig != null) {
-      List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
-      if (CollectionUtils.isNotEmpty(sourceFieldConfigs)) {
-        for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
-          // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
-          // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
-          if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
-            dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
-          }
+    if (ingestionConfig == null) {
+      return;
+    }
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (CollectionUtils.isNotEmpty(sourceFieldConfigs)) {
+      for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+        // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
+        // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
+        if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
+          dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
         }
       }
     }
     // Opt-in: convert aggregation source columns that are not in the schema (and not already covered by an explicit
     // SourceFieldConfig) so mistyped JSON/Avro string numbers are converted before MutableSegmentImpl indexes them.
     // Off by default; uses the stock DataTypeTransformer (no lazy compatibility short-circuit).
-    if (!preComplexTypeTransform && schema != null && ingestionConfig != null
-        && ingestionConfig.isConvertAggregationSourceTypes()) {
+    if (!preComplexTypeTransform && schema != null && ingestionConfig.isConvertAggregationSourceTypes()) {
       addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
     }
     if (!dataTypes.isEmpty()) {
@@ -187,23 +188,20 @@ public class RecordTransformerUtils {
   /// wider type so config order cannot drop precision. Sketch/HLL/COUNT sources are left unconverted so offering
   /// semantics (e.g. hashing a string vs a number) are preserved.
   /// [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
+  @VisibleForTesting
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
       Map<String, PinotDataType> dataTypes) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    if (ingestionConfig == null) {
-      return;
-    }
     List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
     if (CollectionUtils.isEmpty(aggregationConfigs)) {
       return;
     }
+    // dataTypes only has this phase's SourceFieldConfigs. Pre-complex-type names are absent from the post-phase map
+    // and must still skip inference so an explicit type is not overwritten.
     Set<String> explicitSourceFields = getExplicitSourceFieldNames(ingestionConfig);
     for (AggregationConfig aggregationConfig : aggregationConfigs) {
       String destColumn = aggregationConfig.getColumnName();
       String aggregationFunction = aggregationConfig.getAggregationFunction();
-      if (destColumn == null || aggregationFunction == null) {
-        continue;
-      }
       ExpressionContext expressionContext;
       try {
         expressionContext = RequestContextUtils.getExpression(aggregationFunction);
