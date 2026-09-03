@@ -52,16 +52,36 @@ public class ParquetAvroRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
-    _dataFilePath = new Path(parquetFile.getAbsolutePath());
-    _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
+    Path dataFilePath = new Path(parquetFile.getAbsolutePath());
     AvroRecordExtractorConfig extractorConfig = new AvroRecordExtractorConfig();
     if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
       extractorConfig.setExtractRawTimeValues(
           ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
     }
-    _recordExtractor = new ParquetAvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, extractorConfig);
-    _nextRecord = _parquetReader.read();
+    ParquetAvroRecordExtractor recordExtractor = new ParquetAvroRecordExtractor();
+    recordExtractor.init(fieldsToRead, extractorConfig);
+
+    ParquetReader<GenericRecord> parquetReader = ParquetUtils.getParquetAvroReader(dataFilePath);
+    GenericRecord nextRecord;
+    try {
+      nextRecord = parquetReader.read();
+    } catch (IOException | RuntimeException e) {
+      try {
+        parquetReader.close();
+      } catch (IOException | RuntimeException closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    }
+    ParquetReader<GenericRecord> previousReader = _parquetReader;
+    // Publish only the fully initialized replacement. A previous-reader close failure must not restore stale state.
+    _dataFilePath = dataFilePath;
+    _parquetReader = parquetReader;
+    _recordExtractor = recordExtractor;
+    _nextRecord = nextRecord;
+    if (previousReader != null) {
+      previousReader.close();
+    }
   }
 
   @Override
@@ -86,14 +106,35 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public void rewind()
       throws IOException {
-    _parquetReader.close();
-    _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
-    _nextRecord = _parquetReader.read();
+    ParquetReader<GenericRecord> parquetReader = _parquetReader;
+    _parquetReader = null;
+    _nextRecord = null;
+    parquetReader.close();
+
+    ParquetReader<GenericRecord> rewoundReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
+    try {
+      _nextRecord = rewoundReader.read();
+      _parquetReader = rewoundReader;
+    } catch (IOException | RuntimeException e) {
+      try {
+        rewoundReader.close();
+      } catch (IOException | RuntimeException closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    }
   }
 
   @Override
   public void close()
       throws IOException {
-    _parquetReader.close();
+    ParquetReader<GenericRecord> parquetReader = _parquetReader;
+    _dataFilePath = null;
+    _recordExtractor = null;
+    _parquetReader = null;
+    _nextRecord = null;
+    if (parquetReader != null) {
+      parquetReader.close();
+    }
   }
 }
