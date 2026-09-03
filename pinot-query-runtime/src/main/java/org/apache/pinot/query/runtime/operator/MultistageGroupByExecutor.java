@@ -85,10 +85,9 @@ public class MultistageGroupByExecutor {
     for (int i = 0; i < groupKeyIds.length; i++) {
       ColumnDataType dataType = inputSchema != null ? inputSchema.getColumnDataType(groupKeyIds[i])
           : resultSchema.getColumnDataType(i);
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw new IllegalArgumentException(dataType == ColumnDataType.VARIANT
-            ? "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first"
-            : "GROUP BY does not support " + dataType + " values");
+      if (dataType == ColumnDataType.VARIANT) {
+        throw new IllegalArgumentException(
+            "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first");
       }
     }
 

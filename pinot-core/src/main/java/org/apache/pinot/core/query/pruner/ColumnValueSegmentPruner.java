@@ -92,6 +92,9 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
         : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    if (dataSourceMetadata.getDataType() == DataType.VARIANT) {
+      return false;
+    }
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
     if (!checkMinMaxRange(dataSourceMetadata, cachedValue.getComparableValue())) {
@@ -124,6 +127,9 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
         : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    if (dataSourceMetadata.getDataType() == DataType.VARIANT) {
+      return false;
+    }
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
     for (ValueCache.CachedValue value : cachedValues) {
@@ -144,6 +150,9 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
         : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    if (dataSourceMetadata.getDataType() == DataType.VARIANT) {
+      return false;
+    }
 
     // Get lower/upper boundary value
     DataType dataType = dataSourceMetadata.getDataType();

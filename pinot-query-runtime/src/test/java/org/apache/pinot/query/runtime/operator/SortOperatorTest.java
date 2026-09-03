@@ -43,6 +43,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -512,14 +513,12 @@ public class SortOperatorTest {
   }
 
   @Test
-  public void shouldNameUnsupportedNonVariantCollationType() {
+  public void shouldPreserveNonVariantCollationValidationBehavior() {
     DataSchema schema =
         new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
 
-    IllegalArgumentException exception =
-        expectThrows(IllegalArgumentException.class, () -> getOperator(schema, collations));
-    assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
+    assertNotNull(getOperator(schema, collations));
   }
 
   private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations, int fetch, int offset) {

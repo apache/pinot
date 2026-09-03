@@ -203,12 +203,14 @@
     <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-variant</artifactId>
-      <!-- Query-time Variant navigation uses parquet-variant's codec classes and their parquet-common utilities.
-           Keep the full parquet-column/schema stack isolated to the Parquet ingestion plugin. -->
+      <!-- VariantBuilder has bytecode descriptors that reference parquet-column classes (for example Binary), so
+           parquet-column must remain in the runtime closure even though Pinot does not call those methods here.
+           Dependencies added to pinot-common are amplified by the global shade; see apache/pinot#18459 for the
+           classloader-realm isolation work that would reduce this dependency impact. -->
       <exclusions>
         <exclusion>
           <groupId>org.apache.parquet</groupId>
-          <artifactId>parquet-column</artifactId>
+          <artifactId>parquet-jackson</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

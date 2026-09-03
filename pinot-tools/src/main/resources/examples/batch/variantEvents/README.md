@@ -29,7 +29,7 @@ contain Avro schema metadata so existing Parquet reader selection remains
 backward compatible.
 
 The persisted format, query semantics, compatibility rules, and rollout gate are
-documented in the [VARIANT design document](../../../../../../../pinot-spi/VARIANT_DESIGN.md).
+documented in the [VARIANT design document](../../../../../../../docs/design/VARIANT.md).
 
 Build and start the dedicated quickstart:
 

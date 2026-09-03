@@ -22,16 +22,24 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 
 
@@ -114,10 +122,52 @@ public class AggregationFunctionUtilsTest {
   }
 
   @Test
-  public void testAllowsAggregationOfTypedVariantExtraction() {
-    AggregationFunctionUtils.validateRawVariantAggregationInputs(
-        new AggregationFunction[]{aggregationFunction(AggregationFunctionType.MINSTRING)},
-        projectOperator(FieldSpec.DataType.STRING));
+  public void testDoesNotRejectNonVariantInputs() {
+    for (FieldSpec.DataType dataType
+        : List.of(FieldSpec.DataType.STRING, FieldSpec.DataType.MAP, FieldSpec.DataType.LIST)) {
+      AggregationFunctionUtils.validateRawVariantAggregationInputs(
+          new AggregationFunction[]{aggregationFunction(AggregationFunctionType.MINSTRING)},
+          projectOperator(dataType));
+    }
+  }
+
+  @Test
+  public void testNonVariantSchemaSkipsIdentifierDataSourceValidation() {
+    QueryContext queryContext = new QueryContext.Builder().build();
+    queryContext.setSchema(
+        new Schema.SchemaBuilder().addSingleValueDimension("payload", FieldSpec.DataType.STRING).build());
+    SegmentContext segmentContext = mock(SegmentContext.class);
+    BaseFilterOperator filterOperator = mock(BaseFilterOperator.class);
+    when(filterOperator.isResultEmpty()).thenReturn(true);
+
+    AggregationFunction[] aggregationFunctions =
+        new AggregationFunction[]{aggregationFunction(AggregationFunctionType.SUM)};
+    for (int i = 0; i < 100; i++) {
+      assertNull(AggregationFunctionUtils.buildAggregationInfoWithStarTree(segmentContext, queryContext,
+          aggregationFunctions, null, filterOperator, List.of()));
+    }
+    // The query-wide schema gate prevents any per-segment data-source lookup for non-VARIANT tables.
+    verifyNoInteractions(segmentContext);
+  }
+
+  @Test
+  public void testNoSchemaPreservesRawVariantIdentifierValidation() {
+    QueryContext queryContext = new QueryContext.Builder().build();
+    SegmentContext segmentContext = mock(SegmentContext.class);
+    IndexSegment indexSegment = mock(IndexSegment.class);
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    BaseFilterOperator filterOperator = mock(BaseFilterOperator.class);
+    when(segmentContext.getIndexSegment()).thenReturn(indexSegment);
+    when(indexSegment.getDataSource("payload", null)).thenReturn(dataSource);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSourceMetadata.getDataType()).thenReturn(FieldSpec.DataType.VARIANT);
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> AggregationFunctionUtils.buildAggregationInfoWithStarTree(segmentContext, queryContext,
+            new AggregationFunction[]{aggregationFunction(AggregationFunctionType.SUM)}, null, filterOperator,
+            List.of()));
+    Assert.assertTrue(exception.getMessage().contains("does not support raw VARIANT values"));
   }
 
   private static AggregationFunction aggregationFunction(AggregationFunctionType functionType) {

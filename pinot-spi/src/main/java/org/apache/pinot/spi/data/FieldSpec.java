@@ -689,8 +689,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, (String) _defaultNullValue);
           break;
         case BYTES:
-          jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
-          break;
         case VARIANT:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
@@ -954,7 +952,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return BytesUtils.toBytes(value);
           case VARIANT:
             byte[] envelope = BytesUtils.toBytes(value);
-            VariantEnvelope.decode(envelope);
+            if (envelope.length != 0) {
+              VariantEnvelope.decode(envelope);
+            }
             return envelope;
           case UUID:
             return UuidUtils.toBytes(value);
@@ -972,14 +972,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     public boolean equals(Object value1, Object value2) {
-      if (!supportsEquality()) {
+      if (this == VARIANT) {
         throw new UnsupportedOperationException(this + " does not support equality");
       }
       return this == BYTES || this == UUID ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
     }
 
     public int hashCode(Object value) {
-      if (!supportsHashing()) {
+      if (this == VARIANT) {
         throw new UnsupportedOperationException(this + " does not support hashing");
       }
       return this == BYTES || this == UUID ? Arrays.hashCode((byte[]) value) : value.hashCode();
@@ -991,7 +991,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     /// return -1 if value1 is less than value2
     /// return 1 if value1 is greater than value2
     public int compare(Object value1, Object value2) {
-      if (!supportsOrdering()) {
+      if (this == VARIANT) {
         throw new UnsupportedOperationException(this + " does not support ordering");
       }
       switch (this) {
@@ -1013,7 +1013,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
         case UUID:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
-        case VARIANT:
         case MAP:
         case OPEN_STRUCT:
         case LIST:
@@ -1028,10 +1027,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (this == BIG_DECIMAL) {
         return ((BigDecimal) value).toPlainString();
       }
-      if (this == BYTES) {
-        return BytesUtils.toHexString((byte[]) value);
-      }
-      if (this == VARIANT) {
+      if (this == BYTES || this == VARIANT) {
         return BytesUtils.toHexString((byte[]) value);
       }
       if (this == UUID) {
@@ -1072,7 +1068,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return BytesUtils.toByteArray(value);
           case VARIANT:
             byte[] envelope = BytesUtils.toBytes(value);
-            VariantEnvelope.decode(envelope);
+            if (envelope.length != 0) {
+              VariantEnvelope.decode(envelope);
+            }
             return new ByteArray(envelope);
           case UUID:
             return new ByteArray(UuidUtils.toBytes(value));
