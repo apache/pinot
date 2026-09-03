@@ -75,7 +75,9 @@ public class LaunchSparkDataIngestionJobCommandTest {
     File dist = new File(_tempDir, "dist-" + System.nanoTime());
     for (String d : List.of("lib", "plugin-libs", "plugins/pinot-input-format/pinot-json",
         "plugins/pinot-stream-ingestion/pinot-kafka-3.0", "plugins/pinot-file-system/pinot-s3",
-        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3")) {
+        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3",
+        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-2",
+        "plugins/pinot-connectors/pinot-spark-3-connector")) {
       FileUtils.forceMkdir(new File(dist, d));
     }
     for (String f : List.of("lib/pinot-all-1.0.jar",
@@ -84,7 +86,9 @@ public class LaunchSparkDataIngestionJobCommandTest {
         "plugins/pinot-input-format/pinot-json/pinot-json-1.0.jar",
         "plugins/pinot-stream-ingestion/pinot-kafka-3.0/pinot-kafka-3.0-1.0.jar",
         "plugins/pinot-file-system/pinot-s3/pinot-s3-1.0.jar",
-        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/spark3-1.0-shaded.jar")) {
+        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/spark3-1.0-shaded.jar",
+        "plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-2/spark2-1.0-shaded.jar",
+        "plugins/pinot-connectors/pinot-spark-3-connector/spark-connector-1.0.jar")) {
       FileUtils.touch(new File(dist, f));
     }
     Files.write(new File(dist, "plugins/pinot-input-format/pinot-json/pinot-plugin.classpath").toPath(),
@@ -127,8 +131,28 @@ public class LaunchSparkDataIngestionJobCommandTest {
     assertFalse(resolved.contains("pinot-kafka-3.0-1.0.jar"), resolved.toString());
     assertFalse(resolved.contains("kafka-clients-3.9.jar"), resolved.toString());
     assertFalse(resolved.contains("scala-library-2.13.jar"), resolved.toString());
-    // spark plugins run inside the executor and are never shipped
-    assertFalse(resolved.contains("spark3-1.0-shaded.jar"), resolved.toString());
+    // The ingestion plugin for the selected Spark version is required in the executor, and is the
+    // one exception to the rule that "spark"-named plugin directories are skipped.
+    assertTrue(resolved.contains("spark3-1.0-shaded.jar"), resolved.toString());
+    // Every other Spark-named plugin stays behind: a different Spark version's ingestion plugin,
+    // and the Spark connector, which is not an ingestion plugin at all.
+    assertFalse(resolved.contains("spark2-1.0-shaded.jar"), resolved.toString());
+    assertFalse(resolved.contains("spark-connector-1.0.jar"), resolved.toString());
+  }
+
+  /// Regression test: SparkType.SPARK_3 named the plugin "pinot-batch-ingestion-spark-3.2" while
+  /// the module ships in pinot-batch-ingestion-spark-3, so shouldLoadPlugin never re-included it
+  /// after the "spark" directory-name exclusion and the job died in the executor with
+  /// ClassNotFoundException: SparkSegmentGenerationJobRunner.
+  @Test
+  public void testSparkIngestionPluginNameMatchesItsDirectory()
+      throws Exception {
+    File dist = buildDistribution();
+    String pluginDir = LaunchSparkDataIngestionJobCommand.SparkType.SPARK_3.getPluginName();
+    assertTrue(new File(dist, "plugins-external/pinot-batch-ingestion/" + pluginDir).isDirectory(),
+        "SparkType plugin name must match the directory the plugin ships in, got: " + pluginDir);
+    assertTrue(names(commandWithCliDefaults().resolveDepsJars(dist.getAbsolutePath()))
+        .contains("spark3-1.0-shaded.jar"));
   }
 
   /// An explicit selection must ship the named plugin *with* its dependencies, which before the
@@ -224,7 +248,7 @@ public class LaunchSparkDataIngestionJobCommandTest {
   public void testMissingIndexIsToleratedAndYieldsNoDependencies() {
     String missing = new File(_tempDir, "does-not-exist.classpath").getAbsolutePath();
     assertTrue(_command.readPluginClasspathIndex(_fs, missing).isEmpty());
-
+  }
 
   /// `shouldLoadPlugin` skips any plugin directory whose name contains "spark", so that only the
   /// ingestion plugin for the selected Spark version is re-included, by comparing the directory
@@ -256,6 +280,5 @@ public class LaunchSparkDataIngestionJobCommandTest {
       }
     }
     return null;
-}
   }
 }
