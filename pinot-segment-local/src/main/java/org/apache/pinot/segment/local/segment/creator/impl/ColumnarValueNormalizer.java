@@ -28,21 +28,21 @@ import org.apache.pinot.spi.utils.PinotDataType;
 /// (`buildColumnar`) path.
 ///
 /// The row-major build runs each record through a `TransformPipeline` whose
-/// `NullValueTransformer` substitutes [FieldSpec#getDefaultNullValue()] for `null`
-/// and whose `DataTypeTransformer` coerces every value to the column's stored type (e.g.
+/// `DataTypeTransformer` coerces every non-null value to the column's stored type (e.g.
 /// `Boolean` → `Integer` for a `BOOLEAN` column stored as `INT`,
-/// `Timestamp` → `Long` for `TIMESTAMP`). The column-major driver deliberately runs
-/// with no transform pipeline, so a non-segment source (e.g. Arrow) delivers values in the source's
+/// `Timestamp` → `Long` for `TIMESTAMP`) and whose `NullValueTransformer` substitutes
+/// [FieldSpec#getDefaultNullValue()] for values that remain `null`. The column-major driver deliberately runs with
+/// no transform pipeline, so a non-segment source (e.g. Arrow) delivers values in the source's
 /// logical type with raw `null`s — which the typed collectors / index creators do not accept.
 ///
 /// This helper applies the equivalent of those two transformers to one value, in the same order:
 ///
-/// 1. `NullValueTransformer`: a `null` value becomes the column default — the scalar
-///       default for single-value columns, or a one-element `Object[]` of that scalar for
-///       multi-value columns (matching `NullValueTransformerUtils.getDefaultNullValue`).
-/// 2. `DataTypeTransformer`: [DataTypeTransformerUtils#transformValue] standardizes the
+/// 1. `DataTypeTransformer`: [DataTypeTransformerUtils#transformValue] standardizes the
 ///       value (collapsing single-element collections, dropping `null` elements from multi-value
 ///       arrays) and converts it to `destDataType` via [PinotDataType].
+/// 2. `NullValueTransformer`: a `null` value becomes the column default — the scalar
+///       default for single-value columns, or a one-element `Object[]` of that scalar for
+///       multi-value columns (matching `NullValueTransformerUtils.getDefaultNullValue`).
 ///
 /// A whole-value `null` (or a value that standardizes to `null`, e.g. an empty array)
 /// therefore resolves to the column default rather than reaching the collector as `null`. The
@@ -63,13 +63,11 @@ public final class ColumnarValueNormalizer {
   /// @param value the raw value read from the `ColumnReader` (may be `null`)
   /// @return the normalized, never-`null` value to feed to the stats collector / index creator
   public static Object normalize(String column, FieldSpec fieldSpec, PinotDataType destDataType, Object value) {
-    if (value == null) {
-      value = defaultNullValue(fieldSpec);
-    }
     value = DataTypeTransformerUtils.transformValue(column, value, destDataType);
     if (value == null) {
-      // The value standardized to null (e.g. an empty multi-value array). Substitute the default so a
-      // null never reaches the typed collectors / index creators.
+      // The source was null or standardized to null (e.g. an empty multi-value array). FieldSpec stores its default
+      // in the canonical ingestion representation, so return it directly. In particular, VARIANT uses empty bytes as
+      // the reserved SQL-null sentinel, which must never be decoded as a PVAR envelope.
       value = defaultNullValue(fieldSpec);
     }
     return value;

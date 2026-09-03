@@ -143,6 +143,42 @@ public class PinotGrpcResultSetTest {
   }
 
   @Test
+  public void testVariantGetStringAndGetObjectPreserveVariantNullAndSqlNull()
+      throws Exception {
+    DataSchema schema = new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    PinotGrpcResultSet resultSet = createResultSetFromFormattedRows(schema, List.of(
+        new Object[]{"{\"a\":[1,true,null],\"b\":\"text\"}"},
+        new Object[]{"null"},
+        new Object[]{"\"null\""},
+        new Object[]{null}));
+
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getString(1), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    assertFalse(resultSet.wasNull());
+    assertEquals(resultSet.getObject(1), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    assertFalse(resultSet.wasNull());
+
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getString(1), "null");
+    assertFalse(resultSet.wasNull(), "An encoded Variant null is not SQL null");
+    assertEquals(resultSet.getObject(1), "null");
+    assertFalse(resultSet.wasNull(), "An encoded Variant null is not SQL null");
+
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getString(1), "\"null\"");
+    assertFalse(resultSet.wasNull(), "A Variant string containing null is not SQL null");
+    assertEquals(resultSet.getObject(1), "\"null\"");
+    assertFalse(resultSet.wasNull(), "A Variant string containing null is not SQL null");
+
+    assertTrue(resultSet.next());
+    assertNull(resultSet.getString(1));
+    assertTrue(resultSet.wasNull());
+    assertNull(resultSet.getObject(1));
+    assertTrue(resultSet.wasNull());
+    assertFalse(resultSet.next());
+  }
+
+  @Test
   public void testGetUuid()
       throws Exception {
     UUID uuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -241,6 +277,11 @@ public class PinotGrpcResultSetTest {
       throws Exception {
     List<Object[]> rows = new ArrayList<>();
     rows.add(formattedRow);
+    return createResultSetFromFormattedRows(schema, rows);
+  }
+
+  private static PinotGrpcResultSet createResultSetFromFormattedRows(DataSchema schema, List<Object[]> rows)
+      throws Exception {
     byte[] encodedRows = new JsonResponseEncoder().encodeResultTable(new ResultTable(schema, rows), 0, rows.size());
 
     Broker.BrokerResponse metadataResponse = Broker.BrokerResponse.newBuilder()

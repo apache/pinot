@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.factory;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -37,13 +39,15 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
       PlanNode leftPlanNode, MultiStageOperator rightOperator, PlanNode rightPlanNode, JoinNode joinNode) {
     JoinNode.JoinStrategy joinStrategy = joinNode.getJoinStrategy();
     DataSchema leftSchema = leftPlanNode.getDataSchema();
+    DataSchema rightSchema = rightPlanNode.getDataSchema();
+    validateJoinKeys(joinNode, leftSchema, rightSchema);
     switch (joinStrategy) {
       case HASH:
         if (joinNode.getLeftKeys().isEmpty()) {
           // TODO: Consider adding non-equi as a separate join strategy.
           return new NonEquiJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
         } else {
-          return new HashJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
+          return new HashJoinOperator(context, leftOperator, leftSchema, rightOperator, rightSchema, joinNode);
         }
       case LOOKUP:
         return new LookupJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
@@ -51,6 +55,28 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
         return new AsofJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
+    }
+  }
+
+  private static void validateJoinKeys(JoinNode joinNode, DataSchema leftSchema, DataSchema rightSchema) {
+    for (int leftKey : joinNode.getLeftKeys()) {
+      DataSchema.ColumnDataType dataType = leftSchema.getColumnDataType(leftKey);
+      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
+          "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
+    }
+    for (int rightKey : joinNode.getRightKeys()) {
+      DataSchema.ColumnDataType dataType = rightSchema.getColumnDataType(rightKey);
+      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
+          "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first");
+    }
+    if (joinNode.getJoinStrategy() == JoinNode.JoinStrategy.ASOF) {
+      RexExpression.FunctionCall matchCondition = (RexExpression.FunctionCall) joinNode.getMatchCondition();
+      int leftMatchKey = ((RexExpression.InputRef) matchCondition.getFunctionOperands().get(0)).getIndex();
+      int rightMatchKey =
+          ((RexExpression.InputRef) matchCondition.getFunctionOperands().get(1)).getIndex() - leftSchema.size();
+      Preconditions.checkArgument(leftSchema.getColumnDataType(leftMatchKey).supportsOrdering()
+              && rightSchema.getColumnDataType(rightMatchKey).supportsOrdering(),
+          "Raw VARIANT values do not support ASOF JOIN match keys; extract a typed path with variantGet first");
     }
   }
 

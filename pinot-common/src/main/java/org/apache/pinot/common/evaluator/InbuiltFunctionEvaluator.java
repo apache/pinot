@@ -22,16 +22,23 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.VariantUtils;
+import org.apache.pinot.common.utils.VariantUtils.ResultType;
+import org.apache.pinot.common.utils.VariantUtils.ReusableResult;
+import org.apache.pinot.common.utils.VariantUtils.VariantPath;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /// Evaluates an expression.
@@ -103,6 +110,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
                 throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
               }
             }
+            ExecutableNode variantExecutionNode =
+                VariantExecutionNode.tryCreate(functionName, canonicalName, arguments, childNodes);
+            if (variantExecutionNode != null) {
+              return variantExecutionNode;
+            }
             return new FunctionExecutionNode(functionInfo, childNodes);
         }
       default:
@@ -128,6 +140,148 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   @Override
   public String toString() {
     return _functionExpression;
+  }
+
+  /**
+   * Planned ingestion evaluator for Variant scalar functions with literal path and target-type operands.
+   *
+   * <p>Each node compiles its literals once and owns a reusable cursor result. Like the enclosing evaluator, instances
+   * are intended to be confined to the record-transformer thread and are not thread-safe.
+   */
+  private static class VariantExecutionNode implements ExecutableNode {
+    private static final String VARIANT_GET = "variantget";
+    private static final String TRY_VARIANT_GET = "tryvariantget";
+    private static final String VARIANT_EXISTS = "variantexists";
+    private static final String IS_VARIANT_NULL = "isvariantnull";
+    private static final String VARIANT_TYPE_OF = "varianttypeof";
+
+    private final String _functionName;
+    private final ExecutableNode _variantNode;
+    private final VariantOperation _operation;
+    private final VariantPath _path;
+    @Nullable
+    private final ResultType _targetType;
+    private final ReusableResult _reusableResult = new ReusableResult();
+
+    private VariantExecutionNode(String functionName, ExecutableNode variantNode, VariantOperation operation,
+        VariantPath path, @Nullable ResultType targetType) {
+      _functionName = functionName;
+      _variantNode = variantNode;
+      _operation = operation;
+      _path = path;
+      _targetType = targetType;
+    }
+
+    @Nullable
+    static ExecutableNode tryCreate(String functionName, String canonicalName, List<ExpressionContext> arguments,
+        ExecutableNode[] childNodes) {
+      int numArguments = arguments.size();
+      switch (canonicalName) {
+        case VARIANT_GET:
+        case TRY_VARIANT_GET:
+          if ((numArguments != 2 && numArguments != 3) || !hasStringLiteral(arguments, 1)
+              || (numArguments == 3 && !hasStringLiteral(arguments, 2))) {
+            return null;
+          }
+          return new VariantExecutionNode(functionName, childNodes[0],
+              canonicalName.equals(VARIANT_GET) ? VariantOperation.GET : VariantOperation.TRY_GET,
+              VariantUtils.compilePath(stringLiteral(arguments, 1)),
+              numArguments == 2 ? ResultType.VARIANT
+                  : VariantUtils.parseResultType(stringLiteral(arguments, 2)));
+        case VARIANT_EXISTS:
+          if (numArguments != 2 || !hasStringLiteral(arguments, 1)) {
+            return null;
+          }
+          return new VariantExecutionNode(functionName, childNodes[0], VariantOperation.EXISTS,
+              VariantUtils.compilePath(stringLiteral(arguments, 1)), null);
+        case IS_VARIANT_NULL:
+        case VARIANT_TYPE_OF:
+          if ((numArguments != 1 && numArguments != 2)
+              || (numArguments == 2 && !hasStringLiteral(arguments, 1))) {
+            return null;
+          }
+          return new VariantExecutionNode(functionName, childNodes[0],
+              canonicalName.equals(IS_VARIANT_NULL) ? VariantOperation.IS_NULL : VariantOperation.TYPE_OF,
+              VariantUtils.compilePath(numArguments == 1 ? "$" : stringLiteral(arguments, 1)), null);
+        default:
+          return null;
+      }
+    }
+
+    private static boolean hasStringLiteral(List<ExpressionContext> arguments, int index) {
+      ExpressionContext argument = arguments.get(index);
+      return argument.getType() == ExpressionContext.Type.LITERAL
+          && argument.getLiteral().getValue() instanceof String;
+    }
+
+    private static String stringLiteral(List<ExpressionContext> arguments, int index) {
+      return (String) arguments.get(index).getLiteral().getValue();
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      return executeVariant(_variantNode.execute(row));
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return executeVariant(_variantNode.execute(values));
+    }
+
+    @Nullable
+    private Object executeVariant(@Nullable Object input) {
+      try {
+        byte[] variant = toBytes(input);
+        switch (_operation) {
+          case GET:
+            return extract(variant, false);
+          case TRY_GET:
+            return extract(variant, true);
+          case EXISTS:
+            return VariantUtils.variantExists(variant, _path, _reusableResult);
+          case IS_NULL:
+            return VariantUtils.isVariantNull(variant, _path, _reusableResult);
+          case TYPE_OF:
+            return VariantUtils.variantTypeOf(variant, _path, _reusableResult);
+          default:
+            throw new IllegalStateException("Unhandled Variant operation: " + _operation);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Caught exception while executing function: " + _functionName + ": " + e.getMessage(), e);
+      }
+    }
+
+    @Nullable
+    private Object extract(@Nullable byte[] variant, boolean tolerant) {
+      ResultType targetType = Preconditions.checkNotNull(_targetType, "Variant target type must be planned");
+      boolean present = tolerant
+          ? VariantUtils.tryExtractInto(variant, _path, targetType, _reusableResult)
+          : VariantUtils.extractInto(variant, _path, targetType, _reusableResult);
+      if (!present) {
+        return null;
+      }
+      return _reusableResult.getExternalValue(targetType);
+    }
+
+    @Nullable
+    private static byte[] toBytes(@Nullable Object input) {
+      if (input == null) {
+        return null;
+      }
+      if (input instanceof byte[]) {
+        return (byte[]) input;
+      }
+      return (byte[]) PinotDataType.BYTES.convert(input, FunctionUtils.getArgumentType(input));
+    }
+  }
+
+  private enum VariantOperation {
+    GET,
+    TRY_GET,
+    EXISTS,
+    IS_NULL,
+    TYPE_OF
   }
 
   private interface ExecutableNode {

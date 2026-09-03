@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
@@ -43,6 +44,14 @@ public class TransformOperandFactory {
   private static TransformOperand getTransformOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
+    String canonicalName = FunctionRegistry.canonicalize(functionCall.getFunctionName());
+    if (VariantOperand.isSupported(canonicalName)) {
+      return new VariantOperand(functionCall, dataSchema, canonicalName);
+    }
+    if (LiteralParseJsonOperand.isSupported(canonicalName) && numOperands == 1
+        && operands.get(0) instanceof RexExpression.Literal) {
+      return new LiteralParseJsonOperand(functionCall, canonicalName);
+    }
     switch (functionCall.getFunctionName()) {
       case "AND":
         Preconditions.checkState(numOperands >= 2, "AND takes >=2 arguments, got: %s", numOperands);

@@ -126,6 +126,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case STRING:
         case JSON:
         case BYTES:
+        case VARIANT:
         case UUID:
         case OBJECT:
           field = new Field(colName, FieldType.nullable(new ArrowType.Utf8()), null);
@@ -255,6 +256,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case VARIANT:
             case UUID:
             case OBJECT:
               // The broker renders every other type in this group to a String; OBJECT values arrive as-is
@@ -435,6 +437,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case VARIANT:
             case UUID:
             case OBJECT:
               row[col] = new String(((VarCharVector) vector).get(i), StandardCharsets.UTF_8);

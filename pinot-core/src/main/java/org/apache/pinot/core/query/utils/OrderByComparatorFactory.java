@@ -51,6 +51,10 @@ public class OrderByComparatorFactory {
         throw new BadQueryRequestException("MV expression: " + orderByExpressions.get(i)
             + " should not be included in the ORDER-BY clause");
       }
+      if (!orderByColumnContexts[i].getDataType().supportsOrdering()) {
+        throw new BadQueryRequestException(
+            "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+      }
     }
 
     return getComparator(orderByExpressions, nullHandlingEnabled, from, to);
