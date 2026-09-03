@@ -123,6 +123,29 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
+  public void testReaderSelectionAccessorBeforeInitAndAfterClose()
+      throws IOException {
+    ParquetRecordReader recordReader = new ParquetRecordReader();
+    Assert.assertTrue(recordReader.useAvroParquetRecordReader());
+
+    ParquetRecordReaderConfig forceNative = new ParquetRecordReaderConfig();
+    forceNative.setUseParquetNativeRecordReader(true);
+    File nativeParquetFile = new File(getClass().getClassLoader().getResource("users.parquet").getFile());
+    recordReader.init(nativeParquetFile, null, forceNative);
+    Assert.assertFalse(recordReader.useAvroParquetRecordReader());
+    recordReader.close();
+    Assert.assertFalse(recordReader.useAvroParquetRecordReader());
+
+    ParquetRecordReaderConfig forceAvro = new ParquetRecordReaderConfig();
+    forceAvro.setUseParquetAvroRecordReader(true);
+    File avroParquetFile = new File(getClass().getClassLoader().getResource("data-avro.parquet").getFile());
+    recordReader.init(avroParquetFile, null, forceAvro);
+    Assert.assertTrue(recordReader.useAvroParquetRecordReader());
+    recordReader.close();
+    Assert.assertTrue(recordReader.useAvroParquetRecordReader());
+  }
+
+  @Test
   public void testComparison()
       throws IOException {
     testComparison(_dataFile, SAMPLE_RECORDS_SIZE);
