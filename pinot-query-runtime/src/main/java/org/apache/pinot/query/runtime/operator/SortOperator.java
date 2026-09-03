@@ -114,12 +114,11 @@ public abstract class SortOperator extends MultiStageOperator {
     int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
-    // Every implementation below orders by the collation, so the ordering capability is checked once here.
+    // Every implementation below orders by the collation, so raw VARIANT collations are rejected once here.
     for (RelFieldCollation collation : collations) {
       ColumnDataType dataType = dataSchema.getColumnDataType(collation.getFieldIndex());
-      Preconditions.checkArgument(dataType.supportsOrdering(), dataType == ColumnDataType.VARIANT
-          ? "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first"
-          : "ORDER BY does not support " + dataType + " values");
+      Preconditions.checkArgument(dataType != ColumnDataType.VARIANT,
+          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
     }
     if (collations.isEmpty()) {
       return new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);

@@ -123,8 +123,9 @@ Ownership is deliberately split by module:
 - client, response, and DDL modules carry the logical type without redefining its
   semantics.
 
-`pinot-common` depends only on the small `parquet-variant` codec. Parquet column,
-schema, Hadoop, and reader dependencies remain isolated to the input-format plugin.
+`pinot-common` depends on `parquet-variant` and its required `parquet-common` and
+`parquet-column` codec closure; the unused `parquet-jackson` artifact is excluded.
+Hadoop and record-reader integrations remain isolated to the input-format plugin.
 
 ## 4. Persisted `PVAR` envelope
 
@@ -254,6 +255,15 @@ overflow, and malformed JSON. `try_` functions return SQL null for those failure
 Literal paths, target types, and JSON inputs are compiled or parsed once per query.
 Vectorized execution reuses thread-confined cursors and unboxed result holders.
 
+The query cursor directly decodes the Parquet Variant binary layout to avoid per-row
+codec objects and buffer allocation. Its type tags, length rules, metadata version,
+and wide-object threshold must stay synchronized with the pinned `parquet-variant`
+dependency. Tests compare the cursor constants with parquet-java's codec constants,
+exercise every `Variant.Type`, and reject unrecognized metadata versions and primitive
+tags. A parquet-variant upgrade that adds an encoding must update the cursor and these
+tests in the same change; unknown encodings fail closed rather than returning a
+partially decoded or incorrectly typed result.
+
 JSON parsing is bounded to 100 nesting levels. Parquet Variant decimal encoding is
 bounded to 38 digits of precision and a scale of at most 38 after exact normalization.
 Exponent bounds are checked before expansion so hostile inputs cannot request
@@ -279,9 +289,10 @@ reserved empty-byte placeholder cannot preserve these states under disabled-null
 ## 8. Query wire and client compatibility
 
 The protobuf expression enum assigns `VARIANT` permanent number `24`. Numbers `22` and
-`23` remain reserved for the separately allocated UUID contract. Existing numbers are
-not renumbered. A frozen pre-Variant proto test verifies that an old peer reads value
-`24` as `UNRECOGNIZED`, while a current peer continues to read every legacy value.
+`23` are already assigned to `UUID` and `UUID_ARRAY`, respectively. Existing numbers
+are not renumbered. A frozen pre-Variant proto test verifies that an old peer reads
+value `24` as `UNRECOGNIZED`, while a current peer continues to read every legacy
+value.
 
 Data blocks and `DataSchema` carry the logical `VARIANT` token, with a `ByteArray`
 internal representation. JSON, Arrow, Java, HTTP JDBC, and gRPC JDBC response paths

@@ -138,7 +138,7 @@ final class ParquetVariantConverter {
     // without intermediate byte arrays or another duplicate view.
     int metadataLength = metadata.length();
     int valueLength = value.length();
-    byte[] envelope = VariantEnvelope.allocate(metadataLength, valueLength);
+    byte[] envelope = VariantEnvelope.allocateUnfilled(metadataLength, valueLength);
     copyInto(metadata, envelope, VariantEnvelope.HEADER_SIZE, metadataLength, "metadata");
     copyInto(value, envelope, VariantEnvelope.HEADER_SIZE + metadataLength, valueLength, "value");
     return envelope;

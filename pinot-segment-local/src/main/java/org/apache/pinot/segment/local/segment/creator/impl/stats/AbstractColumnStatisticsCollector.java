@@ -68,7 +68,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     _storedType = fieldSpec.getDataType().getStoredType();
     // PVAR envelope byte ordering is not semantic VARIANT ordering. Never advertise a VARIANT column as sorted even
     // when its physical bytes happen to be monotonic.
-    _sorted = fieldSpec.isSingleValueField() && fieldSpec.getDataType().supportsOrdering();
+    _sorted = fieldSpec.isSingleValueField() && fieldSpec.getDataType() != FieldSpec.DataType.VARIANT;
     _fieldConfig = fieldConfig;
     _partitionFunction = partitionFunction;
     _partitions = partitionFunction != null ? new HashSet<>() : null;

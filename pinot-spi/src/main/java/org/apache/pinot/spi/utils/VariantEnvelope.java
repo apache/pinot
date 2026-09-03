@@ -31,8 +31,8 @@ import javax.annotation.Nullable;
 /// 4        1 byte   envelope version (1)
 /// 5        1 byte   flags (0)
 /// 6        2 bytes  reserved (0)
-/// 8        4 bytes  metadata length, unsigned range restricted to Java array sizes
-/// 12       4 bytes  value length, unsigned range restricted to Java array sizes
+/// 8        4 bytes  metadata length, big-endian signed int restricted to >= 0
+/// 12       4 bytes  value length, big-endian signed int restricted to >= 0
 /// 16       M bytes  Parquet Variant metadata
 /// 16 + M   V bytes  Parquet Variant value
 /// ```
@@ -63,7 +63,7 @@ public final class VariantEnvelope {
 
     int metadataLength = metadata.remaining();
     int valueLength = value.remaining();
-    byte[] envelope = allocate(metadataLength, valueLength);
+    byte[] envelope = allocateUnfilled(metadataLength, valueLength);
     copyRemaining(metadata, envelope, HEADER_SIZE);
     copyRemaining(value, envelope, HEADER_SIZE + metadataLength);
     return envelope;
@@ -77,7 +77,7 @@ public final class VariantEnvelope {
     requireRange(metadata, metadataOffset, metadataLength, "metadata");
     requireRange(value, valueOffset, valueLength, "value");
 
-    byte[] envelope = allocate(metadataLength, valueLength);
+    byte[] envelope = allocateUnfilled(metadataLength, valueLength);
     System.arraycopy(metadata, metadataOffset, envelope, HEADER_SIZE, metadataLength);
     System.arraycopy(value, valueOffset, envelope, HEADER_SIZE + metadataLength, valueLength);
     return envelope;
@@ -146,7 +146,9 @@ public final class VariantEnvelope {
     return metadataLength;
   }
 
-  /// Returns whether the bytes form a complete, supported Variant envelope.
+  /// Returns whether the bytes form complete, supported outer framing.
+  ///
+  /// This does not validate the Parquet Variant payload stored inside the envelope.
   public static boolean isEnvelope(@Nullable byte[] envelope) {
     if (envelope == null) {
       return false;
@@ -159,12 +161,13 @@ public final class VariantEnvelope {
     }
   }
 
-  /// Allocates an initialized envelope with writable, zero-filled metadata and value regions.
+  /// Allocates a header-initialized envelope with writable, zero-filled metadata and value regions.
   ///
   /// This is the zero-intermediate-copy producer API for sources that can write directly into a destination array.
   /// The metadata region begins at [#HEADER_SIZE]; the value region begins at `HEADER_SIZE + metadataLength`. Callers
-  /// must completely fill both regions before publishing the envelope.
-  public static byte[] allocate(int metadataLength, int valueLength) {
+  /// must completely fill both regions before publishing the envelope. The returned array passes the outer
+  /// [#isEnvelope(byte[])] framing check immediately, but its unfilled payload is not a valid Parquet Variant value.
+  public static byte[] allocateUnfilled(int metadataLength, int valueLength) {
     if (metadataLength < 0 || valueLength < 0) {
       throw new IllegalArgumentException(
           "Variant envelope lengths must be non-negative: metadata=" + metadataLength + ", value=" + valueLength);

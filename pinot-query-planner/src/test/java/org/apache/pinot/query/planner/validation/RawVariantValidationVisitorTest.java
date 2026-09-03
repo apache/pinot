@@ -30,12 +30,16 @@ import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class TypeCapabilityValidationVisitorTest {
+public class RawVariantValidationVisitorTest {
+  private static final List<DataSchema.ColumnDataType> PRE_EXISTING_NON_VARIANT_TYPES = List.of(
+      DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.OBJECT,
+      DataSchema.ColumnDataType.MAP, DataSchema.ColumnDataType.UNKNOWN);
   private static final DataSchema VARIANT_SCHEMA =
       new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.VARIANT});
   private static final DataSchema TYPED_EXTRACTION_SCHEMA =
@@ -47,30 +51,44 @@ public class TypeCapabilityValidationVisitorTest {
         List.of(new RelFieldCollation(0)), 10, 0);
 
     QueryException exception =
-        Assert.expectThrows(QueryException.class, () -> sortNode.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        Assert.expectThrows(QueryException.class, () -> sortNode.visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("ORDER BY"));
   }
 
   @Test
-  public void testNamesUnsupportedNonVariantOrderByType() {
-    DataSchema objectSchema =
-        new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
-    SortNode sortNode = new SortNode(0, objectSchema, PlanNode.NodeHint.EMPTY, List.of(),
-        List.of(new RelFieldCollation(0)), 10, 0);
+  public void testPreservesPreExistingNonVariantOperationValidation() {
+    for (DataSchema.ColumnDataType dataType : PRE_EXISTING_NON_VARIANT_TYPES) {
+      DataSchema schema = schema(dataType);
 
-    QueryException exception =
-        Assert.expectThrows(QueryException.class, () -> sortNode.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
-    Assert.assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
+      new SortNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(new RelFieldCollation(0)), 10, 0)
+          .visit(RawVariantValidationVisitor.INSTANCE, null);
+      for (SetOpNode.SetOpType setOpType
+          : List.of(SetOpNode.SetOpType.UNION, SetOpNode.SetOpType.INTERSECT, SetOpNode.SetOpType.MINUS)) {
+        setOp(setOpType, false, schema).visit(RawVariantValidationVisitor.INSTANCE, null);
+      }
+      aggregate("ANYVALUE", false, schema).visit(RawVariantValidationVisitor.INSTANCE, null);
+      aggregateGroupBy("COUNT", schema, List.of(0)).visit(RawVariantValidationVisitor.INSTANCE, null);
+      window("COUNT", schema, List.of(0), List.of(new RelFieldCollation(0)))
+          .visit(RawVariantValidationVisitor.INSTANCE, null);
+      for (JoinNode.JoinStrategy strategy : List.of(JoinNode.JoinStrategy.HASH, JoinNode.JoinStrategy.LOOKUP)) {
+        join(strategy, schema, schema).visit(RawVariantValidationVisitor.INSTANCE, null);
+      }
+
+      DataSchema asofSchema = new DataSchema(new String[]{"key", "match"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, dataType});
+      asofJoin(asofSchema, asofSchema).visit(RawVariantValidationVisitor.INSTANCE, null);
+    }
   }
 
   @Test
   public void testRawVariantProjectionRequiresNullHandling() {
     QueryException exception = Assert.expectThrows(QueryException.class,
-        () -> TypeCapabilityValidationVisitor.validateResultSchema(VARIANT_SCHEMA, false));
+        () -> RawVariantValidationVisitor.validateResultSchema(VARIANT_SCHEMA, false));
+    Assert.assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
     Assert.assertTrue(exception.getMessage().contains("requires query null handling"));
 
-    TypeCapabilityValidationVisitor.validateResultSchema(VARIANT_SCHEMA, true);
-    TypeCapabilityValidationVisitor.validateResultSchema(TYPED_EXTRACTION_SCHEMA, false);
+    RawVariantValidationVisitor.validateResultSchema(VARIANT_SCHEMA, true);
+    RawVariantValidationVisitor.validateResultSchema(TYPED_EXTRACTION_SCHEMA, false);
   }
 
   @Test
@@ -84,14 +102,14 @@ public class TypeCapabilityValidationVisitorTest {
 
     for (SetOpNode node : unsupportedNodes) {
       QueryException exception =
-          Assert.expectThrows(QueryException.class, () -> node.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+          Assert.expectThrows(QueryException.class, () -> node.visit(RawVariantValidationVisitor.INSTANCE, null));
       Assert.assertTrue(exception.getMessage().contains("raw VARIANT"));
     }
   }
 
   @Test
   public void testAllowsVariantUnionAll() {
-    setOp(SetOpNode.SetOpType.UNION, true).visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+    setOp(SetOpNode.SetOpType.UNION, true).visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   @Test
@@ -99,12 +117,12 @@ public class TypeCapabilityValidationVisitorTest {
     for (JoinNode.JoinStrategy strategy : JoinNode.JoinStrategy.values()) {
       JoinNode leftVariant = join(strategy, VARIANT_SCHEMA, TYPED_EXTRACTION_SCHEMA);
       QueryException exception = Assert.expectThrows(QueryException.class,
-          () -> leftVariant.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+          () -> leftVariant.visit(RawVariantValidationVisitor.INSTANCE, null));
       Assert.assertTrue(exception.getMessage().contains("JOIN keys"));
 
       JoinNode rightVariant = join(strategy, TYPED_EXTRACTION_SCHEMA, VARIANT_SCHEMA);
       exception = Assert.expectThrows(QueryException.class,
-          () -> rightVariant.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+          () -> rightVariant.visit(RawVariantValidationVisitor.INSTANCE, null));
       Assert.assertTrue(exception.getMessage().contains("JOIN keys"));
     }
   }
@@ -116,7 +134,7 @@ public class TypeCapabilityValidationVisitorTest {
     DataSchema rightTyped = new DataSchema(new String[]{"key", "match"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     QueryException exception = Assert.expectThrows(QueryException.class,
-        () -> asofJoin(leftVariant, rightTyped).visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        () -> asofJoin(leftVariant, rightTyped).visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support ASOF JOIN match keys"));
 
     DataSchema leftTyped = new DataSchema(new String[]{"key", "match"},
@@ -124,7 +142,7 @@ public class TypeCapabilityValidationVisitorTest {
     DataSchema rightVariant = new DataSchema(new String[]{"key", "match"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.VARIANT});
     exception = Assert.expectThrows(QueryException.class,
-        () -> asofJoin(leftTyped, rightVariant).visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        () -> asofJoin(leftTyped, rightVariant).visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support ASOF JOIN match keys"));
   }
 
@@ -133,7 +151,7 @@ public class TypeCapabilityValidationVisitorTest {
     for (String functionName : List.of("SUM", "ANYVALUE", "DISTINCTCOUNTHLL")) {
       AggregateNode node = aggregate(functionName, false, VARIANT_SCHEMA);
       QueryException exception =
-          Assert.expectThrows(QueryException.class, () -> node.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+          Assert.expectThrows(QueryException.class, () -> node.visit(RawVariantValidationVisitor.INSTANCE, null));
       Assert.assertTrue(exception.getMessage().contains("Aggregate function " + functionName));
       Assert.assertTrue(exception.getMessage().contains("variantGet"));
     }
@@ -144,13 +162,13 @@ public class TypeCapabilityValidationVisitorTest {
     AggregateNode node = aggregate("COUNT", true, VARIANT_SCHEMA);
 
     QueryException exception =
-        Assert.expectThrows(QueryException.class, () -> node.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        Assert.expectThrows(QueryException.class, () -> node.visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Aggregate function COUNT"));
   }
 
   @Test
   public void testAllowsRawVariantCount() {
-    aggregate("COUNT", false, VARIANT_SCHEMA).visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+    aggregate("COUNT", false, VARIANT_SCHEMA).visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   @Test
@@ -158,7 +176,7 @@ public class TypeCapabilityValidationVisitorTest {
     // COUNT is raw-variant-independent, so the rejection must come from the VARIANT GROUP BY key itself.
     AggregateNode node = aggregateGroupBy("COUNT", VARIANT_SCHEMA, List.of(0));
     QueryException exception =
-        Assert.expectThrows(QueryException.class, () -> node.visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        Assert.expectThrows(QueryException.class, () -> node.visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("GROUP BY"));
     Assert.assertTrue(exception.getMessage().contains("raw VARIANT"));
   }
@@ -167,7 +185,7 @@ public class TypeCapabilityValidationVisitorTest {
   public void testUsesLogicalTypeInsteadOfVariantStorageType() {
     DataSchema bytesSchema =
         new DataSchema(new String[]{"bytes"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES});
-    aggregate("ANYVALUE", false, bytesSchema).visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+    aggregate("ANYVALUE", false, bytesSchema).visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   @Test
@@ -177,39 +195,47 @@ public class TypeCapabilityValidationVisitorTest {
             List.of(new RexExpression.InputRef(0)));
     AggregateNode node = aggregate("MINSTRING", false, VARIANT_SCHEMA, typedExtraction);
 
-    node.visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+    node.visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   @Test
   public void testValidatesWindowAggregateInputs() {
     QueryException exception = Assert.expectThrows(QueryException.class,
-        () -> window("SUM").visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+        () -> window("SUM").visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Aggregate function SUM"));
 
-    window("COUNT").visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+    window("COUNT").visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   @Test
   public void testRejectsRawVariantWindowKeys() {
     QueryException exception = Assert.expectThrows(QueryException.class,
         () -> window("COUNT", VARIANT_SCHEMA, List.of(0), List.of())
-            .visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+            .visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Window PARTITION BY"));
 
     exception = Assert.expectThrows(QueryException.class,
         () -> window("COUNT", VARIANT_SCHEMA, List.of(), List.of(new RelFieldCollation(0)))
-            .visit(TypeCapabilityValidationVisitor.INSTANCE, null));
+            .visit(RawVariantValidationVisitor.INSTANCE, null));
     Assert.assertTrue(exception.getMessage().contains("Window ORDER BY"));
   }
 
   @Test
   public void testAllowsWindowKeysOverTypedVariantExtraction() {
     window("COUNT", TYPED_EXTRACTION_SCHEMA, List.of(0), List.of(new RelFieldCollation(0)))
-        .visit(TypeCapabilityValidationVisitor.INSTANCE, null);
+        .visit(RawVariantValidationVisitor.INSTANCE, null);
   }
 
   private static SetOpNode setOp(SetOpNode.SetOpType setOpType, boolean all) {
-    return new SetOpNode(0, VARIANT_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), setOpType, all);
+    return setOp(setOpType, all, VARIANT_SCHEMA);
+  }
+
+  private static SetOpNode setOp(SetOpNode.SetOpType setOpType, boolean all, DataSchema schema) {
+    return new SetOpNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), setOpType, all);
+  }
+
+  private static DataSchema schema(DataSchema.ColumnDataType dataType) {
+    return new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{dataType});
   }
 
   private static JoinNode join(JoinNode.JoinStrategy strategy, DataSchema leftSchema, DataSchema rightSchema) {
