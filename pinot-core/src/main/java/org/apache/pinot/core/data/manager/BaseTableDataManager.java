@@ -484,6 +484,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
         localMetadata.getCrc(), zkMetadata.getCrc());
     downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
+    _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
   }
 
