@@ -45,6 +45,11 @@
         plugins/ with its dependencies in plugin-libs/. The copy in the uber-jar also wins on the
         classpath, so the plugin directory would be dead weight for exactly these plugins.
 
+        A plugin may only be excluded here if the distribution ships it under plugins/, otherwise it
+        would disappear from the distribution entirely rather than move: pinot-compound-metrics is
+        not in the plugin list below, so it stays in the uber-jar, which is the only place it has
+        ever been available from.
+
         Only plugins pinot-tools never references at compile time are excluded. It genuinely
         imports classes from pinot-avro, pinot-json, pinot-parquet and pinot-minion-builtin-tasks,
         which therefore stay; removing those needs the shared classes extracted into library
@@ -108,10 +113,6 @@
         <exclusion>
           <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-dropwizard</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-compound-metrics</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

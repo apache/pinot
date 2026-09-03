@@ -38,6 +38,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <!-- Pinot's own modules are always present where a plugin is loaded, from lib/pinot-all.jar or
+           the parent realm, so bundling them into the plugin would ship a second copy of them and of
+           their dependency tree - here fastutil, calcite-core and grpc-netty-shaded, none of which
+           this plugin uses directly -->
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
