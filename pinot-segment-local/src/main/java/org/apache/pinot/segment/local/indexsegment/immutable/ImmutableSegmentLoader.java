@@ -103,8 +103,11 @@ public class ImmutableSegmentLoader {
     return load(indexDir, indexLoadingConfig, needPreprocess, null, null);
   }
 
-  /// Loads the segment with specified schema and IndexLoadingConfig, and allows to control whether to
-  /// modify the segment like to convert segment format, add or remove indices.
+  /// Loads the segment with specified schema and IndexLoadingConfig.
+  ///
+  /// `needPreprocess` is the caller's opt-in signal: `false` skips preprocess unconditionally; `true` asks the
+  /// loader to decide by calling [#needPreprocess(SegmentDirectory, IndexLoadingConfig)]. Preprocess is only
+  /// invoked when both the caller opts in and the loader determines work is actually pending.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
@@ -114,9 +117,6 @@ public class ImmutableSegmentLoader {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() == 0) {
       return new EmptyIndexSegment(segmentMetadata);
-    }
-    if (needPreprocess) {
-      preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottlerSet, zkMetadata);
     }
     String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
@@ -131,6 +131,17 @@ public class ImmutableSegmentLoader {
         .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
         .build();
+    if (needPreprocess) {
+      // Probe with the default (non-tier-aware) loader so this check never physically moves the segment across
+      // tiers; the tier-aware loader is only used for the final open below.
+      try (SegmentDirectory checkDirectory =
+          SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(),
+              segmentLoaderContext)) {
+        if (needPreprocess(checkDirectory, indexLoadingConfig)) {
+          preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottlerSet, zkMetadata);
+        }
+      }
+    }
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
