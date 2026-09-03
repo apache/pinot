@@ -66,50 +66,8 @@ public class PredicateEvaluatorProvider {
 
   private static PredicateEvaluator buildEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext, @Nullable DataSource dataSource) {
+    validatePredicate(predicate, dataType);
     try {
-      boolean predicateSupported;
-      switch (predicate.getType()) {
-        case EQ:
-        case NOT_EQ:
-          predicateSupported = dataType.supportsEquality();
-          break;
-        case IN:
-        case NOT_IN:
-          predicateSupported = dataType.supportsEquality() && dataType.supportsHashing();
-          break;
-        case RANGE:
-          predicateSupported = dataType.supportsOrdering();
-          break;
-        case REGEXP_LIKE:
-          predicateSupported = dataType.supportsPatternMatching();
-          break;
-        default:
-          predicateSupported = true;
-          break;
-      }
-      if (!predicateSupported) {
-        String operation;
-        switch (predicate.getType()) {
-          case IN:
-          case NOT_IN:
-            operation = "IN";
-            break;
-          case EQ:
-          case NOT_EQ:
-          case RANGE:
-            operation = "comparison";
-            break;
-          default:
-            operation = predicate.getType().name();
-            break;
-        }
-        // Name the actual failing type: ordering capability is also absent for e.g. MAP and STRUCT, which must not
-        // be blamed on VARIANT. The variantGet hint only makes sense for VARIANT.
-        String hint =
-            dataType == DataType.VARIANT ? "; extract a typed path with variantGet first" : "";
-        throw new IllegalArgumentException(
-            "Raw " + dataType + " values do not support " + operation + hint);
-      }
       if (dictionary != null) {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
@@ -172,6 +130,33 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
+  }
+
+  /// Validates predicate operations that depend only on the logical column type. This is also called before segment
+  /// pruning so invalid raw VARIANT filters cannot be hidden by an all-segments-pruned result.
+  public static void validatePredicate(Predicate predicate, DataType dataType) {
+    if (dataType != DataType.VARIANT) {
+      return;
+    }
+    String operation;
+    switch (predicate.getType()) {
+      case IN:
+      case NOT_IN:
+        operation = "IN";
+        break;
+      case EQ:
+      case NOT_EQ:
+      case RANGE:
+        operation = "comparison";
+        break;
+      case REGEXP_LIKE:
+        operation = predicate.getType().name();
+        break;
+      default:
+        return;
+    }
+    throw new BadQueryRequestException(new IllegalArgumentException(
+        "Raw VARIANT values do not support " + operation + "; extract a typed path with variantGet first"));
   }
 
   /// Returns the column dictionary if the planner can actually use it for filtering this specific predicate, otherwise

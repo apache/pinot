@@ -47,6 +47,7 @@ import org.apache.parquet.variant.Variant;
 import org.apache.parquet.variant.VariantArrayBuilder;
 import org.apache.parquet.variant.VariantBuilder;
 import org.apache.parquet.variant.VariantObjectBuilder;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -59,15 +60,20 @@ import org.apache.pinot.spi.utils.VariantEnvelope;
 /// Instances are not required, and stateless convenience methods are thread-safe. Overloads that accept a
 /// caller-provided {@link ReusableResult} require that result to be thread-confined and not shared by concurrent calls.
 /// An empty byte array is Pinot's SQL-null placeholder and is never decoded as an envelope.
+///
+/// <p>The cursor's encoding constants deliberately mirror parquet-variant's package-private {@code VariantUtil}
+/// constants. {@code VariantUtilsTest} checks those constants and every {@code Variant.Type} whenever the pinned
+/// parquet dependency changes. Metadata versions and primitive tags unknown to this cursor fail closed; support for a
+/// new parquet-variant encoding must be added here in the same change that upgrades the codec.
 public final class VariantUtils {
   public static final String RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR =
       "Raw VARIANT projection requires query null handling to be enabled; set enableNullHandling=true";
 
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
-  private static final BigDecimal MIN_INT_DECIMAL = BigDecimal.valueOf(Integer.MIN_VALUE);
-  private static final BigDecimal MAX_INT_DECIMAL = BigDecimal.valueOf(Integer.MAX_VALUE);
-  private static final BigDecimal MIN_LONG_DECIMAL = BigDecimal.valueOf(Long.MIN_VALUE);
-  private static final BigDecimal MAX_LONG_DECIMAL = BigDecimal.valueOf(Long.MAX_VALUE);
+  private static final int MAX_VARIANT_DECIMAL_SCALE_BYTE = (1 << Byte.SIZE) - 1;
+  private static final int DECIMAL_POWER_LIMBS = 10;
+  private static final int DECIMAL_CONVERSION_LIMBS = 14;
+  private static final long[][] DECIMAL_POWERS_OF_FIVE = decimalPowersOfFive();
   private static final int MAX_JSON_NESTING_DEPTH = 100;
   private static final int MAX_VARIANT_DECIMAL_PRECISION = 38;
   private static final int MAX_VARIANT_DECIMAL_SCALE = 38;
@@ -111,15 +117,28 @@ public final class VariantUtils {
   private VariantUtils() {
   }
 
-  /// Returns whether a final result containing raw VARIANT values requires query null handling. Without a null bitmap,
-  /// Pinot's reserved empty-byte SQL-null placeholder cannot be distinguished from a logical Variant value.
-  public static boolean requiresNullHandlingForRawVariantResult(DataSchema resultSchema,
-      boolean nullHandlingEnabled) {
-    if (nullHandlingEnabled) {
-      return false;
+  private static long[][] decimalPowersOfFive() {
+    long[][] powers = new long[MAX_VARIANT_DECIMAL_SCALE_BYTE + 1][DECIMAL_POWER_LIMBS];
+    powers[0][0] = 1;
+    for (int scale = 1; scale < powers.length; scale++) {
+      long carry = 0;
+      for (int limb = 0; limb < DECIMAL_POWER_LIMBS; limb++) {
+        long value = powers[scale - 1][limb];
+        long lowProduct = (value & 0xFFFF_FFFFL) * 5 + carry;
+        long highProduct = (value >>> Integer.SIZE) * 5 + (lowProduct >>> Integer.SIZE);
+        powers[scale][limb] = highProduct << Integer.SIZE | lowProduct & 0xFFFF_FFFFL;
+        carry = highProduct >>> Integer.SIZE;
+      }
     }
-    for (DataSchema.ColumnDataType dataType : resultSchema.getColumnDataTypes()) {
-      if (dataType == DataSchema.ColumnDataType.VARIANT) {
+    return powers;
+  }
+
+  /// Returns whether a final result schema contains raw VARIANT values. Callers that serialize raw VARIANT results
+  /// must also require query null handling because Pinot's reserved empty-byte SQL-null placeholder cannot otherwise
+  /// be distinguished from a logical Variant value.
+  public static boolean containsRawVariantResult(DataSchema resultSchema) {
+    for (ColumnDataType dataType : resultSchema.getColumnDataTypes()) {
+      if (dataType == ColumnDataType.VARIANT) {
         return true;
       }
     }
@@ -655,7 +674,7 @@ public final class VariantUtils {
           case DECIMAL4:
           case DECIMAL8:
           case DECIMAL16:
-            result._floatValue = value.getDecimal().floatValue();
+            result._floatValue = value.getDecimalAsFloat();
             return true;
           default:
             return false;
@@ -677,7 +696,7 @@ public final class VariantUtils {
           case DECIMAL4:
           case DECIMAL8:
           case DECIMAL16:
-            result._doubleValue = value.getDecimal().doubleValue();
+            result._doubleValue = value.getDecimalAsDouble();
             return true;
           default:
             return false;
@@ -733,8 +752,14 @@ public final class VariantUtils {
       case TIMESTAMP:
         switch (valueType) {
           case DATE:
-            result._longValue = value.getInteger() * TimeUnit.DAYS.toMillis(1);
-            return true;
+            // DATE is int32 in Variant v1, but keep this path exact and aligned with strict conversion if that
+            // representation is ever widened.
+            try {
+              result._longValue = Math.multiplyExact(value.getInteger(), TimeUnit.DAYS.toMillis(1));
+              return true;
+            } catch (ArithmeticException e) {
+              return false;
+            }
           case TIMESTAMP_TZ:
           case TIMESTAMP_NTZ:
             result._longValue = Math.floorDiv(value.getInteger(), TimeUnit.MILLISECONDS.toMicros(1));
@@ -774,11 +799,14 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        BigDecimal decimalValue = value.getDecimal();
-        if (!isIntegralInRange(decimalValue, MIN_INT_DECIMAL, MAX_INT_DECIMAL)) {
+        if (!value.tryGetDecimalAsLongExact()) {
           return false;
         }
-        result._intValue = decimalValue.intValue();
+        long decimalIntValue = value.getConvertedDecimalLong();
+        if (decimalIntValue < Integer.MIN_VALUE || decimalIntValue > Integer.MAX_VALUE) {
+          return false;
+        }
+        result._intValue = (int) decimalIntValue;
         return true;
       default:
         return false;
@@ -796,20 +824,14 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        BigDecimal decimalValue = value.getDecimal();
-        if (!isIntegralInRange(decimalValue, MIN_LONG_DECIMAL, MAX_LONG_DECIMAL)) {
+        if (!value.tryGetDecimalAsLongExact()) {
           return false;
         }
-        result._longValue = decimalValue.longValue();
+        result._longValue = value.getConvertedDecimalLong();
         return true;
       default:
         return false;
     }
-  }
-
-  private static boolean isIntegralInRange(BigDecimal value, BigDecimal minimum, BigDecimal maximum) {
-    return value.compareTo(minimum) >= 0 && value.compareTo(maximum) <= 0
-        && (value.scale() <= 0 || value.stripTrailingZeros().scale() <= 0);
   }
 
   private static int toInt(Cursor value, ResultType targetType) {
@@ -823,7 +845,7 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        return value.getDecimal().intValueExact();
+        return Math.toIntExact(value.getDecimalAsLongExact());
       default:
         throw typeMismatch(value, targetType);
     }
@@ -839,7 +861,7 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        return value.getDecimal().longValueExact();
+        return value.getDecimalAsLongExact();
       default:
         throw typeMismatch(value, targetType);
     }
@@ -859,7 +881,7 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        return value.getDecimal().floatValue();
+        return value.getDecimalAsFloat();
       default:
         throw typeMismatch(value, targetType);
     }
@@ -879,7 +901,7 @@ public final class VariantUtils {
       case DECIMAL4:
       case DECIMAL8:
       case DECIMAL16:
-        return value.getDecimal().doubleValue();
+        return value.getDecimalAsDouble();
       default:
         throw typeMismatch(value, targetType);
     }
@@ -1191,6 +1213,11 @@ public final class VariantUtils {
     private static final int MEMO_ABSENT_FROM_DICTIONARY = -2;
     /// Objects at or below this entry count resolve by direct linear scan; the navigation memo cannot beat it.
     private static final int SMALL_OBJECT_LINEAR_THRESHOLD = 4;
+    /// Comparing an anchored metadata dictionary costs one pass over every metadata byte. When the dictionary is much
+    /// larger than the object being searched, repeating the direct object scan is cheaper than validating a cached
+    /// absent-from-dictionary verdict. This conservative budget retains the memo for the wide-object benchmark shapes
+    /// while bypassing it for small objects backed by large shared dictionaries.
+    private static final int ABSENT_MEMO_METADATA_BYTES_PER_OBJECT_ENTRY_BUDGET = 16;
 
 
     private byte[] _envelope;
@@ -1204,6 +1231,12 @@ public final class VariantUtils {
     private int _metadataDataLength;
     private int _selectedOffset;
     private int _selectedLength;
+    private long _convertedDecimalLong;
+    private final long[] _decimalDivisor = new long[DECIMAL_CONVERSION_LIMBS];
+    private final long[] _decimalRemainder = new long[DECIMAL_CONVERSION_LIMBS];
+    private boolean _decimalNegative;
+    private long _decimalMagnitudeHigh;
+    private long _decimalMagnitudeLow;
 
     // Cross-row navigation memo. Rows in a segment overwhelmingly share one metadata dictionary and one object
     // layout, so the dictionary id and object-entry index resolved for each path element on one row almost always
@@ -1364,7 +1397,7 @@ public final class VariantUtils {
             case VARIANT_UUID:
               return Variant.Type.UUID;
             default:
-              throw new UnsupportedOperationException("Unknown type in Variant. primitive type: " + typeInfo);
+              throw unsupportedPrimitiveType(typeInfo);
           }
         default:
           throw new IllegalStateException("Unhandled Variant basic type: " + basicType);
@@ -1434,6 +1467,314 @@ public final class VariantUtils {
         default:
           throw new IllegalArgumentException("Cannot read non-decimal Variant value as DECIMAL");
       }
+    }
+
+    /// Converts a decimal directly from its encoded unscaled integer without materializing {@link BigDecimal}.
+    /// The fixed-limb division rounds the exact decimal rational directly to binary32, avoiding the double-rounding
+    /// error that would result from casting a rounded binary64 value to float.
+    private float getDecimalAsFloat() {
+      loadDecimalMagnitude();
+      if ((_decimalMagnitudeHigh | _decimalMagnitudeLow) == 0) {
+        return 0F;
+      }
+      int scale = getDecimalScale();
+      int binaryExponent = decimalBinaryExponent(scale);
+      if (binaryExponent < -150) {
+        return _decimalNegative ? -0F : 0F;
+      }
+      int quantumExponent = Math.max(binaryExponent - 23, -149);
+      long significand = roundedDecimalSignificand(scale, quantumExponent);
+      float value = Math.scalb((float) significand, quantumExponent);
+      return _decimalNegative ? -value : value;
+    }
+
+    /// Converts a decimal directly from its encoded unscaled integer without materializing {@link BigDecimal}.
+    /// The exact quotient/remainder calculation supplies IEEE-754 round-to-nearest, ties-to-even semantics without
+    /// the double-rounding error from separately approximating the unscaled integer and decimal divisor.
+    private double getDecimalAsDouble() {
+      loadDecimalMagnitude();
+      if ((_decimalMagnitudeHigh | _decimalMagnitudeLow) == 0) {
+        return 0D;
+      }
+      int scale = getDecimalScale();
+      int binaryExponent = decimalBinaryExponent(scale);
+      int quantumExponent = binaryExponent - 52;
+      long significand = roundedDecimalSignificand(scale, quantumExponent);
+      double value = Math.scalb((double) significand, quantumExponent);
+      return _decimalNegative ? -value : value;
+    }
+
+    private void loadDecimalMagnitude() {
+      int typeInfo = getPrimitiveTypeInfo();
+      long high;
+      long low;
+      switch (typeInfo) {
+        case VARIANT_DECIMAL4:
+          high = 0;
+          low = readSignedLittleEndian(_selectedOffset + 2, Integer.BYTES);
+          break;
+        case VARIANT_DECIMAL8:
+          high = 0;
+          low = readSignedLittleEndian(_selectedOffset + 2, Long.BYTES);
+          break;
+        case VARIANT_DECIMAL16:
+          requireSelectedRange(2, 16);
+          low = readSignedLittleEndian(_selectedOffset + 2, Long.BYTES);
+          high = readSignedLittleEndian(_selectedOffset + 2 + Long.BYTES, Long.BYTES);
+          break;
+        default:
+          throw new IllegalArgumentException("Cannot read non-decimal Variant value as DECIMAL");
+      }
+      _decimalNegative = typeInfo == VARIANT_DECIMAL16 ? high < 0 : low < 0;
+      if (_decimalNegative) {
+        if (typeInfo == VARIANT_DECIMAL16) {
+          low = -low;
+          high = ~high + (low == 0 ? 1 : 0);
+        } else {
+          low = -low;
+          high = 0;
+        }
+      }
+      _decimalMagnitudeHigh = high;
+      _decimalMagnitudeLow = low;
+    }
+
+    private int decimalBinaryExponent(int scale) {
+      int exponent = unsigned128BitLength(_decimalMagnitudeHigh, _decimalMagnitudeLow)
+          - (decimalPowerOfFiveBitLength(scale) + scale);
+      loadDecimalDivisor(scale, scale + Math.max(exponent, 0));
+      loadDecimalMagnitudeShifted(Math.max(-exponent, 0));
+      int comparison = compareDecimalScratch(_decimalRemainder, _decimalDivisor);
+      return comparison >= 0 ? exponent : exponent - 1;
+    }
+
+    /// Returns round((unscaled / 10^scale) / 2^quantumExponent) using exact fixed-limb arithmetic.
+    private long roundedDecimalSignificand(int scale, int quantumExponent) {
+      int binaryShift = -quantumExponent - scale;
+      int numeratorShift = Math.max(binaryShift, 0);
+      loadDecimalDivisor(scale, Math.max(-binaryShift, 0));
+      Arrays.fill(_decimalRemainder, 0);
+
+      int numeratorBits = unsigned128BitLength(_decimalMagnitudeHigh, _decimalMagnitudeLow) + numeratorShift;
+      long quotient = 0;
+      for (int bitIndex = numeratorBits - 1; bitIndex >= 0; bitIndex--) {
+        int sourceBit = bitIndex - numeratorShift;
+        long incomingBit;
+        if (sourceBit < 0) {
+          incomingBit = 0;
+        } else if (sourceBit < Long.SIZE) {
+          incomingBit = _decimalMagnitudeLow >>> sourceBit & 1L;
+        } else {
+          incomingBit = _decimalMagnitudeHigh >>> (sourceBit - Long.SIZE) & 1L;
+        }
+        shiftDecimalRemainderLeft(incomingBit);
+        quotient <<= 1;
+        if (compareDecimalScratch(_decimalRemainder, _decimalDivisor) >= 0) {
+          subtractDecimalDivisor();
+          quotient |= 1;
+        }
+      }
+
+      shiftDecimalRemainderLeft(0);
+      int halfwayComparison = compareDecimalScratch(_decimalRemainder, _decimalDivisor);
+      if (halfwayComparison > 0 || halfwayComparison == 0 && (quotient & 1L) != 0) {
+        quotient++;
+      }
+      return quotient;
+    }
+
+    private void loadDecimalDivisor(int scale, int binaryShift) {
+      Arrays.fill(_decimalDivisor, 0);
+      int wordShift = binaryShift / Long.SIZE;
+      int bitShift = binaryShift % Long.SIZE;
+      long[] powerOfFive = DECIMAL_POWERS_OF_FIVE[scale];
+      for (int source = 0; source < DECIMAL_POWER_LIMBS; source++) {
+        long value = powerOfFive[source];
+        int target = source + wordShift;
+        if (target >= _decimalDivisor.length) {
+          if (value != 0) {
+            throw new ArithmeticException("Decimal divisor exceeds fixed-limb conversion capacity");
+          }
+          continue;
+        }
+        _decimalDivisor[target] |= value << bitShift;
+        if (bitShift != 0) {
+          long upper = value >>> (Long.SIZE - bitShift);
+          if (target + 1 < _decimalDivisor.length) {
+            _decimalDivisor[target + 1] |= upper;
+          } else if (upper != 0) {
+            throw new ArithmeticException("Decimal divisor exceeds fixed-limb conversion capacity");
+          }
+        }
+      }
+    }
+
+    private void loadDecimalMagnitudeShifted(int binaryShift) {
+      Arrays.fill(_decimalRemainder, 0);
+      int wordShift = binaryShift / Long.SIZE;
+      int bitShift = binaryShift % Long.SIZE;
+      loadDecimalMagnitudeLimb(_decimalMagnitudeLow, wordShift, bitShift);
+      loadDecimalMagnitudeLimb(_decimalMagnitudeHigh, wordShift + 1, bitShift);
+    }
+
+    private void loadDecimalMagnitudeLimb(long value, int target, int bitShift) {
+      if (target >= _decimalRemainder.length) {
+        if (value != 0) {
+          throw new ArithmeticException("Decimal magnitude exceeds fixed-limb conversion capacity");
+        }
+        return;
+      }
+      _decimalRemainder[target] |= value << bitShift;
+      if (bitShift != 0) {
+        long upper = value >>> (Long.SIZE - bitShift);
+        if (target + 1 < _decimalRemainder.length) {
+          _decimalRemainder[target + 1] |= upper;
+        } else if (upper != 0) {
+          throw new ArithmeticException("Decimal magnitude exceeds fixed-limb conversion capacity");
+        }
+      }
+    }
+
+    private static int decimalPowerOfFiveBitLength(int scale) {
+      long[] power = DECIMAL_POWERS_OF_FIVE[scale];
+      for (int limb = power.length - 1; limb >= 0; limb--) {
+        if (power[limb] != 0) {
+          return limb * Long.SIZE + Long.SIZE - Long.numberOfLeadingZeros(power[limb]);
+        }
+      }
+      throw new IllegalStateException("Power of five cannot be zero");
+    }
+
+    private void shiftDecimalRemainderLeft(long incomingBit) {
+      long carry = incomingBit;
+      for (int i = 0; i < _decimalRemainder.length; i++) {
+        long value = _decimalRemainder[i];
+        _decimalRemainder[i] = value << 1 | carry;
+        carry = value >>> (Long.SIZE - 1);
+      }
+    }
+
+    private static int compareDecimalScratch(long[] left, long[] right) {
+      for (int i = left.length - 1; i >= 0; i--) {
+        int comparison = Long.compareUnsigned(left[i], right[i]);
+        if (comparison != 0) {
+          return comparison;
+        }
+      }
+      return 0;
+    }
+
+    private void subtractDecimalDivisor() {
+      long borrow = 0;
+      for (int i = 0; i < _decimalRemainder.length; i++) {
+        long left = _decimalRemainder[i];
+        long difference = left - _decimalDivisor[i];
+        long divisorBorrow = Long.compareUnsigned(left, _decimalDivisor[i]) < 0 ? 1 : 0;
+        long result = difference - borrow;
+        long incomingBorrow = borrow != 0 && difference == 0 ? 1 : 0;
+        _decimalRemainder[i] = result;
+        borrow = divisorBorrow | incomingBorrow;
+      }
+    }
+
+    private static int unsigned128BitLength(long high, long low) {
+      return high != 0 ? Long.SIZE * 2 - Long.numberOfLeadingZeros(high)
+          : low != 0 ? Long.SIZE - Long.numberOfLeadingZeros(low) : 0;
+    }
+
+    /// Returns an exact long conversion for a decimal or throws with the same contract as
+    /// {@link BigDecimal#longValueExact()}.
+    private long getDecimalAsLongExact() {
+      if (!tryGetDecimalAsLongExact()) {
+        throw new ArithmeticException("Rounding necessary or decimal overflow");
+      }
+      return _convertedDecimalLong;
+    }
+
+    private long getConvertedDecimalLong() {
+      return _convertedDecimalLong;
+    }
+
+    /// Attempts an exact long conversion directly on the encoded decimal. DECIMAL16 division uses four unsigned
+    /// 32-bit limbs so it remains allocation-free even when the unscaled value does not fit in a Java long.
+    private boolean tryGetDecimalAsLongExact() {
+      int typeInfo = getPrimitiveTypeInfo();
+      int scale = getDecimalScale();
+      switch (typeInfo) {
+        case VARIANT_DECIMAL4:
+          return tryConvertScaledLong(readSignedLittleEndian(_selectedOffset + 2, Integer.BYTES), scale);
+        case VARIANT_DECIMAL8:
+          return tryConvertScaledLong(readSignedLittleEndian(_selectedOffset + 2, Long.BYTES), scale);
+        case VARIANT_DECIMAL16:
+          requireSelectedRange(2, 16);
+          return tryConvertScaledInt128(
+              readSignedLittleEndian(_selectedOffset + 2 + Long.BYTES, Long.BYTES),
+              readSignedLittleEndian(_selectedOffset + 2, Long.BYTES), scale);
+        default:
+          throw new IllegalArgumentException("Cannot read non-decimal Variant value as DECIMAL");
+      }
+    }
+
+    private int getDecimalScale() {
+      requireSelectedRange(1, 1);
+      return Byte.toUnsignedInt(_envelope[_selectedOffset + 1]);
+    }
+
+    private boolean tryConvertScaledLong(long unscaled, int scale) {
+      for (int i = 0; i < scale && unscaled != 0; i++) {
+        if (unscaled % 10 != 0) {
+          return false;
+        }
+        unscaled /= 10;
+      }
+      _convertedDecimalLong = unscaled;
+      return true;
+    }
+
+    private boolean tryConvertScaledInt128(long high, long low, int scale) {
+      boolean negative = high < 0;
+      if (negative) {
+        low = -low;
+        high = ~high + (low == 0 ? 1 : 0);
+      }
+
+      long limb3 = high >>> Integer.SIZE;
+      long limb2 = high & Integer.toUnsignedLong(-1);
+      long limb1 = low >>> Integer.SIZE;
+      long limb0 = low & Integer.toUnsignedLong(-1);
+      for (int i = 0; i < scale && (limb3 | limb2 | limb1 | limb0) != 0; i++) {
+        long remainder = 0;
+        long dividend = remainder << Integer.SIZE | limb3;
+        limb3 = dividend / 10;
+        remainder = dividend % 10;
+        dividend = remainder << Integer.SIZE | limb2;
+        limb2 = dividend / 10;
+        remainder = dividend % 10;
+        dividend = remainder << Integer.SIZE | limb1;
+        limb1 = dividend / 10;
+        remainder = dividend % 10;
+        dividend = remainder << Integer.SIZE | limb0;
+        limb0 = dividend / 10;
+        if (dividend % 10 != 0) {
+          return false;
+        }
+      }
+      if (limb3 != 0 || limb2 != 0) {
+        return false;
+      }
+      long magnitude = limb1 << Integer.SIZE | limb0;
+      if (negative) {
+        if (Long.compareUnsigned(magnitude, Long.MIN_VALUE) > 0) {
+          return false;
+        }
+        _convertedDecimalLong = magnitude == Long.MIN_VALUE ? Long.MIN_VALUE : -magnitude;
+      } else {
+        if (magnitude < 0) {
+          return false;
+        }
+        _convertedDecimalLong = magnitude;
+      }
+      return true;
     }
 
     private String getString() {
@@ -1531,9 +1872,13 @@ public final class VariantUtils {
               dataStart, totalDataLength);
         }
         // The dictionary changed underneath the memo; fall through to a fresh resolution.
-      } else if (memoId == MEMO_ABSENT_FROM_DICTIONARY && absentFromDictionary(elementIndex)) {
-        // No object under an identical dictionary can contain a key the dictionary does not define.
-        return false;
+      } else if (memoId == MEMO_ABSENT_FROM_DICTIONARY) {
+        if (isAbsentDictionaryMemoCostEffective(numElements) && absentFromDictionary(elementIndex)) {
+          // No object under an identical dictionary can contain a key the dictionary does not define.
+          return false;
+        }
+        // The current object is cheaper to scan than its metadata is to compare, or the metadata changed.
+        clearMemo(elementIndex);
       }
       return selectObjectFieldSlow(field, elementIndex, numElements, idStart, idSize, offsetStart, offsetSize,
           dataStart, totalDataLength);
@@ -1568,12 +1913,14 @@ public final class VariantUtils {
         selectObjectFieldAtIndex(index, offsetStart, offsetSize, dataStart, totalDataLength);
         return true;
       }
+      if (!isAbsentDictionaryMemoCostEffective(numElements)) {
+        clearMemo(elementIndex);
+        return false;
+      }
       if (!metadataRepeatedAcrossRows()) {
         // The dictionary changes row over row, so classifying the miss against the whole dictionary would cost a
         // full dictionary scan per row with nothing reusable. Keep the pre-memo miss cost instead.
-        _memoIds[elementIndex] = MEMO_UNKNOWN;
-        _memoHints[elementIndex] = HINT_UNKNOWN;
-        _memoAbsentEnvelopes[elementIndex] = null;
+        clearMemo(elementIndex);
         return false;
       }
       int dictionaryId = findDictionaryId(field._fieldUtf8);
@@ -1588,6 +1935,16 @@ public final class VariantUtils {
         _memoAbsentMetadataLengths[elementIndex] = _metadataLength;
       }
       return false;
+    }
+
+    private boolean isAbsentDictionaryMemoCostEffective(int numElements) {
+      return _metadataLength <= (long) numElements * ABSENT_MEMO_METADATA_BYTES_PER_OBJECT_ENTRY_BUDGET;
+    }
+
+    private void clearMemo(int elementIndex) {
+      _memoIds[elementIndex] = MEMO_UNKNOWN;
+      _memoHints[elementIndex] = HINT_UNKNOWN;
+      _memoAbsentEnvelopes[elementIndex] = null;
     }
 
     /// Returns the object-entry index whose key equals the path field, or {@code -1} when absent.
@@ -1781,7 +2138,7 @@ public final class VariantUtils {
               length = 1 + UuidUtils.UUID_NUM_BYTES;
               break;
             default:
-              throw new UnsupportedOperationException("Unknown type in Variant. primitive type: " + typeInfo);
+              throw unsupportedPrimitiveType(typeInfo);
           }
           break;
         default:
@@ -1789,6 +2146,11 @@ public final class VariantUtils {
       }
       requireRange(valueOffset, length, limit, "Variant value");
       return length;
+    }
+
+    private static UnsupportedOperationException unsupportedPrimitiveType(int typeInfo) {
+      return new UnsupportedOperationException(
+          "Unsupported Parquet Variant primitive type: " + typeInfo + "; update VariantUtils with the codec");
     }
 
     /// Compares one encoded metadata key with {@code expected} using Java String's UTF-16 code-unit order without

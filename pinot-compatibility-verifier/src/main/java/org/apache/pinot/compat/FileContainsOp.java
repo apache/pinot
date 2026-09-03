@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,35 +36,41 @@ public class FileContainsOp extends BaseOp {
   private static final int MAX_ATTEMPTS = 10;
   private static final long RETRY_DELAY_MS = 100L;
 
+  @Nullable
   private String _directorySystemProperty;
+  @Nullable
   private String _fileNameGlob;
+  @Nullable
   private String _expectedTextContains;
 
   public FileContainsOp() {
     super(OpType.FILE_CONTAINS_OP);
   }
 
+  @Nullable
   public String getDirectorySystemProperty() {
     return _directorySystemProperty;
   }
 
-  public void setDirectorySystemProperty(String directorySystemProperty) {
+  public void setDirectorySystemProperty(@Nullable String directorySystemProperty) {
     _directorySystemProperty = directorySystemProperty;
   }
 
+  @Nullable
   public String getFileNameGlob() {
     return _fileNameGlob;
   }
 
-  public void setFileNameGlob(String fileNameGlob) {
+  public void setFileNameGlob(@Nullable String fileNameGlob) {
     _fileNameGlob = fileNameGlob;
   }
 
+  @Nullable
   public String getExpectedTextContains() {
     return _expectedTextContains;
   }
 
-  public void setExpectedTextContains(String expectedTextContains) {
+  public void setExpectedTextContains(@Nullable String expectedTextContains) {
     _expectedTextContains = expectedTextContains;
   }
 

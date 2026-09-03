@@ -34,7 +34,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.planner.validation.TypeCapabilityValidationVisitor;
+import org.apache.pinot.query.planner.validation.RawVariantValidationVisitor;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
@@ -109,7 +109,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
       WindowNode node) {
     super(context);
-    TypeCapabilityValidationVisitor.validateWindowInputs(node, inputSchema);
+    RawVariantValidationVisitor.validateWindowInputs(node, inputSchema);
 
     _input = input;
     _resultSchema = node.getDataSchema();

@@ -129,8 +129,6 @@ public class UnionOperatorTest {
 
     DataSchema objectSchema =
         new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
-    exception = Assert.expectThrows(IllegalArgumentException.class,
-        () -> new UnionOperator(OperatorTestUtil.getTracingContext(), inputs, objectSchema));
-    Assert.assertTrue(exception.getMessage().contains("UNION DISTINCT does not support OBJECT values"));
+    Assert.assertNotNull(new UnionOperator(OperatorTestUtil.getTracingContext(), inputs, objectSchema));
   }
 }

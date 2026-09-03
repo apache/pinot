@@ -82,7 +82,7 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable()
       throws IOException {
-    if (VariantUtils.requiresNullHandlingForRawVariantResult(_dataSchema, _queryContext.isNullHandlingEnabled())) {
+    if (!_queryContext.isNullHandlingEnabled() && VariantUtils.containsRawVariantResult(_dataSchema)) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(VariantUtils.RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR);
     }
     return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());

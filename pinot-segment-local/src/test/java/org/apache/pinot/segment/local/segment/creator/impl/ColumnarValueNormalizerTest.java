@@ -40,4 +40,34 @@ public class ColumnarValueNormalizerTest {
     assertSame(result, fieldSpec.getDefaultNullValue());
     assertEquals(((byte[]) result).length, 0);
   }
+
+  @Test
+  public void testNullBooleanReturnsInternalIntegerDefault() {
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN, DataType.BOOLEAN, true);
+
+    Object result = ColumnarValueNormalizer.normalize(COLUMN, fieldSpec, PinotDataType.BOOLEAN, null);
+
+    assertEquals(result, 0);
+    assertEquals(result.getClass(), Integer.class);
+  }
+
+  @Test
+  public void testNullTimestampReturnsInternalLongDefault() {
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN, DataType.TIMESTAMP, true);
+
+    Object result = ColumnarValueNormalizer.normalize(COLUMN, fieldSpec, PinotDataType.TIMESTAMP, null);
+
+    assertEquals(result, 0L);
+    assertEquals(result.getClass(), Long.class);
+  }
+
+  @Test
+  public void testNullMultiValueReturnsOneElementObjectArray() {
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN, DataType.STRING, false);
+
+    Object result = ColumnarValueNormalizer.normalize(COLUMN, fieldSpec, PinotDataType.STRING_ARRAY, null);
+
+    assertEquals(result, new Object[]{fieldSpec.getDefaultNullValue()});
+    assertEquals(result.getClass(), Object[].class);
+  }
 }

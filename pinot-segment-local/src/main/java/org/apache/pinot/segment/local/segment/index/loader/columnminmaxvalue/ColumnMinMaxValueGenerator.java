@@ -133,7 +133,7 @@ public class ColumnMinMaxValueGenerator {
   }
 
   private static boolean supportsMinMax(FieldSpec fieldSpec) {
-    return !fieldSpec.isVirtualColumn() && fieldSpec.getDataType().supportsMinMax();
+    return !fieldSpec.isVirtualColumn() && fieldSpec.getDataType() != FieldSpec.DataType.VARIANT;
   }
 
   private boolean needAddColumnMinMaxValueForColumn(String columnName) {

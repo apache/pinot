@@ -188,7 +188,7 @@ public class AggregationFunctionUtils {
       }
       for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
         ColumnContext columnContext = projectOperator.getResultColumnContext(inputExpression);
-        if (columnContext != null && !columnContext.getDataType().supportsDirectAggregation()) {
+        if (columnContext != null && columnContext.getDataType() == DataType.VARIANT) {
           throw rawVariantUnsupported(aggregationFunction);
         }
       }
@@ -197,6 +197,11 @@ public class AggregationFunctionUtils {
 
   private static void validateRawVariantIdentifierInputs(AggregationFunction<?, ?>[] aggregationFunctions,
       SegmentContext segmentContext, QueryContext queryContext) {
+    // QueryContext is shared by every segment. Preserve the legacy no-schema path, but skip all per-expression
+    // data-source lookups when the assigned table schema proves that VARIANT cannot be referenced.
+    if (queryContext.getSchema() != null && !queryContext.hasVariantColumns()) {
+      return;
+    }
     for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
         continue;
@@ -206,7 +211,7 @@ public class AggregationFunctionUtils {
           DataType dataType =
               segmentContext.getIndexSegment().getDataSource(inputExpression.getIdentifier(), queryContext.getSchema())
                   .getDataSourceMetadata().getDataType();
-          if (!dataType.supportsDirectAggregation()) {
+          if (dataType == DataType.VARIANT) {
             throw rawVariantUnsupported(aggregationFunction);
           }
         }

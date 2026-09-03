@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -35,7 +36,7 @@ import org.roaringbitmap.RoaringBitmap;
 ///
 /// <p>Instances are query-local and not thread-safe.
 public class ParseJsonToVariantTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "parseJson";
+  public static final String FUNCTION_NAME = TransformFunctionType.PARSE_JSON_TO_VARIANT.getName();
   private static final TransformResultMetadata RESULT_METADATA =
       new TransformResultMetadata(DataType.VARIANT, true, false);
 
@@ -155,7 +156,7 @@ public class ParseJsonToVariantTransformFunction extends BaseTransformFunction {
 
   /// Tolerant JSON-to-Variant parsing.
   public static final class Try extends ParseJsonToVariantTransformFunction {
-    public static final String FUNCTION_NAME = "tryParseJson";
+    public static final String FUNCTION_NAME = TransformFunctionType.TRY_PARSE_JSON_TO_VARIANT.getName();
 
     public Try() {
       super(true);
