@@ -327,7 +327,12 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   }
 
   enum SparkType {
-    SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3.2", JavaVersion.JAVA_11);
+    // The plugin name must match the directory the plugin ships in, which is what
+    // shouldLoadPlugin() compares it against. It read "pinot-batch-ingestion-spark-3.2" while the
+    // module has always been pinot-batch-ingestion-spark-3, so the comparison never matched and
+    // the ingestion plugin was never selected: because its directory name contains "spark" it is
+    // first excluded, and this is the clause meant to bring it back.
+    SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3", JavaVersion.JAVA_11);
 
     private final String _sparkVersion;
     private final String _pluginName;
