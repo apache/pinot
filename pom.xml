@@ -246,7 +246,7 @@
     <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
     <fastutil.version>8.5.19</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
-    <snakeyaml.version>2.6</snakeyaml.version>
+    <snakeyaml.version>2.7</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>9.0.0</datasketches-java.version>
