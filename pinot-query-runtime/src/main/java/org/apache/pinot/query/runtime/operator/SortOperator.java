@@ -77,9 +77,8 @@ public class SortOperator extends MultiStageOperator {
     List<RelFieldCollation> collations = node.getCollations();
     for (RelFieldCollation collation : collations) {
       ColumnDataType dataType = _dataSchema.getColumnDataType(collation.getFieldIndex());
-      Preconditions.checkArgument(dataType.supportsOrdering(), dataType == ColumnDataType.VARIANT
-          ? "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first"
-          : "ORDER BY does not support " + dataType + " values");
+      Preconditions.checkArgument(dataType != ColumnDataType.VARIANT,
+          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
     }
     if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
       _priorityQueue = null;

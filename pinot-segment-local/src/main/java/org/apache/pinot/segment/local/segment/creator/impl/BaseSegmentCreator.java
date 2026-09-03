@@ -666,7 +666,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
 
     // Min/max value
-    if (fieldSpec.getFieldType() != FieldType.COMPLEX && fieldSpec.getDataType().supportsMinMax()) {
+    if (fieldSpec.getFieldType() != FieldType.COMPLEX && fieldSpec.getDataType() != DataType.VARIANT) {
       // Regular (non-complex) field
       if (totalDocs > 0) {
         Object min = columnStatistics.getMinValue();

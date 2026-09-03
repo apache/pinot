@@ -177,6 +177,20 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testVariantToJsonRequiresVariantOperand() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT variant_to_json(parse_json_to_variant(col1)), variant_to_json(parse_json(col1)) FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+
+    String query = "SELECT variant_to_json(col3) FROM a";
+    Throwable thrown = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(query));
+    assertTrue(Throwables.getStackTraceAsString(thrown).contains("Cannot apply 'VARIANTTOJSON"),
+        "Unexpected rejection for " + query + ": " + Throwables.getStackTraceAsString(thrown));
+  }
+
+  @Test
   public void testVariantFunctionsRequireQueryNullHandling() {
     QueryEnvironment nullHandlingDisabled = getQueryEnvironment(
         13, 11, 12, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, false);

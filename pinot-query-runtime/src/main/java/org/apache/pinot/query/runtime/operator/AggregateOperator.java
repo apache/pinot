@@ -48,7 +48,7 @@ import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.validation.TypeCapabilityValidationVisitor;
+import org.apache.pinot.query.planner.validation.RawVariantValidationVisitor;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
@@ -95,7 +95,7 @@ public class AggregateOperator extends MultiStageOperator {
     DataSchema inputSchema = input instanceof RepeatOperator ? ((RepeatOperator) input).getResultSchema()
         : node.getInputs().size() == 1 ? node.getInputs().get(0).getDataSchema() : null;
     if (inputSchema != null) {
-      TypeCapabilityValidationVisitor.validateAggregateInputs(node, inputSchema);
+      RawVariantValidationVisitor.validateAggregateInputs(node, inputSchema);
     }
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());

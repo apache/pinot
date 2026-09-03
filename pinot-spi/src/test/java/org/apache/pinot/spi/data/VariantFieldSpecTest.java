@@ -71,8 +71,20 @@ public class VariantFieldSpecTest {
     assertEquals(DataType.VARIANT.convertInternal(envelopeHex), new ByteArray(envelope));
     assertEquals(DataType.VARIANT.toString(envelope), envelopeHex);
 
-    assertThrows(IllegalArgumentException.class, () -> DataType.VARIANT.convert(""));
+    assertEquals((byte[]) DataType.VARIANT.convert(""), new byte[0]);
+    assertEquals(DataType.VARIANT.convertInternal(""), new ByteArray(new byte[0]));
     assertThrows(IllegalArgumentException.class, () -> DataType.VARIANT.convert("00"));
+  }
+
+  @Test
+  public void testExplicitDefaultNullSentinelRoundTripsThroughSchemaJson()
+      throws Exception {
+    String schemaJson = "{\"schemaName\":\"events\",\"dimensionFieldSpecs\":["
+        + "{\"name\":\"payload\",\"dataType\":\"VARIANT\",\"defaultNullValue\":\"\"}]}";
+
+    Schema schema = Schema.fromString(schemaJson);
+    assertEquals((byte[]) schema.getFieldSpecFor("payload").getDefaultNullValue(), new byte[0]);
+    assertEquals(Schema.fromString(schema.toString()), schema);
   }
 
   @Test
@@ -83,6 +95,17 @@ public class VariantFieldSpecTest {
     assertThrows(UnsupportedOperationException.class, () -> DataType.VARIANT.equals(envelope, envelope));
     assertThrows(UnsupportedOperationException.class, () -> DataType.VARIANT.hashCode(envelope));
     assertThrows(UnsupportedOperationException.class, () -> DataType.VARIANT.compare(envelope, envelope));
+  }
+
+  @Test
+  public void testExistingOpaqueTypesPreserveComparisonException() {
+    Object value = new Object();
+    for (DataType dataType : new DataType[]{DataType.STRUCT, DataType.UNKNOWN}) {
+      assertThrows(IllegalStateException.class, () -> dataType.compare(value, value));
+    }
+    for (DataType dataType : new DataType[]{DataType.MAP, DataType.OPEN_STRUCT, DataType.LIST}) {
+      assertThrows(UnsupportedOperationException.class, () -> dataType.compare(value, value));
+    }
   }
 
   @Test

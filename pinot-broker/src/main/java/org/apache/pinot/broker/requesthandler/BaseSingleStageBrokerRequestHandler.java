@@ -1548,8 +1548,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     ResultTable resultTable = brokerResponse.getResultTable();
     Map<String, String> queryOptions = serverPinotQuery.getQueryOptions();
     boolean nullHandlingEnabled = queryOptions != null && QueryOptionsUtils.isNullHandlingEnabled(queryOptions);
-    if (resultTable == null || !VariantUtils.requiresNullHandlingForRawVariantResult(resultTable.getDataSchema(),
-        nullHandlingEnabled)) {
+    if (resultTable == null || nullHandlingEnabled
+        || !VariantUtils.containsRawVariantResult(resultTable.getDataSchema())) {
       return;
     }
     requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);

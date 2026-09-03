@@ -23,7 +23,7 @@ import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/// Scalar functions for the Pinot {@code VARIANT} logical type.
+/// Stateless scalar functions for the Pinot {@code VARIANT} logical type. All methods are thread-safe.
 public final class VariantFunctions {
   private VariantFunctions() {
   }
@@ -87,13 +87,13 @@ public final class VariantFunctions {
   }
 
   @Nullable
-  @ScalarFunction(names = {"parseJson", "parseJsonToVariant"})
+  @ScalarFunction(names = {"parseJsonToVariant", "parseJson"})
   public static byte[] parseJsonToVariant(String json) {
     return VariantUtils.parseJsonToVariant(json);
   }
 
   @Nullable
-  @ScalarFunction(names = {"tryParseJson", "tryParseJsonToVariant"})
+  @ScalarFunction(names = {"tryParseJsonToVariant", "tryParseJson"})
   public static byte[] tryParseJsonToVariant(String json) {
     return VariantUtils.tryParseJsonToVariant(json);
   }

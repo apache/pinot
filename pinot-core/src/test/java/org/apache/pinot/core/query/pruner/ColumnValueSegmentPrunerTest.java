@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.pruner;
 
 import com.google.common.collect.ImmutableSet;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +34,8 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.VariantEnvelope;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -110,6 +113,29 @@ public class ColumnValueSegmentPrunerTest {
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 30 OR column < 10"));
     assertTrue(runPruner(indexSegment,
         "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 0 AND 5 OR column BETWEEN 30 AND 35"));
+  }
+
+  @Test
+  public void testRawVariantPredicatesNeverPruneOnEnvelopeBytes() {
+    IndexSegment indexSegment = mockIndexSegment();
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.VARIANT);
+    String minValue = variantEnvelopeHex(0x10);
+    String maxValue = variantEnvelopeHex(0x20);
+    when(dataSourceMetadata.getMinValue()).thenReturn(DataType.VARIANT.convertInternal(minValue));
+    when(dataSourceMetadata.getMaxValue()).thenReturn(DataType.VARIANT.convertInternal(maxValue));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    String belowMin = variantEnvelopeHex(0x01);
+    String aboveMax = variantEnvelopeHex(0x30);
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '" + belowMin + "'"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN ('" + belowMin + "', '" + aboveMax + "')"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column BETWEEN '" + belowMin + "' AND '" + belowMin + "'"));
   }
 
   @Test
@@ -250,5 +276,10 @@ public class ColumnValueSegmentPrunerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     queryContext.setSchema(mock(Schema.class));
     return pruner.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
+  }
+
+  private static String variantEnvelopeHex(int valueByte) {
+    byte[] envelope = VariantEnvelope.encode(ByteBuffer.allocate(0), ByteBuffer.wrap(new byte[]{(byte) valueByte}));
+    return BytesUtils.toHexString(envelope);
   }
 }

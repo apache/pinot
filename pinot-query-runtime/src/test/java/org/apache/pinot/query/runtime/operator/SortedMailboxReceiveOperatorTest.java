@@ -55,6 +55,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -127,15 +128,13 @@ public class SortedMailboxReceiveOperatorTest {
   }
 
   @Test
-  public void shouldNameUnsupportedNonVariantCollationType() {
+  public void shouldPreserveNonVariantCollationValidationBehavior() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     DataSchema objectSchema =
         new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
 
-    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-        () -> getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, objectSchema, FIELD_COLLATIONS,
-            Long.MAX_VALUE));
-    assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
+    assertNotNull(getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, objectSchema, FIELD_COLLATIONS,
+        Long.MAX_VALUE));
   }
 
   @Test

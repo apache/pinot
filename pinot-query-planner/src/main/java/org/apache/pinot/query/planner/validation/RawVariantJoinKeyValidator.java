@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 
@@ -30,13 +31,13 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 ///
 /// <p>This stateless validator is shared by planning and execution so that mixed-version plans are rejected with the
 /// same semantics and error messages regardless of where validation first occurs.
-public final class JoinKeyTypeValidator {
+public final class RawVariantJoinKeyValidator {
   private static final String JOIN_KEY_ERROR =
       "Raw VARIANT values do not support JOIN keys; extract a typed path with variantGet first";
   private static final String ASOF_MATCH_KEY_ERROR =
       "Raw VARIANT values do not support ASOF JOIN match keys; extract a typed path with variantGet first";
 
-  private JoinKeyTypeValidator() {
+  private RawVariantJoinKeyValidator() {
   }
 
   /// Validates equality/hash keys and, for ASOF joins, ordering keys.
@@ -56,8 +57,8 @@ public final class JoinKeyTypeValidator {
 
   private static void validateEqualityAndHashing(List<Integer> keys, DataSchema schema) {
     for (int key : keys) {
-      DataSchema.ColumnDataType dataType = schema.getColumnDataType(key);
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(), JOIN_KEY_ERROR);
+      ColumnDataType dataType = schema.getColumnDataType(key);
+      Preconditions.checkArgument(dataType != ColumnDataType.VARIANT, JOIN_KEY_ERROR);
     }
   }
 
@@ -66,7 +67,7 @@ public final class JoinKeyTypeValidator {
     List<RexExpression> matchKeys = matchCondition.getFunctionOperands();
     int leftMatchKey = ((RexExpression.InputRef) matchKeys.get(0)).getIndex();
     int rightMatchKey = ((RexExpression.InputRef) matchKeys.get(1)).getIndex() - leftSchema.size();
-    Preconditions.checkArgument(leftSchema.getColumnDataType(leftMatchKey).supportsOrdering()
-        && rightSchema.getColumnDataType(rightMatchKey).supportsOrdering(), ASOF_MATCH_KEY_ERROR);
+    Preconditions.checkArgument(leftSchema.getColumnDataType(leftMatchKey) != ColumnDataType.VARIANT
+        && rightSchema.getColumnDataType(rightMatchKey) != ColumnDataType.VARIANT, ASOF_MATCH_KEY_ERROR);
   }
 }

@@ -307,6 +307,21 @@ public class HashJoinOperatorTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  public void shouldValidateLeftKeyWithLegacyConstructor() {
+    DataSchema variantSchema = new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    _leftInput = new BlockListMultiStageOperator.Builder(variantSchema).buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
+    JoinNode joinNode = new JoinNode(-1, variantSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.SEMI,
+        List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH);
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, variantSchema, _rightInput,
+            joinNode));
+    assertTrue(exception.getMessage().contains("Raw VARIANT values do not support JOIN keys"));
+  }
+
+  @Test
   public void shouldPropagateRightTableError() {
     _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
         .addRow(1, "BB")
@@ -933,6 +948,7 @@ public class HashJoinOperatorTest {
     assertTrue(exception.getMessage().contains("Raw VARIANT values do not support JOIN keys"));
   }
 
+  @SuppressWarnings("deprecation")
   private void assertLegacyConstructorSupports(JoinRelType joinType) {
     _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
     _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
@@ -942,5 +958,7 @@ public class HashJoinOperatorTest {
 
     assertNotNull(new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA,
         _rightInput, joinNode));
+    assertNotNull(new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA,
+        _rightInput, joinNode, DEFAULT_CHILD_SCHEMA));
   }
 }

@@ -311,6 +311,18 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testRawVariantRegexpLikeIsRejected(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    JsonNode response = postVariantQuery(
+        "SELECT " + EVENT_ID + " FROM " + TABLE_NAME + " WHERE REGEXP_LIKE(" + PAYLOAD + ", '.*')");
+    // Calcite inserts a VARCHAR cast for REGEXP_LIKE in the multi-stage plan, so that engine rejects the raw
+    // VARIANT at the earlier CAST boundary. The single-stage engine reaches the predicate-specific guard.
+    assertExceptionContains(response, "raw variant", useMultiStageQueryEngine ? "cast" : "regexp_like");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testRawVariantOrderByIsRejected(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

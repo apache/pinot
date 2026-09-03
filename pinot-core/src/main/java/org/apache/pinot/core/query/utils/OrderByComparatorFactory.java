@@ -53,10 +53,9 @@ public class OrderByComparatorFactory {
             + " should not be included in the ORDER-BY clause");
       }
       FieldSpec.DataType dataType = orderByColumnContexts[i].getDataType();
-      if (!dataType.supportsOrdering()) {
-        throw new BadQueryRequestException(dataType == FieldSpec.DataType.VARIANT
-            ? "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first"
-            : "ORDER BY does not support " + dataType + " values");
+      if (dataType == FieldSpec.DataType.VARIANT) {
+        throw new BadQueryRequestException(
+            "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
       }
     }
 
