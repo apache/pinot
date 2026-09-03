@@ -22,7 +22,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.validation.JoinKeyTypeValidator;
+import org.apache.pinot.query.planner.validation.RawVariantJoinKeyValidator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
@@ -39,7 +39,7 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
     JoinNode.JoinStrategy joinStrategy = joinNode.getJoinStrategy();
     DataSchema leftSchema = leftPlanNode.getDataSchema();
     DataSchema rightSchema = rightPlanNode.getDataSchema();
-    JoinKeyTypeValidator.validate(joinNode, leftSchema, rightSchema);
+    RawVariantJoinKeyValidator.validate(joinNode, leftSchema, rightSchema);
     switch (joinStrategy) {
       case HASH:
         if (joinNode.getLeftKeys().isEmpty()) {

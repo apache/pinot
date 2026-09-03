@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -57,7 +58,8 @@ public class PredicateEvaluatorProviderTest {
         new NotEqPredicate(column, "{}"),
         new RangePredicate(column, "[1\t\t2]"),
         new InPredicate(column, List.of("{}", "[]")),
-        new NotInPredicate(column, List.of("{}", "[]")))) {
+        new NotInPredicate(column, List.of("{}", "[]")),
+        new RegexpLikePredicate(column, ".*"))) {
       BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
           () -> PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, DataType.VARIANT, null));
       String message = exception.getCause().getMessage();
@@ -66,15 +68,14 @@ public class PredicateEvaluatorProviderTest {
     }
   }
 
-  /// Non-VARIANT types can also fail a capability check (e.g. MAP has no ordering); the rejection must name the
-  /// actual type and must not suggest variantGet.
+  /// VARIANT validation must not replace the pre-existing failure path for other unsupported data types.
   @Test
-  public void testCapabilityRejectionNamesActualDataType() {
+  public void testNonVariantRejectionPreservesExistingError() {
     BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
         () -> PredicateEvaluatorProvider.getPredicateEvaluator(
             new RangePredicate(ExpressionContext.forIdentifier("mapCol"), "[1\t\t2]"), null, DataType.MAP, null));
     String message = exception.getCause().getMessage();
-    assertTrue(message.contains("Raw MAP values do not support"), message);
+    assertTrue(message.contains("Unsupported data type: MAP"), message);
     assertFalse(message.contains("variantGet"), message);
   }
 

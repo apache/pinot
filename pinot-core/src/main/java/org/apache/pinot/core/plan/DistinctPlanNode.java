@@ -55,16 +55,20 @@ public class DistinctPlanNode implements PlanNode {
   @Override
   public Operator<DistinctResultsBlock> run() {
     List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
-    for (ExpressionContext expression : expressions) {
-      String column = expression.getIdentifier();
-      if (column != null) {
-        DataType dataType = _indexSegment.getDataSource(column, _queryContext.getSchema())
-            .getDataSourceMetadata().getDataType();
-        if (dataType.supportsEquality() && dataType.supportsHashing()) {
-          continue;
+    // QueryContext is shared by every segment. Tables without VARIANT columns take this constant-time branch instead
+    // of repeating one data-source lookup per DISTINCT expression per segment.
+    if (_queryContext.getSchema() == null || _queryContext.hasVariantColumns()) {
+      for (ExpressionContext expression : expressions) {
+        String column = expression.getIdentifier();
+        if (column != null) {
+          DataType dataType = _indexSegment.getDataSource(column, _queryContext.getSchema())
+              .getDataSourceMetadata().getDataType();
+          if (dataType != DataType.VARIANT) {
+            continue;
+          }
+          throw new IllegalArgumentException(
+              "Raw VARIANT values do not support DISTINCT; extract a typed path with variantGet first");
         }
-        throw new IllegalArgumentException(
-            "Raw VARIANT values do not support DISTINCT; extract a typed path with variantGet first");
       }
     }
 

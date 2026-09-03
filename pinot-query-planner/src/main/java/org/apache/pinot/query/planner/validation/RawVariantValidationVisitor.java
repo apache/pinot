@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.validation;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -34,13 +35,12 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/// Validates that each logical input type supports the capabilities required by its operation, including equality,
-/// hashing, ordering, aggregation, and lossless result projection. The visitor has no mutable state and is thread-safe,
-/// so callers may share {@link #INSTANCE}.
-public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
-  public static final TypeCapabilityValidationVisitor INSTANCE = new TypeCapabilityValidationVisitor();
+/// Enforces the operations that cannot consume raw VARIANT values and the null-handling requirement for projecting
+/// raw VARIANT results. The visitor has no mutable state and is thread-safe, so callers may share {@link #INSTANCE}.
+public final class RawVariantValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
+  public static final RawVariantValidationVisitor INSTANCE = new RawVariantValidationVisitor();
 
-  private TypeCapabilityValidationVisitor() {
+  private RawVariantValidationVisitor() {
   }
 
   @Override
@@ -63,9 +63,9 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
   /// current broker planner.
   public static void validateAggregateInputs(AggregateNode node, DataSchema inputSchema) {
     for (int key : node.getGroupKeys()) {
-      DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(key);
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw unsupported("GROUP BY", dataType);
+      ColumnDataType dataType = inputSchema.getColumnDataType(key);
+      if (dataType == ColumnDataType.VARIANT) {
+        throw unsupported("GROUP BY");
       }
     }
     validateAggregateInputs(node.getAggCalls(), inputSchema);
@@ -78,9 +78,9 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
         continue;
       }
       for (RexExpression operand : aggCall.getFunctionOperands()) {
-        DataSchema.ColumnDataType dataType = getLogicalType(operand, inputSchema);
-        if (!dataType.supportsDirectAggregation()) {
-          throw unsupported("Aggregate function " + aggCall.getFunctionName(), dataType);
+        ColumnDataType dataType = getLogicalType(operand, inputSchema);
+        if (dataType == ColumnDataType.VARIANT) {
+          throw unsupported("Aggregate function " + aggCall.getFunctionName());
         }
       }
     }
@@ -90,7 +90,7 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
   /// byte placeholder cannot participate in normal disabled-null semantics while also remaining distinguishable from
   /// an encoded Variant null.
   public static void validateResultSchema(DataSchema resultSchema, boolean nullHandlingEnabled) {
-    if (VariantUtils.requiresNullHandlingForRawVariantResult(resultSchema, nullHandlingEnabled)) {
+    if (!nullHandlingEnabled && VariantUtils.containsRawVariantResult(resultSchema)) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           VariantUtils.RAW_VARIANT_REQUIRES_NULL_HANDLING_ERROR);
     }
@@ -101,9 +101,9 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
     DataSchema dataSchema = node.getDataSchema();
     for (RelFieldCollation collation : node.getCollations()) {
       int fieldIndex = collation.getFieldIndex();
-      DataSchema.ColumnDataType dataType = dataSchema.getColumnDataType(fieldIndex);
-      if (!dataType.supportsOrdering()) {
-        throw unsupported("ORDER BY", dataType);
+      ColumnDataType dataType = dataSchema.getColumnDataType(fieldIndex);
+      if (dataType == ColumnDataType.VARIANT) {
+        throw unsupported("ORDER BY");
       }
     }
     return super.visitSort(node, context);
@@ -112,9 +112,9 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
   @Override
   public Void visitSetOp(SetOpNode node, Void context) {
     if (!(node.getSetOpType() == SetOpNode.SetOpType.UNION && node.isAll())) {
-      for (DataSchema.ColumnDataType dataType : node.getDataSchema().getColumnDataTypes()) {
-        if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-          throw unsupported(node.explain().replace('_', ' '), dataType);
+      for (ColumnDataType dataType : node.getDataSchema().getColumnDataTypes()) {
+        if (dataType == ColumnDataType.VARIANT) {
+          throw unsupported(node.explain().replace('_', ' '));
         }
       }
     }
@@ -136,7 +136,7 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
   /// {@code HashJoinOperator}.
   public static void validateJoinInputs(JoinNode node, DataSchema leftSchema, DataSchema rightSchema) {
     try {
-      JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
+      RawVariantJoinKeyValidator.validate(node, leftSchema, rightSchema);
     } catch (IllegalArgumentException e) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING, e.getMessage(), e);
     }
@@ -157,15 +157,15 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
   /// current broker planner.
   public static void validateWindowInputs(WindowNode node, DataSchema inputSchema) {
     for (int key : node.getKeys()) {
-      DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(key);
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw unsupported("Window PARTITION BY", dataType);
+      ColumnDataType dataType = inputSchema.getColumnDataType(key);
+      if (dataType == ColumnDataType.VARIANT) {
+        throw unsupported("Window PARTITION BY");
       }
     }
     for (RelFieldCollation collation : node.getCollations()) {
-      DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(collation.getFieldIndex());
-      if (!dataType.supportsOrdering()) {
-        throw unsupported("Window ORDER BY", dataType);
+      ColumnDataType dataType = inputSchema.getColumnDataType(collation.getFieldIndex());
+      if (dataType == ColumnDataType.VARIANT) {
+        throw unsupported("Window ORDER BY");
       }
     }
     validateAggregateInputs(node.getAggCalls(), inputSchema);
@@ -175,7 +175,7 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
     return !aggCall.isDistinct() && aggCall.getFunctionName().equalsIgnoreCase("COUNT");
   }
 
-  private static DataSchema.ColumnDataType getLogicalType(RexExpression expression, DataSchema inputSchema) {
+  private static ColumnDataType getLogicalType(RexExpression expression, DataSchema inputSchema) {
     if (expression instanceof RexExpression.InputRef) {
       return inputSchema.getColumnDataType(((RexExpression.InputRef) expression).getIndex());
     }
@@ -188,12 +188,8 @@ public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.Depth
     throw new IllegalStateException("Unsupported aggregate operand: " + expression.getClass().getName());
   }
 
-  private static QueryException unsupported(String operation, DataSchema.ColumnDataType dataType) {
-    // Name the actual unsupported type so the error is accurate for non-VARIANT opaque types (OBJECT, arrays, MAP),
-    // while preserving the raw-VARIANT wording and remediation guidance for the VARIANT case.
-    String message = dataType == DataSchema.ColumnDataType.VARIANT
-        ? operation + " does not support raw VARIANT values; extract a typed path with variantGet first"
-        : operation + " does not support " + dataType + " values";
-    return new QueryException(QueryErrorCode.QUERY_PLANNING, message);
+  private static QueryException unsupported(String operation) {
+    return new QueryException(QueryErrorCode.QUERY_PLANNING,
+        operation + " does not support raw VARIANT values; extract a typed path with variantGet first");
   }
 }

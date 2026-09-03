@@ -128,11 +128,11 @@ public enum TransformFunctionType {
   VARIANT_EXISTS("variantExists", ReturnTypes.BOOLEAN_NULLABLE, variantPathOperandTypeChecker()),
   IS_VARIANT_NULL("isVariantNull", ReturnTypes.BOOLEAN, optionalVariantPathOperandTypeChecker()),
   VARIANT_TYPE_OF("variantTypeOf", ReturnTypes.VARCHAR_2000_NULLABLE, optionalVariantPathOperandTypeChecker()),
-  VARIANT_TO_JSON("variantToJson", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.ANY),
-  PARSE_JSON_TO_VARIANT("parseJson", TransformFunctionType::nullableVariantReturnTypeInference,
-      OperandTypes.CHARACTER, "parseJsonToVariant"),
-  TRY_PARSE_JSON_TO_VARIANT("tryParseJson", TransformFunctionType::nullableVariantReturnTypeInference,
-      OperandTypes.CHARACTER, "tryParseJsonToVariant"),
+  VARIANT_TO_JSON("variantToJson", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.VARIANT),
+  PARSE_JSON_TO_VARIANT("parseJsonToVariant", TransformFunctionType::nullableVariantReturnTypeInference,
+      OperandTypes.CHARACTER, "parseJson"),
+  TRY_PARSE_JSON_TO_VARIANT("tryParseJsonToVariant", TransformFunctionType::nullableVariantReturnTypeInference,
+      OperandTypes.CHARACTER, "tryParseJson"),
 
   // Date time functions
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
@@ -328,6 +328,14 @@ public enum TransformFunctionType {
   /// can enforce the same contract before selecting an implementation.
   public static boolean requiresNullHandling(String functionName) {
     return NULL_HANDLING_REQUIRED_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
+  /// Returns the pre-canonicalized names of functions that require query null handling.
+  ///
+  /// Callers that already canonicalize function names can retain this immutable set and avoid canonicalizing the
+  /// same name a second time on every lookup.
+  public static Set<String> getNullHandlingRequiredCanonicalNames() {
+    return NULL_HANDLING_REQUIRED_FUNCTION_NAMES;
   }
 
   /// Returns whether the function parses JSON text into a Variant value.

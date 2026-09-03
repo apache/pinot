@@ -325,7 +325,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
 
   private void ensureResultType(BlockValSet bvs) {
     DataType valueType = bvs.getValueType();
-    if (!valueType.supportsDirectAggregation()) {
+    if (valueType == DataType.VARIANT) {
       throw new IllegalArgumentException(
           "ANY_VALUE does not support raw VARIANT values; extract a typed path with variantGet first");
     }

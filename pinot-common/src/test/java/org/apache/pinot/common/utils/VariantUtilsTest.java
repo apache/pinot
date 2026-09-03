@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -50,19 +53,19 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class VariantUtilsTest {
   @Test
-  public void testRawVariantResultRequiresNullHandling() {
+  public void testContainsRawVariantResult() {
     DataSchema variantSchema =
         new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
     DataSchema typedSchema =
         new DataSchema(new String[]{"eventType"}, new ColumnDataType[]{ColumnDataType.STRING});
 
-    assertTrue(VariantUtils.requiresNullHandlingForRawVariantResult(variantSchema, false));
-    assertFalse(VariantUtils.requiresNullHandlingForRawVariantResult(variantSchema, true));
-    assertFalse(VariantUtils.requiresNullHandlingForRawVariantResult(typedSchema, false));
+    assertTrue(VariantUtils.containsRawVariantResult(variantSchema));
+    assertFalse(VariantUtils.containsRawVariantResult(typedSchema));
   }
 
   @Test
@@ -282,6 +285,134 @@ public class VariantUtilsTest {
     builder = new VariantBuilder();
     builder.appendTimestampNanosNtz(-1_234_567L);
     assertReusableParity(encode(builder), ResultType.TIMESTAMP);
+  }
+
+  @Test
+  public void testDecimalPrimitiveConversionForEveryEncoding() {
+    assertDecimalFloatingPointParity("123.45", Variant.Type.DECIMAL4);
+    assertDecimalFloatingPointParity("-9999999.99", Variant.Type.DECIMAL4);
+    assertDecimalFloatingPointParity("1234567890.12345678", Variant.Type.DECIMAL8);
+    assertDecimalFloatingPointParity("-999999999999999999", Variant.Type.DECIMAL8);
+    assertDecimalFloatingPointParity("-0.0293221387768523759", Variant.Type.DECIMAL8);
+    assertDecimalFloatingPointParity("12345678901234567890.123456789012345678", Variant.Type.DECIMAL16);
+    assertDecimalFloatingPointParity("-99999999999999999999999999999999999999", Variant.Type.DECIMAL16);
+    assertDecimalFloatingPointParity("-2276255542851026358.8820475617538817020", Variant.Type.DECIMAL16);
+    assertDecimalFloatingPointParity("1E-255", Variant.Type.DECIMAL4);
+    assertDecimalFloatingPointParity("-1E-255", Variant.Type.DECIMAL4);
+
+    assertDecimalIntegralParity("123.00", Variant.Type.DECIMAL4, 123L);
+    assertDecimalIntegralParity("123.0000000000", Variant.Type.DECIMAL8, 123L);
+    assertDecimalIntegralParity("123.0000000000000000000", Variant.Type.DECIMAL16, 123L);
+    assertDecimalIntegralParity("9223372036854775807.00", Variant.Type.DECIMAL16, Long.MAX_VALUE);
+    assertDecimalIntegralParity("-9223372036854775808.00", Variant.Type.DECIMAL16, Long.MIN_VALUE);
+
+    assertDecimalIntegralFailure("123.45", Variant.Type.DECIMAL4);
+    assertDecimalIntegralFailure("123.0000000001", Variant.Type.DECIMAL8);
+    assertDecimalIntegralFailure("123.0000000000000000001", Variant.Type.DECIMAL16);
+    assertDecimalIntegralFailure("9223372036854775808.00", Variant.Type.DECIMAL16);
+    assertDecimalIntegralFailure("-9223372036854775809.00", Variant.Type.DECIMAL16);
+  }
+
+  @Test
+  public void testDecimalFloatingPointParityRandomized() {
+    Random random = new Random(0x5EED_C0DEL);
+    for (int i = 0; i < 500; i++) {
+      int decimal4 = random.nextInt(999_999_999) + 1;
+      assertDecimalFloatingPointParity(random.nextBoolean() ? Integer.toString(decimal4) : "-" + decimal4,
+          Variant.Type.DECIMAL4, random.nextInt(1 << Byte.SIZE));
+
+      long decimal8 = (random.nextLong() & Long.MAX_VALUE) % 999_000_000_000_000_000L + 1_000_000_000L;
+      assertDecimalFloatingPointParity(random.nextBoolean() ? Long.toString(decimal8) : "-" + decimal8,
+          Variant.Type.DECIMAL8, random.nextInt(1 << Byte.SIZE));
+
+      BigInteger decimal16 = new BigInteger(126, random).add(BigInteger.TEN.pow(18));
+      if (random.nextBoolean()) {
+        decimal16 = decimal16.negate();
+      }
+      assertDecimalFloatingPointParity(decimal16.toString(), Variant.Type.DECIMAL16, random.nextInt(39));
+    }
+  }
+
+  @Test
+  public void testDateToTimestampInt32BoundaryDoesNotOverflow() {
+    VariantBuilder builder = new VariantBuilder();
+    builder.appendDate(Integer.MAX_VALUE);
+    byte[] dateValue = encode(builder);
+    VariantPath rootPath = VariantUtils.compilePath("$");
+    ReusableResult result = new ReusableResult();
+    long expectedMillis = Math.multiplyExact((long) Integer.MAX_VALUE, TimeUnit.DAYS.toMillis(1));
+
+    assertEquals(((Timestamp) VariantUtils.variantGet(dateValue, "$", "TIMESTAMP")).getTime(), expectedMillis);
+    assertEquals(((Timestamp) VariantUtils.tryVariantGet(dateValue, "$", "TIMESTAMP")).getTime(), expectedMillis);
+    assertTrue(VariantUtils.extractInto(dateValue, rootPath, ResultType.TIMESTAMP, result));
+    assertEquals(result.getLongValue(), expectedMillis);
+    assertTrue(VariantUtils.tryExtractInto(dateValue, rootPath, ResultType.TIMESTAMP, result));
+    assertEquals(result.getLongValue(), expectedMillis);
+  }
+
+  @Test
+  public void testCursorConstantsMatchParquetVariantCodec()
+      throws ReflectiveOperationException {
+    Class<?> parquetVariantUtil = Class.forName("org.apache.parquet.variant.VariantUtil");
+    String[][] constantNames = {
+        {"VARIANT_BASIC_TYPE_MASK", "BASIC_TYPE_MASK"},
+        {"VARIANT_PRIMITIVE_TYPE_MASK", "PRIMITIVE_TYPE_MASK"},
+        {"VARIANT_PRIMITIVE", "PRIMITIVE"},
+        {"VARIANT_SHORT_STRING", "SHORT_STR"},
+        {"VARIANT_OBJECT", "OBJECT"},
+        {"VARIANT_ARRAY", "ARRAY"},
+        {"VARIANT_NULL", "NULL"},
+        {"VARIANT_TRUE", "TRUE"},
+        {"VARIANT_FALSE", "FALSE"},
+        {"VARIANT_INT8", "INT8"},
+        {"VARIANT_INT16", "INT16"},
+        {"VARIANT_INT32", "INT32"},
+        {"VARIANT_INT64", "INT64"},
+        {"VARIANT_DOUBLE", "DOUBLE"},
+        {"VARIANT_DECIMAL4", "DECIMAL4"},
+        {"VARIANT_DECIMAL8", "DECIMAL8"},
+        {"VARIANT_DECIMAL16", "DECIMAL16"},
+        {"VARIANT_DATE", "DATE"},
+        {"VARIANT_TIMESTAMP_TZ", "TIMESTAMP_TZ"},
+        {"VARIANT_TIMESTAMP_NTZ", "TIMESTAMP_NTZ"},
+        {"VARIANT_FLOAT", "FLOAT"},
+        {"VARIANT_BINARY", "BINARY"},
+        {"VARIANT_LONG_STRING", "LONG_STR"},
+        {"VARIANT_TIME", "TIME"},
+        {"VARIANT_TIMESTAMP_NANOS_TZ", "TIMESTAMP_NANOS_TZ"},
+        {"VARIANT_TIMESTAMP_NANOS_NTZ", "TIMESTAMP_NANOS_NTZ"},
+        {"VARIANT_UUID", "UUID"},
+        {"VARIANT_METADATA_VERSION_MASK", "VERSION_MASK"},
+        {"VARIANT_METADATA_VERSION", "VERSION"}
+    };
+    for (String[] constantName : constantNames) {
+      assertEquals(readPrivateNumericConstant(VariantUtils.class, constantName[0]),
+          readPrivateNumericConstant(parquetVariantUtil, constantName[1]),
+          constantName[0] + " must stay synchronized with parquet-variant " + constantName[1]);
+    }
+    assertEquals(readPrivateNumericConstant(VariantUtils.class, "OBJECT_BINARY_SEARCH_THRESHOLD"),
+        readPrivateNumericConstant(Variant.class, "BINARY_SEARCH_THRESHOLD"));
+  }
+
+  @Test
+  public void testUnknownParquetPrimitiveTypesFailClosed() {
+    int firstUnassignedV1PrimitiveType = 21;
+    byte unknownHeader = (byte) (firstUnassignedV1PrimitiveType << 2);
+
+    byte[] rootValue = VariantUtils.parseJsonToVariant("1");
+    int rootValueOffset = VariantEnvelope.HEADER_SIZE + readBigEndianInt(rootValue, 8);
+    rootValue[rootValueOffset] = unknownHeader;
+    UnsupportedOperationException rootException = expectThrows(UnsupportedOperationException.class,
+        () -> VariantUtils.variantTypeOf(rootValue));
+    assertTrue(rootException.getMessage().contains("Unsupported Parquet Variant primitive type: 21"));
+    assertNull(VariantUtils.tryVariantGet(rootValue, "$", "INT"));
+
+    byte[] nestedValue = VariantUtils.parseJsonToVariant("{\"a\":1}");
+    nestedValue[firstObjectValueOffset(nestedValue)] = unknownHeader;
+    UnsupportedOperationException nestedException = expectThrows(UnsupportedOperationException.class,
+        () -> VariantUtils.variantGet(nestedValue, "$.a", "INT"));
+    assertTrue(nestedException.getMessage().contains("Unsupported Parquet Variant primitive type: 21"));
+    assertNull(VariantUtils.tryVariantGet(nestedValue, "$.a", "INT"));
   }
 
   @Test
@@ -733,6 +864,74 @@ public class VariantUtilsTest {
     assertReusableParity(envelope, VariantUtils.compilePath("$"), resultType);
   }
 
+  private static void assertDecimalFloatingPointParity(String text, Variant.Type expectedType) {
+    BigDecimal decimal = new BigDecimal(text);
+    assertDecimalFloatingPointParity(decimal, expectedType);
+  }
+
+  private static void assertDecimalFloatingPointParity(String unscaled, Variant.Type expectedType, int scale) {
+    assertDecimalFloatingPointParity(new BigDecimal(new BigInteger(unscaled), scale), expectedType);
+  }
+
+  private static void assertDecimalFloatingPointParity(BigDecimal decimal, Variant.Type expectedType) {
+    VariantBuilder builder = new VariantBuilder();
+    builder.appendDecimal(decimal);
+    Variant variant = builder.build();
+    assertEquals(variant.getType(), expectedType, decimal.toString());
+    byte[] envelope = encode(variant);
+    VariantPath path = VariantUtils.compilePath("$");
+    ReusableResult result = new ReusableResult();
+
+    assertTrue(VariantUtils.extractInto(envelope, path, ResultType.FLOAT, result));
+    assertEquals(Float.floatToRawIntBits(result.getFloatValue()), Float.floatToRawIntBits(decimal.floatValue()),
+        decimal.toString());
+    assertTrue(VariantUtils.tryExtractInto(envelope, path, ResultType.FLOAT, result));
+    assertEquals(Float.floatToRawIntBits(result.getFloatValue()), Float.floatToRawIntBits(decimal.floatValue()),
+        decimal.toString());
+    assertTrue(VariantUtils.extractInto(envelope, path, ResultType.DOUBLE, result));
+    assertEquals(Double.doubleToRawLongBits(result.getDoubleValue()), Double.doubleToRawLongBits(decimal.doubleValue()),
+        decimal.toString());
+    assertTrue(VariantUtils.tryExtractInto(envelope, path, ResultType.DOUBLE, result));
+    assertEquals(Double.doubleToRawLongBits(result.getDoubleValue()), Double.doubleToRawLongBits(decimal.doubleValue()),
+        decimal.toString());
+  }
+
+  private static void assertDecimalIntegralParity(String text, Variant.Type expectedType, long expected) {
+    BigDecimal decimal = new BigDecimal(text);
+    VariantBuilder builder = new VariantBuilder();
+    builder.appendDecimal(decimal);
+    Variant variant = builder.build();
+    assertEquals(variant.getType(), expectedType, text);
+    byte[] envelope = encode(variant);
+    VariantPath path = VariantUtils.compilePath("$");
+    ReusableResult result = new ReusableResult();
+
+    assertTrue(VariantUtils.extractInto(envelope, path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), expected, text);
+    assertTrue(VariantUtils.tryExtractInto(envelope, path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), expected, text);
+    if (expected >= Integer.MIN_VALUE && expected <= Integer.MAX_VALUE) {
+      assertTrue(VariantUtils.extractInto(envelope, path, ResultType.INT, result));
+      assertEquals(result.getIntValue(), (int) expected, text);
+      assertTrue(VariantUtils.tryExtractInto(envelope, path, ResultType.INT, result));
+      assertEquals(result.getIntValue(), (int) expected, text);
+    }
+  }
+
+  private static void assertDecimalIntegralFailure(String text, Variant.Type expectedType) {
+    VariantBuilder builder = new VariantBuilder();
+    builder.appendDecimal(new BigDecimal(text));
+    Variant variant = builder.build();
+    assertEquals(variant.getType(), expectedType, text);
+    byte[] envelope = encode(variant);
+    VariantPath path = VariantUtils.compilePath("$");
+    ReusableResult result = new ReusableResult();
+
+    assertFalse(VariantUtils.tryExtractInto(envelope, path, ResultType.LONG, result), text);
+    assertThrows(text, ArithmeticException.class,
+        () -> VariantUtils.extractInto(envelope, path, ResultType.LONG, result));
+  }
+
   private static void assertReusableParity(byte[] envelope, VariantPath path, ResultType resultType) {
     Object expected = VariantUtils.variantGet(envelope, path, resultType);
     Object tolerantExpected = VariantUtils.tryVariantGet(envelope, path, resultType);
@@ -994,6 +1193,25 @@ public class VariantUtilsTest {
 
   private static Object[] jsonRenderingCase(Variant.Type type, byte[] envelope, String expectedJson) {
     return new Object[]{type, envelope, expectedJson};
+  }
+
+  private static int firstObjectValueOffset(byte[] envelope) {
+    int valueStart = VariantEnvelope.HEADER_SIZE + readBigEndianInt(envelope, 8);
+    int typeInfo = Byte.toUnsignedInt(envelope[valueStart]) >>> 2 & 0x3F;
+    int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+    int numElements = readUnsignedLittleEndian(envelope, valueStart + 1, sizeBytes);
+    int idSize = ((typeInfo >>> 2) & 3) + 1;
+    int offsetSize = (typeInfo & 3) + 1;
+    int offsetStart = valueStart + 1 + sizeBytes + numElements * idSize;
+    int dataStart = offsetStart + (numElements + 1) * offsetSize;
+    return dataStart + readUnsignedLittleEndian(envelope, offsetStart, offsetSize);
+  }
+
+  private static int readPrivateNumericConstant(Class<?> declaringClass, String name)
+      throws ReflectiveOperationException {
+    Field field = declaringClass.getDeclaredField(name);
+    field.setAccessible(true);
+    return ((Number) field.get(null)).intValue();
   }
 
   private static int readBigEndianInt(byte[] bytes, int offset) {

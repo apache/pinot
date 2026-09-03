@@ -961,8 +961,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
         if (dictId < 0) {
           // Update min/max value from raw value
-          // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
-          if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+          // NOTE: Skip VARIANT because its stored envelope bytes have no semantic order. Also skip aggregated metrics
+          // because the value will change over time.
+          if (dataType != DataType.VARIANT
+              && (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC)) {
             Comparable comparable = toComparableValue(value, dataType, column);
             if (indexContainer._minValue == null) {
               indexContainer._minValue = comparable;

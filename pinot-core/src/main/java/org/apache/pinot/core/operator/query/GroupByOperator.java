@@ -91,7 +91,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       DataType dataType = _projectOperator.getResultColumnContext(groupByExpression).getDataType();
-      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
+      if (dataType == DataType.VARIANT) {
         throw new IllegalArgumentException(
             "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first");
       }

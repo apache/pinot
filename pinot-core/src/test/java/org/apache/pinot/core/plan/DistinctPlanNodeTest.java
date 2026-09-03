@@ -20,11 +20,13 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.mockito.Mockito;
@@ -46,6 +48,7 @@ public class DistinctPlanNodeTest {
     Mockito.when(queryContext.getSelectExpressions())
         .thenReturn(List.of(ExpressionContext.forIdentifier("payload")));
     Mockito.when(queryContext.getSchema()).thenReturn(schema);
+    Mockito.when(queryContext.hasVariantColumns()).thenReturn(true);
     Mockito.when(indexSegment.getDataSource("payload", schema)).thenReturn(dataSource);
     Mockito.when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
     Mockito.when(metadata.getDataType()).thenReturn(DataType.VARIANT);
@@ -54,5 +57,76 @@ public class DistinctPlanNodeTest {
         () -> new DistinctPlanNode(segmentContext, queryContext).run());
     Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support DISTINCT"));
     Assert.assertTrue(exception.getMessage().contains("extract a typed path with variantGet first"));
+  }
+
+  @Test
+  public void rawVariantIsStillRejectedWhenQuerySchemaIsUnavailable() {
+    SegmentContext segmentContext = Mockito.mock(SegmentContext.class);
+    IndexSegment indexSegment = Mockito.mock(IndexSegment.class);
+    QueryContext queryContext = Mockito.mock(QueryContext.class);
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    DataSourceMetadata metadata = Mockito.mock(DataSourceMetadata.class);
+
+    Mockito.when(segmentContext.getIndexSegment()).thenReturn(indexSegment);
+    Mockito.when(queryContext.getSelectExpressions())
+        .thenReturn(List.of(ExpressionContext.forIdentifier("payload")));
+    Mockito.when(indexSegment.getDataSource("payload", null)).thenReturn(dataSource);
+    Mockito.when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    Mockito.when(metadata.getDataType()).thenReturn(DataType.VARIANT);
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> new DistinctPlanNode(segmentContext, queryContext).run());
+    Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support DISTINCT"));
+  }
+
+  @Test
+  public void nonVariantSchemaSkipsPerExpressionValidationLookup() {
+    SegmentContext segmentContext = Mockito.mock(SegmentContext.class);
+    IndexSegment indexSegment = Mockito.mock(IndexSegment.class);
+    QueryContext queryContext = Mockito.mock(QueryContext.class);
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    DataSourceMetadata metadata = Mockito.mock(DataSourceMetadata.class);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("name", DataType.STRING).build();
+
+    Mockito.when(segmentContext.getIndexSegment()).thenReturn(indexSegment);
+    Mockito.when(queryContext.getSelectExpressions())
+        .thenReturn(List.of(ExpressionContext.forIdentifier("name")));
+    Mockito.when(queryContext.getSchema()).thenReturn(schema);
+    Mockito.when(queryContext.hasVariantColumns()).thenReturn(false);
+    Mockito.when(indexSegment.getDataSource("name", schema)).thenReturn(dataSource);
+    Mockito.when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    Mockito.when(metadata.getDataType()).thenReturn(DataType.STRING);
+    Mockito.when(dataSource.getDictionary()).thenReturn(Mockito.mock(Dictionary.class));
+
+    int numSegments = 100;
+    for (int i = 0; i < numSegments; i++) {
+      Assert.assertTrue(new DistinctPlanNode(segmentContext, queryContext).run()
+          instanceof DictionaryBasedDistinctOperator);
+    }
+    // Each segment needs one lookup to select the dictionary fast path. The VARIANT guard must not double that cost.
+    Mockito.verify(indexSegment, Mockito.times(numSegments)).getDataSource("name", schema);
+  }
+
+  @Test
+  public void nonVariantExpressionIsNotRejectedWhenSchemaAlsoContainsVariant() {
+    SegmentContext segmentContext = Mockito.mock(SegmentContext.class);
+    IndexSegment indexSegment = Mockito.mock(IndexSegment.class);
+    QueryContext queryContext = Mockito.mock(QueryContext.class);
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    DataSourceMetadata metadata = Mockito.mock(DataSourceMetadata.class);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("name", DataType.STRING)
+        .addSingleValueDimension("payload", DataType.VARIANT).build();
+
+    Mockito.when(segmentContext.getIndexSegment()).thenReturn(indexSegment);
+    Mockito.when(queryContext.getSelectExpressions()).thenReturn(List.of(ExpressionContext.forIdentifier("name")));
+    Mockito.when(queryContext.getSchema()).thenReturn(schema);
+    Mockito.when(queryContext.hasVariantColumns()).thenReturn(true);
+    Mockito.when(indexSegment.getDataSource("name", schema)).thenReturn(dataSource);
+    Mockito.when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    Mockito.when(metadata.getDataType()).thenReturn(DataType.STRING);
+    Mockito.when(dataSource.getDictionary()).thenReturn(Mockito.mock(Dictionary.class));
+
+    Assert.assertTrue(
+        new DistinctPlanNode(segmentContext, queryContext).run() instanceof DictionaryBasedDistinctOperator);
   }
 }
