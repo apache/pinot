@@ -33,6 +33,8 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker;
 
@@ -48,6 +50,17 @@ public class QueryLogger {
 
   private static final String FINGERPRINT_FAILED_QUERY_REDACTED = "FINGERPRINT_FAILED_QUERY_REDACTED";
   private static final String FULLY_REDACTED = "REDACTED";
+
+  /// Marks the pre-processing "query received" record so a deployment can route or suppress it
+  /// independently of the completion record, which shares this logger. The two cannot be told apart
+  /// by logger name, and telling them apart by message text is brittle -- it breaks the moment the
+  /// wording changes. Follows the existing marker convention in this module (MSE_STATS_MARKER,
+  /// QUERY_RESPONSE_EXCEPTION), so a log4j2 MarkerFilter is all that is needed:
+  ///
+  ///   <MarkerFilter marker="QUERY_RECEIVED" onMatch="DENY" onMismatch="NEUTRAL"/>
+  ///
+  /// Kept enabled by default: this record is the only trace of a query that never completes.
+  private static final Marker QUERY_RECEIVED_MARKER = MarkerFactory.getMarker("QUERY_RECEIVED");
 
   public enum SqlRedactionMode {
     // Log the full SQL query text as-is.
@@ -123,7 +136,8 @@ public class QueryLogger {
     }
 
     if (_logBeforeProcessing) {
-      _logger.info("SQL query for request {}: {}", requestId, redactQuery(query, queryFingerprint));
+      _logger.info(QUERY_RECEIVED_MARKER, "SQL query for request {}: {}", requestId,
+          redactQuery(query, queryFingerprint));
     }
 
     tryLogDropped();
