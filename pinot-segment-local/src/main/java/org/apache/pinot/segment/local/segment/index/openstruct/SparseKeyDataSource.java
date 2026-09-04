@@ -103,9 +103,10 @@ public class SparseKeyDataSource extends BaseDataSource {
       return node == null ? defaultValue : map.apply(node);
     }
 
-    // TODO: these hardcode the type defaults, so a child with a schema-configured defaultNullValue
-    // reads back differently here than on the dense path (OpenStructColumnSplitter uses the spec).
-    // Fixing it means threading the spec in and updating MapFilterOperator's sentinel check to match.
+    // TODO: Read a document without the key as the child field spec's default null value, as
+    //   OpenStructDataSource.getValueFieldSpec does for a key absent from the segment, instead of the standard type
+    //   default hardcoded below. MapFilterOperator already refuses the sparse JSON fast path for the spec's default.
+    //   See https://github.com/apache/pinot/issues/19466
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
       return orDefault(docId, context, JsonNode::asInt, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);

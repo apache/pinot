@@ -23,8 +23,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
-import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
@@ -88,15 +86,8 @@ public class ProjectionBlock implements ValueBlock {
     DataSource keyDataSource;
     if (columnDataSource instanceof MapDataSource) {
       keyDataSource = ((MapDataSource) columnDataSource).getDataSource(paths[1]);
-      if (keyDataSource == null) {
-        keyDataSource = new NullDataSource(paths[1]);
-      }
     } else if (columnDataSource instanceof OpenStructDataSource) {
-      OpenStructDataSource osDs = (OpenStructDataSource) columnDataSource;
-      keyDataSource = osDs.getDataSource(paths[1]);
-      if (keyDataSource == null) {
-        keyDataSource = OpenStructNullDataSource.forAbsentKey(osDs, paths[1]);
-      }
+      keyDataSource = ((OpenStructDataSource) columnDataSource).getDataSource(paths[1]);
     } else {
       throw new IllegalStateException("Path-based access requires MAP or OPEN_STRUCT column: " + paths[0]);
     }

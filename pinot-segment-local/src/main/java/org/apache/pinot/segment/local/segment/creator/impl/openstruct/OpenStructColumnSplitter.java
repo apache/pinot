@@ -376,6 +376,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
 
+    // TODO: Honor the declared child field spec (field type, single/multi-value and custom default null value) instead
+    //   of synthesizing a single-value dimension of the stored type, so a document without the key reads the same as
+    //   through OpenStructDataSource.getValueFieldSpec, which returns the declared spec for a key absent from the
+    //   segment. See https://github.com/apache/pinot/issues/19466
     // Synthetic field spec for the materialized child. Its natural Pinot dimension null value is the value
     // stored for absent docs, so column metadata stays consistent with on-disk content.
     DimensionFieldSpec childFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
