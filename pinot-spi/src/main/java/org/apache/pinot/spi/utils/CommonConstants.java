@@ -833,6 +833,24 @@ public class CommonConstants {
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
+
+        /// When `true`, each node in the response's `stageStats` also reports `estimatedRows` --
+        /// the row count the optimizer expected -- next to the count the runtime actually emitted.
+        ///
+        /// The value is the optimizer's estimate, a double, and it appears only on nodes for which
+        /// an estimate was captured: nothing is reported for a node the optimizer could not estimate,
+        /// and a group of fused operators reports the estimate of its topmost member, since that is
+        /// the node whose output the group's emitted-row count represents.
+        ///
+        /// Off by default, and off in both senses -- a query that does not ask for estimates does not
+        /// pay to compute them either. Not supported together with `usePhysicalOptimizer`, which
+        /// builds its plan fragments without going through the conversion that records estimates; a
+        /// query combining the two gets a notice on the response rather than a silently missing field.
+        ///
+        /// A query option rather than a config because it is a per-query diagnostic: it answers "was
+        /// the estimate for THIS query any good?", which today can only be reconstructed by hand from
+        /// EXPLAIN.
+        public static final String INCLUDE_ESTIMATED_ROWS = "includeEstimatedRows";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";

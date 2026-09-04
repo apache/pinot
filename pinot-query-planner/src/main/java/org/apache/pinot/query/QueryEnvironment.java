@@ -96,6 +96,7 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -518,15 +519,24 @@ public class QueryEnvironment {
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     long requestId = _envConfig.getRequestId();
+    boolean includeEstimatedRows = QueryOptionsUtils.isIncludeEstimatedRows(plannerContext.getOptions());
     if (plannerContext.isUsePhysicalOptimizer()) {
       Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
           plannerContext.getPhysicalPlannerContext());
+      if (includeEstimatedRows) {
+        // Tell the user rather than silently returning stats without the field they asked for. Sent
+        // on the response instead of logged: the option is per query, so a log line would say
+        // nothing to whoever ran it while costing a broker under load real write volume.
+        QueryThreadContext.addResponseBrokerMetadata(QueryOptionKey.INCLUDE_ESTIMATED_ROWS,
+            "ignored: row count estimates are not captured on the physical optimizer path ("
+                + QueryOptionKey.USE_PHYSICAL_OPTIMIZER + ")");
+      }
       PinotDispatchPlanner pinotDispatchPlanner = new PinotDispatchPlanner(plannerContext,
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
+        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()), includeEstimatedRows);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
