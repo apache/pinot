@@ -111,6 +111,12 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - Keep Apache 2.0 license headers on all new source files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
+- Prefer records for immutable value carriers, especially in new APIs. A record states the
+  intent (data, not behaviour), gives correct `equals`/`hashCode`/`toString` for free, and cannot
+  drift out of sync with its fields. Use a class only when the type genuinely needs mutability,
+  inheritance, or a non-trivial identity contract. Note that a record does not excuse a dangerous
+  constructor: when a record has several components of the same type in a row, add a builder so
+  call sites name what they pass — a record and a builder compose fine.
 - Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
   `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
   `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
