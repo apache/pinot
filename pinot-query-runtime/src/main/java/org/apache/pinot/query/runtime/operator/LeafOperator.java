@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
-public class LeafOperator extends MultiStageOperator {
+public class LeafOperator extends MultiStageOperator implements ExplainableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
   private static final ErrorMseBlock CANCELLED_BLOCK =
@@ -230,6 +230,7 @@ public class LeafOperator extends MultiStageOperator {
         terminateException.getMessage()) : errorBlock;
   }
 
+  @Override
   public ExplainedNode explain() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
