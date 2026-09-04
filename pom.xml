@@ -847,6 +847,20 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>${orc.version}</version>
+        <exclusions>
+          <!-- ORC pulls hadoop-client-api, which is the API half of Hadoop's shaded client pair:
+               its bytecode references third-party classes relocated under
+               org.apache.hadoop.shaded, and those live only in hadoop-client-runtime. Pinot uses
+               the unshaded hadoop-common instead, so hadoop-client-api would put a second, and
+               incompatible, copy of org.apache.hadoop.conf.Configuration on the classpath. Which
+               one wins is decided by classpath order, and when hadoop-client-api wins, loading a
+               Configuration fails with NoClassDefFoundError on the relocated Woodstox it expects
+               hadoop-client-runtime to supply. Exclude it so Hadoop comes from one flavour only. -->
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.orc</groupId>
