@@ -70,7 +70,11 @@ public class AggregationEquivalenceRegistryTest {
     String[][] pairs = {
         {"DISTINCTCOUNTHLL", "DISTINCTCOUNTRAWHLL"},
         {"DISTINCTCOUNTHLLPLUS", "DISTINCTCOUNTRAWHLLPLUS"},
-        {"DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTRAWTHETASKETCH"}
+        {"DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTRAWTHETASKETCH"},
+        {"DISTINCTCOUNTCPCSKETCH", "DISTINCTCOUNTRAWCPCSKETCH"},
+        {"DISTINCTCOUNTTUPLESKETCH", "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"},
+        {"SUMVALUESINTEGERSUMTUPLESKETCH", "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"},
+        {"AVGVALUEINTEGERSUMTUPLESKETCH", "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"}
     };
     for (String[] pair : pairs) {
       AggregationEquivalence rule = AggregationEquivalenceRegistry.findRule(pair[0], pair[1]);
@@ -94,7 +98,8 @@ public class AggregationEquivalenceRegistryTest {
     /// The analyzer relies on this set to reject MV definitions whose aggregations have no
     /// re-aggregation rule.  If the registry changes, this test forces an explicit update.
     String[] supported = {"SUM", "MIN", "MAX", "COUNT",
-        "DISTINCTCOUNTRAWHLL", "DISTINCTCOUNTRAWHLLPLUS", "DISTINCTCOUNTRAWTHETASKETCH"};
+        "DISTINCTCOUNTRAWHLL", "DISTINCTCOUNTRAWHLLPLUS", "DISTINCTCOUNTRAWTHETASKETCH",
+        "DISTINCTCOUNTRAWCPCSKETCH", "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"};
     for (String fn : supported) {
       assertTrue(AggregationEquivalenceRegistry.isMaterializedViewFunctionSupported(fn),
           fn + " must be recognized as a supported MV-side function");
@@ -131,6 +136,26 @@ public class AggregationEquivalenceRegistryTest {
 
   @Test
   public void testSupportedMaterializedViewFunctionsReturnsExpectedSet() {
-    assertEquals(AggregationEquivalenceRegistry.supportedMaterializedViewFunctions().size(), 7);
+    assertEquals(AggregationEquivalenceRegistry.supportedMaterializedViewFunctions().size(), 9);
+  }
+
+  @Test
+  public void testRawSketchRulesServeMergedSketchQueries() {
+    for (String fn : new String[] {
+        "DISTINCTCOUNTRAWTHETASKETCH",
+        "DISTINCTCOUNTRAWCPCSKETCH",
+        "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"}) {
+      AggregationEquivalence rule = AggregationEquivalenceRegistry.findRule(fn, fn);
+      assertNotNull(rule, fn + " must be served from an MV storing the same raw sketch");
+      assertTrue(rule.isSplitSafe(), fn + " re-aggregates into itself and must be split-safe");
+    }
+  }
+
+  @Test
+  public void testRawSketchRulesDoNotCrossFamilies() {
+    assertNull(AggregationEquivalenceRegistry.findRule("DISTINCTCOUNTRAWTHETASKETCH", "DISTINCTCOUNTRAWCPCSKETCH"));
+    assertNull(AggregationEquivalenceRegistry.findRule("DISTINCTCOUNTRAWCPCSKETCH", "DISTINCTCOUNTRAWTHETASKETCH"));
+    assertNull(
+        AggregationEquivalenceRegistry.findRule("SUMVALUESINTEGERSUMTUPLESKETCH", "DISTINCTCOUNTRAWTHETASKETCH"));
   }
 }

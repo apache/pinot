@@ -40,6 +40,12 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 ///   - `DISTINCTCOUNTHLL` / `DISTINCTCOUNTRAWHLL`
 ///   - `DISTINCTCOUNTHLLPLUS` / `DISTINCTCOUNTRAWHLLPLUS`
 ///   - `DISTINCTCOUNTTHETASKETCH` / `DISTINCTCOUNTRAWTHETASKETCH`
+///   - `DISTINCTCOUNTCPCSKETCH` / `DISTINCTCOUNTRAWCPCSKETCH`
+///   - `DISTINCTCOUNTTUPLESKETCH`, `SUMVALUESINTEGERSUMTUPLESKETCH`,
+///     `AVGVALUEINTEGERSUMTUPLESKETCH` / `DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH`
+///
+/// Each raw variant is also registered user-side, so a query wanting the merged sketch itself can
+/// be served from an MV storing it.
 ///
 /// Trailing literal parameters injected by broker overrides (e.g. HLL
 /// `log2m`) are preserved in the rewritten expression.
