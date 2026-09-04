@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.io.IOException;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -242,6 +244,45 @@ public class MailboxReceiveOperatorTest {
       assertTrue(block.isError());
       assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(errorMessage));
     }
+  }
+
+  /// After an error the mailbox stays in the service's cache until it expires, and the reader callback it holds keeps
+  /// the stream that adapts it reachable. That stream must not point back at the operator, or every failed query
+  /// would pin its operator tree and execution context for as long as the mailbox lingers.
+  @Test
+  public void shouldNotStayReachableFromTheMailboxAfterAnError()
+      throws InterruptedException {
+    ReceivingMailbox mailbox = new ReceivingMailbox(MAILBOX_ID_1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(mailbox);
+    MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON);
+    mailbox.offer(ErrorMseBlock.fromException(new RuntimeException("TEST ERROR")), List.of(), 1000L);
+    assertTrue(operator.nextBlock().isError());
+    operator.cancel(new RuntimeException("TEST ERROR"));
+    operator.close();
+
+    ReferenceQueue<MailboxReceiveOperator> queue = new ReferenceQueue<>();
+    WeakReference<MailboxReceiveOperator> operatorRef = new WeakReference<>(operator, queue);
+    operator = null;
+    assertTrue(awaitCleared(operatorRef, queue), "the mailbox must not keep the closed operator reachable");
+    // The mailbox is the retention path under test, so it has to stay strongly reachable until this point.
+    assertEquals(mailbox.getId(), MAILBOX_ID_1);
+  }
+
+  /// Waits for `ref` to be cleared, prompting collection as it goes. The reference queue does the waiting rather than a
+  /// sleep loop over [WeakReference#get()], so the expected case costs one collection instead of a fixed delay, and the
+  /// failing case still gives the collector several attempts before giving up.
+  private static boolean awaitCleared(WeakReference<?> ref, ReferenceQueue<?> queue)
+      throws InterruptedException {
+    long deadlineMs = System.currentTimeMillis() + 5_000L;
+    do {
+      System.gc();
+      if (queue.remove(200L) != null) {
+        return true;
+      }
+    } while (System.currentTimeMillis() < deadlineMs);
+    // The collector clears the reference before enqueueing it, so check directly rather than call a late enqueue a
+    // failure.
+    return ref.get() == null;
   }
 
   @Test
