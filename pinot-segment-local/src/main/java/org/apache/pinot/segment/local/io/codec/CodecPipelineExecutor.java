@@ -36,9 +36,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// Write path: values → transforms (in order) → compression stages → bytes stored on disk.
 /// Read path: bytes from disk → reverse compression/transform stages → values.
 ///
-/// The executor is constructed once per column from the canonical `codecSpec` string
-/// stored in the file header and is thread-safe for concurrent read calls (it holds no mutable
-/// per-call state).
+/// Executors are immutable and thread-safe, so lifecycle owners can retain and share them;
+/// concurrent calls must use separate caller-owned workspaces and output buffers.
 ///
 /// The executor is codec-agnostic: it holds an ordered list of internal bound stages, each pairing
 /// a handler with its parsed options. The registry and handlers are a closed, package-private
@@ -46,13 +45,13 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///
 /// ### Buffer contract
 ///
-/// - [#encode]: `src` is ready for read (position=0); returns a new
-///       [ByteBuffer] ready for read containing the encoded bytes.
-/// - [#decode(ByteBuffer)]: `src` is ready for read; returns a new
-///       [ByteBuffer] ready for read containing the decoded bytes.
+/// - [#encode]: reads the source's remaining bytes and returns a scratch-owned readable view,
+///       invalidated by the next encode call with that workspace or by closing the workspace.
+/// - [#decode]: reads the source's remaining bytes into a caller-owned destination and leaves
+///       the destination ready for read. Source and destination must not alias scratch storage
+///       or each other. Source consumption is permitted on decode.
 /// - [#maxEncodedSize]: returns an upper bound on encoded size.
 public final class CodecPipelineExecutor {
-
   /// A codec handler bound to the options parsed from a specific pipeline invocation.
   private static final class BoundStage<O extends CodecOptions> {
     final ChunkCodecHandler<O> _handler;
@@ -65,24 +64,20 @@ public final class CodecPipelineExecutor {
       _ctx = ctx;
     }
 
-    ByteBuffer encode(ByteBuffer src) throws IOException {
-      return _handler.encode(_options, _ctx, src);
+    void encode(ByteBuffer src, ByteBuffer dst) throws IOException {
+      _handler.encode(_options, _ctx, src, dst);
     }
 
-    ByteBuffer decode(ByteBuffer src) throws IOException {
-      return _handler.decode(_options, _ctx, src);
-    }
-
-    void decodeInto(ByteBuffer src, ByteBuffer dst) throws IOException {
-      _handler.decodeInto(_options, _ctx, src, dst);
+    void decode(ByteBuffer src, ByteBuffer dst) throws IOException {
+      _handler.decode(_options, _ctx, src, dst);
     }
 
     int maxEncodedSize(int inputSize) {
-      return _handler.maxEncodedSize(_options, inputSize);
+      return _handler.maxEncodedSize(_options, _ctx, inputSize);
     }
 
-    boolean requiresDirectDstBuffer() {
-      return _handler.requiresDirectDstBuffer();
+    boolean requiresDirectDecodeDstBuffer() {
+      return _handler.requiresDirectDecodeDstBuffer();
     }
 
     boolean isCompression() {
@@ -94,35 +89,69 @@ public final class CodecPipelineExecutor {
     }
   }
 
-  /// Caller-owned, reusable decode workspace.
-  ///
-  /// The workspace retains at most two direct buffers and grows them on demand. Multi-stage
-  /// decoding alternates between those buffers, so repeated chunk reads avoid allocating and
-  /// explicitly cleaning a direct buffer for every intermediate stage. This class is not
-  /// thread-safe; each reader context or calling thread must own a separate instance.
-  public static final class DecodeScratch implements AutoCloseable {
+  /// Shared bounded-buffer machinery for encode and decode scratch spaces. Every stage checkout
+  /// resets byte order and limits capacity to the validated bound, including after backing-buffer
+  /// growth invalidates cached views.
+  private static final class StageViewWorkspace implements AutoCloseable {
+    private final String _ownerName;
     private final ByteBuffer[] _buffers = new ByteBuffer[2];
+    private final ByteBuffer[][] _stageViews = {new ByteBuffer[0], new ByteBuffer[0]};
+    private final int[][] _stageViewCapacities = {new int[0], new int[0]};
     private int[] _stageBounds = new int[0];
     private int _allocationCount;
+    private int _viewCreationCount;
     private boolean _closed;
 
-    private ByteBuffer buffer(int slot, int capacity) {
+    private StageViewWorkspace(String ownerName) {
+      _ownerName = ownerName;
+    }
+
+    private ByteBuffer buffer(int stageIndex, int slot, int capacity) {
       ensureOpen();
       Preconditions.checkArgument(capacity >= 0, "Scratch capacity must be non-negative: %s", capacity);
-      ByteBuffer buffer = _buffers[slot];
-      if (buffer == null || buffer.capacity() < capacity) {
-        CleanerUtil.cleanQuietly(buffer);
-        buffer = ByteBuffer.allocateDirect(capacity);
-        _buffers[slot] = buffer;
-        _allocationCount++;
-      }
+      ensureCapacity(slot, capacity);
+      ensureStageViewCapacity(slot, stageIndex + 1);
       // Limit the returned view's capacity to this stage's validated bound. Reusing a larger
       // backing buffer must not let a corrupt inner frame exploit capacity left from an earlier
       // larger chunk.
-      ByteBuffer view = buffer.duplicate();
-      view.clear();
-      view.limit(capacity);
-      return view.slice();
+      ByteBuffer view = _stageViews[slot][stageIndex];
+      if (view == null || _stageViewCapacities[slot][stageIndex] != capacity) {
+        view = _buffers[slot].duplicate().order(ByteOrder.BIG_ENDIAN);
+        view.clear();
+        view.limit(capacity);
+        view = view.slice().order(ByteOrder.BIG_ENDIAN);
+        _stageViews[slot][stageIndex] = view;
+        _stageViewCapacities[slot][stageIndex] = capacity;
+        _viewCreationCount++;
+      } else {
+        view.clear();
+        view.order(ByteOrder.BIG_ENDIAN);
+      }
+      return view;
+    }
+
+    private void ensureCapacity(int slot, int capacity) {
+      ensureOpen();
+      ByteBuffer buffer = _buffers[slot];
+      if (buffer == null || buffer.capacity() < capacity) {
+        CleanerUtil.cleanQuietly(buffer);
+        _buffers[slot] = ByteBuffer.allocateDirect(capacity);
+        _stageViews[slot] = new ByteBuffer[0];
+        _stageViewCapacities[slot] = new int[0];
+        _allocationCount++;
+      }
+    }
+
+    private void ensureStageViewCapacity(int slot, int requiredSize) {
+      if (_stageViews[slot].length >= requiredSize) {
+        return;
+      }
+      ByteBuffer[] views = new ByteBuffer[requiredSize];
+      System.arraycopy(_stageViews[slot], 0, views, 0, _stageViews[slot].length);
+      _stageViews[slot] = views;
+      int[] capacities = new int[requiredSize];
+      System.arraycopy(_stageViewCapacities[slot], 0, capacities, 0, _stageViewCapacities[slot].length);
+      _stageViewCapacities[slot] = capacities;
     }
 
     private int[] stageBounds(int stageCount) {
@@ -134,11 +163,19 @@ public final class CodecPipelineExecutor {
     }
 
     private void ensureOpen() {
-      Preconditions.checkState(!_closed, "DecodeScratch is closed");
+      Preconditions.checkState(!_closed, "%s is closed", _ownerName);
     }
 
-    int allocationCount() {
+    private boolean isClosed() {
+      return _closed;
+    }
+
+    private int allocationCount() {
       return _allocationCount;
+    }
+
+    private int viewCreationCount() {
+      return _viewCreationCount;
     }
 
     @Override
@@ -150,8 +187,138 @@ public final class CodecPipelineExecutor {
       for (int i = 0; i < _buffers.length; i++) {
         CleanerUtil.cleanQuietly(_buffers[i]);
         _buffers[i] = null;
+        _stageViews[i] = new ByteBuffer[0];
+        _stageViewCapacities[i] = new int[0];
       }
       _stageBounds = new int[0];
+    }
+  }
+
+  /// Caller-owned, reusable encode workspace.
+  ///
+  /// The workspace retains one source view and at most two direct buffers, growing the buffers on
+  /// demand. Pipeline stages alternate between capacity-bounded views of those buffers, so repeated
+  /// chunk writes do not allocate and explicitly clean direct buffers per stage. This class is not
+  /// thread-safe; each writer or calling thread must own a separate instance. Any view returned by
+  /// [#encode(ByteBuffer, int, long, EncodeScratch)] is owned by this workspace and is invalidated
+  /// by the next encode call or by [#close()].
+  public static final class EncodeScratch implements AutoCloseable {
+    private final StageViewWorkspace _workspace = new StageViewWorkspace("EncodeScratch");
+    private ByteBuffer _source;
+    private ByteBuffer _sourceView;
+    private int _sourceViewCreationCount;
+
+    private ByteBuffer buffer(int stageIndex, int slot, int capacity) {
+      return _workspace.buffer(stageIndex, slot, capacity);
+    }
+
+    private ByteBuffer sourceView(ByteBuffer source) {
+      ensureOpen();
+      if (_source != source) {
+        _source = source;
+        _sourceView = source.duplicate();
+        _sourceViewCreationCount++;
+      }
+      _sourceView.limit(source.limit());
+      _sourceView.position(source.position());
+      _sourceView.order(ByteOrder.BIG_ENDIAN);
+      return _sourceView;
+    }
+
+    private void prepare(int[] stageBounds, int stageCount) {
+      ensureOpen();
+      int evenCapacity = 0;
+      int oddCapacity = 0;
+      for (int i = 0; i < stageCount; i++) {
+        if ((i & 1) == 0) {
+          evenCapacity = Math.max(evenCapacity, stageBounds[i]);
+        } else {
+          oddCapacity = Math.max(oddCapacity, stageBounds[i]);
+        }
+      }
+      _workspace.ensureCapacity(0, evenCapacity);
+      if (stageCount > 1) {
+        _workspace.ensureCapacity(1, oddCapacity);
+      }
+    }
+
+    private int[] stageBounds(int stageCount) {
+      return _workspace.stageBounds(stageCount);
+    }
+
+    private void ensureOpen() {
+      _workspace.ensureOpen();
+    }
+
+    int allocationCount() {
+      return _workspace.allocationCount();
+    }
+
+    int viewCreationCount() {
+      return _workspace.viewCreationCount() + _sourceViewCreationCount;
+    }
+
+    @Override
+    public void close() {
+      if (_workspace.isClosed()) {
+        return;
+      }
+      _workspace.close();
+      _source = null;
+      _sourceView = null;
+    }
+  }
+
+  /// Caller-owned, reusable decode workspace.
+  ///
+  /// The workspace retains at most two direct buffers and grows them on demand. Multi-stage
+  /// decoding alternates between those buffers, so repeated chunk reads avoid allocating and
+  /// explicitly cleaning a direct buffer for every intermediate stage. This class is not
+  /// thread-safe; each reader context or calling thread must own a separate instance.
+  public static final class DecodeScratch implements AutoCloseable {
+    private final StageViewWorkspace _workspace = new StageViewWorkspace("DecodeScratch");
+    private ByteBuffer _finalDestination;
+    private ByteBuffer _finalView;
+
+    private ByteBuffer buffer(int stageIndex, int slot, int capacity) {
+      return _workspace.buffer(stageIndex, slot, capacity);
+    }
+
+    private ByteBuffer finalOutput(ByteBuffer destination) {
+      ensureOpen();
+      if (_finalDestination != destination) {
+        _finalDestination = destination;
+        _finalView = destination.duplicate().order(ByteOrder.BIG_ENDIAN);
+      }
+      _finalView.clear();
+      _finalView.order(ByteOrder.BIG_ENDIAN);
+      return _finalView;
+    }
+
+    private int[] stageBounds(int stageCount) {
+      return _workspace.stageBounds(stageCount);
+    }
+
+    private void ensureOpen() {
+      _workspace.ensureOpen();
+    }
+
+    int allocationCount() {
+      return _workspace.allocationCount();
+    }
+
+    int viewCreationCount() {
+      return _workspace.viewCreationCount();
+    }
+
+    @Override
+    public void close() {
+      if (_workspace.isClosed()) {
+        return;
+      }
+      _workspace.close();
+      _finalDestination = null;
+      _finalView = null;
     }
   }
 
@@ -159,7 +326,7 @@ public final class CodecPipelineExecutor {
   private final String _canonicalSpec;
   private final DataType _storedType;
   private final boolean _hasCompression;
-  private final boolean _requiresDirectDstBuffer;
+  private final boolean _requiresDirectDecodeDstBuffer;
 
   /// Creates an executor by parsing and validating the given spec.
   ///
@@ -189,13 +356,13 @@ public final class CodecPipelineExecutor {
       CodecOptions opts = handler.parseOptions(inv.args());
       stages.add(new BoundStage<>(handler, opts, ctx));
     }
-    _stages = stages;
+    _stages = List.copyOf(stages);
     _canonicalSpec = buildCanonical(stages);
     _storedType = ctx.getDataType();
     _hasCompression = stages.stream().anyMatch(BoundStage::isCompression);
-    // decodeInto() writes the final output through stage zero. All other stage outputs use
-    // executor-owned direct scratch buffers, so only stage zero constrains the caller's dst.
-    _requiresDirectDstBuffer = stages.get(0).requiresDirectDstBuffer();
+    // decode() writes the final output through stage zero. All other stage outputs use
+    // caller-owned direct scratch buffers, so only stage zero constrains the caller's dst.
+    _requiresDirectDecodeDstBuffer = stages.get(0).requiresDirectDecodeDstBuffer();
   }
 
   /// Returns the canonical spec string derived from the parsed pipeline.
@@ -225,11 +392,18 @@ public final class CodecPipelineExecutor {
   /// bounds. The cumulative limit bounds CPU and allocation churn for long pipelines even when
   /// each individual stage stays below `maxStageSize`.
   public int maxEncodedSize(int decodedSize, int maxStageSize, long maxCumulativeSize) {
+    return encodedStageBounds(decodedSize, maxStageSize, maxCumulativeSize, null);
+  }
+
+  private int encodedStageBounds(int decodedSize, int maxStageSize, long maxCumulativeSize,
+      int[] stageBounds) {
     Preconditions.checkArgument(decodedSize >= 0, "decodedSize must be non-negative: %s", decodedSize);
     Preconditions.checkArgument(maxStageSize >= decodedSize,
         "maxStageSize %s must be at least decodedSize %s", maxStageSize, decodedSize);
     Preconditions.checkArgument(maxCumulativeSize >= decodedSize,
         "maxCumulativeSize %s must be at least decodedSize %s", maxCumulativeSize, decodedSize);
+    Preconditions.checkArgument(stageBounds == null || stageBounds.length >= _stages.size(),
+        "stageBounds length must be at least %s", _stages.size());
     int size = decodedSize;
     long cumulativeSize = 0;
     for (int i = 0; i < _stages.size(); i++) {
@@ -245,174 +419,109 @@ public final class CodecPipelineExecutor {
             "Codec pipeline cumulative stage-output bound " + cumulativeSize + " exceeds " + maxCumulativeSize
                 + " at stage " + i + " for pipeline " + _canonicalSpec);
       }
+      if (stageBounds != null) {
+        stageBounds[i] = size;
+      }
     }
     return size;
   }
 
-  /// Encodes `src` through the pipeline and returns the encoded bytes ready for read.
+  /// Encodes through capacity-bounded caller-owned scratch buffers.
   ///
-  /// The readable range is interpreted in the persisted big-endian typed-value order, independent
-  /// of the caller view's byte order. The caller's position, limit, and order are not modified.
+  /// Every stage output is written directly into one of two alternating direct buffers. The
+  /// returned readable view is owned by `scratch`: callers must consume or copy it before the next
+  /// call using that workspace, and must not use it after the workspace is closed. The caller's
+  /// source position, limit, and byte order are not modified. Typed input is interpreted in
+  /// persisted big-endian order, independent of the caller view's byte order. The source must
+  /// not alias this workspace's buffers (including a view returned by a previous call).
   ///
-  /// @param src decoded chunk data, ready for read (position=0, limit=dataSize)
-  /// @return encoded buffer ready for read; the caller owns this buffer
-  public ByteBuffer encode(ByteBuffer src) throws IOException {
-    ByteBuffer input = src.duplicate().order(ByteOrder.BIG_ENDIAN);
-    ByteBuffer current = input;
-    try {
-      for (BoundStage<?> stage : _stages) {
-        ByteBuffer previous = current;
-        current = stage.encode(previous);
-        if (previous != input && previous != current) {
-          CleanerUtil.cleanQuietly(previous);
-        }
-      }
-      return current;
-    } catch (IOException | RuntimeException | Error e) {
-      if (current != input) {
-        CleanerUtil.cleanQuietly(current);
-      }
-      throw e;
-    }
-  }
-
-  /// Decodes `src` through the reversed pipeline and returns the original bytes.
-  ///
-  /// @param src encoded chunk data, ready for read
-  /// @return decoded buffer ready for read; the caller owns this buffer
-  ByteBuffer decode(ByteBuffer src) throws IOException {
-    ByteBuffer current = src;
-    try {
-      for (int i = _stages.size() - 1; i >= 0; i--) {
-        ByteBuffer previous = current;
-        current = _stages.get(i).decode(previous);
-        if (previous != src && previous != current) {
-          CleanerUtil.cleanQuietly(previous);
-        }
-      }
-      return current;
-    } catch (IOException | RuntimeException | Error e) {
-      if (current != src) {
-        CleanerUtil.cleanQuietly(current);
-      }
-      throw e;
-    }
-  }
-
-  /// Decodes `src` through the reversed pipeline, writing the result directly into
-  /// `dst`.  On return `dst` is flipped and ready for read (position=0,
-  /// limit=decoded size).
-  ///
-  /// For single-stage pipelines (transform-only or compression-only), the decoded bytes are
-  /// written directly into `dst`, avoiding an intermediate allocation.  For multi-stage
-  /// pipelines an intermediate buffer is allocated for any stage that is not the last in the
-  /// reversed pipeline; the final stage writes directly into `dst`.
-  ///
-  /// @param src encoded chunk data, ready for read
-  /// @param dst caller-supplied output buffer; must be a *direct* [ByteBuffer] when
-  ///            the pipeline requires it (see [ChunkCodecHandler#requiresDirectDstBuffer]);
-  ///            must have sufficient [ByteBuffer#capacity()] for the decoded data; its
-  ///            position and limit are overwritten before returning
-  /// @throws IOException              if decoding fails
-  /// @throws IllegalArgumentException if `dst` is not direct when required, or does not have
-  ///                                  enough capacity
-  void decode(ByteBuffer src, ByteBuffer dst) throws IOException {
-    decode(src, dst, dst.capacity());
-  }
-
-  /// Decodes into `dst` while bounding every intermediate allocation from the expected final
-  /// decoded size. This is the segment-reader entry point: codec frames are untrusted and may
-  /// advertise arbitrary decoded lengths, so an intermediate stage must never allocate directly
-  /// from its frame header.
-  ///
-  /// @param src                 encoded chunk data, ready for read
-  /// @param dst                 caller-owned final output buffer
-  /// @param expectedDecodedSize exact decoded bytes declared and validated by the outer format
-  void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize) throws IOException {
-    decode(src, dst, expectedDecodedSize, Integer.MAX_VALUE, Long.MAX_VALUE);
-  }
-
-  /// Variant of [#decode(ByteBuffer, ByteBuffer, int)] that caps every intermediate scratch
-  /// buffer. Callers reading untrusted persisted data should pass the format's validated limit.
-  void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize, int maxIntermediateSize)
+  /// @param src               decoded chunk data, ready for read
+  /// @param maxStageSize      maximum permitted output bound for any stage
+  /// @param maxCumulativeSize maximum permitted sum of all stage-output bounds
+  /// @param scratch           caller-owned workspace, not shared across concurrent calls
+  /// @return scratch-owned encoded bytes ready for read
+  public ByteBuffer encode(ByteBuffer src, int maxStageSize, long maxCumulativeSize, EncodeScratch scratch)
       throws IOException {
-    decode(src, dst, expectedDecodedSize, maxIntermediateSize, Long.MAX_VALUE);
-  }
-
-  /// Variant that also caps the sum of stage-output bounds, limiting total work and allocation
-  /// churn for an otherwise-valid long pipeline. This convenience overload owns a temporary
-  /// workspace; production chunk readers should use the caller-owned [DecodeScratch] overload.
-  void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize, int maxIntermediateSize,
-      long maxCumulativeSize)
-      throws IOException {
-    try (DecodeScratch scratch = new DecodeScratch()) {
-      decode(src, dst, expectedDecodedSize, maxIntermediateSize, maxCumulativeSize, scratch);
+    scratch.ensureOpen();
+    int[] stageBounds = scratch.stageBounds(_stages.size());
+    encodedStageBounds(src.remaining(), maxStageSize, maxCumulativeSize, stageBounds);
+    scratch.prepare(stageBounds, _stages.size());
+    ByteBuffer current = scratch.sourceView(src);
+    for (int i = 0; i < _stages.size(); i++) {
+      ByteBuffer output = scratch.buffer(i, i & 1, stageBounds[i]);
+      _stages.get(i).encode(current, output);
+      Preconditions.checkState(output.position() == 0,
+          "Codec stage %s did not return an encoded buffer ready for read", i);
+      Preconditions.checkState(output.remaining() <= stageBounds[i],
+          "Codec stage %s encoded size %s exceeds validated bound %s", i, output.remaining(), stageBounds[i]);
+      current = output;
     }
+    return current;
   }
 
   /// Decodes with caller-owned reusable scratch buffers.
   ///
   /// The caller must not share scratch across concurrent decode calls and must close it when the
-  /// owning reader context is closed.
-  public void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize, int maxIntermediateSize,
+  /// owning reader context is closed. Source and destination must not alias each other or scratch
+  /// storage. The source may be consumed; destination position and limit are overwritten, leaving
+  /// it ready for read, and its byte order is preserved.
+  ///
+  /// @param src                 encoded chunk data, ready for read
+  /// @param dst                 caller-owned output; direct when required by the first codec
+  /// @param expectedDecodedSize exact decoded bytes validated by the caller, not an inner codec frame
+  /// @param maxStageSize      maximum permitted stage-output bound
+  /// @param maxCumulativeSize maximum permitted sum of stage-output bounds
+  /// @param scratch           caller-owned workspace, not shared across concurrent calls
+  public void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize, int maxStageSize,
       long maxCumulativeSize, DecodeScratch scratch)
       throws IOException {
     scratch.ensureOpen();
-    Preconditions.checkArgument(!_requiresDirectDstBuffer || dst.isDirect(),
+    Preconditions.checkArgument(!_requiresDirectDecodeDstBuffer || dst.isDirect(),
         "decode(src, dst) requires a direct ByteBuffer for pipeline: %s", _canonicalSpec);
     Preconditions.checkArgument(expectedDecodedSize >= 0 && expectedDecodedSize <= dst.capacity(),
         "expectedDecodedSize %s is out of range [0, %s]", expectedDecodedSize, dst.capacity());
-    Preconditions.checkArgument(maxIntermediateSize >= expectedDecodedSize,
-        "maxIntermediateSize %s must be at least expectedDecodedSize %s", maxIntermediateSize, expectedDecodedSize);
+    Preconditions.checkArgument(maxStageSize >= expectedDecodedSize,
+        "maxStageSize %s must be at least expectedDecodedSize %s", maxStageSize, expectedDecodedSize);
     Preconditions.checkArgument(maxCumulativeSize >= expectedDecodedSize,
         "maxCumulativeSize %s must be at least expectedDecodedSize %s", maxCumulativeSize, expectedDecodedSize);
 
     int stageCount = _stages.size();
     int[] maxOutputAfterStage = scratch.stageBounds(stageCount);
-    int maxSize = expectedDecodedSize;
-    long cumulativeSize = 0;
-    for (int i = 0; i < stageCount; i++) {
-      maxSize = _stages.get(i).maxEncodedSize(maxSize);
-      if (maxSize < 0 || maxSize > maxIntermediateSize) {
-        throw new IllegalArgumentException(
-            "Codec stage " + i + " maximum encoded size " + maxSize + " is outside [0, "
-                + maxIntermediateSize + "] for pipeline " + _canonicalSpec);
-      }
-      cumulativeSize += maxSize;
-      if (cumulativeSize > maxCumulativeSize) {
-        throw new IllegalArgumentException(
-            "Codec pipeline cumulative stage-output bound " + cumulativeSize + " exceeds " + maxCumulativeSize
-                + " at stage " + i + " for pipeline " + _canonicalSpec);
-      }
-      maxOutputAfterStage[i] = maxSize;
-    }
-    Preconditions.checkArgument(src.remaining() <= maxOutputAfterStage[stageCount - 1],
+    int maxEncodedSize = encodedStageBounds(expectedDecodedSize, maxStageSize, maxCumulativeSize,
+        maxOutputAfterStage);
+    Preconditions.checkArgument(src.remaining() <= maxEncodedSize,
         "Encoded input size %s exceeds composed pipeline bound %s for expected decoded size %s",
-        src.remaining(), maxOutputAfterStage[stageCount - 1], expectedDecodedSize);
+        src.remaining(), maxEncodedSize, expectedDecodedSize);
 
-    // Decode every stage through decodeInto(). Intermediate stages alternate between two reusable
+    // Decode every stage into its destination. Intermediate stages alternate between two reusable
     // direct buffers whose views are capacity-limited to the forward maxEncodedSize chain rooted
     // at the validated final decoded size. A corrupt inner frame-controlled length can therefore
     // only trigger a bounded "exceeds dst capacity" failure, never a frame-controlled allocation.
-    ByteBuffer finalOutput = dst.duplicate().order(ByteOrder.BIG_ENDIAN);
-    ByteBuffer current = src;
-    int scratchSlot = 0;
-    for (int i = stageCount - 1; i >= 0; i--) {
-      ByteBuffer output;
-      if (i == 0) {
-        output = finalOutput;
-      } else {
-        output = scratch.buffer(scratchSlot, maxOutputAfterStage[i - 1]);
-        scratchSlot ^= 1;
+    ByteBuffer finalOutput = scratch.finalOutput(dst);
+    ByteOrder sourceOrder = src.order();
+    try {
+      src.order(ByteOrder.BIG_ENDIAN);
+      ByteBuffer current = src;
+      int scratchSlot = 0;
+      for (int i = stageCount - 1; i >= 0; i--) {
+        ByteBuffer output;
+        if (i == 0) {
+          output = finalOutput;
+        } else {
+          output = scratch.buffer(i - 1, scratchSlot, maxOutputAfterStage[i - 1]);
+          scratchSlot ^= 1;
+        }
+        _stages.get(i).decode(current, output);
+        current = output;
       }
-      _stages.get(i).decodeInto(current, output);
-      current = output;
+    } finally {
+      src.order(sourceOrder);
     }
     if (finalOutput.remaining() != expectedDecodedSize) {
       throw new IOException("Codec pipeline decoded " + finalOutput.remaining() + " bytes but expected "
           + expectedDecodedSize + " for pipeline " + _canonicalSpec + ". Segment may be corrupt.");
     }
-    // decodeInto() flips the final view. Mirror that readable range onto the caller's buffer while
+    // decode() flips the final view. Mirror that readable range onto the caller's buffer while
     // preserving its independently configured byte order.
     dst.clear();
     dst.limit(finalOutput.limit());

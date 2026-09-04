@@ -56,11 +56,10 @@ public class GorillaCodecDefinitionTest {
       src.putInt(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
-    assertDecodedInts(CODEC.decode(OPTS, INT_CTX, encoded.duplicate()), values);
+    ByteBuffer encoded = encode(INT_CTX, src);
 
     ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
-    CODEC.decodeInto(OPTS, INT_CTX, encoded.duplicate(), dst);
+    CODEC.decode(OPTS, INT_CTX, encoded.duplicate(), dst);
     assertDecodedInts(dst, values);
   }
 
@@ -78,11 +77,10 @@ public class GorillaCodecDefinitionTest {
       src.putLong(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, LONG_CTX, src);
-    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, encoded.duplicate()), values);
+    ByteBuffer encoded = encode(LONG_CTX, src);
 
     ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, encoded.duplicate(), dst);
+    CODEC.decode(OPTS, LONG_CTX, encoded.duplicate(), dst);
     assertDecodedLongs(dst, values);
   }
 
@@ -227,9 +225,9 @@ public class GorillaCodecDefinitionTest {
 
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(
         "DELTADELTA,GORILLA,ZSTD(3)", LONG_CTX, CodecRegistry.DEFAULT);
-    ByteBuffer encoded = executor.encode(src.duplicate());
+    ByteBuffer encoded = CodecTestUtils.encode(executor, src.duplicate());
     ByteBuffer decoded = ByteBuffer.allocateDirect(src.remaining());
-    executor.decode(encoded, decoded, src.remaining());
+    CodecTestUtils.decode(executor, encoded, decoded, src.remaining());
     assertDecodedLongs(decoded, values);
   }
 
@@ -241,16 +239,16 @@ public class GorillaCodecDefinitionTest {
     buf.put((byte) 7);
     buf.putInt(1);
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class,
+        () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(Integer.BYTES)));
   }
 
   @Test
   public void testInvalidFlagWithZeroCountThrows() {
     ByteBuffer buf = ByteBuffer.allocateDirect(5);
     buf.put((byte) 7).putInt(0).flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf.duplicate()));
     assertThrows(IllegalStateException.class,
-        () -> CODEC.decodeInto(OPTS, INT_CTX, buf.duplicate(), ByteBuffer.allocateDirect(0)));
+        () -> CODEC.decode(OPTS, INT_CTX, buf.duplicate(), ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -258,9 +256,7 @@ public class GorillaCodecDefinitionTest {
     ByteBuffer longFrame = ByteBuffer.allocateDirect(5);
     longFrame.put((byte) 1).putInt(0).flip();
     assertThrows(IllegalStateException.class,
-        () -> CODEC.decode(OPTS, INT_CTX, longFrame.duplicate()));
-    assertThrows(IllegalStateException.class,
-        () -> CODEC.decodeInto(OPTS, INT_CTX, longFrame.duplicate(), ByteBuffer.allocateDirect(0)));
+        () -> CODEC.decode(OPTS, INT_CTX, longFrame.duplicate(), ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -269,7 +265,7 @@ public class GorillaCodecDefinitionTest {
     buf.put((byte) 0);
     buf.putInt(-1);
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -284,7 +280,8 @@ public class GorillaCodecDefinitionTest {
     // 10000000 = 0x80
     buf.put((byte) 0x80);
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class,
+        () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(2 * Integer.BYTES)));
   }
 
   @Test
@@ -295,17 +292,15 @@ public class GorillaCodecDefinitionTest {
         src.putInt(value);
       }
       src.flip();
-      ByteBuffer withTrailingByte = appendByte(CODEC.encode(OPTS, INT_CTX, src));
+      ByteBuffer withTrailingByte = appendByte(encode(INT_CTX, src));
 
       assertThrows(IllegalStateException.class,
-          () -> CODEC.decode(OPTS, INT_CTX, withTrailingByte.duplicate()));
-      assertThrows(IllegalStateException.class,
-          () -> CODEC.decodeInto(OPTS, INT_CTX, withTrailingByte.duplicate(),
+          () -> CODEC.decode(OPTS, INT_CTX, withTrailingByte.duplicate(),
               ByteBuffer.allocateDirect(values.length * Integer.BYTES)));
 
       CodecPipelineExecutor executor = CodecPipelineExecutor.create("GORILLA", INT_CTX, CodecRegistry.DEFAULT);
       assertThrows(RuntimeException.class,
-          () -> executor.decode(withTrailingByte.duplicate(),
+          () -> CodecTestUtils.decode(executor, withTrailingByte.duplicate(),
               ByteBuffer.allocateDirect(values.length * Integer.BYTES), values.length * Integer.BYTES));
     }
   }
@@ -314,14 +309,14 @@ public class GorillaCodecDefinitionTest {
   public void testNonZeroPaddingBitsRejected() {
     ByteBuffer src = ByteBuffer.allocateDirect(2 * Integer.BYTES);
     src.putInt(7).putInt(7).flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
+    ByteBuffer encoded = encode(INT_CTX, src);
     encoded.put(encoded.limit() - 1, (byte) 1);
 
     assertThrows(IllegalStateException.class,
-        () -> CODEC.decode(OPTS, INT_CTX, encoded.duplicate()));
+        () -> CODEC.decode(OPTS, INT_CTX, encoded.duplicate(), ByteBuffer.allocate(2 * Integer.BYTES)));
     CodecPipelineExecutor executor = CodecPipelineExecutor.create("GORILLA", INT_CTX, CodecRegistry.DEFAULT);
     assertThrows(IllegalStateException.class,
-        () -> executor.decode(encoded.duplicate(), ByteBuffer.allocateDirect(2 * Integer.BYTES),
+        () -> CodecTestUtils.decode(executor, encoded.duplicate(), ByteBuffer.allocateDirect(2 * Integer.BYTES),
             2 * Integer.BYTES));
   }
 
@@ -335,8 +330,9 @@ public class GorillaCodecDefinitionTest {
         0, 0, 0, 0,
         (byte) 0xFE, 0x08
     };
-    assertDecodedInts(
-        CODEC.decode(OPTS, INT_CTX, ByteBuffer.wrap(encodedInt).order(ByteOrder.LITTLE_ENDIAN)), new int[]{0, 1});
+    ByteBuffer intDestination = ByteBuffer.allocate(2 * Integer.BYTES);
+    CODEC.decode(OPTS, INT_CTX, ByteBuffer.wrap(encodedInt).order(ByteOrder.LITTLE_ENDIAN), intDestination);
+    assertDecodedInts(intDestination, new int[]{0, 1});
 
     byte[] encodedLong = {
         1,
@@ -345,10 +341,8 @@ public class GorillaCodecDefinitionTest {
         (byte) 0xFF, 0x02
     };
     long[] expectedLongs = {0L, 1L};
-    assertDecodedLongs(
-        CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong).order(ByteOrder.LITTLE_ENDIAN)), expectedLongs);
     ByteBuffer dst = ByteBuffer.allocateDirect(expectedLongs.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong).order(ByteOrder.LITTLE_ENDIAN), dst);
+    CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong).order(ByteOrder.LITTLE_ENDIAN), dst);
     assertDecodedLongs(dst, expectedLongs);
   }
 
@@ -369,7 +363,13 @@ public class GorillaCodecDefinitionTest {
   @Test
   public void testMaxEncodedSizeRejectsOverflow() {
     assertThrows(IllegalArgumentException.class,
-        () -> CODEC.maxEncodedSize(OPTS, Integer.MAX_VALUE));
+        () -> CODEC.maxEncodedSize(OPTS, INT_CTX, Integer.MAX_VALUE));
+  }
+
+  private static ByteBuffer encode(CodecContext context, ByteBuffer source) {
+    ByteBuffer encoded = ByteBuffer.allocate(CODEC.maxEncodedSize(OPTS, context, source.remaining()));
+    CODEC.encode(OPTS, context, source, encoded);
+    return encoded;
   }
 
   private static ByteBuffer appendByte(ByteBuffer buffer) {

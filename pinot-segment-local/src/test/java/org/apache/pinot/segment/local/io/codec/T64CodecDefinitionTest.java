@@ -58,11 +58,10 @@ public class T64CodecDefinitionTest {
       src.putInt(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
-    assertDecodedInts(CODEC.decode(OPTS, INT_CTX, encoded.duplicate()), values);
+    ByteBuffer encoded = encode(INT_CTX, src);
 
     ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
-    CODEC.decodeInto(OPTS, INT_CTX, encoded.duplicate(), dst);
+    CODEC.decode(OPTS, INT_CTX, encoded.duplicate(), dst);
     assertDecodedInts(dst, values);
   }
 
@@ -80,11 +79,10 @@ public class T64CodecDefinitionTest {
       src.putLong(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, LONG_CTX, src);
-    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, encoded.duplicate()), values);
+    ByteBuffer encoded = encode(LONG_CTX, src);
 
     ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, encoded.duplicate(), dst);
+    CODEC.decode(OPTS, LONG_CTX, encoded.duplicate(), dst);
     assertDecodedLongs(dst, values);
   }
 
@@ -245,9 +243,9 @@ public class T64CodecDefinitionTest {
 
     CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA,T64,LZ4", INT_CTX,
         CodecRegistry.DEFAULT);
-    ByteBuffer encoded = executor.encode(src.duplicate());
+    ByteBuffer encoded = CodecTestUtils.encode(executor, src.duplicate());
     ByteBuffer decoded = ByteBuffer.allocateDirect(src.remaining());
-    executor.decode(encoded, decoded, src.remaining());
+    CodecTestUtils.decode(executor, encoded, decoded, src.remaining());
     assertDecodedInts(decoded, values);
   }
 
@@ -259,7 +257,8 @@ public class T64CodecDefinitionTest {
     buf.put((byte) 7); // invalid flag
     buf.putInt(1);
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class,
+        () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(Integer.BYTES)));
   }
 
   @Test
@@ -269,7 +268,7 @@ public class T64CodecDefinitionTest {
     buf.put((byte) 42); // invalid flag
     buf.putInt(0); // count = 0
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -277,9 +276,7 @@ public class T64CodecDefinitionTest {
     ByteBuffer longFrame = ByteBuffer.allocateDirect(5);
     longFrame.put((byte) 1).putInt(0).flip();
     assertThrows(IllegalStateException.class,
-        () -> CODEC.decode(OPTS, INT_CTX, longFrame.duplicate()));
-    assertThrows(IllegalStateException.class,
-        () -> CODEC.decodeInto(OPTS, INT_CTX, longFrame.duplicate(), ByteBuffer.allocateDirect(0)));
+        () -> CODEC.decode(OPTS, INT_CTX, longFrame.duplicate(), ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -288,7 +285,7 @@ public class T64CodecDefinitionTest {
     buf.put((byte) 0);
     buf.putInt(-1);
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(0)));
   }
 
   @Test
@@ -300,7 +297,8 @@ public class T64CodecDefinitionTest {
     buf.putInt(0); // baseline
     buf.put((byte) 33); // invalid bitWidth for INT
     buf.flip();
-    assertThrows(IllegalStateException.class, () -> CODEC.decode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalStateException.class,
+        () -> CODEC.decode(OPTS, INT_CTX, buf, ByteBuffer.allocate(64 * Integer.BYTES)));
   }
 
   @Test
@@ -311,17 +309,15 @@ public class T64CodecDefinitionTest {
         src.putInt(value);
       }
       src.flip();
-      ByteBuffer withTrailingByte = appendByte(CODEC.encode(OPTS, INT_CTX, src));
+      ByteBuffer withTrailingByte = appendByte(encode(INT_CTX, src));
 
       assertThrows(IllegalStateException.class,
-          () -> CODEC.decode(OPTS, INT_CTX, withTrailingByte.duplicate()));
-      assertThrows(IllegalStateException.class,
-          () -> CODEC.decodeInto(OPTS, INT_CTX, withTrailingByte.duplicate(),
+          () -> CODEC.decode(OPTS, INT_CTX, withTrailingByte.duplicate(),
               ByteBuffer.allocateDirect(values.length * Integer.BYTES)));
 
       CodecPipelineExecutor executor = CodecPipelineExecutor.create("T64", INT_CTX, CodecRegistry.DEFAULT);
       assertThrows(RuntimeException.class,
-          () -> executor.decode(withTrailingByte.duplicate(),
+          () -> CodecTestUtils.decode(executor, withTrailingByte.duplicate(),
               ByteBuffer.allocateDirect(values.length * Integer.BYTES), values.length * Integer.BYTES));
     }
   }
@@ -330,21 +326,21 @@ public class T64CodecDefinitionTest {
   public void testNonZeroPartialBlockPaddingRejected() {
     ByteBuffer src = ByteBuffer.allocateDirect(4 * Integer.BYTES);
     src.putInt(0).putInt(1).putInt(2).putInt(3).flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
+    ByteBuffer encoded = encode(INT_CTX, src);
     encoded.put(encoded.limit() - 1, (byte) 1);
 
     assertThrows(IllegalStateException.class,
-        () -> CODEC.decode(OPTS, INT_CTX, encoded.duplicate()));
+        () -> CODEC.decode(OPTS, INT_CTX, encoded.duplicate(), ByteBuffer.allocate(4 * Integer.BYTES)));
     CodecPipelineExecutor executor = CodecPipelineExecutor.create("T64", INT_CTX, CodecRegistry.DEFAULT);
     assertThrows(IllegalStateException.class,
-        () -> executor.decode(encoded.duplicate(), ByteBuffer.allocateDirect(4 * Integer.BYTES),
+        () -> CodecTestUtils.decode(executor, encoded.duplicate(), ByteBuffer.allocateDirect(4 * Integer.BYTES),
             4 * Integer.BYTES));
   }
 
   @Test
   public void testMisalignedInputSizeThrows() {
     ByteBuffer buf = ByteBuffer.allocateDirect(7); // not a multiple of INT size
-    assertThrows(IllegalArgumentException.class, () -> CODEC.encode(OPTS, INT_CTX, buf));
+    assertThrows(IllegalArgumentException.class, () -> encode(INT_CTX, buf));
   }
 
   @Test
@@ -382,8 +378,8 @@ public class T64CodecDefinitionTest {
       src.putInt(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
-    int max = CODEC.maxEncodedSize(OPTS, count * Integer.BYTES);
+    ByteBuffer encoded = encode(INT_CTX, src);
+    int max = CODEC.maxEncodedSize(OPTS, INT_CTX, count * Integer.BYTES);
     assertTrue(encoded.remaining() <= max,
         "count=" + count + " encoded.remaining()=" + encoded.remaining()
             + " exceeds maxEncodedSize=" + max);
@@ -400,8 +396,8 @@ public class T64CodecDefinitionTest {
       src.putLong(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, LONG_CTX, src);
-    int max = CODEC.maxEncodedSize(OPTS, count * Long.BYTES);
+    ByteBuffer encoded = encode(LONG_CTX, src);
+    int max = CODEC.maxEncodedSize(OPTS, LONG_CTX, count * Long.BYTES);
     assertTrue(encoded.remaining() <= max,
         "count=" + count + " encoded.remaining()=" + encoded.remaining()
             + " exceeds maxEncodedSize=" + max);
@@ -410,7 +406,18 @@ public class T64CodecDefinitionTest {
   @Test
   public void testMaxEncodedSizeRejectsOverflow() {
     assertThrows(IllegalArgumentException.class,
-        () -> CODEC.maxEncodedSize(OPTS, Integer.MAX_VALUE));
+        () -> CODEC.maxEncodedSize(OPTS, INT_CTX, Integer.MAX_VALUE));
+    assertThrows(IllegalArgumentException.class,
+        () -> CODEC.maxEncodedSize(OPTS, LONG_CTX, Integer.MAX_VALUE));
+  }
+
+  @Test
+  public void testMaxEncodedSizeUsesStoredType() {
+    int oneMiB = 1 << 20;
+    assertEquals(CODEC.maxEncodedSize(OPTS, INT_CTX, oneMiB), 1_069_061);
+    assertEquals(CODEC.maxEncodedSize(OPTS, LONG_CTX, oneMiB), 1_067_013);
+    assertThrows(IllegalArgumentException.class,
+        () -> CODEC.maxEncodedSize(OPTS, new CodecContext(DataType.DOUBLE), oneMiB));
   }
 
   // ---------- Wire-format byte-layout pin test ----------
@@ -426,7 +433,7 @@ public class T64CodecDefinitionTest {
       src.putInt(v);
     }
     src.flip();
-    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
+    ByteBuffer encoded = encode(INT_CTX, src);
 
     // Frame: flag=0 (INT), count=4, then one block:
     //   baseline = 0 (int, 4 bytes big-endian — the ByteBuffer default)
@@ -470,11 +477,25 @@ public class T64CodecDefinitionTest {
     encoded[14] = (byte) 0xE4;
     long[] expected = {0L, 1L, 2L, 3L};
 
-    assertDecodedLongs(
-        CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected);
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst);
+    CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst);
     assertDecodedLongs(dst, expected);
+  }
+
+  @Test
+  public void testDecodeHonorsOffsetSlice() {
+    int[] values = {0, 1, 2, 3};
+    ByteBuffer input = ByteBuffer.allocate(values.length * Integer.BYTES);
+    for (int value : values) {
+      input.putInt(value);
+    }
+    ByteBuffer encoded = encode(INT_CTX, input.flip());
+    ByteBuffer framed = ByteBuffer.allocate(encoded.remaining() + 11);
+    framed.position(7);
+    framed.put(encoded).flip().position(7);
+    ByteBuffer output = ByteBuffer.allocate(values.length * Integer.BYTES);
+    CODEC.decode(OPTS, INT_CTX, framed.slice().order(ByteOrder.LITTLE_ENDIAN), output);
+    assertDecodedInts(output, values);
   }
 
   // ---------- Parameterized bit-width × position coverage ----------
@@ -522,6 +543,12 @@ public class T64CodecDefinitionTest {
       values[i] = (i % 2 == 0) ? 0 : range;
     }
     roundTripInt(values);
+  }
+
+  private static ByteBuffer encode(CodecContext context, ByteBuffer source) {
+    ByteBuffer encoded = ByteBuffer.allocate(CODEC.maxEncodedSize(OPTS, context, source.remaining()));
+    CODEC.encode(OPTS, context, source, encoded);
+    return encoded;
   }
 
   private static ByteBuffer appendByte(ByteBuffer buffer) {

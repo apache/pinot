@@ -287,27 +287,22 @@ public class CodecPipelineValidatorTest {
     }
 
     @Override
-    public ByteBuffer encode(CodecOptions options, CodecContext ctx, ByteBuffer src) {
+    public void encode(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
       throw new UnsupportedOperationException("Validation-only test codec");
     }
 
     @Override
-    public ByteBuffer decode(CodecOptions options, CodecContext ctx, ByteBuffer src) {
+    public void decode(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
       throw new UnsupportedOperationException("Validation-only test codec");
     }
 
     @Override
-    public void decodeInto(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
-      throw new UnsupportedOperationException("Validation-only test codec");
-    }
-
-    @Override
-    public int maxEncodedSize(CodecOptions options, int inputSize) {
+    public int maxEncodedSize(CodecOptions options, CodecContext ctx, int inputSize) {
       return inputSize;
     }
 
     @Override
-    public boolean requiresDirectDstBuffer() {
+    public boolean requiresDirectDecodeDstBuffer() {
       return false;
     }
   }
