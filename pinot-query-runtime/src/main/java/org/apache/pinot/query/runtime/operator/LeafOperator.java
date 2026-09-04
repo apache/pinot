@@ -320,16 +320,17 @@ public class LeafOperator extends MultiStageOperator {
     cancelSseTasks();
   }
 
+  /// Stops the single-stage tasks feeding this operator and drains the blocks they have already queued. Routed
+  /// through the release hook rather than through separate `close()`/`cancel()` overrides so that it runs on every
+  /// termination path by construction, and so a failure here cannot abort the rest of the teardown.
   @Override
-  public void cancel(Throwable e) {
-    super.cancel(e);
+  protected void releaseBuffers() {
     cancelSseTasks();
   }
 
   @Override
-  public void close() {
-    super.close();
-    cancelSseTasks();
+  protected boolean hasBufferedState() {
+    return !_blockingQueue.isEmpty();
   }
 
   @VisibleForTesting

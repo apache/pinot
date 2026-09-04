@@ -111,4 +111,9 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   protected void releaseBuffers() {
     _rows = null;
   }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return _rows != null;
+  }
 }

@@ -41,7 +41,7 @@ public class UnionOperator extends SetOperator {
 
   private MseBlock _eosBlock = null;
   private int _currentOperatorIndex = 0;
-  private final Set<Record> _seenRecords = new ObjectOpenHashSet<>();
+  private Set<Record> _seenRecords = new ObjectOpenHashSet<>();
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> inputOperators, DataSchema dataSchema) {
@@ -106,10 +106,17 @@ public class UnionOperator extends SetOperator {
     return EXPLAIN_NAME;
   }
 
-  /// Clears rather than drops `_seenRecords`: it holds [Record] wrappers, while the emitted blocks reference the row
-  /// arrays directly, so emptying the set does not touch anything downstream.
+  /// Replaces `_seenRecords` with a fresh, empty set rather than clearing it: `ObjectOpenHashSet.clear()` nulls the
+  /// entries but deliberately keeps the key table at the capacity it grew to, and for a de-duplicating UNION that
+  /// table is sized by the full distinct cardinality of every input. Safe to swap because [#getNextBlock()] returns
+  /// the cached `_eosBlock` without touching the set once it is set, and it is set before every release.
   @Override
   protected void releaseBuffers() {
-    _seenRecords.clear();
+    _seenRecords = new ObjectOpenHashSet<>();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_seenRecords.isEmpty();
   }
 }

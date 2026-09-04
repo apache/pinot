@@ -96,6 +96,11 @@ public class AsofJoinOperator extends BaseJoinOperator {
   }
 
   @Override
+  protected boolean hasBufferedState() {
+    return _rightTable != null;
+  }
+
+  @Override
   protected List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
     assert _rightTable != null : "Right table should not be null when building joined rows";
     List<Object[]> rows = new ArrayList<>();

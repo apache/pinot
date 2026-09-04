@@ -36,7 +36,7 @@ public abstract class BinarySetOperator extends SetOperator {
 
   protected final MultiStageOperator _leftChildOperator;
   protected final MultiStageOperator _rightChildOperator;
-  protected final Multiset<Record> _rightRowSet;
+  protected Multiset<Record> _rightRowSet;
   private MseBlock.Eos _eos;
   private boolean _isRightChildOperatorProcessed;
 
@@ -123,11 +123,19 @@ public abstract class BinarySetOperator extends SetOperator {
     }
   }
 
-  /// Clears rather than drops `_rightRowSet`: the emitted rows all come from the left child, so no downstream block
-  /// aliases this multiset.
+  /// Replaces `_rightRowSet` with a fresh, empty multiset rather than clearing it: `HashMultiset.clear()` walks every
+  /// entry and still leaves the backing table at the capacity it grew to, which for a wide INTERSECT / EXCEPT is the
+  /// bulk of what we are trying to release. Safe to swap because [#handleRowMatched(Object[])] is only reached from
+  /// [#processLeftOperator()], which [#getNextBlock()] stops calling once `_eos` is set — and `_eos` is set before
+  /// every release.
   @Override
   protected void releaseBuffers() {
-    _rightRowSet.clear();
+    _rightRowSet = HashMultiset.create();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_rightRowSet.isEmpty();
   }
 
   /// Returns true if the row matches the criteria defined by the set operation.

@@ -164,6 +164,11 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
+  protected boolean hasBufferedState() {
+    return _rightTable != null || _matchedRightRows != null || _nullKeyRightRows != null;
+  }
+
+  @Override
   protected List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
     assert _rightTable != null : "Right table should not be null when building joined rows";
     switch (_joinType) {

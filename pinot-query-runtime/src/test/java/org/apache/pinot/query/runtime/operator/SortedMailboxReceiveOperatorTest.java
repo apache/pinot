@@ -22,12 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -56,7 +54,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -285,16 +283,7 @@ public class SortedMailboxReceiveOperatorTest {
 
     operator.cancel(new RuntimeException("TEST ERROR"));
 
-    assertNull(readBufferedRows(operator));
-  }
-
-  @Nullable
-  private static Object readBufferedRows(SortedMailboxReceiveOperator operator) {
-    try {
-      return FieldUtils.readField(operator, "_rows", true);
-    } catch (IllegalAccessException e) {
-      throw new AssertionError("Cannot read the buffered rows", e);
-    }
+    assertFalse(operator.hasBufferedState());
   }
 
   private SortedMailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,

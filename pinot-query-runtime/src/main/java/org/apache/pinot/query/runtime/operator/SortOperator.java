@@ -47,13 +47,16 @@ public class SortOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private final int _offset;
   private final int _numRowsToKeep;
+  /// Whether this operator has to sort, or is a plain limit/offset over an already-sorted input. Decides which of
+  /// the two buffers below is in use. Kept separate from them so that releasing a buffer cannot change the mode.
+  private final boolean _requiresSort;
+  /// The rows-to-keep heap, used when [#_requiresSort]. Never handed downstream — [#produceSortedBlock()] drains it
+  /// into a fresh array — so releasing replaces it outright rather than clearing it, which would keep the backing
+  /// array alive.
   @Nullable
-  private final PriorityQueue<Object[]> _priorityQueue;
-  /// The buffered rows, when this operator is a plain limit/offset over an already-sorted input. Handed downstream
-  /// as a sublist view of itself, so [#releaseBuffers()] drops the reference instead of clearing it.
-  ///
-  /// `null` once released, and whenever [#_priorityQueue] is the buffer in use — but note that the discriminator
-  /// between the two modes is `_priorityQueue == null`, not this field.
+  private PriorityQueue<Object[]> _priorityQueue;
+  /// The buffered rows, used when not [#_requiresSort]. Handed downstream as a sublist view of itself, so releasing
+  /// must drop the reference rather than empty the list.
   @Nullable
   private ArrayList<Object[]> _rows;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
@@ -81,7 +84,8 @@ public class SortOperator extends MultiStageOperator {
     // - There is no collation
     // - Input is already sorted
     List<RelFieldCollation> collations = node.getCollations();
-    if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
+    _requiresSort = !(collations.isEmpty() || input instanceof SortedMailboxReceiveOperator);
+    if (!_requiresSort) {
       _priorityQueue = null;
       _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
     } else {
@@ -116,14 +120,15 @@ public class SortOperator extends MultiStageOperator {
     return List.of(_input);
   }
 
-  /// Releases the buffered rows. The priority queue is cleared rather than dropped because `_priorityQueue == null`
-  /// is what tells the two buffering modes apart; nothing outside this operator ever sees the queue itself.
   @Override
   protected void releaseBuffers() {
-    if (_priorityQueue != null) {
-      _priorityQueue.clear();
-    }
+    _priorityQueue = null;
     _rows = null;
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return _priorityQueue != null || _rows != null;
   }
 
   @Override
@@ -139,7 +144,7 @@ public class SortOperator extends MultiStageOperator {
     }
     _eosBlock = consumeInputBlocks();
     // returning upstream error block if finalBlock contains error.
-    _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
+    _statMap.merge(StatKey.REQUIRE_SORT, _requiresSort);
     if (_eosBlock.isError()) {
       return _eosBlock;
     }
@@ -153,7 +158,7 @@ public class SortOperator extends MultiStageOperator {
 
   private MseBlock produceSortedBlock() {
     _hasConstructedSortedBlock = true;
-    if (_priorityQueue == null) {
+    if (!_requiresSort) {
       assert _rows != null : "Rows should not be null when producing the sorted block";
       if (_rows.size() > _offset) {
         List<Object[]> row = _rows.subList(_offset, _rows.size());
@@ -162,6 +167,7 @@ public class SortOperator extends MultiStageOperator {
         return _eosBlock;
       }
     } else {
+      assert _priorityQueue != null : "Priority queue should not be null when producing the sorted block";
       int resultSize = _priorityQueue.size() - _offset;
       if (resultSize <= 0) {
         return _eosBlock;
@@ -179,7 +185,7 @@ public class SortOperator extends MultiStageOperator {
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
-      if (_priorityQueue == null) {
+      if (!_requiresSort) {
         assert _rows != null : "Rows should not be null when consuming input blocks";
         // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
         int numRows = _rows.size();
@@ -200,6 +206,7 @@ public class SortOperator extends MultiStageOperator {
           }
         }
       } else {
+        assert _priorityQueue != null : "Priority queue should not be null when consuming input blocks";
         for (Object[] row : container) {
           SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
         }
