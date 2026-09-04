@@ -25,7 +25,6 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.predicate.BaseRawValueBasedPredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
@@ -226,13 +225,14 @@ public class StarTreeUtilsTest {
     FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_segment), queryContext);
     filterPlanNode.run();
 
-    BaseProjectOperator<?> operator = StarTreeUtils.createStarTreeBasedProjectOperator(_segment, queryContext,
-        queryContext.getAggregationFunctions(), queryContext.getFilter(),
-        filterPlanNode.getPredicateEvaluators());
-    assertNotNull(operator, "Star-tree plan expected for EQ on RAW+dict dimension");
+    StarTreeUtils.StarTreeProjectPlan projectPlan =
+        StarTreeUtils.createStarTreeBasedProjectOperator(_segment, queryContext,
+            queryContext.getAggregationFunctions(), queryContext.getFilter(),
+            filterPlanNode.getPredicateEvaluators());
+    assertNotNull(projectPlan, "Star-tree plan expected for EQ on RAW+dict dimension");
 
     // Traversal must not throw; before the fix, StarTreeFilterOperator.getMatchingDictIds threw UOE here.
-    ValueBlock block = operator.nextBlock();
+    ValueBlock block = projectPlan.getProjectOperator().nextBlock();
     assertNotNull(block, "Star-tree traversal returned no block");
 
     // Star-tree yields one aggregated document per matching path — same behavior as DICTIONARY-encoded columns.

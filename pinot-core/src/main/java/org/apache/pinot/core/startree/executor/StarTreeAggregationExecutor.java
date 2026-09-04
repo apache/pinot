@@ -30,21 +30,21 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 /// - The column in function context is function-column pair
 /// - No transform function in aggregation
 /// - For `COUNT` aggregation function, we need to aggregate on the pre-aggregated column
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
-
-  public StarTreeAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+  /// Creates an executor over the pre-aggregated columns the query was routed to.
+  ///
+  /// `aggregationFunctionColumnPairs` must be the pairs the star-tree project operator was built with, because they
+  /// depend on which star-tree was picked: a null-aware star-tree resolves `COUNT(column)` to `count__column` while a
+  /// regular one resolves it to `count__*`.
+  public StarTreeAggregationExecutor(AggregationFunction[] aggregationFunctions,
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs) {
     // StarTreeAggregationExecutor doesn't support pre-aggregated results.
     // So, we don't need to pass pre-aggregated results to the super class.
     super(aggregationFunctions);
-
-    int numAggregationFunctions = aggregationFunctions.length;
-    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      _aggregationFunctionColumnPairs[i] =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
-    }
+    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
   }
 
   @Override

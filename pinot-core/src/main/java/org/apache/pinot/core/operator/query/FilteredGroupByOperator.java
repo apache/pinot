@@ -49,6 +49,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -85,7 +86,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
     int numAggregationFunctions = _aggregationFunctions.length;
-    /// Grouping-set queries append a synthetic $groupingId key column after the union group-by columns.
+    // Grouping-set queries append a synthetic $groupingId key column after the union group-by columns.
     int numExtraKeyColumns = queryContext.getNumExtraGroupByKeyColumns();
     int numKeyColumns = numGroupByExpressions + numExtraKeyColumns;
     int numColumns = numKeyColumns + numAggregationFunctions;
@@ -101,7 +102,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
-    /// Synthetic grouping-id discriminator column for GROUP BY GROUPING SETS / ROLLUP / CUBE
+    // Synthetic grouping-id discriminator column for GROUP BY GROUPING SETS / ROLLUP / CUBE
     if (numExtraKeyColumns > 0) {
       columnNames[numGroupByExpressions] = GroupingSets.GROUPING_ID_COLUMN;
       columnDataTypes[numGroupByExpressions] = DataSchema.ColumnDataType.INT;
@@ -141,17 +142,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
 
       // Perform aggregation group-by on all the blocks
-      DefaultGroupByExecutor groupByExecutor;
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
+      DefaultGroupByExecutor groupByExecutor = starTreeFunctionColumnPairs != null
+          ? new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+              starTreeFunctionColumnPairs, groupKeyGenerator)
+          : new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+              groupKeyGenerator);
 
-      if (aggregationInfo.isUseStarTree()) {
-        groupByExecutor =
-            new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
-      } else {
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
-      }
       // The group key generator should be shared across all AggregationFunctions so that agg results can be
       // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
       // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
@@ -172,8 +169,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsScanned);
-        scanCost.addEntriesScannedPostFilter(
-            (long) numDocsScanned * projectOperator.getNumColumnsProjected());
+        scanCost.addEntriesScannedPostFilter((long) numDocsScanned * projectOperator.getNumColumnsProjected());
       }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
@@ -212,11 +208,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
 
     GroupByResultsBlock resultsBlock;
-    /// Grouping-set queries use a per-set bucketed segment trim (keyed on the $groupingId discriminator) so
-    /// that a global top-K cannot starve low-magnitude sets such as the grand total. The broker still applies
-    /// the final ORDER BY + LIMIT across all sets.
+    // Grouping-set queries use a per-set bucketed segment trim (keyed on the $groupingId discriminator) so
+    // that a global top-K cannot starve low-magnitude sets such as the grand total. The broker still applies
+    // the final ORDER BY + LIMIT across all sets.
     if (_queryContext.isGroupingSets()) {
-      /// The $groupingId discriminator is the key column immediately after the union group-by columns.
+      // The $groupingId discriminator is the key column immediately after the union group-by columns.
       return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema, groupKeyGenerator,
           groupByResultHolders, groupKeyGenerator.getNumKeys(), _groupByExpressions.length, numGroupsLimitReached,
           numGroupsWarningLimitReached);
