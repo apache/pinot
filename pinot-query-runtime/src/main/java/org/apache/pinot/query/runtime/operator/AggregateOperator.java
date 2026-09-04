@@ -205,12 +205,21 @@ public class AggregateOperator extends MultiStageOperator {
     _eosBlock = finalBlock;
 
     if (finalBlock.isError()) {
+      // The upstream failed, so no result will ever be produced from what we accumulated: drop it right away instead
+      // of waiting for close()/cancel().
+      releaseBuffers();
       return finalBlock;
     }
     MseBlock mseBlock = produceAggregatedBlock();
+    releaseBuffers();
+    return mseBlock;
+  }
+
+  /// Drops the executors, and with them the group-by hash maps and the aggregate result holders they own.
+  @Override
+  protected void releaseBuffers() {
     _aggregationExecutor = null;
     _groupByExecutor = null;
-    return mseBlock;
   }
 
   private MseBlock produceAggregatedBlock() {

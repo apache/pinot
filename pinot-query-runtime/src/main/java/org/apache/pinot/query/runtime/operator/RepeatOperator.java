@@ -166,6 +166,14 @@ public class RepeatOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
+  /// Drops the input block being expanded. The rows belong to the input block, not to this operator, and the emitted
+  /// rows are freshly allocated, so dropping the reference is enough — and clearing would corrupt a block another
+  /// operator may still be holding.
+  @Override
+  protected void releaseBuffers() {
+    _currentRows = null;
+  }
+
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override

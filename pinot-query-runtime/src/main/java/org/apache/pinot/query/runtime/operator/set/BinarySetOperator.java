@@ -105,6 +105,7 @@ public abstract class BinarySetOperator extends SetOperator {
         return mseBlock;
       } else if (mseBlock.isError()) {
         _eos = (MseBlock.Eos) mseBlock;
+        releaseBuffers();
         return _eos;
       } else if (mseBlock.isSuccess()) {
         // If it's a regular EOS block, we continue to process the left child operator.
@@ -115,10 +116,18 @@ public abstract class BinarySetOperator extends SetOperator {
     MseBlock mseBlock = processLeftOperator();
     if (mseBlock.isEos()) {
       _eos = (MseBlock.Eos) mseBlock;
+      releaseBuffers();
       return _eos;
     } else {
       return mseBlock;
     }
+  }
+
+  /// Clears rather than drops `_rightRowSet`: the emitted rows all come from the left child, so no downstream block
+  /// aliases this multiset.
+  @Override
+  protected void releaseBuffers() {
+    _rightRowSet.clear();
   }
 
   /// Returns true if the row matches the criteria defined by the set operation.

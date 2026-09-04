@@ -60,11 +60,13 @@ public class UnionOperator extends SetOperator {
       MseBlock block = currentOperator.nextBlock();
       if (block.isError()) {
         _eosBlock = block;
+        releaseBuffers();
         return block;
       } else if (block.isSuccess()) {
         _currentOperatorIndex++;
         if (_currentOperatorIndex == _inputOperators.size()) {
           _eosBlock = block;
+          releaseBuffers();
           return block;
         }
       } else if (block.isData()) {
@@ -102,5 +104,12 @@ public class UnionOperator extends SetOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  /// Clears rather than drops `_seenRecords`: it holds [Record] wrappers, while the emitted blocks reference the row
+  /// arrays directly, so emptying the set does not touch anything downstream.
+  @Override
+  protected void releaseBuffers() {
+    _seenRecords.clear();
   }
 }

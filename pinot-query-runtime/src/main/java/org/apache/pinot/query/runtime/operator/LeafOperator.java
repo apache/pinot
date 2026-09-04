@@ -322,11 +322,13 @@ public class LeafOperator extends MultiStageOperator {
 
   @Override
   public void cancel(Throwable e) {
+    super.cancel(e);
     cancelSseTasks();
   }
 
   @Override
   public void close() {
+    super.close();
     cancelSseTasks();
   }
 

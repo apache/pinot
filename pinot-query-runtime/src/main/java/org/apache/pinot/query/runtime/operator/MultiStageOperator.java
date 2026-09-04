@@ -238,6 +238,21 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   /// the stat map the operator keeps.
   public abstract StatMap<?> copyStatMaps();
 
+  /// Drops the row and hash buffers this operator accumulated while running, so that they become collectable even
+  /// while the operator itself stays reachable.
+  ///
+  /// Both [#close()] and [#cancel(Throwable)] call this, so the buffers are released on *every* termination path:
+  /// end of stream, error and cancellation alike. Operators that can release earlier (when they produce their
+  /// end-of-stream block, say) should keep doing that as well — this is the backstop, not the prompt path.
+  ///
+  /// Implementations must be idempotent: this can run twice, and it runs after [#cancel(Throwable)] on the error
+  /// path. They must not touch anything [#calculateStats()] and [#copyStatMaps()] read, since stats are collected
+  /// after termination. They must also not `clear()` a collection whose identity was handed downstream — a block
+  /// sitting in a local mailbox still points at it, and emptying it silently drops rows. Drop the reference (set
+  /// the field to `null`) in that case.
+  protected void releaseBuffers() {
+  }
+
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
@@ -250,6 +265,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
+    releaseBuffersSafely();
   }
 
   public void cancel(Throwable e) {
@@ -260,6 +276,16 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
+    }
+    releaseBuffersSafely();
+  }
+
+  private void releaseBuffersSafely() {
+    try {
+      releaseBuffers();
+    } catch (Exception e) {
+      // Releasing buffers is best-effort cleanup; never let it break the rest of the teardown.
+      logger().error("Failed to release buffers of operator: " + this + " with exception:" + e);
     }
   }
 

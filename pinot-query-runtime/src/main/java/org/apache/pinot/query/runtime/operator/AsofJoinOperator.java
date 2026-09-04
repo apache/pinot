@@ -91,7 +91,7 @@ public class AsofJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void onEosProduced() {
+  protected void releaseBuffers() {
     _rightTable = null; // Release memory in case we keep the operator around for a while
   }
 

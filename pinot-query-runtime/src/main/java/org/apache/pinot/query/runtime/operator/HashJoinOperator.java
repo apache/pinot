@@ -157,7 +157,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void onEosProduced() {
+  protected void releaseBuffers() {
     _rightTable = null;
     _matchedRightRows = null;
     _nullKeyRightRows = null;

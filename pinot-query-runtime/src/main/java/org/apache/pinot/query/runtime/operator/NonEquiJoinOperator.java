@@ -69,8 +69,11 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     }
   }
 
+  /// Clears rather than drops `_rightTable`: its rows are only ever copied into the emitted rows by `joinRow`, so no
+  /// downstream block aliases the list itself.
   @Override
-  protected void onEosProduced() {
+  protected void releaseBuffers() {
+    _rightTable.clear();
     _matchedRightRows = null;
   }
 

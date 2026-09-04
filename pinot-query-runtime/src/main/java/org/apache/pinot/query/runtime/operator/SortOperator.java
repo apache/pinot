@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -46,8 +47,15 @@ public class SortOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private final int _offset;
   private final int _numRowsToKeep;
+  @Nullable
   private final PriorityQueue<Object[]> _priorityQueue;
-  private final ArrayList<Object[]> _rows;
+  /// The buffered rows, when this operator is a plain limit/offset over an already-sorted input. Handed downstream
+  /// as a sublist view of itself, so [#releaseBuffers()] drops the reference instead of clearing it.
+  ///
+  /// `null` once released, and whenever [#_priorityQueue] is the buffer in use — but note that the discriminator
+  /// between the two modes is `_priorityQueue == null`, not this field.
+  @Nullable
+  private ArrayList<Object[]> _rows;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedSortedBlock;
@@ -108,8 +116,14 @@ public class SortOperator extends MultiStageOperator {
     return List.of(_input);
   }
 
+  /// Releases the buffered rows. The priority queue is cleared rather than dropped because `_priorityQueue == null`
+  /// is what tells the two buffering modes apart; nothing outside this operator ever sees the queue itself.
   @Override
-  public void cancel(Throwable e) {
+  protected void releaseBuffers() {
+    if (_priorityQueue != null) {
+      _priorityQueue.clear();
+    }
+    _rows = null;
   }
 
   @Override
@@ -140,6 +154,7 @@ public class SortOperator extends MultiStageOperator {
   private MseBlock produceSortedBlock() {
     _hasConstructedSortedBlock = true;
     if (_priorityQueue == null) {
+      assert _rows != null : "Rows should not be null when producing the sorted block";
       if (_rows.size() > _offset) {
         List<Object[]> row = _rows.subList(_offset, _rows.size());
         return new RowHeapDataBlock(row, _dataSchema);
@@ -165,6 +180,7 @@ public class SortOperator extends MultiStageOperator {
     while (block.isData()) {
       List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
       if (_priorityQueue == null) {
+        assert _rows != null : "Rows should not be null when consuming input blocks";
         // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
         int numRows = _rows.size();
         if (numRows < _numRowsToKeep) {

@@ -196,7 +196,13 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return mseBlock;
   }
 
-  protected abstract void onEosProduced();
+  /// Called once this operator has produced its end-of-stream block, i.e. on the successful termination path.
+  ///
+  /// Releases the buffered right table as early as possible. [#releaseBuffers()] runs again from `close()` and
+  /// `cancel()`, which is what covers the error and cancellation paths.
+  protected void onEosProduced() {
+    releaseBuffers();
+  }
 
   protected void buildRightTable() {
     LOGGER.trace("Building right table for join operator");
