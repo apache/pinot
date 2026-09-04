@@ -22,6 +22,7 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -32,6 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -137,7 +139,11 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap();
     int count = 0;
+    // Null rows within the counted ranges are UNKNOWN rather than true; they are counted per range so that no bitmap
+    // has to be materialized
+    int numNulls = 0;
     boolean exclusive = _predicateEvaluator.isExclusive();
     if (_predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
       // For RANGE predicate, use start/end document id to construct a new document id range
@@ -147,6 +153,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
       int endDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getEndDictId() - 1).getRight();
       count = endDocId - startDocId + 1;
+      numNulls = countNulls(nullBitmap, startDocId, endDocId);
     } else {
       int[] dictIds =
           exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
@@ -156,6 +163,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       if (numDictIds == 1) {
         IntPair docIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
         count = docIdRange.getRight() - docIdRange.getLeft() + 1;
+        numNulls = countNulls(nullBitmap, docIdRange.getLeft(), docIdRange.getRight());
       } else {
         IntPair lastDocIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
         for (int i = 1; i < numDictIds; i++) {
@@ -164,13 +172,20 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
             lastDocIdRange.setRight(docIdRange.getRight());
           } else {
             count += lastDocIdRange.getRight() - lastDocIdRange.getLeft() + 1;
+            numNulls += countNulls(nullBitmap, lastDocIdRange.getLeft(), lastDocIdRange.getRight());
             lastDocIdRange = docIdRange;
           }
         }
         count += lastDocIdRange.getRight() - lastDocIdRange.getLeft() + 1;
+        numNulls += countNulls(nullBitmap, lastDocIdRange.getLeft(), lastDocIdRange.getRight());
       }
     }
-    return exclusive ? _numDocs - count : count;
+    return toNumTrueDocs(count, numNulls, exclusive);
+  }
+
+  /// Returns how many null rows fall in the inclusive document id range, or 0 without a null bitmap.
+  private static int countNulls(@Nullable ImmutableRoaringBitmap nullBitmap, int startDocId, int endDocId) {
+    return nullBitmap != null ? (int) nullBitmap.rangeCardinality(startDocId, endDocId + 1L) : 0;
   }
 
   @Override
@@ -213,7 +228,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
         bitmap.add(lastDocIdRange.getLeft(), lastDocIdRange.getRight() + 1L);
       }
     }
-    return new BitmapCollection(_numDocs, exclusive, bitmap);
+    return new BitmapCollection(_numDocs, exclusive, bitmap).excludingNulls(getNullBitmap());
   }
 
 

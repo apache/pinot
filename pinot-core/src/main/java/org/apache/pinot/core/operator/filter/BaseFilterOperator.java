@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
@@ -70,9 +72,18 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     return false;
   }
 
-  /// @return bitmaps of matching docIds
+  /// Returns the true documents as bitmaps. The collection leaves out the documents the filter is UNKNOWN for and
+  /// carries them, so that its inversion leaves them out as well.
   public BitmapCollection getBitmaps() {
     throw new UnsupportedOperationException();
+  }
+
+  /// Returns whether some documents may be UNKNOWN to this filter, that is whether [#getNulls] may be non-empty. The
+  /// answer comes from metadata rather than from evaluating the filter, so it may be pessimistic, and it is `false`
+  /// whenever null handling is disabled, since every document then reads as a value. A parent that derives its result
+  /// from the two-valued shortcuts alone, such as a negation counting the complement, consults this before doing so.
+  public boolean mayHaveNulls() {
+    return _nullHandlingEnabled;
   }
 
   /// Exact filtered docIds for the operator. `null` indicates match-all.
@@ -139,22 +150,52 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     return EmptyDocIdSet.getInstance();
   }
 
-  /// @return document IDs in which the predicate evaluates to false.
-  protected BlockDocIdSet getFalses() {
+  /// Returns the document IDs in which the predicate does not evaluate to false: the true ones and, with null
+  /// handling enabled, the NULL ones. The result is a [MatchAllDocIdSet] when the predicate is true everywhere and an
+  /// [EmptyDocIdSet] when it is false everywhere, so that a parent can short-circuit on either.
+  protected BlockDocIdSet getNotFalses() {
     BlockDocIdSet trues = getTrues();
+    if (!_nullHandlingEnabled || trues instanceof MatchAllDocIdSet) {
+      return trues;
+    }
+    BlockDocIdSet nulls = getNulls();
+    if (nulls instanceof EmptyDocIdSet) {
+      return trues;
+    }
+    return trues instanceof EmptyDocIdSet ? nulls : new OrDocIdSet(List.of(trues, nulls), _numDocs);
+  }
+
+  /// Returns the document IDs in which the predicate evaluates to NULL, derived as the ones that are neither false
+  /// nor true.
+  ///
+  /// Only for operators that override [#getNotFalses]. The default [#getNotFalses] reads [#getNulls], so an operator
+  /// that keeps it would recurse; a leaf returns its UNKNOWN documents directly instead.
+  protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions) {
+    BlockDocIdSet notFalses = getNotFalses().getOptimizedDocIdSet();
+    if (notFalses instanceof EmptyDocIdSet) {
+      return EmptyDocIdSet.getInstance();
+    }
+    BlockDocIdSet trues = getTrues().getOptimizedDocIdSet();
     if (trues instanceof MatchAllDocIdSet) {
       return EmptyDocIdSet.getInstance();
     }
-    if (_nullHandlingEnabled) {
-      BlockDocIdSet nulls = getNulls();
-      if (!(nulls instanceof EmptyDocIdSet)) {
-        return new NotDocIdSet(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs),
-            _numDocs);
-      }
-    }
     if (trues instanceof EmptyDocIdSet) {
+      return notFalses;
+    }
+    BlockDocIdSet notTrues = new NotDocIdSet(trues, _numDocs);
+    return notFalses instanceof MatchAllDocIdSet ? notTrues
+        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions);
+  }
+
+  /// @return document IDs in which the predicate evaluates to false.
+  protected BlockDocIdSet getFalses() {
+    BlockDocIdSet notFalses = getNotFalses();
+    if (notFalses instanceof MatchAllDocIdSet) {
+      return EmptyDocIdSet.getInstance();
+    }
+    if (notFalses instanceof EmptyDocIdSet) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new NotDocIdSet(trues, _numDocs);
+    return new NotDocIdSet(notFalses, _numDocs);
   }
 }
