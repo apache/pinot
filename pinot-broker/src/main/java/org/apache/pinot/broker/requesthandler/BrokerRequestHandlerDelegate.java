@@ -77,6 +77,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public int preConnectServers(long deadlineMs) {
+    // Only the single-stage handler owns the broker-to-server Netty channels; the multi-stage (gRPC)
+    // and time-series paths have nothing to pre-connect here.
+    return _singleStageBrokerRequestHandler.preConnectServers(deadlineMs);
+  }
+
+  @Override
   public void shutDown() {
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {

@@ -113,6 +113,17 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     _brokerReduceService.shutDown();
   }
 
+  /// Opens a channel to every routable server, for both table types, taking the blocking connect -- and,
+  /// when broker-to-server TLS is on, the handshake -- off the first real query's critical path. The
+  /// caller guarantees Helix has converged, so [RoutingManager#getRoutableServerInstanceMap] already
+  /// reflects the servers this broker will route to. Never throws; returns the number of channels
+  /// connected before `deadlineMs`.
+  @Override
+  public int preConnectServers(long deadlineMs) {
+    return new ServerPreConnector(() -> _routingManager.getRoutableServerInstanceMap().values(),
+        _queryRouter::preConnect).preConnect(deadlineMs);
+  }
+
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
