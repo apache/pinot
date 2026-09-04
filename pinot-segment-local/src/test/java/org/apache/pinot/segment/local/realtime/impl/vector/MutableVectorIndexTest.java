@@ -597,6 +597,20 @@ public class MutableVectorIndexTest {
     }
   }
 
+  /// A null bitmap must not silently degrade into an unfiltered search, which would return doc ids the query is
+  /// not allowed to see. The reader rejects it with its contract message rather than throwing a bare
+  /// NullPointerException from deep inside Lucene.
+  @Test
+  public void testFilteredSearchRejectsNullBitmap() {
+    try (MutableVectorIndex index = createIndexWithoutCommits()) {
+      NullPointerException thrown = Assert.expectThrows(NullPointerException.class,
+          () -> index.getDocIds(new float[]{1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, 1, (ImmutableRoaringBitmap) null));
+      Assert.assertNotNull(thrown.getMessage(), "The rejection must carry the pre-filter contract message");
+      Assert.assertTrue(thrown.getMessage().contains("must not be null"),
+          "Expected the pre-filter contract message, got: " + thrown.getMessage());
+    }
+  }
+
   private static MutableVectorIndex createIndex() {
     return createIndex("mutableVectorIndexTest_" + System.nanoTime(), COLUMN_NAME);
   }
