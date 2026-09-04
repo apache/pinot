@@ -50,6 +50,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -71,6 +72,9 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
   private final AggregationFunction<?, ?>[] _aggFunctions;
+  /// Whether this operator groups. Decides which of the two executors below is in use; kept separate from them so
+  /// that releasing an executor cannot change the mode.
+  private final boolean _isGroupBy;
   @Nullable
   private MultistageAggregationExecutor _aggregationExecutor;
   @Nullable
@@ -136,7 +140,8 @@ public class AggregateOperator extends MultiStageOperator {
     AggregateNode.AggType aggType = node.getAggType();
     // TODO: Allow leaf return final result for non-group-by queries
     boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
-    if (groupKeys.isEmpty()) {
+    _isGroupBy = !groupKeys.isEmpty();
+    if (!_isGroupBy) {
       _aggregationExecutor =
           new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
       _groupByExecutor = null;
@@ -201,20 +206,40 @@ public class AggregateOperator extends MultiStageOperator {
     if (_eosBlock != null) {
       return _eosBlock;
     }
-    MseBlock.Eos finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+    MseBlock.Eos finalBlock = _isGroupBy ? consumeGroupBy() : consumeAggregation();
     _eosBlock = finalBlock;
 
     if (finalBlock.isError()) {
+      // The upstream failed, so no result will ever be produced from what we accumulated: drop it right away instead
+      // of waiting for close()/cancel().
+      releaseBuffers();
       return finalBlock;
     }
     MseBlock mseBlock = produceAggregatedBlock();
-    _aggregationExecutor = null;
-    _groupByExecutor = null;
+    releaseBuffers();
     return mseBlock;
   }
 
+  /// Drops the executors, and with them the group-by hash maps and the aggregate result holders they own. Marks the
+  /// operator finished at the same time, so that a later [#getNextBlock()] returns the cached end of stream instead
+  /// of trying to consume the input again with a dropped executor.
+  @Override
+  protected void releaseBuffers() {
+    _aggregationExecutor = null;
+    _groupByExecutor = null;
+    if (_eosBlock == null) {
+      _eosBlock = SuccessMseBlock.INSTANCE;
+    }
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return _aggregationExecutor != null || _groupByExecutor != null;
+  }
+
   private MseBlock produceAggregatedBlock() {
-    if (_aggregationExecutor != null) {
+    if (!_isGroupBy) {
+      assert _aggregationExecutor != null;
       return new RowHeapDataBlock(_aggregationExecutor.getResult(), _resultSchema, _aggFunctions);
     } else {
       assert _groupByExecutor != null;
