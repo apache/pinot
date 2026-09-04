@@ -611,6 +611,52 @@ public class CommonConstants {
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
+    // ---------------------------------------------------------------------------
+    // Cost-based optimizer (CBO) stats store — EXPERIMENTAL
+    // ---------------------------------------------------------------------------
+
+    /// Prefix for every statistics setting. The subset below this prefix is handed to the
+    /// configured `StatsStoreProvider`, so a contributed store is configured the same way the
+    /// built-in ones are.
+    public static final String CONFIG_PREFIX_OF_STATS = "pinot.broker.stats";
+
+    /// [EXPERIMENTAL] When `true`, the broker collects per-segment statistics into the store
+    /// selected by [#CONFIG_OF_STATS_STORE]. Disabled by default.
+    ///
+    /// Collection only. Nothing consults these statistics yet, so enabling this changes no query
+    /// plan and no query result: it buys the collection cost, and a database file for the `sqlite`
+    /// store. The multi-stage planner starts reading them in a later change, at which point
+    /// enabling this will change the row-count and selectivity ESTIMATES every planner rule sees
+    /// — plans, and therefore performance characteristics, may change, though never correctness.
+    public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
+    public static final boolean DEFAULT_STATS_ENABLED = false;
+
+    /// [EXPERIMENTAL] Which `StatsStore` implementation backs CBO statistics collection.
+    ///
+    /// Built-in values:
+    /// - `sqlite` (default): an embedded database file under [#CONFIG_OF_STATS_DIR]. Keeps
+    ///   statistics off-heap and, when the directory is on a persistent volume, survives restarts.
+    /// - `memory`: heap-resident, nothing written to disk. Statistics are lost on restart and are
+    ///   re-collected from the ZooKeeper segment metadata the broker re-reads anyway; per-column
+    ///   statistics pulled from servers must be fetched again. Reads scan the table's segments, so
+    ///   prefer it for modest segment counts or where a file is unacceptable.
+    ///
+    /// The value is a NAME, not a class name: a store is contributed by registering a
+    /// `StatsStoreProvider` that declares its own name, so an implementation can be renamed or
+    /// moved without invalidating this configuration. An unknown name fails startup with the list
+    /// of names actually available.
+    ///
+    /// [#CONFIG_OF_STATS_DIR] applies only to `sqlite` and is ignored by the other stores.
+    public static final String CONFIG_OF_STATS_STORE = "pinot.broker.stats.store";
+    public static final String DEFAULT_STATS_STORE = "sqlite";
+
+    /// [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
+    /// (`broker-stats.sqlite`). Applies only when [#CONFIG_OF_STATS_STORE] selects `sqlite`.
+    /// Defaults to `<java.io.tmpdir>/<instanceId>/broker-stats` (per-instance so multiple brokers
+    /// on one host do not share a database). Configure a path on a persistent volume to preserve
+    /// collected statistics across restarts.
+    public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
+
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
