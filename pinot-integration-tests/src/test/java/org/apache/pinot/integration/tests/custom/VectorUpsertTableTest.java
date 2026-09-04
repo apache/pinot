@@ -267,10 +267,12 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
     String explain = GroupByOptionsTest.toExplainStr(explainResponse, useMultiStageQueryEngine);
     assertExplainContains(explain, "requiredDocIdFilterApplied", true);
     if (tableName.equals(CONSUMING_TABLE_NAME)) {
-      // The mutable vector index cannot restrict its search, so the planner selects the exact scan operator.
-      assertTrue(explain.contains("VECTOR_SIMILARITY_EXACT_SCAN") || explain.contains("VectorSimilarityExactScan"),
-          "Consuming segments must fall back to the exact scan operator: " + explain);
-      assertExplainContains(explain, "fallbackReason", "mutable_vector_index_not_filter_aware");
+      // The consuming segment is intentionally small, so scanning only the required upsert-visible rows is cheaper
+      // and exact. Larger required scopes retain filtered ANN, as covered by FilterPlanNodeTest.
+      assertTrue(explain.contains("VECTOR_SIMILARITY_EXACT_SCAN")
+              || explain.contains("VectorSimilarityExactScan"),
+          "Consuming segments with a sparse required scope must use an exact scan: " + explain);
+      assertExplainContains(explain, "fallbackReason", "required_doc_ids_strategy_exact_scan");
     } else {
       assertTrue(explain.contains("VECTOR_SIMILARITY_INDEX") || explain.contains("VectorSimilarityIndex"),
           "Sealed segments must use their vector index: " + explain);
