@@ -19,11 +19,8 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,58 +28,100 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
-import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-public class SortOperator extends MultiStageOperator {
-  private static final String EXPLAIN_NAME = "SORT";
-  private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
+/// Base class for the operators that implement a [SortNode].
+///
+/// A `SortNode` carries a collation, a `fetch` and an `offset`, but the cheapest way to honor them depends on what the
+/// input can promise and on whether the fetch bounds the result. Rather than branching inside one operator, the
+/// [#create] factory picks one of three implementations, each of which reports itself in the explain plan:
+///
+///   - [LimitSortOperator] (`SORT_LIMIT`) - there is no collation, so no ordering is required at all. Nothing is
+///     sorted and nothing is accumulated: blocks stream through with `offset` rows skipped and at most `fetch` rows
+///     emitted.
+///   - [TopNSortOperator] (`SORT_TOP_N`) - the result is bounded by `fetch` (or by the broker response limit), so a
+///     bounded max-heap of `fetch + offset` entries is enough. Peak memory is the bound, not the input size.
+///   - [FullSortOperator] (`SORT_FULL`) - no bound is available, so every row is buffered and sorted once. This is the
+///     only implementation whose memory is proportional to the input, and it is chosen only when nothing smaller is
+///     correct.
+///
+/// All three emit their result as a stream of blocks of at most [#DEFAULT_MAX_ROWS_PER_BLOCK] rows. A single block
+/// holding the whole result is expensive to serialize and forces the consumer to materialize everything at once, so
+/// even the two buffering implementations hand their result back in slices.
+///
+/// Like every multi-stage operator this class is driven by a single thread and is not thread-safe.
+public abstract class SortOperator extends MultiStageOperator {
+  /// Upper bound on the number of rows in each emitted block.
+  ///
+  /// This bounds serialization cost and consumer-side materialization; it does not bound this operator's own memory,
+  /// which is decided by the implementation the factory picks.
+  protected static final int DEFAULT_MAX_ROWS_PER_BLOCK = 10_000;
 
-  private final MultiStageOperator _input;
-  private final DataSchema _dataSchema;
-  private final int _offset;
-  private final int _numRowsToKeep;
-  private final PriorityQueue<Object[]> _priorityQueue;
-  private final ArrayList<Object[]> _rows;
-  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  protected final MultiStageOperator _input;
+  protected final DataSchema _dataSchema;
+  protected final int _offset;
+  /// Maximum number of rows to retain before `offset` is applied, i.e. `fetch + offset`, or the broker response limit
+  /// when there is no fetch. [Integer#MAX_VALUE] means the result is unbounded.
+  protected final int _numRowsToKeep;
+  protected final int _maxRowsPerBlock;
+  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  private boolean _hasConstructedSortedBlock;
-  private MseBlock.Eos _eosBlock;
+  /// Set once a terminal block has been read from the input. Returned from [#getNextBlock()] after any pending rows
+  /// have been drained.
+  @Nullable
+  protected MseBlock.Eos _eosBlock;
 
-  public SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
-    this(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
-        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+  /// Result rows that did not fit in the block already returned, together with the index of the first row not yet
+  /// emitted. Only used by the implementations that produce their whole result at once.
+  @Nullable
+  private List<Object[]> _pendingRows;
+  private int _pendingIndex;
+
+  protected SortOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema dataSchema, int offset,
+      int numRowsToKeep, int maxRowsPerBlock, boolean requiresSort) {
+    super(context);
+    _input = input;
+    _dataSchema = dataSchema;
+    _offset = offset;
+    _numRowsToKeep = numRowsToKeep;
+    _maxRowsPerBlock = maxRowsPerBlock;
+    _statMap.merge(StatKey.REQUIRE_SORT, requiresSort);
+  }
+
+  /// Creates the cheapest operator that correctly implements `node` over `input`.
+  public static SortOperator create(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
+    return create(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_MAX_ROWS_PER_BLOCK);
   }
 
   @VisibleForTesting
-  SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node, int defaultHolderCapacity,
-      int defaultResponseLimit) {
-    super(context);
-    _input = input;
-    _dataSchema = node.getDataSchema();
-    _offset = Math.max(node.getOffset(), 0);
+  static SortOperator create(OpChainExecutionContext context, MultiStageOperator input, SortNode node,
+      int defaultHolderCapacity, int defaultResponseLimit) {
+    return create(context, input, node, defaultHolderCapacity, defaultResponseLimit, DEFAULT_MAX_ROWS_PER_BLOCK);
+  }
+
+  @VisibleForTesting
+  static SortOperator create(OpChainExecutionContext context, MultiStageOperator input, SortNode node,
+      int defaultHolderCapacity, int defaultResponseLimit, int maxRowsPerBlock) {
+    int offset = Math.max(node.getOffset(), 0);
     // Setting numRowsToKeep as default maximum on Broker if limit not set.
     // TODO: make this default behavior configurable.
     int fetch = node.getFetch();
-    _numRowsToKeep = fetch > 0 ? fetch + _offset : defaultResponseLimit;
-    // Under the following circumstances, the SortOperator is a simple selection with row trim on limit & offset:
-    // - There is no collation
-    // - Input is already sorted
+    int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
     List<RelFieldCollation> collations = node.getCollations();
-    if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
-      _priorityQueue = null;
-      _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
-    } else {
-      // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
-      // which elements to keep and which to remove based on the limits.
-      _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
-          new SortUtils.SortComparator(collations, true));
-      _rows = null;
+    DataSchema dataSchema = node.getDataSchema();
+    if (collations.isEmpty()) {
+      return new LimitSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock);
     }
+    if (numRowsToKeep == Integer.MAX_VALUE) {
+      // Nothing bounds the result, so a bounded heap cannot be used and every row has to be buffered and sorted.
+      return new FullSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
+          defaultHolderCapacity);
+    }
+    return new TopNSortOperator(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, collations,
+        defaultHolderCapacity);
   }
 
   @Override
@@ -99,11 +138,6 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
-  protected Logger logger() {
-    return LOGGER;
-  }
-
-  @Override
   public List<MultiStageOperator> getChildOperators() {
     return List.of(_input);
   }
@@ -113,85 +147,54 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
-  public String toExplainString() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
-  protected MseBlock getNextBlock() {
-    if (_hasConstructedSortedBlock) {
-      assert _eosBlock != null;
-      return _eosBlock;
-    }
-    _eosBlock = consumeInputBlocks();
-    // returning upstream error block if finalBlock contains error.
-    _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
-    if (_eosBlock.isError()) {
-      return _eosBlock;
-    }
-    return produceSortedBlock();
-  }
-
-  @Override
   public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
-  private MseBlock produceSortedBlock() {
-    _hasConstructedSortedBlock = true;
-    if (_priorityQueue == null) {
-      if (_rows.size() > _offset) {
-        List<Object[]> row = _rows.subList(_offset, _rows.size());
-        return new RowHeapDataBlock(row, _dataSchema);
-      } else {
-        return _eosBlock;
-      }
-    } else {
-      int resultSize = _priorityQueue.size() - _offset;
-      if (resultSize <= 0) {
-        return _eosBlock;
-      }
-      Object[][] rowsArr = new Object[resultSize][];
-      for (int i = resultSize - 1; i >= 0; i--) {
-        Object[] row = _priorityQueue.poll();
-        rowsArr[i] = row;
-      }
-      return new RowHeapDataBlock(Arrays.asList(rowsArr), _dataSchema);
+  @Override
+  protected MseBlock getNextBlock() {
+    MseBlock pending = nextPendingBlock();
+    if (pending != null) {
+      return pending;
     }
+    if (_eosBlock != null) {
+      return _eosBlock;
+    }
+    return produceNextBlock();
   }
 
-  private MseBlock.Eos consumeInputBlocks() {
-    MseBlock block = _input.nextBlock();
-    while (block.isData()) {
-      List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
-      if (_priorityQueue == null) {
-        // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
-        int numRows = _rows.size();
-        if (numRows < _numRowsToKeep) {
-          if (numRows + container.size() < _numRowsToKeep) {
-            _rows.addAll(container);
-          } else {
-            _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
-            if (LOGGER.isDebugEnabled()) {
-              // this operatorId is an old name. It is being kept to avoid breaking changes on the log message.
-              String operatorId =
-                  Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", operatorId,
-                  _context.getId());
-            }
-            // setting operator to be early terminated and awaits EOS block next.
-            earlyTerminate();
-          }
-        }
-      } else {
-        for (Object[] row : container) {
-          SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
-        }
-        checkTerminationAndSampleUsage();
-      }
-      block = _input.nextBlock();
+  /// Produces the next block once every previously produced row has been emitted and no terminal block has been
+  /// reached yet. Implementations must assign [#_eosBlock] when they read a terminal block from the input, and must
+  /// hand result rows back through [#emit] so that block sizes stay bounded.
+  protected abstract MseBlock produceNextBlock();
+
+  /// Returns `rows` as a block, retaining anything beyond [#_maxRowsPerBlock] for the following calls.
+  ///
+  /// `rows` must not be modified afterwards: the returned blocks are views over it.
+  protected MseBlock emit(List<Object[]> rows) {
+    assert !rows.isEmpty() : "emit() must not be called with an empty row list";
+    if (rows.size() <= _maxRowsPerBlock) {
+      return new RowHeapDataBlock(rows, _dataSchema);
     }
-    return (MseBlock.Eos) block;
+    _pendingRows = rows;
+    _pendingIndex = _maxRowsPerBlock;
+    return new RowHeapDataBlock(rows.subList(0, _maxRowsPerBlock), _dataSchema);
+  }
+
+  @Nullable
+  private MseBlock nextPendingBlock() {
+    if (_pendingRows == null) {
+      return null;
+    }
+    int end = Math.min(_pendingIndex + _maxRowsPerBlock, _pendingRows.size());
+    List<Object[]> slice = _pendingRows.subList(_pendingIndex, end);
+    if (end == _pendingRows.size()) {
+      _pendingRows = null;
+      _pendingIndex = 0;
+    } else {
+      _pendingIndex = end;
+    }
+    return new RowHeapDataBlock(slice, _dataSchema);
   }
 
   public enum StatKey implements StatMap.Key {

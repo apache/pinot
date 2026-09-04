@@ -7,7 +7,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0])",
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -19,7 +19,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(value1=[$0])",
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -31,7 +31,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -43,7 +43,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[10])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[10])",
           "\n      PinotLogicalTableScan(table=[[default, b]])",
           "\n"
@@ -67,7 +67,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10000000])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC], fetch=[10000000])",
           "\n      PinotLogicalTableScan(table=[[default, b]])",
           "\n"
@@ -79,7 +79,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], fetch=[20])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
@@ -90,7 +90,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[10000000])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
@@ -101,7 +101,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], aggType=[LEAF])",
@@ -115,7 +115,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
@@ -129,7 +129,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], aggType=[LEAF])",
@@ -143,7 +143,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
