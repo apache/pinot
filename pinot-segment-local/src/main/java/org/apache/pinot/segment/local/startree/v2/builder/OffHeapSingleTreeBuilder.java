@@ -35,10 +35,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The `OffHeapSingleTreeBuilder` class is the single star-tree builder that uses off-heap memory.
 public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapSingleTreeBuilder.class);
   private static final String SEGMENT_RECORD_FILE_NAME = "segment.record";
   private static final String STAR_TREE_RECORD_FILE_NAME = "star-tree.record";
   // If the temporary buffer needed is larger than 500M, use MMAP, otherwise use DIRECT
@@ -49,6 +52,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private final BufferedOutputStream _starTreeRecordOutputStream;
   private final RecordOffsets _starTreeRecordOffsets;
 
+  private PinotDataBuffer _segmentRecordBuffer;
   private PinotDataBuffer _starTreeRecordBuffer;
   private int _numReadableStarTreeRecords;
 
@@ -203,13 +207,12 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
       throws IOException {
     // Write all dimensions for segment records into the buffer, and sort all records using an int array
-    PinotDataBuffer dataBuffer;
     long bufferSize = (long) numDocs * _numDimensions * Integer.BYTES;
     if (bufferSize > MMAP_SIZE_THRESHOLD) {
-      dataBuffer = PinotDataBuffer.mapFile(_segmentRecordFile, false, 0, bufferSize, PinotDataBuffer.NATIVE_ORDER,
-          "OffHeapSingleTreeBuilder: segment record buffer");
+      _segmentRecordBuffer = PinotDataBuffer.mapFile(_segmentRecordFile, false, 0, bufferSize,
+          PinotDataBuffer.NATIVE_ORDER, "OffHeapSingleTreeBuilder: segment record buffer");
     } else {
-      dataBuffer = PinotDataBuffer.allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER,
+      _segmentRecordBuffer = PinotDataBuffer.allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER,
           "OffHeapSingleTreeBuilder: segment record buffer");
     }
     int[] sortedDocIds = new int[numDocs];
@@ -221,7 +224,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       for (int i = 0; i < numDocs; i++) {
         int[] dimensions = getSegmentRecordDimensions(i);
         for (int j = 0; j < _numDimensions; j++) {
-          dataBuffer.putInt(offset, dimensions[j]);
+          _segmentRecordBuffer.putInt(offset, dimensions[j]);
           offset += Integer.BYTES;
         }
       }
@@ -229,8 +232,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
         long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
         for (int i = 0; i < _numDimensions; i++) {
-          int dimension1 = dataBuffer.getInt(offset1 + (long) i * Integer.BYTES);
-          int dimension2 = dataBuffer.getInt(offset2 + (long) i * Integer.BYTES);
+          int dimension1 = _segmentRecordBuffer.getInt(offset1 + (long) i * Integer.BYTES);
+          int dimension2 = _segmentRecordBuffer.getInt(offset2 + (long) i * Integer.BYTES);
           if (dimension1 != dimension2) {
             return dimension1 - dimension2;
           }
@@ -241,40 +244,67 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         sortedDocIds[i1] = sortedDocIds[i2];
         sortedDocIds[i2] = temp;
       });
-    } finally {
-      dataBuffer.close();
-      if (_segmentRecordFile.exists()) {
+
+      // Iterator reads dims from `_segmentRecordBuffer` (populated sequentially above) instead of
+      // re-fetching them from the segment forward index in the sorted (random-with-respect-to-layout)
+      // order. The buffer is a field, guaranteed to be released by close() via the try-with-resources
+      // on the builder in MultipleTreesBuilder — the terminal next() below is an early-release
+      // optimization; releaseSegmentRecordBuffer() is idempotent, so double-release is safe.
+      return new Iterator<Record>() {
+        boolean _hasNext = true;
+        Record _currentRecord = getSegmentRecordWithBufferDims(sortedDocIds[0], _segmentRecordBuffer);
+        int _docId = 1;
+
+        @Override
+        public boolean hasNext() {
+          return _hasNext;
+        }
+
+        @Override
+        public Record next() {
+          Record next = mergeSegmentRecord(null, _currentRecord);
+          while (_docId < numDocs) {
+            Record record = getSegmentRecordWithBufferDims(sortedDocIds[_docId++], _segmentRecordBuffer);
+            if (!Arrays.equals(record._dimensions, next._dimensions)) {
+              _currentRecord = record;
+              return next;
+            } else {
+              next = mergeSegmentRecord(next, record);
+            }
+          }
+          _hasNext = false;
+          releaseSegmentRecordBuffer();
+          return next;
+        }
+      };
+    } catch (Throwable t) {
+      // Fill / sort / iterator construction failed: nobody will drain the iterator, so release
+      // the buffer here. close() will find `_segmentRecordBuffer == null` and skip re-releasing.
+      releaseSegmentRecordBuffer();
+      throw t;
+    }
+  }
+
+  // Idempotent: safe to call multiple times from any exit path (iterator drain, exception during
+  // sortAndAggregate, or close() via try-with-resources). Null-checks the field and sets it to null
+  // after release, so a second call is a no-op. Best-effort — close() failures are logged, not
+  // thrown, so a successful build isn't masked by a cleanup error on the return path.
+  private void releaseSegmentRecordBuffer() {
+    if (_segmentRecordBuffer != null) {
+      try {
+        _segmentRecordBuffer.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to close segment record buffer", e);
+      }
+      _segmentRecordBuffer = null;
+    }
+    if (_segmentRecordFile.exists()) {
+      try {
         FileUtils.forceDelete(_segmentRecordFile);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to delete segment record file: {}", _segmentRecordFile, e);
       }
     }
-
-    // Create an iterator for aggregated records
-    return new Iterator<Record>() {
-      boolean _hasNext = true;
-      Record _currentRecord = getSegmentRecord(sortedDocIds[0]);
-      int _docId = 1;
-
-      @Override
-      public boolean hasNext() {
-        return _hasNext;
-      }
-
-      @Override
-      public Record next() {
-        Record next = mergeSegmentRecord(null, _currentRecord);
-        while (_docId < numDocs) {
-          Record record = getSegmentRecord(sortedDocIds[_docId++]);
-          if (!Arrays.equals(record._dimensions, next._dimensions)) {
-            _currentRecord = record;
-            return next;
-          } else {
-            next = mergeSegmentRecord(next, record);
-          }
-        }
-        _hasNext = false;
-        return next;
-      }
-    };
   }
 
   @Override
@@ -352,7 +382,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   public void close()
       throws IOException {
-    super.close();
+    try {
+      super.close();
+    } finally {
+      releaseSegmentRecordBuffer();
+    }
     if (_starTreeRecordBuffer != null) {
       _starTreeRecordBuffer.close();
     }
