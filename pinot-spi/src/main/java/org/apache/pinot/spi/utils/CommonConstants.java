@@ -877,6 +877,9 @@ public class CommonConstants {
 
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+
+        // Per-query override of Server.AndRestrictionPushdownMode: ALWAYS, NEVER or AUTO
+        public static final String AND_RESTRICTION_PUSHDOWN_MODE = "andRestrictionPushdownMode";
         public static final String SKIP_INDEXES = "skipIndexes";
 
         // Query option key used to trace rule productions
@@ -1428,6 +1431,28 @@ public class CommonConstants {
     public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_MONITOR_INTERVAL_MS =
         QUERY_EXECUTOR_CONFIG_PREFIX + ".heap.usage.throttle.monitorIntervalMs";
     public static final long DEFAULT_HEAP_USAGE_THROTTLE_MONITOR_INTERVAL_MS = 1_000L;
+
+    /// Controls whether an AND pushes the document ids matched by its index-based children into its composite
+    /// (AND/OR/NOT) children, so that a scan-based predicate nested inside an OR is only evaluated on the documents
+    /// that can still match the AND. See [issue 19339](https://github.com/apache/pinot/issues/19339).
+    public static final String AND_RESTRICTION_PUSHDOWN_MODE = "and.restriction.pushdown.mode";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + AND_RESTRICTION_PUSHDOWN_MODE;
+    /// Defaults to NEVER: the push-down is a new filter execution path and is opt-in until it has soaked.
+    public static final AndRestrictionPushdownMode DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        AndRestrictionPushdownMode.NEVER;
+
+    /// How aggressively an AND pushes the document ids it has matched so far into its composite children.
+    public enum AndRestrictionPushdownMode {
+      /// Always push the restriction down.
+      ALWAYS,
+      /// Never push the restriction down, keeping the behavior Pinot had before the push-down existed.
+      NEVER,
+      /// Push the restriction down unless the query can stop before reading every matching document. The push-down
+      /// materializes the filter result, so applying it to a query that stops at its LIMIT makes it do the full
+      /// filter work instead of only enough to fill the result.
+      AUTO
+    }
 
     // Group-by query related configs
     public static final String NUM_GROUPS_LIMIT = "num.groups.limit";

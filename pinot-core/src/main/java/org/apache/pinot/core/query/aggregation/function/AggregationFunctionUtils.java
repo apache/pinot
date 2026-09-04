@@ -473,7 +473,8 @@ public class AggregationFunctionUtils {
             combinedFilterOperator = mainFilterOperator;
           } else {
             combinedFilterOperator =
-                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
+                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions(),
+                    queryContext.isAndRestrictionPushdownEnabled());
           }
 
           List<Pair<Predicate, PredicateEvaluator>> subPredicateEvaluators = subFilterPlan.getPredicateEvaluators();
