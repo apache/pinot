@@ -19,6 +19,8 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.net.URISyntaxException;
+import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -39,6 +41,10 @@ public class SegmentCommitterFactory {
   private final StreamConfig _streamConfig;
   private final ServerMetrics _serverMetrics;
   private final IndexLoadingConfig _indexLoadingConfig;
+  @Nullable
+  private UUID _activeSegmentBuildId;
+  @Nullable
+  private PinotFSSegmentUploader _activePinotFSSegmentUploader;
 
   public SegmentCommitterFactory(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, ServerMetrics serverMetrics) {
@@ -52,6 +58,22 @@ public class SegmentCommitterFactory {
 
   public SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
       String controllerVipUrl)
+      throws URISyntaxException {
+    return createSegmentCommitterInternal(params, controllerVipUrl, null);
+  }
+
+  SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
+      String controllerVipUrl, @Nullable UUID segmentBuildId)
+      throws URISyntaxException {
+    if (getClass() != SegmentCommitterFactory.class) {
+      // Preserve virtual dispatch for custom factories that override the original public method.
+      return createSegmentCommitter(params, controllerVipUrl);
+    }
+    return createSegmentCommitterInternal(params, controllerVipUrl, segmentBuildId);
+  }
+
+  private SegmentCommitter createSegmentCommitterInternal(SegmentCompletionProtocol.Request.Params params,
+      String controllerVipUrl, @Nullable UUID segmentBuildId)
       throws URISyntaxException {
     InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
 
@@ -67,8 +89,9 @@ public class SegmentCommitterFactory {
     SegmentUploader segmentUploader;
     if (uploadToFs || peerSegmentDownloadScheme != null) {
       // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
-      segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
-          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+      segmentUploader = segmentBuildId != null ? getOrCreatePinotFSSegmentUploader(segmentStoreUri, segmentBuildId)
+          : new PinotFSSegmentUploader(segmentStoreUri,
+              ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
     } else {
       segmentUploader = new Server2ControllerSegmentUploader(_logger,
           _protocolHandler.getFileUploadDownloadClient(),
@@ -82,5 +105,26 @@ public class SegmentCommitterFactory {
           peerSegmentDownloadScheme);
     }
     return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
+  }
+
+  private synchronized PinotFSSegmentUploader getOrCreatePinotFSSegmentUploader(String segmentStoreUri,
+      UUID segmentBuildId) {
+    if (!segmentBuildId.equals(_activeSegmentBuildId)) {
+      if (_activePinotFSSegmentUploader != null) {
+        _activePinotFSSegmentUploader.retire();
+      }
+      _activeSegmentBuildId = segmentBuildId;
+      _activePinotFSSegmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
+          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics, segmentBuildId);
+    }
+    return _activePinotFSSegmentUploader;
+  }
+
+  synchronized void close() {
+    if (_activePinotFSSegmentUploader != null) {
+      _activePinotFSSegmentUploader.close();
+      _activePinotFSSegmentUploader = null;
+      _activeSegmentBuildId = null;
+    }
   }
 }

@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.UUID;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 public class SegmentCompletionUtilsTest {
@@ -33,10 +35,34 @@ public class SegmentCompletionUtilsTest {
   }
 
   @Test
-  public void testGenerateSegmentLocation() {
+  public void testGenerateTmpSegmentFileName() {
     String segmentName = "segment";
     String segmentNamePrefix = SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName);
-    assertTrue(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+    String firstSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String secondSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    assertTrue(firstSegmentFileName.startsWith(segmentNamePrefix));
+    assertTrue(secondSegmentFileName.startsWith(segmentNamePrefix));
+    assertNotEquals(secondSegmentFileName, firstSegmentFileName);
+    assertTrue(SegmentCompletionUtils.isTmpFile(firstSegmentFileName));
+    assertTrue(SegmentCompletionUtils.isTmpFile(secondSegmentFileName));
+
+    UUID segmentBuildId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    assertEquals(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, segmentBuildId),
+        "segment.tmp.550e8400-e29b-41d4-a716-446655440000");
+    assertEquals(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, segmentBuildId),
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, segmentBuildId));
+  }
+
+  @Test
+  public void testGenerateUploadId() {
+    UUID uploadId = SegmentCompletionUtils.generateUploadId("server-1", "segment", "100");
+    assertEquals(uploadId.version(), 8);
+    assertEquals(uploadId.variant(), 2);
+    assertEquals(SegmentCompletionUtils.generateUploadId("server-1", "segment", "100"), uploadId);
+    assertNotEquals(SegmentCompletionUtils.generateUploadId("server-2", "segment", "100"), uploadId);
+    assertNotEquals(SegmentCompletionUtils.generateUploadId("server-1", "segment", "101"), uploadId);
+    assertNotEquals(SegmentCompletionUtils.generateUploadId("a", "bc", "d"),
+        SegmentCompletionUtils.generateUploadId("ab", "c", "d"));
   }
 
   @Test

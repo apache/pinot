@@ -26,12 +26,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -67,6 +70,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -94,6 +98,8 @@ public abstract class BaseResourceTest {
   protected WebTarget _webTarget;
   protected String _instanceId;
   protected ServerInstance _serverInstance;
+  protected SegmentUploader _segmentUploader;
+  protected ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
 
   protected String getAvroFileName() {
     return "data/test_data-mv.avro";
@@ -128,22 +134,31 @@ public abstract class BaseResourceTest {
     when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         _tempDir.getAbsolutePath());
+    when(instanceDataManager.getInstanceId()).thenReturn("Server_localhost_1234");
 
     // Create a single HelixManager mock with proper segment data
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("testCluster");
+    _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(_helixPropertyStore);
 
     when(_serverInstance.getHelixManager()).thenReturn(helixManager);
 
     // Mock the segment uploader
-    SegmentUploader segmentUploader = mock(SegmentUploader.class);
-    when(segmentUploader.uploadSegment(any(File.class),
-        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)))).thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
-    when(segmentUploader.uploadSegment(any(File.class),
-        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)))).thenReturn(null);
-    when(instanceDataManager.getSegmentUploader()).thenReturn(segmentUploader);
+    _segmentUploader = mock(SegmentUploader.class);
+    when(_segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)), any(UUID.class)))
+        .thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(_segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)), any(UUID.class))).thenReturn(null);
+    when(_segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)), anyInt(), any(UUID.class)))
+        .thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(_segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)), anyInt(), any(UUID.class))).thenReturn(null);
+    when(instanceDataManager.getSegmentUploader()).thenReturn(_segmentUploader);
 
     // Add the default tables and segments.
     addTable(REALTIME_TABLE_NAME);

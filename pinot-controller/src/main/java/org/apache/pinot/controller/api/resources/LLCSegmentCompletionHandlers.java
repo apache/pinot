@@ -20,6 +20,9 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +31,8 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -54,6 +59,7 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -66,7 +72,16 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class LLCSegmentCompletionHandlers {
   private static final Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
-  private static final Object SEGMENT_UPLOAD_LOCK = new Object();
+  private static final LoadingCache<UUID, Lock> SEGMENT_UPLOAD_LOCKS =
+      CacheBuilder.newBuilder().weakValues().build(new CacheLoader<>() {
+        @Override
+        public Lock load(UUID uploadCoordinationId) {
+          return new ReentrantLock();
+        }
+      });
+  // Isolate coordination after controller failover. Each accepted upload still gets a fresh destination because an
+  // older commitEnd request can keep moving its previously returned destination after the upload request times out.
+  private static final String CONTROLLER_UPLOAD_NAMESPACE = UUID.randomUUID().toString();
   private static final String SCHEME = "file://";
 
   @Inject
@@ -229,17 +244,26 @@ public class LLCSegmentCompletionHandlers {
 
     // Get the segment from the form input and put it into the data directory (could be remote)
     File localTempFile = null;
+    Lock uploadLock = null;
+    boolean uploadLockAcquired = false;
     try {
-      localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
       String rawTableName = new LLCSegmentName(segmentName).getTableName();
-      URI segmentFileURI =
-          URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-              URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
+      UUID uploadCoordinationId = getSegmentUploadCoordinationId(
+          CONTROLLER_UPLOAD_NAMESPACE, instanceId, segmentName, streamPartitionMsgOffset);
+      uploadLock = SEGMENT_UPLOAD_LOCKS.getUnchecked(uploadCoordinationId);
+      if (!uploadLock.tryLock()) {
+        LOGGER.warn("An upload is already in progress for segment {} from instance {}", segmentName, instanceId);
+        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      }
+      uploadLockAcquired = true;
+      URI segmentFileURI = getSegmentUploadURI(ControllerFilePathProvider.getInstance().getDataDirURI(), segmentName,
+          UUID.randomUUID());
+      localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
       // Emit metrics related to deep-store upload operation
       long startTimeMs = System.currentTimeMillis();
       long segmentSizeBytes = localTempFile.length();
       ResourceUtils.emitPreSegmentUploadMetrics(_controllerMetrics, rawTableName, segmentSizeBytes);
-      PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
+      copySegmentToDeepStoreWithoutLock(localTempFile, segmentFileURI);
       ResourceUtils.emitPostSegmentUploadMetrics(_controllerMetrics, rawTableName, startTimeMs, segmentSizeBytes);
 
       SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
@@ -254,8 +278,46 @@ public class LLCSegmentCompletionHandlers {
       LOGGER.error("Caught exception while uploading segment: {} from instance: {}", segmentName, instanceId, e);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     } finally {
+      if (uploadLockAcquired) {
+        uploadLock.unlock();
+      }
       FileUtils.deleteQuietly(localTempFile);
     }
+  }
+
+  @VisibleForTesting
+  static UUID getSegmentUploadCoordinationId(String controllerNamespace, String instanceId, String segmentName,
+      String streamPartitionMsgOffset) {
+    UUID producerId = SegmentCompletionUtils.generateUploadId(controllerNamespace, instanceId, segmentName);
+    return SegmentCompletionUtils.generateUploadId(producerId.toString(), segmentName, streamPartitionMsgOffset);
+  }
+
+  @VisibleForTesting
+  static URI getSegmentUploadURI(URI dataDirUri, String segmentName, UUID uploadAttemptId) {
+    String rawTableName = new LLCSegmentName(segmentName).getTableName();
+    return URIUtils.getUri(dataDirUri.toString(), rawTableName,
+        URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, uploadAttemptId)));
+  }
+
+  @VisibleForTesting
+  static boolean tryCopySegmentToDeepStore(File localSegmentFile, UUID uploadCoordinationId, URI segmentFileUri)
+      throws Exception {
+    Lock uploadLock = SEGMENT_UPLOAD_LOCKS.getUnchecked(uploadCoordinationId);
+    if (!uploadLock.tryLock()) {
+      return false;
+    }
+    try {
+      copySegmentToDeepStoreWithoutLock(localSegmentFile, segmentFileUri);
+      return true;
+    } finally {
+      uploadLock.unlock();
+    }
+  }
+
+  private static void copySegmentToDeepStoreWithoutLock(File localSegmentFile, URI segmentFileUri)
+      throws Exception {
+    PinotFS pinotFS = PinotFSFactory.create(segmentFileUri.getScheme());
+    pinotFS.copyFromLocalFile(localSegmentFile, segmentFileUri);
   }
 
   @POST

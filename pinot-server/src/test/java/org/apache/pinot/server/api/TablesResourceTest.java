@@ -27,10 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
@@ -40,6 +43,7 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -72,11 +76,19 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.ArgumentCaptor;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -597,13 +609,81 @@ public class TablesResourceTest extends BaseResourceTest {
     setUpSegment(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS, null, _realtimeIndexSegments);
     setUpSegment(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE, null, _realtimeIndexSegments);
 
-    // Verify segment uploading succeed.
-    Response response = _webTarget.path(
-            String.format("/segments/%s/%s/upload", REALTIME_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS))
+    String basicUploadPath =
+        String.format("/segments/%s/%s/upload", REALTIME_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
+    String uploadV2Path = String.format("/segments/%s/%s/uploadLLCSegment", REALTIME_TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
+    String committedUploadPath = String.format("/segments/%s/%s/uploadCommittedSegment", REALTIME_TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
+    int uploadTimeoutMs = 1_234;
+    UUID requestUploadId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID nextRequestUploadId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
+    segmentZKMetadata.setEndOffset("100");
+    when(_helixPropertyStore.get(anyString(), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(segmentZKMetadata.toZNRecord());
+    clearInvocations(_segmentUploader);
+
+    // One controller attempt must keep the same derived ID through HTTP retries and all fallback endpoints.
+    Response response = _webTarget.path(basicUploadPath)
+        .queryParam("uploadTimeoutMs", uploadTimeoutMs)
+        .queryParam("uploadId", requestUploadId)
         .request()
         .post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
+    response = _webTarget.path(basicUploadPath)
+        .queryParam("uploadTimeoutMs", uploadTimeoutMs)
+        .queryParam("uploadId", requestUploadId)
+        .request()
+        .post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    response = _webTarget.path(uploadV2Path)
+        .queryParam("uploadTimeoutMs", uploadTimeoutMs)
+        .queryParam("uploadId", requestUploadId)
+        .request()
+        .post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    response = _webTarget.path(committedUploadPath)
+        .queryParam("uploadTimeoutMs", uploadTimeoutMs)
+        .queryParam("uploadId", requestUploadId)
+        .request()
+        .post(null);
+    // The shared upload completes before this fixture's metadata update fails: BaseResourceTest deliberately builds
+    // segments without a time column, so the committed-segment response cannot derive its time interval.
+    Assert.assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+
+    response = _webTarget.path(basicUploadPath)
+        .queryParam("uploadTimeoutMs", uploadTimeoutMs)
+        .queryParam("uploadId", nextRequestUploadId)
+        .request()
+        .post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    response = _webTarget.path(basicUploadPath).queryParam("uploadTimeoutMs", uploadTimeoutMs).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    response = _webTarget.path(basicUploadPath).queryParam("uploadTimeoutMs", uploadTimeoutMs).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+
+    ArgumentCaptor<UUID> keyedUploadIds = ArgumentCaptor.forClass(UUID.class);
+    verify(_segmentUploader, times(7)).uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)), eq(uploadTimeoutMs), keyedUploadIds.capture());
+    List<UUID> capturedIds = keyedUploadIds.getAllValues();
+    Assert.assertEquals(capturedIds.get(1), capturedIds.get(0));
+    Assert.assertEquals(capturedIds.get(2), capturedIds.get(0));
+    Assert.assertEquals(capturedIds.get(3), capturedIds.get(0));
+    Assert.assertNotEquals(capturedIds.get(4), capturedIds.get(0));
+    Assert.assertNotEquals(capturedIds.get(5), capturedIds.get(0));
+    Assert.assertNotEquals(capturedIds.get(6), capturedIds.get(0));
+    Assert.assertNotEquals(capturedIds.get(5), capturedIds.get(6));
+
+    // The default-timeout path uses the UUID overload and derives the same operation ID.
+    response = _webTarget.path(basicUploadPath).queryParam("uploadId", requestUploadId).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    ArgumentCaptor<UUID> defaultTimeoutUploadId = ArgumentCaptor.forClass(UUID.class);
+    verify(_segmentUploader).uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)), defaultTimeoutUploadId.capture());
+    Assert.assertEquals(defaultTimeoutUploadId.getValue(), capturedIds.get(0));
+    clearInvocations(_segmentUploader);
 
     // Verify bad request: table type is offline
     response = _webTarget.path(

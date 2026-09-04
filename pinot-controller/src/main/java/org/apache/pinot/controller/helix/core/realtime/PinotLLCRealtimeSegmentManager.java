@@ -43,6 +43,7 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -2260,7 +2261,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
   private void uploadToDeepStoreWithFallback(URI uri, String segmentName, String rawTableName,
       SegmentZKMetadata segmentZKMetadata, PinotFS pinotFS) {
-    String serverUploadRequestUrl = getUploadUrl(uri, "uploadCommittedSegment");
+    UUID uploadId = UUID.randomUUID();
+    String serverUploadRequestUrl = getUploadUrl(uri, "uploadCommittedSegment", uploadId);
     LOGGER.info("Asking server to upload segment: {} by path: {}", segmentName, serverUploadRequestUrl);
     try {
       SegmentZKMetadata uploadedMetadata =
@@ -2276,7 +2278,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           segmentName, serverUploadRequestUrl, e);
     }
 
-    serverUploadRequestUrl = getUploadUrl(uri, "uploadLLCSegment");
+    serverUploadRequestUrl = getUploadUrl(uri, "uploadLLCSegment", uploadId);
     LOGGER.info("Asking server to upload segment: {} by path: {}", segmentName, serverUploadRequestUrl);
     try {
       TableLLCSegmentUploadResponse response =
@@ -2289,7 +2291,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           segmentName, serverUploadRequestUrl, e);
     }
 
-    serverUploadRequestUrl = getUploadUrl(uri, "upload");
+    serverUploadRequestUrl = getUploadUrl(uri, "upload", uploadId);
     LOGGER.info("Asking server to upload segment: {} by path: {}", segmentName, serverUploadRequestUrl);
     try {
       String segmentLocation = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl,
@@ -2300,8 +2302,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  private String getUploadUrl(URI uri, String endpoint) {
-    return String.format("%s/%s?uploadTimeoutMs=%d", uri.toString(), endpoint, _deepstoreUploadRetryTimeoutMs);
+  @VisibleForTesting
+  String getUploadUrl(URI uri, String endpoint) {
+    return getUploadUrl(uri, endpoint, UUID.randomUUID());
+  }
+
+  @VisibleForTesting
+  String getUploadUrl(URI uri, String endpoint, UUID uploadId) {
+    return String.format("%s/%s?uploadTimeoutMs=%d&uploadId=%s", uri, endpoint, _deepstoreUploadRetryTimeoutMs,
+        uploadId);
   }
 
   private void handleMetadataUpload(String rawTableName, String segmentName, SegmentZKMetadata currentMetadata,

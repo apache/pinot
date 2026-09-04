@@ -18,13 +18,20 @@
  */
 package org.apache.pinot.server.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -65,6 +72,15 @@ public class ServerSegmentCompletionProtocolHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final String HTTPS_PROTOCOL = CommonConstants.HTTPS_PROTOCOL;
   private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
+  // A server restart gets a different key so an upload from the old process cannot race the new process.
+  private static final String REINGESTION_UPLOAD_NAMESPACE = UUID.randomUUID().toString();
+  private static final LoadingCache<UUID, Lock> REINGESTION_UPLOAD_LOCKS =
+      CacheBuilder.newBuilder().weakValues().build(new CacheLoader<>() {
+        @Override
+        public Lock load(UUID uploadCoordinationId) {
+          return new ReentrantLock();
+        }
+      });
 
   private static SSLContext _sslContext;
   private static HttpClientConfig _httpClientConfig = HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG;
@@ -266,13 +282,24 @@ public class ServerSegmentCompletionProtocolHandler {
 
   public void uploadReingestedSegment(String segmentName, String segmentStoreUri, File segmentTarFile)
       throws Exception {
-    String destUriStr = StringUtil.join(File.separator, segmentStoreUri, _rawTableName,
-        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
-    try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
-      URI destUri = new URI(destUriStr);
-      if (pinotFS.exists(destUri)) {
-        pinotFS.delete(destUri, true);
-      }
+    uploadReingestedSegment(segmentName, segmentStoreUri, segmentTarFile, UUID.randomUUID());
+  }
+
+  public void uploadReingestedSegment(String segmentName, String segmentStoreUri, File segmentTarFile,
+      UUID reingestionBuildId)
+      throws Exception {
+    UUID uploadCoordinationId = getReingestionUploadCoordinationId(_rawTableName, segmentName,
+        REINGESTION_UPLOAD_NAMESPACE, reingestionBuildId);
+    URI destUri = getReingestedSegmentUploadURI(segmentStoreUri, _rawTableName, segmentName, UUID.randomUUID());
+    if (!tryWithReingestionUploadLock(uploadCoordinationId,
+        () -> uploadReingestedSegmentWithLock(segmentName, segmentTarFile, destUri))) {
+      throw new IOException("Another reingestion upload is already in progress for " + segmentName);
+    }
+  }
+
+  private void uploadReingestedSegmentWithLock(String segmentName, File segmentTarFile, URI destUri)
+      throws Exception {
+    try (PinotFS pinotFS = PinotFSFactory.create(destUri.getScheme())) {
       pinotFS.copyFromLocalFile(segmentTarFile, destUri);
     }
 
@@ -286,7 +313,7 @@ public class ServerSegmentCompletionProtocolHandler {
       List<Header> headers = AuthProviderUtils.toRequestHeaders(_authProvider);
       headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
           FileUploadDownloadClient.FileUploadType.METADATA.name()));
-      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
+      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUri.toString()));
       headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE, "true"));
 
       // Set table name parameter
@@ -306,6 +333,41 @@ public class ServerSegmentCompletionProtocolHandler {
     } finally {
       FileUtils.deleteQuietly(segmentMetadataFile);
     }
+  }
+
+  @VisibleForTesting
+  static UUID getReingestionUploadCoordinationId(String rawTableName, String segmentName,
+      String processNamespace, UUID reingestionBuildId) {
+    UUID producerId = SegmentCompletionUtils.generateUploadId(processNamespace, rawTableName, segmentName);
+    return SegmentCompletionUtils.generateUploadId(producerId.toString(), segmentName,
+        reingestionBuildId.toString());
+  }
+
+  @VisibleForTesting
+  static URI getReingestedSegmentUploadURI(String segmentStoreUri, String rawTableName, String segmentName,
+      UUID uploadAttemptId) {
+    return URI.create(StringUtil.join(File.separator, segmentStoreUri, rawTableName,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, uploadAttemptId)));
+  }
+
+  @VisibleForTesting
+  static boolean tryWithReingestionUploadLock(UUID uploadCoordinationId, ReingestionUploadAction uploadAction)
+      throws Exception {
+    Lock uploadLock = REINGESTION_UPLOAD_LOCKS.getUnchecked(uploadCoordinationId);
+    if (!uploadLock.tryLock()) {
+      return false;
+    }
+    try {
+      uploadAction.run();
+      return true;
+    } finally {
+      uploadLock.unlock();
+    }
+  }
+
+  @FunctionalInterface
+  interface ReingestionUploadAction {
+    void run() throws Exception;
   }
 
   /// Generate a tar.gz file containing only the metadata files (metadata.properties, creation.meta)

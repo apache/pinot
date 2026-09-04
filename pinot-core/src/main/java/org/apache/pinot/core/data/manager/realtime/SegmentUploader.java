@@ -20,10 +20,11 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
+import java.util.UUID;
 import org.apache.pinot.common.utils.LLCSegmentName;
 
 
-public interface SegmentUploader {
+public interface SegmentUploader extends AutoCloseable {
 
   /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName);
@@ -31,4 +32,22 @@ public interface SegmentUploader {
   /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded. The upload will
   /// wait for the specified timeout.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
+
+  /// Uploads using a stable identifier when the implementation supports retry deduplication. The default preserves
+  /// compatibility for custom uploaders by delegating to the existing method.
+  default URI uploadSegment(File segmentFile, LLCSegmentName segmentName, UUID uploadId) {
+    return uploadSegment(segmentFile, segmentName);
+  }
+
+  /// Uploads using a stable identifier and timeout when the implementation supports retry deduplication. The default
+  /// preserves compatibility for custom uploaders by delegating to the existing method.
+  default URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis, UUID uploadId) {
+    return uploadSegment(segmentFile, segmentName, timeoutInMillis);
+  }
+
+  /// Releases resources held by the uploader. The default is a no-op so custom implementations stay
+  /// source-compatible. Implementations that own threads or file handles should override this.
+  @Override
+  default void close() {
+  }
 }
