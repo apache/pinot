@@ -63,6 +63,12 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean deliversByReference() {
+    // Blocks are offered to the receiving mailbox as they are, so the receiver reads the same instance
+    return true;
+  }
+
+  @Override
   public void send(MseBlock.Data data) {
     QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
     sendPrivate(data, List.of());

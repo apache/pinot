@@ -165,6 +165,28 @@ public class BlockExchangeTest {
     Assert.assertEquals(sentBlocks.get(1).asRowHeap().getRows(), outBlockTwo.getRows());
   }
 
+  @Test
+  public void shouldDeliverByReferenceWhenAnyDestinationDoes() {
+    // Given: an exchange whose destinations are one mailbox that serializes blocks and one that does not
+    when(_mailbox2.deliversByReference()).thenReturn(true);
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it delivers by reference
+    Assert.assertTrue(exchange.asSendingMailbox("1").deliversByReference());
+  }
+
+  @Test
+  public void shouldNotDeliverByReferenceWhenNoDestinationDoes() {
+    // Given: an exchange whose destinations all serialize the blocks they are sent
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it does not deliver by reference. It still takes blocks
+    // whole, because splitting them is left to the exchange it decorates
+    SendingMailbox sendingMailbox = exchange.asSendingMailbox("1");
+    Assert.assertFalse(sendingMailbox.deliversByReference());
+    Assert.assertTrue(sendingMailbox.isLocal());
+  }
+
   private static class TestBlockExchange extends BlockExchange {
     protected TestBlockExchange(List<SendingMailbox> destinations) {
       this(destinations, (block, size) -> Iterators.singletonIterator(block));
