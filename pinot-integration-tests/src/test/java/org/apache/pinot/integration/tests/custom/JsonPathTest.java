@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.jayway.jsonpath.spi.cache.Cache;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -1064,6 +1065,95 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(extractOrderedDistinctValues(withSkip), List.of("value-k1-0"));
 
     assertEquals(withSkip.get("numEntriesScannedPostFilter").asInt(), getNumAvroFiles());
+  }
+
+  /// Real JSON cell asserts for both SQL aliases, a non-null default, an explicit NULL default,
+  /// BOOLEAN broker-facing values, and the 3-arg error path. MSE uses a self-join. SSE cannot JOIN,
+  /// so it runs the same extracts on a leaf scan.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonExtractScalarJoinAliasesAndDefaults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String table = getTableName();
+    // SSE has no JOIN or table aliases. MSE self-join is the case that used to fail to resolve
+    // the scalar.
+    String from = useMultiStageQueryEngine
+        ? table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1"
+        : table;
+    String a = useMultiStageQueryEngine ? "a." : "";
+    String rightJson = useMultiStageQueryEngine ? "b.myMapStr" : "myMapStr";
+
+    String query = "SELECT "
+        + "json_extract_scalar(" + a + "myMapStr, '$.k1', 'STRING'), "
+        + "jsonExtractScalar(" + rightJson + ", '$.k1', 'STRING'), "
+        + "json_extract_scalar(" + a + "myMapStr, '$.missing', 'STRING', 'def'), "
+        + "jsonExtractScalar(" + a + "myMapNumberStr, '$.n', 'INT'), "
+        + "json_extract_scalar(" + a + "myMapNumberStr, '$.n', 'BIG_DECIMAL') "
+        + "FROM " + from + " LIMIT 20";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    ArrayNode rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      String leftK1 = row.get(0).asText();
+      assertEquals(row.get(1).asText(), leftK1);
+      assertTrue(leftK1.startsWith("value-k1-"));
+      assertEquals(row.get(2).asText(), "def");
+      assertTrue(row.get(3).isNumber());
+      assertEquals(new BigDecimal(row.get(4).asText()).intValue(), row.get(3).asInt());
+    }
+
+    query = "SELECT json_extract_scalar(" + a + "myMapNumberStr, '$.n', 'BOOLEAN') "
+        + "FROM " + from + " WHERE jsonExtractScalar(" + a + "myMapNumberStr, '$.n', 'INT') = 0 LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      JsonNode cell = row.get(0);
+      assertTrue(cell.isBoolean(), "BOOLEAN result should be broker boolean, got " + cell);
+      assertFalse(cell.asBoolean(), "n=0 must be false");
+    }
+
+    query = "SET enableNullHandling=true; SELECT "
+        + "jsonExtractScalar(" + a + "myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      assertTrue(row.get(0).isNull(), "explicit NULL default should return SQL NULL, got " + row.get(0));
+    }
+
+    // Null-handling off: a single-side extract stays on the leaf transform, which writes the INT
+    // placeholder 0. The DataTable also cannot distinguish INT NULL from 0 without the flag.
+    query = "SELECT jsonExtractScalar(" + a + "myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      assertEquals(row.get(0).asInt(), 0, "NULL default without null handling is INT 0, got " + row.get(0));
+    }
+
+    query = "SELECT json_extract_scalar(" + a + "myMapStr, '$.missing', 'STRING') FROM " + from + " LIMIT 1";
+    response = postQuery(query);
+    assertFalse(response.get("exceptions").isEmpty(), "3-arg missing path must error");
+    assertTrue(response.get("exceptions").get(0).get("message").asText().contains("Cannot resolve JSON path"),
+        response.get("exceptions").toString());
+
+    if (useMultiStageQueryEngine) {
+      // Path computed from the other row cannot fold to a literal, so this stays on the scalar.
+      query = "SELECT jsonExtractScalar(a.myMapStr, replace(b.myMapStr_k1, b.myMapStr_k1, '$.k1'), 'STRING') "
+          + "FROM " + from + " LIMIT 5";
+      response = postQuery(query);
+      assertTrue(response.get("exceptions").isEmpty(), response.toString());
+      rows = (ArrayNode) response.get("resultTable").get("rows");
+      assertTrue(rows.size() > 0);
+      for (JsonNode row : rows) {
+        assertTrue(row.get(0).asText().startsWith("value-k1-"), row.toString());
+      }
+    }
   }
 
   private static List<String> extractOrderedDistinctValues(JsonNode response) {
