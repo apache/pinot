@@ -100,6 +100,76 @@ public class IvfPqVectorIndexTest {
     }
   }
 
+  /// Every filter-aware reader rejects a null bitmap with the same contract failure, so a caller that loses its
+  /// filter never silently receives documents outside it. See FilterAwareVectorIndexReader#getDocIds.
+  @Test
+  public void testPreFilterRejectsNullBitmap()
+      throws Exception {
+    int dimension = 8;
+    int nlist = 4;
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist, 2,
+        4, 64, TEST_SEED);
+    float[][] vectors = generateClusteredVectors(8, 20, dimension, 0.04f, TEST_SEED);
+
+    try (IvfPqVectorIndexCreator creator = new IvfPqVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
+      NullPointerException thrown = Assert.expectThrows(NullPointerException.class,
+          () -> reader.getDocIds(vectors[3], 5, (ImmutableRoaringBitmap) null));
+      Assert.assertNotNull(thrown.getMessage(), "The rejection must carry the pre-filter contract message");
+      Assert.assertTrue(thrown.getMessage().contains("must not be null"),
+          "Expected the pre-filter contract message, got: " + thrown.getMessage());
+    }
+  }
+
+  /// The engine relies on IVF_PQ's filter-aware search to drop disallowed documents during candidate generation
+  /// rather than intersecting an unfiltered top-K afterwards. The allowed documents here are deliberately outside
+  /// the unfiltered top-K, so an implementation that post-intersected would return nothing and fail.
+  @Test
+  public void testPreFilterExcludesNearestDocsFromCandidateGeneration()
+      throws IOException {
+    int dimension = 8;
+    int nlist = 4;
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist, 2,
+        4, 64, TEST_SEED);
+    float[][] vectors = generateClusteredVectors(8, 20, dimension, 0.04f, TEST_SEED);
+
+    try (IvfPqVectorIndexCreator creator = new IvfPqVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
+      Assert.assertTrue(reader.supportsPreFilter(),
+          "IVF_PQ must advertise filtered search, otherwise the engine falls back to an exact scan");
+      reader.setNprobe(nlist);
+
+      int topK = 2;
+      MutableRoaringBitmap allowed = MutableRoaringBitmap.bitmapOf(40, 100);
+      MutableRoaringBitmap unfiltered = (MutableRoaringBitmap) reader.getDocIds(vectors[3], topK);
+      MutableRoaringBitmap unfilteredAllowedOverlap = unfiltered.clone();
+      unfilteredAllowedOverlap.and(allowed);
+      Assert.assertTrue(unfilteredAllowedOverlap.isEmpty(),
+          "Sanity check: the allowed documents must sit outside the unfiltered top-K for this test to prove"
+              + " anything, got unfiltered=" + unfiltered);
+
+      ImmutableRoaringBitmap matches = reader.getDocIds(vectors[3], topK, allowed);
+      Assert.assertEquals(matches, allowed,
+          "Filtered candidate generation must return the farther allowed docs; post-intersection would be empty");
+      Assert.assertTrue(reader.getDocIds(vectors[3], topK, new MutableRoaringBitmap()).isEmpty(),
+          "An empty filter must yield no results");
+    }
+  }
+
   @Test
   public void testEmptyIndexIsReadable()
       throws IOException {

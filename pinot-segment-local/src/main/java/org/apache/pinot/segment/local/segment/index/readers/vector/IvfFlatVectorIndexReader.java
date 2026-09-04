@@ -250,6 +250,7 @@ public class IvfFlatVectorIndexReader
 
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
     Preconditions.checkArgument(searchQuery.length == _dimension,
         "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
     Preconditions.checkArgument(topK > 0, "topK must be positive, got: %s", topK);

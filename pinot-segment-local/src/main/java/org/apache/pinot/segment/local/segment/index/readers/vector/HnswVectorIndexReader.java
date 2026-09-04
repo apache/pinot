@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -195,6 +196,14 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    // Without this the null reaches BaseFilterQuery's iterator and surfaces as an unmessaged NullPointerException
+    // from inside Lucene's traversal, where the cause is far harder to read than the contract it violated.
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
+    if (preFilterBitmap.isEmpty()) {
+      // Nothing is admitted, so skip the Lucene search entirely -- its filter clause would otherwise walk every doc
+      // in every leaf, translating ids and testing membership, to build an accept set guaranteed to be empty.
+      return new MutableRoaringBitmap();
+    }
     try {
       Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator);
       return translateTopDocs(search(searchQuery, topK, filterQuery));
@@ -222,7 +231,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     info.put("effectiveEfSearch", getEffectiveEfSearch());
     info.put("effectiveHnswUseRelativeDistance", getEffectiveUseRelativeDistance());
     info.put("effectiveHnswUseBoundedQueue", getEffectiveUseBoundedQueue());
-    info.put("supportsPreFilter", true);
+    info.put("supportsPreFilter", supportsPreFilter());
     return info;
   }
 
