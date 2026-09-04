@@ -504,15 +504,7 @@ public class PinotTableRestletResource {
                       : _pinotHelixResourceManager.getAllOfflineTables(database));
 
       if (StringUtils.isNotBlank(taskType)) {
-        Set<String> tableNamesForTaskType = new HashSet<>();
-        for (String tableNameWithType : tableNamesWithType) {
-          TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-          if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
-              .isTaskTypeEnabled(taskType)) {
-            tableNamesForTaskType.add(tableNameWithType);
-          }
-        }
-        tableNamesWithType.retainAll(tableNamesForTaskType);
+        tableNamesWithType.retainAll(_pinotTaskManager.getTablesForTaskType(taskType, tableNamesWithType));
       }
 
       List<String> tableNames;
