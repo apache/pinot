@@ -18,15 +18,22 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -55,6 +62,13 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public static final String BASEDIR = "basedir";
   public static final String LOCAL_FILE_PREFIX = "local://";
   public static final String PINOT_MAIN_JAR_PREFIX = "pinot-all";
+  /// Directory holding plugin dependencies that are shared between plugins, stored once each.
+  /// Its jars cannot be attributed to a plugin by their location, so they are never added by
+  /// walking the directory; they are added from the index of each selected plugin instead.
+  private static final String SHARED_PLUGIN_LIBS_DIR = "plugin-libs";
+  /// Written next to a plugin's jar at build time: the shared-store jars that plugin needs, as
+  /// distribution-relative paths in classpath form.
+  private static final String PLUGIN_CLASSPATH_INDEX = "pinot-plugin.classpath";
 
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true, description = "Ingestion job spec file")
   private String _jobSpecFile;
@@ -118,6 +132,21 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   public void setPropertyFile(String propertyFile) {
     _propertyFile = propertyFile;
+  }
+
+  @VisibleForTesting
+  void setSparkVersion(SparkType sparkVersion) {
+    _sparkVersion = sparkVersion;
+  }
+
+  @VisibleForTesting
+  void setPluginsToLoad(List<String> pluginsToLoad) {
+    _pluginsToLoad = pluginsToLoad;
+  }
+
+  @VisibleForTesting
+  void setPluginsToExclude(List<String> pluginsToExclude) {
+    _pluginsToExclude = pluginsToExclude;
   }
 
   public void setAuthProvider(AuthProvider authProvider) {
@@ -246,25 +275,70 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   private void addDepsJarToDistributedCache(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
-    if (depsJarDir != null) {
-      URI depsJarDirURI = URI.create(depsJarDir);
-      if (depsJarDirURI.getScheme() == null) {
-        depsJarDirURI = new File(depsJarDir).toURI();
-      }
-      PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
-      String[] files = pinotFS.listFiles(depsJarDirURI, true);
-      for (String file : files) {
-        if (!pinotFS.isDirectory(URI.create(file))) {
-          if (file.endsWith(".jar")) {
-            String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
+    for (String jar : resolveDepsJars(depsJarDir)) {
+      addJarFilePath(sparkLauncher, extraClassPath, jar);
+    }
+  }
 
-            if (shouldLoadPlugin(parentDir)) {
-              addJarFilePath(sparkLauncher, extraClassPath, file);
-            }
-          }
+  /// Works out which jars under the Pinot installation should be shipped to the executors, honouring
+  /// [#shouldLoadPlugin]. A plugin is identified by the directory its jar sits in, so the shared
+  /// dependency store is a special case: every jar in it has the same parent directory and belongs
+  /// to no single plugin, and adding it wholesale would ignore `-pluginsToLoad` and
+  /// `-pluginsToExclude` entirely. Those jars are therefore reached only through the
+  /// `pinot-plugin.classpath` index of a plugin that was selected.
+  @VisibleForTesting
+  List<String> resolveDepsJars(String depsJarDir)
+      throws IOException {
+    Set<String> resolved = new LinkedHashSet<>();
+    if (depsJarDir == null) {
+      return new ArrayList<>(resolved);
+    }
+    URI depsJarDirURI = URI.create(depsJarDir);
+    if (depsJarDirURI.getScheme() == null) {
+      depsJarDirURI = new File(depsJarDir).toURI();
+    }
+    PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
+    for (String file : pinotFS.listFiles(depsJarDirURI, true)) {
+      if (pinotFS.isDirectory(URI.create(file))) {
+        continue;
+      }
+      String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
+      if (file.endsWith(".jar")) {
+        if (!SHARED_PLUGIN_LIBS_DIR.equals(parentDir) && shouldLoadPlugin(parentDir)) {
+          resolved.add(file);
+        }
+      } else if (PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file)) && shouldLoadPlugin(parentDir)) {
+        for (String dep : readPluginClasspathIndex(pinotFS, file)) {
+          resolved.add(depsJarDir.endsWith("/") ? depsJarDir + dep : depsJarDir + "/" + dep);
         }
       }
     }
+    return new ArrayList<>(resolved);
+  }
+
+  /// Reads a plugin's shared-store dependency list. A plugin with no index (an old-format plugin
+  /// that keeps its own jars beside it) simply contributes nothing here, and an unreadable index
+  /// is logged rather than failing the submit - the plugin's own jars have already been added.
+  @VisibleForTesting
+  List<String> readPluginClasspathIndex(PinotFS pinotFS, String indexFile) {
+    List<String> deps = new ArrayList<>();
+    try (InputStream in = pinotFS.open(URI.create(indexFile));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        // The index is a classpath fragment, so entries may be ':'-separated as well as split
+        // across lines.
+        for (String entry : line.split(":")) {
+          String dep = entry.trim();
+          if (!dep.isEmpty()) {
+            deps.add(dep);
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read plugin classpath index: {}", indexFile, e);
+    }
+    return deps;
   }
 
   private boolean shouldLoadPlugin(String parentDir) {
