@@ -152,6 +152,12 @@ public class SegmentCompletionProtocol {
   // (like size reaching close to its limit or number of col values for a col is about to overflow int max)
   public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
 
+  /// Stable wire codes for server stop reasons.
+  ///
+  /// Numeric IDs are part of the segment-completion protocol and must remain unique, stable, and non-reusable.
+  /// Controllers ignore unknown numeric `reasonCode` values and fall back to the retained legacy `reason` value.
+  /// When both a known `reasonCode` and a legacy `reason` are present, the numeric code takes precedence and
+  /// normalizes the legacy reason string carried through the request params.
   public enum ReasonCode {
     ROW_LIMIT(100, REASON_ROW_LIMIT),
     TIME_LIMIT(110, REASON_TIME_LIMIT),
@@ -183,18 +189,14 @@ public class SegmentCompletionProtocol {
       return _reason;
     }
 
-    public boolean shouldPickWinnerImmediately() {
-      return this == ROW_LIMIT || this == END_OF_PARTITION_GROUP;
-    }
-
     @Nullable
-    public static ReasonCode fromCode(String reasonCode) {
+    public static ReasonCode fromReasonCodeParam(@Nullable String reasonCode) {
       if (reasonCode == null) {
         return null;
       }
       try {
         return fromCode(Integer.parseInt(reasonCode));
-      } catch (NumberFormatException e) {
+      } catch (NumberFormatException ignored) {
         return null;
       }
     }
@@ -205,7 +207,7 @@ public class SegmentCompletionProtocol {
     }
 
     @Nullable
-    public static ReasonCode fromReason(String reason) {
+    public static ReasonCode fromReason(@Nullable String reason) {
       if (reason == null) {
         return null;
       }
@@ -302,7 +304,9 @@ public class SegmentCompletionProtocol {
     public static class Params {
       private String _segmentName;
       private String _instanceId;
+      @Nullable
       private String _reason;
+      @Nullable
       private ReasonCode _reasonCode;
       private int _numRows;
       private long _buildTimeMillis;
@@ -353,23 +357,27 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withReason(String reason) {
+      public Params withReason(@Nullable String reason) {
         _reason = reason;
         _reasonCode = ReasonCode.fromReason(reason);
         return this;
       }
 
-      public Params withReasonCode(@Nullable String reasonCode) {
-        ReasonCode parsedReasonCode = ReasonCode.fromCode(reasonCode);
+      /// Parses the raw `reasonCode` query parameter. Missing, malformed, or unknown values are ignored so the
+      /// retained legacy `reason` can continue to be used as fallback.
+      public Params withReasonCodeParam(@Nullable String reasonCode) {
+        ReasonCode parsedReasonCode = ReasonCode.fromReasonCodeParam(reasonCode);
         if (parsedReasonCode != null) {
           return withReasonCode(parsedReasonCode);
         }
         return this;
       }
 
+      /// Sets the typed stop reason. A known code also sets the legacy reason string so older controllers can ignore
+      /// `reasonCode` and still use `reason`. Passing `null` clears only the typed code.
       public Params withReasonCode(@Nullable ReasonCode reasonCode) {
         _reasonCode = reasonCode;
-        if (reasonCode != null && _reason == null) {
+        if (reasonCode != null) {
           _reason = reasonCode.getReason();
         }
         return this;
@@ -419,6 +427,7 @@ public class SegmentCompletionProtocol {
         return _segmentName;
       }
 
+      @Nullable
       public String getReason() {
         return _reason;
       }
