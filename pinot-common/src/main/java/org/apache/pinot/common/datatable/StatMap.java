@@ -305,7 +305,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             if (key.includeDefaultInJson()) {
               node.put(key.getStatName(), false);
             }
-          } else {
+          } else if (key.includeInJson()) {
             node.put(key.getStatName(), (boolean) value);
           }
           break;
@@ -314,7 +314,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             if (key.includeDefaultInJson()) {
               node.put(key.getStatName(), 0);
             }
-          } else {
+          } else if (key.includeInJson()) {
             node.put(key.getStatName(), (int) value);
           }
           break;
@@ -323,7 +323,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             if (key.includeDefaultInJson()) {
               node.put(key.getStatName(), 0L);
             }
-          } else {
+          } else if (key.includeInJson()) {
             node.put(key.getStatName(), (long) value);
           }
           break;
@@ -332,7 +332,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             if (key.includeDefaultInJson()) {
               node.put(key.getStatName(), "");
             }
-          } else {
+          } else if (key.includeInJson()) {
             node.put(key.getStatName(), (String) value);
           }
           break;
@@ -557,6 +557,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     default boolean includeDefaultInJson() {
       return false;
+    }
+
+    default boolean includeInJson() {
+      return true;
     }
 
     static int minPositive(int value1, int value2) {
