@@ -226,7 +226,9 @@ public class PinotHelixResourceManager {
     START, END, REVERT
   }
 
-  // TODO: make this configurable
+  // Default values for the endReplaceSegments IdealState -> ExternalView convergence wait,
+  // overridable via controller config (see ControllerConf#getSegmentReplaceExternalView*). The
+  // resolved values live in the _segmentReplace* / _endReplaceSegmentsRetryPolicy fields.
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
@@ -247,6 +249,11 @@ public class PinotHelixResourceManager {
   @Nullable
   private final ControllerConf _controllerConf;
   private final AuthProvider _serverAdminAuthProvider;
+  // endReplaceSegments IdealState -> ExternalView convergence knobs, resolved once from controller
+  // config (or the static defaults when no config is supplied).
+  private final long _segmentReplaceExternalViewMaxWaitMs;
+  private final long _segmentReplaceExternalViewCheckIntervalMs;
+  private final RetryPolicy _endReplaceSegmentsRetryPolicy;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -279,6 +286,16 @@ public class PinotHelixResourceManager {
     _controllerConf = controllerConf;
     _serverAdminAuthProvider =
         AuthProviderUtils.extractAuthProvider(controllerConf, ControllerConf.CONTROLLER_SERVER_ADMIN_AUTH_PREFIX);
+    if (controllerConf != null) {
+      _segmentReplaceExternalViewMaxWaitMs = controllerConf.getSegmentReplaceExternalViewMaxWaitMs();
+      _segmentReplaceExternalViewCheckIntervalMs = controllerConf.getSegmentReplaceExternalViewCheckIntervalMs();
+      _endReplaceSegmentsRetryPolicy =
+          RetryPolicies.exponentialBackoffRetryPolicy(controllerConf.getSegmentReplaceMaxRetryAttempts(), 1000L, 2.0f);
+    } else {
+      _segmentReplaceExternalViewMaxWaitMs = EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+      _segmentReplaceExternalViewCheckIntervalMs = EXTERNAL_VIEW_CHECK_INTERVAL_MS;
+      _endReplaceSegmentsRetryPolicy = DEFAULT_RETRY_POLICY;
+    }
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -4557,7 +4574,7 @@ public class PinotHelixResourceManager {
     long endReplaceSegmentsTs = System.currentTimeMillis();
     int attemptCount;
     try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+      attemptCount = _endReplaceSegmentsRetryPolicy.attempt(() -> {
         long endReplaceSegmentsTsForAttempt = System.currentTimeMillis();
         // Fetch the segment lineage and look up the lineage entry based on the entry id.
         SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
@@ -4856,7 +4873,7 @@ public class PinotHelixResourceManager {
 
   private boolean waitForSegmentsBecomeOnline(String tableNameWithType, List<String> segmentsToCheck)
       throws InterruptedException {
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _segmentReplaceExternalViewMaxWaitMs;
     String segmentNotOnline;
     do {
       segmentNotOnline = null;
@@ -4870,7 +4887,7 @@ public class PinotHelixResourceManager {
       if (segmentNotOnline == null) {
         return true;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_segmentReplaceExternalViewCheckIntervalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     LOGGER.warn("Timed out while waiting for segment: {} to become ONLINE for table: {}", segmentNotOnline,
         tableNameWithType);

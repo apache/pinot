@@ -35,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -458,6 +459,18 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
+
+  // Knobs governing how long endReplaceSegments blocks while waiting for the new segments to become
+  // ONLINE in the ExternalView (IdealState -> ExternalView convergence). The per-attempt wait is
+  // retried up to the configured number of attempts, so the worst-case block is
+  // maxWaitMs * maxRetryAttempts. Defaults preserve the historical hard-coded values.
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS =
+      "controller.segment.replace.externalViewMaxWaitMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS =
+      "controller.segment.replace.externalViewCheckIntervalMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS =
+      "controller.segment.replace.maxRetryAttempts";
+  public static final int DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS = 5;
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
@@ -1598,6 +1611,20 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMaxForceCommitZkJobs() {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+  }
+
+  public long getSegmentReplaceExternalViewMaxWaitMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS);
+  }
+
+  public long getSegmentReplaceExternalViewCheckIntervalMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+  }
+
+  public int getSegmentReplaceMaxRetryAttempts() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS, DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS);
   }
 
   /// Get the configured timeseries languages from controller configuration.
