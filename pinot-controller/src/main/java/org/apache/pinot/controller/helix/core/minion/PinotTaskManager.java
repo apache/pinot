@@ -726,6 +726,19 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return _taskGeneratorRegistry;
   }
 
+  /// Return the subset of [candidateTables] that have [taskType] enabled.
+  public Set<String> getTablesForTaskType(String taskType, Collection<String> candidateTables) {
+    Set<String> tables = new HashSet<>();
+    for (String tableNameWithType : candidateTables) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig != null && tableConfig.getTaskConfig() != null
+          && tableConfig.getTaskConfig().isTaskTypeEnabled(taskType)) {
+        tables.add(tableNameWithType);
+      }
+    }
+    return tables;
+  }
+
   /// Registers a task generator.
   ///
   /// This method can be used to plug in custom task generators.
