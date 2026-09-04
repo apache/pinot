@@ -1041,7 +1041,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
       }
 
-      if (_routingEntryMap.remove(tableNameWithType) != null) {
+      RoutingEntry removedRoutingEntry = _routingEntryMap.remove(tableNameWithType);
+      if (removedRoutingEntry != null) {
         LOGGER.info("Removed routing for table: {}", tableNameWithType);
 
         // Stop reporting the table level gauges owned by the routing, otherwise they keep being exported
@@ -1060,7 +1061,20 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
           }
         }
 
-        // Clean up any per-table build data structures / locks as the routing for this table has been removed
+        // Let listeners release per-table state they hold outside the routing entry (e.g. persisted
+        // statistics). One failing listener must not abort the rest of the removal.
+        for (SegmentZkMetadataFetchListener listener : removedRoutingEntry._segmentZkMetadataFetcher.getListeners()) {
+          try {
+            listener.onRoutingRemoved();
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while notifying listener {} of routing removal for table: {}",
+                listener.getClass().getSimpleName(), tableNameWithType, e);
+          }
+        }
+
+        // Clean up any per-table build data structures / locks as the routing for this table has been removed.
+        // This must stay LAST: dropping the build lock while teardown is still running would let a concurrent
+        // buildRouting() acquire a different monitor and repopulate state that the callbacks above are clearing.
         _routingTableBuildStartTimeMs.remove(tableNameWithType);
         if (!tableCounterPartExists) {
           _routingTableBuildLocks.remove(rawTableName);
@@ -1309,6 +1323,21 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
     TimeBoundaryManager timeBoundaryManager = routingEntry.getTimeBoundaryManager();
     return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryInfo() : null;
+  }
+
+  /// Returns the time boundary of the given offline table in epoch milliseconds, or `null` if the
+  /// table has no routing entry or no published boundary.
+  ///
+  /// See [TimeBoundaryManager#getTimeBoundaryMs()] for why callers must not derive this by parsing
+  /// [TimeBoundaryInfo#getTimeValue()] themselves.
+  @Nullable
+  public Long getTimeBoundaryMs(String offlineTableName) {
+    RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
+    if (routingEntry == null) {
+      return null;
+    }
+    TimeBoundaryManager timeBoundaryManager = routingEntry.getTimeBoundaryManager();
+    return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryMs() : null;
   }
 
   @Nullable

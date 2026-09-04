@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +65,10 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
+import org.apache.pinot.broker.stats.BrokerStatisticsProvider;
+import org.apache.pinot.broker.stats.BrokerTableStatsManager;
+import org.apache.pinot.broker.stats.SqliteStatsStoreProvider;
+import org.apache.pinot.broker.stats.StatsStoreFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
@@ -101,6 +108,9 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.StatsStore;
+import org.apache.pinot.query.planner.spi.stats.StatsStoreException;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
@@ -126,6 +136,7 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
@@ -173,6 +184,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
+  @Nullable
+  protected BrokerTableStatsManager _statsManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
@@ -291,6 +304,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// Override to supply a custom [MultiStageBrokerRequestHandler] subclass (e.g. one that
   /// overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query logging).
   /// The default implementation returns a plain [MultiStageBrokerRequestHandler].
+  ///
+  /// `statisticsProvider` is a parameter rather than something this method resolves for itself:
+  /// resolving it inside the body would let an existing override keep compiling while silently
+  /// dropping the statistics wiring, so an operator setting `pinot.broker.stats.enabled=true`
+  /// would pay the collection cost, change no plan, and get no signal at all. Breaking the
+  /// signature is the point.
   protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
       PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
       RoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -298,11 +317,33 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
       ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
-      ServerRoutingStatsManager serverRoutingStatsManager) {
+      ServerRoutingStatsManager serverRoutingStatsManager,
+      @Nullable PinotStatisticsProvider statisticsProvider) {
     return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
         threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-        serverRoutingStatsManager);
+        serverRoutingStatsManager, statisticsProvider);
+  }
+
+  /// Returns the statistics provider the multi-stage planner should use, or `null` to leave it on
+  /// Calcite's heuristics.
+  ///
+  /// Logged at startup because both ways of ending up without one — collection disabled, or
+  /// collection enabled but consumption switched off — are otherwise invisible: the feature simply
+  /// produces the same plans as before, with nothing saying why.
+  @Nullable
+  protected PinotStatisticsProvider createStatisticsProvider() {
+    if (_statsManager == null) {
+      LOGGER.info("Statistics collection is not active; multi-stage planning will use heuristics");
+      return null;
+    }
+    if (!_brokerConf.getProperty(Broker.CONFIG_OF_USE_STATISTICS, Broker.DEFAULT_USE_STATISTICS)) {
+      LOGGER.info("Broker statistics are being collected but not used for planning ({}=false)",
+          Broker.CONFIG_OF_USE_STATISTICS);
+      return null;
+    }
+    LOGGER.info("Multi-stage query planning will use broker-collected statistics");
+    return new BrokerStatisticsProvider(_statsManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -424,6 +465,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+
+    // Wire the stats-manager providers that require both the routing manager and the table cache.
+    // Both are now available: _routingManager was built in initRoutingManager() and _tableCache
+    // was just created above. The setters are no-ops if _statsManager is null (stats disabled).
+    if (_statsManager != null) {
+      // The boundary must come from the routing manager rather than be re-derived here: it owns the
+      // DateTimeFormatSpec needed to read TimeBoundaryInfo's formatted value, and a second
+      // conversion would be free to drift from the authoritative one.
+      _statsManager.setTimeBoundaryMsProvider(rawTableName ->
+          _routingManager.getTimeBoundaryMs(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)));
+      _statsManager.setTableConfigProvider(_tableCache::getTableConfig);
+    }
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -548,7 +601,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-              _serverRoutingStatsManager);
+              _serverRoutingStatsManager, createStatisticsProvider());
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
@@ -731,9 +784,85 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  protected void initRoutingManager() throws Exception {
+  protected void initRoutingManager()
+      throws Exception {
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+    boolean statsEnabled =
+        _brokerConf.getProperty(Broker.CONFIG_OF_STATS_ENABLED, Broker.DEFAULT_STATS_ENABLED);
+    if (statsEnabled) {
+      BrokerTableStatsManager statsManager = createStatsManager();
+      if (statsManager != null) {
+        _statsManager = statsManager;
+        // Attach through the generic listener-provider seam so the routing manager needs no
+        // knowledge of statistics. Registered before routing is built, so the listener also sees
+        // the initial bulk load of segment metadata.
+        _routingManager.addSegmentZkMetadataFetchListenerProvider(_statsManager::createListener);
+      }
+    }
     _routingManager.init(_spectatorHelixManager);
+  }
+
+  /// Creates and initializes the [BrokerTableStatsManager]. Returns `null` if the
+  /// manager cannot be started (error is logged; broker startup continues normally).
+  @Nullable
+  private BrokerTableStatsManager createStatsManager() {
+    BrokerTableStatsManager statsManager = null;
+    try {
+      statsManager = new BrokerTableStatsManager(createStatsStore());
+      statsManager.init();
+      return statsManager;
+    } catch (StatsStoreException e) {
+      LOGGER.error("Failed to initialize BrokerTableStatsManager; stats collection disabled: {}",
+          e.getMessage(), e);
+      if (statsManager != null) {
+        try {
+          statsManager.close();
+        } catch (IOException closeEx) {
+          LOGGER.warn("Error closing failed stats manager: {}", closeEx.getMessage());
+        }
+      }
+      return null;
+    }
+  }
+
+  /// Creates the [StatsStore] backing statistics collection, selected by
+  /// [Broker#CONFIG_OF_STATS_STORE]. The returned store must not be initialized yet; the manager
+  /// calls [StatsStore#init()].
+  ///
+  /// Broker starters may override this to supply an implementation of their own.
+  ///
+  /// @throws StatsStoreException if the store cannot be created, which disables statistics
+  ///         collection while leaving broker startup unaffected. A configured name that no provider
+  ///         declares is instead an unchecked [IllegalArgumentException] that fails startup: asking
+  ///         for a store that does not exist is a configuration error, not a degraded mode.
+  protected StatsStore createStatsStore()
+      throws StatsStoreException {
+    // Hand the provider everything configured under pinot.broker.stats, so a contributed store is
+    // configurable the same way the built-in ones are; the resolved directory only fills in when
+    // the operator did not set one.
+    Map<String, String> statsProperties = new HashMap<>();
+    PinotConfiguration statsConf = _brokerConf.subset(Broker.CONFIG_PREFIX_OF_STATS);
+    for (String key : statsConf.getKeys()) {
+      statsProperties.put(key, statsConf.getProperty(key));
+    }
+    statsProperties.putIfAbsent(SqliteStatsStoreProvider.DIR_KEY, resolveStatsDir().toString());
+    return StatsStoreFactory.create(_brokerConf.getProperty(Broker.CONFIG_OF_STATS_STORE), statsProperties);
+  }
+
+  /// Resolves the directory for the stats store: [Broker#CONFIG_OF_STATS_DIR] when the operator
+  /// set one, otherwise `<java.io.tmpdir>/<instanceId>/broker-stats`.
+  ///
+  /// The instance id is part of the default because the broker has no standard per-instance data
+  /// directory, and two brokers on one host sharing a single SQLite file would corrupt it and
+  /// purge each other's tables.
+  private Path resolveStatsDir() {
+    String configured = _brokerConf.getProperty(Broker.CONFIG_OF_STATS_DIR);
+    if (configured != null && !configured.isEmpty()) {
+      return Paths.get(configured);
+    }
+    // Broker has no standard INSTANCE_DATA_DIR; use tmpdir/<instanceId>/broker-stats so that
+    // multiple broker instances on the same host do not share the same SQLite file.
+    return Paths.get(System.getProperty("java.io.tmpdir"), _instanceId, "broker-stats");
   }
 
   protected void initSpectatorHelixManager() throws Exception {
@@ -947,6 +1076,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Stopping the broker routing manager");
     _routingManager.stop();
 
+    if (_statsManager != null) {
+      LOGGER.info("Closing BrokerTableStatsManager");
+      try {
+        _statsManager.close();
+      } catch (IOException e) {
+        LOGGER.warn("Error closing BrokerTableStatsManager: {}", e.getMessage());
+      }
+    }
+
     LOGGER.info("Close PinotFs");
     try {
       PinotFSFactory.shutdown();
@@ -984,6 +1122,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerMetrics;
   }
 
+  /// The statistics manager, or `null` when statistics collection is disabled.
+  @VisibleForTesting
+  @Nullable
+  public BrokerTableStatsManager getStatsManager() {
+    return _statsManager;
+  }
+
   public BrokerRoutingManager getRoutingManager() {
     return _routingManager;
   }
@@ -1004,7 +1149,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _statsManager);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);

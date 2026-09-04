@@ -611,6 +611,56 @@ public class CommonConstants {
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
+    // ---------------------------------------------------------------------------
+    // Cost-based optimizer (CBO) stats store — EXPERIMENTAL
+    // ---------------------------------------------------------------------------
+
+    /// Prefix for every statistics setting. The subset below this prefix is handed to the
+    /// configured `StatsStoreProvider`, so a contributed store is configured the same way the
+    /// built-in ones are.
+    public static final String CONFIG_PREFIX_OF_STATS = "pinot.broker.stats";
+
+    /// [EXPERIMENTAL] When `true`, the broker collects per-segment statistics into the store
+    /// selected by [#CONFIG_OF_STATS_STORE]. Disabled by default.
+    ///
+    /// Enabling this changes the row-count and selectivity ESTIMATES the multi-stage planner sees:
+    /// any rule consulting cardinality metadata observes statistics-backed numbers instead of
+    /// Calcite's defaults. Query results never change, but plans — and therefore performance
+    /// characteristics — may. Statistics whose confidence is LOW or UNKNOWN are treated as absent,
+    /// so a table whose raw counts are known to be biased keeps the previous heuristic behaviour.
+    ///
+    /// To stop the planner using them without losing the collected store, set
+    /// [#CONFIG_OF_USE_STATISTICS] to `false` rather than turning this off. Enable on a canary
+    /// broker first.
+    public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
+    public static final boolean DEFAULT_STATS_ENABLED = false;
+
+    /// [EXPERIMENTAL] Which `StatsStore` implementation backs CBO statistics collection.
+    ///
+    /// Built-in values:
+    /// - `sqlite` (default): an embedded database file under [#CONFIG_OF_STATS_DIR]. Keeps
+    ///   statistics off-heap and, when the directory is on a persistent volume, survives restarts.
+    /// - `memory`: heap-resident, nothing written to disk. Statistics are lost on restart and are
+    ///   re-collected from the ZooKeeper segment metadata the broker re-reads anyway; per-column
+    ///   statistics pulled from servers must be fetched again. Reads scan the table's segments, so
+    ///   prefer it for modest segment counts or where a file is unacceptable.
+    ///
+    /// The value is a NAME, not a class name: a store is contributed by registering a
+    /// `StatsStoreProvider` that declares its own name, so an implementation can be renamed or
+    /// moved without invalidating this configuration. An unknown name fails startup with the list
+    /// of names actually available.
+    ///
+    /// [#CONFIG_OF_STATS_DIR] applies only to `sqlite` and is ignored by the other stores.
+    public static final String CONFIG_OF_STATS_STORE = "pinot.broker.stats.store";
+    public static final String DEFAULT_STATS_STORE = "sqlite";
+
+    /// [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
+    /// (`broker-stats.sqlite`). Applies only when [#CONFIG_OF_STATS_STORE] selects `sqlite`.
+    /// Defaults to `<java.io.tmpdir>/<instanceId>/broker-stats` (per-instance so multiple brokers
+    /// on one host do not share a database). Configure a path on a persistent volume to preserve
+    /// collected statistics across restarts.
+    public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
+
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
@@ -626,6 +676,20 @@ public class CommonConstants {
     /// This value can always be overridden by [Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER] query option
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
+
+    /// [EXPERIMENTAL] Whether the multi-stage planner consults the statistics collected under
+    /// [#CONFIG_OF_STATS_ENABLED]. Enabled by default, so turning collection on gives the whole
+    /// feature; this exists as a kill switch.
+    ///
+    /// Separate from collection on purpose. If statistics-backed plans regress, the alternative
+    /// would be turning collection off — which also discards the store the broker spent time
+    /// warming, and has to be re-collected before the feature can be tried again. Setting this to
+    /// `false` returns planning to Calcite's heuristics while the store stays warm, which also
+    /// makes "collect, observe, then enable" a usable rollout order.
+    ///
+    /// Ignored when [#CONFIG_OF_STATS_ENABLED] is `false`: there are no statistics to consult.
+    public static final String CONFIG_OF_USE_STATISTICS = "pinot.broker.multistage.use.statistics";
+    public static final boolean DEFAULT_USE_STATISTICS = true;
 
     /// Whether to use lite mode by default.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LITE_MODE] query option

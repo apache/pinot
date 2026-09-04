@@ -66,6 +66,9 @@ public class TimeBoundaryManager {
 
   private long _explicitlySetTimeBoundaryMs = INVALID_TIME_MS;
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
+  /// The published boundary in epoch milliseconds, or [#INVALID_TIME_MS] when none is published.
+  /// Derived from the same formatted value as [#_timeBoundaryInfo] so the two cannot disagree.
+  private volatile long _timeBoundaryMs = INVALID_TIME_MS;
 
   public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics) {
@@ -185,10 +188,12 @@ public class TimeBoundaryManager {
       }
       // Convert formatted time boundary to millis in case the time boundary is rounded
       long formattedTimeBoundaryMs = _timeFormatSpec.fromFormatToMillis(timeBoundary);
+      _timeBoundaryMs = formattedTimeBoundaryMs;
       _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE,
           maxEndTimeMs - formattedTimeBoundaryMs);
     } else {
       _timeBoundaryInfo = null;
+      _timeBoundaryMs = INVALID_TIME_MS;
       _brokerMetrics.removeTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE);
     }
   }
@@ -237,5 +242,18 @@ public class TimeBoundaryManager {
   @Nullable
   public TimeBoundaryInfo getTimeBoundaryInfo() {
     return _timeBoundaryInfo;
+  }
+
+  /// Returns the published time boundary in epoch milliseconds, or `null` when none is published.
+  ///
+  /// [TimeBoundaryInfo#getTimeValue()] carries the boundary in the time column's own format, which
+  /// only this class can interpret: it owns the [DateTimeFormatSpec]. Callers that need a
+  /// comparable instant must use this rather than parsing the formatted value, since for a column
+  /// stored in DAYS, SECONDS or a numeric date pattern the formatted value parses cleanly as a
+  /// number that is not an epoch-millisecond instant.
+  @Nullable
+  public Long getTimeBoundaryMs() {
+    long timeBoundaryMs = _timeBoundaryMs;
+    return timeBoundaryMs > 0 ? timeBoundaryMs : null;
   }
 }
