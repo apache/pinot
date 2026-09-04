@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -150,6 +151,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     try {
       FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
       CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
+      int canonicalSpecBytes = executor.getCanonicalSpec().getBytes(StandardCharsets.UTF_8).length;
+      Preconditions.checkArgument(
+          canonicalSpecBytes <= FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES,
+          "Canonical codec spec is %s bytes; the V7 header allows at most %s", canonicalSpecBytes,
+          FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES);
       FixedByteChunkForwardIndexWriterV7.validateAndNormalizeNumDocsPerChunk(executor, storedType.size(),
           forwardIndexConfig.getTargetDocsPerChunk());
     } catch (IllegalArgumentException e) {

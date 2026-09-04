@@ -65,6 +65,8 @@ public final class FixedByteChunkSVForwardIndexReaderV7
         return;
       }
       _closed = true;
+      // Drop the cached chunk id so a post-close read cannot short-circuit into the freed buffer.
+      _chunkId = -1;
       if (_decodeScratch != null) {
         _decodeScratch.close();
         _decodeScratch = null;
@@ -273,32 +275,54 @@ public final class FixedByteChunkSVForwardIndexReaderV7
               + "-byte cumulative-work limits. Segment may be corrupt.", e);
     }
 
-    // Validate the complete data section up front. Chunk frames must be contiguous: permitting a
-    // gap before/between/after frames would make those bytes unauthenticated trailing data and
-    // could hide a partially overwritten or concatenated segment.
+    // Validate only header-resident structure here so segment load does not fault in every data page
+    // of the index (the legacy readers only read their fixed header). The chunk-offset table must start
+    // at the data section, each later offset must leave room for its predecessor's header and payload
+    // bound, and the final frame must end exactly at the file end so truncated or concatenated files are
+    // rejected at load. Each frame's exact size is checked lazily in loadChunk, which verifies that the
+    // accessed frame ends exactly where its successor (or the file) begins; corruption confined to a
+    // frame that is never read is therefore reported at read time, not at load time.
     long dataSectionStart = _dataHeaderStart + (long) _numChunks * Long.BYTES;
     long maxChunkOffset = bufferSize - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
-    long expectedChunkOffset = dataSectionStart;
+    long maxFrameBytes = (long) FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + _maxFullChunkEncodedSize;
+    long previousChunkOffset = -1;
     for (int i = 0; i < _numChunks; i++) {
       long chunkOffset = dataBuffer.getLong(_dataHeaderStart + (long) i * Long.BYTES);
-      if (chunkOffset != expectedChunkOffset || chunkOffset > maxChunkOffset) {
-        throw new IllegalArgumentException(
-            "Corrupt chunkOffsets[" + i + "]=" + chunkOffset + ": expected contiguous frame at "
-                + expectedChunkOffset + " within [" + dataSectionStart + ", " + maxChunkOffset + "]");
+      if (i == 0) {
+        if (chunkOffset != dataSectionStart || chunkOffset > maxChunkOffset) {
+          throw new IllegalArgumentException(
+              "Corrupt chunkOffsets[0]=" + chunkOffset + ": expected the first frame exactly at " + dataSectionStart
+                  + " within [" + dataSectionStart + ", " + maxChunkOffset + "]");
+        }
+      } else {
+        long previousFrameBytes = chunkOffset - previousChunkOffset;
+        if (previousFrameBytes < FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES
+            || previousFrameBytes > maxFrameBytes || chunkOffset > maxChunkOffset) {
+          throw new IllegalArgumentException(
+              "Corrupt chunkOffsets[" + i + "]=" + chunkOffset + ": expected a frame between "
+                  + (previousChunkOffset + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES) + " and "
+                  + (previousChunkOffset + maxFrameBytes) + " within [" + dataSectionStart + ", " + maxChunkOffset
+                  + "]");
+        }
       }
-      int encodedSize = dataBuffer.getInt(chunkOffset);
-      long maxPayloadBytes = bufferSize - chunkOffset - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
-      if (encodedSize < 0 || encodedSize > maxPayloadBytes) {
-        throw new IllegalArgumentException(
-            "Corrupt per-chunk header for chunk " + i + ": encodedSize=" + encodedSize
-                + ", remainingBuffer=" + maxPayloadBytes);
-      }
-      expectedChunkOffset = chunkOffset + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + encodedSize;
+      previousChunkOffset = chunkOffset;
     }
-    if (expectedChunkOffset != bufferSize) {
+    long dataSectionEnd = dataSectionStart;
+    if (_numChunks > 0) {
+      int lastChunkId = _numChunks - 1;
+      int lastEncodedSize = dataBuffer.getInt(previousChunkOffset);
+      long maxPayloadBytes = Math.min(_maxFullChunkEncodedSize,
+          bufferSize - previousChunkOffset - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES);
+      if (lastEncodedSize < 0 || lastEncodedSize > maxPayloadBytes) {
+        throw new IllegalArgumentException(
+            "Corrupt per-chunk header for chunk " + lastChunkId + ": encodedSize=" + lastEncodedSize
+                + ", maximum payload " + maxPayloadBytes);
+      }
+      dataSectionEnd = previousChunkOffset + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + lastEncodedSize;
+    }
+    if (dataSectionEnd != bufferSize) {
       throw new IllegalArgumentException(
-          "Corrupt V7 data section: chunk frames end at " + expectedChunkOffset + " but file size is "
-              + bufferSize);
+          "Corrupt V7 data section: chunk frames end at " + dataSectionEnd + " but file size is " + bufferSize);
     }
   }
 
@@ -357,11 +381,16 @@ public final class FixedByteChunkSVForwardIndexReaderV7
   }
 
   private ByteBuffer loadChunk(int chunkId, Context context) {
+    // Explicit guard: a closed context has released its direct buffer, so decoding into it would corrupt
+    // native memory. Checked once per chunk transition, so it stays off the per-row read path.
+    if (context._closed) {
+      throw new IllegalStateException("V7 forward-index reader context is closed");
+    }
     long chunkStart = getChunkOffset(chunkId);
-    // Validate the chunk offset before using it as a buffer index. Constructor validates the
-    // chunk-offset table extents, but each entry's value is a per-chunk file offset that must
-    // (1) point past the end of the chunk-offset table (i.e. into the data section), and
-    // (2) leave room for the per-chunk header before the buffer end.
+    // Validate the chunk offset before using it as a buffer index. The constructor validates the
+    // chunk-offset table, but per-frame sizes are only verified here, on first access: the frame
+    // must (1) start inside the data section, (2) leave room for its header before the buffer end,
+    // and (3) end exactly where the next frame (or the file) begins.
     long bufferSize = _dataBuffer.size();
     long dataSectionStart = _dataHeaderStart + (long) _numChunks * Long.BYTES;
     if (chunkStart < dataSectionStart

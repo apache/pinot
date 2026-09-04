@@ -103,7 +103,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   // This should contain a list of all indexes that need to be rewritten if the dictionary is enabled or disabled
   private static final List<IndexType<?, ?, ?>> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
-  private final Map<String, CodecPipelineExecutor> _configuredCodecExecutors = new HashMap<>();
 
   /// Re-enable operations are split by target encoding so the intent is explicit at the operation level: a
   /// `forwardIndex.disabled` column being re-enabled may want to come back as either dict-encoded or raw,
@@ -302,7 +301,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   ///    `desiredDict = newIsDict || any-enabled-index-requires-dict`. The "force on if required" rule is the
   ///    only place this method consults other indexes — once `desiredDict` is computed, the rest of the logic
   ///    treats it as the source of truth.
-  /// 3. **Compression-type change** — only when no encoding change happened (forward + dict both unchanged).
+  /// 3. **Compression-type change** — whenever an existing RAW forward index remains RAW after the other
+  ///    operations. Adding/removing a standalone dictionary does not recreate that raw index, so a codec change
+  ///    must be queued alongside the dictionary operation.
   /// 4. **Cross-cutting guards** — sorted columns can't toggle forward; range index format is incompatible
   ///    with disabling the dictionary; enabling forward needs dict + inverted on disk; enabling dict needs
   ///    forward to be on so the dict can be bootstrapped.
@@ -540,9 +541,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
     String newCodecSpec = newConfig.getCodecSpec();
     if (newCodecSpec != null) {
-      CodecPipelineExecutor configuredExecutor = _configuredCodecExecutors.computeIfAbsent(column,
-          ignored -> CodecPipelineExecutor.create(newCodecSpec, existingColMetadata.getDataType().getStoredType()));
-      String canonicalNewSpec = configuredExecutor.getCanonicalSpec();
+      // Compare canonical forms so equivalent spellings (case, aliases, default arguments) do not trigger a rewrite.
+      String canonicalNewSpec = CodecPipelineExecutor.create(newCodecSpec,
+          existingColMetadata.getDataType().getStoredType()).getCanonicalSpec();
       return !canonicalNewSpec.equals(existingCodecSpec);
     }
 

@@ -27,7 +27,6 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
-import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -69,9 +68,12 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
   public static final int VERSION = 7;
   public static final int FORMAT_MAGIC = 0xC0DEC0DE;
 
-  /// Upper bound for the canonical, ASCII-only codec spec embedded in the header. Keep the wire
-  /// limit aligned with the DSL parser so every accepted header is representable by public config.
-  public static final int MAX_CODEC_SPEC_LENGTH_BYTES = CodecSpecParser.MAX_SPEC_LENGTH;
+  /// Upper bound for the canonical, ASCII-only codec spec embedded in the header. This is part of
+  /// the frozen on-disk format and is deliberately an independent literal: raising the DSL parser
+  /// limit (`CodecSpecParser.MAX_SPEC_LENGTH`) later must not change how existing files are validated.
+  /// Canonicalization can append default arguments, so table-config validation checks the canonical
+  /// byte length against this bound rather than relying on the parser limit alone.
+  public static final int MAX_CODEC_SPEC_LENGTH_BYTES = 4096;
 
   /// Maximum decoded bytes in one V7 chunk. The normal Pinot target is 1 MiB; this 64 MiB ceiling
   /// bounds per-reader direct scratch and intermediate pipeline buffers for corrupt segments.
@@ -256,7 +258,8 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
       ByteBuffer encoded = _executor.encode(_chunkBuffer, MAX_ENCODED_CHUNK_SIZE_BYTES,
           MAX_PIPELINE_WORK_SIZE_BYTES, _encodeScratch);
       int encodedSize = encoded.remaining();
-      int maxEncodedSize = decodedSize == _chunkFullBytes ? _maxFullChunkEncodedSize
+      int maxEncodedSize = decodedSize == _chunkFullBytes
+          ? _maxFullChunkEncodedSize
           : _executor.maxEncodedSize(decodedSize, MAX_ENCODED_CHUNK_SIZE_BYTES, MAX_PIPELINE_WORK_SIZE_BYTES);
       if (encodedSize > maxEncodedSize) {
         throw new IllegalStateException(
