@@ -41,6 +41,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class BigDecimalDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "BigDecimalDistinctTable#mergeDistinctTable";
+
   private final HashSet<BigDecimal> _valueSet;
   private final OrderByExpressionContext _orderByExpression;
 
@@ -134,13 +136,16 @@ public class BigDecimalDistinctTable extends DistinctTable {
     if (bigDecimalDistinctTable._hasNull) {
       addNull();
     }
+    int numValuesMerged = 0;
     if (hasLimit()) {
       if (hasOrderBy()) {
         for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           addWithOrderBy(value);
         }
       } else {
         for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(value)) {
             return;
           }
@@ -149,6 +154,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
         addUnbounded(value);
       }
     }
