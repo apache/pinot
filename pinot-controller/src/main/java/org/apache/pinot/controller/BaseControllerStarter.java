@@ -816,6 +816,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
     }
 
+    // Deprecated: kept so existing `pinot.jfr.*` cluster configs keep working. New deployments should
+    // start JFR with JVM arguments instead; see ContinuousJfrStarter for the replacement.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         ConsumingSegmentConsistencyModeListener.getInstance());

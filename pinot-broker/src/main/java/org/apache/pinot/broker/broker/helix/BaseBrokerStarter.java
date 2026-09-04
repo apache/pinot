@@ -676,6 +676,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
+    // Deprecated: kept so existing `pinot.jfr.*` cluster configs keep working. New deployments should
+    // start JFR with JVM arguments instead; see ContinuousJfrStarter for the replacement.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
 
