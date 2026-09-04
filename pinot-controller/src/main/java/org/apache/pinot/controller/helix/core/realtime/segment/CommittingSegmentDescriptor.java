@@ -31,7 +31,9 @@ public class CommittingSegmentDescriptor {
 
   private String _segmentLocation;
   private SegmentMetadataImpl _segmentMetadata;
+  @Nullable
   private String _stopReason;
+  @Nullable
   private SegmentCompletionProtocol.ReasonCode _stopReasonCode;
   private int _preCommitRowCount;
 
@@ -103,7 +105,7 @@ public class CommittingSegmentDescriptor {
     return _stopReason;
   }
 
-  public void setStopReason(String stopReason) {
+  public void setStopReason(@Nullable String stopReason) {
     _stopReason = stopReason;
   }
 
@@ -112,7 +114,7 @@ public class CommittingSegmentDescriptor {
     return _stopReasonCode;
   }
 
-  public void setStopReasonCode(SegmentCompletionProtocol.ReasonCode stopReasonCode) {
+  public void setStopReasonCode(@Nullable SegmentCompletionProtocol.ReasonCode stopReasonCode) {
     _stopReasonCode = stopReasonCode;
   }
 

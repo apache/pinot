@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
@@ -610,7 +611,7 @@ public class SegmentCompletionTest {
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
         .withSegmentName(_segmentNameStr)
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
-        .withReasonCode("999");
+        .withReasonCodeParam("999");
     response = _segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
   }
@@ -622,9 +623,19 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds = 10L;
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
         .withSegmentName(_segmentNameStr)
-        .withReasonCode("999");
+        .withReasonCodeParam("999");
     response = _segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+  }
+
+  @Test
+  public void testSegmentCompletionFsmKeepsLegacySegmentConsumedSignature()
+      throws Exception {
+    Method segmentConsumedMethod =
+        SegmentCompletionFSM.class.getMethod("segmentConsumed", String.class, StreamPartitionMsgOffset.class,
+            String.class);
+    Assert.assertEquals(segmentConsumedMethod.getParameterTypes()[2], String.class);
+    Assert.assertTrue(SegmentCompletionFSM.class.isAssignableFrom(LegacyStringSegmentCompletionFSM.class));
   }
 
   @Test
@@ -1349,6 +1360,51 @@ public class SegmentCompletionTest {
 
     // FSM should still be there for that segment
     Assert.assertTrue(_fsmMap.containsKey(_segmentNameStr));
+  }
+
+  private static class LegacyStringSegmentCompletionFSM implements SegmentCompletionFSM {
+    @Override
+    public void transitionToInitialState(String msgType) {
+    }
+
+    @Override
+    public boolean isDone() {
+      return false;
+    }
+
+    @Override
+    public boolean isImmutableSegmentCreated() {
+      return false;
+    }
+
+    @Override
+    public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
+        @Nullable String stopReason) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    @Override
+    public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    @Override
+    public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, StreamPartitionMsgOffset offset,
+        String reason) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    @Override
+    public SegmentCompletionProtocol.Response extendBuildTime(String instanceId, StreamPartitionMsgOffset offset,
+        int extTimeSec) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    @Override
+    public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
+        CommittingSegmentDescriptor committingSegmentDescriptor) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
   }
 
   private static HelixManager createMockHelixManager(boolean isLeader, boolean isConnected) {

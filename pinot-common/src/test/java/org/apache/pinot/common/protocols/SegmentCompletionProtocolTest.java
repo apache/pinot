@@ -20,7 +20,9 @@ package org.apache.pinot.common.protocols;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.utils.URIUtils;
 import org.testng.Assert;
@@ -94,8 +96,7 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_INSTANCE_ID), "Server_localhost_8099");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
         SegmentCompletionProtocol.REASON_ROW_LIMIT);
-    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE),
-        String.valueOf(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT.getId()));
+    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE), "100");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS), "1000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS), "2000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC), "3000");
@@ -142,7 +143,7 @@ public class SegmentCompletionProtocolTest {
   }
 
   @Test
-  public void testReasonCodeCompatibility() {
+  public void testReasonCodeCompatibilityAndPrecedence() {
     SegmentCompletionProtocol.Request.Params params =
         new SegmentCompletionProtocol.Request.Params().withReasonCode(SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
@@ -150,25 +151,75 @@ public class SegmentCompletionProtocolTest {
 
     params = new SegmentCompletionProtocol.Request.Params().withReason("customReason")
         .withReasonCode(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
-    Assert.assertEquals(params.getReason(), "customReason");
+    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
 
     params = new SegmentCompletionProtocol.Request.Params()
-        .withReasonCode(String.valueOf(SegmentCompletionProtocol.ReasonCode.TIME_LIMIT.getId()));
+        .withReasonCodeParam("110");
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
 
     params = new SegmentCompletionProtocol.Request.Params().withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
-        .withReasonCode("999");
+        .withReasonCodeParam("999");
     Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
 
-    params = new SegmentCompletionProtocol.Request.Params().withReasonCode("999");
+    params = new SegmentCompletionProtocol.Request.Params().withReasonCodeParam("999");
     Assert.assertNull(params.getReason());
     Assert.assertNull(params.getReasonCode());
 
-    params = new SegmentCompletionProtocol.Request.Params().withReasonCode("FUTURE_REASON_CODE");
+    params = new SegmentCompletionProtocol.Request.Params().withReasonCodeParam("FUTURE_REASON_CODE");
     Assert.assertNull(params.getReason());
     Assert.assertNull(params.getReasonCode());
+  }
+
+  @Test
+  public void testReasonCodeValuesAreStableAndUnique() {
+    Object[][] expectedValues = {
+        {SegmentCompletionProtocol.ReasonCode.ROW_LIMIT, 100, SegmentCompletionProtocol.REASON_ROW_LIMIT},
+        {SegmentCompletionProtocol.ReasonCode.TIME_LIMIT, 110, SegmentCompletionProtocol.REASON_TIME_LIMIT},
+        {SegmentCompletionProtocol.ReasonCode.END_OF_PARTITION_GROUP, 120,
+            SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP},
+        {SegmentCompletionProtocol.ReasonCode.FORCE_COMMIT_MESSAGE_RECEIVED, 130,
+            SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED},
+        {SegmentCompletionProtocol.ReasonCode.INDEX_CAPACITY_THRESHOLD_BREACHED, 140,
+            SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED}
+    };
+
+    Set<Integer> ids = new HashSet<>();
+    for (Object[] expectedValue : expectedValues) {
+      SegmentCompletionProtocol.ReasonCode reasonCode =
+          (SegmentCompletionProtocol.ReasonCode) expectedValue[0];
+      int id = (int) expectedValue[1];
+      String reason = (String) expectedValue[2];
+
+      Assert.assertTrue(ids.add(id), "Reason code IDs must be unique");
+      Assert.assertEquals(reasonCode.getId(), id);
+      Assert.assertEquals(reasonCode.getReason(), reason);
+      Assert.assertEquals(SegmentCompletionProtocol.ReasonCode.fromCode(id), reasonCode);
+      Assert.assertEquals(SegmentCompletionProtocol.ReasonCode.fromReason(reason), reasonCode);
+    }
+
+    Assert.assertEquals(ids.size(), SegmentCompletionProtocol.ReasonCode.values().length);
+  }
+
+  @Test
+  public void testReasonCodeRequestRetainsLegacyReasonForOldController()
+      throws Exception {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params()
+        .withSegmentName("foo__0__0__12345Z")
+        .withInstanceId("Server_localhost_8099")
+        .withStreamPartitionMsgOffset("7000")
+        .withReasonCode(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+    SegmentCompletionProtocol.SegmentConsumedRequest request =
+        new SegmentCompletionProtocol.SegmentConsumedRequest(params);
+
+    URI uri = new URI(request.getUrl("localhost:8080", "http"));
+    Map<String, String> paramsMap =
+        Arrays.stream(uri.getQuery().split("&")).collect(Collectors.toMap(e -> e.split("=")[0], e -> e.split("=")[1]));
+
+    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
+        SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE), "100");
   }
 }
