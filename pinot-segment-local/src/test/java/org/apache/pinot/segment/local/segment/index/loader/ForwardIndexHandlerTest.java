@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -2871,15 +2872,75 @@ public class ForwardIndexHandlerTest {
     }
   }
 
+  /// One config push can toggle a standalone dictionary and change the codec of the same RAW column.
+  /// Both operations must be queued in a single reload: the dictionary is built from the existing
+  /// forward index first, then the forward index is rewritten to V7 while staying RAW. The mirror
+  /// drops the dictionary while changing the codec again.
+  @Test
+  public void testDictionaryToggleAndCodecSpecTogether()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", "DELTA,LZ4");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    _invertedIndexColumns.add(column);
+    _noDictionaryColumns.remove(column);
+    _fieldConfigMap.put(column, new FieldConfig(column, FieldConfig.EncodingType.RAW, null,
+        List.of(FieldConfig.IndexType.INVERTED), null, null, indexes, null, null));
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, "DELTA,LZ4", null);
+    assertStandaloneDictionaryState(column, true);
+
+    _invertedIndexColumns.remove(column);
+    _noDictionaryColumns.add(column);
+    _fieldConfigMap.put(column, rawFieldConfigWithCodecSpec(column, "DELTA,ZSTD(3)"));
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, "DELTA,ZSTD(3)", null);
+    assertStandaloneDictionaryState(column, false);
+  }
+
+  private void assertStandaloneDictionaryState(String column, boolean expectDictionary)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertEquals(metadata.hasDictionary(), expectDictionary);
+      assertEquals(metadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertEquals(reader.hasIndexFor(column, StandardIndexes.dictionary()), expectDictionary);
+      if (expectDictionary) {
+        // Check the dictionary against the source data, not against metadata derived from the same rebuild.
+        TreeSet<Integer> expectedValues = new TreeSet<>();
+        for (GenericRow row : TEST_DATA) {
+          expectedValues.add(((Number) row.getValue(column)).intValue());
+        }
+        try (Dictionary dictionary = DictionaryIndexType.read(reader, metadata)) {
+          assertEquals(dictionary.length(), expectedValues.size());
+          int dictId = 0;
+          for (int expected : expectedValues) {
+            assertEquals(dictionary.getIntValue(dictId++), expected);
+          }
+        }
+      }
+    }
+  }
+
   private void applyCodecRewrite(String column)
+      throws Exception {
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+  }
+
+  private void applyOperations(String column, List<ForwardIndexHandler.Operation> expectedOperations)
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
       _writer = writer;
       ForwardIndexHandler handler = createForwardIndexHandler();
-      assertEquals(handler.computeOperations(writer),
-          Map.of(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
+      assertEquals(handler.computeOperations(writer), Map.of(column, expectedOperations));
       handler.updateIndices(writer);
       handler.postUpdateIndicesCleanup(writer);
     }

@@ -23,13 +23,17 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CompressionStatsTrackingForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -140,7 +144,8 @@ public class ForwardIndexCreatorFactoryTest {
           .build();
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
       tableConfig.getIndexingConfig().setCompressionStatsEnabled(compressionStatsEnabled);
-      long[] values = storedType == DataType.INT ? new long[]{11, 13, 21}
+      long[] values = storedType == DataType.INT
+          ? new long[]{11, 13, 21}
           : new long[]{Long.MIN_VALUE, (long) Integer.MAX_VALUE + 1, Long.MAX_VALUE};
       try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
           newContext(indexDir, false, tableConfig, values.length, storedType), config)) {
@@ -174,6 +179,116 @@ public class ForwardIndexCreatorFactoryTest {
                 values[i]);
           }
         }
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /// Realistic-volume round trip: many chunks, a non-power-of-two target normalized to 1024 docs per
+  /// chunk, a partial final chunk, and reads through both a sequential and a random-access context.
+  @Test(dataProvider = "v7CodecSpecs")
+  public void testCodecSpecMultiChunkRoundTrip(String codecSpec, DataType storedType, boolean compressionStatsEnabled)
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      int numDocs = 10009;
+      Random random = new Random(42);
+      long[] values = new long[numDocs];
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = storedType == DataType.INT ? random.nextInt() : random.nextLong();
+      }
+      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec(codecSpec)
+          .withTargetDocsPerChunk(1000)
+          .build();
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+      tableConfig.getIndexingConfig().setCompressionStatsEnabled(compressionStatsEnabled);
+      try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
+          newContext(indexDir, false, tableConfig, numDocs, storedType), config)) {
+        for (long value : values) {
+          if (storedType == DataType.INT) {
+            creator.putInt((int) value);
+          } else {
+            creator.putLong(value);
+          }
+        }
+        creator.seal();
+      }
+      File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+          ForwardIndexReader<?> reader =
+              ForwardIndexReaderFactory.getInstance().createRawIndexReader(buffer, storedType, true)) {
+        FixedByteChunkSVForwardIndexReaderV7 v7Reader = (FixedByteChunkSVForwardIndexReaderV7) reader;
+        // Header ints: version, magic, numChunks, numDocsPerChunk, sizeOfEntry, totalDocs
+        assertEquals(buffer.getInt(3 * Integer.BYTES), 1024, "targetDocsPerChunk=1000 should normalize to 1024");
+        assertEquals(buffer.getInt(2 * Integer.BYTES), (numDocs + 1023) / 1024);
+        assertEquals(buffer.getInt(5 * Integer.BYTES), numDocs);
+        try (FixedByteChunkSVForwardIndexReaderV7.Context sequential = v7Reader.createContext();
+            FixedByteChunkSVForwardIndexReaderV7.Context randomAccess = v7Reader.createContext()) {
+          for (int docId = 0; docId < numDocs; docId++) {
+            assertEquals(readValue(v7Reader, storedType, docId, sequential), values[docId], "docId " + docId);
+          }
+          for (int i = 0; i < 2000; i++) {
+            int docId = random.nextInt(numDocs);
+            assertEquals(readValue(v7Reader, storedType, docId, randomAccess), values[docId], "docId " + docId);
+          }
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  private static long readValue(FixedByteChunkSVForwardIndexReaderV7 reader, DataType storedType, int docId,
+      FixedByteChunkSVForwardIndexReaderV7.Context context) {
+    return storedType == DataType.INT ? reader.getInt(docId, context) : reader.getLong(docId, context);
+  }
+
+  /// The V7 writer rejects shapes it cannot represent and refuses to seal a file whose declared document
+  /// count does not match what was written; the reader rejects a mismatched stored type and reads after
+  /// its context is closed.
+  @Test
+  public void testV7WriterAndReaderGuards()
+      throws Exception {
+    assertTrue(CodecSpecParser.MAX_SPEC_LENGTH <= FixedByteChunkForwardIndexWriterV7.MAX_CODEC_SPEC_LENGTH_BYTES,
+        "The DSL parser limit must not exceed the frozen V7 header limit");
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+      CodecPipelineExecutor intExecutor = CodecPipelineExecutor.create("DELTA,LZ4", DataType.INT);
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkForwardIndexWriterV7(indexFile, intExecutor, 3, 2, Long.BYTES));
+      try (FixedByteChunkForwardIndexWriterV7 writer =
+          new FixedByteChunkForwardIndexWriterV7(indexFile, intExecutor, 3, 2, Integer.BYTES)) {
+        expectThrows(UnsupportedOperationException.class, () -> writer.putFloat(1.0f));
+        expectThrows(UnsupportedOperationException.class, () -> writer.putDouble(1.0));
+        expectThrows(IllegalStateException.class, () -> writer.putLong(1L));
+        writer.putInt(1);
+        writer.putInt(2);
+        writer.putInt(3);
+        expectThrows(IllegalStateException.class, () -> writer.putInt(4));
+      }
+      FixedByteChunkForwardIndexWriterV7 shortWriter =
+          new FixedByteChunkForwardIndexWriterV7(indexFile, intExecutor, 3, 2, Integer.BYTES);
+      shortWriter.putInt(1);
+      expectThrows(IllegalStateException.class, shortWriter::close);
+
+      try (FixedByteChunkForwardIndexWriterV7 writer = new FixedByteChunkForwardIndexWriterV7(indexFile,
+          CodecPipelineExecutor.create("LZ4", DataType.LONG), 2, 2, Long.BYTES)) {
+        writer.putLong(1L);
+        writer.putLong(2L);
+      }
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+        expectThrows(IllegalArgumentException.class,
+            () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+        expectThrows(UnsupportedOperationException.class,
+            () -> ForwardIndexReaderFactory.getInstance().createRawIndexReader(buffer, DataType.DOUBLE, true));
+        FixedByteChunkSVForwardIndexReaderV7 reader = new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.LONG);
+        FixedByteChunkSVForwardIndexReaderV7.Context context = reader.createContext();
+        assertEquals(reader.getLong(0, context), 1L);
+        context.close();
+        expectThrows(IllegalStateException.class, () -> reader.getLong(0, context));
       }
     } finally {
       FileUtils.deleteQuietly(indexDir);
@@ -226,23 +341,28 @@ public class ForwardIndexCreatorFactoryTest {
     }
   }
 
+  /// Columns: mutation, expected failure type, expected message fragment, and whether the corruption is
+  /// only detected on first read of the affected chunk (header-resident corruption fails at load).
   @DataProvider(name = "malformedV7Files")
   public Object[][] malformedV7Files() {
     return new Object[][]{
-        {"metadata", IllegalArgumentException.class, "does not match segment metadata"},
-        {"chunkSize", IllegalArgumentException.class, "positive power of two"},
-        {"specLength", IllegalArgumentException.class, "Invalid specLength"},
-        {"offset", IllegalArgumentException.class, "Corrupt chunkOffsets"},
-        {"truncated", IllegalArgumentException.class, "Corrupt per-chunk header"},
-        {"trailing", IllegalArgumentException.class, "Corrupt V7 data section"},
-        {"encodedSize", IllegalArgumentException.class, "Corrupt per-chunk header"},
-        {"decodedSize", IllegalStateException.class, "decodedSize"}
+        {"metadata", IllegalArgumentException.class, "does not match segment metadata", false},
+        {"chunkSize", IllegalArgumentException.class, "positive power of two", false},
+        {"specLength", IllegalArgumentException.class, "Invalid specLength", false},
+        {"offset", IllegalArgumentException.class, "Corrupt chunkOffsets[0]", false},
+        {"offsetOrder", IllegalArgumentException.class, "Corrupt chunkOffsets[1]", false},
+        {"truncated", IllegalArgumentException.class, "Corrupt per-chunk header", false},
+        {"trailing", IllegalArgumentException.class, "Corrupt V7 data section", false},
+        {"encodedSize", IllegalStateException.class, "Corrupt per-chunk header", true},
+        {"gap", IllegalStateException.class, "exactPayloadBytes", true},
+        {"decodedSize", IllegalStateException.class, "decodedSize", true}
     };
   }
 
   @Test(dataProvider = "malformedV7Files")
   public void testMalformedV7FileIsRejected(String mutation, Class<? extends RuntimeException> failureType,
-      String message) throws Exception {
+      String message, boolean rejectedAtRead)
+      throws Exception {
     File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
     try {
       ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
@@ -271,6 +391,10 @@ public class ForwardIndexCreatorFactoryTest {
         case "offset":
           header.putLong(offsetTable, bytes.length);
           break;
+        case "offsetOrder":
+          // Duplicate the first offset: chunkOffsets[1] no longer leaves room for chunk 0's header.
+          header.putLong(offsetTable + Long.BYTES, firstFrame);
+          break;
         case "truncated":
           bytes = Arrays.copyOf(bytes, bytes.length - 1);
           break;
@@ -279,6 +403,10 @@ public class ForwardIndexCreatorFactoryTest {
           break;
         case "encodedSize":
           header.putInt(firstFrame, -1);
+          break;
+        case "gap":
+          // Shrink the first (non-final) frame by one byte; only the lazy exact-size check can see it.
+          header.putInt(firstFrame, header.getInt(firstFrame) - 1);
           break;
         case "decodedSize":
           header.putInt(firstFrame + Integer.BYTES, Integer.MAX_VALUE);
@@ -290,16 +418,26 @@ public class ForwardIndexCreatorFactoryTest {
       ColumnMetadataImpl metadata = new ColumnMetadataImpl.Builder()
           .setFieldSpec(new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true))
           .setTotalDocs(mutation.equals("metadata") ? 4 : 3).setHasDictionary(false).build();
-      RuntimeException failure = expectThrows(failureType, () -> {
+      RuntimeException failure;
+      if (rejectedAtRead) {
+        // Construction must succeed: frame-level corruption is only detected when the chunk is read.
         try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
             ForwardIndexReader<?> reader =
                 ForwardIndexReaderFactory.getInstance().createIndexReader(buffer, metadata)) {
           FixedByteChunkSVForwardIndexReaderV7 v7Reader = (FixedByteChunkSVForwardIndexReaderV7) reader;
           try (FixedByteChunkSVForwardIndexReaderV7.Context context = v7Reader.createContext()) {
-            v7Reader.getInt(0, context);
+            failure = expectThrows(failureType, () -> v7Reader.getInt(0, context));
           }
         }
-      });
+      } else {
+        failure = expectThrows(failureType, () -> {
+          try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+              ForwardIndexReader<?> reader =
+                  ForwardIndexReaderFactory.getInstance().createIndexReader(buffer, metadata)) {
+            assertTrue(reader instanceof FixedByteChunkSVForwardIndexReaderV7);
+          }
+        });
+      }
       assertTrue(failure.getMessage().contains(message), failure.getMessage());
     } finally {
       FileUtils.deleteQuietly(indexDir);
