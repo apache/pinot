@@ -288,6 +288,44 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
+  public void sameUnnestKeepEquivalence() {
+    when(
+        join(
+            exchange(1, unnest(tableScan("T1"), passthrough(List.of(0, 1), true))),
+            exchange(2, unnest(tableScan("T1"), passthrough(List.of(0, 1), true)))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  /// The passthrough columns decide which input columns reach the output, so two unnests that only differ there do
+  /// not compute the same rows.
+  @Test
+  public void differentPassthroughInputIndexesBreakEquivalence() {
+    when(
+        join(
+            exchange(1, unnest(tableScan("T1"), passthrough(List.of(0, 1), true))),
+            exchange(2, unnest(tableScan("T1"), passthrough(List.of(0), true)))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
+  public void differentPrunedPassthroughBreakEquivalence() {
+    when(
+        join(
+            exchange(1, unnest(tableScan("T1"), passthrough(List.of(0, 1), true))),
+            exchange(2, unnest(tableScan("T1"), passthrough(List.of(0, 1), false)))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
   public void differentDataSchemaBreakEquivalence() {
     when(
         join(
