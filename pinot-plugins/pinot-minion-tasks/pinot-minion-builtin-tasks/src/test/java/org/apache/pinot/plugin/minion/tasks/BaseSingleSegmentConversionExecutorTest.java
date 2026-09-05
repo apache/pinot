@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.common.MinionConstants;
@@ -50,6 +52,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -134,6 +137,43 @@ public class BaseSingleSegmentConversionExecutorTest {
     }
   }
 
+  @Test
+  public void testExecuteTaskUpdatesMetadataWithoutUploadingUnchangedSegment()
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(true);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig());
+
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.updateSegmentZKMetadata(Mockito.eq(TABLE_NAME_WITH_TYPE),
+          Mockito.eq(SEGMENT_NAME), Mockito.anyString(), Mockito.eq(Long.toString(SEGMENT_CRC)), Mockito.any(),
+          Mockito.any()));
+      mocked.verifyNoMoreInteractions();
+    }
+  }
+
+  @Test(dataProvider = "metadataApiUnavailableStatusCodes")
+  public void testExecuteTaskFallsBackToUploadWhenMetadataApiIsUnavailable(int statusCode)
+      throws Exception {
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      mocked.when(() -> SegmentConversionUtils.updateSegmentZKMetadata(Mockito.anyString(), Mockito.anyString(),
+              Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any()))
+          .thenThrow(new HttpErrorStatusException("metadata API unavailable", statusCode));
+
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(true);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig());
+
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
+          Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)));
+    }
+  }
+
+  @DataProvider(name = "metadataApiUnavailableStatusCodes")
+  public Object[][] metadataApiUnavailableStatusCodes() {
+    return new Object[][]{{HttpStatus.SC_NOT_FOUND}, {HttpStatus.SC_METHOD_NOT_ALLOWED}};
+  }
+
   private PinotTaskConfig createTaskConfig() {
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_TYPE);
@@ -204,6 +244,16 @@ public class BaseSingleSegmentConversionExecutorTest {
   /// Minimal concrete executor that stubs out the infrastructure-dependent hooks (download, CRC check, conversion, ZK
   /// metadata modifier) so `executeTask` runs to the upload step without a server, controller, or deep store.
   private class TestSingleSegmentConversionExecutor extends BaseSingleSegmentConversionExecutor {
+    private final boolean _returnInputSegment;
+
+    private TestSingleSegmentConversionExecutor() {
+      this(false);
+    }
+
+    private TestSingleSegmentConversionExecutor(boolean returnInputSegment) {
+      _returnInputSegment = returnInputSegment;
+    }
+
     @Override
     protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,
         String taskType, File tempDataDir, String suffix)
@@ -221,6 +271,11 @@ public class BaseSingleSegmentConversionExecutorTest {
     @Override
     protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
         throws Exception {
+      if (_returnInputSegment) {
+        return new SegmentConversionResult.Builder().setFile(indexDir)
+            .setTableNameWithType(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))
+            .setSegmentName(SEGMENT_NAME).build();
+      }
       File convertedDir = new File(workingDir, SEGMENT_NAME);
       FileUtils.copyDirectory(indexDir, convertedDir);
       return new SegmentConversionResult.Builder().setFile(convertedDir)

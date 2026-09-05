@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,9 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -165,6 +168,25 @@ public class SegmentConversionUtils {
           return false;
         }
       });
+    }
+  }
+
+  /// Updates the custom map in the segment ZK metadata without uploading the segment.
+  public static void updateSegmentZKMetadata(String tableNameWithType, String segmentName, String uploadURL,
+      String originalSegmentCrc,
+      SegmentZKMetadataCustomMapModifier customMapModifier, @Nullable AuthProvider authProvider)
+      throws Exception {
+    URI controllerBaseUri = FileUploadDownloadClient.extractBaseURI(new URI(uploadURL));
+    URI updateUri = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(controllerBaseUri, tableNameWithType,
+        segmentName);
+    List<Header> headers = new ArrayList<>(AuthProviderUtils.toRequestHeaders(authProvider));
+    headers.add(new BasicHeader(HttpHeaders.IF_MATCH, originalSegmentCrc));
+    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    try (FileUploadDownloadClient client = new FileUploadDownloadClient(sslContext)) {
+      SimpleHttpResponse response = client.updateSegmentZKMetadata(updateUri, customMapModifier.toJsonString(),
+          headers, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      LOGGER.info("Got response {}: {} while updating ZK metadata for table: {}, segment: {}",
+          response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName);
     }
   }
 
