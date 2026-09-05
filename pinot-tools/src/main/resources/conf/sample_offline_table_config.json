@@ -20,6 +20,18 @@
       "column2"
     ]
   },
+  "fieldConfigList": [
+    {
+      "name": "dim1",
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        },
+        "text": {
+        }
+      }
+    }
+  ],
   "metadata": {
     "customConfigs": {
     }
