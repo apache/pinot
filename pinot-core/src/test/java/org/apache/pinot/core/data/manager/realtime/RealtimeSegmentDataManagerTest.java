@@ -67,6 +67,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -78,6 +80,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
@@ -1174,6 +1177,54 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
     }
+  }
+
+  @Test
+  public void testEmptyBatchWithAdvancedNextOffsetMovesCurrentOffset()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._stubConsumeLoop = false;
+      long nextOffset = START_OFFSET_VALUE + 2;
+      injectPartitionGroupConsumer(segmentDataManager, emptyBatch(nextOffset));
+
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE);
+      segmentDataManager.consumeLoop();
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), nextOffset);
+    }
+  }
+
+  @Test
+  public void testEmptyBatchWithUnchangedNextOffsetDoesNotInventOffset()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._stubConsumeLoop = false;
+      injectPartitionGroupConsumer(segmentDataManager, emptyBatch(START_OFFSET_VALUE));
+
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE);
+      segmentDataManager.consumeLoop();
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE);
+    }
+  }
+
+  private static MessageBatch emptyBatch(long offsetOfNextBatch) {
+    MessageBatch messageBatch = mock(MessageBatch.class);
+    when(messageBatch.getMessageCount()).thenReturn(0);
+    when(messageBatch.getUnfilteredMessageCount()).thenReturn(0);
+    when(messageBatch.getOffsetOfNextBatch()).thenReturn(new LongMsgOffset(offsetOfNextBatch));
+    return messageBatch;
+  }
+
+  private static void injectPartitionGroupConsumer(FakeRealtimeSegmentDataManager segmentDataManager,
+      MessageBatch messageBatch)
+      throws Exception {
+    PartitionGroupConsumer partitionGroupConsumer = mock(PartitionGroupConsumer.class);
+    when(partitionGroupConsumer.fetchMessages(any(), anyInt())).thenAnswer(invocation -> {
+      segmentDataManager._shouldStop.set(segmentDataManager, true);
+      return messageBatch;
+    });
+    Field field = RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumer");
+    field.setAccessible(true);
+    field.set(segmentDataManager, partitionGroupConsumer);
   }
 
   @Test
