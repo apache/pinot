@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import java.util.List;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -30,6 +31,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.sql.parsers.CalciteSqlParser.CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests for CalciteSqlParser.
@@ -53,6 +56,108 @@ public class CalciteSqlParserTest {
   public void resetLegacyUnescaping() {
     // Reset to default (false) after each test
     RequestUtils.setUseLegacyLiteralUnescaping(true);
+  }
+
+  @Test
+  public void testPostgreSqlByteaHexLiterals() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT '\\x0102'::bytea");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(), new byte[]{1, 2});
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST('\\xDe Ad Be Ef' AS BYTEA)");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(),
+        new byte[]{(byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef});
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT '\\x'::ByTeA");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(), new byte[0]);
+
+    Expression expression = CalciteSqlParser.compileToExpression("'\\x0102'::bytea");
+    assertEquals(expression.getLiteral().getBinaryValue(), new byte[]{1, 2});
+  }
+
+  /// `::` must bind only to the literal on its left, not to the whole expression accumulated so far, so that a bytea
+  /// constant can be used as the right operand of a comparison.
+  @Test(dataProvider = "binaryOperatorsTakingByteaLiterals")
+  public void testPostgreSqlByteaLiteralBindsTighterThanBinaryOperators(String predicate, String expectedOperator) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT id FROM myTable WHERE bytesColumn " + predicate + " '\\x0102'::bytea");
+    Function filter = pinotQuery.getFilterExpression().getFunctionCall();
+    assertEquals(filter.getOperator(), expectedOperator);
+    assertEquals(filter.getOperands().get(0).getIdentifier().getName(), "bytesColumn");
+    assertEquals(filter.getOperands().get(1).getLiteral().getBinaryValue(), new byte[]{1, 2});
+  }
+
+  @DataProvider
+  public static Object[][] binaryOperatorsTakingByteaLiterals() {
+    return new Object[][]{
+        {"=", "EQUALS"},
+        {"<>", "NOT_EQUALS"},
+        {">", "GREATER_THAN"},
+        {"<=", "LESS_THAN_OR_EQUAL"}
+    };
+  }
+
+  @Test
+  public void testPostgreSqlByteaLiteralInCompoundPredicate() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT id FROM myTable WHERE id = 1 AND bytesColumn = '\\x0102'::bytea");
+    Function and = pinotQuery.getFilterExpression().getFunctionCall();
+    assertEquals(and.getOperator(), "AND");
+    Function byteaEquals = and.getOperands().get(1).getFunctionCall();
+    assertEquals(byteaEquals.getOperands().get(0).getIdentifier().getName(), "bytesColumn");
+    assertEquals(byteaEquals.getOperands().get(1).getLiteral().getBinaryValue(), new byte[]{1, 2});
+  }
+
+  /// The infix and standard cast spellings must normalize to the same binary literal wherever they appear.
+  @Test
+  public void testPostgreSqlByteaLiteralMatchesStandardCastSpelling() {
+    for (String bytea : List.of("'\\x0102'::bytea", "'\\x0102' :: ByTeA", "CAST('\\x0102' AS BYTEA)",
+        "cast('\\x0102' as bytea)", "X'0102'")) {
+      PinotQuery pinotQuery =
+          CalciteSqlParser.compileToPinotQuery("SELECT id FROM myTable WHERE bytesColumn = " + bytea);
+      assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
+          .getBinaryValue(), new byte[]{1, 2}, bytea);
+      assertEquals(CalciteSqlParser.compileToExpression(bytea).getLiteral().getBinaryValue(), new byte[]{1, 2},
+          bytea);
+    }
+  }
+
+  @Test(dataProvider = "invalidPostgreSqlByteaLiterals")
+  public void testInvalidPostgreSqlByteaHexLiterals(String sql, String expectedMessageFragment) {
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(sql));
+    assertTrue(ExceptionUtils.getStackTrace(e).contains(expectedMessageFragment),
+        "Expected <" + expectedMessageFragment + "> for " + sql + " but got: " + e.getMessage());
+  }
+
+  private static final String INVALID_CONSTANT = "Invalid PostgreSQL BYTEA hex constant";
+  private static final String NOT_A_CONSTANT = "BYTEA casts are supported only for quoted hex constants";
+
+  @DataProvider
+  public static Object[][] invalidPostgreSqlByteaLiterals() {
+    return new Object[][]{
+        // Malformed hex constants.
+        {"SELECT '\\x0'::bytea", INVALID_CONSTANT},
+        {"SELECT '\\x0g'::bytea", INVALID_CONSTANT},
+        {"SELECT '\\x0 1'::bytea", INVALID_CONSTANT},
+        {"SELECT '0102'::bytea", INVALID_CONSTANT},
+        // Full-width and non-Latin digits are hex digits to Character.digit but not to PostgreSQL.
+        {"SELECT '\\x\uFF21\uFF22'::bytea", INVALID_CONSTANT},
+        {"SELECT '\\x\u0660\u0661'::bytea", INVALID_CONSTANT},
+        // Non-ASCII whitespace is whitespace to Character.isWhitespace but not to PostgreSQL.
+        {"SELECT '\\x01\u205F02'::bytea", INVALID_CONSTANT},
+
+        // BYTEA casts of something that is not a constant.
+        {"SELECT bytesColumn::bytea FROM myTable", NOT_A_CONSTANT},
+        {"SELECT CAST(bytesColumn AS BYTEA) FROM myTable", NOT_A_CONSTANT},
+        {"SELECT id FROM myTable WHERE id = 1 AND bytesColumn::bytea = X'01'", NOT_A_CONSTANT},
+
+        // `::` to a target type other than BYTEA.
+        {"SELECT 1::int", "not for target type 'INTEGER'"},
+        {"SELECT bytesColumn::varchar FROM myTable", "not for target type 'VARCHAR'"},
+
+        // The item accessor binds tighter than `::`, so the target type does not survive as a type spec.
+        {"SELECT bytesColumn::bytea[1] FROM myTable", "Unsupported PostgreSQL :: cast target"}
+    };
   }
 
   @Test
@@ -100,6 +205,7 @@ public class CalciteSqlParserTest {
         new Object[]{"string"},
         new Object[]{"varchar"},
         new Object[]{"bytes"},
+        new Object[]{"bytea"},
         new Object[]{"binary"},
         new Object[]{"varbinary"},
         new Object[]{"variant"},
