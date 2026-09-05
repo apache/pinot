@@ -42,7 +42,8 @@ public final class VectorIndexConfigValidator {
   // HNSW-specific property keys
   static final Set<String> HNSW_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("maxCon", "beamWidth", "maxDimensions", "maxBufferSizeMB",
-          "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs")));
+          "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs",
+          "refreshMinIntervalMs", "refreshWaitTimeoutMs")));
 
   // IVF_FLAT-specific property keys
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
@@ -260,6 +261,33 @@ public final class VectorIndexConfigValidator {
     validatePositiveIntProperty(properties, "beamWidth", "HNSW beamWidth");
     validatePositiveIntProperty(properties, "maxDimensions", "HNSW maxDimensions");
     validatePositiveDoubleProperty(properties, "maxBufferSizeMB", "HNSW maxBufferSizeMB");
+    // Rejected here rather than only in MutableVectorIndex: the constructor guard runs when a consuming segment is
+    // created on the server, which would stop ingestion for the partition instead of failing the table config.
+    validateLongProperty(properties, "refreshMinIntervalMs", "HNSW refreshMinIntervalMs", 0L);
+    validateLongProperty(properties, "refreshWaitTimeoutMs", "HNSW refreshWaitTimeoutMs", 1L);
+  }
+
+  /// Absent means "use the default"; anything present must parse and satisfy the bound.
+  ///
+  /// Deliberately parses exactly as the consumer does -- no trimming -- so a value this accepts cannot then fail
+  /// on the server when a consuming segment is created, which would stop ingestion for the partition rather than
+  /// rejecting the table config. A key present with a null value is rejected for the same reason: `getOrDefault`
+  /// does not substitute the default for it.
+  private static void validateLongProperty(Map<String, String> properties, String key, String displayName,
+      long minInclusive) {
+    if (!properties.containsKey(key)) {
+      return;
+    }
+    String value = properties.get(key);
+    long longValue;
+    try {
+      longValue = Long.parseLong(value);
+    } catch (NumberFormatException | NullPointerException e) {
+      throw new IllegalArgumentException(displayName + " must be a valid long, got: '" + value + "'");
+    }
+    if (longValue < minInclusive) {
+      throw new IllegalArgumentException(displayName + " must be >= " + minInclusive + ", got: " + longValue);
+    }
   }
 
   /// Validates IVF_FLAT-specific property values.
