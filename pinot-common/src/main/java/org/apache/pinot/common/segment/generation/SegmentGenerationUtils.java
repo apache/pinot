@@ -56,6 +56,9 @@ public class SegmentGenerationUtils {
 
   private static final String OFFLINE = "OFFLINE";
   private static final String REALTIME = "REALTIME";
+  private static final String RESPONSE_TYPE = "responseType";
+  private static final String CONFIGS = "configs";
+  private static final String REDACTED_TABLE_CONFIG_RESPONSE_TYPE = "redactedTableConfig";
   public static final String PINOT_PLUGINS_TAR_GZ = "pinot-plugins.tar.gz";
   public static final String PINOT_PLUGINS_DIR = "pinot-plugins-dir";
 
@@ -122,7 +125,9 @@ public class SegmentGenerationUtils {
     try {
       tableConfigURI = new URI(tableConfigURIStr);
     } catch (URISyntaxException e) {
-      throw new RuntimeException("Table config URI is not valid - '" + tableConfigURIStr + "'", e);
+      // URI user-info and query parameters can contain credentials. Do not retain the input or the parser exception,
+      // whose message can echo the complete URI, in a diagnostic that callers commonly log.
+      throw new RuntimeException("Table config URI is not valid");
     }
     String scheme = tableConfigURI.getScheme();
     String tableConfigJson;
@@ -131,22 +136,33 @@ public class SegmentGenerationUtils {
       try (PinotFS pinotFS = PinotFSFactory.create(scheme);) {
         tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to open table config file stream on Pinot fs - '" + tableConfigURI + "'", e);
+        throw new RuntimeException("Failed to open table config file stream on Pinot fs");
       }
     } else {
       try {
         tableConfigJson = fetchUrl(tableConfigURI.toURL(), authToken, tlsSpec);
       } catch (IOException e) {
-        throw new RuntimeException(
-            "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
+        throw new RuntimeException("Failed to read from table config file data stream on Pinot fs");
       }
     }
+    return parseTableConfig(tableConfigJson);
+  }
+
+  static TableConfig parseTableConfig(String tableConfigJson) {
     // Controller API returns a wrapper of table config.
     JsonNode tableJsonNode;
     try {
       tableJsonNode = JsonUtils.stringToJsonNode(tableConfigJson);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
+      // Both the input and Jackson's exception can include literal config values.
+      throw new RuntimeException("Failed to decode table config into JSON");
+    }
+    if (REDACTED_TABLE_CONFIG_RESPONSE_TYPE.equals(tableJsonNode.path(RESPONSE_TYPE).asText())) {
+      JsonNode configsNode = tableJsonNode.get(CONFIGS);
+      if (configsNode == null || !configsNode.isObject()) {
+        throw new RuntimeException("Failed to decode table config: invalid controller response envelope");
+      }
+      tableJsonNode = configsNode;
     }
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
@@ -156,7 +172,7 @@ public class SegmentGenerationUtils {
     try {
       return JsonUtils.jsonNodeToObject(tableJsonNode, TableConfig.class);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
+      throw new RuntimeException("Failed to decode table config from JSON");
     }
   }
 

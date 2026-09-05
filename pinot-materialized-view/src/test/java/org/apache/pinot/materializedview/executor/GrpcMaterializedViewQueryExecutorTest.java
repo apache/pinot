@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.materializedview.executor;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +37,8 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -200,6 +203,23 @@ public class GrpcMaterializedViewQueryExecutorTest {
 
     /// Auth headers are preserved alongside the forced flag.
     assertEquals(request.getMetadataMap().get("Authorization"), "Bearer token", "Auth headers must be preserved");
+  }
+
+  @Test
+  public void testFailureDiagnosticsDoNotExposeExceptionMessages() {
+    String opaqueLiteral = "opaque-resolved-literal";
+
+    IOException executionFailure = GrpcMaterializedViewQueryExecutor.safeQueryExecutionFailure(
+        new IOException("Broker rejected SQL containing " + opaqueLiteral));
+    RuntimeException streamFailure = GrpcMaterializedViewQueryExecutor.safeQueryStreamFailure(
+        new IllegalStateException("Remote stream failed for " + opaqueLiteral));
+
+    assertTrue(executionFailure.getMessage().contains(IOException.class.getName()));
+    assertFalse(executionFailure.getMessage().contains(opaqueLiteral));
+    assertNull(executionFailure.getCause());
+    assertTrue(streamFailure.getMessage().contains(IllegalStateException.class.getName()));
+    assertFalse(streamFailure.getMessage().contains(opaqueLiteral));
+    assertNull(streamFailure.getCause());
   }
 
   private InstanceConfig buildBrokerConfig(String instanceName, String hostname, int grpcPort) {

@@ -71,6 +71,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -132,6 +133,8 @@ public class PinotDdlRestletResource {
   /// in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
   /// sizing reverse-proxy body limits should plan accordingly.
   private static final int MAX_DDL_SQL_CHARS = 256 * 1024;
+  private static final String ACTIVE_TASKS_BLOCKED_MESSAGE =
+      "DROP TABLE blocked because active running tasks exist";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -200,7 +203,7 @@ public class PinotDdlRestletResource {
     try {
       compiled = DdlCompiler.compile(request.getSql(), compileCtx);
     } catch (DdlCompilationException e) {
-      throw badRequest(e.getMessage());
+      throw badRequest("Invalid DDL statement");
     }
     // Any other RuntimeException is a programmer error or unexpected upstream failure;
     // let it propagate to the JAX-RS default handler as 500 so monitoring fires on it
@@ -344,6 +347,7 @@ public class PinotDdlRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
     }
+    rejectRedactionMarkers(create.getTableConfig());
 
     // Look up the stored schema first. When the second physical variant of a hybrid pair is
     // created, the stored schema is the canonical source of metadata (primary keys, tags,
@@ -446,12 +450,10 @@ public class PinotDdlRestletResource {
       // Don't append a "remove via DELETE /schemas" hint here: arbitrary RuntimeException /
       // IOException from addTable can be a transient ZK or Helix blip, and pointing the
       // operator at a destructive schema-deletion command in response to a transient failure
-      // would encourage premature cleanup. The error message is logged with the original
-      // cause so an operator can investigate via log/metrics.
-      // ControllerApplicationException(LOGGER, ...) logs the exception, so don't double-log here.
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to create table " + tableNameWithType + ": " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      // would encourage premature cleanup. Do not attach the original exception because it may
+      // have formatted values from the submitted table config.
+      throw new ControllerApplicationException(LOGGER, "Failed to create table " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -490,8 +492,8 @@ public class PinotDdlRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Failed to create table " + tableNameWithType + " after concurrent schema create: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+          "Failed to create table " + tableNameWithType + " after concurrent schema create",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -607,15 +609,22 @@ public class PinotDdlRestletResource {
       // The Pinot validators consistently raise these for user-facing config errors
       // (upsert without primary keys, field configs referencing non-existent columns,
       // bad task configs, etc.). Surface as 400 — the caller can fix their DDL.
-      throw new ControllerApplicationException(LOGGER,
-          "Table config validation failed: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Table config validation failed", Response.Status.BAD_REQUEST);
     } catch (Exception e) {
       // Any other exception is unexpected — most likely a controller-side defect (e.g. NPE in
       // a registry validator, ZK connectivity blip during validateTableTenantConfig). 400 would
       // mislead the caller into "fix your DDL"; surface as 500 so monitoring picks it up.
+      throw new ControllerApplicationException(LOGGER, "Internal error during table config validation",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private void rejectRedactionMarkers(TableConfig tableConfig) {
+    try {
+      TableConfigRedactionUtils.restoreRedactedValues(tableConfig, null);
+    } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER,
-          "Internal error during table config validation: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+          "A redacted credential cannot be used when creating a table", Response.Status.BAD_REQUEST);
     }
   }
 
@@ -690,13 +699,13 @@ public class PinotDdlRestletResource {
     // preflight on the symmetric DROP side. IF NOT EXISTS does NOT suppress the type-mismatch
     // error: IF NOT EXISTS suppresses "object not found", not "wrong DDL verb for this object".
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    TableConfig existingOfflineConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    TableConfig existingOfflineConfig = getStoredOfflineTableConfig(tableNameWithType);
     if (existingOfflineConfig != null) {
       if (existingOfflineConfig.isMaterializedView()) {
         if (create.isIfNotExists()) {
           // Echo the persisted state, not the client-attempted body: an idempotent re-run
           // must not advertise the new (rejected) config as if it had been applied.
-          populateNoOpResponseFromPersisted(response, existingOfflineConfig, schemaName);
+          populateNoOpResponseFromPersisted(response, existingOfflineConfig, schemaName, headers, httpRequest);
           response.setMessage("Materialized view " + tableNameWithType
               + " already exists; CREATE IF NOT EXISTS is a no-op.");
           return Response.ok(response).build();
@@ -730,6 +739,7 @@ public class PinotDdlRestletResource {
               + "REALTIME table first.",
           Response.Status.BAD_REQUEST);
     }
+    rejectRedactionMarkers(create.getTableConfig());
 
     // A pre-existing schema can survive a prior failed CREATE (addSchema succeeded but
     // addTable failed). Accept it iff the column shape matches; otherwise 409 so the
@@ -778,7 +788,8 @@ public class PinotDdlRestletResource {
       }
       _pinotHelixResourceManager.addTable(create.getTableConfig());
     } catch (TableAlreadyExistsException e) {
-      Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+      Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response,
+          headers, httpRequest);
       if (noOp != null) {
         return noOp;
       }
@@ -788,15 +799,14 @@ public class PinotDdlRestletResource {
       // schema, mirroring the CREATE TABLE recovery path so the two endpoints behave the same
       // under concurrent provisioning.
       return retryCreateMaterializedViewAfterSchemaRace(create, response, schemaName,
-          tableNameWithType, e);
+          tableNameWithType, e, headers, httpRequest);
     } catch (Exception e) {
       // Same intentional decision as CREATE TABLE: do not roll back the schema on a generic
       // addTable failure. A concurrent sibling CREATE may already be reusing the schema and
       // a non-atomic orphan-check + deleteSchema would race with it. Operators can DELETE
       // stale schemas explicitly via /schemas.
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to create materialized view " + tableNameWithType + ": " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Failed to create materialized view " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     response.setMessage("Successfully created materialized view " + tableNameWithType);
@@ -806,8 +816,9 @@ public class PinotDdlRestletResource {
 
   private Response retryCreateMaterializedViewAfterSchemaRace(CompiledCreateMaterializedView create,
       DdlExecutionResponse response, String schemaName, String tableNameWithType,
-      SchemaAlreadyExistsException schemaFailure) {
-    Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+      SchemaAlreadyExistsException schemaFailure, HttpHeaders headers, Request httpRequest) {
+    Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response,
+        headers, httpRequest);
     if (noOp != null) {
       return noOp;
     }
@@ -829,16 +840,16 @@ public class PinotDdlRestletResource {
     try {
       _pinotHelixResourceManager.addTable(create.getTableConfig());
     } catch (TableAlreadyExistsException e) {
-      Response noOp2 = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+      Response noOp2 = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response,
+          headers, httpRequest);
       if (noOp2 != null) {
         return noOp2;
       }
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Failed to create materialized view " + tableNameWithType
-              + " after concurrent schema create: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+          "Failed to create materialized view " + tableNameWithType + " after concurrent schema create",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     response.setMessage("Successfully created materialized view " + tableNameWithType);
     LOGGER.info("DDL created materialized view {} after concurrent schema create", tableNameWithType);
@@ -846,30 +857,19 @@ public class PinotDdlRestletResource {
   }
 
   /// Overload: takes an already-fetched [TableConfig] (the fast-path pre-check has it in
-  /// hand) and only re-fetches the schema. Avoids a redundant ZK read while preserving the
-  /// "echo persisted, not client-attempted" contract documented on the other overload.
+  /// hand) and only re-fetches the schema. The persisted config is returned only after the normal
+  /// read authorization check and is redacted before it is added to the response.
   private void populateNoOpResponseFromPersisted(DdlExecutionResponse response,
-      TableConfig persistedTableConfig, String schemaName) {
+      TableConfig persistedTableConfig, String schemaName, HttpHeaders headers, Request httpRequest) {
     if (persistedTableConfig != null) {
-      response.setTableConfig(toJson(persistedTableConfig));
+      ResourceUtils.checkPermissionAndAccess(persistedTableConfig.getTableName(), httpRequest, headers,
+          AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
+      response.setTableConfig(toJson(TableConfigRedactionUtils.redact(persistedTableConfig)));
     }
     Schema persistedSchema = _pinotHelixResourceManager.getSchema(schemaName);
     if (persistedSchema != null) {
       response.setSchema(toJson(persistedSchema));
     }
-  }
-
-  /// Rewrites `response.tableConfig` and `response.schema` to reflect what is currently
-  /// persisted in Helix/ZK rather than what the client submitted. Without this rewrite, a
-  /// `CREATE MATERIALIZED VIEW IF NOT EXISTS` that lands on an existing MV returns 200 with
-  /// the client-attempted body echoed back — leading an operator running an idempotent
-  /// deployment script to believe their drifted body was applied when in fact the persisted
-  /// MV is unchanged. If either ZK read returns null (transient blip, raced DROP, etc.) the
-  /// corresponding response field is left as-is so the operator never sees an empty payload.
-  private void populateNoOpResponseFromPersisted(DdlExecutionResponse response,
-      String tableNameWithType, String schemaName) {
-    populateNoOpResponseFromPersisted(response,
-        _pinotHelixResourceManager.getTableConfig(tableNameWithType), schemaName);
   }
 
   /// CREATE MATERIALIZED VIEW IF NOT EXISTS no-op helper for `addTable` retry catches. Returns
@@ -880,18 +880,23 @@ public class PinotDdlRestletResource {
   /// (`executeCreateMaterializedView` main path, schema-race retry, and inner addTable retry).
   @Nullable
   private Response mvIfNotExistsNoOpResponse(boolean ifNotExists, String tableNameWithType,
-      String schemaName, DdlExecutionResponse response) {
+      String schemaName, DdlExecutionResponse response, HttpHeaders headers, Request httpRequest) {
     if (!ifNotExists) {
       return null;
     }
-    TableConfig raced = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    TableConfig raced = getStoredOfflineTableConfig(tableNameWithType);
     if (raced == null || !raced.isMaterializedView()) {
       return null;
     }
-    populateNoOpResponseFromPersisted(response, tableNameWithType, schemaName);
+    populateNoOpResponseFromPersisted(response, raced, schemaName, headers, httpRequest);
     response.setMessage("Materialized view " + tableNameWithType
         + " already exists; CREATE IF NOT EXISTS is a no-op.");
     return Response.ok(response).build();
+  }
+
+  private TableConfig getStoredOfflineTableConfig(String tableNameWithType) {
+    return _pinotHelixResourceManager.getOfflineTableConfig(
+        TableNameBuilder.extractRawTableName(tableNameWithType), false, false);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -933,7 +938,7 @@ public class PinotDdlRestletResource {
     List<String> targets = new ArrayList<>(2);
     for (String candidate : candidates) {
       if (_pinotHelixResourceManager.hasTable(candidate)
-          || _pinotHelixResourceManager.getTableConfig(candidate) != null) {
+          || PinotTableRestletResource.getUnresolvedTableConfig(_pinotHelixResourceManager, candidate) != null) {
         targets.add(candidate);
       }
     }
@@ -974,7 +979,8 @@ public class PinotDdlRestletResource {
     // no-op for a missing target — `targets` is non-empty here, so we know at least one
     // candidate table really exists, and we can compare its shape against the requested form.
     for (String target : targets) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(target);
+      TableConfig tableConfig =
+          PinotTableRestletResource.getUnresolvedTableConfig(_pinotHelixResourceManager, target);
       if (tableConfig != null && tableConfig.isMaterializedView()) {
         throw new ControllerApplicationException(LOGGER,
             "Table " + target + " is a materialized view. "
@@ -1013,13 +1019,13 @@ public class PinotDdlRestletResource {
         if (restorer != null && restorer.restore()) {
           tasksCleaned = false;
         }
-        LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
+        LOGGER.warn("DROP TABLE on {} failed with status {}", target, e.getResponse().getStatus());
         throw dropFailed(target, dropped, tasksCleaned, e.getResponse().getStatus(), e);
       } catch (Exception e) {
         if (restorer != null && restorer.restore()) {
           tasksCleaned = false;
         }
-        LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
+        LOGGER.warn("DROP TABLE on {} failed unexpectedly ({})", target, e.getClass().getName());
         throw dropFailed(target, dropped, tasksCleaned,
             Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
       }
@@ -1072,8 +1078,9 @@ public class PinotDdlRestletResource {
     ResourceUtils.checkPermissionAndAccess(tableNameWithType, httpRequest, headers,
         AccessType.DELETE, Actions.Table.DELETE_TABLE, _accessControlFactory, LOGGER);
 
-    boolean exists = _pinotHelixResourceManager.hasTable(tableNameWithType)
-        || _pinotHelixResourceManager.getTableConfig(tableNameWithType) != null;
+    TableConfig tableConfig =
+        PinotTableRestletResource.getUnresolvedTableConfig(_pinotHelixResourceManager, tableNameWithType);
+    boolean exists = _pinotHelixResourceManager.hasTable(tableNameWithType) || tableConfig != null;
 
     DdlExecutionResponse response = new DdlExecutionResponse()
         .setOperation(DdlOperation.DROP_MATERIALIZED_VIEW)
@@ -1094,7 +1101,6 @@ public class PinotDdlRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       // hasTable was true but the config disappeared between the two reads. Same diagnosis as
       // the SHOW CREATE path: ZK torn write or concurrent delete. Surface as 500 so monitoring
@@ -1145,7 +1151,7 @@ public class PinotDdlRestletResource {
       if (restorer != null && restorer.restore()) {
         tasksCleaned = false;
       }
-      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed: {}", tableNameWithType, e.getMessage());
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed ({})", tableNameWithType, e.getClass().getName());
       throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           e.getResponse().getStatus(), e);
     } catch (IllegalStateException e) {
@@ -1155,15 +1161,15 @@ public class PinotDdlRestletResource {
       if (restorer != null && restorer.restore()) {
         tasksCleaned = false;
       }
-      LOGGER.warn("DROP MATERIALIZED VIEW on {} blocked: {}", tableNameWithType, e.getMessage());
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} blocked ({})", tableNameWithType, e.getClass().getName());
       throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           Response.Status.CONFLICT.getStatusCode(), e);
     } catch (Exception e) {
       if (restorer != null && restorer.restore()) {
         tasksCleaned = false;
       }
-      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed unexpectedly: {}",
-          tableNameWithType, e.toString());
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed unexpectedly ({})",
+          tableNameWithType, e.getClass().getName());
       throw dropFailed(tableNameWithType, List.of(), tasksCleaned,
           Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
     }
@@ -1203,7 +1209,8 @@ public class PinotDdlRestletResource {
   private void assertNoActiveTasksBeforeDrop(List<String> targets) {
     List<String> pendingTasks = new ArrayList<>();
     for (String target : targets) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(target);
+      TableConfig tableConfig =
+          PinotTableRestletResource.getUnresolvedTableConfig(_pinotHelixResourceManager, target);
       if (tableConfig == null || tableConfig.getTaskConfig() == null) {
         continue;
       }
@@ -1238,7 +1245,8 @@ public class PinotDdlRestletResource {
   @Nullable
   private TaskCleanupRestorer cleanupTableTasksBeforeDrop(String tableWithType)
       throws Exception {
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableWithType);
+    TableConfig tableConfig =
+        PinotTableRestletResource.getUnresolvedTableConfig(_pinotHelixResourceManager, tableWithType);
     if (tableConfig == null || tableConfig.getTaskConfig() == null) {
       return null;
     }
@@ -1304,8 +1312,8 @@ public class PinotDdlRestletResource {
         restoreTaskSchedules(_tableWithType, _tableConfig, _removedSchedules);
         return true;
       } catch (ControllerApplicationException restoreFailure) {
-        LOGGER.warn("DROP TABLE on {} could not restore task schedules after deleteTable rejected the drop: {}",
-            _tableWithType, restoreFailure.getMessage());
+        LOGGER.warn("DROP TABLE on {} could not restore task schedules after deleteTable rejected the drop",
+            _tableWithType);
         return false;
       }
     }
@@ -1321,8 +1329,8 @@ public class PinotDdlRestletResource {
     } catch (Exception e) {
       restoreTaskSchedulesInMemory(tableConfig, removedSchedules);
       LOGGER.warn("Unable to remove task schedules before DROP TABLE on {}. "
-              + "Proceeding with table deletion because no active tasks were found. Reason: {}",
-          tableConfig.getTableName(), e.getMessage());
+              + "Proceeding with table deletion because no active tasks were found",
+          tableConfig.getTableName());
       return false;
     }
   }
@@ -1335,8 +1343,8 @@ public class PinotDdlRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "DROP TABLE detected active tasks after clearing task schedules for " + tableWithType
-              + " and failed to restore those schedules: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+              + " and failed to restore those schedules",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -1374,7 +1382,7 @@ public class PinotDdlRestletResource {
 
   private ControllerApplicationException activeTasksBlocked(List<String> pendingTasks, String mutationContext) {
     return new ControllerApplicationException(LOGGER,
-        "DROP TABLE blocked because active running tasks exist: " + pendingTasks
+        ACTIVE_TASKS_BLOCKED_MESSAGE + ": " + pendingTasks
             + ". " + mutationContext + "; retry once the tasks finish.",
         Response.Status.BAD_REQUEST);
   }
@@ -1386,7 +1394,11 @@ public class PinotDdlRestletResource {
 
   private ControllerApplicationException dropFailed(String target, List<String> dropped,
       boolean taskSchedulesCleared, int statusCode, Exception cause) {
-    String causeDesc = cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
+    // Preserve only the controller-owned active-task diagnosis. Other exception text can contain values formatted
+    // from a table config, so it is intentionally reduced to the exception type.
+    String causeDesc = cause instanceof ControllerApplicationException && cause.getMessage() != null
+        && cause.getMessage().startsWith(ACTIVE_TASKS_BLOCKED_MESSAGE)
+        ? "active running tasks exist" : cause.getClass().getSimpleName();
     String partialPrefix = dropped.isEmpty() ? "" : "Partial DROP TABLE: dropped " + dropped + ", ";
     String reCreateHint = dropped.isEmpty() ? ""
         : ". The successfully-dropped variant must be re-created if the original DROP was unintended.";
@@ -1397,7 +1409,7 @@ public class PinotDdlRestletResource {
         : "";
     return new ControllerApplicationException(LOGGER,
         partialPrefix + "failed to drop " + target + ": " + causeDesc + reCreateHint + taskScheduleHint,
-        statusCode, cause);
+        statusCode);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -1473,7 +1485,9 @@ public class PinotDdlRestletResource {
       }
     }
 
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    TableConfig tableConfig = resolvedType == TableType.OFFLINE
+        ? _pinotHelixResourceManager.getOfflineTableConfig(fullyQualifiedRaw, false, false)
+        : _pinotHelixResourceManager.getRealtimeTableConfig(fullyQualifiedRaw, false, false);
     if (tableConfig == null) {
       // hasTable returned true but getTableConfig returned null. This indicates ZK inconsistency
       // (torn write or concurrent delete between the two reads), not a missing table from the
@@ -1523,7 +1537,7 @@ public class PinotDdlRestletResource {
     // carries the correct qualifier even when the caller omits the db. prefix in the SQL.
     String ddl;
     try {
-      ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
+      ddl = CanonicalDdlEmitter.emit(schema, TableConfigRedactionUtils.redact(tableConfig), database);
     } catch (IllegalArgumentException e) {
       // The emitter explicitly throws IllegalArgumentException to signal "this schema or config
       // cannot be expressed in the current DDL grammar":
@@ -1592,7 +1606,8 @@ public class PinotDdlRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    TableConfig tableConfig =
+        _pinotHelixResourceManager.getOfflineTableConfig(fullyQualifiedRaw, false, false);
     if (tableConfig == null) {
       throw new ControllerApplicationException(LOGGER,
           "Table " + tableNameWithType + " has IdealState but no TableConfig in ZK; "
@@ -1628,7 +1643,7 @@ public class PinotDdlRestletResource {
 
     String ddl;
     try {
-      ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
+      ddl = CanonicalDdlEmitter.emit(schema, TableConfigRedactionUtils.redact(tableConfig), database);
     } catch (IllegalArgumentException e) {
       // IllegalArgumentException from the MV branch of CanonicalDdlEmitter covers the
       // caller-actionable failure modes: non-round-trippable cron schedule (Q1=A —
