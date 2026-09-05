@@ -22,11 +22,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfOnDiskVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
@@ -89,6 +100,164 @@ public final class BenchmarkVectorFilterWorkloads {
     benchmarkExactBaselines(out);
     benchmarkFilterAwareAnn(out);
     benchmarkApproximateRadius(out);
+    benchmarkConcurrentMutableIngestAndQuery(out);
+  }
+
+  /// Filtered search against a consuming segment while that segment is still ingesting. This is the case the
+  /// near-real-time reopen exists for, and the one whose cost is invisible to every other scenario here: the
+  /// others index everything up front, so their searcher is never stale and never reopens.
+  ///
+  /// Reported alongside throughput is the reopen count. Queries do not reopen the searcher themselves -- they wait
+  /// for a background thread -- so the gap between query count and reopen count is the sharing that keeps a high
+  /// query rate from flushing the writer once per query.
+  private static void benchmarkConcurrentMutableIngestAndQuery(PrintStream out)
+      throws Exception {
+    out.println();
+    out.println("=== Concurrent Mutable Ingest + Filtered Query ===");
+    out.printf("%-28s %14s %10s %10s %10s %10s%n", "Workload", "ingest(docs/s)", "QPS", "p50(us)", "p95(us)",
+        "p99(us)");
+
+    int seedDocs = 4000;
+    int readerThreads = 8;
+    long ingestPerSec = Long.getLong("pinot.perf.vector.filters.ingestPerSec", 2000L);
+    long runMs = Long.getLong("pinot.perf.vector.filters.concurrentRunMs", 10_000L);
+    long warmupMs = Long.getLong("pinot.perf.vector.filters.concurrentWarmupMs", 3_000L);
+
+    RealtimeLuceneTextIndexSearcherPool.init(readerThreads * 2);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", String.valueOf(DIMENSION));
+    properties.put("commitDocs", String.valueOf(Integer.MAX_VALUE));
+    properties.put("commitIntervalMs", String.valueOf(TimeUnit.DAYS.toMillis(1)));
+    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", DIMENSION, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
+    MutableVectorIndex index =
+        new MutableVectorIndex("benchmarkConcurrentVector_" + System.nanoTime(), COLUMN_NAME, config);
+    try {
+      Random seeder = new Random(SEED);
+      for (int i = 0; i < seedDocs; i++) {
+        index.add(boxed(BenchmarkVectorIndex.generateGaussianVectors(1, DIMENSION, seeder.nextLong())[0]), null, i);
+      }
+      // ~1% of the seeded rows, which is the selectivity range where a filtered scan is worth doing at all.
+      MutableRoaringBitmap allowed = new MutableRoaringBitmap();
+      for (int i = 0; i < seedDocs; i += 100) {
+        allowed.add(i);
+      }
+
+      AtomicBoolean stop = new AtomicBoolean();
+      AtomicLong ingested = new AtomicLong();
+      AtomicLong queried = new AtomicLong();
+      List<List<Long>> perReaderLatencies = new ArrayList<>();
+      Thread writer = new Thread(() -> {
+        Random wr = new Random(SEED + 1);
+        int docId = seedDocs;
+        long intervalNs = ingestPerSec > 0 ? 1_000_000_000L / ingestPerSec : 0L;
+        long next = System.nanoTime();
+        while (!stop.get()) {
+          index.add(boxed(BenchmarkVectorIndex.generateGaussianVectors(1, DIMENSION, wr.nextLong())[0]), null,
+              docId++);
+          ingested.incrementAndGet();
+          if (intervalNs > 0) {
+            next += intervalNs;
+            long sleepNs = next - System.nanoTime();
+            if (sleepNs > 0) {
+              try {
+                Thread.sleep(sleepNs / 1_000_000L, (int) (sleepNs % 1_000_000L));
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+              }
+            }
+          }
+        }
+      }, "vector-bench-writer");
+
+      List<Thread> readers = new ArrayList<>(readerThreads);
+      CountDownLatch ready = new CountDownLatch(readerThreads);
+      for (int r = 0; r < readerThreads; r++) {
+        List<Long> latencies = Collections.synchronizedList(new ArrayList<>());
+        perReaderLatencies.add(latencies);
+        int readerId = r;
+        readers.add(new Thread(() -> {
+          Random qr = new Random(SEED + 100 + readerId);
+          ready.countDown();
+          while (!stop.get()) {
+            float[] query = BenchmarkVectorIndex.generateGaussianVectors(1, DIMENSION, qr.nextLong())[0];
+            long start = System.nanoTime();
+            index.getDocIds(query, TOP_K, allowed);
+            latencies.add(System.nanoTime() - start);
+            queried.incrementAndGet();
+          }
+        }, "vector-bench-reader-" + readerId));
+      }
+
+      writer.start();
+      readers.forEach(Thread::start);
+      ready.await();
+      // Discard the warmup window: the first queries pay class loading, JIT, and the first graph build.
+      Thread.sleep(warmupMs);
+      long queriesAtWarmupEnd = queried.get();
+      long ingestedAtWarmupEnd = ingested.get();
+      // Counters are cumulative from construction, so snapshot here: only the delta over the measured window is
+      // comparable with the query count reported below.
+      Map<String, Object> debugAtWarmupEnd = index.getIndexDebugInfo();
+      long reopensAtWarmupEnd = ((Number) debugAtWarmupEnd.get("searcherRefreshCount")).longValue();
+      long waitsAtWarmupEnd = ((Number) debugAtWarmupEnd.get("searcherRefreshWaitCount")).longValue();
+      List<List<Long>> measured = new ArrayList<>();
+      for (List<Long> latencies : perReaderLatencies) {
+        synchronized (latencies) {
+          latencies.clear();
+        }
+        measured.add(latencies);
+      }
+      long startNs = System.nanoTime();
+      Thread.sleep(runMs);
+      long elapsedMs = (System.nanoTime() - startNs) / 1_000_000L;
+      long queries = queried.get() - queriesAtWarmupEnd;
+      long docs = ingested.get() - ingestedAtWarmupEnd;
+      stop.set(true);
+      writer.join(TimeUnit.SECONDS.toMillis(30));
+      for (Thread reader : readers) {
+        reader.join(TimeUnit.SECONDS.toMillis(30));
+      }
+      // Read after the threads stop, so the counters cover exactly the measured window.
+      Map<String, Object> debugAtEnd = index.getIndexDebugInfo();
+      long reopens = ((Number) debugAtEnd.get("searcherRefreshCount")).longValue() - reopensAtWarmupEnd;
+      long waits = ((Number) debugAtEnd.get("searcherRefreshWaitCount")).longValue() - waitsAtWarmupEnd;
+
+      List<Long> all = new ArrayList<>();
+      for (List<Long> latencies : measured) {
+        synchronized (latencies) {
+          all.addAll(latencies);
+        }
+      }
+      Collections.sort(all);
+      out.printf("%-28s %14.1f %10.1f %10.1f %10.1f %10.1f%n",
+          ingestPerSec + "/s_" + readerThreads + "_readers", docs * 1000.0 / elapsedMs, queries * 1000.0 / elapsedMs,
+          percentileMicros(all, 0.50), percentileMicros(all, 0.95), percentileMicros(all, 0.99));
+      // Deltas over the measured window, not the cumulative counters: only these are comparable with the query
+      // count above. waits/reopens is the sharing -- how many queries one reopen served.
+      out.printf("  reopens=%d waits=%d luceneSegments=%s (waits per reopen is the sharing)%n", reopens, waits,
+          debugAtEnd.get("luceneSegments"));
+    } finally {
+      index.close();
+    }
+  }
+
+  private static double percentileMicros(List<Long> sortedNanos, double percentile) {
+    if (sortedNanos.isEmpty()) {
+      return 0.0;
+    }
+    int idx = Math.min(sortedNanos.size() - 1, (int) (sortedNanos.size() * percentile));
+    return sortedNanos.get(idx) / 1000.0;
+  }
+
+  private static Float[] boxed(float[] values) {
+    Float[] boxedValues = new Float[values.length];
+    for (int i = 0; i < values.length; i++) {
+      boxedValues[i] = values[i];
+    }
+    return boxedValues;
   }
 
   private static void benchmarkExactBaselines(PrintStream out) {

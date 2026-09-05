@@ -25,13 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -39,6 +40,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -289,8 +291,8 @@ public class MutableVectorIndexTest {
           () -> index.getDocIds(new float[]{1.0F, 0.0F}, 2, ImmutableRoaringBitmap.bitmapOf()));
       ImmutableRoaringBitmap filtered = emptySearch.get(10, TimeUnit.SECONDS);
       Assert.assertEquals(filtered.getCardinality(), 0);
-      Assert.assertEquals(index.getSearcherRefreshCount(), 0L,
-          "An empty filter must return before search submission or NRT refresh");
+      Assert.assertEquals(index.getSearcherRefreshWaitCount(), 0L,
+          "An empty filter must return before search submission or entering the NRT wait path");
     } finally {
       releaseBlocker.countDown();
       try {
@@ -312,42 +314,311 @@ public class MutableVectorIndexTest {
   }
 
   @Test(timeOut = 60_000)
-  public void testConcurrentFilteredSearchesCoalesceRefresh()
+  public void testConcurrentFilteredSearchesShareOneReopen()
       throws Exception {
-    int numCallers = SEARCHER_POOL_SIZE;
+    // Exercises the generation handshake directly rather than through getDocIds. The searcher pool is a shared,
+    // scaling singleton that serializes blocking searches in this JVM, so routing through it would only ever put
+    // one caller in the wait path at a time and the assertion would measure the pool, not the sharing.
+    //
+    // A long refreshMinIntervalMs makes the overlap deterministic: the first waiter's reopen cannot start until
+    // the limiter elapses, so both callers are guaranteed to be parked before it runs, and one reopen must serve
+    // them both.
+    int numCallers = 2;
     ExecutorService callers = Executors.newFixedThreadPool(numCallers);
-    CoordinatedRefreshMutableVectorIndex index = createCoordinatedIndexWithoutCommits(1);
+    MutableVectorIndex index = createIndexWithRefreshTuning("1000");
     try (index) {
       float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
       Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
       long initialRefreshCount = index.getSearcherRefreshCount();
+      long initialWaits = index.getSearcherRefreshWaitCount();
       addVector(index, query, 10);
-      index.coordinateNextRefresh();
+      long target = index.getLastAddedSequenceNumber();
 
       CyclicBarrier startTogether = new CyclicBarrier(numCallers);
-      List<Future<ImmutableRoaringBitmap>> searches = new ArrayList<>(numCallers);
+      List<Future<?>> waits = new ArrayList<>(numCallers);
       for (int i = 0; i < numCallers; i++) {
-        searches.add(callers.submit(() -> {
+        waits.add(callers.submit(() -> {
           startTogether.await(10, TimeUnit.SECONDS);
-          return index.getDocIds(query, 1, bitmapOf(10));
+          index.awaitSearcherGeneration(target);
+          return null;
         }));
       }
-      index.awaitWinningRefresher();
-      index.awaitWaitingCallers();
-      index.releaseWinningRefresher();
-      for (Future<ImmutableRoaringBitmap> search : searches) {
-        Assert.assertEquals(search.get(10, TimeUnit.SECONDS).toArray(), new int[]{10});
+      for (Future<?> wait : waits) {
+        wait.get(30, TimeUnit.SECONDS);
       }
+      Assert.assertEquals(index.getSearcherRefreshWaitCount() - initialWaits, numCallers,
+          "Every caller must have blocked on the shared reopen rather than being served without waiting");
       Assert.assertEquals(index.getSearcherRefreshCount(), initialRefreshCount + 1,
-          "Concurrent readers targeting one writer generation must share exactly one refresh");
-      // The refresh count alone does not prove coalescing: a caller arriving after publication would skip refresh
-      // and still leave the count at one. Require actual participation in the production waiter path.
-      Assert.assertTrue(index.getObservedRefreshWaiters() > 0,
-          "Expected concurrent callers to coalesce onto the in-flight refresh, but none entered the waiter path");
+          "Callers targeting one writer generation must cost exactly one reopen between them");
+      // And the searcher really does cover the row, not merely claim the generation.
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(10)).toArray(), new int[]{10});
     } finally {
-      index.releaseWinningRefresher();
       callers.shutdownNow();
       Assert.assertTrue(callers.awaitTermination(10, TimeUnit.SECONDS), "Concurrent callers did not terminate");
+    }
+  }
+
+  /// The reason this path does not delegate to Lucene's ControlledRealTimeReopenThread: a reopen that threw must
+  /// not publish the generation it merely attempted. Publishing it would let the next query search a searcher
+  /// that does not hold the rows its filter names, and return fewer results with no error at all.
+  @Test(timeOut = 60_000)
+  public void testFailedReopenNeitherPublishesItsGenerationNorHangsTheQuery()
+      throws Exception {
+    AtomicBoolean failReopen = new AtomicBoolean(true);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("commitDocs", String.valueOf(Integer.MAX_VALUE));
+    properties.put("commitIntervalMs", String.valueOf(TimeUnit.DAYS.toMillis(1)));
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "5");
+    properties.put(MutableVectorIndex.REFRESH_MIN_INTERVAL_MS, "0");
+    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 5, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
+    try (MutableVectorIndex index =
+        new MutableVectorIndex("mutableVectorIndexReopenFailureTest_" + System.nanoTime(), COLUMN_NAME, config) {
+          @Override
+          void doReopen()
+              throws IOException {
+            if (failReopen.get()) {
+              throw new IOException("injected reopen failure");
+            }
+            super.doReopen();
+          }
+        }) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      addVector(index, query, 10);
+      long generation = index.getLastAddedSequenceNumber();
+
+      IOException thrown = Assert.expectThrows(IOException.class, () -> index.awaitSearcherGeneration(generation));
+      Assert.assertTrue(thrown.getMessage().contains("reopen failed"),
+          "A query must fail when the reopen it needs failed, got: " + thrown.getMessage());
+      Assert.assertEquals(index.getSearcherRefreshCount(), 0L,
+          "A reopen that threw must not be counted as having produced a searcher");
+      // The decisive assertion: the failed attempt must not have advanced the published generation, or a later
+      // query would take the fast path and search a searcher that never received the row.
+      IOException second = Assert.expectThrows(IOException.class, () -> index.awaitSearcherGeneration(generation));
+      Assert.assertNotNull(second.getMessage());
+
+      // And a transient failure recovers on the next request rather than disabling the segment.
+      failReopen.set(false);
+      addVector(index, query, 11);
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(11)).toArray(), new int[]{11});
+    }
+  }
+
+  /// A reopen that never completes must surface as a failed query rather than an unbounded wait holding a thread
+  /// of the shared searcher pool.
+  @Test(timeOut = 60_000)
+  public void testFilteredSearchTimesOutRatherThanWaitingForever()
+      throws Exception {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("commitDocs", String.valueOf(Integer.MAX_VALUE));
+    properties.put("commitIntervalMs", String.valueOf(TimeUnit.DAYS.toMillis(1)));
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "5");
+    // The spacing outlives the timeout, so the reopen this query needs cannot start before it gives up.
+    properties.put(MutableVectorIndex.REFRESH_MIN_INTERVAL_MS, String.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    properties.put(MutableVectorIndex.REFRESH_WAIT_TIMEOUT_MS, "50");
+    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 5, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
+    try (MutableVectorIndex index =
+        new MutableVectorIndex("mutableVectorIndexTimeoutTest_" + System.nanoTime(), COLUMN_NAME, config)) {
+      addVector(index, new float[]{1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, 0);
+      // Spend the first reopen, which is never delayed: only from the second on does the spacing apply, and it is
+      // the spacing that keeps the awaited reopen from starting before the wait gives up.
+      Assert.assertEquals(index.getDocIds(new float[]{1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, 1, bitmapOf(0)).toArray(),
+          new int[]{0});
+      addVector(index, new float[]{1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, 10);
+      IOException thrown = Assert.expectThrows(IOException.class,
+          () -> index.awaitSearcherGeneration(index.getLastAddedSequenceNumber()));
+      Assert.assertTrue(thrown.getMessage().contains("Timed out after 50ms"),
+          "Expected the bounded-wait failure, got: " + thrown.getMessage());
+    }
+  }
+
+  /// The spacing must hold even while queries keep arriving. Each arriving query notifies the reopen thread, so a
+  /// single timed wait would return on that notification and reopen early -- leaving the interval unenforced
+  /// exactly under the load it exists to bound.
+  @Test(timeOut = 60_000)
+  public void testReopenSpacingHoldsWhileQueriesKeepArriving()
+      throws Exception {
+    long spacingMs = 1000L;
+    try (MutableVectorIndex index = createIndexWithRefreshTuning(String.valueOf(spacingMs))) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+      long reopensAfterFirst = index.getSearcherRefreshCount();
+
+      // Keep registering fresh requests for most of one spacing window; every one of them notifies the loop.
+      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(spacingMs / 2);
+      int docId = 100;
+      while (System.nanoTime() < deadline) {
+        addVector(index, query, docId++);
+        long generation = index.getLastAddedSequenceNumber();
+        Thread nudge = new Thread(() -> {
+          try {
+            index.awaitSearcherGeneration(generation);
+          } catch (IOException e) {
+            // The wait may outlive the window; the notification it sent is what this test is about.
+          }
+        });
+        nudge.setDaemon(true);
+        nudge.start();
+        Thread.sleep(20);
+      }
+      Assert.assertEquals(index.getSearcherRefreshCount(), reopensAfterFirst,
+          "No reopen may run inside the spacing window, however many queries notify the loop");
+    }
+  }
+
+  /// A query interrupted while waiting must surface that as a failure carrying the cause, not return as though
+  /// the generation had arrived.
+  @Test(timeOut = 60_000)
+  public void testInterruptedWaitFailsRatherThanReturningEarly()
+      throws Exception {
+    try (MutableVectorIndex index = createIndexWithRefreshTuning(String.valueOf(TimeUnit.SECONDS.toMillis(30)))) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+      addVector(index, query, 10);
+      long generation = index.getLastAddedSequenceNumber();
+
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      CountDownLatch waiting = new CountDownLatch(1);
+      Thread waiter = new Thread(() -> {
+        waiting.countDown();
+        try {
+          index.awaitSearcherGeneration(generation);
+          failure.set(new AssertionError("Interrupted wait returned normally"));
+        } catch (Throwable t) {
+          failure.set(t);
+        }
+      });
+      waiter.setDaemon(true);
+      waiter.start();
+      Assert.assertTrue(waiting.await(10, TimeUnit.SECONDS), "Waiter did not start");
+      awaitWaitCount(index, 2);
+      waiter.interrupt();
+      waiter.join(TimeUnit.SECONDS.toMillis(10));
+
+      Assert.assertTrue(failure.get() instanceof IOException,
+          "An interrupted wait must fail, got: " + failure.get());
+      Assert.assertTrue(failure.get().getMessage().contains("Interrupted while waiting"),
+          "Expected the interrupt failure, got: " + failure.get().getMessage());
+    }
+  }
+
+  /// One reopen thread exists per consuming segment per vector column, so a close that failed to stop it would
+  /// leak a thread per partition -- invisible at runtime because the thread is a daemon.
+  @Test(timeOut = 60_000)
+  public void testCloseStopsTheReopenThread()
+      throws Exception {
+    String segmentName = "mutableVectorIndexCloseTest_" + System.nanoTime();
+    String threadName = "vector-nrt-reopen-" + segmentName + "-" + COLUMN_NAME;
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "5");
+    MutableVectorIndex index = new MutableVectorIndex(segmentName, COLUMN_NAME,
+        new VectorIndexConfig(false, "HNSW", 5, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties));
+    Assert.assertTrue(hasLiveThread(threadName), "The reopen thread must run while the index is open");
+    index.close();
+    Assert.assertFalse(hasLiveThread(threadName),
+        "close() must stop the reopen thread, or every consuming segment leaks one");
+  }
+
+  /// A query must never be told a generation is available when the reopen that would have produced it failed:
+  /// answering from the stale searcher would silently drop rows the filter names. Closing the index mid-wait is
+  /// the reachable version of that -- the awaited generation can no longer arrive, so the query must fail.
+  @Test(timeOut = 60_000)
+  public void testFilteredSearchFailsWhenTheAwaitedGenerationCannotArrive()
+      throws Exception {
+    MutableVectorIndex index = createIndexWithRefreshTuning(String.valueOf(TimeUnit.SECONDS.toMillis(5)));
+    float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+    Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+    addVector(index, query, 10);
+    ExecutorService caller = Executors.newSingleThreadExecutor();
+    try {
+      // The 30s limiter keeps the reopen pending, so this call is parked in the wait path when close() lands.
+      Future<ImmutableRoaringBitmap> search = caller.submit(() -> index.getDocIds(query, 1, bitmapOf(10)));
+      awaitWaitCount(index, 2);
+      index.close();
+      ExecutionException thrown = Assert.expectThrows(ExecutionException.class,
+          () -> search.get(30, TimeUnit.SECONDS));
+      Assert.assertTrue(hasCauseContaining(thrown, "closed while waiting for the searcher to reopen"),
+          "A query whose generation can never arrive must fail for that reason: " + thrown.getCause());
+    } finally {
+      caller.shutdownNow();
+      Assert.assertTrue(caller.awaitTermination(10, TimeUnit.SECONDS), "Caller did not terminate");
+    }
+  }
+
+  @Test(dataProvider = "invalidRefreshTuning")
+  public void testRejectsInvalidRefreshTuning(String key, String value) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "5");
+    properties.put(key, value);
+    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 5, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
+    Assert.expectThrows(IllegalArgumentException.class,
+        () -> new MutableVectorIndex("mutableVectorIndexConfigTest_" + System.nanoTime(), COLUMN_NAME, config));
+  }
+
+  @DataProvider(name = "invalidRefreshTuning")
+  public Object[][] invalidRefreshTuning() {
+    return new Object[][]{
+        {MutableVectorIndex.REFRESH_MIN_INTERVAL_MS, "-1"},
+        {MutableVectorIndex.REFRESH_MIN_INTERVAL_MS, "abc"},
+        {MutableVectorIndex.REFRESH_WAIT_TIMEOUT_MS, "0"},
+        {MutableVectorIndex.REFRESH_WAIT_TIMEOUT_MS, "-5"}
+    };
+  }
+
+  private static boolean hasCauseContaining(Throwable thrown, String fragment) {
+    for (Throwable cause = thrown; cause != null; cause = cause.getCause()) {
+      if (cause.getMessage() != null && cause.getMessage().contains(fragment)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasLiveThread(String threadName) {
+    return Thread.getAllStackTraces().keySet().stream()
+        .anyMatch(thread -> thread.isAlive() && threadName.equals(thread.getName()));
+  }
+
+  private static void awaitWaitCount(MutableVectorIndex index, long expected)
+      throws InterruptedException, TimeoutException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (index.getSearcherRefreshWaitCount() < expected) {
+      if (System.nanoTime() > deadline) {
+        throw new TimeoutException("Only " + index.getSearcherRefreshWaitCount() + " of " + expected + " waits seen");
+      }
+      Thread.sleep(5);
+    }
+  }
+
+  /// Queries already covered by the searcher's current generation must neither reopen nor enter the wait path.
+  /// This guards the regression where a filtered query drives a reopen unconditionally, which is what makes the
+  /// per-query flush cost unbounded. It does not on its own distinguish publishing the true generation reached
+  /// from the previous per-caller watermark: with no rows added between these queries, both skip the refresh.
+  @Test
+  public void testFilteredSearchesAfterOneReopenDoNotRefreshAgain()
+      throws Exception {
+    try (MutableVectorIndex index = createIndexWithRefreshTuning()) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+      addVector(index, query, 10);
+
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(10)).toArray(), new int[]{10});
+      long refreshesAfterFirstSearch = index.getSearcherRefreshCount();
+      long waitersAfterFirstSearch = index.getSearcherRefreshWaitCount();
+
+      for (int i = 0; i < 20; i++) {
+        Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(10)).toArray(), new int[]{10});
+      }
+      Assert.assertEquals(index.getSearcherRefreshCount(), refreshesAfterFirstSearch,
+          "Queries already covered by the published generation must not trigger another reopen");
+      Assert.assertEquals(index.getSearcherRefreshWaitCount(), waitersAfterFirstSearch,
+          "Queries already covered by the published generation must not even enter the waiter path");
     }
   }
 
@@ -440,74 +711,6 @@ public class MutableVectorIndexTest {
     return phaser.awaitAdvanceInterruptibly(phase, 10, TimeUnit.SECONDS) >= 0;
   }
 
-  /// Holds the winning refresher after it publishes `_searcherRefreshInProgress`, so at least one concurrent search
-  /// is proven to enter the production waiter path before the refresh is allowed to finish.
-  private static class CoordinatedRefreshMutableVectorIndex extends MutableVectorIndex {
-    private final CountDownLatch _winningRefresherEntered = new CountDownLatch(1);
-    private final CountDownLatch _releaseWinningRefresher = new CountDownLatch(1);
-    private final AtomicInteger _observedRefreshWaiters = new AtomicInteger();
-    private final CountDownLatch _waitingCallers;
-    private volatile boolean _coordinateRefresh;
-
-    CoordinatedRefreshMutableVectorIndex(String segmentName, VectorIndexConfig config, int expectedWaitingCallers) {
-      super(segmentName, COLUMN_NAME, config);
-      _waitingCallers = new CountDownLatch(expectedWaitingCallers);
-    }
-
-    void coordinateNextRefresh() {
-      _coordinateRefresh = true;
-    }
-
-    void awaitWinningRefresher()
-        throws InterruptedException, TimeoutException {
-      if (!_winningRefresherEntered.await(10, TimeUnit.SECONDS)) {
-        throw new TimeoutException("No filtered-search caller became the winning refresher");
-      }
-    }
-
-    void awaitWaitingCallers()
-        throws InterruptedException, TimeoutException {
-      if (!_waitingCallers.await(10, TimeUnit.SECONDS)) {
-        throw new TimeoutException("No concurrent caller entered the refresh waiter path");
-      }
-    }
-
-    void releaseWinningRefresher() {
-      _releaseWinningRefresher.countDown();
-    }
-
-    @Override
-    void beforeSearcherRefresh()
-        throws IOException {
-      if (!_coordinateRefresh) {
-        return;
-      }
-      _winningRefresherEntered.countDown();
-      try {
-        if (!_releaseWinningRefresher.await(10, TimeUnit.SECONDS)) {
-          throw new IOException("Timed out waiting to release the winning refresher");
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Interrupted while holding the winning refresher", e);
-      } finally {
-        _coordinateRefresh = false;
-      }
-    }
-
-    @Override
-    void onSearcherRefreshWait() {
-      _observedRefreshWaiters.incrementAndGet();
-      if (_coordinateRefresh) {
-        _waitingCallers.countDown();
-      }
-    }
-
-    int getObservedRefreshWaiters() {
-      return _observedRefreshWaiters.get();
-    }
-  }
-
   /// Blocks the first filter membership check until the writer has added its concurrent rows. This puts the
   /// synchronization point inside Lucene's actual filtered search, rather than merely racing two caller threads.
   private static class ConcurrentWriteCoordinatingBitmap extends MutableRoaringBitmap {
@@ -550,16 +753,24 @@ public class MutableVectorIndexTest {
     return index;
   }
 
-  private static CoordinatedRefreshMutableVectorIndex createCoordinatedIndexWithoutCommits(int expectedWaiters) {
+  /// An index whose reopen cadence is pinned for assertions: no commits, no idle reopen inside the test
+  /// window, and a waiting query allowed to trigger its reopen immediately.
+  private static MutableVectorIndex createIndexWithRefreshTuning() {
+    return createIndexWithRefreshTuning("0");
+  }
+
+  private static MutableVectorIndex createIndexWithRefreshTuning(String refreshMinIntervalMs) {
     Map<String, String> properties = new HashMap<>();
     properties.put("commitDocs", String.valueOf(Integer.MAX_VALUE));
     properties.put("commitIntervalMs", String.valueOf(TimeUnit.DAYS.toMillis(1)));
     properties.put("vectorIndexType", "HNSW");
     properties.put("vectorDimension", "5");
+    // No rate limiting, so a waiting query's reopen starts immediately and the test never sits on the limiter.
+    properties.put(MutableVectorIndex.REFRESH_MIN_INTERVAL_MS, refreshMinIntervalMs);
     VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 5, 1,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, properties);
-    CoordinatedRefreshMutableVectorIndex index = new CoordinatedRefreshMutableVectorIndex(
-        "mutableVectorIndexCoalescingTest_" + System.nanoTime(), config, expectedWaiters);
+    MutableVectorIndex index =
+        new MutableVectorIndex("mutableVectorIndexCoalescingTest_" + System.nanoTime(), COLUMN_NAME, config);
     addVector(index, new float[]{1.0F, 0.0F, 0.0F, 0.0F, 0.0F}, 0);
     addVector(index, new float[]{0.0F, 1.0F, 0.0F, 0.0F, 0.0F}, 1);
     return index;
