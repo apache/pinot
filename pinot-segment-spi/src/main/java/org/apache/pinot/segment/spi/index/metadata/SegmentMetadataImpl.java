@@ -308,9 +308,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   /// Helper method to add the physical columns from source list to destination set.
+  ///
+  /// Column names are interned: the same names recur in every segment of a table and each one is retained by the
+  /// column metadata map key, the FieldSpec, the segment Schema and the loader's per-column maps, so one JVM-wide
+  /// instance replaces a copy per segment (the JVM string table holds them weakly, so they live exactly as long as a
+  /// loaded segment references them).
   private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
-      String column = o.toString();
+      String column = o.toString().intern();
       if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
         // NOTE:
         //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform

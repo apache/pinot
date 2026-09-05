@@ -19,21 +19,32 @@
 package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -287,9 +298,204 @@ public class ColumnMetadataImplTest {
     assertEquals(metadata.getIndexSize(1), 200);
   }
 
+  private static final String DATETIME_FORMAT = "1:MILLISECONDS:EPOCH";
+  private static final String DATETIME_GRANULARITY = "1:MILLISECONDS";
+
+  /// The segment creator writes `defaultNullValue` for every column, so a column whose default is the type default
+  /// must come back holding the shared static constant (one instance per JVM instead of a box plus the literal per
+  /// segment) while staying equal to the spec the table schema would build.
+  @Test
+  public void typeDefaultLiteralSharesTheStaticConstant() {
+    Map<DataType, Object> dimensionDefaults = Map.ofEntries(
+        Map.entry(DataType.INT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT),
+        Map.entry(DataType.LONG, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG),
+        Map.entry(DataType.FLOAT, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT),
+        Map.entry(DataType.DOUBLE, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE),
+        Map.entry(DataType.BOOLEAN, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN),
+        Map.entry(DataType.TIMESTAMP, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP),
+        Map.entry(DataType.STRING, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING),
+        Map.entry(DataType.JSON, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON),
+        Map.entry(DataType.BYTES, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES),
+        Map.entry(DataType.BIG_DECIMAL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL));
+    dimensionDefaults.forEach((dataType, constant) -> {
+      FieldSpec spec = parse(FieldType.DIMENSION, dataType, writtenLiteral(dataType, constant));
+      assertSame(spec.getDefaultNullValue(), constant, dataType.name());
+      assertEquals(spec.getDefaultNullValueString(), dataType.toString(constant), dataType.name());
+      assertEquals(spec, new DimensionFieldSpec("col", dataType, true), dataType.name());
+    });
+
+    Map<DataType, Object> metricDefaults = Map.of(
+        DataType.INT, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_INT,
+        DataType.LONG, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_LONG,
+        DataType.FLOAT, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_FLOAT,
+        DataType.DOUBLE, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE,
+        DataType.BIG_DECIMAL, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL,
+        DataType.STRING, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_STRING,
+        DataType.BYTES, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_BYTES);
+    metricDefaults.forEach((dataType, constant) -> {
+      FieldSpec spec = parse(FieldType.METRIC, dataType, writtenLiteral(dataType, constant));
+      assertSame(spec.getDefaultNullValue(), constant, dataType.name());
+      assertEquals(spec.getDefaultNullValueString(), dataType.toString(constant), dataType.name());
+      assertEquals(spec, new MetricFieldSpec("col", dataType), dataType.name());
+    });
+  }
+
+  /// The UUID default is a fresh nil-UUID array per lookup, so there is no constant to share; the literal is still
+  /// recognised as the type default (it is dropped rather than retained) and the value stays equal.
+  @Test
+  public void uuidTypeDefaultStaysValueEqual() {
+    String literal = UuidUtils.toString(UuidUtils.nullUuidBytes());
+    assertNull(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.UUID, literal));
+    FieldSpec spec = parse(FieldType.DIMENSION, DataType.UUID, literal);
+    assertEquals((byte[]) spec.getDefaultNullValue(), UuidUtils.nullUuidBytes());
+    assertEquals(spec.getDefaultNullValueString(), literal);
+    assertEquals(spec, new DimensionFieldSpec("col", DataType.UUID, true));
+  }
+
+  /// Custom defaults are parsed exactly as before and equal the spec a table schema builds; the literal itself is
+  /// interned so the segments of a table share it.
+  @Test
+  public void customLiteralsRoundTrip() {
+    FieldSpec intSpec = parse(FieldType.DIMENSION, DataType.INT, "-1");
+    assertEquals(intSpec, new DimensionFieldSpec("col", DataType.INT, true, -1));
+    assertNotSame(intSpec.getDefaultNullValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    assertEquals(parse(FieldType.DIMENSION, DataType.STRING, "N/A"),
+        new DimensionFieldSpec("col", DataType.STRING, true, "N/A"));
+    assertEquals(parse(FieldType.DIMENSION, DataType.BYTES, "abcd"),
+        new DimensionFieldSpec("col", DataType.BYTES, true, BytesUtils.toBytes("abcd")));
+    assertEquals(parse(FieldType.METRIC, DataType.DOUBLE, "1.5"), new MetricFieldSpec("col", DataType.DOUBLE, 1.5));
+    // Equality is the data type's own: a BIG_DECIMAL with another scale and a negative zero are not the type default,
+    // so their string form survives the round trip.
+    FieldSpec scaledZero = parse(FieldType.DIMENSION, DataType.BIG_DECIMAL, "0.0");
+    assertNotSame(scaledZero.getDefaultNullValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
+    assertEquals(scaledZero.getDefaultNullValueString(), "0.0");
+    assertEquals(scaledZero, new DimensionFieldSpec("col", DataType.BIG_DECIMAL, true, new BigDecimal("0.0")));
+    FieldSpec negativeZero = parse(FieldType.METRIC, DataType.FLOAT, "-0.0");
+    assertNotSame(negativeZero.getDefaultNullValue(), FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_FLOAT);
+    assertEquals(negativeZero.getDefaultNullValueString(), "-0.0");
+
+    assertSame(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, new String("-1")),
+        "-1");
+    assertNull(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, null));
+  }
+
+  /// A STRING default with a leading/trailing space or a comma is escaped by the segment creator and recovered here
+  /// before the type-default comparison, so it round-trips verbatim.
+  @Test
+  public void stringDefaultWithSpecialCharactersRoundTrips() {
+    String custom = " a,b ";
+    FieldSpec spec = parse(FieldType.DIMENSION, DataType.STRING,
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(custom));
+    assertEquals(spec.getDefaultNullValue(), custom);
+    assertEquals(spec, new DimensionFieldSpec("col", DataType.STRING, true, custom));
+    FieldSpec typeDefault = parse(FieldType.DIMENSION, DataType.STRING,
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(
+            FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING));
+    assertSame(typeDefault.getDefaultNullValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+  }
+
+  @Test
+  public void dateTimeDefaultsAndFormatStrings() {
+    PropertiesConfiguration config = configFor(FieldType.DATE_TIME, DataType.LONG,
+        DataType.LONG.toString(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG));
+    DateTimeFieldSpec spec = (DateTimeFieldSpec) ColumnMetadataImpl.extractFieldSpec("col", config);
+    assertSame(spec.getDefaultNullValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+    assertEquals(spec, new DateTimeFieldSpec("col", DataType.LONG, DATETIME_FORMAT, DATETIME_GRANULARITY));
+    // The format and granularity are stored as fresh strings and come back as the interned instances.
+    assertSame(spec.getFormat(), DATETIME_FORMAT);
+    assertSame(spec.getGranularity(), DATETIME_GRANULARITY);
+
+    DateTimeFieldSpec custom =
+        (DateTimeFieldSpec) ColumnMetadataImpl.extractFieldSpec("col", configFor(FieldType.DATE_TIME, DataType.LONG,
+            "0"));
+    assertEquals(custom,
+        new DateTimeFieldSpec("col", DataType.LONG, DATETIME_FORMAT, DATETIME_GRANULARITY, 0L, null));
+    assertEquals(custom.getDefaultNullValue(), 0L);
+  }
+
+  /// `/tables/{table}/segments/{segment}/metadata` bean-serializes the FieldSpec, i.e. `getDefaultNullValue()` by
+  /// value, so its payload is byte-identical to the one a spec built straight from the literal (the
+  /// pre-canonicalization shape) produces, for every type including BYTES and UUID. Only `FieldSpec#toJsonObject()`,
+  /// which compares the value against the type default by identity, now omits a redundant BYTES default that used to
+  /// be emitted; no endpoint serializes a segment-derived schema that way.
+  @Test
+  public void segmentMetadataJsonUnchangedByCanonicalization()
+      throws Exception {
+    for (DataType dataType : new DataType[] {
+        DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BOOLEAN, DataType.TIMESTAMP,
+        DataType.STRING, DataType.JSON, DataType.BYTES, DataType.UUID, DataType.BIG_DECIMAL
+    }) {
+      Object constant = FieldSpec.getDefaultNullValue(FieldType.DIMENSION, dataType, null);
+      String literal = dataType.toString(constant);
+      FieldSpec parsed = parse(FieldType.DIMENSION, dataType, writtenLiteral(dataType, constant));
+      FieldSpec legacy = new DimensionFieldSpec("col", dataType, true, literal);
+      assertEquals(JsonUtils.objectToString(parsed), JsonUtils.objectToString(legacy), dataType.name());
+      assertEquals(parsed, legacy, dataType.name());
+    }
+    assertFalse(parse(FieldType.DIMENSION, DataType.BYTES, "").toJsonObject().has("defaultNullValue"));
+  }
+
+  /// A combination with no type default (rejected by schema validation, but constructible with an explicit default)
+  /// keeps parsing the literal instead of failing on the type-default lookup.
+  @Test
+  public void literalWithoutTypeDefaultIsKept() {
+    assertSame(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.METRIC, DataType.BOOLEAN, new String("1")),
+        "1");
+    assertEquals(parse(FieldType.METRIC, DataType.BOOLEAN, "1").getDefaultNullValue(), 1);
+  }
+
+  /// The strings a column retains for its lifetime alias the JVM-wide interned instances, so every segment of the
+  /// table shares them.
+  @Test
+  public void columnNameAndParentColumnAreInterned() {
+    PropertiesConfiguration config = baseConfig("metrics$cpu");
+    config.setProperty(Column.getKeyFor("metrics$cpu", Column.COLUMN_NAME), new String("cpu"));
+    config.setProperty(Column.getKeyFor("metrics$cpu", Column.PARENT_COLUMN), new String("metrics"));
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "metrics$cpu");
+
+    assertSame(metadata.getFieldSpec().getName(), "cpu");
+    assertSame(metadata.getParentColumn(), "metrics");
+    // Without an explicit COLUMN_NAME the key itself is the name.
+    String column = new String("plain");
+    FieldSpec spec = ColumnMetadataImpl.extractFieldSpec(column, baseConfigWithoutName(column));
+    assertSame(spec.getName(), "plain");
+  }
+
+  private static FieldSpec parse(FieldType fieldType, DataType dataType, @Nullable String defaultNullValue) {
+    return ColumnMetadataImpl.extractFieldSpec("col", configFor(fieldType, dataType, defaultNullValue));
+  }
+
+  /// The literal the segment creator writes for the given default null value.
+  private static String writtenLiteral(DataType dataType, Object defaultNullValue) {
+    String literal = dataType.toString(defaultNullValue);
+    return dataType.getStoredType() == DataType.STRING
+        ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(literal) : literal;
+  }
+
+  private static PropertiesConfiguration configFor(FieldType fieldType, DataType dataType,
+      @Nullable String defaultNullValue) {
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.COLUMN_TYPE), fieldType.name());
+    config.setProperty(Column.getKeyFor("col", Column.DATA_TYPE), dataType.name());
+    if (defaultNullValue != null) {
+      config.setProperty(Column.getKeyFor("col", Column.DEFAULT_NULL_VALUE), defaultNullValue);
+    }
+    if (fieldType == FieldType.DATE_TIME) {
+      config.setProperty(Column.getKeyFor("col", Column.DATETIME_FORMAT), new String(DATETIME_FORMAT));
+      config.setProperty(Column.getKeyFor("col", Column.DATETIME_GRANULARITY), new String(DATETIME_GRANULARITY));
+    }
+    return config;
+  }
+
   private static PropertiesConfiguration baseConfig(String column) {
-    PropertiesConfiguration config = new PropertiesConfiguration();
+    PropertiesConfiguration config = baseConfigWithoutName(column);
     config.setProperty(Column.getKeyFor(column, Column.COLUMN_NAME), column);
+    return config;
+  }
+
+  private static PropertiesConfiguration baseConfigWithoutName(String column) {
+    PropertiesConfiguration config = new PropertiesConfiguration();
     config.setProperty(Column.getKeyFor(column, Column.COLUMN_TYPE), FieldType.DIMENSION.name());
     config.setProperty(Column.getKeyFor(column, Column.DATA_TYPE), DataType.STRING.name());
     config.setProperty(Column.getKeyFor(column, Column.IS_SINGLE_VALUED), true);
