@@ -24,6 +24,7 @@ import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGeneratorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -34,11 +35,18 @@ public class GroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
+  private final GroupKeyGeneratorProvider _groupKeyGeneratorProvider;
 
   public GroupByPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    this(segmentContext, queryContext, GroupKeyGeneratorProvider.DEFAULT);
+  }
+
+  public GroupByPlanNode(SegmentContext segmentContext, QueryContext queryContext,
+      GroupKeyGeneratorProvider groupKeyGeneratorProvider) {
     _indexSegment = segmentContext.getIndexSegment();
     _segmentContext = segmentContext;
     _queryContext = queryContext;
+    _groupKeyGeneratorProvider = groupKeyGeneratorProvider;
   }
 
   @Override
@@ -60,6 +68,7 @@ public class GroupByPlanNode implements PlanNode {
         AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,
             _queryContext.getAggregationFunctions(), _queryContext.getFilter(), filterOperator,
             filterPlanNode.getPredicateEvaluators());
-    return new GroupByOperator(_queryContext, aggregationInfo, _indexSegment.getSegmentMetadata().getTotalDocs());
+    return new GroupByOperator(_queryContext, aggregationInfo, _indexSegment.getSegmentMetadata().getTotalDocs(),
+        _groupKeyGeneratorProvider);
   }
 }

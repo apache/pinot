@@ -38,6 +38,7 @@ import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -58,6 +59,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -475,6 +479,28 @@ public class StreamingGroupByCombineOperatorTest {
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
     }
     return new CombinePlanNode(planNodes, queryContext, EXECUTOR, block -> { }).run();
+  }
+
+  @Test
+  public void testDetachPreservesFailureWhenCloseAlsoFails() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT groupColumn, COUNT(*) FROM testTable GROUP BY groupColumn");
+    IllegalStateException extractionFailure = new IllegalStateException("extraction failure");
+    IllegalArgumentException closeFailure = new IllegalArgumentException("close failure");
+    AggregationGroupByResult aggregationGroupByResult = mock(AggregationGroupByResult.class);
+    when(aggregationGroupByResult.getNumGroups()).thenThrow(extractionFailure);
+    doThrow(closeFailure).when(aggregationGroupByResult).close();
+    GroupByResultsBlock resultsBlock = mock(GroupByResultsBlock.class);
+    when(resultsBlock.getAggregationGroupByResult()).thenReturn(aggregationGroupByResult);
+    when(resultsBlock.getIntermediateRecords()).thenReturn(null);
+
+    StreamingGroupByCombineOperator combineOperator =
+        new StreamingGroupByCombineOperator(List.of(), queryContext, EXECUTOR, 10);
+    IllegalStateException thrown = expectThrows(IllegalStateException.class,
+        () -> combineOperator.detachFromWorkerThreadState(resultsBlock));
+
+    assertSame(thrown, extractionFailure);
+    assertEquals(thrown.getSuppressed(), new Throwable[]{closeFailure});
   }
 
   private List<Operator> buildOperators(QueryContext queryContext) {

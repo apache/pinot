@@ -46,6 +46,7 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGeneratorProvider;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
@@ -358,7 +359,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Group-by query
-        return new GroupByPlanNode(segmentContext, queryContext);
+        return new GroupByPlanNode(segmentContext, queryContext,
+            getGroupKeyGeneratorProvider(segmentContext, queryContext));
       } else {
         // Aggregation query
         return new AggregationPlanNode(segmentContext, queryContext);
@@ -369,6 +371,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(segmentContext, queryContext);
     }
+  }
+
+  /// Returns the group-key generator provider for a segment group-by query. Filtered aggregations keep Pinot's shared
+  /// built-in generator and ignore the returned provider.
+  protected GroupKeyGeneratorProvider getGroupKeyGeneratorProvider(SegmentContext segmentContext,
+      QueryContext queryContext) {
+    return GroupKeyGeneratorProvider.DEFAULT;
   }
 
   @Override

@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -38,6 +42,9 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// This class implements group by aggregation.
@@ -69,20 +76,62 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
       BaseProjectOperator<?> projectOperator) {
-    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null);
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null,
+        GroupKeyGeneratorProvider.DEFAULT);
+  }
+
+  public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
+      BaseProjectOperator<?> projectOperator, GroupKeyGeneratorProvider groupKeyGeneratorProvider) {
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null,
+        groupKeyGeneratorProvider);
+  }
+
+  public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
+    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null,
+        GroupKeyGeneratorProvider.DEFAULT);
   }
 
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
       @Nullable GroupKeyGenerator groupKeyGenerator) {
+    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, groupKeyGenerator,
+        GroupKeyGeneratorProvider.DEFAULT);
+  }
+
+  private DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
+      @Nullable GroupKeyGenerator groupKeyGenerator, GroupKeyGeneratorProvider groupKeyGeneratorProvider) {
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    Objects.requireNonNull(groupKeyGeneratorProvider);
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
+    boolean groupingSets = queryContext.isGroupingSets();
+    List<GroupKeyGeneratorContext.GroupKeySpec> groupKeySpecs =
+        groupKeyGenerator == null && !groupingSets
+            && groupKeyGeneratorProvider != GroupKeyGeneratorProvider.DEFAULT
+            ? new ArrayList<>(groupByExpressions.length) : null;
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+      if (groupKeySpecs != null) {
+        DataSource dataSource = columnContext.getDataSource();
+        DataType storedType = columnContext.getDataType().getStoredType();
+        Optional<GroupKeyGeneratorContext.IntegralDomain> exactIntegralDomain = Optional.empty();
+        OptionalInt cardinalityHint = OptionalInt.empty();
+        if (dataSource != null) {
+          DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+          exactIntegralDomain = getExactIntegralDomain(storedType, dataSourceMetadata);
+          int cardinality = dataSourceMetadata.getCardinality();
+          if (cardinality >= 0) {
+            cardinalityHint = OptionalInt.of(cardinality);
+          }
+        }
+        groupKeySpecs.add(new GroupKeyGeneratorContext.GroupKeySpec(groupByExpression, storedType,
+            columnContext.isSingleValue(), columnContext.isDictionaryEncoded(), exactIntegralDomain, cardinalityHint));
+      }
       hasMVGroupByExpression |= !columnContext.isSingleValue();
       // A column with EncodingType.RAW + explicit dictionaryIndex has a non-null dictionary but a RAW forward
       // index that throws on readDictIds; route those through the no-dict GROUP BY generator via the explicit
@@ -91,57 +140,117 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     // Grouping-set queries expand each row into one group per grouping set, so they always use the
     // multi-value (int[][]) executor path even though the union group-by columns are single-valued.
-    boolean groupingSets = queryContext.isGroupingSets();
     _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
+    Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
+        queryContext.isOptimizeMaxInitialResultHolderCapacity()
+            ? getGroupByExpressionSizesFromPredicates(queryContext, projectOperator) : null;
+    GroupKeyGenerator selectedGroupKeyGenerator;
     if (groupKeyGenerator != null) {
-      _groupKeyGenerator = groupKeyGenerator;
+      selectedGroupKeyGenerator = groupKeyGenerator;
     } else if (groupingSets) {
-      _groupKeyGenerator =
-          new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions, queryContext.getGroupingSets(),
-              numGroupsLimit, _nullHandlingEnabled);
+      selectedGroupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
+    } else if (groupKeyGeneratorProvider == GroupKeyGeneratorProvider.DEFAULT) {
+      selectedGroupKeyGenerator = createDefaultGroupKeyGenerator(groupByExpressions, projectOperator,
+          hasNoDictionaryGroupByExpression, numGroupsLimit, maxInitialResultHolderCapacity,
+          groupByExpressionSizesFromPredicates);
     } else {
-      Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
-          queryContext.isOptimizeMaxInitialResultHolderCapacity()
-              ? getGroupByExpressionSizesFromPredicates(queryContext, projectOperator) : null;
-      // Null handling does not steer this choice: every generator below gives a null an id of its own, so the
-      // encoding of the group-by columns decides on its own which one to use.
-      if (hasNoDictionaryGroupByExpression) {
-        if (groupByExpressions.length == 1) {
-          _groupKeyGenerator =
-              new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
-                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
-        } else {
-          _groupKeyGenerator =
-              new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
-        }
-      } else {
-        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-            maxInitialResultHolderCapacity, _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+      GroupKeyGeneratorContext context = createGroupKeyGeneratorContext(Objects.requireNonNull(groupKeySpecs),
+          groupByExpressionSizesFromPredicates, numGroupsLimit,
+          maxInitialResultHolderCapacity);
+      Optional<GroupKeyGenerator> providedGroupKeyGenerator =
+          Objects.requireNonNull(groupKeyGeneratorProvider.tryCreate(context));
+      selectedGroupKeyGenerator = providedGroupKeyGenerator.isPresent() ? providedGroupKeyGenerator.get()
+          : createDefaultGroupKeyGenerator(groupByExpressions, projectOperator, hasNoDictionaryGroupByExpression,
+              numGroupsLimit, maxInitialResultHolderCapacity,
+              groupByExpressionSizesFromPredicates);
+    }
+
+    try {
+      // Initialize result holders
+      int maxNumResults = selectedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
+      int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
+      int numAggregationFunctions = _aggregationFunctions.length;
+      GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        groupByResultHolders[i] =
+            _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
       }
-    }
 
-    // Initialize result holders
-    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
-    int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
-    int numAggregationFunctions = _aggregationFunctions.length;
-    _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
+      // Initialize map from document Id to group key
+      int[] svGroupKeys;
+      int[][] mvGroupKeys;
+      if (_hasMVGroupByExpression) {
+        svGroupKeys = null;
+        mvGroupKeys = THREAD_LOCAL_MV_GROUP_KEYS.get();
+      } else {
+        svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
+        mvGroupKeys = null;
+      }
+      _groupKeyGenerator = selectedGroupKeyGenerator;
+      _groupByResultHolders = groupByResultHolders;
+      _svGroupKeys = svGroupKeys;
+      _mvGroupKeys = mvGroupKeys;
+    } catch (RuntimeException | Error e) {
+      if (groupKeyGenerator == null) {
+        try {
+          selectedGroupKeyGenerator.close();
+        } catch (RuntimeException | Error closeError) {
+          if (closeError != e) {
+            e.addSuppressed(closeError);
+          }
+        }
+      }
+      throw e;
     }
+  }
 
-    // Initialize map from document Id to group key
-    if (_hasMVGroupByExpression) {
-      _svGroupKeys = null;
-      _mvGroupKeys = THREAD_LOCAL_MV_GROUP_KEYS.get();
-    } else {
-      _svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
-      _mvGroupKeys = null;
+  private GroupKeyGenerator createDefaultGroupKeyGenerator(ExpressionContext[] groupByExpressions,
+      BaseProjectOperator<?> projectOperator, boolean hasNoDictionaryGroupByExpression, int numGroupsLimit,
+      int maxInitialResultHolderCapacity,
+      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
+    // Null handling does not steer this choice: every generator gives a null an id of its own, so the physical
+    // encoding of the group-by columns decides which built-in implementation to use.
+    if (hasNoDictionaryGroupByExpression) {
+      if (groupByExpressions.length == 1) {
+        return new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
+            _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+      }
+      return new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
+          _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
     }
+    return new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
+        maxInitialResultHolderCapacity, _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+  }
+
+  private GroupKeyGeneratorContext createGroupKeyGeneratorContext(
+      List<GroupKeyGeneratorContext.GroupKeySpec> groupKeySpecs,
+      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates, int numGroupsLimit,
+      int maxInitialResultHolderCapacity) {
+    return new GroupKeyGeneratorContext(groupKeySpecs,
+        groupByExpressionSizesFromPredicates != null ? groupByExpressionSizesFromPredicates : Map.of(),
+        numGroupsLimit, maxInitialResultHolderCapacity, _nullHandlingEnabled);
+  }
+
+  private static Optional<GroupKeyGeneratorContext.IntegralDomain> getExactIntegralDomain(DataType dataType,
+      DataSourceMetadata dataSourceMetadata) {
+    Object minValue = dataSourceMetadata.getMinValue();
+    Object maxValue = dataSourceMetadata.getMaxValue();
+    if (dataType == DataType.INT && minValue instanceof Integer && maxValue instanceof Integer) {
+      int min = (Integer) minValue;
+      int max = (Integer) maxValue;
+      return min <= max ? Optional.of(new GroupKeyGeneratorContext.IntegralDomain(min, max)) : Optional.empty();
+    }
+    if (dataType == DataType.LONG && minValue instanceof Long && maxValue instanceof Long) {
+      long min = (Long) minValue;
+      long max = (Long) maxValue;
+      return min <= max ? Optional.of(new GroupKeyGeneratorContext.IntegralDomain(min, max)) : Optional.empty();
+    }
+    return Optional.empty();
   }
 
   /// Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
