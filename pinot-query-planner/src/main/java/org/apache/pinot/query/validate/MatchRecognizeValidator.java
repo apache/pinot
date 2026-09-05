@@ -20,6 +20,7 @@ package org.apache.pinot.query.validate;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlAggFunction;
@@ -32,8 +33,9 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlUnresolvedFunction;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
-import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +55,18 @@ import org.slf4j.LoggerFactory;
 ///  2. **Unsupported constructs must be rejected before conversion.** Several of them (`ORDER BY` / `PARTITION BY`
 ///     on arbitrary expressions in particular) blow up inside `SqlToRelConverter` with an `AssertionError` or
 ///     `ClassCastException` rather than a usable message.
+///  3. **`RUNNING` in `DEFINE` must be normalized before Calcite validation.** SQL:2016 and Trino allow it (and it is
+///     the default processing mode for a definition), but Calcite 1.42 rejects both `RUNNING` and `FINAL` there.
+///     [#validateDefinitions] removes the redundant `RUNNING` wrapper and rejects `FINAL`, whose future-row
+///     semantics cannot be evaluated while a match is being built.
+///  4. **Unquoted pattern variables must be case-insensitive.** Pinot deliberately preserves the spelling of
+///     unquoted identifiers in its parser, while Calcite stores pattern variables in exact-case string maps. Without
+///     an early rewrite, `PATTERN (A) DEFINE a AS a.price > 0` either creates two symbols or fails to bind. See
+///     [#normalizePatternVariableNames].
+///  5. **Pattern variables and the row source alias need separate internal names.** SQL gives those names separate
+///     namespaces inside MATCH_RECOGNIZE, but Calcite reuses the row source alias as the alpha of the universal row
+///     pattern variable. [#isolateRowSourceAlias] gives a colliding input an internal alias before Calcite validation,
+///     so explicit pattern references and unqualified universal references remain distinguishable.
 ///
 /// Everything this class rejects is deferred, not permanently unsupported; each message names the construct so the
 /// user can rewrite the query.
@@ -67,8 +81,8 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       "PERMUTE is not supported yet in the MATCH_RECOGNIZE PATTERN clause. Expand the permutation into an explicit "
           + "alternation, e.g. PATTERN ((A B) | (B A)).";
 
-  /// Whether the node currently being visited sits inside a MEASURES or DEFINE list, the only two places where the
-  /// `RUNNING` / `FINAL` semantics modifiers are legal.
+  /// Whether the node currently being visited sits inside a MEASURES or DEFINE list. `RUNNING` wrappers in DEFINE
+  /// have already been removed and `FINAL` rejected by [#validateDefinitions] before this traversal.
   private boolean _inMeasureOrDefine;
   private boolean _matchRecognizeFound;
 
@@ -88,7 +102,8 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       // The RUNNING / FINAL prefix operators are registered for MATCH_RECOGNIZE, but unlike PREV / NEXT / FIRST /
       // LAST / CLASSIFIER / MATCH_NUMBER, Calcite does not confine them to a MatchRecognizeScope. Reject them here
       // so they cannot leak into an ordinary projection.
-      throw unsupported(kind + " can only be used in the MEASURES or DEFINE clause of a MATCH_RECOGNIZE query: '"
+      String legalClause = kind == SqlKind.FINAL ? "MEASURES" : "MEASURES or DEFINE";
+      throw unsupported(kind + " can only be used in the " + legalClause + " clause of a MATCH_RECOGNIZE query: '"
           + call + "'.");
     }
     return super.visit(call);
@@ -116,6 +131,7 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
   }
 
   private void validateAndRewrite(SqlMatchRecognize match) {
+    normalizePatternVariableNames(match);
     rejectUnsupportedClauses(match);
     validatePartitionBy(match.getPartitionList());
     validateOrderBy(match.getOrderList());
@@ -124,9 +140,107 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     validateDefinitions(match.getPatternDefList());
     // Deliberately last: a query that also uses a deferred construct should be told about that construct first.
     validateMeasures(match);
-    rejectRowSourceAliasCollision(match, definedVariables);
+    isolateRowSourceAlias(match, definedVariables);
     applyStandardAfterMatchDefault(match);
     warnOnUndefinedPatternVariables(match, definedVariables);
+  }
+
+  /// Canonicalizes every unquoted pattern variable to upper case while retaining quoted identifiers verbatim.
+  ///
+  /// Pinot configures its parser with `Casing.UNCHANGED`, but Calcite's MATCH_RECOGNIZE implementation keys PATTERN,
+  /// DEFINE, pattern-field references, and AFTER MATCH targets by exact [String] equality. SQL identifiers do not
+  /// have those semantics: unquoted names are case-insensitive, while quoted names are case-sensitive. Rewriting the
+  /// raw tree gives every downstream Calcite map one stable spelling and preserves each component's quoted parser
+  /// position so `"a"` remains distinct from unquoted `a` (canonical `A`).
+  private void normalizePatternVariableNames(SqlMatchRecognize match) {
+    match.setOperand(SqlMatchRecognize.OPERAND_PATTERN, normalizePattern(match.getPattern()));
+
+    SqlNodeList definitions = match.getPatternDefList();
+    for (SqlNode definition : definitions) {
+      SqlNode condition = patternDefinitionCondition(definition);
+      SqlIdentifier variable = patternDefinitionVariable(definition);
+      if (condition != null) {
+        ((SqlCall) definition).setOperand(0, normalizePatternReferences(condition));
+      }
+      if (variable != null && variable.isSimple()) {
+        ((SqlCall) definition).setOperand(1, normalizeIdentifierComponent(variable, 0));
+      }
+    }
+
+    SqlNodeList measures = match.getMeasureList();
+    for (int i = 0; i < measures.size(); i++) {
+      SqlNode measure = measures.get(i);
+      SqlNode expression = asOperand(measure, 0);
+      if (expression != null) {
+        ((SqlCall) measure).setOperand(0, normalizePatternReferences(expression));
+      } else {
+        measures.set(i, normalizePatternReferences(measure));
+      }
+    }
+
+    SqlNode after = match.getAfter();
+    if (after != null) {
+      match.setOperand(SqlMatchRecognize.OPERAND_AFTER, normalizePattern(after));
+    }
+  }
+
+  /// Rewrites the identifiers in the PATTERN grammar, where every identifier is a pattern variable.
+  private SqlNode normalizePattern(SqlNode node) {
+    if (node instanceof SqlIdentifier) {
+      SqlIdentifier identifier = (SqlIdentifier) node;
+      return identifier.isSimple() ? normalizeIdentifierComponent(identifier, 0) : identifier;
+    }
+    if (!(node instanceof SqlCall)) {
+      return node;
+    }
+    SqlCall call = (SqlCall) node;
+    List<SqlNode> operands = call.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode operand = operands.get(i);
+      if (operand != null) {
+        call.setOperand(i, normalizePattern(operand));
+      }
+    }
+    return call;
+  }
+
+  /// Rewrites only the alpha of a qualified pattern-field reference. A simple identifier is an input column, not a
+  /// pattern variable, so changing it here would also change column-name resolution.
+  private SqlNode normalizePatternReferences(SqlNode node) {
+    if (node instanceof SqlIdentifier) {
+      SqlIdentifier identifier = (SqlIdentifier) node;
+      return identifier.names.size() > 1 ? normalizeIdentifierComponent(identifier, 0) : identifier;
+    }
+    if (!(node instanceof SqlCall)) {
+      return node;
+    }
+    SqlCall call = (SqlCall) node;
+    List<SqlNode> operands = call.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode operand = operands.get(i);
+      if (operand != null) {
+        call.setOperand(i, normalizePatternReferences(operand));
+      }
+    }
+    return call;
+  }
+
+  private static SqlIdentifier normalizeIdentifierComponent(SqlIdentifier identifier, int component) {
+    // Calcite's single-name SqlIdentifier constructor stores quoting only on the node position and leaves
+    // componentPositions null; compound identifiers retain per-component positions. Consult both representations.
+    boolean quoted = identifier.isComponentQuoted(component)
+        || (identifier.isSimple() && identifier.getParserPosition().isQuoted());
+    if (quoted) {
+      return identifier;
+    }
+    return identifier.setName(component, canonicalIdentifierComponent(identifier, component));
+  }
+
+  private static String canonicalIdentifierComponent(SqlIdentifier identifier, int component) {
+    boolean quoted = identifier.isComponentQuoted(component)
+        || (identifier.isSimple() && identifier.getParserPosition().isQuoted());
+    String name = identifier.names.get(component);
+    return quoted ? name : name.toUpperCase(Locale.ROOT);
   }
 
   /// Rewrites an omitted `AFTER MATCH` clause into an explicit `AFTER MATCH SKIP PAST LAST ROW`.
@@ -198,31 +312,90 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     }
   }
 
-  /// Rejects a pattern variable whose name equals the row source alias.
+  /// Gives the row source an internal alias when its SQL name equals a pattern variable.
   ///
-  /// Calcite has no separate representation for the SQL:2016 universal row pattern variable: it qualifies an
-  /// unqualified column reference in `MEASURES` / `DEFINE` with the row source alias, and
-  /// `RelToPlanNodeConverter#bindPatternFieldRefs` recognises the universal variable purely by that alpha not being a
-  /// pattern variable name. When the two names coincide, `LAST(col)` silently becomes "last row mapped to that
-  /// variable" instead of "last row of the match", and an unqualified reference in a `DEFINE` predicate changes which
-  /// rows match at all. Nothing is left at the `RexNode` level to disambiguate, so it has to be caught here.
+  /// SQL places the input relation and pattern variables in separate namespaces: with input alias `A` and pattern
+  /// variable `A`, a qualifier in PARTITION BY / ORDER BY names the input, a qualifier in MEASURES / DEFINE names the
+  /// pattern variable, and an unqualified measure or definition column uses the universal row pattern variable.
   ///
-  /// The comparison is case-sensitive because the symbol table is a plain `Map<String, Integer>` lookup:
-  /// `FROM a AS aa ... PATTERN (AA B+)` binds to the universal variable correctly today and must keep working.
-  private void rejectRowSourceAliasCollision(SqlMatchRecognize match, Set<String> definedVariables) {
-    String alias = SqlValidatorUtil.alias(match.getTableRef());
-    if (alias == null) {
-      // A join or a sub-query with no derivable alias; Calcite does not qualify anything with a row source alias.
+  /// Calcite does not retain that distinction: it qualifies an unqualified column in MEASURES / DEFINE with the row
+  /// source alias and later represents both forms as `RexPatternFieldRef(alpha, column)`. Re-aliasing the input before
+  /// Calcite sees the tree gives universal references an alpha that cannot equal a pattern variable. Qualified input
+  /// references in PARTITION BY / ORDER BY are rewritten with it; pattern references deliberately are not.
+  private void isolateRowSourceAlias(SqlMatchRecognize match, Set<String> definedVariables) {
+    SqlNode tableRef = match.getTableRef();
+    SqlIdentifier aliasIdentifier = rowSourceAliasIdentifier(tableRef);
+    if (aliasIdentifier == null) {
+      // A join or a sub-query with no explicit alias; Calcite does not qualify anything with a row source alias.
       return;
     }
     Set<String> variables = new LinkedHashSet<>(definedVariables);
     collectPatternVariables(match.getPattern(), variables);
-    if (variables.contains(alias)) {
-      throw unsupported("MATCH_RECOGNIZE pattern variable '" + alias + "' collides with the row source alias '"
-          + alias + "'. Calcite qualifies unqualified column references in MEASURES and DEFINE with the row source "
-          + "alias, so they would silently bind to that pattern variable instead of to the universal row pattern "
-          + "variable. Rename the pattern variable, or alias the input table differently.");
+    // Isolate both SQL-equivalent names (so cosmetic case cannot change validity) and exact raw-name collisions
+    // (Calcite's maps can otherwise conflate distinct names such as unquoted a and quoted "a").
+    if (!variables.contains(aliasIdentifier.getSimple())
+        && !variables.contains(canonicalIdentifierComponent(aliasIdentifier, 0))) {
+      return;
     }
+
+    String internalAlias = "__PINOT_MATCH_INPUT";
+    for (int suffix = 0; variables.contains(internalAlias); suffix++) {
+      internalAlias = "__PINOT_MATCH_INPUT_" + suffix;
+    }
+    rewriteRowSourceQualifier(match.getPartitionList(), aliasIdentifier, internalAlias);
+    rewriteRowSourceQualifier(match.getOrderList(), aliasIdentifier, internalAlias);
+
+    SqlIdentifier internalAliasIdentifier = new SqlIdentifier(internalAlias, SqlParserPos.ZERO);
+    if (tableRef.getKind() == SqlKind.AS) {
+      ((SqlCall) tableRef).setOperand(1, internalAliasIdentifier);
+    } else {
+      match.setOperand(SqlMatchRecognize.OPERAND_TABLE_REF,
+          SqlStdOperatorTable.AS.createCall(tableRef.getParserPosition(), tableRef, internalAliasIdentifier));
+    }
+  }
+
+  @Nullable
+  private static SqlIdentifier rowSourceAliasIdentifier(SqlNode tableRef) {
+    SqlNode explicitAlias = asOperand(tableRef, 1);
+    if (explicitAlias instanceof SqlIdentifier && ((SqlIdentifier) explicitAlias).isSimple()) {
+      return (SqlIdentifier) explicitAlias;
+    }
+    if (tableRef instanceof SqlIdentifier) {
+      SqlIdentifier tableIdentifier = (SqlIdentifier) tableRef;
+      int lastComponent = tableIdentifier.names.size() - 1;
+      return new SqlIdentifier(tableIdentifier.names.get(lastComponent),
+          tableIdentifier.getComponentParserPosition(lastComponent));
+    }
+    return null;
+  }
+
+  private static void rewriteRowSourceQualifier(SqlNodeList nodes, SqlIdentifier oldAlias, String newAlias) {
+    for (int i = 0; i < nodes.size(); i++) {
+      nodes.set(i, rewriteRowSourceQualifier(nodes.get(i), oldAlias, newAlias));
+    }
+  }
+
+  private static SqlNode rewriteRowSourceQualifier(SqlNode node, SqlIdentifier oldAlias, String newAlias) {
+    if (node instanceof SqlIdentifier) {
+      SqlIdentifier identifier = (SqlIdentifier) node;
+      if (identifier.names.size() > 1
+          && canonicalIdentifierComponent(identifier, 0).equals(canonicalIdentifierComponent(oldAlias, 0))) {
+        return identifier.setName(0, newAlias);
+      }
+      return identifier;
+    }
+    if (!(node instanceof SqlCall)) {
+      return node;
+    }
+    SqlCall call = (SqlCall) node;
+    List<SqlNode> operands = call.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode operand = operands.get(i);
+      if (operand != null) {
+        call.setOperand(i, rewriteRowSourceQualifier(operand, oldAlias, newAlias));
+      }
+    }
+    return call;
   }
 
   private static String lastName(SqlIdentifier identifier) {
@@ -296,20 +469,24 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     }
   }
 
-  /// Rejects aggregate calls inside `DEFINE`. Aggregates are legal in SQL:2016 `DEFINE` (they aggregate over the
-  /// rows matched so far), but Pinot does not implement running aggregation inside the pattern matcher yet.
+  /// Normalizes processing modes and rejects aggregate calls inside `DEFINE`.
+  ///
+  /// SQL:2016 `DEFINE` always evaluates while the matcher is building a candidate match, so `RUNNING` is legal but
+  /// redundant and `FINAL` is illegal. Calcite 1.42 rejects both modifiers before relational conversion; stripping
+  /// `RUNNING` here preserves its standard semantics while allowing the query through Calcite. Aggregates are also
+  /// legal in SQL:2016 `DEFINE` (over the rows matched so far), but Pinot does not implement their running state yet.
   private void validateDefinitions(SqlNodeList patternDefList) {
     for (SqlNode definition : patternDefList) {
       SqlNode condition = patternDefinitionCondition(definition);
       if (condition != null) {
-        rejectAggregates(condition, definition);
+        ((SqlCall) definition).setOperand(0, normalizeDefinition(condition, definition));
       }
     }
   }
 
-  private void rejectAggregates(SqlNode node, SqlNode definition) {
+  private SqlNode normalizeDefinition(SqlNode node, SqlNode definition) {
     if (!(node instanceof SqlCall)) {
-      return;
+      return node;
     }
     SqlCall call = (SqlCall) node;
     if (isAggregate(call.getOperator())) {
@@ -317,11 +494,21 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
           + "MATCH_RECOGNIZE DEFINE clause: '" + definition + "'. Only row level predicates, optionally using "
           + "PREV / NEXT / FIRST / LAST / CLASSIFIER / MATCH_NUMBER, are supported.");
     }
-    for (SqlNode operand : call.getOperandList()) {
+    if (call.getKind() == SqlKind.FINAL) {
+      throw unsupported("FINAL semantics is not supported in the MATCH_RECOGNIZE DEFINE clause: '" + definition
+          + "'. DEFINE predicates are evaluated with RUNNING semantics while the candidate match is being built.");
+    }
+    if (call.getKind() == SqlKind.RUNNING) {
+      return normalizeDefinition(call.operand(0), definition);
+    }
+    List<SqlNode> operands = call.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode operand = operands.get(i);
       if (operand != null) {
-        rejectAggregates(operand, definition);
+        call.setOperand(i, normalizeDefinition(operand, definition));
       }
     }
+    return call;
   }
 
   /// Warns about pattern variables that appear in `PATTERN` but are never `DEFINE`d. SQL:2016 says such a variable

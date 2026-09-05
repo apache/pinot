@@ -112,6 +112,29 @@ public class MatchOperatorTest {
     assertEquals(output.get(1), new Object[]{0, 1L, 4, 4, 4.0});
   }
 
+  @Test
+  public void testRepeatedPatternVariableMeasuresUseSparseRows() {
+    // PATTERN (A B A) maps A to non-contiguous rows. Aggregation and logical navigation must use A's sparse row
+    // indexes instead of treating the span from its first row to its last row as if every row belonged to A.
+    RowPattern pattern = concat(symbol(0), symbol(1), symbol(0));
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "sumA", "countA", "firstA1", "lastA1"},
+        new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.INT, ColumnDataType.INT
+        });
+    List<MatchNode.Measure> measures = List.of(
+        measure("sumA", aggregate("SUM", ColumnDataType.LONG, patternRef(0, "A"))),
+        measure("countA", aggregate("COUNT", ColumnDataType.LONG, patternRef(0, "A"))),
+        measure("firstA1", navigation("FIRST", ColumnDataType.INT, patternRef(0, "A"), 1)),
+        measure("lastA1", navigation("LAST", ColumnDataType.INT, patternRef(0, "A"), 1)));
+
+    List<Object[]> output = run(node(resultSchema, labelSymbols("A", "B"), pattern, measures,
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL), rows("ABAABA"));
+
+    assertEquals(output.size(), 2);
+    assertEquals(output.get(0), new Object[]{0, 2L, 2L, 2, 0});
+    assertEquals(output.get(1), new Object[]{0, 8L, 2L, 5, 3});
+  }
+
   @Test(dataProvider = "skipModes")
   public void testAfterMatchSkipModes(MatchNode.AfterMatchSkipMode skipMode, int skipToSymbolOrdinal,
       List<Integer> expectedLastValues) {
@@ -225,23 +248,50 @@ public class MatchOperatorTest {
     assertErrorContains(block, QueryErrorCode.INTERNAL, "upstream failed");
   }
 
-  @Test
-  public void testEmptyMatchIsEmittedAndAlwaysAdvancesOneRow() {
-    // PATTERN (A*) over B A B: rows that are not an A still produce an empty match, and the scan must move on
-    // instead of matching the same empty match forever.
+  @Test(dataProvider = "emptyMatchSkipModes")
+  public void testEmptyMatchIsEmittedAndAlwaysAdvancesOneRow(MatchNode.AfterMatchSkipMode skipMode,
+      int skipToSymbolOrdinal) {
+    // PATTERN (A*) over B B B: every row produces an empty match. AFTER MATCH SKIP only governs non-empty matches,
+    // so every skip mode must advance one row rather than trying to resolve a variable that the empty match cannot map.
     RowPattern pattern = quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true);
-    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno", "cnt"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG});
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno", "cnt", "cls"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.STRING});
     List<MatchNode.Measure> measures = List.of(measure("mno", matchNumber()),
-        measure("cnt", new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of())));
+        measure("cnt", new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of())),
+        measure("cls", classifier()));
 
     List<Object[]> output = run(node(resultSchema, labelSymbols("A"), pattern, measures,
-        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL), rows("BAB"));
+        skipMode, skipToSymbolOrdinal), rows("BBB"));
 
     assertEquals(output.size(), 3);
-    assertEquals(output.get(0), new Object[]{0, 1L, 0L});
-    assertEquals(output.get(1), new Object[]{0, 2L, 1L});
-    assertEquals(output.get(2), new Object[]{0, 3L, 0L});
+    assertEquals(output.get(0), new Object[]{0, 1L, 0L, null});
+    assertEquals(output.get(1), new Object[]{0, 2L, 0L, null});
+    assertEquals(output.get(2), new Object[]{0, 3L, 0L, null});
+  }
+
+  @DataProvider(name = "emptyMatchSkipModes")
+  public Object[][] emptyMatchSkipModes() {
+    return new Object[][]{
+        {MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL},
+        {MatchNode.AfterMatchSkipMode.TO_NEXT_ROW, MatchNode.NO_SKIP_TO_SYMBOL},
+        {MatchNode.AfterMatchSkipMode.TO_FIRST, 0},
+        {MatchNode.AfterMatchSkipMode.TO_LAST, 0}
+    };
+  }
+
+  @Test
+  public void testSkipToVariableAbsentFromNonEmptyMatchIsAnError() {
+    // PATTERN (A B?) can report a non-empty A-only match. Skipping to B must fail when the optional B is absent.
+    RowPattern pattern = concat(symbol(0), quantifier(symbol(1), 0, 1, true));
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    List<MatchNode.Measure> measures =
+        List.of(measure("cnt", new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of())));
+
+    MseBlock block = execute(node(resultSchema, labelSymbols("A", "B"), pattern, measures,
+        MatchNode.AfterMatchSkipMode.TO_LAST, 1), rows("AAA"), Map.of());
+
+    assertErrorContains(block, QueryErrorCode.QUERY_EXECUTION, "no row of the match");
   }
 
   @Test
