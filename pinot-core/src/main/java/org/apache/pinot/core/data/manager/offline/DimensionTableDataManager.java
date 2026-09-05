@@ -47,6 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /// Dimension Table is a special type of OFFLINE table which is assigned to all servers
@@ -240,6 +241,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               }
 
               Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+              primaryKey = wrapPrimaryKey(primaryKey);
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
               Object[] previousValue = lookupTable.put(primaryKey, values);
@@ -318,6 +320,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             }
 
             Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+            primaryKey = wrapPrimaryKey(primaryKey);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
             long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
@@ -335,6 +338,16 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
     return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, segmentDataManagers, recordReaders,
         this);
+  }
+
+
+  private Object[] wrapPrimaryKey(Object[] primaryKey) {
+    for (int i = 0; i < primaryKey.length; i++) {
+      if (primaryKey[i] instanceof byte[]) {
+        primaryKey[i] = new ByteArray((byte[]) primaryKey[i]);
+      }
+    }
+    return primaryKey;
   }
 
   private void sortSegmentsForUpsert(List<SegmentDataManager> segmentDataManagers) {
