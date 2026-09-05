@@ -49,9 +49,12 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
@@ -191,11 +194,11 @@ public class PinotMatchExchangeNodeInsertRuleTest {
     Match matchOverExchange = (Match) match.copy(match.getTraitSet(),
         List.of(PinotLogicalExchange.create(match.getInput(), RelDistributions.hash(List.of(0)))));
 
-    RelOptRuleCall call = Mockito.mock(RelOptRuleCall.class);
-    Mockito.when(call.rel(0)).thenReturn(matchOverExchange);
+    RelOptRuleCall call = mock(RelOptRuleCall.class);
+    when(call.rel(0)).thenReturn(matchOverExchange);
     assertFalse(PinotMatchExchangeNodeInsertRule.INSTANCE.matches(call));
     // ... but it does fire when the input is not an exchange yet.
-    Mockito.when(call.rel(0)).thenReturn(match);
+    when(call.rel(0)).thenReturn(match);
     assertTrue(PinotMatchExchangeNodeInsertRule.INSTANCE.matches(call));
   }
 
@@ -203,16 +206,16 @@ public class PinotMatchExchangeNodeInsertRuleTest {
   /// options so the rule can read them the same way it does during real planning.
   private static Match applyRule(Match match, Map<String, String> options) {
     PlannerContext plannerContext =
-        PlannerContext.forTesting(options, Mockito.mock(QueryEnvironment.Config.class));
+        PlannerContext.forTesting(options, mock(QueryEnvironment.Config.class));
     HepPlanner planner = new HepPlanner(new HepProgramBuilder().build(), plannerContext);
-    RelOptRuleCall call = Mockito.mock(RelOptRuleCall.class);
-    Mockito.when(call.rel(0)).thenReturn(match);
-    Mockito.when(call.getPlanner()).thenReturn(planner);
+    RelOptRuleCall call = mock(RelOptRuleCall.class);
+    when(call.rel(0)).thenReturn(match);
+    when(call.getPlanner()).thenReturn(planner);
 
     PinotMatchExchangeNodeInsertRule.INSTANCE.onMatch(call);
 
     ArgumentCaptor<RelNode> captor = ArgumentCaptor.forClass(RelNode.class);
-    Mockito.verify(call, Mockito.times(1)).transformTo(captor.capture());
+    verify(call, times(1)).transformTo(captor.capture());
     return (Match) captor.getValue();
   }
 

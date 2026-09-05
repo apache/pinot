@@ -48,6 +48,7 @@ import static org.testng.Assert.expectThrows;
 /// different row count only.
 public class PatternToNfaCompilerTest {
   private static final long UNLIMITED_STEPS = Long.MAX_VALUE;
+  private static final long ZERO_WIDTH_PATTERN_STEP_BUDGET = 32;
 
   @Test
   public void testGreedyQuantifierPrefersTheLongestMatch() {
@@ -217,6 +218,66 @@ public class PatternToNfaCompilerTest {
   }
 
   @Test
+  public void testQuantifiedStartAnchorTerminatesAndHonoursExactBoundary() {
+    for (boolean greedy : new boolean[]{true, false}) {
+      RowPattern zeroOrMore =
+          quantifier(RowPattern.AnchorStart.INSTANCE, 0, RowPattern.Quantifier.UNBOUNDED, greedy);
+      RowPattern oneOrMore =
+          quantifier(RowPattern.AnchorStart.INSTANCE, 1, RowPattern.Quantifier.UNBOUNDED, greedy);
+      String preference = greedy ? "greedy" : "reluctant";
+
+      // ^* may take zero repetitions anywhere, while ^+ must take one at the exact partition boundary. The finite
+      // budget also proves that repeating a successful zero-width anchor cannot spin forever.
+      assertEquals(matchAt(zeroOrMore, List.of(), "AA", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 0, preference);
+      assertEquals(matchAt(zeroOrMore, List.of(), "AA", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET), 1, preference);
+      assertEquals(matchAt(oneOrMore, List.of(), "AA", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 0, preference);
+      assertEquals(matchAt(oneOrMore, List.of(), "AA", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET),
+          PartitionMatcher.NO_MATCH, preference);
+    }
+  }
+
+  @Test
+  public void testQuantifiedEndAnchorTerminatesAndHonoursExactBoundary() {
+    for (boolean greedy : new boolean[]{true, false}) {
+      RowPattern zeroOrMore =
+          quantifier(RowPattern.AnchorEnd.INSTANCE, 0, RowPattern.Quantifier.UNBOUNDED, greedy);
+      RowPattern oneOrMore =
+          quantifier(RowPattern.AnchorEnd.INSTANCE, 1, RowPattern.Quantifier.UNBOUNDED, greedy);
+      String preference = greedy ? "greedy" : "reluctant";
+
+      // $* may take zero repetitions before the end, while $+ succeeds only just past the partition's final row.
+      assertEquals(matchAt(zeroOrMore, List.of(), "AA", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET), 1, preference);
+      assertEquals(matchAt(zeroOrMore, List.of(), "AA", 2, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2, preference);
+      assertEquals(matchAt(oneOrMore, List.of(), "AA", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET),
+          PartitionMatcher.NO_MATCH, preference);
+      assertEquals(matchAt(oneOrMore, List.of(), "AA", 2, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2, preference);
+    }
+  }
+
+  @Test
+  public void testQuantifiedAnchorsComposeWithConsumingPatterns() {
+    List<PatternSymbol> symbols = labelSymbols("A", "B");
+    RowPattern optionalStart = concat(
+        quantifier(RowPattern.AnchorStart.INSTANCE, 0, RowPattern.Quantifier.UNBOUNDED, true), symbol(0), symbol(1));
+    RowPattern requiredStart = concat(
+        quantifier(RowPattern.AnchorStart.INSTANCE, 1, RowPattern.Quantifier.UNBOUNDED, false), symbol(0), symbol(1));
+    RowPattern optionalEnd = concat(symbol(1), symbol(0),
+        quantifier(RowPattern.AnchorEnd.INSTANCE, 0, RowPattern.Quantifier.UNBOUNDED, false));
+    RowPattern requiredEnd = concat(symbol(1), symbol(0),
+        quantifier(RowPattern.AnchorEnd.INSTANCE, 1, RowPattern.Quantifier.UNBOUNDED, true));
+
+    assertEquals(matchAt(optionalStart, symbols, "AB", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2);
+    assertEquals(matchAt(optionalStart, symbols, "XAB", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET), 3);
+    assertEquals(matchAt(requiredStart, symbols, "AB", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2);
+    assertEquals(matchAt(requiredStart, symbols, "XAB", 1, ZERO_WIDTH_PATTERN_STEP_BUDGET),
+        PartitionMatcher.NO_MATCH);
+    assertEquals(matchAt(optionalEnd, symbols, "BAX", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2);
+    assertEquals(matchAt(requiredEnd, symbols, "BA", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET), 2);
+    assertEquals(matchAt(requiredEnd, symbols, "BAX", 0, ZERO_WIDTH_PATTERN_STEP_BUDGET),
+        PartitionMatcher.NO_MATCH);
+  }
+
+  @Test
   public void testSymbolWithoutDefinitionMatchesEveryRow() {
     // SQL:2016: a PATTERN variable with no DEFINE entry has the condition TRUE.
     assertMatch(quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true), List.of(anySymbol("A")), "XYZ", "AAA");
@@ -284,6 +345,12 @@ public class PatternToNfaCompilerTest {
 
   private static int matchAt(RowPattern pattern, List<PatternSymbol> symbols, String input, int startPos) {
     return newMatcher(pattern, symbols).match(rows(input), startPos, 1);
+  }
+
+  private static int matchAt(RowPattern pattern, List<PatternSymbol> symbols, String input, int startPos,
+      long maxStepsPerMatchAttempt) {
+    return new PartitionMatcher(PatternToNfaCompiler.compile(pattern), symbols, INPUT_SCHEMA, maxStepsPerMatchAttempt)
+        .match(rows(input), startPos, 1);
   }
 
   private static PartitionMatcher newMatcher(RowPattern pattern, List<PatternSymbol> symbols) {

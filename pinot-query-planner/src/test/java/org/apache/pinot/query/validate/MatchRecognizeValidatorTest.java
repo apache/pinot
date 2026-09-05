@@ -167,11 +167,16 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             // Calcite does not confine the RUNNING / FINAL prefix operators to a MatchRecognizeScope, so registering
             // them would otherwise let them leak into an ordinary projection.
             "SELECT FINAL col3 FROM a",
-            "FINAL can only be used in the MEASURES or DEFINE clause"
+            "FINAL can only be used in the MEASURES clause"
         },
         new Object[]{
             "SELECT RUNNING col3 FROM a",
             "RUNNING can only be used in the MEASURES or DEFINE clause"
+        },
+        new Object[]{
+            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(A.col3) AS v PATTERN (A+) "
+                + "DEFINE A AS FINAL LAST(A.col3) > 0)",
+            "FINAL semantics is not supported in the MATCH_RECOGNIZE DEFINE clause"
         },
         new Object[]{
             // MEASURES is optional in SQL:2016, but Calcite then sets the MATCH_RECOGNIZE row type to the whole
@@ -192,19 +197,6 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(A.col3) AS v, FIRST(A.col3) AS v "
                 + "PATTERN (A) DEFINE A AS A.col3 > 0)",
             "measure alias 'v' collides with a PARTITION BY column or an earlier measure alias"
-        },
-        new Object[]{
-            // The row source alias doubles as the alpha of an unqualified column reference, so a pattern variable of
-            // the same name silently steals every unqualified reference from the universal row pattern variable.
-            "SELECT * FROM a AS A MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s PATTERN (A B+) "
-                + "DEFINE A AS A.col3 > 0, B AS B.col3 > 0)",
-            "pattern variable 'A' collides with the row source alias 'A'"
-        },
-        new Object[]{
-            // Without an explicit alias the bare table name plays the same role.
-            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s PATTERN (\"a\" B+) "
-                + "DEFINE \"a\" AS \"a\".col3 > 0, B AS B.col3 > 0)",
-            "pattern variable 'a' collides with the row source alias 'a'"
         }
     };
     //@formatter:on
@@ -253,11 +245,17 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts MEASURES LAST(A.col3) AS COL1 "
                 + "PATTERN (A) DEFINE A AS A.col3 > 0)"
         },
-        // A pattern variable that differs from the row source alias only in case binds to the universal row pattern
-        // variable correctly, because the symbol table lookup is exact-case.
+        // Pattern variables and row-source aliases occupy separate namespaces, even when their SQL names are equal.
         new Object[]{
-            "SELECT * FROM a AS aa MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s PATTERN (AA B+) "
-                + "DEFINE AA AS AA.col3 > 0, B AS B.col3 > 0)"
+            "SELECT * FROM a AS A MATCH_RECOGNIZE (PARTITION BY A.col1 ORDER BY A.ts "
+                + "MEASURES LAST(col3) AS universal_s, LAST(a.col3) AS pattern_s "
+                + "PATTERN (a B+) DEFINE a AS a.col3 > 0, B AS B.col3 > 0)"
+        },
+        // The same namespace rule applies when Calcite derives the row-source alias from the bare table name.
+        new Object[]{
+            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts "
+                + "MEASURES LAST(col3) AS universal_s, LAST(\"a\".col3) AS pattern_s "
+                + "PATTERN (\"a\" B+) DEFINE \"a\" AS \"a\".col3 > 0, B AS B.col3 > 0)"
         }
     };
     //@formatter:on
@@ -269,6 +267,18 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
         _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + String.format(QUERY_TEMPLATE, ""),
             RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(explain.contains("LogicalMatch"), "Expected a LogicalMatch in the plan but got:\n" + explain);
+  }
+
+  @Test
+  public void testProcessingModesPlanThroughCalcite() {
+    // Calcite 1.42 rejects RUNNING in DEFINE even though it is standard and semantically the default. The raw Pinot
+    // validator removes that redundant wrapper before Calcite sees it, while preserving both modifiers in MEASURES.
+    try (CompiledQuery query = _queryEnvironment.compile(
+        "SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+            + "MEASURES RUNNING LAST(A.col3) AS running_v, FINAL LAST(A.col3) AS final_v "
+            + "PATTERN (A+) DEFINE A AS RUNNING LAST(A.col3) > 0)")) {
+      assertNotNull(query);
+    }
   }
 
   @Test

@@ -277,7 +277,7 @@ public class MatchOperator extends MultiStageOperator {
         throw QueryErrorCode.QUERY_EXECUTION.asException(
             "MATCH_RECOGNIZE PARTITION BY value is not sortable: " + left.getClass().getName());
       }
-      final int comparison;
+      int comparison;
       try {
         comparison = ((Comparable) left).compareTo(right);
       } catch (ClassCastException e) {
@@ -349,18 +349,10 @@ public class MatchOperator extends MultiStageOperator {
 
   /// Where pattern matching resumes after a match that covered `[scanStart, endPos)`.
   ///
-  /// An empty match always resumes at the next row: every skip mode would otherwise resume exactly where it
-  /// started and loop forever. `SKIP TO FIRST` / `SKIP TO LAST` that would not make progress is an error
-  /// in SQL:2016 rather than a silently adjusted position, so it is reported as one.
+  /// `AFTER MATCH SKIP` applies only to non-empty matches. An empty match always resumes at the next row, which also
+  /// ensures that matching makes progress.
   private int nextScanStart(int scanStart, int endPos, MatchTape tape) {
     if (endPos == scanStart) {
-      if (_skipMode == MatchNode.AfterMatchSkipMode.TO_FIRST
-          || _skipMode == MatchNode.AfterMatchSkipMode.TO_LAST) {
-        throw QueryErrorCode.QUERY_EXECUTION.asException(
-            "AFTER MATCH SKIP TO " + skipTargetName() + " cannot be applied to the empty match at row " + scanStart
-                + " of its partition, because no row is mapped to that pattern variable. Make the PATTERN require "
-                + "at least one row, or use AFTER MATCH SKIP PAST LAST ROW.");
-      }
       return scanStart + 1;
     }
     switch (_skipMode) {

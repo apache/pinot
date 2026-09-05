@@ -25,6 +25,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
@@ -154,6 +155,13 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         {"NFLX", 3, 6},
         {"NFLX", 5, 8}
     });
+    // Unquoted pattern variables are case-insensitive; a lowercase skip target must bind to the uppercase U.
+    assertMatchRows(skipTargetQuery("AFTER MATCH SKIP TO FIRST u"), new Object[][]{
+        {"AAPL", 2, 5},
+        {"NFLX", 1, 4},
+        {"NFLX", 3, 6},
+        {"NFLX", 5, 8}
+    });
     // LAST(U) is the fourth and last row of the match, so matching resumes three rows in.
     assertMatchRows(skipTargetQuery("AFTER MATCH SKIP TO LAST U"), new Object[][]{
         {"AAPL", 2, 5},
@@ -259,6 +267,164 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         {"AMZN", 1, "UP", 3, 4, 30, 5, 15, 10.0d},
         {"MSFT", 1, "UP", 1, 2, 3, 3, 3, 3.0d}
     });
+  }
+
+  /// Navigation around CLASSIFIER() designates a row just like navigation around a column. During DEFINE the label
+  /// of a future row is not visible; after a match completes FIRST and LAST report the labels at opposite ends.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testClassifierNavigation(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES FIRST(A.seqCol) AS start_seq, FIRST(CLASSIFIER()) AS first_cls,"
+        + " LAST(CLASSIFIER()) AS last_cls"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A B)"
+        + " DEFINE A AS NEXT(CLASSIFIER()) IS NULL"
+        + ") AS mr ORDER BY symbolCol, start_seq";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 1, "A", "B"}, {"AAPL", 3, "A", "B"}, {"AAPL", 5, "A", "B"},
+        {"AMZN", 1, "A", "B"}, {"AMZN", 3, "A", "B"},
+        {"GOOG", 1, "A", "B"},
+        {"MSFT", 1, "A", "B"},
+        {"NFLX", 1, "A", "B"}, {"NFLX", 3, "A", "B"}, {"NFLX", 5, "A", "B"},
+        {"NFLX", 7, "A", "B"}
+    }, "STRING", "INT", "STRING", "STRING");
+  }
+
+  /// RUNNING is the default processing mode for DEFINE and is therefore a no-op there. With ONE ROW PER MATCH,
+  /// RUNNING and FINAL measures are both evaluated at the final row and produce the same value.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testRunningAndFinalProcessingModes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES RUNNING LAST(A.priceCol) AS running_last, FINAL LAST(A.priceCol) AS final_last"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+)"
+        + " DEFINE A AS RUNNING LAST(A.priceCol) > 0"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 11, 11}, {"AMZN", 25, 25}, {"GOOG", 4, 4}, {"MSFT", 8, 8}, {"NFLX", 8, 8}
+    }, "STRING", "INT", "INT");
+  }
+
+  /// Unquoted SQL identifiers are case-insensitive. The lowercase DEFINE must bind to the uppercase PATTERN symbol;
+  /// if it becomes a dead second symbol, A defaults to TRUE and this deliberately impossible predicate returns rows.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testUnquotedPatternVariablesAreCaseInsensitive(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " AS src MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES COUNT(*) AS cnt"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+) DEFINE a AS a.priceCol < 0"
+        + ") AS mr";
+    assertMatchRows(query, new Object[][]{}, "STRING", "LONG");
+  }
+
+  /// Input aliases and pattern variables occupy separate SQL namespaces even when they have the same spelling.
+  /// PARTITION BY / ORDER BY qualifiers name the input, pattern-qualified measures name A's rows, and unqualified
+  /// measures use the universal row pattern variable (the final B row here).
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testRowSourceAliasAndPatternVariableUseSeparateNamespaces(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM (SELECT * FROM " + getTableName() + " WHERE symbolCol = 'AAPL') AS A"
+        + " MATCH_RECOGNIZE ("
+        + " PARTITION BY A.symbolCol ORDER BY A.seqCol"
+        + " MEASURES FIRST(A.seqCol) AS start_seq, LAST(priceCol) AS universal_price,"
+        + " LAST(A.priceCol) AS pattern_price"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A B)"
+        + " DEFINE A AS A.priceCol > 0, B AS B.priceCol > 0"
+        + ") AS mr ORDER BY start_seq";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 1, 8, 10}, {"AAPL", 3, 9, 5}, {"AAPL", 5, 7, 12}
+    }, "STRING", "INT", "INT", "INT");
+  }
+
+  /// Aggregate arguments may be scalar expressions. An optional variable that matches no rows has COUNT 0 and NULL
+  /// for every other supported aggregate, independently of the aggregate over the populated variable.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testAggregateExpressionsAndEmptyVariableSemantics(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES SUM(A.priceCol * A.seqCol) AS weighted_sum, COUNT(B.priceCol) AS b_count,"
+        + " SUM(B.priceCol) AS b_sum, MIN(B.priceCol) AS b_min, MAX(B.priceCol) AS b_max, AVG(B.priceCol) AS b_avg"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+ B?)"
+        + " DEFINE A AS A.priceCol > 0, B AS B.priceCol < 0"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 256, 0, null, null, null, null},
+        {"AMZN", 225, 0, null, null, null, null},
+        {"GOOG", 24, 0, null, null, null, null},
+        {"MSFT", 35, 0, null, null, null, null},
+        {"NFLX", 204, 0, null, null, null, null}
+    }, "STRING", "LONG", "LONG", "LONG", "INT", "INT", "DOUBLE");
+  }
+
+  /// DESC and the ascending tie-breaker must both affect the distributed sort feeding the matcher, not merely
+  /// survive in the logical plan. GOOG's equal prices make the second key observable.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testMultiKeyDescendingOrderExecutes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY priceCol DESC, seqCol ASC"
+        + " MEASURES FIRST(A.seqCol) AS first_seq, LAST(A.seqCol) AS last_seq"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+) DEFINE A AS A.priceCol > 0"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 5, 3}, {"AMZN", 5, 4}, {"GOOG", 1, 3}, {"MSFT", 3, 2}, {"NFLX", 8, 1}
+    }, "STRING", "INT", "INT");
+  }
+
+  /// Empty matches are emitted once at each input position and always advance one row, whatever skip mode is written.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testEmptyMatchesAdvanceForEverySkipMode(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // First prove that CLASSIFIER() survives the distributed result path as SQL NULL for an empty match. The
+    // aggregate assertions below additionally guard against Calcite treating that nullable measure as NOT NULL and
+    // simplifying COUNT(cls) to COUNT(*).
+    String directQuery = "SET enableNullHandling=true; SELECT * FROM (SELECT * FROM " + getTableName()
+        + " WHERE symbolCol = 'GOOG') AS filtered MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES MATCH_NUMBER() AS mno, CLASSIFIER() AS cls"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A*) DEFINE A AS A.priceCol < 0"
+        + ") AS matches ORDER BY symbolCol, mno";
+    assertMatchRows(directQuery, new Object[][]{
+        {"GOOG", 1, null}, {"GOOG", 2, null}, {"GOOG", 3, null}
+    }, "STRING", "LONG", "STRING");
+
+    Object[][] expected = {
+        {"AAPL", 7, 1, 7, 0, 0}, {"AMZN", 5, 1, 5, 0, 0}, {"GOOG", 3, 1, 3, 0, 0},
+        {"MSFT", 3, 1, 3, 0, 0}, {"NFLX", 8, 1, 8, 0, 0}
+    };
+    String[] resultTypes = {"STRING", "LONG", "LONG", "LONG", "LONG", "LONG"};
+    assertMatchRows(emptyMatchQuery("AFTER MATCH SKIP PAST LAST ROW"), expected, resultTypes);
+    assertMatchRows(emptyMatchQuery("AFTER MATCH SKIP TO NEXT ROW"), expected, resultTypes);
+    assertMatchRows(emptyMatchQuery("AFTER MATCH SKIP TO FIRST A"), expected, resultTypes);
+    assertMatchRows(emptyMatchQuery("AFTER MATCH SKIP TO LAST A"), expected, resultTypes);
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testEmptyInputProducesNoMatches(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM (SELECT * FROM " + getTableName() + " WHERE seqCol < 0) AS empty_input"
+        + " MATCH_RECOGNIZE (PARTITION BY symbolCol ORDER BY seqCol MEASURES COUNT(*) AS cnt"
+        + " ONE ROW PER MATCH PATTERN (A+) DEFINE A AS A.priceCol > 0) AS mr";
+    assertMatchRows(query, new Object[][]{}, "STRING", "LONG");
   }
 
   /// PREV and NEXT are bounded by the partition, not by the input: at a partition boundary they must yield NULL rather
@@ -478,6 +644,13 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + " DEFINE DOWN AS COUNT(DOWN.priceCol) < 3, UP AS UP.priceCol > PREV(UP.priceCol)"
         + ") AS mr", "is not supported yet in the MATCH_RECOGNIZE DEFINE clause");
 
+    assertPlanningError("SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES LAST(A.priceCol) AS p"
+        + " ONE ROW PER MATCH PATTERN (A+)"
+        + " DEFINE A AS FINAL LAST(A.priceCol) > 0"
+        + ") AS mr", "FINAL semantics is not supported in the MATCH_RECOGNIZE DEFINE clause");
+
     // PERMUTE is a non-reserved keyword, so the single argument form parses as a concatenation of an undefined
     // pattern variable named PERMUTE and a group. MatchRecognizeValidator turns that silently wrong plan into an
     // explicit error.
@@ -519,17 +692,6 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + " PATTERN (DOWN+ UP+)"
         + V_SHAPE_DEFINE
         + ") AS mr", "collides with a PARTITION BY column or an earlier measure alias");
-
-    // Calcite qualifies an unqualified column reference with the row source alias, so a pattern variable of the same
-    // name steals every unqualified reference from the SQL:2016 universal row pattern variable - silently changing
-    // both measure values and which rows match.
-    assertPlanningError("SELECT * FROM " + getTableName() + " AS DOWN MATCH_RECOGNIZE ("
-        + " PARTITION BY symbolCol ORDER BY seqCol"
-        + " MEASURES LAST(priceCol) AS p"
-        + " ONE ROW PER MATCH"
-        + " PATTERN (DOWN+ UP+)"
-        + V_SHAPE_DEFINE
-        + ")", "collides with the row source alias");
   }
 
   private String neighbourQuery(String definition) {
@@ -583,6 +745,19 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + ") AS mr ORDER BY symbolCol, start_seq";
   }
 
+  private String emptyMatchQuery(String afterMatch) {
+    // Run with explicit SQL null handling so COUNT(cls) must observe CLASSIFIER()'s null bitmap on empty matches.
+    return "SET enableNullHandling=true; SELECT symbolCol, COUNT(*) AS match_count, MIN(mno) AS first_match,"
+        + " MAX(mno) AS last_match,"
+        + " SUM(row_count) AS matched_rows, COUNT(cls) AS classified_rows FROM (SELECT * FROM " + getTableName()
+        + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES MATCH_NUMBER() AS mno, COUNT(*) AS row_count, CLASSIFIER() AS cls"
+        + " ONE ROW PER MATCH " + afterMatch
+        + " PATTERN (A*) DEFINE A AS A.priceCol < 0"
+        + ") AS matches) GROUP BY symbolCol ORDER BY symbolCol";
+  }
+
   /// Asserts the full result set of `query`, cell by cell. `null` expects a SQL NULL, a [String]
   /// expects a string, a [Double] expects an approximate double and any other [Number] an exact integer.
   private JsonNode assertMatchRows(String query, Object[][] expected)
@@ -604,13 +779,32 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         if (expectedValue == null) {
           assertTrue(actual.isNull(), where + "\nExpected NULL but got: " + actual);
         } else if (expectedValue instanceof String) {
+          assertTrue(actual.isTextual(), where + "\nExpected a JSON string but got: " + actual);
           assertEquals(actual.asText(), expectedValue, where);
         } else if (expectedValue instanceof Double) {
+          assertTrue(actual.isFloatingPointNumber(),
+              where + "\nExpected a floating-point JSON number but got: " + actual);
           assertEquals(actual.asDouble(), (double) (Double) expectedValue, 1e-9, where);
         } else {
+          assertTrue(actual.isIntegralNumber(), where + "\nExpected an integral JSON number but got: " + actual);
           assertEquals(actual.asLong(), ((Number) expectedValue).longValue(), where);
         }
       }
+    }
+    return response;
+  }
+
+  /// Also asserts the user-visible result schema, including for an empty result where no row can prove its shape.
+  private JsonNode assertMatchRows(String query, Object[][] expected, String... expectedColumnTypes)
+      throws Exception {
+    JsonNode response = assertMatchRows(query, expected);
+    JsonNode actualColumnTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertNotNull(actualColumnTypes, "No column types in response for query: " + query);
+    assertEquals(actualColumnTypes.size(), expectedColumnTypes.length,
+        "Unexpected number of result types for query: " + query);
+    for (int i = 0; i < expectedColumnTypes.length; i++) {
+      assertEquals(actualColumnTypes.get(i).asText(), expectedColumnTypes[i],
+          "Unexpected result type at column " + i + " for query: " + query);
     }
     return response;
   }
@@ -629,10 +823,10 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .setEnableColumnBasedNullHandling(true)
-        .addSingleValueDimension(SYMBOL_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SEQ_COLUMN, FieldSpec.DataType.INT)
-        .addSingleValueDimension(PRICE_COLUMN, FieldSpec.DataType.INT)
-        .addSingleValueDimension(NULLABLE_PRICE_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(SYMBOL_COLUMN, DataType.STRING)
+        .addSingleValueDimension(SEQ_COLUMN, DataType.INT)
+        .addSingleValueDimension(PRICE_COLUMN, DataType.INT)
+        .addSingleValueDimension(NULLABLE_PRICE_COLUMN, DataType.INT)
         .build();
   }
 

@@ -185,8 +185,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.NOT,
       SqlStdOperatorTable.UNARY_MINUS,
       SqlStdOperatorTable.UNARY_PLUS,
-      /// MATCH_RECOGNIZE running / final semantics modifiers, e.g. `FINAL LAST(A.price)`. These are only legal inside
-      /// a MATCH_RECOGNIZE MEASURES / DEFINE clause; Calcite rejects them anywhere else.
+      /// MATCH_RECOGNIZE processing-mode modifiers, e.g. `FINAL LAST(A.price)`. Both are legal in MEASURES;
+      /// RUNNING is also legal (and redundant) in DEFINE, while FINAL is rejected there.
       SqlStdOperatorTable.FINAL,
       SqlStdOperatorTable.RUNNING,
 

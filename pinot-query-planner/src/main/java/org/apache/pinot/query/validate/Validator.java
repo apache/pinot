@@ -69,6 +69,19 @@ public class Validator extends SqlValidatorImpl {
             .withTypeCoercionFactory(PinotTypeCoercion::new));
   }
 
+  /// Calcite 1.42 declares `CLASSIFIER()` as a non-null VARCHAR, but an empty match has no classified row and must
+  /// return SQL NULL. Correct the type at the validator boundary so the MATCH_RECOGNIZE output schema is nullable and
+  /// Calcite cannot simplify an outer `COUNT(classifier_measure)` to `COUNT(*)`.
+  @Override
+  public RelDataType deriveType(SqlValidatorScope scope, SqlNode expression) {
+    RelDataType type = super.deriveType(scope, expression);
+    if (expression.getKind() == SqlKind.CLASSIFIER && !type.isNullable()) {
+      type = getTypeFactory().createTypeWithNullability(type, true);
+      setValidatedNodeType(expression, type);
+    }
+    return type;
+  }
+
   /// Expand the star in the select list.
   /// Pinot table schema has all columns along with virtual columns.
   /// We don't want to include virtual columns in the select \* query
