@@ -35,9 +35,11 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
+import org.slf4j.Marker;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -82,6 +84,16 @@ public class QueryLoggerTest {
       _infoLog.add(String.format(format.replace("{}", "%s"), arg1, arg2));
       return null;
     }).when(_logger).info(Mockito.anyString(), Mockito.anyLong(), Mockito.anyString());
+
+    // logQueryReceived tags its record with QUERY_RECEIVED, which is a different overload
+    Mockito.doAnswer(invocationOnMock -> {
+      String format = invocationOnMock.getArgument(1);
+      Object arg1 = invocationOnMock.getArgument(2);
+      Object arg2 = invocationOnMock.getArgument(3);
+      _infoLog.add(String.format(format.replace("{}", "%s"), arg1, arg2));
+      return null;
+    }).when(_logger)
+        .info(Mockito.any(Marker.class), Mockito.anyString(), Mockito.anyLong(), Mockito.anyString());
 
     Mockito.doAnswer(inv -> {
       _numDropped.add(inv.getArgument(1));
@@ -223,6 +235,25 @@ public class QueryLoggerTest {
     Assert.assertTrue(wasLogged);
     Assert.assertEquals(_infoLog.size(), 1);
     Assert.assertTrue(_infoLog.get(0).contains("SQL query for request 123"));
+  }
+
+  @Test
+  public void shouldMarkOnlyTheQueryReceivedRecord() {
+    // Given:
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    // When: a query is received and then completes
+    queryLogger.logQueryReceived(123L, "SELECT * FROM foo", null);
+    queryLogger.logQueryCompleted(generateParams(false, false, 0, 456, null), true);
+
+    // Then: the received record carries the marker so it can be routed independently...
+    Mockito.verify(_logger).info(
+        ArgumentMatchers.argThat(marker -> marker != null && "QUERY_RECEIVED".equals(marker.getName())),
+        Mockito.anyString(), Mockito.anyLong(), Mockito.anyString());
+    // ...and the completion record, which shares this logger, does not
+    Mockito.verify(_logger).info(Mockito.anyString());
   }
 
   @Test
