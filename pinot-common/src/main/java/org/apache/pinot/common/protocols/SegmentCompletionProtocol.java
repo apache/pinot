@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -129,6 +130,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
+  public static final String PARAM_REASON_CODE = "reasonCode";
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   // Sent by servers to indicate the number of rows read so far
@@ -149,6 +151,74 @@ public class SegmentCompletionProtocol {
   // Stop reason sent by server as mutable index cannot consume more rows
   // (like size reaching close to its limit or number of col values for a col is about to overflow int max)
   public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
+
+  /// Stable wire codes for server stop reasons.
+  ///
+  /// Numeric IDs are part of the segment-completion protocol and must remain unique, stable, and non-reusable.
+  /// Controllers ignore unknown numeric `reasonCode` values and fall back to the retained legacy `reason` value.
+  /// When both a known `reasonCode` and a legacy `reason` are present, the numeric code takes precedence and
+  /// normalizes the legacy reason string carried through the request params.
+  public enum ReasonCode {
+    ROW_LIMIT(100, REASON_ROW_LIMIT),
+    TIME_LIMIT(110, REASON_TIME_LIMIT),
+    END_OF_PARTITION_GROUP(120, REASON_END_OF_PARTITION_GROUP),
+    FORCE_COMMIT_MESSAGE_RECEIVED(130, REASON_FORCE_COMMIT_MESSAGE_RECEIVED),
+    INDEX_CAPACITY_THRESHOLD_BREACHED(140, REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+
+    private static final Map<Integer, ReasonCode> BY_ID = new HashMap<>();
+
+    static {
+      for (ReasonCode value : values()) {
+        BY_ID.put(value.getId(), value);
+      }
+    }
+
+    private final int _id;
+    private final String _reason;
+
+    ReasonCode(int id, String reason) {
+      _id = id;
+      _reason = reason;
+    }
+
+    public int getId() {
+      return _id;
+    }
+
+    public String getReason() {
+      return _reason;
+    }
+
+    @Nullable
+    public static ReasonCode fromReasonCodeParam(@Nullable String reasonCode) {
+      if (reasonCode == null) {
+        return null;
+      }
+      try {
+        return fromCode(Integer.parseInt(reasonCode));
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+
+    @Nullable
+    public static ReasonCode fromCode(int reasonCode) {
+      return BY_ID.get(reasonCode);
+    }
+
+    @Nullable
+    public static ReasonCode fromReason(@Nullable String reason) {
+      if (reason == null) {
+        return null;
+      }
+      for (ReasonCode value : values()) {
+        if (value.getReason().equals(reason)) {
+          return value;
+        }
+      }
+      return null;
+    }
+  }
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -201,6 +271,9 @@ public class SegmentCompletionProtocol {
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
+      if (_params.getReasonCode() != null) {
+        params.put(PARAM_REASON_CODE, String.valueOf(_params.getReasonCode().getId()));
+      }
       if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
       }
@@ -231,7 +304,10 @@ public class SegmentCompletionProtocol {
     public static class Params {
       private String _segmentName;
       private String _instanceId;
+      @Nullable
       private String _reason;
+      @Nullable
+      private ReasonCode _reasonCode;
       private int _numRows;
       private long _buildTimeMillis;
       private long _waitTimeMillis;
@@ -253,6 +329,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
         _reason = null;
+        _reasonCode = null;
       }
 
       public Params(Params params) {
@@ -267,6 +344,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
         _reason = params.getReason();
+        _reasonCode = params.getReasonCode();
       }
 
       public Params withSegmentName(String segmentName) {
@@ -279,8 +357,29 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withReason(String reason) {
+      public Params withReason(@Nullable String reason) {
         _reason = reason;
+        _reasonCode = ReasonCode.fromReason(reason);
+        return this;
+      }
+
+      /// Parses the raw `reasonCode` query parameter. Missing, malformed, or unknown values are ignored so the
+      /// retained legacy `reason` can continue to be used as fallback.
+      public Params withReasonCodeParam(@Nullable String reasonCode) {
+        ReasonCode parsedReasonCode = ReasonCode.fromReasonCodeParam(reasonCode);
+        if (parsedReasonCode != null) {
+          return withReasonCode(parsedReasonCode);
+        }
+        return this;
+      }
+
+      /// Sets the typed stop reason. A known code also sets the legacy reason string so older controllers can ignore
+      /// `reasonCode` and still use `reason`. Passing `null` clears only the typed code.
+      public Params withReasonCode(@Nullable ReasonCode reasonCode) {
+        _reasonCode = reasonCode;
+        if (reasonCode != null) {
+          _reason = reasonCode.getReason();
+        }
         return this;
       }
 
@@ -328,8 +427,14 @@ public class SegmentCompletionProtocol {
         return _segmentName;
       }
 
+      @Nullable
       public String getReason() {
         return _reason;
+      }
+
+      @Nullable
+      public ReasonCode getReasonCode() {
+        return _reasonCode;
       }
 
       public String getInstanceId() {
@@ -372,6 +477,7 @@ public class SegmentCompletionProtocol {
         return "Segment name: " + _segmentName
             + ",Instance Id: " + _instanceId
             + ",Reason: " + _reason
+            + ",ReasonCode: " + _reasonCode
             + ",NumRows: " + _numRows
             + ",BuildTimeMillis: " + _buildTimeMillis
             + ",WaitTimeMillis: " + _waitTimeMillis
