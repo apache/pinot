@@ -201,6 +201,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
   protected ControllerConf.ControllerMode _controllerMode;
+  protected boolean _isIngestionGroovyPolicyExplicitlyConfigured;
   protected HelixManager _helixControllerManager;
   protected HelixManager _helixParticipantManager;
   protected PinotMetricsRegistry _metricsRegistry;
@@ -249,12 +250,22 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
+    _isIngestionGroovyPolicyExplicitlyConfigured = _config.containsKey(ControllerConf.DISABLE_GROOVY);
     if (_controllerMode == ControllerConf.ControllerMode.DUAL
         || _controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
       HelixSetupUtils.setupHelixClusterWithDefaultConfigs(_helixZkURL, _helixClusterName, getDefaultClusterConfigs());
     }
-    ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+    if (_controllerMode == ControllerConf.ControllerMode.DUAL) {
+      HelixSetupUtils.reconcileIngestionGroovyPolicy(_helixZkURL, _helixClusterName,
+          _isIngestionGroovyPolicyExplicitlyConfigured, _config.isDisableIngestionGroovy());
+    }
+    ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER,
+        _controllerMode != ControllerConf.ControllerMode.HELIX_ONLY);
+    boolean disableGroovy = _config.isDisableIngestionGroovy();
     applyCustomConfigs(_config);
+    if (_controllerMode != ControllerConf.ControllerMode.HELIX_ONLY) {
+      ServiceStartableUtils.enforceIngestionGroovyPolicy(_config, disableGroovy, ServiceRole.CONTROLLER);
+    }
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
     PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
@@ -305,7 +316,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
 
-    TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
     ControllerJobTypes.init(_config);
@@ -480,6 +490,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
+    if (_controllerMode == ControllerConf.ControllerMode.PINOT_ONLY) {
+      boolean configuredDisableGroovy = _isIngestionGroovyPolicyExplicitlyConfigured
+          ? _config.isDisableIngestionGroovy() : ControllerConf.DEFAULT_DISABLE_GROOVY;
+      boolean disableGroovy = HelixSetupUtils.reconcileIngestionGroovyPolicy(_helixZkURL, _helixClusterName,
+          _isIngestionGroovyPolicyExplicitlyConfigured, configuredDisableGroovy);
+      _config.setProperty(ControllerConf.DISABLE_GROOVY, disableGroovy);
+    }
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();

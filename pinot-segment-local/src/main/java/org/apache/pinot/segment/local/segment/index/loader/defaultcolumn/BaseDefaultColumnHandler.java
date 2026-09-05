@@ -83,6 +83,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -387,7 +388,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       for (TransformConfig transformConfig : transformConfigs) {
         if (transformConfig.getColumnName().equals(column)) {
           String transformFunction = transformConfig.getTransformFunction();
-          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+          boolean disableGroovy = FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(
+              _indexLoadingConfig.getInstanceDataManagerConfig() != null
+                  ? _indexLoadingConfig.getInstanceDataManagerConfig().getConfig()
+                  .getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY) : null);
+          FunctionEvaluator functionEvaluator =
+              FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction, disableGroovy);
 
           // Check if all arguments exist in the segment
           // TODO: Support chained derived column

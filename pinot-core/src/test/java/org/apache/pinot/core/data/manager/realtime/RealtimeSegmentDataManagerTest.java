@@ -168,6 +168,32 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testRealtimeInitializationRejectsLegacyFieldSpecGroovy()
+      throws Exception {
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    TableConfig tableConfig = createTableConfig();
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
+    LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, tableDataManager));
+    Schema legacySchema = Fixtures.createSchema();
+    legacySchema.getFieldSpecFor("d").setTransformFunction("Groovy({m.toString()}, m)");
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
+        () -> new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
+            new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), legacySchema, llcSegmentName,
+            _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier(), true));
+    Assert.assertTrue(exception.getMessage().contains("controller.disable.ingestion.groovy=false"));
+
+    try (FakeRealtimeSegmentDataManager ignored = new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig,
+        tableDataManager, new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), legacySchema, llcSegmentName,
+        _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier(), false)) {
+      // Explicit server opt-in must preserve legacy Groovy ingestion behavior.
+    }
+  }
+
+  @Test
   public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
@@ -1379,13 +1405,15 @@ public class RealtimeSegmentDataManagerTest {
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
 
-    private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
+    private static InstanceDataManagerConfig makeInstanceDataManagerConfig(boolean disableGroovy) {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
       when(dataManagerConfig.getReadMode()).thenReturn(null);
       when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
-      when(dataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
+      PinotConfiguration config = new PinotConfiguration();
+      config.setProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, disableGroovy);
+      when(dataManagerConfig.getConfig()).thenReturn(config);
       return dataManagerConfig;
     }
 
@@ -1394,10 +1422,18 @@ public class RealtimeSegmentDataManagerTest {
         LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
         ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
+      this(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, schema, llcSegmentName,
+          consumerCoordinatorMap, serverMetrics, timeSupplier, true);
+    }
+
+    public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+        RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier, boolean disableGroovy)
+        throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
-          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
-          () -> true);
+          new IndexLoadingConfig(makeInstanceDataManagerConfig(disableGroovy), tableConfig), schema, llcSegmentName,
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
       _tableDataManager = realtimeTableDataManager;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
@@ -1408,10 +1444,10 @@ public class RealtimeSegmentDataManagerTest {
       _segmentBuildFailedWithDeterministicError =
           RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
       _segmentBuildFailedWithDeterministicError.setAccessible(true);
-      _consumerCoordinatorMap = consumerCoordinatorMap;
       _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
+      _consumerCoordinatorMap = consumerCoordinatorMap;
       _timeSupplier = timeSupplier;
     }
 

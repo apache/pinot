@@ -63,7 +63,8 @@ public final class TableConfigValidationUtils {
       ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
       @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
-    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
+    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig,
+        controllerConf.isDisableIngestionGroovy());
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());

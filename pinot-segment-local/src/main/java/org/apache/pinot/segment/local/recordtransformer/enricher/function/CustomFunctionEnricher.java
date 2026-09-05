@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -40,13 +41,20 @@ public class CustomFunctionEnricher implements RecordEnricher {
 
   public CustomFunctionEnricher(JsonNode enricherProps)
       throws IOException {
+    this(enricherProps, IngestionGroovyPolicy.fromDisabled(
+        FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public CustomFunctionEnricher(JsonNode enricherProps, IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws IOException {
     CustomFunctionEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
     _fieldToFunctionEvaluator = new LinkedHashMap<>();
     _fieldsToExtract = new ArrayList<>();
     for (Map.Entry<String, String> entry : config.getFieldToFunctionMap().entrySet()) {
       String column = entry.getKey();
       String function = entry.getValue();
-      FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(function);
+      FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(function,
+          ingestionGroovyPolicy.isIngestionGroovyDisabled());
       _fieldToFunctionEvaluator.put(column, functionEvaluator);
       _fieldsToExtract.addAll(functionEvaluator.getArguments());
     }

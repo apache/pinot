@@ -43,6 +43,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -89,6 +90,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -341,6 +343,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Whether null handling is enabled by default. This value is only used if
   /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private final boolean _defaultNullHandlingEnabled;
+  private final boolean _disableGroovy;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
@@ -1240,7 +1243,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _defaultNullHandlingEnabled);
+              _defaultNullHandlingEnabled, IngestionGroovyPolicy.fromDisabled(_disableGroovy));
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion);
@@ -1941,7 +1944,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
+    boolean disableGroovy = FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(instanceDataManagerConfig != null
+        ? instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY) : null);
+    _disableGroovy = disableGroovy;
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema, disableGroovy);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
     try {
@@ -1964,7 +1970,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _streamDataDecoder = localStreamDataDecoder.get();
 
     try {
-      _transformPipeline = new TransformPipeline(tableConfig, schema);
+      _transformPipeline = new TransformPipeline(tableConfig, schema,
+          IngestionGroovyPolicy.fromDisabled(disableGroovy));
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));

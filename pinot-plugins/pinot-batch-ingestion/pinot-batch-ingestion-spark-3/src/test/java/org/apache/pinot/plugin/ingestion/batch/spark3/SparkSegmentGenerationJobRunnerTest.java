@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.spark.SparkContext;
 import org.testng.Assert;
@@ -73,7 +75,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
-        .addMetric("col2", DataType.INT).build();
+        .addMetric("col2", DataType.INT).addSingleValueDimension("derived", DataType.STRING).build();
+    schema.getFieldSpecFor("derived").setTransformFunction("Groovy({col1.reverse()}, col1)");
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     File tableConfigFile = new File(testDir, "myTable.table");
@@ -102,6 +105,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
     efSpec.setName("standalone");
     efSpec.setSegmentGenerationJobRunnerClassName(SparkSegmentGenerationJobRunner.class.getName());
+    efSpec.setExtraConfigs(Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false"));
     jobSpec.setExecutionFrameworkSpec(efSpec);
 
     PinotFSSpec pfsSpec = new PinotFSSpec();
@@ -127,7 +131,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
-        .addMetric("col2", DataType.INT).build();
+        .addMetric("col2", DataType.INT).addSingleValueDimension("derived", DataType.STRING).build();
+    schema.getFieldSpecFor("derived").setTransformFunction("Groovy({col1.reverse()}, col1)");
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -158,6 +163,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
     efSpec.setName("standalone");
     efSpec.setSegmentGenerationJobRunnerClassName(SparkSegmentGenerationJobRunner.class.getName());
+    efSpec.setExtraConfigs(Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false"));
     jobSpec.setExecutionFrameworkSpec(efSpec);
 
     PinotFSSpec pfsSpec = new PinotFSSpec();
