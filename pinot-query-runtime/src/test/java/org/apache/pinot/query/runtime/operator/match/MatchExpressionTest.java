@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.math.BigDecimal;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -30,6 +29,8 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -39,6 +40,8 @@ import static org.testng.Assert.expectThrows;
 public class MatchExpressionTest {
   private static final int UNIVERSAL_SYMBOL_ORDINAL = RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL;
   private static final List<PatternSymbol> SYMBOLS = List.of(new PatternSymbol("A", null));
+  private static final List<PatternSymbol> A_B_SYMBOLS =
+      List.of(new PatternSymbol("A", null), new PatternSymbol("B", null));
 
   @Test
   public void testNavigationOffsetMustBeAnExactNonNegativeIntegerInRange() {
@@ -84,11 +87,83 @@ public class MatchExpressionTest {
   }
 
   @Test
-  public void testCountStarUsesTapeLengthWithoutMaterializingUniversalRows() {
+  public void testNavigationDefaultsRunningWrapperAndLogicalBounds() {
+    MatchTape tape = tape(List.<Object[]>of(new Object[]{10}, new Object[]{20}, new Object[]{30}));
+
+    assertEquals(MatchExpression.compile(navigation("FIRST", patternRef(), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 10);
+    assertEquals(MatchExpression.compile(navigation("LAST", patternRef(), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 30);
+    assertEquals(MatchExpression.compile(navigation("PREV", patternRef(), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 20);
+    assertNull(MatchExpression.compile(navigation("NEXT", patternRef(), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape));
+
+    // This is the nested form produced for PREV(RUNNING LAST(value)): RUNNING does not change the designated row.
+    RexExpression runningLast = new RexExpression.FunctionCall(ColumnDataType.INT, "RUNNING",
+        List.of(navigation("LAST", patternRef(), ColumnDataType.INT)));
+    assertEquals(MatchExpression.compile(navigation("PREV", runningLast, ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 20);
+
+    // FIRST/LAST offsets are logical positions within the designated variable, not partition-relative positions.
+    assertNull(MatchExpression.compile(
+        navigation("FIRST", patternRef(), new RexExpression.Literal(ColumnDataType.INT, 3), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape));
+  }
+
+  @Test
+  public void testNestedLogicalAndPhysicalOffsetsCompose() {
+    MatchTape tape = new MatchTape(A_B_SYMBOLS);
+    tape.reset(List.<Object[]>of(
+        new Object[]{0}, new Object[]{10}, new Object[]{20}, new Object[]{30}, new Object[]{40}), 0, 1);
+    tape.push(0);
+    tape.push(1);
+    tape.push(0);
+    tape.push(1);
+    tape.push(0);
+
+    RexExpression secondLastA = navigation("LAST", patternRef(), literal(1), ColumnDataType.INT);
+    RexExpression secondA = navigation("FIRST", patternRef(), literal(1), ColumnDataType.INT);
+    assertEquals(MatchExpression.compile(navigation("PREV", secondLastA, literal(1), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 10);
+    assertEquals(MatchExpression.compile(navigation("NEXT", secondA, literal(1), ColumnDataType.INT),
+        schema(ColumnDataType.INT)).evaluate(tape), 30);
+  }
+
+  @Test
+  public void testDefinePredicateAcceptsBooleanResults() {
+    MatchTape tape = tape(List.<Object[]>of(new Object[]{1}));
+
+    assertTrue(MatchExpression.compile(new RexExpression.Literal(ColumnDataType.BOOLEAN, true),
+        schema(ColumnDataType.INT)).test(tape));
+    assertFalse(MatchExpression.compile(new RexExpression.Literal(ColumnDataType.BOOLEAN, false),
+        schema(ColumnDataType.INT)).test(tape));
+    assertFalse(MatchExpression.compile(new RexExpression.Literal(ColumnDataType.BOOLEAN, null),
+        schema(ColumnDataType.INT)).test(tape));
+  }
+
+  @Test
+  public void testClassifierNavigationPreservesTheDesignatedRow() {
+    MatchTape tape = new MatchTape(A_B_SYMBOLS);
+    tape.reset(List.<Object[]>of(new Object[]{0}, new Object[]{1}, new Object[]{2}), 0, 1);
+    tape.push(0);
+    tape.push(1);
+    tape.push(0);
+
+    assertEquals(classifierNavigation("FIRST", 0).evaluate(tape), "A");
+    assertEquals(classifierNavigation("FIRST", 1).evaluate(tape), "B");
+    assertEquals(classifierNavigation("LAST", 1).evaluate(tape), "B");
+    assertEquals(classifierNavigation("PREV", 1).evaluate(tape), "B");
+    // A future partition row exists, but it has not been classified in the current candidate match.
+    assertNull(classifierNavigation("NEXT", 1).evaluate(tape));
+  }
+
+  @Test
+  public void testCountStarDoesNotVisitUniversalRows() {
     MatchTape tape = new MatchTape(SYMBOLS) {
       @Override
-      public IntArrayList rowsOf(int symbolOrdinal) {
-        throw new AssertionError("COUNT(*) must not materialize universal row indexes");
+      public int rowAt(int symbolOrdinal, int logicalIndex) {
+        throw new AssertionError("COUNT(*) must not visit individual rows");
       }
     };
     tape.reset(List.<Object[]>of(new Object[]{1}, new Object[]{2}), 0, 1);
@@ -101,6 +176,28 @@ public class MatchExpressionTest {
   }
 
   @Test
+  public void testUniversalAggregatesTraverseOnlyTheContiguousMatchRange() {
+    List<Object[]> partitionRows = List.of(
+        new Object[]{100L}, new Object[]{2L}, new Object[]{null}, new Object[]{4L}, new Object[]{200L});
+    MatchTape tape = new MatchTape(SYMBOLS);
+    tape.reset(partitionRows, 1, 1);
+    tape.push(0);
+    tape.push(0);
+    tape.push(0);
+
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.COUNT, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(tape),
+        2L);
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(tape),
+        6L);
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.MIN, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(tape),
+        2L);
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.MAX, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(tape),
+        4L);
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(tape),
+        3L);
+  }
+
+  @Test
   public void testIntegralAndFloatingPointAggregates() {
     MatchTerm.Aggregate longSum = aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.LONG, ColumnDataType.LONG);
     List<Object[]> longRows = List.of(new Object[]{9_007_199_254_740_993L}, new Object[]{2L}, new Object[]{null});
@@ -110,6 +207,34 @@ public class MatchExpressionTest {
         aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE);
     List<Object[]> doubleRows = List.of(new Object[]{1.25}, new Object[]{2.75});
     assertEquals(doubleAverage.evaluate(tape(doubleRows)), 2.0);
+  }
+
+  @Test
+  public void testAggregateEmptySetIdentitiesAndStoredResultTypes() {
+    MatchTape nullTape = tape(List.<Object[]>of(new Object[]{null}));
+    assertEquals(aggregate(MatchTerm.Aggregate.Kind.COUNT, ColumnDataType.LONG, ColumnDataType.LONG)
+        .evaluate(nullTape), 0L);
+    assertNull(aggregate(MatchTerm.Aggregate.Kind.MIN, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(nullTape));
+    assertNull(aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.LONG, ColumnDataType.LONG).evaluate(nullTape));
+    assertNull(aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE)
+        .evaluate(nullTape));
+    assertNull(aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.BIG_DECIMAL, ColumnDataType.BIG_DECIMAL)
+        .evaluate(nullTape));
+
+    Object intSum = aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.INT, ColumnDataType.INT)
+        .evaluate(tape(List.<Object[]>of(new Object[]{1}, new Object[]{2})));
+    assertTrue(intSum instanceof Integer);
+    assertEquals(intSum, 3);
+
+    Object floatAverage = aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.FLOAT, ColumnDataType.FLOAT)
+        .evaluate(tape(List.<Object[]>of(new Object[]{1.0F}, new Object[]{3.0F})));
+    assertTrue(floatAverage instanceof Float);
+    assertEquals(floatAverage, 2.0F);
+
+    Object widenedMin = aggregate(MatchTerm.Aggregate.Kind.MIN, ColumnDataType.INT, ColumnDataType.LONG)
+        .evaluate(tape(List.<Object[]>of(new Object[]{2}, new Object[]{1})));
+    assertTrue(widenedMin instanceof Long);
+    assertEquals(widenedMin, 1L);
   }
 
   @Test
@@ -183,8 +308,22 @@ public class MatchExpressionTest {
     return new RexExpression.PatternFieldRef(0, 0, "A");
   }
 
+  private static RexExpression.Literal literal(int value) {
+    return new RexExpression.Literal(ColumnDataType.INT, value);
+  }
+
   private static RexExpression navigation(String functionName, RexExpression operand, RexExpression offset,
       ColumnDataType resultType) {
     return new RexExpression.FunctionCall(resultType, functionName, List.of(operand, offset));
+  }
+
+  private static RexExpression navigation(String functionName, RexExpression operand, ColumnDataType resultType) {
+    return new RexExpression.FunctionCall(resultType, functionName, List.of(operand));
+  }
+
+  private static MatchExpression classifierNavigation(String functionName, int offset) {
+    RexExpression classifier = new RexExpression.FunctionCall(ColumnDataType.STRING, "CLASSIFIER", List.of());
+    return MatchExpression.compile(navigation(functionName, classifier,
+        new RexExpression.Literal(ColumnDataType.INT, offset), ColumnDataType.STRING), schema(ColumnDataType.INT));
   }
 }
