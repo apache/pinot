@@ -46,6 +46,11 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
     }
   }
 
+  /// Returns the default value for un-initialized results. Used to mirror this holder off-heap.
+  double getDefaultValue() {
+    return _defaultValue;
+  }
+
   @Override
   public void ensureCapacity(int capacity) {
     Preconditions.checkArgument(capacity <= _maxCapacity);

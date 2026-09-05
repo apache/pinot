@@ -900,6 +900,8 @@ public class CommonConstants {
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         // Not actually accepted as Query Option but faked as one during MSE
         public static final String NUM_GROUPS_WARNING_LIMIT = "numGroupsWarningLimit";
+        /// Store SSE group-by key tables and fixed-width result holders in off-heap (direct) memory.
+        public static final String GROUP_BY_OFF_HEAP = "groupByOffHeap";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
@@ -1483,6 +1485,28 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+    // Store SSE group-by key tables and fixed-width aggregation result holders in off-heap (direct) memory.
+    // NOTE: Off-heap group-by memory draws from -XX:MaxDirectMemorySize (shared with segment buffers and Netty)
+    // and is not yet visible to the per-query resource accountant or bounded by a per-query byte budget — the
+    // only bound is numGroupsLimit per table. Size direct memory accordingly before enabling. The per-query
+    // option can override this config in either direction (matching the numGroupsLimit precedent).
+    // On the streaming combine (MSE leaf stages), each per-segment result is materialized into on-heap records
+    // at hand-off and the off-heap state is released immediately, so there the mode only relieves the
+    // segment-execution phase itself — it does not reduce the heap footprint of the streamed results.
+    public static final String GROUPBY_OFF_HEAP = "groupby.offheap";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_OFF_HEAP =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_OFF_HEAP;
+    public static final boolean DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP = false;
+    // Per-thread cap on direct buffers pooled for reuse across queries by the off-heap group-by structures
+    // (mirrors the on-heap thread-local map caching); 0 disables pooling. Pooled bytes stay visible in the
+    // direct-buffer usage accounting; the aggregate retention bound is this cap times the number of threads that
+    // release group-by buffers (combine workers plus reduce threads). Changing the config to 0 drains each
+    // thread's retained buffers lazily on its next group-by. TODO: export the pooled bytes as a server gauge.
+    public static final String GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD =
+        "groupby.offheap.pool.max.bytes.per.thread";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD;
+    public static final long DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP_POOL_MAX_BYTES_PER_THREAD = 0;
     // Do sort-aggregation when LIMIT is below this threshold
     public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
     // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold
