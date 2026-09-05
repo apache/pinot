@@ -463,6 +463,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       FileUtils.deleteQuietly(tempEncryptedFile);
       FileUtils.deleteQuietly(tempDecryptedFile);
       FileUtils.deleteQuietly(tempSegmentDir);
+      if (multiPart != null) {
+        multiPart.cleanup();
+      }
     }
   }
 
@@ -555,6 +558,9 @@ public class PinotSegmentUploadDownloadRestletResource {
     } finally {
       FileUtils.deleteQuietly(tempTarFile);
       FileUtils.deleteQuietly(tempSegmentDir);
+      if (multiPart != null) {
+        multiPart.cleanup();
+      }
     }
   }
 
@@ -1260,7 +1266,9 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   private static void createSegmentFileFromMultipart(FormDataMultiPart multiPart, File destFile)
       throws IOException {
-    // Read segment file or segment metadata file and directly use that information to update zk
+    // Read segment file or segment metadata file and directly use that information to update zk.
+    // NOTE: multiPart.cleanup() is intentionally NOT called here. The calling handler method owns the multipart
+    // lifecycle and cleans it up in its outer finally block.
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
     if (!validateMultiPart(segmentMetadataMap, null)) {
       throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata",
@@ -1270,8 +1278,6 @@ public class PinotSegmentUploadDownloadRestletResource {
     try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
         OutputStream outputStream = new FileOutputStream(destFile)) {
       IOUtils.copyLarge(inputStream, outputStream);
-    } finally {
-      multiPart.cleanup();
     }
   }
 

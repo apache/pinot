@@ -406,6 +406,7 @@ public class LLCSegmentCompletionHandlers {
       return new SegmentMetadataImpl(tempIndexDir);
     } finally {
       FileUtils.deleteQuietly(tempIndexDir);
+      form.cleanup();
     }
   }
 
