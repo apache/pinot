@@ -67,6 +67,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -75,6 +76,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -181,6 +183,115 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test
+  public void testHelixConstructorDoesNotCreateStreamConsumer()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITHOUT_POLICY_COUNT.get(), 0);
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 0);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testPartitionConsumerInitUsesRecreateRetryPolicy()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
+              .withStreamPartitionMsgOffset(endOffset.toString())));
+
+      consumer.run();
+
+      Assert.assertSame(RecordingStreamConsumerFactory.LAST_RETRY_POLICY.get(),
+          RealtimeSegmentDataManager.CONSUMER_RECREATE_RETRY_POLICY);
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 1);
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITHOUT_POLICY_COUNT.get(), 0);
+      Assert.assertNotNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testConsumerInitFailureAfterRetryExhaustionPostsStopConsumed()
+      throws Exception {
+    RecordingStreamConsumerFactory.FAIL_CREATE.set(true);
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertSame(RecordingStreamConsumerFactory.LAST_RETRY_POLICY.get(),
+          RealtimeSegmentDataManager.CONSUMER_RECREATE_RETRY_POLICY);
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 1);
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITHOUT_POLICY_COUNT.get(), 0);
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.ERROR);
+    }
+  }
+
+  @Test
+  public void testOffloadSucceedsWhenStreamConsumerWasNeverCreated()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+    }
+  }
+
+  @Test
+  public void testStopDuringConsumerInitKeepsConsumerForCatchup()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      RecordingStreamConsumerFactory.BEFORE_CREATE_WITH_POLICY.set(segmentDataManager::stop);
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 1);
+      Assert.assertNotNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertEquals(RecordingStreamConsumerFactory.CLOSE_COUNT.get(), 0);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testOffloadDuringConsumerInitClosesCreatedConsumer()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      RecordingStreamConsumerFactory.BEFORE_CREATE_WITH_POLICY.set(segmentDataManager::offload);
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 1);
+      Assert.assertNull(segmentDataManager.getPartitionGroupConsumer());
+      Assert.assertEquals(RecordingStreamConsumerFactory.CLOSE_COUNT.get(), 1);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
@@ -220,6 +331,11 @@ public class RealtimeSegmentDataManagerTest {
 
     FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.initExecutor();
+  }
+
+  @BeforeMethod
+  public void resetRecordingStreamConsumerFactory() {
+    RecordingStreamConsumerFactory.reset();
   }
 
   @AfterClass
@@ -611,6 +727,7 @@ public class RealtimeSegmentDataManagerTest {
     // If catching up, but we did not get to the final offset, then download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.setPartitionGroupConsumer(mock(PartitionGroupConsumer.class));
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -622,12 +739,24 @@ public class RealtimeSegmentDataManagerTest {
     // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.setPartitionGroupConsumer(mock(PartitionGroupConsumer.class));
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+
+    // Semaphore acquired but first create never finished: skip catchup and download.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(finalOffset);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
 
     // But then if we get to the exact offset, we download the segment because consumer semaphore was never acquired.
