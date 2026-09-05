@@ -166,17 +166,22 @@ public class MatchTape {
     return offset < rows.size() ? rows.getInt(offset) : NO_ROW;
   }
 
-  /// Partition indexes of the rows mapped to `symbolOrdinal`, in ascending order, or of the whole match for
-  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL]. Used by the MEASURES aggregates. The returned
-  /// list is the live backing list and is invalidated by the next [#push] or [#pop].
-  public IntArrayList rowsOf(int symbolOrdinal) {
+  /// Number of rows mapped to `symbolOrdinal`, or the length of the whole match for
+  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL].
+  public int rowCount(int symbolOrdinal) {
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
-      IntArrayList allRows = new IntArrayList(_length);
-      for (int i = 0; i < _length; i++) {
-        allRows.add(_startPos + i);
-      }
-      return allRows;
+      return _length;
     }
-    return _rowsBySymbol[symbolOrdinal];
+    return _rowsBySymbol[symbolOrdinal].size();
+  }
+
+  /// Partition index of the row at `logicalIndex` among the rows mapped to `symbolOrdinal`, or in the whole match
+  /// for [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL]. Universal rows are contiguous, so this lookup
+  /// traverses them directly without allocating or filling a per-aggregate position list.
+  public int rowAt(int symbolOrdinal, int logicalIndex) {
+    if (symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
+      return _startPos + logicalIndex;
+    }
+    return _rowsBySymbol[symbolOrdinal].getInt(logicalIndex);
   }
 }
