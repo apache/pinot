@@ -176,6 +176,7 @@ const queryErrorCodeMap = {
   200: "QueryExecutionError",
   210: "ServerShuttingDown",
   211: "ServerOutOfCapacity",
+  212: "BrokerShuttingDown",
   230: "ServerTableMissing",
   235: "ServerSegmentMissing",
   240: "QuerySchedulingTimeoutError",

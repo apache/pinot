@@ -101,6 +101,10 @@ public class TablePropagationScheme implements PropagationScheme {
     // Using IdealState to include offline brokers (e.g. during rolling restart)
     IdealState brokerIdealState = HelixHelper.getTableIdealState(helixManager,
         CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Set<String> exactMatchInstances = brokerIdealState.getInstanceSet(tableName);
+    if (!exactMatchInstances.isEmpty()) {
+      return exactMatchInstances;
+    }
     for (String tableWithType : expandToTablesWithType(tableName)) {
       Set<String> instances = brokerIdealState.getInstanceSet(tableWithType);
       if (!instances.isEmpty()) {

@@ -20,10 +20,13 @@ package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -118,17 +121,18 @@ public class HelixHelper {
       Preconditions.checkArgument(TagNameUtils.isBrokerTag(brokerTag), "Invalid broker tag: %s", brokerTag);
     }
 
-    Set<String> tablesForBrokerTag;
-    int numBrokerTags = brokerTags.size();
-    if (numBrokerTags == 0) {
-      tablesForBrokerTag = Set.of();
-    } else if (numBrokerTags == 1) {
-      tablesForBrokerTag = getTablesForBrokerTag(helixManager, brokerTags.get(0));
-    } else {
-      tablesForBrokerTag = getTablesForBrokerTags(helixManager, brokerTags);
-    }
-
     updateIdealState(helixManager, BROKER_RESOURCE, idealState -> {
+      InstanceConfig instanceConfig = getInstanceConfig(helixManager, brokerId);
+      boolean shutdownInProgress = instanceConfig != null && instanceConfig.getRecord()
+          .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      // The caller's tags can become stale between its InstanceConfig write and this IdealState update. Resolve the
+      // latest tags inside every CAS attempt so a delayed reconciliation cannot overwrite a newer tag assignment.
+      // Retain the supplied tags only for compatibility with callers reconciling an already-removed instance config.
+      List<String> currentBrokerTags = instanceConfig != null
+          ? instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList())
+          : brokerTags;
+      Set<String> tablesForBrokerTag = currentBrokerTags.isEmpty()
+          ? Set.of() : getTablesForBrokerTags(helixManager, currentBrokerTags);
       if (tablesAdded != null) {
         tablesAdded.clear();
       }
@@ -138,7 +142,7 @@ public class HelixHelper {
       for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
         String tableNameWithType = entry.getKey();
         Map<String, String> brokerAssignment = entry.getValue();
-        if (tablesForBrokerTag.contains(tableNameWithType)) {
+        if (!shutdownInProgress && tablesForBrokerTag.contains(tableNameWithType)) {
           if (brokerAssignment.put(brokerId, BrokerResourceStateModel.ONLINE) == null && tablesAdded != null) {
             tablesAdded.add(tableNameWithType);
           }
@@ -171,7 +175,14 @@ public class HelixHelper {
       Map<String, String> instancesStateMap, @Nullable WorkloadChangeListener listener) {
     updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       assert idealState != null;
-      idealState.getRecord().getMapFields().put(tableNameWithType, instancesStateMap);
+      Map<String, String> eligibleInstancesStateMap = new HashMap<>(instancesStateMap);
+      for (InstanceConfig instanceConfig : getInstanceConfigs(helixManager)) {
+        if (instanceConfig.getRecord()
+            .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
+          eligibleInstancesStateMap.remove(instanceConfig.getInstanceName());
+        }
+      }
+      idealState.getRecord().getMapFields().put(tableNameWithType, eligibleInstancesStateMap);
       return idealState;
     });
     if (listener != null) {
@@ -561,6 +572,27 @@ public class HelixHelper {
     Preconditions.checkState(
         helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()),
             instanceConfig), "Failed to update instance config for instance: " + instanceConfig.getId());
+  }
+
+  /// Atomically updates an existing instance config using the latest record from Helix. The mutator can be invoked
+  /// multiple times when a concurrent write causes a version conflict, and therefore must tolerate repeated
+  /// invocation and must not perform non-idempotent side effects outside of the supplied instance config.
+  ///
+  /// @return `true` when the existing instance config was updated, `false` when it did not exist or the update failed
+  public static boolean updateInstanceConfig(HelixDataAccessor helixDataAccessor, String instanceId,
+      Consumer<InstanceConfig> mutator) {
+    AtomicBoolean instanceExists = new AtomicBoolean();
+    boolean updated = helixDataAccessor.updateProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceId),
+        currentRecord -> {
+          instanceExists.set(currentRecord != null);
+          if (currentRecord == null) {
+            return null;
+          }
+          InstanceConfig instanceConfig = new InstanceConfig(currentRecord);
+          mutator.accept(instanceConfig);
+          return instanceConfig.getRecord();
+        }, new InstanceConfig(instanceId));
+    return updated && instanceExists.get();
   }
 
   /// Updates hostname and port in the instance config, returns `true` if the value is updated, `false`

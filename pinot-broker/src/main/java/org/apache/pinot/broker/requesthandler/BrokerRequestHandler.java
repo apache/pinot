@@ -51,6 +51,16 @@ public interface BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception;
 
+  /// Handles a query whose drain admission permit is already owned by the HTTP transport. The transport must keep
+  /// that permit until response completion. Direct and custom-container callers should use [#handleRequest] so the
+  /// handler performs admission itself.
+  default BrokerResponse handleRequestWithPreAcquiredPermit(JsonNode request,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
+      throws Exception {
+    return handleRequest(request, sqlNodeAndOptions, requesterIdentity, requestContext, httpHeaders);
+  }
+
   @VisibleForTesting
   default BrokerResponse handleRequest(String sql)
       throws Exception {
@@ -67,6 +77,14 @@ public interface BrokerRequestHandler {
       Map<String, String> queryParams, RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
     throw new UnsupportedOperationException("Handler does not support Time Series requests");
+  }
+
+  /// Runs a time-series query whose drain admission permit is already owned by the HTTP transport.
+  default TimeSeriesBlock handleTimeSeriesRequestWithPreAcquiredPermit(String lang, String rawQueryParamString,
+      Map<String, String> queryParams, RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) throws QueryException {
+    return handleTimeSeriesRequest(lang, rawQueryParamString, queryParams, requestContext, requesterIdentity,
+        httpHeaders);
   }
 
   /// Handle an explain request for time-series queries.
