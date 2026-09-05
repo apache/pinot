@@ -23,9 +23,9 @@ public class ValueAggregatorUtils {
   }
 
   /// Tries to convert the given value to a double.
-  /// We need this for [ValueAggregator] because the raw value might not be converted to the desired data type yet if it
-  /// is not specified in the schema.
-  /// TODO: Provide a way to specify the desired data type for the raw value.
+  /// Safety net for [ValueAggregator]s when the raw value was not converted by the transform pipeline yet (source
+  /// column not in the schema). Prefer auto SourceField conversion in RecordTransformerUtils so unparsable values
+  /// fail before MutableSegmentImpl mutates the row.
   public static double toDouble(Object value) {
     if (value instanceof Number) {
       return ((Number) value).doubleValue();
