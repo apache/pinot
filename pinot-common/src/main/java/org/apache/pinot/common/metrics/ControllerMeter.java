@@ -93,7 +93,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+  // Segment uploads rejected for being outside the table retention window.
+  OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED("OutOfRetentionSegmentUploadRejected", true);
 
   private final String _brokerMeterName;
   private final String _unit;
