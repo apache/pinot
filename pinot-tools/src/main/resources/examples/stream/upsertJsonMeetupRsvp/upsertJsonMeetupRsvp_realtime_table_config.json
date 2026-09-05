@@ -15,12 +15,12 @@
       "member_json",
       "venue_json"
     ],
-    "jsonIndexColumns": [
-      "event_json",
-      "group_json",
-      "member_json",
-      "venue_json"
-    ],
+    "jsonIndexConfigs": {
+      "event_json": {},
+      "group_json": {},
+      "member_json": {},
+      "venue_json": {}
+    },
     "columnPartitionMap": {
       "rsvp_id": {
         "functionName": "Hashcode",
