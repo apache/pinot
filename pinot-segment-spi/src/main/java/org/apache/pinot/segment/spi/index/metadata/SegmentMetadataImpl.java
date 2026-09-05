@@ -243,8 +243,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
       // Load index metadata
       // Support V3 (e.g. SingleFileIndexDirectory only). Skip for empty segments — there is no payload to size up,
-      // and [EmptyColumnMetadata] does not support `addIndexSize`.
-      if (_segmentVersion == SegmentVersion.v3) {
+      // and [EmptyColumnMetadata] does not support `addIndexSize`. Index sizes come from the local index_map, so
+      // metadata loaded from streams (no index directory) has none; without the guard this probed a cwd-relative
+      // `v3/index_map` once per segment and would NPE on `_indexDir.getPath()` if such a file existed.
+      if (_segmentVersion == SegmentVersion.v3 && _indexDir != null) {
         File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
         if (indexMapFile.exists()) {
           IndexService indexService = IndexService.getInstance();

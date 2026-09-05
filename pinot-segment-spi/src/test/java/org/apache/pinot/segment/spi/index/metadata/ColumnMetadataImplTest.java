@@ -205,6 +205,67 @@ public class ColumnMetadataImplTest {
     assertFalse(json.has("dictionaryUncompressedValueSizeInBytes"));
   }
 
+  // The index-size API works on numeric index ids so this module's tests need no index plugins registered.
+  private static final short FORWARD_ID = 2;
+  private static final short DICTIONARY_ID = 0;
+  private static final short JSON_ID = 5;
+
+  @Test
+  public void indexSizesAbsentByDefault()
+      throws Exception {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    assertEquals(metadata.getNumIndexes(), 0);
+    assertTrue(metadata.getIndexSizeMap().isEmpty());
+    // The REST segment-metadata payload keeps its shape: an empty object, never null.
+    JsonNode indexSizeMap = JsonUtils.objectToJsonNode(metadata).get("indexSizeMap");
+    assertTrue(indexSizeMap.isObject() && indexSizeMap.isEmpty(), String.valueOf(indexSizeMap));
+  }
+
+  @Test
+  public void indexSizesRoundTripAfterAdd() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    metadata.addIndexSize(FORWARD_ID, 100);
+    metadata.addIndexSize(DICTIONARY_ID, 200);
+    metadata.addIndexSize(JSON_ID, 0);
+
+    assertEquals(metadata.getNumIndexes(), 3);
+    assertEquals(metadata.getIndexType(0), FORWARD_ID);
+    assertEquals(metadata.getIndexSize(0), 100);
+    assertEquals(metadata.getIndexType(1), DICTIONARY_ID);
+    assertEquals(metadata.getIndexSize(1), 200);
+    assertEquals(metadata.getIndexType(2), JSON_ID);
+    assertEquals(metadata.getIndexSize(2), 0);
+    // A 48-bit size survives the packing.
+    metadata.addIndexSize((short) 7, (1L << 48) - 1);
+    assertEquals(metadata.getIndexSize(3), (1L << 48) - 1);
+    assertEquals(metadata.getIndexType(3), 7);
+  }
+
+  @Test
+  public void indexSizesParticipateInValueObjectMethods() {
+    ColumnMetadataImpl first = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl second = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl third = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl noSizes = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    first.addIndexSize(FORWARD_ID, 100);
+    second.addIndexSize(FORWARD_ID, 100);
+    third.addIndexSize(FORWARD_ID, 101);
+
+    assertEquals(first, second);
+    assertEquals(first.hashCode(), second.hashCode());
+    assertNotEquals(first, third);
+    assertNotEquals(first, noSizes);
+    assertTrue(first.toString().contains("_indexTypeSizes=["), first.toString());
+  }
+
+  @Test
+  public void rejectsInvalidIndexSize() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, -1));
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, 1L << 48));
+    assertEquals(metadata.getNumIndexes(), 0, "a rejected size must not be recorded");
+  }
+
   private static PropertiesConfiguration baseConfig(String column) {
     PropertiesConfiguration config = new PropertiesConfiguration();
     config.setProperty(Column.getKeyFor(column, Column.COLUMN_NAME), column);
