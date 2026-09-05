@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 ///
 ///  TODO: Once sorting on the `MailboxSendOperator` is available, modify this to use a k-way merge instead of
 ///        resorting via the PriorityQueue.
-public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
+public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator implements SortedMultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
 
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_RECEIVE";
@@ -55,7 +55,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     super(context, node);
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
-    _collations = node.getCollations();
+    _collations = List.copyOf(node.getCollations());
   }
 
   @Override
@@ -66,6 +66,11 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
   }
 
   @Override

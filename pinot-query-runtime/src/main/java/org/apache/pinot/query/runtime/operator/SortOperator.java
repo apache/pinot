@@ -20,10 +20,13 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -40,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
+  private static final int MAX_ROWS_PER_OUTPUT_BLOCK = 10_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
   private final MultiStageOperator _input;
@@ -48,19 +52,38 @@ public class SortOperator extends MultiStageOperator {
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _priorityQueue;
   private final ArrayList<Object[]> _rows;
+  @Nullable
+  private final Comparator<Object[]> _fullSortComparator;
+  private final boolean _requiresSort;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  private boolean _hasConstructedSortedBlock;
+  private boolean _hasConstructedSortedRows;
+  private List<Object[]> _sortedRows = List.of();
+  private int _nextOutputRowIndex;
   private MseBlock.Eos _eosBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
     this(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
-        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT, false);
+  }
+
+  /// Creates a sort that retains every input row. This is used for an explicit sender sort whose output is merged by
+  /// the receiver, rather than for a user-visible finite top-K.
+  public static SortOperator createFullSort(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
+    Preconditions.checkArgument(node.getOffset() <= 0, "Full sender sort cannot have an offset: %s", node.getOffset());
+    Preconditions.checkArgument(!node.getCollations().isEmpty(), "Full sender sort requires a collation");
+    return new SortOperator(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT, true);
   }
 
   @VisibleForTesting
   SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node, int defaultHolderCapacity,
       int defaultResponseLimit) {
+    this(context, input, node, defaultHolderCapacity, defaultResponseLimit, false);
+  }
+
+  private SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node,
+      int defaultHolderCapacity, int defaultResponseLimit, boolean fullSort) {
     super(context);
     _input = input;
     _dataSchema = node.getDataSchema();
@@ -73,16 +96,31 @@ public class SortOperator extends MultiStageOperator {
     // - There is no collation
     // - Input is already sorted
     List<RelFieldCollation> collations = node.getCollations();
-    if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
+    if (fullSort) {
+      _priorityQueue = null;
+      _rows = new ArrayList<>(defaultHolderCapacity);
+      _fullSortComparator = SortUtils.withTerminationAndUsageSampling(
+          new SortUtils.SortComparator(collations, false), EXPLAIN_NAME, _context.getActiveDeadlineMs());
+      _requiresSort = true;
+    } else if (collations.isEmpty() || isInputSorted(input, collations)) {
       _priorityQueue = null;
       _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
+      _fullSortComparator = null;
+      _requiresSort = false;
     } else {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
       _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
           new SortUtils.SortComparator(collations, true));
       _rows = null;
+      _fullSortComparator = null;
+      _requiresSort = true;
     }
+  }
+
+  private static boolean isInputSorted(MultiStageOperator input, List<RelFieldCollation> collations) {
+    return input instanceof SortedMultiStageOperator
+        && collations.equals(((SortedMultiStageOperator) input).getCollations());
   }
 
   @Override
@@ -110,6 +148,20 @@ public class SortOperator extends MultiStageOperator {
 
   @Override
   public void cancel(Throwable e) {
+    super.cancel(e);
+    releaseRetainedRows();
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    releaseRetainedRows();
+  }
+
+  @Override
+  protected void earlyTerminate() {
+    super.earlyTerminate();
+    releaseRetainedRows();
   }
 
   @Override
@@ -119,15 +171,15 @@ public class SortOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    if (_hasConstructedSortedBlock) {
-      assert _eosBlock != null;
-      return _eosBlock;
-    }
-    _eosBlock = consumeInputBlocks();
-    // returning upstream error block if finalBlock contains error.
-    _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
-    if (_eosBlock.isError()) {
-      return _eosBlock;
+    if (!_hasConstructedSortedRows) {
+      _eosBlock = consumeInputBlocks();
+      // returning upstream error block if finalBlock contains error.
+      _statMap.merge(StatKey.REQUIRE_SORT, _requiresSort);
+      if (_eosBlock.isError()) {
+        return _eosBlock;
+      }
+      constructSortedRows();
+      _hasConstructedSortedRows = true;
     }
     return produceSortedBlock();
   }
@@ -137,34 +189,90 @@ public class SortOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
-  private MseBlock produceSortedBlock() {
-    _hasConstructedSortedBlock = true;
-    if (_priorityQueue == null) {
-      if (_rows.size() > _offset) {
-        List<Object[]> row = _rows.subList(_offset, _rows.size());
-        return new RowHeapDataBlock(row, _dataSchema);
-      } else {
-        return _eosBlock;
+  private void constructSortedRows() {
+    if (_fullSortComparator != null) {
+      _rows.sort(_fullSortComparator);
+      _sortedRows = _rows;
+    } else if (_priorityQueue == null) {
+      _sortedRows = _rows;
+      _nextOutputRowIndex = Math.min(_offset, _rows.size());
+      for (int i = 0; i < _nextOutputRowIndex; i++) {
+        _sortedRows.set(i, null);
       }
     } else {
       int resultSize = _priorityQueue.size() - _offset;
       if (resultSize <= 0) {
-        return _eosBlock;
+        _priorityQueue.clear();
+        return;
       }
       Object[][] rowsArr = new Object[resultSize][];
       for (int i = resultSize - 1; i >= 0; i--) {
+        checkTerminationAndSampleUsagePeriodically(resultSize - i - 1, EXPLAIN_NAME);
         Object[] row = _priorityQueue.poll();
         rowsArr[i] = row;
       }
-      return new RowHeapDataBlock(Arrays.asList(rowsArr), _dataSchema);
+      _priorityQueue.clear();
+      _sortedRows = Arrays.asList(rowsArr);
     }
+  }
+
+  private MseBlock produceSortedBlock() {
+    assert _eosBlock != null;
+    int numRows = Math.min(MAX_ROWS_PER_OUTPUT_BLOCK, _sortedRows.size() - _nextOutputRowIndex);
+    if (numRows <= 0) {
+      releaseSortedRows();
+      return _eosBlock;
+    }
+    int endIndex = _nextOutputRowIndex + numRows;
+    List<Object[]> outputRows = new ArrayList<>(numRows);
+    for (int i = _nextOutputRowIndex; i < endIndex; i++) {
+      outputRows.add(_sortedRows.set(i, null));
+    }
+    _nextOutputRowIndex = endIndex;
+    if (_nextOutputRowIndex == _sortedRows.size()) {
+      releaseSortedRows();
+    }
+    return new RowHeapDataBlock(outputRows, _dataSchema);
+  }
+
+  private void releaseSortedRows() {
+    releaseRetainedRows();
+  }
+
+  private void releaseRetainedRows() {
+    if (_sortedRows == _rows) {
+      _rows.clear();
+    }
+    if (_priorityQueue != null) {
+      _priorityQueue.clear();
+    }
+    if (_rows != null) {
+      _rows.clear();
+    }
+    _sortedRows = List.of();
+    _nextOutputRowIndex = 0;
+  }
+
+  @VisibleForTesting
+  int getRetainedRowCount() {
+    int retainedRowCount = _sortedRows.size();
+    if (_rows != null && _sortedRows != _rows) {
+      retainedRowCount += _rows.size();
+    }
+    if (_priorityQueue != null) {
+      retainedRowCount += _priorityQueue.size();
+    }
+    return retainedRowCount;
   }
 
   private MseBlock.Eos consumeInputBlocks() {
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
-      if (_priorityQueue == null) {
+      if (_fullSortComparator != null) {
+        _rows.addAll(container);
+        checkTerminationAndSampleUsage();
+      } else if (_priorityQueue == null) {
         // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
         int numRows = _rows.size();
         if (numRows < _numRowsToKeep) {
@@ -179,8 +287,9 @@ public class SortOperator extends MultiStageOperator {
               LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", operatorId,
                   _context.getId());
             }
-            // setting operator to be early terminated and awaits EOS block next.
-            earlyTerminate();
+            // Ask only the child to stop. Calling this operator's earlyTerminate() would also clear the retained rows
+            // that still need to be returned to the consumer.
+            _input.earlyTerminate();
           }
         }
       } else {

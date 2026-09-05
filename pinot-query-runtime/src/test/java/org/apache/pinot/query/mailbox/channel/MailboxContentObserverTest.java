@@ -19,7 +19,11 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.stub.ServerCallStreamObserver;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -105,5 +109,45 @@ public class MailboxContentObserverTest {
     // With manual flow control disabled, onNext must NOT call request(1) — gRPC's auto-inbound machinery
     // handles credit replenishment after onNext returns.
     verify(mockStatusObserver, never()).request(anyInt());
+  }
+
+  @Test
+  public void testOnNextForwardsSenderSortConfirmation() {
+    MailboxContent content = MailboxContent.newBuilder()
+        .setMailboxId(TEST_MAILBOX_ID)
+        .setPayload(ByteString.EMPTY)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_SORTED_ON_SENDER, "true")
+        .build();
+    assertSenderSortConfirmation(content, true);
+  }
+
+  @Test
+  public void testOnNextTreatsAbsentSenderSortConfirmationAsFalse() {
+    MailboxContent legacyContent = MailboxContent.newBuilder()
+        .setMailboxId(TEST_MAILBOX_ID)
+        .setPayload(ByteString.EMPTY)
+        .build();
+    assertSenderSortConfirmation(legacyContent, false);
+  }
+
+  private static void assertSenderSortConfirmation(MailboxContent content, boolean expected) {
+    MailboxService mailboxService = mock(MailboxService.class);
+    ReceivingMailbox receivingMailbox = mock(ReceivingMailbox.class);
+    when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
+    when(receivingMailbox.offerRaw(anyList(), anyLong(), eq(expected)))
+        .thenReturn(ReceivingMailbox.ReceivingMailboxStatus.SUCCESS);
+    @SuppressWarnings("unchecked")
+    ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
+    MailboxContentObserver observer =
+        new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver, true);
+
+    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    try {
+      Context.current().withDeadlineAfter(1, TimeUnit.MINUTES, scheduler).run(() -> observer.onNext(content));
+    } finally {
+      scheduler.shutdownNow();
+    }
+
+    verify(receivingMailbox).offerRaw(anyList(), anyLong(), eq(expected));
   }
 }

@@ -37,12 +37,22 @@ class RandomExchange extends BlockExchange {
 
   RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
-    this(sendingMailboxes, RANDOM::nextInt, splitter, statsIndexChooser);
+    this(sendingMailboxes, RANDOM::nextInt, splitter, statsIndexChooser, false);
+  }
+
+  RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, boolean sortedOnSender) {
+    this(sendingMailboxes, RANDOM::nextInt, splitter, statsIndexChooser, sortedOnSender);
   }
 
   RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
-    super(sendingMailboxes, splitter, statsIndexChooser);
+    this(sendingMailboxes, rand, splitter, statsIndexChooser, false);
+  }
+
+  RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, boolean sortedOnSender) {
+    super(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
     _rand = rand;
   }
 

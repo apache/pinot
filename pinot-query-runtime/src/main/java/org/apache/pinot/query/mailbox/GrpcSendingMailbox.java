@@ -121,8 +121,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// by reference to a local receiver that mutates them.
   @Override
   public void send(MseBlock.Data data) {
+    send(data, false);
+  }
+
+  @Override
+  public void send(MseBlock.Data data, boolean sortedOnSender) {
     QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
-    sendInternal(data, List.of());
+    sendInternal(data, List.of(), false, sortedOnSender);
   }
 
   @Override
@@ -147,7 +152,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // defensive `catch(Exception)` in [#cancel] for the symmetric edge.
     boolean sent;
     try {
-      sent = sendInternal(block, serializedStats, /* bypassReady */ true);
+      sent = sendInternal(block, serializedStats, /* bypassReady */ true, /* sortedOnSender */ false);
     } catch (IllegalStateException e) {
       // Concurrent cancel won the race and half-closed the stream while we were pushing the EOS payload.
       LOGGER.debug("EOS send raced with cancel on already half-closed stream for mailbox: {}", _id, e);
@@ -180,10 +185,15 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   /// Tries to send the block to the receiver. Returns true if the block is sent, false otherwise.
   private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
-    return sendInternal(block, serializedStats, /* bypassReady */ false);
+    return sendInternal(block, serializedStats, /* bypassReady */ false, /* sortedOnSender */ false);
   }
 
   private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady) {
+    return sendInternal(block, serializedStats, bypassReady, false);
+  }
+
+  private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady,
+      boolean sortedOnSender) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
@@ -194,7 +204,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
     ensureContentObserverInitialized();
     try {
-      processAndSend(block, serializedStats, bypassReady);
+      processAndSend(block, serializedStats, bypassReady, sortedOnSender);
     } catch (IOException e) {
       throw new QueryException(QueryErrorCode.INTERNAL, "Failed to split and send mailbox", e);
     }
@@ -206,7 +216,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
-    processAndSend(block, serializedStats, false);
+    processAndSend(block, serializedStats, false, false);
   }
 
   /// Same as [#processAndSend(MseBlock, List)] but with a flag to bypass the [#awaitReady] gate. Used by the
@@ -214,11 +224,17 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// a cancel issued while the receiver is congested would itself block until the receiver drains.
   private void processAndSend(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady)
       throws IOException {
+    processAndSend(block, serializedStats, bypassReady, false);
+  }
+
+  private void processAndSend(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady,
+      boolean sortedOnSender)
+      throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      int sizeInBytes = processAndSend(dataBlock, bypassReady);
+      int sizeInBytes = processAndSend(dataBlock, bypassReady, sortedOnSender);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
@@ -237,6 +253,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   protected int processAndSend(DataBlock dataBlock, boolean bypassReady)
       throws IOException {
+    return processAndSend(dataBlock, bypassReady, false);
+  }
+
+  private int processAndSend(DataBlock dataBlock, boolean bypassReady, boolean sortedOnSender)
+      throws IOException {
     List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
     int sizeInBytes = 0;
     for (ByteString byteString : byteStrings) {
@@ -246,7 +267,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     while (byteStringIt.hasNext()) {
       ByteString byteString = byteStringIt.next();
       boolean waitForMore = byteStringIt.hasNext();
-      sendContent(byteString, waitForMore, bypassReady);
+      sendContent(byteString, waitForMore, bypassReady, sortedOnSender);
     }
     return sizeInBytes;
   }
@@ -409,10 +430,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   protected void sendContent(ByteString byteString, boolean waitForMore) {
-    sendContent(byteString, waitForMore, false);
+    sendContent(byteString, waitForMore, false, false);
   }
 
   protected void sendContent(ByteString byteString, boolean waitForMore, boolean bypassReady) {
+    sendContent(byteString, waitForMore, bypassReady, false);
+  }
+
+  private void sendContent(ByteString byteString, boolean waitForMore, boolean bypassReady, boolean sortedOnSender) {
     if (!awaitReady(bypassReady)) {
       // Either the mailbox was cancelled while we were waiting (normal path) or the gRPC stream is already dead
       // (bypass path). Either way, skip the send.
@@ -429,12 +454,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
       if (!bypassReady && isTerminated()) {
         return;
       }
-      MailboxContent content = MailboxContent.newBuilder()
+      MailboxContent.Builder contentBuilder = MailboxContent.newBuilder()
           .setMailboxId(_id)
           .setPayload(byteString)
-          .setWaitForMore(waitForMore)
-          .build();
-      _contentObserver.onNext(content);
+          .setWaitForMore(waitForMore);
+      if (sortedOnSender) {
+        contentBuilder.putMetadata(ChannelUtils.MAILBOX_METADATA_SORTED_ON_SENDER, Boolean.TRUE.toString());
+      }
+      _contentObserver.onNext(contentBuilder.build());
     } finally {
       _readyLock.unlock();
     }
