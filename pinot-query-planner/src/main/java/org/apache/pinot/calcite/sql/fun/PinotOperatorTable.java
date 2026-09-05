@@ -185,6 +185,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.NOT,
       SqlStdOperatorTable.UNARY_MINUS,
       SqlStdOperatorTable.UNARY_PLUS,
+      /// MATCH_RECOGNIZE processing-mode modifiers, e.g. `FINAL LAST(A.price)`. Both are legal in MEASURES;
+      /// RUNNING is also legal (and redundant) in DEFINE, while FINAL is rejected there.
+      SqlStdOperatorTable.FINAL,
+      SqlStdOperatorTable.RUNNING,
 
       // AGGREGATE OPERATORS
       SqlStdOperatorTable.COUNT,
@@ -261,6 +265,15 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.SIN,
       SqlStdOperatorTable.TAN,
       SqlStdOperatorTable.TRUNCATE,
+      /// MATCH_RECOGNIZE (row pattern recognition) navigation and classification functions. The parser already binds
+      /// these calls to the standard operators, but they must also be visible in this table so that the validator can
+      /// resolve their overloads while deriving types.
+      SqlStdOperatorTable.FIRST,
+      SqlStdOperatorTable.LAST,
+      SqlStdOperatorTable.PREV,
+      SqlStdOperatorTable.NEXT,
+      SqlStdOperatorTable.CLASSIFIER,
+      SqlStdOperatorTable.MATCH_NUMBER,
       SqlStdOperatorTable.FLOOR,
       SqlStdOperatorTable.CEIL,
       SqlStdOperatorTable.TIMESTAMP_ADD,

@@ -57,6 +57,7 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.match.MatchLimits;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -128,6 +129,10 @@ public class QueryRunner {
   @Nullable
   private WindowOverFlowMode _windowOverflowMode;
   @Nullable
+  private Integer _maxRowsInMatchPartition;
+  @Nullable
+  private Long _maxStepsPerMatchAttempt;
+  @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   /// Cluster-level decision on whether to send stats over the mailbox path, driven by the `SendStatsPredicate`
   /// at startup time. **May be overridden per-request** via the `KEY_OF_STATS_REPORTING_MODE` metadata key —
@@ -187,6 +192,13 @@ public class QueryRunner {
 
     String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+
+    String maxRowsInMatchPartitionStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_ROWS_IN_MATCH_PARTITION);
+    _maxRowsInMatchPartition =
+        maxRowsInMatchPartitionStr != null ? Integer.parseInt(maxRowsInMatchPartitionStr) : null;
+
+    String maxStepsPerMatchAttemptStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_STEPS_PER_MATCH_ATTEMPT);
+    _maxStepsPerMatchAttempt = maxStepsPerMatchAttemptStr != null ? Long.parseLong(maxStepsPerMatchAttemptStr) : null;
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
@@ -546,7 +558,23 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
     }
 
+    applyMatchLimitDefaults(opChainMetadata, _maxRowsInMatchPartition, _maxStepsPerMatchAttempt);
+
     return opChainMetadata;
+  }
+
+  /// Applies MATCH_RECOGNIZE cluster defaults after query options have been canonicalized and consolidated.
+  /// Package-private for focused precedence coverage without initializing a complete query server.
+  static void applyMatchLimitDefaults(Map<String, String> opChainMetadata,
+      @Nullable Integer maxRowsInMatchPartition, @Nullable Long maxStepsPerMatchAttempt) {
+    if (maxRowsInMatchPartition != null
+        && !opChainMetadata.containsKey(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION)) {
+      opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, Integer.toString(maxRowsInMatchPartition));
+    }
+    if (maxStepsPerMatchAttempt != null
+        && !opChainMetadata.containsKey(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT)) {
+      opChainMetadata.put(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(maxStepsPerMatchAttempt));
+    }
   }
 
   public MailboxService getMailboxService() {

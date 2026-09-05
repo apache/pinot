@@ -44,6 +44,10 @@ message PlanNode {
     // serialized by an older-version broker can still be deserialized. No current broker sets this field.
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
+    // Rolling-upgrade boundary: servers released before MATCH_RECOGNIZE do not know field 19. Protobuf preserves it
+    // as an unknown field, but their PlanNodeDeserializer sees NODE_NOT_SET and cannot execute the stage. Upgrade all
+    // servers before issuing MATCH_RECOGNIZE queries; there is no mixed-version fallback to another node kind.
+    MatchNode matchNode = 19;
   }
 }
 
@@ -262,6 +266,119 @@ message UnnestNode {
   repeated int32 passthroughInputIndexes = 5;
   // Whether the output schema was pruned to only the input columns referenced downstream. Absent => false => legacy.
   bool prunedPassthrough = 6;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// MATCH_RECOGNIZE (SQL:2016 row pattern recognition)
+// ---------------------------------------------------------------------------------------------------------------
+
+// SQL:2016 `AFTER MATCH SKIP` clause: where pattern matching resumes after a successful match.
+//
+// SKIP_PAST_LAST_ROW is 0 on purpose. It is the SQL:2016 default (and the default in Trino, Snowflake and Oracle),
+// so a MatchNode that omits the field falls back to non-overlapping matches rather than to the overlapping
+// SKIP TO NEXT ROW semantics that Calcite defaults to internally when the clause is omitted.
+//
+// The values are wire-stable; renumbering them silently changes query results across mixed-version brokers/servers.
+enum AfterMatchSkipMode {
+  SKIP_PAST_LAST_ROW = 0;
+  SKIP_TO_NEXT_ROW = 1;
+  SKIP_TO_FIRST = 2;
+  SKIP_TO_LAST = 3;
+}
+
+// SQL:2016 `ONE ROW PER MATCH` / `ALL ROWS PER MATCH`. ALL_ROWS_PER_MATCH is declared so that its wire value is
+// pinned, but it is rejected at planning time until per-row output is implemented.
+enum RowsPerMatchMode {
+  ONE_ROW_PER_MATCH = 0;
+  ALL_ROWS_PER_MATCH = 1;
+}
+
+// The kind of a RowPattern tree node. PATTERN_EXCLUDE and PATTERN_PERMUTE are declared up front so the deferred
+// work cannot renumber the supported kinds; a plan carrying them is rejected at deserialization time.
+enum RowPatternKind {
+  // A single pattern variable. Carries symbolOrdinal.
+  PATTERN_SYMBOL = 0;
+  // Juxtaposition, e.g. `A B C`. Two or more children, in pattern order.
+  PATTERN_CONCAT = 1;
+  // Alternation `|`, e.g. `A | B`. Two or more children, in pattern order (leftmost alternative wins).
+  PATTERN_ALTERNATE = 2;
+  // A quantifier applied to exactly one child. Carries quantifier.
+  PATTERN_QUANTIFIER = 3;
+  // The `^` anchor: the match must start at the first row of the partition. No children.
+  PATTERN_ANCHOR_START = 4;
+  // The `$` anchor: the match must end at the last row of the partition. No children.
+  PATTERN_ANCHOR_END = 5;
+  // Deferred: `{- ... -}` exclusion. Exactly one child.
+  PATTERN_EXCLUDE = 6;
+  // Deferred: `PERMUTE(...)`. Two or more children.
+  PATTERN_PERMUTE = 7;
+}
+
+// A `{n,m}` style repetition applied to the single child of a PATTERN_QUANTIFIER node. `*`, `+` and `?` are
+// normalized into this form: `*` is {0,-1}, `+` is {1,-1}, `?` is {0,1}.
+message RowPatternQuantifier {
+  // Minimum number of repetitions, >= 0.
+  int32 minRepeat = 1;
+  // Maximum number of repetitions, or -1 for unbounded (`*`, `+`, `{n,}`).
+  int32 maxRepeat = 2;
+  // False for the reluctant forms (`*?`, `+?`, `??`, `{n,m}?`), which prefer the shortest match.
+  bool greedy = 3;
+}
+
+// One node of the row pattern tree. This is a self-contained representation of the PATTERN clause: pattern
+// variables are referenced by their ordinal in MatchNode.patternSymbols, so a consumer never string-matches
+// variable names.
+message RowPattern {
+  RowPatternKind kind = 1;
+  // PATTERN_SYMBOL only: ordinal into MatchNode.patternSymbols.
+  int32 symbolOrdinal = 2;
+  // PATTERN_CONCAT / PATTERN_ALTERNATE / PATTERN_PERMUTE: two or more children, in pattern order.
+  // PATTERN_QUANTIFIER / PATTERN_EXCLUDE: exactly one child. Empty for PATTERN_SYMBOL and the anchors.
+  repeated RowPattern children = 3;
+  // PATTERN_QUANTIFIER only.
+  RowPatternQuantifier quantifier = 4;
+}
+
+// One entry of the pattern variable symbol table. The variable's ordinal is its index in
+// MatchNode.patternSymbols.
+message PatternSymbol {
+  // Pattern variable name as written in PATTERN / DEFINE. Informational: consumers resolve variables by ordinal.
+  string name = 1;
+  // The DEFINE predicate for this variable. Absent when the variable has no DEFINE entry, which per SQL:2016
+  // means it matches every row.
+  optional Expression definition = 2;
+}
+
+// One `MEASURES <expression> AS <name>` item.
+message MatchMeasure {
+  // Output column name.
+  string name = 1;
+  Expression expression = 2;
+}
+
+message MatchNode {
+  // Pattern variable symbol table. A symbol's ordinal is its index in this list; every PATTERN_SYMBOL node and
+  // every PatternFieldRef refers to a variable by that ordinal.
+  repeated PatternSymbol patternSymbols = 1;
+  // Root of the row pattern tree (the PATTERN clause).
+  RowPattern pattern = 2;
+  // MEASURES items, in output order.
+  repeated MatchMeasure measures = 3;
+  // PARTITION BY: column indexes into the input row.
+  repeated int32 partitionKeys = 4;
+  // ORDER BY. Mandatory for MATCH_RECOGNIZE, so this is never empty.
+  repeated Collation collations = 5;
+  AfterMatchSkipMode afterMatchSkipMode = 6;
+  // For SKIP_TO_FIRST / SKIP_TO_LAST: ordinal of the target pattern variable. Absent for the other skip modes.
+  // Explicitly optional because ordinal 0 is a valid variable, so the proto3 default cannot double as "unset".
+  optional int32 afterMatchSkipToSymbolOrdinal = 7;
+  RowsPerMatchMode rowsPerMatchMode = 8;
+
+  // Reserved for the deferred SQL:2016 clauses so that implementing them later cannot renumber anything above:
+  //    9 -> SUBSET: `repeated PatternSubset subsets` (union variable name -> member symbol ordinals)
+  //   10 -> WITHIN: the match time interval
+  reserved 9, 10;
+  reserved "subsets", "within";
 }
 
 enum WindowFrameType {
