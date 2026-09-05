@@ -24,7 +24,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -391,6 +393,35 @@ public class HelixHelper {
       }
     };
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
+  }
+
+  /// Atomically validates and removes segments from IdealState. This guarded operation is the sole updater in its
+  /// versioned compare-and-set, and the validator is invoked again whenever the update retries after a concurrent
+  /// version change.
+  ///
+  /// @param helixManager Helix manager used to access the cluster
+  /// @param tableName table resource name
+  /// @param segments segments to remove
+  /// @param idealStateValidator read-only validator invoked before any segment is removed; returns whether deletion is
+  ///                             allowed
+  /// @return whether validation allowed the delete
+  public static boolean removeSegmentsFromIdealStateWithValidation(HelixManager helixManager, String tableName,
+      final List<String> segments, Predicate<IdealState> idealStateValidator) {
+    AtomicBoolean validationPassed = new AtomicBoolean();
+    Function<IdealState, IdealState> updater = idealState -> {
+      boolean currentValidationPassed = idealStateValidator.test(idealState);
+      validationPassed.set(currentValidationPassed);
+      if (!currentValidationPassed) {
+        return idealState;
+      }
+      Set<String> partitionSet = idealState.getPartitionSet();
+      if (partitionSet != null) {
+        partitionSet.removeAll(segments);
+      }
+      return idealState;
+    };
+    IdealStateSingleCommit.updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY, true);
+    return validationPassed.get();
   }
 
   /// Returns the config for all the instances in the cluster.

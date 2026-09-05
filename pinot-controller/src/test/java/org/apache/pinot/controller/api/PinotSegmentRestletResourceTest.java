@@ -18,32 +18,53 @@
  */
 package org.apache.pinot.controller.api;
 
+import java.lang.reflect.Field;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
+import org.apache.pinot.client.admin.PinotAdminValidationException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class PinotSegmentRestletResourceTest {
@@ -233,11 +254,182 @@ public class PinotSegmentRestletResourceTest {
         .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1"), null);
     assertTrue(reply.contains("Deleted segments: [segment1] from table: offlineTableName1_OFFLINE"));
 
+    // force=true is a no-op extra for OFFLINE tables and must still succeed.
+    URI forceOfflineUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/"
+        + TEST_RAW_OFFLINE_TABLE_NAME + "/segment2?force=true");
+    SimpleHttpResponse forceOfflineResponse =
+        ControllerTest.getHttpClient().sendDeleteRequest(forceOfflineUri, Map.of());
+    assertEquals(forceOfflineResponse.getStatusCode(), 200, forceOfflineResponse.getResponse());
+    assertFalse(resourceManager.getTableIdealState(offlineTableName).getPartitionSet().contains("segment2"));
+
     // case 2: delete all remaining segments
     reply = adminClient.getSegmentClient()
         .deleteMultipleSegments(TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of(),
             null);
     assertTrue(reply.contains("All segments of table offlineTableName1_OFFLINE deleted"));
+  }
+
+  @Test
+  public void testRealtimeConsumingSegmentDeleteHttpContracts()
+      throws Exception {
+    String rawTableName = "consumingSegmentDeleteRest";
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    TEST_INSTANCE.addDummySchema(rawTableName);
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    try {
+      TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+          .setDeletedSegmentsRetentionPeriod("0d")
+          .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+      resourceManager.addTable(tableConfig);
+
+      TestUtils.waitForCondition(aVoid -> getConsumingSegment(resourceManager, realtimeTableName) != null, 60_000L,
+          "Failed to create a consuming segment for table: " + realtimeTableName);
+      String consumingSegment = getConsumingSegment(resourceManager, realtimeTableName);
+      assertNotNull(consumingSegment);
+      String completedSegment = "completedSegment";
+      resourceManager.addNewSegment(realtimeTableName,
+          SegmentMetadataMockUtils.mockSegmentMetadata(realtimeTableName, completedSegment), "downloadUrl");
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getInstanceStateMap(completedSegment)
+          .containsValue(SegmentStateModel.CONSUMING));
+
+      PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+      PinotAdminValidationException singleDeleteException = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getSegmentClient().deleteSegment(realtimeTableName, consumingSegment, null));
+      assertTrue(singleDeleteException.getMessage().contains("status: 400"), singleDeleteException.getMessage());
+      assertTrue(singleDeleteException.getMessage().contains(consumingSegment), singleDeleteException.getMessage());
+      assertTrue(singleDeleteException.getMessage().contains("/tables/{tableName}/pauseStatus"),
+          singleDeleteException.getMessage());
+      assertTrue(singleDeleteException.getMessage().contains("consumingSegments is empty"),
+          singleDeleteException.getMessage());
+      assertTrue(singleDeleteException.getMessage().contains("force=true"), singleDeleteException.getMessage());
+
+      URI batchDeleteUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + rawTableName
+          + "?type=REALTIME&segments=" + completedSegment + "&segments=" + consumingSegment);
+      SimpleHttpResponse batchDeleteResponse =
+          ControllerTest.getHttpClient().sendDeleteRequest(batchDeleteUri, Map.of());
+      assertEquals(batchDeleteResponse.getStatusCode(), 400, batchDeleteResponse.getResponse());
+      assertTrue(batchDeleteResponse.getResponse().contains(consumingSegment), batchDeleteResponse.getResponse());
+      assertTrue(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .containsAll(Set.of(completedSegment, consumingSegment)));
+
+      LLCSegmentName currentConsumingSegment = new LLCSegmentName(consumingSegment);
+      String onlineLowerPartitionSegment = new LLCSegmentName(rawTableName,
+          currentConsumingSegment.getPartitionGroupId(), currentConsumingSegment.getSequenceNumber() + 1,
+          System.currentTimeMillis()).getSegmentName();
+      String consumingHigherPartitionSegment = new LLCSegmentName(rawTableName,
+          currentConsumingSegment.getPartitionGroupId() + 1, 0, System.currentTimeMillis()).getSegmentName();
+      HelixHelper.updateIdealState(TEST_INSTANCE.getHelixManager(), realtimeTableName, idealState -> {
+        String server = idealState.getInstanceStateMap(consumingSegment).keySet().iterator().next();
+        idealState.getRecord().setMapField(onlineLowerPartitionSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.ONLINE)));
+        idealState.getRecord().setMapField(consumingHigherPartitionSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.CONSUMING)));
+        return idealState;
+      });
+
+      URI forceDeleteUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl()
+          + "/deleteSegmentsFromSequenceNum/" + realtimeTableName + "?segments=" + onlineLowerPartitionSegment
+          + "&segments=" + consumingHigherPartitionSegment + "&dryRun=false&force=true");
+      SimpleHttpResponse forceDeleteResponse =
+          ControllerTest.getHttpClient().sendDeleteRequest(forceDeleteUri, Map.of());
+      assertEquals(forceDeleteResponse.getStatusCode(), 400, forceDeleteResponse.getResponse());
+      assertTrue(forceDeleteResponse.getResponse().contains(consumingHigherPartitionSegment),
+          forceDeleteResponse.getResponse());
+      assertTrue(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .containsAll(Set.of(onlineLowerPartitionSegment, consumingHigherPartitionSegment)));
+
+      Set<String> beforeDeleteAll =
+          Set.copyOf(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet());
+      PinotAdminValidationException deleteAllException = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getSegmentClient().deleteMultipleSegments(rawTableName, TableType.REALTIME.name(),
+              List.of(), null));
+      assertTrue(deleteAllException.getMessage().contains("status: 400"), deleteAllException.getMessage());
+      assertEquals(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet(), beforeDeleteAll);
+
+      String successResponse =
+          adminClient.getSegmentClient().deleteSegment(realtimeTableName, completedSegment, null);
+      assertTrue(successResponse.contains("Segment deleted"), successResponse);
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet().contains(completedSegment));
+      assertTrue(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet().contains(consumingSegment));
+
+      String failingSegment = "failingCompletedSegment";
+      resourceManager.addNewSegment(realtimeTableName,
+          SegmentMetadataMockUtils.mockSegmentMetadata(realtimeTableName, failingSegment), "downloadUrl");
+      SegmentDeletionManager failingDeletionManager = mock(SegmentDeletionManager.class);
+      doThrow(new RuntimeException("test deletion failure")).when(failingDeletionManager)
+          .deleteSegments(eq(realtimeTableName), anyCollection(), nullable(Long.class));
+      SegmentDeletionManager originalDeletionManager = replaceSegmentDeletionManager(resourceManager,
+          failingDeletionManager);
+      try {
+        PinotAdminException internalError = expectThrows(PinotAdminException.class,
+            () -> adminClient.getSegmentClient().deleteSegment(realtimeTableName, failingSegment, "0d"));
+        assertTrue(internalError.getMessage().contains("status: 500"), internalError.getMessage());
+      } finally {
+        replaceSegmentDeletionManager(resourceManager, originalDeletionManager);
+      }
+
+      String forceOnlineSegment = "forceOnlineSegment";
+      String forceConsumingSegment = "forceConsumingSegment";
+      HelixHelper.updateIdealState(TEST_INSTANCE.getHelixManager(), realtimeTableName, idealState -> {
+        String server = idealState.getInstanceStateMap(consumingSegment).keySet().iterator().next();
+        idealState.getRecord().setMapField(forceOnlineSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.ONLINE)));
+        idealState.getRecord().setMapField(forceConsumingSegment,
+            new HashMap<>(Map.of(server, SegmentStateModel.CONSUMING)));
+        return idealState;
+      });
+
+      URI mixedForceUri = URI.create(TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + rawTableName
+          + "?type=REALTIME&segments=" + forceOnlineSegment + "&segments=" + forceConsumingSegment + "&force=true");
+      SimpleHttpResponse mixedForceResponse =
+          ControllerTest.getHttpClient().sendDeleteRequest(mixedForceUri, Map.of());
+      assertEquals(mixedForceResponse.getStatusCode(), 200, mixedForceResponse.getResponse());
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .contains(forceOnlineSegment));
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet()
+          .contains(forceConsumingSegment));
+
+      String forceSingleResponse =
+          adminClient.getSegmentClient().deleteSegment(realtimeTableName, consumingSegment, null, true);
+      assertTrue(forceSingleResponse.contains("Segment deleted"), forceSingleResponse);
+      assertFalse(resourceManager.getTableIdealState(realtimeTableName).getPartitionSet().contains(consumingSegment));
+
+      // Dropping a realtime table remains the supported unconditional cleanup path.
+      resourceManager.deleteRealtimeTable(rawTableName, "0d");
+      assertNull(resourceManager.getTableIdealState(realtimeTableName));
+    } finally {
+      try {
+        if (resourceManager.getTableIdealState(realtimeTableName) != null) {
+          resourceManager.deleteRealtimeTable(rawTableName, "0d");
+        }
+      } finally {
+        TEST_INSTANCE.deleteSchema(rawTableName);
+      }
+    }
+  }
+
+  private static String getConsumingSegment(PinotHelixResourceManager resourceManager, String realtimeTableName) {
+    IdealState idealState = resourceManager.getTableIdealState(realtimeTableName);
+    if (idealState == null) {
+      return null;
+    }
+    for (String segmentName : idealState.getPartitionSet()) {
+      Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+      if (stateMap != null && stateMap.containsValue(SegmentStateModel.CONSUMING)) {
+        return segmentName;
+      }
+    }
+    return null;
+  }
+
+  private static SegmentDeletionManager replaceSegmentDeletionManager(PinotHelixResourceManager resourceManager,
+      SegmentDeletionManager replacement)
+      throws ReflectiveOperationException {
+    Field field = PinotHelixResourceManager.class.getDeclaredField("_segmentDeletionManager");
+    field.setAccessible(true);
+    SegmentDeletionManager previous = (SegmentDeletionManager) field.get(resourceManager);
+    field.set(resourceManager, replacement);
+    return previous;
   }
 
   private void checkCrcRequest(PinotAdminClient adminClient, String tableName,

@@ -50,6 +50,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -1108,6 +1109,12 @@ public class PinotHelixResourceManager {
   ///
   /// Cleanup paths that already coordinated with the lineage lifecycle must call
   /// [#deleteSegmentsForLineageCleanup] instead.
+  /// For realtime tables, the whole batch is also rejected when any target has a `CONSUMING` replica in IdealState.
+  /// Callers that need to recover a table by deleting CONSUMING segments must use
+  /// [#deleteSegments(String, List, String, boolean)] with `force=true`.
+  /// The default path runs that CONSUMING check and IdealState removal in one versioned updater, so concurrent
+  /// state transitions are revalidated before a retry can remove anything. `force=true` skips only the CONSUMING
+  /// check and uses the unguarded IdealState remover; lineage exclusivity still applies.
   ///
   /// @param tableNameWithType Table name with type suffix
   /// @param segmentNames List of names of segment to be deleted
@@ -1115,33 +1122,52 @@ public class PinotHelixResourceManager {
   /// @return Request response
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
-    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod, false);
+    return deleteSegments(tableNameWithType, segmentNames, retentionPeriod, false);
   }
 
-  /// Lineage-aware delete path that skips the cross-check against the live lineage entries. Reserved for callers
-  /// that have already coordinated with the lineage lifecycle: proactive cleanup in `startReplaceSegments`,
+  /// Same as [#deleteSegments(String, List, String)] but allows bypassing CONSUMING-replica protection.
+  ///
+  /// Lineage exclusivity checks still apply. `force` only skips the CONSUMING IdealState check so operators can
+  /// recover a table that still has consuming replicas.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @param segmentNames List of names of segment to be deleted
+  /// @param retentionPeriod The retention period of the deleted segments.
+  /// @param force when true, delete realtime segments even if a replica is still `CONSUMING`
+  /// @return Request response
+  public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
+      @Nullable String retentionPeriod, boolean force) {
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod, false, force);
+  }
+
+  /// Lineage-aware delete path that bypasses the public lineage and CONSUMING-state checks. Reserved for internal
+  /// cleanup callers: proactive cleanup in `startReplaceSegments`,
   /// post-revert cleanup in `revertReplaceSegments`, and `RetentionManager`'s lineage-cleanup pass.
   /// External call sites (REST handlers, retention based on table config, minion task generators, push-failure
   /// cleanup) must continue to use the public [#deleteSegments] overloads.
   public PinotResourceManagerResponse deleteSegmentsForLineageCleanup(String tableNameWithType,
       List<String> segmentNames) {
-    return deleteSegmentsInternal(tableNameWithType, segmentNames, null, true);
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, null, true, false);
   }
 
   private PinotResourceManagerResponse deleteSegmentsInternal(String tableNameWithType, List<String> segmentNames,
-      @Nullable String retentionPeriod, boolean bypassLineageCheck) {
+      @Nullable String retentionPeriod, boolean bypassPublicDeleteChecks, boolean force) {
     if (segmentNames.isEmpty()) {
       return PinotResourceManagerResponse.success("No segments to delete");
     }
     try {
-      LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
+      LOGGER.info("Trying to delete segments: {} from table: {} (force={})", segmentNames, tableNameWithType, force);
+      if (force && TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        LOGGER.warn("Force-deleting segments from table: {} (CONSUMING replica protection bypassed): {}",
+            tableNameWithType, segmentNames);
+      }
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      if (!bypassLineageCheck && isLineageExclusiveDeleteEnabled()) {
+      if (!bypassPublicDeleteChecks && isLineageExclusiveDeleteEnabled()) {
         // Reject the whole batch if any target segment participates in a live lineage entry.
         rejectIfTargetsLineageLockedSegments(tableNameWithType, segmentNames);
       }
-      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+      removeSegmentsFromIdealState(tableNameWithType, segmentNames, bypassPublicDeleteChecks || force);
       if (retentionPeriod != null) {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
             TimeUtils.convertPeriodToMillis(retentionPeriod));
@@ -1150,6 +1176,8 @@ public class PinotHelixResourceManager {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
+    } catch (ConsumingSegmentDeletionException e) {
+      throw e;
     } catch (SegmentsInLineageException e) {
       LOGGER.warn("Refusing to delete segments from table: {}. {}", tableNameWithType, e.getMessage());
       return PinotResourceManagerResponse.failure(e.getMessage());
@@ -1157,6 +1185,39 @@ public class PinotHelixResourceManager {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
       return PinotResourceManagerResponse.failure(e.getMessage());
     }
+  }
+
+  private void removeSegmentsFromIdealState(String tableNameWithType, List<String> segmentNames,
+      boolean bypassConsumingCheck) {
+    if (bypassConsumingCheck || !TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+      return;
+    }
+
+    AtomicReference<List<String>> consumingSegmentsRef = new AtomicReference<>(List.of());
+    boolean validationPassed = HelixHelper.removeSegmentsFromIdealStateWithValidation(_helixZkManager,
+        tableNameWithType, segmentNames, idealState -> {
+          List<String> consumingSegments = getConsumingSegmentsForDeletion(idealState, segmentNames);
+          consumingSegmentsRef.set(consumingSegments);
+          return consumingSegments.isEmpty();
+        });
+    if (!validationPassed) {
+      throw new ConsumingSegmentDeletionException(tableNameWithType, consumingSegmentsRef.get());
+    }
+  }
+
+  @VisibleForTesting
+  List<String> getConsumingSegmentsForDeletion(IdealState idealState, List<String> segmentNames) {
+    List<String> consumingSegments = new ArrayList<>();
+    Set<String> seenSegments = new HashSet<>();
+    for (String segmentName : segmentNames) {
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+      if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.CONSUMING)
+          && seenSegments.add(segmentName)) {
+        consumingSegments.add(segmentName);
+      }
+    }
+    return consumingSegments;
   }
 
   /// Reads the current segment lineage znode (if any) and throws [SegmentsInLineageException] when the
@@ -1190,6 +1251,9 @@ public class PinotHelixResourceManager {
   }
 
   /// Delete a single segment from ideal state and remove it from the local storage.
+  ///
+  /// Realtime segments with a `CONSUMING` replica are rejected. Use
+  /// [#deleteSegments(String, List, String, boolean)] with `force=true` to recover a table.
   ///
   /// @param tableNameWithType Table name with type suffix
   /// @param segmentName Name of segment to be deleted
