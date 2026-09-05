@@ -493,22 +493,28 @@ public class MutableVectorIndex
         if (_closed) {
           return;
         }
-        request = _requestedSequenceNumber;
-        // Spacing waits on the monitor rather than sleeping, so close() can wake it immediately.
-        long sinceLastMs = System.currentTimeMillis() - lastReopenMs;
-        long backoffMs = Math.max(_refreshMinIntervalMs - sinceLastMs,
+        // Spacing waits on the monitor rather than sleeping, so close() can wake it immediately. It has to loop:
+        // every arriving query calls notifyAll, and a single timed wait would return on that notification and
+        // reopen early, leaving the interval unenforced exactly when load makes it matter.
+        long reopenNotBeforeMs = lastReopenMs + Math.max(_refreshMinIntervalMs,
             consecutiveFailures == 0 ? 0L : Math.min(1000L << Math.min(consecutiveFailures - 1, 5), 30_000L));
-        if (backoffMs > 0) {
+        while (!_closed) {
+          long waitMs = reopenNotBeforeMs - System.currentTimeMillis();
+          if (waitMs <= 0) {
+            break;
+          }
           try {
-            _refreshMonitor.wait(backoffMs);
+            _refreshMonitor.wait(waitMs);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return;
           }
-          if (_closed) {
-            return;
-          }
         }
+        if (_closed) {
+          return;
+        }
+        // Read after the wait, so this reopen serves the newest request rather than the one that woke us.
+        request = _requestedSequenceNumber;
       }
       // Read the writer's generation BEFORE reopening, so rows arriving during the reopen are not claimed as
       // visible by a reader that may not contain them.

@@ -435,6 +435,76 @@ public class MutableVectorIndexTest {
     }
   }
 
+  /// The spacing must hold even while queries keep arriving. Each arriving query notifies the reopen thread, so a
+  /// single timed wait would return on that notification and reopen early -- leaving the interval unenforced
+  /// exactly under the load it exists to bound.
+  @Test(timeOut = 60_000)
+  public void testReopenSpacingHoldsWhileQueriesKeepArriving()
+      throws Exception {
+    long spacingMs = 1000L;
+    try (MutableVectorIndex index = createIndexWithRefreshTuning(String.valueOf(spacingMs))) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+      long reopensAfterFirst = index.getSearcherRefreshCount();
+
+      // Keep registering fresh requests for most of one spacing window; every one of them notifies the loop.
+      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(spacingMs / 2);
+      int docId = 100;
+      while (System.nanoTime() < deadline) {
+        addVector(index, query, docId++);
+        long generation = index.getLastAddedSequenceNumber();
+        Thread nudge = new Thread(() -> {
+          try {
+            index.awaitSearcherGeneration(generation);
+          } catch (IOException e) {
+            // The wait may outlive the window; the notification it sent is what this test is about.
+          }
+        });
+        nudge.setDaemon(true);
+        nudge.start();
+        Thread.sleep(20);
+      }
+      Assert.assertEquals(index.getSearcherRefreshCount(), reopensAfterFirst,
+          "No reopen may run inside the spacing window, however many queries notify the loop");
+    }
+  }
+
+  /// A query interrupted while waiting must surface that as a failure carrying the cause, not return as though
+  /// the generation had arrived.
+  @Test(timeOut = 60_000)
+  public void testInterruptedWaitFailsRatherThanReturningEarly()
+      throws Exception {
+    try (MutableVectorIndex index = createIndexWithRefreshTuning(String.valueOf(TimeUnit.SECONDS.toMillis(30)))) {
+      float[] query = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+      Assert.assertEquals(index.getDocIds(query, 1, bitmapOf(0)).toArray(), new int[]{0});
+      addVector(index, query, 10);
+      long generation = index.getLastAddedSequenceNumber();
+
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      CountDownLatch waiting = new CountDownLatch(1);
+      Thread waiter = new Thread(() -> {
+        waiting.countDown();
+        try {
+          index.awaitSearcherGeneration(generation);
+          failure.set(new AssertionError("Interrupted wait returned normally"));
+        } catch (Throwable t) {
+          failure.set(t);
+        }
+      });
+      waiter.setDaemon(true);
+      waiter.start();
+      Assert.assertTrue(waiting.await(10, TimeUnit.SECONDS), "Waiter did not start");
+      awaitWaitCount(index, 2);
+      waiter.interrupt();
+      waiter.join(TimeUnit.SECONDS.toMillis(10));
+
+      Assert.assertTrue(failure.get() instanceof IOException,
+          "An interrupted wait must fail, got: " + failure.get());
+      Assert.assertTrue(failure.get().getMessage().contains("Interrupted while waiting"),
+          "Expected the interrupt failure, got: " + failure.get().getMessage());
+    }
+  }
+
   /// One reopen thread exists per consuming segment per vector column, so a close that failed to stop it would
   /// leak a thread per partition -- invisible at runtime because the thread is a daemon.
   @Test(timeOut = 60_000)
