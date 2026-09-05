@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -115,13 +114,19 @@ public interface MatchTerm {
     }
   }
 
-  /// `CLASSIFIER()`: the name of the pattern variable the designated row is mapped to. With ONE ROW PER MATCH
-  /// the designated row is the last row of the match, which is also the current row while a DEFINE predicate is being
-  /// evaluated.
+  /// `CLASSIFIER()`: the name of the pattern variable the designated row is mapped to. A bare call designates the
+  /// last (current) row; FIRST / LAST may select another match row and PREV / NEXT may move relative to it.
   final class Classifier implements MatchTerm {
-    public static final Classifier INSTANCE = new Classifier();
+    public static final Classifier INSTANCE = new Classifier(true, 0, 0);
 
-    private Classifier() {
+    private final boolean _fromEnd;
+    private final int _logicalOffset;
+    private final int _physicalDelta;
+
+    public Classifier(boolean fromEnd, int logicalOffset, int physicalDelta) {
+      _fromEnd = fromEnd;
+      _logicalOffset = logicalOffset;
+      _physicalDelta = physicalDelta;
     }
 
     @Override
@@ -132,7 +137,17 @@ public interface MatchTerm {
     @Nullable
     @Override
     public Object evaluate(MatchTape tape) {
-      return tape.classifierAt(tape.getEndPos() - 1);
+      int rowIndex = _fromEnd
+          ? tape.lastRow(RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, _logicalOffset)
+          : tape.firstRow(RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, _logicalOffset);
+      if (rowIndex == MatchTape.NO_ROW) {
+        return null;
+      }
+      long physicalRowIndex = (long) rowIndex + _physicalDelta;
+      if (physicalRowIndex < 0 || physicalRowIndex >= tape.getPartitionRows().size()) {
+        return null;
+      }
+      return tape.classifierAt((int) physicalRowIndex);
     }
   }
 
@@ -197,33 +212,29 @@ public interface MatchTerm {
     @Nullable
     @Override
     public Object evaluate(MatchTape tape) {
-      if (_kind == Kind.COUNT && _argument == null
-          && _symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
-        return (long) tape.getLength();
-      }
-      IntArrayList rows = tape.rowsOf(_symbolOrdinal);
+      int rowCount = tape.rowCount(_symbolOrdinal);
       if (_kind == Kind.COUNT && _argument == null) {
-        return (long) rows.size();
+        return (long) rowCount;
       }
       List<Object[]> partitionRows = tape.getPartitionRows();
       switch (_kind) {
         case COUNT:
-          return countNonNull(rows, partitionRows);
+          return countNonNull(tape, rowCount, partitionRows);
         case MIN:
         case MAX:
-          return evaluateExtremum(rows, partitionRows);
+          return evaluateExtremum(tape, rowCount, partitionRows);
         case SUM:
         case AVG:
-          return evaluateSumOrAverage(rows, partitionRows);
+          return evaluateSumOrAverage(tape, rowCount, partitionRows);
         default:
           throw new IllegalStateException("Unexpected MATCH_RECOGNIZE aggregate: " + _kind);
       }
     }
 
-    private long countNonNull(IntArrayList rows, List<Object[]> partitionRows) {
+    private long countNonNull(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       long count = 0;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+      for (int i = 0; i < rowCount; i++) {
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           count++;
         }
@@ -232,10 +243,10 @@ public interface MatchTerm {
     }
 
     @Nullable
-    private Object evaluateExtremum(IntArrayList rows, List<Object[]> partitionRows) {
+    private Object evaluateExtremum(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       Object extremum = null;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+      for (int i = 0; i < rowCount; i++) {
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value == null) {
           continue;
         }
@@ -250,16 +261,16 @@ public interface MatchTerm {
     }
 
     @Nullable
-    private Object evaluateSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+    private Object evaluateSumOrAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       switch (_storedType) {
         case INT:
         case LONG:
-          return evaluateIntegralSumOrAverage(rows, partitionRows);
+          return evaluateIntegralSumOrAverage(tape, rowCount, partitionRows);
         case FLOAT:
         case DOUBLE:
-          return evaluateFloatingPointSumOrAverage(rows, partitionRows);
+          return evaluateFloatingPointSumOrAverage(tape, rowCount, partitionRows);
         case BIG_DECIMAL:
-          return evaluateDecimalSumOrAverage(rows, partitionRows);
+          return evaluateDecimalSumOrAverage(tape, rowCount, partitionRows);
         default:
           throw QueryErrorCode.QUERY_EXECUTION.asException(
               "MATCH_RECOGNIZE " + _kind + " requires a numeric result type, got: " + _resultType + ".");
@@ -267,11 +278,11 @@ public interface MatchTerm {
     }
 
     @Nullable
-    private Object evaluateIntegralSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+    private Object evaluateIntegralSumOrAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       long sum = 0;
       long count = 0;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+      for (int i = 0; i < rowCount; i++) {
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum += numericValue(value).longValue();
           count++;
@@ -288,11 +299,11 @@ public interface MatchTerm {
     }
 
     @Nullable
-    private Object evaluateFloatingPointSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+    private Object evaluateFloatingPointSumOrAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       double sum = 0;
       long count = 0;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+      for (int i = 0; i < rowCount; i++) {
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum += numericValue(value).doubleValue();
           count++;
@@ -309,11 +320,11 @@ public interface MatchTerm {
     }
 
     @Nullable
-    private Object evaluateDecimalSumOrAverage(IntArrayList rows, List<Object[]> partitionRows) {
+    private Object evaluateDecimalSumOrAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       BigDecimal sum = BigDecimal.ZERO;
       long count = 0;
-      for (int i = 0; i < rows.size(); i++) {
-        Object value = _argument.apply(partitionRows.get(rows.getInt(i)));
+      for (int i = 0; i < rowCount; i++) {
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum = sum.add(toBigDecimal(numericValue(value)));
           count++;

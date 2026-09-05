@@ -161,8 +161,9 @@ public class MatchExpression {
     }
     if (NAVIGATION_FUNCTIONS.contains(functionName)) {
       // Calcite distributes navigation over an expression, so `LAST(A.price * 2)` arrives as
-      // `LAST(A.price, 0) * LAST(2, 0)`. Navigating a constant is the constant itself.
-      if (!containsPatternFieldRef(call)) {
+      // `LAST(A.price, 0) * LAST(2, 0)`. Navigating a constant is the constant itself. CLASSIFIER has no
+      // PatternFieldRef, but its designated row is significant and must not be mistaken for a constant.
+      if (!containsPatternFieldRef(call) && !containsClassifier(call)) {
         return rewrite(singleOperand(call), inputSchema, terms);
       }
       return addTerm(terms, navigation(call, inputSchema));
@@ -186,9 +187,10 @@ public class MatchExpression {
   }
 
   /// Flattens a nest of navigation calls such as `PREV(LAST(A.price, 1), 2)` into a single
-  /// [MatchTerm.Navigation]: at most one logical step (`FIRST` / `LAST`) selects a row of the match,
-  /// and the `PREV` / `NEXT` offsets around it add up into one physical delta.
-  private static MatchTerm.Navigation navigation(RexExpression.FunctionCall call, DataSchema inputSchema) {
+  /// [MatchTerm]: at most one logical step (`FIRST` / `LAST`) selects a row of the match, and the `PREV` / `NEXT`
+  /// offsets around it add up into one physical delta. The terminal operand may be a pattern-qualified column or
+  /// `CLASSIFIER()`.
+  private static MatchTerm navigation(RexExpression.FunctionCall call, DataSchema inputSchema) {
     boolean fromEnd = true;
     int logicalOffset = 0;
     boolean logicalSeen = false;
@@ -201,11 +203,14 @@ public class MatchExpression {
         current = singleOperand(currentCall);
         continue;
       }
+      if (CLASSIFIER.equals(functionName)) {
+        break;
+      }
       if (!NAVIGATION_FUNCTIONS.contains(functionName)) {
         throw QueryErrorCode.QUERY_EXECUTION.asException(
             "Unsupported expression inside a MATCH_RECOGNIZE row pattern navigation: '" + currentCall
-                + "'. Only a column reference qualified by a pattern variable, optionally wrapped in "
-                + "FIRST / LAST / PREV / NEXT, is supported.");
+                + "'. Only a column reference qualified by a pattern variable or CLASSIFIER(), optionally wrapped "
+                + "in FIRST / LAST / PREV / NEXT, is supported.");
       }
       int offset = navigationOffset(currentCall);
       try {
@@ -229,21 +234,33 @@ public class MatchExpression {
       }
       current = currentCall.getFunctionOperands().get(0);
     }
-    if (!(current instanceof RexExpression.PatternFieldRef)) {
-      throw QueryErrorCode.QUERY_EXECUTION.asException(
-          "Unsupported operand of a MATCH_RECOGNIZE row pattern navigation: '" + call
-              + "'. Expecting a column reference qualified by a pattern variable.");
-    }
-    RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) current;
-    ColumnDataType sourceType = columnType(inputSchema, ref);
+    int physicalDeltaInt;
     try {
-      return new MatchTerm.Navigation(ref.getSymbolOrdinal(), fromEnd, logicalOffset, Math.toIntExact(physicalDelta),
-          ref.getIndex(), sourceType, call.getDataType());
+      physicalDeltaInt = Math.toIntExact(physicalDelta);
     } catch (ArithmeticException e) {
       throw QueryErrorCode.QUERY_EXECUTION.asException(
           "The combined PREV / NEXT offset in a MATCH_RECOGNIZE row pattern navigation exceeds the supported "
               + "range of " + Integer.MIN_VALUE + " to " + Integer.MAX_VALUE + ": '" + call + "'.", e);
     }
+    if (current instanceof RexExpression.FunctionCall
+        && CLASSIFIER.equals(((RexExpression.FunctionCall) current).getFunctionName())) {
+      RexExpression.FunctionCall classifier = (RexExpression.FunctionCall) current;
+      if (!classifier.getFunctionOperands().isEmpty()) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "CLASSIFIER with a pattern variable argument is not supported yet in MATCH_RECOGNIZE. Use the no "
+                + "argument form CLASSIFIER().");
+      }
+      return new MatchTerm.Classifier(fromEnd, logicalOffset, physicalDeltaInt);
+    }
+    if (!(current instanceof RexExpression.PatternFieldRef)) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "Unsupported operand of a MATCH_RECOGNIZE row pattern navigation: '" + call
+              + "'. Expecting a column reference qualified by a pattern variable or CLASSIFIER().");
+    }
+    RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) current;
+    ColumnDataType sourceType = columnType(inputSchema, ref);
+    return new MatchTerm.Navigation(ref.getSymbolOrdinal(), fromEnd, logicalOffset, physicalDeltaInt,
+        ref.getIndex(), sourceType, call.getDataType());
   }
 
   /// The offset operand of a navigation call. `PREV` and `NEXT` default to one row, `FIRST` and
@@ -372,6 +389,22 @@ public class MatchExpression {
         if (containsPatternFieldRef(operand)) {
           return true;
         }
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsClassifier(RexExpression expression) {
+    if (!(expression instanceof RexExpression.FunctionCall)) {
+      return false;
+    }
+    RexExpression.FunctionCall call = (RexExpression.FunctionCall) expression;
+    if (CLASSIFIER.equals(call.getFunctionName())) {
+      return true;
+    }
+    for (RexExpression operand : call.getFunctionOperands()) {
+      if (containsClassifier(operand)) {
+        return true;
       }
     }
     return false;

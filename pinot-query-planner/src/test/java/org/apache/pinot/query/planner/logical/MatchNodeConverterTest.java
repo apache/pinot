@@ -25,11 +25,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Match;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,6 +39,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
@@ -145,16 +148,50 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testUnquotedPatternVariableNamesAreCaseInsensitive() {
+    MatchNode match = planMatch("SELECT * FROM a AS src MATCH_RECOGNIZE (ORDER BY ts "
+        + "MEASURES LAST(a.col3) AS ev AFTER MATCH SKIP TO FIRST a "
+        + "PATTERN (A) DEFINE a AS a.col3 > 0)");
+
+    assertEquals(symbolNames(match), List.of("A"));
+    List<RexExpression.PatternFieldRef> definitionRefs =
+        collectPatternFieldRefs(match.getPatternSymbols().get(0).getDefinition());
+    assertEquals(definitionRefs.size(), 1);
+    assertEquals(definitionRefs.get(0).getAlpha(), "A");
+    assertEquals(definitionRefs.get(0).getSymbolOrdinal(), 0);
+    List<RexExpression.PatternFieldRef> measureRefs =
+        collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
+    assertEquals(measureRefs.size(), 1);
+    assertEquals(measureRefs.get(0).getAlpha(), "A");
+    assertEquals(measureRefs.get(0).getSymbolOrdinal(), 0);
+    assertEquals(match.getAfterMatchSkipMode(), MatchNode.AfterMatchSkipMode.TO_FIRST);
+    assertEquals(match.getAfterMatchSkipToSymbolOrdinal(), 0);
+  }
+
+  @Test
+  public void testQuotedPatternVariableNamesRemainCaseSensitive() {
+    MatchNode match = planMatch("SELECT * FROM a AS src MATCH_RECOGNIZE (ORDER BY ts "
+        + "MEASURES LAST(\"a\".col3) AS ev AFTER MATCH SKIP TO FIRST \"a\" "
+        + "PATTERN (\"a\") DEFINE \"a\" AS \"a\".col3 > 0)");
+    assertEquals(symbolNames(match), List.of("a"));
+    assertEquals(match.getAfterMatchSkipToSymbolOrdinal(), 0);
+
+    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
+        "SELECT * FROM a AS src MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+            + "AFTER MATCH SKIP TO FIRST \"A\" PATTERN (\"a\") DEFINE \"a\" AS \"a\".col3 > 0)"));
+    assertTrue(e.getMessage().contains("Unknown pattern 'A'"), e.getMessage());
+  }
+
+  @Test
   public void testUnqualifiedReferenceBindsToUniversalSymbol() {
     // `col3` is not qualified by a pattern variable. Calcite has no representation for the SQL:2016 universal row
-    // pattern variable and reuses the row source alias ("a") as the alpha, so it must not be mistaken for a variable.
+    // pattern variable and reuses the row source alias as the alpha, so it must not be mistaken for pattern A.
     MatchNode match = planMatch("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
         + "PATTERN (A) DEFINE A AS col3 > 0)");
     assertEquals(symbolNames(match), List.of("A"));
     List<RexExpression.PatternFieldRef> refs =
         collectPatternFieldRefs(match.getPatternSymbols().get(0).getDefinition());
     assertEquals(refs.size(), 1);
-    assertEquals(refs.get(0).getAlpha(), "a");
     assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
   }
 
@@ -198,6 +235,32 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(match.getMeasures().get(0).getName(), "mno");
     assertEquals(match.getMeasures().get(1).getName(), "cls");
     assertEquals(match.explain(), "MATCH_RECOGNIZE");
+  }
+
+  @Test
+  public void testClassifierMeasureIsNullableAndCountKeepsItsOperand() {
+    String matchQuery = "SELECT cls FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+        + "MEASURES CLASSIFIER() AS cls PATTERN (A*) DEFINE A AS A.col3 > 0)";
+    try (var compiled = _queryEnvironment.compile(matchQuery)) {
+      Match match = findMatch(compiled.getRelNode());
+      assertNotNull(match, "Expected a match node");
+      assertTrue(match.getRowType().getField("cls", true, false).getType().isNullable(),
+          "CLASSIFIER() must be nullable because it is null for an empty match");
+    }
+
+    try (var compiled = _queryEnvironment.compile("SELECT COUNT(cls) FROM (" + matchQuery + ") matches")) {
+      String plan = RelOptUtil.toString(compiled.getRelNode());
+      Match match = findMatch(compiled.getRelNode());
+      assertNotNull(match, "Expected a match node in:\n" + plan);
+      assertTrue(match.getRowType().getField("cls", true, false).getType().isNullable(),
+          "CLASSIFIER() must remain nullable below COUNT() in:\n" + plan);
+      PinotLogicalAggregate aggregate = findLeafAggregate(compiled.getRelNode());
+      assertNotNull(aggregate, "Expected a leaf aggregate in:\n" + plan);
+      assertEquals(aggregate.getAggCallList().size(), 1);
+      assertEquals(aggregate.getAggCallList().get(0).rexList.size()
+              + aggregate.getAggCallList().get(0).getArgList().size(), 1,
+          "COUNT(CLASSIFIER()) must not be simplified to COUNT(*) in:\n" + plan);
+    }
   }
 
   /// Calcite's `Match#getPartitionKeys()` is an `ImmutableBitSet`, so `asList()` is ascending index order and the
@@ -276,40 +339,59 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     };
   }
 
-  /// A pattern variable named after the row source alias makes an unqualified column reference bind to that variable
-  /// instead of to the SQL:2016 universal row pattern variable, silently changing both measure values and which rows
-  /// match. The information is gone by the time the RexNodes are built, so it has to be rejected on the SqlNode side.
-  @Test(dataProvider = "rowSourceAliasCollisionQueries")
-  public void testRowSourceAliasCollisionIsRejected(String sql) {
-    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(sql));
-    assertTrue(e.getMessage().contains("collides with the row source alias"), e.getMessage());
-  }
-
-  @DataProvider(name = "rowSourceAliasCollisionQueries")
-  public Object[][] rowSourceAliasCollisionQueries() {
-    return new Object[][]{
-        new Object[]{
-            "SELECT * FROM a AS A MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s PATTERN (A B+) "
-                + "DEFINE A AS A.col3 > 0, B AS B.col3 > 0)"
-        },
-        // No explicit alias needed: the bare table name is the row source alias too.
-        new Object[]{
-            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s PATTERN (\"a\" B+) "
-                + "DEFINE \"a\" AS \"a\".col3 > 0, B AS B.col3 > 0)"
-        }
-    };
-  }
-
-  /// The negative control for the check above: the collision is exact-case, because the symbol table is a plain
-  /// `Map<String, Integer>` lookup. A case-insensitive check would reject this query, which works correctly today.
+  /// An unquoted row-source alias and pattern label differing only in cosmetic case are the same SQL name. The input
+  /// is internally re-aliased so its unqualified columns retain universal-row semantics.
   @Test
-  public void testAliasDifferingOnlyInCaseStillBindsToTheUniversalSymbol() {
+  public void testAliasDifferingOnlyInCosmeticCaseStillBindsToTheUniversalSymbol() {
     MatchNode match = planMatch("SELECT * FROM a AS aa MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS s "
         + "PATTERN (AA B+) DEFINE AA AS AA.col3 > 0, B AS B.col3 > 0)");
     List<RexExpression.PatternFieldRef> refs = collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
     assertEquals(refs.size(), 1);
-    assertEquals(refs.get(0).getAlpha(), "aa");
     assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+  }
+
+  @Test(dataProvider = "sameSpellingAliasAndPatternQueries")
+  public void testSameSpellingInSeparateAliasAndPatternNamespaces(String sql, String expectedSymbol) {
+    MatchNode match = planMatch(sql);
+
+    assertEquals(symbolNames(match), List.of(expectedSymbol));
+    List<RexExpression.PatternFieldRef> universalRefs =
+        collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
+    assertEquals(universalRefs.size(), 1);
+    assertEquals(universalRefs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+
+    List<RexExpression.PatternFieldRef> patternRefs =
+        collectPatternFieldRefs(match.getMeasures().get(1).getExpression());
+    assertEquals(patternRefs.size(), 1);
+    assertEquals(patternRefs.get(0).getAlpha(), expectedSymbol);
+    assertEquals(patternRefs.get(0).getSymbolOrdinal(), 0);
+  }
+
+  @DataProvider(name = "sameSpellingAliasAndPatternQueries")
+  public Object[][] sameSpellingAliasAndPatternQueries() {
+    return new Object[][]{
+        new Object[]{
+            // Qualified PARTITION BY / ORDER BY references still name the input after its internal re-aliasing.
+            "SELECT * FROM a AS A MATCH_RECOGNIZE (PARTITION BY A.col1 ORDER BY A.ts "
+                + "MEASURES LAST(col3) AS universal_s, LAST(a.col3) AS pattern_s "
+                + "PATTERN (a) DEFINE a AS a.col3 > 0)",
+            "A"
+        },
+        new Object[]{
+            // Changing only cosmetic case must not change binding or query validity.
+            "SELECT * FROM a AS a MATCH_RECOGNIZE (PARTITION BY a.col1 ORDER BY a.ts "
+                + "MEASURES LAST(col3) AS universal_s, LAST(a.col3) AS pattern_s "
+                + "PATTERN (a) DEFINE a AS a.col3 > 0)",
+            "A"
+        },
+        new Object[]{
+            // The raw names collide inside Calcite even though quoted lowercase "a" is distinct from unquoted A.
+            "SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY a.col1 ORDER BY a.ts "
+                + "MEASURES LAST(col3) AS universal_s, LAST(\"a\".col3) AS pattern_s "
+                + "PATTERN (\"a\") DEFINE \"a\" AS \"a\".col3 > 0)",
+            "a"
+        }
+    };
   }
 
   @Test
@@ -405,6 +487,20 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
       Match match = findMatch(input);
       if (match != null) {
         return match;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static PinotLogicalAggregate findLeafAggregate(RelNode rel) {
+    if (rel instanceof PinotLogicalAggregate && ((PinotLogicalAggregate) rel).getAggType() == AggType.LEAF) {
+      return (PinotLogicalAggregate) rel;
+    }
+    for (RelNode input : rel.getInputs()) {
+      PinotLogicalAggregate aggregate = findLeafAggregate(input);
+      if (aggregate != null) {
+        return aggregate;
       }
     }
     return null;
