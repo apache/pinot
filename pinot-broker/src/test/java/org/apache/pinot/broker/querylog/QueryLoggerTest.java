@@ -226,6 +226,81 @@ public class QueryLoggerTest {
   }
 
   @Test
+  public void shouldLogMultiLineQueryOnASingleLine() {
+    // Given: a client that submits pretty-printed SQL, as JDBC/BI tools routinely do
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+    String prettyPrinted = "SELECT id, name\nFROM users\r\nWHERE id = 42\nLIMIT 10";
+
+    // When:
+    queryLogger.logQueryReceived(123L, prettyPrinted, null);
+
+    // Then: one record, on one physical line
+    Assert.assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    Assert.assertFalse(logged.contains("\n"), "logged query must not contain a line feed: " + logged);
+    Assert.assertFalse(logged.contains("\r"), "logged query must not contain a carriage return: " + logged);
+    // and the breaks are escaped, not discarded, so nothing is lost
+    Assert.assertTrue(logged.contains("SELECT id, name\\nFROM users\\r\\nWHERE id = 42\\nLIMIT 10"), logged);
+  }
+
+  @Test
+  public void shouldNotBreakLineCommentsWhenLoggingOnASingleLine() {
+    // Given: a query whose line comment is terminated by the newline. Pinot's grammar accepts both
+    // "--" and "//" line comments (SINGLE_LINE_COMMENT in Parser.jj), so replacing the break with a
+    // space would pull "FROM t" into the comment and change what the logged query means.
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    // When:
+    queryLogger.logQueryReceived(123L, "SELECT a -- note\nFROM t", null);
+
+    // Then:
+    Assert.assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    Assert.assertFalse(logged.contains("\n"), logged);
+    Assert.assertTrue(logged.contains("SELECT a -- note\\nFROM t"), logged);
+    Assert.assertFalse(logged.contains("-- note FROM t"),
+        "the comment must not swallow the rest of the statement: " + logged);
+  }
+
+  @Test
+  public void shouldLeaveASingleLineQueryUntouched() {
+    // Given:
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    // When:
+    queryLogger.logQueryReceived(123L, "SELECT a FROM t WHERE s = 'x'", null);
+
+    // Then: no escaping applied to a query that was already on one line
+    Assert.assertEquals(_infoLog.size(), 1);
+    Assert.assertTrue(_infoLog.get(0).contains("SELECT a FROM t WHERE s = 'x'"), _infoLog.get(0));
+  }
+
+  @Test
+  public void shouldLogMultiLineQueryOnASingleLineOnCompletion() {
+    // Given: the completion record carries the query too, so it needs the same treatment
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, false,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+    QueryLogger.QueryLogParams params =
+        generateParams(false, false, 0, 456, null, "SELECT id\nFROM users\nLIMIT 1");
+
+    // When:
+    queryLogger.logQueryCompleted(params, true);
+
+    // Then:
+    Assert.assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    Assert.assertFalse(logged.contains("\n"), logged);
+    Assert.assertTrue(logged.contains("query=SELECT id\\nFROM users\\nLIMIT 1"), logged);
+  }
+
+  @Test
   public void shouldNotLogQueryReceivedWhenRateLimited() {
     // Given: rate limiter denies
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
@@ -476,9 +551,15 @@ public class QueryLoggerTest {
 
   private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
       int numExceptions, long timeUsedMs, QueryFingerprint queryFingerprint) {
+    return generateParams(numGroupsLimitReached, numGroupsWarningLimitReached, numExceptions, timeUsedMs,
+        queryFingerprint, "SELECT * FROM foo");
+  }
+
+  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
+      int numExceptions, long timeUsedMs, QueryFingerprint queryFingerprint, String query) {
     RequestContext requestContext = new DefaultRequestContext();
     requestContext.setRequestId(123);
-    requestContext.setQuery("SELECT * FROM foo");
+    requestContext.setQuery(query);
     requestContext.setNumUnavailableSegments(21);
 
     if (queryFingerprint != null) {
