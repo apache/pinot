@@ -19,13 +19,15 @@
 package org.apache.pinot.server.api.resources;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
+import org.apache.pinot.server.api.AdminApiApplication;
 
 
 /// This filter is used to reject all requests when server is shutting down, and only allow the liveness check to go
@@ -34,13 +36,14 @@ import javax.ws.rs.ext.Provider;
 public class ShutDownFilter implements ContainerRequestFilter {
 
   @Inject
-  private AtomicBoolean _shutDownInProgress;
+  @Named(AdminApiApplication.SERVER_SHUTDOWN_IN_PROGRESS)
+  private BooleanSupplier _shutDownInProgress;
 
   @Override
   public void filter(ContainerRequestContext requestContext)
       throws IOException {
     // NOTE: Allow health check requests for liveness check
-    if (_shutDownInProgress.get() && !(requestContext.getUriInfo().getMatchedResources()
+    if (_shutDownInProgress.getAsBoolean() && !(requestContext.getUriInfo().getMatchedResources()
         .get(0) instanceof HealthCheckResource)) {
       String errMessage = "Server is shutting down";
       throw new WebApplicationException(errMessage,
