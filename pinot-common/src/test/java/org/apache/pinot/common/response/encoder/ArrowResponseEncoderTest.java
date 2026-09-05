@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
@@ -182,6 +183,30 @@ public class ArrowResponseEncoderTest {
     assertEquals(decodedTable.getRows().get(0)[1], new String[]{uuidValue}, "Non-null UUID array should round-trip");
     assertNull(decodedTable.getRows().get(1)[0], "Null UUID should round-trip as null");
     assertNull(decodedTable.getRows().get(1)[1], "Null UUID array should round-trip as null");
+  }
+
+  @Test
+  public void testEncodeDecodeVariantColumnPreservesVariantNullAndSqlNull()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    String canonicalJson = VariantUtils.variantToJson(
+        VariantUtils.parseJsonToVariant("{\"a\":[1,true,null],\"b\":\"text\"}"));
+    String variantNull = VariantUtils.variantToJson(VariantUtils.parseJsonToVariant("null"));
+    List<Object[]> rows = Arrays.asList(
+        new Object[]{canonicalJson},
+        new Object[]{variantNull},
+        new Object[]{null}
+    );
+
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(new ResultTable(schema, rows), 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), 3);
+    assertEquals(decodedTable.getRows().get(0)[0], "{\"a\":[1,true,null],\"b\":\"text\"}");
+    assertEquals(decodedTable.getRows().get(1)[0], "null",
+        "An encoded Variant null must remain canonical JSON text");
+    assertNull(decodedTable.getRows().get(2)[0], "SQL null must remain an Arrow null");
   }
 
   @Test

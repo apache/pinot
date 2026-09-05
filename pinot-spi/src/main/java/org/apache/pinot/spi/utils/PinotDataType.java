@@ -1019,6 +1019,75 @@ public enum PinotDataType {
     }
   },
 
+  /// Pinot's external representation of a VARIANT value: a validated PVAR envelope in a `byte[]`.
+  VARIANT {
+    @Override
+    public int toInt(Object value) {
+      throw unsupportedConversion("INT");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      throw unsupportedConversion("LONG");
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw unsupportedConversion("FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      throw unsupportedConversion("DOUBLE");
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw unsupportedConversion("BIG_DECIMAL");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw unsupportedConversion("BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw unsupportedConversion("TIMESTAMP");
+    }
+
+    @Override
+    public String toString(Object value) {
+      throw unsupportedConversion("STRING");
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      byte[] envelope = (byte[]) value;
+      VariantEnvelope.validateAndGetMetadataLength(envelope);
+      return envelope;
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      throw unsupportedConversion("UUID");
+    }
+
+    @Override
+    public byte[] convert(Object value, PinotDataType sourceType) {
+      if (sourceType == VARIANT) {
+        return toBytes(value);
+      }
+      byte[] envelope = sourceType.toBytes(value);
+      VariantEnvelope.validateAndGetMetadataLength(envelope);
+      return envelope;
+    }
+
+    private UnsupportedOperationException unsupportedConversion(String destinationType) {
+      return new UnsupportedOperationException("Cannot convert value from VARIANT to " + destinationType);
+    }
+  },
+
   /// Wraps [UUID]. Internal representation is the 16-byte big-endian binary form.
   ///
   /// When converting from UUID to other types:
@@ -1839,6 +1908,7 @@ public enum PinotDataType {
   /// Converts to the internal representation of the value.
   /// - `BOOLEAN` → `Integer` (0/1)
   /// - `TIMESTAMP` → `Long` (epoch millis)
+  /// - `VARIANT` → `byte[]` (PVAR envelope)
   /// - `UUID` → `byte[]` (16-byte big-endian)
   /// - `PRIMITIVE_BOOLEAN_ARRAY` / `BOOLEAN_ARRAY` → `Integer[]` (per-element 0/1)
   /// - `TIMESTAMP_ARRAY` → `Long[]` (per-element epoch millis)
@@ -2046,6 +2116,11 @@ public enum PinotDataType {
         throw new IllegalStateException("There is no multi-value type for JSON");
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case VARIANT:
+        if (fieldSpec.isSingleValueField()) {
+          return VARIANT;
+        }
+        throw new IllegalStateException("There is no multi-value type for VARIANT");
       case UUID:
         return fieldSpec.isSingleValueField() ? UUID : UUID_ARRAY;
       case MAP:

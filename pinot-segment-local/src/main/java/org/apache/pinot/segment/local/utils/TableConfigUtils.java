@@ -54,6 +54,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -769,8 +771,11 @@ public final class TableConfigUtils {
         "Metrics aggregation cannot be enabled when the schema contains COMPLEX columns");
 
     for (String dimension : schema.getDimensionNames()) {
-      Preconditions.checkState(schema.getFieldSpecFor(dimension).isSingleValueField(),
+      FieldSpec fieldSpec = schema.getFieldSpecFor(dimension);
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
           "Metrics aggregation cannot be enabled with multi-value dimension column: %s", dimension);
+      Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
+          "Metrics aggregation cannot use VARIANT dimension column as an aggregation key: %s", dimension);
     }
 
     Map<String, DictionaryIndexConfig> dictConfigByCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
@@ -1078,6 +1083,8 @@ public final class TableConfigUtils {
       if (comparisonColumns != null) {
         for (String column : comparisonColumns) {
           Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
+          Preconditions.checkState(schema.getFieldSpecFor(column).getDataType() != DataType.VARIANT,
+              "VARIANT column cannot be used as an upsert comparison column: %s", column);
         }
       }
 
@@ -1429,6 +1436,25 @@ public final class TableConfigUtils {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
+    // VARIANT columns support only the OVERWRITE partial-upsert strategy. A column that is not listed in
+    // partialUpsertStrategies is merged at runtime with defaultPartialUpsertStrategy, so validating only the listed
+    // entries would let a non-OVERWRITE default (or a custom merger class) silently apply INCREMENT/APPEND/UNION/IGNORE
+    // to a VARIANT byte envelope. Validate the effective strategy for every VARIANT column here.
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.getDataType() != DataType.VARIANT) {
+        continue;
+      }
+      String column = fieldSpec.getName();
+      Preconditions.checkState(StringUtils.isBlank(partialUpsertMergerClass),
+          "VARIANT column supports only OVERWRITE partial-upsert strategy and cannot be merged by a custom "
+              + "partialUpsertMergerClass: %s", column);
+      UpsertConfig.Strategy effectiveStrategy =
+          partialUpsertStrategies != null && partialUpsertStrategies.containsKey(column)
+              ? partialUpsertStrategies.get(column) : upsertConfig.getDefaultPartialUpsertStrategy();
+      Preconditions.checkState(effectiveStrategy == UpsertConfig.Strategy.OVERWRITE,
+          "VARIANT column supports only OVERWRITE partial-upsert strategy: %s", column);
+    }
+
     // check if partialUpsertMergerClass is provided then partialUpsertStrategies should be empty
     if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
       Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
@@ -1452,6 +1478,7 @@ public final class TableConfigUtils {
 
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
+        // VARIANT columns are validated up front against their effective strategy (default or explicit).
 
         if (columnStrategy == UpsertConfig.Strategy.INCREMENT) {
           Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
@@ -1771,6 +1798,12 @@ public final class TableConfigUtils {
   /// - Proper dependency between index types (e.g. inverted index columns must have dictionary)
   private static void validateIndexingConfigAndFieldConfigList(TableConfig tableConfig, Schema schema) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (schema.getAllFieldSpecs().stream().anyMatch(fieldSpec -> fieldSpec.getDataType() == DataType.VARIANT)) {
+      Preconditions.checkState(
+          schema.isEnableColumnBasedNullHandling() || indexingConfig.isNullHandlingEnabled(),
+          "Null handling must be enabled for tables containing VARIANT columns via "
+              + "schema.enableColumnBasedNullHandling or tableIndexConfig.nullHandlingEnabled");
+    }
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (CollectionUtils.isNotEmpty(fieldConfigs)) {
       Set<String> seenColumns = new HashSet<>();
@@ -1797,8 +1830,19 @@ public final class TableConfigUtils {
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema", column);
       FieldIndexConfigs indexConfigs = entry.getValue();
+      if (fieldSpec.getDataType() == DataType.VARIANT) {
+        validateVariantIndexConfigs(indexConfigs, fieldSpec, allIndexes);
+      }
       for (IndexType<?, ?, ?> indexType : allIndexes) {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
+      }
+    }
+
+    if (CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns())) {
+      for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(primaryKeyColumn);
+        Preconditions.checkState(fieldSpec == null || fieldSpec.getDataType() != DataType.VARIANT,
+            "VARIANT column cannot be used as a primary key: %s", primaryKeyColumn);
       }
     }
 
@@ -1831,6 +1875,12 @@ public final class TableConfigUtils {
       validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema,
           TimestampIndexUtils.extractColumnsWithGranularity(tableConfig));
     }
+    if (indexingConfig.isEnableDefaultStarTree()) {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
+            "Default star-tree index cannot include VARIANT column: %s", fieldSpec.getName());
+      }
+    }
 
     // TIMESTAMP index is not managed by FieldIndexConfigs, and we need to validate it separately.
     if (CollectionUtils.isNotEmpty(fieldConfigs)) {
@@ -1855,6 +1905,8 @@ public final class TableConfigUtils {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
         Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
+        Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
+            "Cannot sort on VARIANT column: %s", column);
       }
     }
 
@@ -1868,9 +1920,43 @@ public final class TableConfigUtils {
           Preconditions.checkState(fieldSpec != null, "Failed to find partition column: %s in schema", column);
           Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
               column);
+          Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
+              "Cannot partition on VARIANT column: %s", column);
         }
       }
     }
+  }
+
+  private static void validateVariantIndexConfigs(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec,
+      List<IndexType<?, ?, ?>> allIndexes) {
+    String column = fieldSpec.getName();
+    Preconditions.checkState(fieldSpec.isSingleValueField(),
+        "VARIANT column must be single-value: %s", column);
+
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(forwardIndexConfig.isEnabled(),
+        "VARIANT column must have an enabled forward index: %s", column);
+    Preconditions.checkState(forwardIndexConfig.getEncodingType() == EncodingType.RAW,
+        "VARIANT column must use RAW forward index encoding: %s", column);
+    Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled(),
+        "VARIANT column cannot use a dictionary: %s", column);
+
+    for (IndexType<?, ?, ?> indexType : allIndexes) {
+      String indexId = indexType.getId();
+      if (StandardIndexes.FORWARD_ID.equals(indexId) || StandardIndexes.NULL_VALUE_VECTOR_ID.equals(indexId)
+          || StandardIndexes.DICTIONARY_ID.equals(indexId) || StandardIndexes.OPEN_STRUCT_ID.equals(indexId)) {
+        // OPEN_STRUCT has an enabled default for every column but is applicable only to OPEN_STRUCT field specs.
+        continue;
+      }
+      Preconditions.checkState(!getIndexConfig(indexConfigs, indexType).isEnabled(),
+          "VARIANT column supports only a RAW forward index; index %s is not supported on column: %s", indexId,
+          column);
+    }
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static IndexConfig getIndexConfig(FieldIndexConfigs indexConfigs, IndexType<?, ?, ?> indexType) {
+    return indexConfigs.getConfig((IndexType) indexType);
   }
 
   /// Rejects a null value vector backfill opt-in on the time column when its default null value is outside the valid
@@ -1971,6 +2057,7 @@ public final class TableConfigUtils {
       assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
       for (String dimension : dimensionsSplitOrder) {
         if (timestampIndexColumns.contains(dimension)) {
+          validateTimestampIndexColumnDoesNotHideVariant(dimension, schema);
           dimensionColumns.add(dimension);
           continue;
         }
@@ -2061,6 +2148,7 @@ public final class TableConfigUtils {
 
       for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
         if (timestampIndexColumns.contains(column)) {
+          validateTimestampIndexColumnDoesNotHideVariant(column, schema);
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -2068,10 +2156,13 @@ public final class TableConfigUtils {
             "Failed to find column: %s specified in star-tree index config in schema", column);
         Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
             "Star-tree index cannot be created on MAP column: %s", column);
+        Preconditions.checkState(fieldSpec.getDataType() != DataType.VARIANT,
+            "Star-tree index cannot be created on VARIANT column: %s", column);
       }
 
       for (String column : dimensionColumns) {
         if (timestampIndexColumns.contains(column)) {
+          validateTimestampIndexColumnDoesNotHideVariant(column, schema);
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -2079,6 +2170,12 @@ public final class TableConfigUtils {
             "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
       }
     }
+  }
+
+  private static void validateTimestampIndexColumnDoesNotHideVariant(String column, Schema schema) {
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec == null || fieldSpec.getDataType() != DataType.VARIANT,
+        "Star-tree index cannot be created on VARIANT column: %s", column);
   }
 
   private static void sanitize(TableConfig tableConfig) {

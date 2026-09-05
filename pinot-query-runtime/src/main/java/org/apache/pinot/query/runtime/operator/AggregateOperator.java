@@ -48,6 +48,7 @@ import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.validation.RawVariantValidationVisitor;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
@@ -91,6 +92,11 @@ public class AggregateOperator extends MultiStageOperator {
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
+    DataSchema inputSchema = input instanceof RepeatOperator ? ((RepeatOperator) input).getResultSchema()
+        : node.getInputs().size() == 1 ? node.getInputs().get(0).getDataSchema() : null;
+    if (inputSchema != null) {
+      RawVariantValidationVisitor.validateAggregateInputs(node, inputSchema);
+    }
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());
     int numFunctions = _aggFunctions.length;
@@ -143,7 +149,7 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       _groupByExecutor =
           new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+              leafReturnFinalResult, inputSchema, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
   }

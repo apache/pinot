@@ -98,6 +98,9 @@ public final class Schema implements Serializable {
   // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
   // queries or not).
   private boolean _hasJSONColumn;
+  // Set to true if this schema has a VARIANT column. QueryContext reads this once per query so VARIANT-only guards do
+  // not scan every field on the query-planning hot path.
+  private boolean _hasVariantColumn;
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -123,6 +126,10 @@ public final class Schema implements Serializable {
   public static void validate(FieldType fieldType, DataType dataType) {
     switch (fieldType) {
       case DIMENSION:
+        if (dataType == DataType.VARIANT) {
+          break;
+        }
+        // fall through
       case TIME:
       case DATE_TIME:
         switch (dataType) {
@@ -327,6 +334,7 @@ public final class Schema implements Serializable {
     }
 
     _hasJSONColumn |= fieldSpec.getDataType().equals(DataType.JSON);
+    _hasVariantColumn |= fieldSpec.getDataType() == DataType.VARIANT;
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
@@ -361,6 +369,10 @@ public final class Schema implements Serializable {
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
       }
+      if (existingFieldSpec.getDataType() == DataType.VARIANT) {
+        _hasVariantColumn = _fieldSpecMap.values().stream()
+            .anyMatch(fieldSpec -> fieldSpec.getDataType() == DataType.VARIANT);
+      }
       return true;
     } else {
       return false;
@@ -374,6 +386,11 @@ public final class Schema implements Serializable {
   @JsonIgnore
   public boolean hasJSONColumn() {
     return _hasJSONColumn;
+  }
+
+  @JsonIgnore
+  public boolean hasVariantColumn() {
+    return _hasVariantColumn;
   }
 
   @JsonIgnore
@@ -591,7 +608,7 @@ public final class Schema implements Serializable {
   /// The following validations are performed:
   ///
   /// - For dimension, time, date time fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
-  ///   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES
+  ///   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES. VARIANT is supported only for dimension fields.
   /// - For metric fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES
   ///
   /// Note: multi-value compatibility checks (e.g. rejecting MV JSON columns) live in

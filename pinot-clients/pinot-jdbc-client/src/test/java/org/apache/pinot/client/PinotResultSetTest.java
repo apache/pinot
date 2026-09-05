@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -41,6 +43,7 @@ import org.testng.annotations.Test;
 /// Tests deserialization of a ResultSet given hardcoded Pinot results.
 public class PinotResultSetTest {
   public static final String TEST_RESULT_SET_RESOURCE = "result_table.json";
+  public static final String VARIANT_RESULT_SET_RESOURCE = "variant_result_table.json";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
 
   @Test
@@ -185,6 +188,64 @@ public class PinotResultSetTest {
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
       Assert.assertEquals(pinotResultSetMetadata.getColumnTypeName(i + 1), resultSet.getColumnDataType(i));
     }
+  }
+
+  @Test
+  public void testVariantUsesCanonicalJsonStringJdbcType() {
+    Assert.assertEquals(DriverUtils.getSQLDataType("VARIANT"), Integer.valueOf(Types.VARCHAR));
+  }
+
+  @Test
+  public void testVariantGetStringAndGetObjectPreserveVariantNullAndSqlNull()
+      throws Exception {
+    ResultSet resultSet = getResultSet(VARIANT_RESULT_SET_RESOURCE).getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+
+    Assert.assertTrue(pinotResultSet.next());
+    Assert.assertEquals(pinotResultSet.getString(1), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    Assert.assertFalse(pinotResultSet.wasNull());
+    Assert.assertEquals(pinotResultSet.getObject(1), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    Assert.assertFalse(pinotResultSet.wasNull());
+
+    Assert.assertTrue(pinotResultSet.next());
+    Assert.assertEquals(pinotResultSet.getString(1), "null");
+    Assert.assertFalse(pinotResultSet.wasNull(), "An encoded Variant null is not SQL null");
+    Assert.assertEquals(pinotResultSet.getObject(1), "null");
+    Assert.assertFalse(pinotResultSet.wasNull(), "An encoded Variant null is not SQL null");
+
+    Assert.assertTrue(pinotResultSet.next());
+    Assert.assertEquals(pinotResultSet.getString(1), "\"null\"");
+    Assert.assertFalse(pinotResultSet.wasNull(), "A Variant string containing null is not SQL null");
+    Assert.assertEquals(pinotResultSet.getObject(1), "\"null\"");
+    Assert.assertFalse(pinotResultSet.wasNull(), "A Variant string containing null is not SQL null");
+
+    Assert.assertTrue(pinotResultSet.next());
+    Assert.assertNull(pinotResultSet.getString(1));
+    Assert.assertTrue(pinotResultSet.wasNull());
+    Assert.assertNull(pinotResultSet.getObject(1));
+    Assert.assertTrue(pinotResultSet.wasNull());
+    Assert.assertFalse(pinotResultSet.next());
+  }
+
+  @Test
+  public void testEstablishedTypesRetainNullHandling()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson(
+        "{\"resultTable\":{\"dataSchema\":{\"columnNames\":[\"stringValue\",\"intValue\"],"
+            + "\"columnDataTypes\":[\"STRING\",\"INT\"]},\"rows\":[[null,null],[\"NuLl\",7]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertNull(resultSet.getString(1));
+    Assert.assertTrue(resultSet.wasNull());
+    Assert.assertEquals(resultSet.getInt(2), 0);
+    Assert.assertTrue(resultSet.wasNull());
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertNull(resultSet.getString(1), "STRING null matching remains case-insensitive");
+    Assert.assertTrue(resultSet.wasNull());
+    Assert.assertEquals(resultSet.getInt(2), 7);
+    Assert.assertFalse(resultSet.wasNull());
+    Assert.assertFalse(resultSet.next());
   }
 
   @Test

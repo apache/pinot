@@ -351,6 +351,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     if (spec instanceof ComplexFieldSpec) {
       return false;
     }
+    if (spec.getDataType() == FieldSpec.DataType.VARIANT) {
+      return false;
+    }
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
@@ -663,7 +666,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
 
     // Min/max value
-    if (fieldSpec.getFieldType() != FieldType.COMPLEX) {
+    if (fieldSpec.getFieldType() != FieldType.COMPLEX && fieldSpec.getDataType() != DataType.VARIANT) {
       // Regular (non-complex) field
       if (totalDocs > 0) {
         Object min = columnStatistics.getMinValue();

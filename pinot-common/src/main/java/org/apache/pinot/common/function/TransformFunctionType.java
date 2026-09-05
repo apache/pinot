@@ -20,7 +20,10 @@ package org.apache.pinot.common.function;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -34,6 +37,8 @@ import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.pinot.common.utils.VariantUtils;
+import org.apache.pinot.common.utils.VariantUtils.ResultType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
@@ -117,6 +122,17 @@ public enum TransformFunctionType {
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i > 1)),
+  VARIANT_GET("variantGet", TransformFunctionType::variantGetReturnTypeInference, variantGetOperandTypeChecker()),
+  TRY_VARIANT_GET("tryVariantGet", TransformFunctionType::variantGetReturnTypeInference,
+      variantGetOperandTypeChecker()),
+  VARIANT_EXISTS("variantExists", ReturnTypes.BOOLEAN_NULLABLE, variantPathOperandTypeChecker()),
+  IS_VARIANT_NULL("isVariantNull", ReturnTypes.BOOLEAN, optionalVariantPathOperandTypeChecker()),
+  VARIANT_TYPE_OF("variantTypeOf", ReturnTypes.VARCHAR_2000_NULLABLE, optionalVariantPathOperandTypeChecker()),
+  VARIANT_TO_JSON("variantToJson", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.VARIANT),
+  PARSE_JSON_TO_VARIANT("parseJsonToVariant", TransformFunctionType::nullableVariantReturnTypeInference,
+      OperandTypes.CHARACTER, "parseJson"),
+  TRY_PARSE_JSON_TO_VARIANT("tryParseJsonToVariant", TransformFunctionType::nullableVariantReturnTypeInference,
+      OperandTypes.CHARACTER, "tryParseJson"),
 
   // Date time functions
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
@@ -259,6 +275,12 @@ public enum TransformFunctionType {
   // Time series functions
   TIME_SERIES_BUCKET("timeSeriesBucket");
 
+  private static final Set<String> NULL_HANDLING_REQUIRED_FUNCTION_NAMES =
+      createNullHandlingRequiredFunctionNames();
+  private static final Set<String> PARSE_JSON_TO_VARIANT_FUNCTION_NAMES =
+      createCanonicalFunctionNames(List.of(PARSE_JSON_TO_VARIANT, TRY_PARSE_JSON_TO_VARIANT));
+  private static final Set<String> TOLERANT_PARSE_JSON_TO_VARIANT_FUNCTION_NAMES =
+      createCanonicalFunctionNames(List.of(TRY_PARSE_JSON_TO_VARIANT));
   private final String _name;
   private final List<String> _names;
   private final SqlReturnTypeInference _returnTypeInference;
@@ -300,6 +322,58 @@ public enum TransformFunctionType {
     return _operandTypeChecker;
   }
 
+  /// Returns whether the function depends on SQL-null semantics and therefore requires query null handling.
+  ///
+  /// The check accepts every registered spelling, including underscore-insensitive aliases, so all query engines
+  /// can enforce the same contract before selecting an implementation.
+  public static boolean requiresNullHandling(String functionName) {
+    return NULL_HANDLING_REQUIRED_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
+  /// Returns the pre-canonicalized names of functions that require query null handling.
+  ///
+  /// Callers that already canonicalize function names can retain this immutable set and avoid canonicalizing the
+  /// same name a second time on every lookup.
+  public static Set<String> getNullHandlingRequiredCanonicalNames() {
+    return NULL_HANDLING_REQUIRED_FUNCTION_NAMES;
+  }
+
+  /// Returns whether the function parses JSON text into a Variant value.
+  ///
+  /// Both engines must keep these calls out of compile-time constant folding: a folded result would degrade to a
+  /// plain BYTES literal, erasing the VARIANT type and with it JSON rendering, null-handling enforcement, and the
+  /// raw-value opacity guards. The check accepts every registered spelling, mirroring [#requiresNullHandling].
+  public static boolean parsesJsonToVariant(String functionName) {
+    return PARSE_JSON_TO_VARIANT_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
+  /// Returns whether the function is the tolerant (`try`) form of [#parsesJsonToVariant], which returns SQL null
+  /// for malformed JSON instead of throwing. Derived from the same registration source so the strict/tolerant
+  /// classification cannot drift from newly registered aliases.
+  public static boolean parsesJsonToVariantTolerantly(String functionName) {
+    return TOLERANT_PARSE_JSON_TO_VARIANT_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
+  private static Set<String> createNullHandlingRequiredFunctionNames() {
+    return createCanonicalFunctionNames(
+        List.of(VARIANT_GET, TRY_VARIANT_GET, VARIANT_EXISTS, IS_VARIANT_NULL, VARIANT_TYPE_OF, VARIANT_TO_JSON,
+            PARSE_JSON_TO_VARIANT, TRY_PARSE_JSON_TO_VARIANT));
+  }
+
+  private static Set<String> createCanonicalFunctionNames(List<TransformFunctionType> functionTypes) {
+    Set<String> names = new HashSet<>();
+    for (TransformFunctionType functionType : functionTypes) {
+      for (String name : functionType.getNames()) {
+        names.add(canonicalize(name));
+      }
+    }
+    return Set.copyOf(names);
+  }
+
+  private static String canonicalize(String functionName) {
+    return FunctionRegistry.canonicalize(functionName);
+  }
+
   /// Returns the optional explicit returning type specification.
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
@@ -308,7 +382,7 @@ public enum TransformFunctionType {
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos,
       SqlTypeName defaultSqlType) {
     if (opBinding.getOperandCount() > pos && opBinding.isOperandLiteral(pos, false)) {
-      String operandType = opBinding.getOperandLiteralValue(pos, String.class).toUpperCase();
+      String operandType = opBinding.getOperandLiteralValue(pos, String.class).toUpperCase(Locale.ROOT);
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
@@ -316,7 +390,7 @@ public enum TransformFunctionType {
 
   private static RelDataType jsonExtractScalarReturnTypeInference(SqlOperatorBinding opBinding) {
     if (opBinding.getOperandCount() > 2 && opBinding.isOperandLiteral(2, false)) {
-      String resultsType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
+      String resultsType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase(Locale.ROOT);
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
       switch (resultsType) {
         case "JSON":
@@ -330,6 +404,47 @@ public enum TransformFunctionType {
       }
     }
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR);
+  }
+
+  private static RelDataType nullableVariantReturnTypeInference(SqlOperatorBinding opBinding) {
+    RelDataType variantType = opBinding.getTypeFactory().createSqlType(SqlTypeName.VARIANT);
+    return opBinding.getTypeFactory().createTypeWithNullability(variantType, true);
+  }
+
+  private static RelDataType variantGetReturnTypeInference(SqlOperatorBinding opBinding) {
+    if (opBinding.getOperandCount() == 2) {
+      return nullableVariantReturnTypeInference(opBinding);
+    }
+    if (!opBinding.isOperandLiteral(2, false)) {
+      throw new IllegalArgumentException("variantGet target type must be a string literal");
+    }
+    ResultType targetType =
+        VariantUtils.parseResultType(opBinding.getOperandLiteralValue(2, String.class));
+    RelDataType resultType = opBinding.getTypeFactory().createSqlType(targetType.getSqlTypeName());
+    return opBinding.getTypeFactory().createTypeWithNullability(resultType, true);
+  }
+
+  private static SqlOperandTypeChecker variantGetOperandTypeChecker() {
+    SqlSingleOperandTypeChecker stringLiteral = OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
+    return OperandTypes.or(
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName() + "(<VARIANT>, <CHARACTER_LITERAL>)'",
+            OperandTypes.ANY, stringLiteral),
+        OperandTypes.sequence(
+            (operator, ignored) -> "'" + operator.getName()
+                + "(<VARIANT>, <CHARACTER_LITERAL>, <CHARACTER_LITERAL>)'",
+            OperandTypes.ANY, stringLiteral, stringLiteral));
+  }
+
+  private static SqlOperandTypeChecker variantPathOperandTypeChecker() {
+    SqlSingleOperandTypeChecker stringLiteral = OperandTypes.and(OperandTypes.CHARACTER, OperandTypes.LITERAL);
+    return OperandTypes.sequence(
+        (operator, ignored) -> "'" + operator.getName() + "(<VARIANT>, <CHARACTER_LITERAL>)'",
+        OperandTypes.ANY, stringLiteral);
+  }
+
+  private static SqlOperandTypeChecker optionalVariantPathOperandTypeChecker() {
+    return OperandTypes.or(OperandTypes.ANY, variantPathOperandTypeChecker());
   }
 
   /// Operand checker shared by `jsonExtractScalar` and its `Fast` / `FirstMatch` variants.

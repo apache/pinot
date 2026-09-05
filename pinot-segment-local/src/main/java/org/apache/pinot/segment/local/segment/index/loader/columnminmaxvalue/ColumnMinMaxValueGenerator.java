@@ -105,21 +105,21 @@ public class ColumnMinMaxValueGenerator {
     switch (_columnMinMaxValueGeneratorMode) {
       case ALL:
         for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn()) {
+          if (supportsMinMax(fieldSpec)) {
             columnsToAddMinMaxValue.add(fieldSpec.getName());
           }
         }
         break;
       case NON_METRIC:
         for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+          if (supportsMinMax(fieldSpec) && fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
             columnsToAddMinMaxValue.add(fieldSpec.getName());
           }
         }
         break;
       case TIME:
         for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn() && (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME
+          if (supportsMinMax(fieldSpec) && (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME
               || fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME)) {
             columnsToAddMinMaxValue.add(fieldSpec.getName());
           }
@@ -130,6 +130,10 @@ public class ColumnMinMaxValueGenerator {
     }
 
     return columnsToAddMinMaxValue;
+  }
+
+  private static boolean supportsMinMax(FieldSpec fieldSpec) {
+    return !fieldSpec.isVirtualColumn() && fieldSpec.getDataType() != FieldSpec.DataType.VARIANT;
   }
 
   private boolean needAddColumnMinMaxValueForColumn(String columnName) {

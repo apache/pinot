@@ -30,6 +30,7 @@ import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
@@ -113,6 +114,22 @@ public class MergeTaskUtils {
   public static MergeType getMergeType(Map<String, String> taskConfig) {
     String mergeType = taskConfig.get(MergeTask.MERGE_TYPE_KEY);
     return mergeType != null ? MergeType.valueOf(mergeType.toUpperCase()) : null;
+  }
+
+  /// Early, submission-time form of [SegmentProcessorConfig#validateMergeTypeForVariantColumns]: rejects rollup and
+  /// dedup merge types for schemas with a VARIANT column. Unknown merge-type strings are ignored here; their
+  /// validity is checked separately.
+  public static void validateMergeTypeForVariantColumns(Schema schema, @Nullable String mergeTypeName) {
+    if (mergeTypeName == null) {
+      return;
+    }
+    MergeType mergeType;
+    try {
+      mergeType = MergeType.valueOf(mergeTypeName.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      return;
+    }
+    SegmentProcessorConfig.validateMergeTypeForVariantColumns(schema, mergeType);
   }
 
   /// Returns the map from column name to the aggregation type associated with it based on the task config.

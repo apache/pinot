@@ -55,6 +55,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
@@ -148,6 +149,56 @@ public class AggregationFunctionUtils {
       return finalResult1;
     }
     return aggregationFunction.mergeFinalResult(finalResult1, finalResult2);
+  }
+
+  /// Rejects raw VARIANT aggregate operands based on their logical result type.
+  ///
+  /// VARIANT is physically stored as BYTES, so checking the stored type would accidentally enable byte equality,
+  /// ordering, hashing, or sketch serialization semantics. COUNT is the deliberately narrow exception because it only
+  /// observes SQL nullness and never consumes the encoded value.
+  public static void validateRawVariantAggregationInputs(AggregationFunction<?, ?>[] aggregationFunctions,
+      BaseProjectOperator<?> projectOperator) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
+        continue;
+      }
+      for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
+        ColumnContext columnContext = projectOperator.getResultColumnContext(inputExpression);
+        if (columnContext != null && columnContext.getDataType() == DataType.VARIANT) {
+          throw rawVariantUnsupported(aggregationFunction);
+        }
+      }
+    }
+  }
+
+  private static void validateRawVariantIdentifierInputs(AggregationFunction<?, ?>[] aggregationFunctions,
+      SegmentContext segmentContext, QueryContext queryContext) {
+    // QueryContext is shared by every segment. Preserve the legacy no-schema path, but skip all per-expression
+    // data-source lookups when the assigned table schema proves that VARIANT cannot be referenced.
+    if (queryContext.getSchema() != null && !queryContext.hasVariantColumns()) {
+      return;
+    }
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
+        continue;
+      }
+      for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
+        if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
+          DataType dataType =
+              segmentContext.getIndexSegment().getDataSource(inputExpression.getIdentifier(), queryContext.getSchema())
+                  .getDataSourceMetadata().getDataType();
+          if (dataType == DataType.VARIANT) {
+            throw rawVariantUnsupported(aggregationFunction);
+          }
+        }
+      }
+    }
+  }
+
+  private static IllegalArgumentException rawVariantUnsupported(AggregationFunction<?, ?> aggregationFunction) {
+    return new IllegalArgumentException(
+        "Aggregation function " + aggregationFunction.getType().getName()
+            + " does not support raw VARIANT values; extract a typed path with variantGet first");
   }
 
   /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
@@ -350,6 +401,21 @@ public class AggregationFunctionUtils {
       _functions = functions;
       _projectOperator = projectOperator;
       _useStarTree = useStarTree;
+      if (!useStarTree) {
+        validateRawVariantAggregationInputs(functions, projectOperator);
+      }
+    }
+
+    private AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator) {
+      _functions = functions;
+      _projectOperator = projectOperator;
+      _useStarTree = false;
+    }
+
+    private static AggregationInfo forPartialProjection(AggregationFunction[] allFunctions,
+        BaseProjectOperator<?> projectOperator, AggregationFunction[] projectionFunctions) {
+      validateRawVariantAggregationInputs(projectionFunctions, projectOperator);
+      return new AggregationInfo(allFunctions, projectOperator);
     }
 
     public AggregationFunction[] getFunctions() {
@@ -383,6 +449,10 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    // Star-tree project operators expose pre-aggregated columns instead of the original logical operands, so validate
+    // direct identifiers before attempting the star-tree path. Function and literal operands cannot use star-tree and
+    // are validated against the regular project operator after fallback.
+    validateRawVariantIdentifierInputs(aggregationFunctions, segmentContext, queryContext);
     /// Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
     /// sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
     if (queryContext.isGroupingSets()) {
@@ -418,12 +488,14 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] allFunctions, AggregationFunction[] projectionFunctions,
       BaseFilterOperator filterOperator) {
+    // This builder is public, so do not rely on its current caller having performed the star-tree validation first.
+    validateRawVariantIdentifierInputs(allFunctions, segmentContext, queryContext);
     Set<ExpressionContext> expressionsToTransform =
         collectExpressionsToTransform(projectionFunctions, queryContext.getGroupByExpressions());
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationInfo(allFunctions, projectOperator, false);
+    return AggregationInfo.forPartialProjection(allFunctions, projectOperator, projectionFunctions);
   }
 
 

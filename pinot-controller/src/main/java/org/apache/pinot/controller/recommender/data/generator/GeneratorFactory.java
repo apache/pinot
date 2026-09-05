@@ -45,6 +45,11 @@ public class GeneratorFactory {
     if (type == DataType.UUID) {
       return new UuidGenerator(cardinality, numberOfValuesPerEntry);
     }
+    if (type == DataType.VARIANT) {
+      // Fail with a clear message rather than falling through to the numeric generators, which would produce
+      // values that are not valid Variant envelopes.
+      throw new UnsupportedOperationException("Data generation is not supported for VARIANT columns");
+    }
     if (timeUnit != null) {
       return new TimeGenerator(cardinality, type, timeUnit);
     }

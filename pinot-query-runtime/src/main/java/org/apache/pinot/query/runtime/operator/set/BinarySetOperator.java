@@ -45,6 +45,7 @@ public abstract class BinarySetOperator extends SetOperator {
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
     Preconditions.checkArgument(inputOperators.size() == 2, "Binary set operator should have 2 inputs");
+    validateNoRawVariantValues(dataSchema, "INTERSECT/EXCEPT");
     _leftChildOperator = inputOperators.get(0);
     _rightChildOperator = inputOperators.get(1);
     _rightRowSet = HashMultiset.create();

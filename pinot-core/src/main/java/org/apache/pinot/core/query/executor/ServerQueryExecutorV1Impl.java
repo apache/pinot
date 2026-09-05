@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.ExplainPlanRowData;
@@ -54,6 +55,7 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -77,6 +79,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -335,6 +339,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       boolean enableStreaming, @Nullable PlanMaker planMakerOverride)
       throws Exception {
     handleSubquery(queryContext, executionInfo, timerContext, executorService);
+    validateVariantFilterPredicates(queryContext);
 
     TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
         executionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, _segmentPrunerService);
@@ -355,6 +360,37 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     addPrunerStats(instanceResponse, selectedSegmentsInfo.getPrunerStats());
 
     return instanceResponse;
+  }
+
+  @VisibleForTesting
+  static void validateVariantFilterPredicates(QueryContext queryContext) {
+    FilterContext filter = queryContext.getFilter();
+    Schema schema = queryContext.getSchema();
+    if (filter == null || schema == null || !queryContext.hasVariantColumns()) {
+      return;
+    }
+    validateVariantFilterPredicates(filter, schema);
+  }
+
+  private static void validateVariantFilterPredicates(FilterContext filter, Schema schema) {
+    if (filter.getType() == FilterContext.Type.PREDICATE) {
+      Predicate predicate = filter.getPredicate();
+      assert predicate != null;
+      ExpressionContext lhs = predicate.getLhs();
+      if (lhs.getType() == ExpressionContext.Type.IDENTIFIER) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(lhs.getIdentifier());
+        if (fieldSpec != null) {
+          PredicateEvaluatorProvider.validatePredicate(predicate, fieldSpec.getDataType());
+        }
+      }
+      return;
+    }
+    List<FilterContext> children = filter.getChildren();
+    if (children != null) {
+      for (FilterContext child : children) {
+        validateVariantFilterPredicates(child, schema);
+      }
+    }
   }
 
   /// Get a mapping of explain plan depth to a unique list of explain plans for each depth
