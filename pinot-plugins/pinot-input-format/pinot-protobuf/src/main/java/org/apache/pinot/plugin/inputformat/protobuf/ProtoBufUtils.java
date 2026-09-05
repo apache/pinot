@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.github.os72.protobuf.dynamic.DynamicSchema;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtobufInternalUtils;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -36,9 +41,25 @@ public class ProtoBufUtils {
   public static final String TMP_DIR_PREFIX = "pinot-protobuf";
   public static final String PB_OUTER_CLASS_SUFFIX = "OuterClass";
 
+  // Last successfully fetched (and parseable) content of each remote (S3, GCS, ...) descriptor file, keyed by URI.
+  // The descriptor is still fetched fresh on every decoder creation, so in-place updates of the file keep
+  // propagating exactly as before; this copy is served only when the fetch fails (e.g. a transient DNS or
+  // object-store outage), so a CONSUMING transition cannot go to ERROR on a network blip once the descriptor has
+  // been fetched once by this JVM. Bounded by total content size as a safety net.
+  private static final long FALLBACK_CACHE_MAX_WEIGHT_BYTES = 64L << 20;
+  private static final Cache<String, byte[]> LAST_KNOWN_GOOD_DESCRIPTORS = CacheBuilder.newBuilder()
+      .maximumWeight(FALLBACK_CACHE_MAX_WEIGHT_BYTES)
+      .weigher((String key, byte[] value) -> value.length)
+      .build();
+
   private ProtoBufUtils() {
   }
 
+  /// Downloads the file at the given path into a fresh local temp directory and returns it. This is a plain
+  /// download with no outage fallback: [ProtoBufCodeGenMessageDecoder] calls it directly for its jar file (which
+  /// must live on disk for class loading and cannot be validated as a descriptor set), so a remote jar remains a
+  /// hard dependency on the remote filesystem being reachable. Descriptor files should be read through
+  /// [#getDescriptorFileInputStream(String)] instead, which adds the last-known-good fallback.
   public static File getFileCopiedToLocal(String filePath)
       throws Exception {
     URI fileURI = URI.create(filePath);
@@ -60,9 +81,53 @@ public class ProtoBufUtils {
     }
   }
 
+  /// Returns the content of the descriptor file at the given path. A remote file is fetched fresh on every call so
+  /// in-place updates are picked up, and the last successfully fetched (and parseable) content is remembered per
+  /// URI: when the fetch fails, or returns bytes that do not parse as a descriptor set, the remembered copy is
+  /// served instead so that decoder creation survives transient DNS / object-store outages. Local files are always
+  /// read fresh and never remembered.
+  ///
+  /// NOTE: Only descriptor files get this fallback. The jar used by [ProtoBufCodeGenMessageDecoder] is downloaded
+  /// via [#getFileCopiedToLocal(String)] without one (see the note there).
   public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
       throws Exception {
-    return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
+    URI fileURI = URI.create(descriptorFilePath);
+    String scheme = fileURI.getScheme();
+    if (scheme == null || scheme.equals(PinotFSFactory.LOCAL_PINOT_FS_SCHEME)) {
+      return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
+    }
+    byte[] content;
+    try {
+      content = downloadFileToBytes(descriptorFilePath);
+      // Validate before remembering so that a corrupt/truncated download can neither be served nor overwrite the
+      // last known good copy
+      DynamicSchema.parseFrom(new ByteArrayInputStream(content));
+      LAST_KNOWN_GOOD_DESCRIPTORS.put(descriptorFilePath, content);
+    } catch (Exception e) {
+      content = LAST_KNOWN_GOOD_DESCRIPTORS.getIfPresent(descriptorFilePath);
+      if (content == null) {
+        throw e;
+      }
+      LOGGER.warn("Failed to fetch protocol buffer descriptor file: {}, falling back to the last successfully"
+          + " fetched copy", descriptorFilePath, e);
+    }
+    return new ByteArrayInputStream(content);
+  }
+
+  private static byte[] downloadFileToBytes(String filePath)
+      throws Exception {
+    File localFile = getFileCopiedToLocal(filePath);
+    try {
+      return Files.readAllBytes(localFile.toPath());
+    } finally {
+      Files.deleteIfExists(localFile.toPath());
+      Files.deleteIfExists(localFile.getParentFile().toPath());
+    }
+  }
+
+  @VisibleForTesting
+  static void clearDescriptorCache() {
+    LAST_KNOWN_GOOD_DESCRIPTORS.invalidateAll();
   }
 
   public static File createLocalFile(URI srcURI, File dstDir) {
