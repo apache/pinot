@@ -593,6 +593,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Boolean isGroupByOffHeap(Map<String, String> queryOptions) {
+    String groupByOffHeap = queryOptions.get(QueryOptionKey.GROUP_BY_OFF_HEAP);
+    return groupByOffHeap != null ? Boolean.parseBoolean(groupByOffHeap) : null;
+  }
+
+  @Nullable
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitialResultHolderCapacity = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     return checkedParseIntPositive(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitialResultHolderCapacity);
