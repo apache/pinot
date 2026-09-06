@@ -18,15 +18,28 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.EmptyColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class EmptyIndexSegmentTest {
@@ -78,6 +91,29 @@ public class EmptyIndexSegmentTest {
     segment.onSegmentAdded();
 
     verify(segmentDirectory, times(1)).onSegmentAdded();
+  }
+
+  /// Column listings are unmodifiable views of the column metadata map in key order (an empty segment registers no
+  /// virtual columns, so both listings agree) and never build the segment schema.
+  @Test
+  public void testColumnNamesComeFromColumnMetadata() {
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
+    for (String column : List.of("b", "a")) {
+      columnMetadataMap.put(column,
+          new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.INT, true), null, null));
+    }
+    when(metadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    EmptyIndexSegment segment = new EmptyIndexSegment(metadata);
+
+    assertEquals(new ArrayList<>(segment.getColumnNames()), List.of("a", "b"));
+    assertEquals(new ArrayList<>(segment.getPhysicalColumnNames()), List.of("a", "b"));
+    assertEquals(segment.getPhysicalColumnNames(), Set.of("a", "b"));
+    assertTrue(segment.getPhysicalColumnNames().contains("a"));
+    assertFalse(segment.getPhysicalColumnNames().contains("c"));
+    assertThrows(UnsupportedOperationException.class, () -> segment.getColumnNames().remove("a"));
+    assertThrows(UnsupportedOperationException.class, () -> segment.getPhysicalColumnNames().add("c"));
+    verify(metadata, never()).getSchema();
   }
 
   /// An empty segment loaded without a directory (e.g. the local File path) must treat the lifecycle callbacks as safe
