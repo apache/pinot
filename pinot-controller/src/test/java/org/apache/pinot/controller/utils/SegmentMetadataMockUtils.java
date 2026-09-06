@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.partition.function.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -30,6 +31,9 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.joda.time.Interval;
 import org.mockito.Mockito;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +42,22 @@ public class SegmentMetadataMockUtils {
   private static final AtomicLong UNIQUE_ID_GENERATOR = new AtomicLong();
 
   private SegmentMetadataMockUtils() {
+  }
+
+  /// Stubs the column accessors of a mocked segment metadata. Mockito stubs every method, so stubbing only
+  /// `getColumnMetadataMap()` leaves the accessors production code reads (the real implementation holds sorted
+  /// arrays, not a map) answering `null`.
+  private static void stubColumns(SegmentMetadata segmentMetadata, TreeMap<String, ColumnMetadata> columns) {
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columns);
+    when(segmentMetadata.getAllColumns()).thenReturn(columns.navigableKeySet());
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(columns.values());
+    when(segmentMetadata.getNumColumns()).thenReturn(columns.size());
+    when(segmentMetadata.getColumnMetadataFor(anyString())).thenAnswer(
+        call -> columns.get(call.<String>getArgument(0)));
+    doAnswer(call -> {
+      columns.forEach(call.<BiConsumer<String, ColumnMetadata>>getArgument(0));
+      return null;
+    }).when(segmentMetadata).forEachColumn(any());
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
@@ -100,7 +120,7 @@ public class SegmentMetadataMockUtils {
     when(colMeta.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(numPartitions, null));
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put(partitionColumn, colMeta);
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    stubColumns(segmentMetadata, columnMetadataMap);
     return segmentMetadata;
   }
 
@@ -112,9 +132,6 @@ public class SegmentMetadataMockUtils {
     when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5, null));
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    if (columnName != null) {
-      when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
-    }
     when(segmentMetadata.getTableName()).thenReturn(rawTableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
@@ -122,7 +139,7 @@ public class SegmentMetadataMockUtils {
 
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put(columnName, columnMetadata);
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    stubColumns(segmentMetadata, columnMetadataMap);
     return segmentMetadata;
   }
 

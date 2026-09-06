@@ -317,7 +317,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected double getMaxComparisonValue(IndexSegment segment) {
-    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataFor(_comparisonColumns.get(0))
         .getMaxValue()).doubleValue();
   }
 

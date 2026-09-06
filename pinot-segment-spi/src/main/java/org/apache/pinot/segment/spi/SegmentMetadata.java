@@ -20,12 +20,14 @@ package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
@@ -120,10 +122,42 @@ public interface SegmentMetadata {
     return getSchema().getColumnNames();
   }
 
+  /// Number of columns the segment metadata holds.
+  default int getNumColumns() {
+    return getColumnMetadataMap().size();
+  }
+
+  /// The column metadata of every column, in the natural column-name order of [#getAllColumns()].
+  default Collection<ColumnMetadata> getAllColumnMetadata() {
+    return getColumnMetadataMap().values();
+  }
+
+  /// Applies `action` to every (column name, column metadata) pair, in the natural column-name order of
+  /// [#getAllColumns()].
+  default void forEachColumn(BiConsumer<String, ColumnMetadata> action) {
+    getColumnMetadataMap().forEach(action);
+  }
+
+  /// Returns the whole column metadata as a map, for callers that need one.
+  ///
+  /// An implementation may hold its columns in a form that costs less than a map entry per column and build this map
+  /// on demand, so load- and query-path code must not call this: it re-inflates a map entry per column for every
+  /// segment it touches, and a server keeps that for the segment's lifetime. Read column names through
+  /// [#getAllColumns()], one column through [#getColumnMetadataFor(String)], all of them through
+  /// [#getAllColumnMetadata()] or [#forEachColumn(BiConsumer)], and mutate through
+  /// [#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)] rather than through the returned map,
+  /// whose writes an implementation is free not to see.
   TreeMap<String, ColumnMetadata> getColumnMetadataMap();
 
+  /// Returns the metadata of the given column, or `null` if the segment has no such column.
+  @Nullable
   default ColumnMetadata getColumnMetadataFor(String column) {
     return getColumnMetadataMap().get(column);
+  }
+
+  /// Registers the metadata of a column, replacing any metadata already registered under the same name.
+  default void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
+    getColumnMetadataMap().put(column, columnMetadata);
   }
 
   /// Removes a column from the segment metadata.

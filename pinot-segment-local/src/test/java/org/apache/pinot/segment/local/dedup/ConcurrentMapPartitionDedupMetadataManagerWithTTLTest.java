@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -446,9 +445,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-      }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
     doReturn(System.currentTimeMillis()).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped
