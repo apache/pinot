@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.lang3.Strings;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -44,7 +45,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,11 +75,11 @@ public class ColumnMinMaxValueGenerator {
   /// Returns the list of columns that need min/max values to be updated
   public List<String> columnMinMaxValueUpdates() {
     List<String> columns = new ArrayList<>();
-    for (String column : getColumnsToAddMinMaxValue()) {
-      if (needAddColumnMinMaxValueForColumn(column)) {
-        columns.add(column);
+    forEachSelectedColumn(columnMetadata -> {
+      if (needAddColumnMinMaxValueForColumn(columnMetadata)) {
+        columns.add(columnMetadata.getColumnName());
       }
-    }
+    });
     return columns;
   }
 
@@ -87,53 +87,40 @@ public class ColumnMinMaxValueGenerator {
       throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
     _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(_segmentMetadata);
-    for (String column : getColumnsToAddMinMaxValue()) {
-      addColumnMinMaxValueForColumn(column);
-    }
+    forEachSelectedColumn(this::addColumnMinMaxValueForColumn);
     if (_minMaxValueAdded) {
       SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
     }
   }
 
-  private List<String> getColumnsToAddMinMaxValue() {
-    Schema schema = _segmentMetadata.getSchema();
-    List<String> columnsToAddMinMaxValue = new ArrayList<>();
+  /// Runs `action` on every column the generator mode selects.
+  ///
+  /// The selection reads the field specs off the column metadata rather than off `_segmentMetadata.getSchema()`,
+  /// which is the same data (the schema is derived from the column metadata) but costs a `Schema` per segment. This
+  /// runs on every segment load — the default mode is `ALL` — so a schema built here would be cached for the
+  /// segment's whole life, and a server holding tens of thousands of wide segments would keep one per segment.
+  private void forEachSelectedColumn(Consumer<ColumnMetadata> action) {
+    for (ColumnMetadata columnMetadata : _segmentMetadata.getAllColumnMetadata()) {
+      FieldSpec fieldSpec = columnMetadata.getFieldSpec();
+      if (!fieldSpec.isVirtualColumn() && isSelected(fieldSpec.getFieldType())) {
+        action.accept(columnMetadata);
+      }
+    }
+  }
 
-    // mode ALL - use all columns
-    // mode NON_METRIC - use all dimensions and time columns
-    // mode TIME - use only time columns
+  /// Whether the generator mode covers the given field type: `ALL` takes every column, `NON_METRIC` every column but
+  /// the metrics, `TIME` only the time columns.
+  private boolean isSelected(FieldSpec.FieldType fieldType) {
     switch (_columnMinMaxValueGeneratorMode) {
       case ALL:
-        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn()) {
-            columnsToAddMinMaxValue.add(fieldSpec.getName());
-          }
-        }
-        break;
+        return true;
       case NON_METRIC:
-        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-            columnsToAddMinMaxValue.add(fieldSpec.getName());
-          }
-        }
-        break;
+        return fieldType != FieldSpec.FieldType.METRIC;
       case TIME:
-        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          if (!fieldSpec.isVirtualColumn() && (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME
-              || fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME)) {
-            columnsToAddMinMaxValue.add(fieldSpec.getName());
-          }
-        }
-        break;
+        return fieldType == FieldSpec.FieldType.TIME || fieldType == FieldSpec.FieldType.DATE_TIME;
       default:
         throw new IllegalStateException("Unsupported generator mode: " + _columnMinMaxValueGeneratorMode);
     }
-
-    return columnsToAddMinMaxValue;
-  }
-
-  private boolean needAddColumnMinMaxValueForColumn(String columnName) {
-    return needAddColumnMinMaxValueForColumn(_segmentMetadata.getColumnMetadataFor(columnName));
   }
 
   private boolean needAddColumnMinMaxValueForColumn(ColumnMetadata columnMetadata) {
@@ -141,8 +128,7 @@ public class ColumnMinMaxValueGenerator {
         && !columnMetadata.isMinMaxValueInvalid();
   }
 
-  private void addColumnMinMaxValueForColumn(String columnName) {
-    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
+  private void addColumnMinMaxValueForColumn(ColumnMetadata columnMetadata) {
     if (!needAddColumnMinMaxValueForColumn(columnMetadata)) {
       return;
     }
@@ -155,7 +141,7 @@ public class ColumnMinMaxValueGenerator {
       _minMaxValueAdded = true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while generating min/max value for column: {} in segment: {}, continuing without "
-          + "persisting them", columnName, _segmentMetadata.getName(), e);
+          + "persisting them", columnMetadata.getColumnName(), _segmentMetadata.getName(), e);
     }
   }
 
