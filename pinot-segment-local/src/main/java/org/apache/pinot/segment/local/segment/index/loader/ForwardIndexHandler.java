@@ -104,6 +104,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private static final List<IndexType<?, ?, ?>> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
 
+  /// Memoizes the canonical form of each configured codec spec for this handler's lifetime.
+  /// [#computeOperations] runs twice per handler (once from [#needUpdateIndices], once from [#updateIndices]) and
+  /// canonicalization is pure string work over an immutable spec, so resolving the same configured spec again only
+  /// repeats the parse and validation. Keyed by the raw spec together with the stored type because parsing is
+  /// validated against the stored type: the same spec may canonicalize for one type and be rejected for another.
+  private final Map<CodecSpecKey, String> _canonicalCodecSpecs = new HashMap<>();
+
   /// Re-enable operations are split by target encoding so the intent is explicit at the operation level: a
   /// `forwardIndex.disabled` column being re-enabled may want to come back as either dict-encoded or raw,
   /// depending on the new config. Both variants flow through the same regenerate-from-inverted-index path
@@ -112,6 +119,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   protected enum Operation {
     DISABLE_FORWARD_INDEX, ENABLE_DICT_FORWARD_INDEX, ENABLE_RAW_FORWARD_INDEX, DISABLE_DICTIONARY,
     ENABLE_DICTIONARY, REWRITE_FORWARD_INDEX
+  }
+
+  /// Key of [#_canonicalCodecSpecs]: the configured codec spec plus the stored type it is validated against.
+  private record CodecSpecKey(String _spec, DataType _storedType) {
   }
 
   @VisibleForTesting
@@ -542,8 +553,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     String newCodecSpec = newConfig.getCodecSpec();
     if (newCodecSpec != null) {
       // Compare canonical forms so equivalent spellings (case, aliases, default arguments) do not trigger a rewrite.
-      String canonicalNewSpec = CodecPipelineExecutor.create(newCodecSpec,
-          existingColMetadata.getDataType().getStoredType()).getCanonicalSpec();
+      DataType storedType = existingColMetadata.getDataType().getStoredType();
+      String canonicalNewSpec = _canonicalCodecSpecs.computeIfAbsent(new CodecSpecKey(newCodecSpec, storedType),
+          key -> CodecPipelineExecutor.create(key._spec(), key._storedType()).getCanonicalSpec());
       return !canonicalNewSpec.equals(existingCodecSpec);
     }
 
