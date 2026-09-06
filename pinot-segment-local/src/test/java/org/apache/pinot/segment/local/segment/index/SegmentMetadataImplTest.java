@@ -40,7 +40,10 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -51,6 +54,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.EmptyColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -330,6 +334,37 @@ public class SegmentMetadataImplTest {
     }
     assertSame(metadata.getSchema(), schema);
     assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations + 1);
+  }
+
+  /// The preprocess that runs on every segment load asks the forward-index handler which physical columns exist. That
+  /// question must not build the per-segment schema: doing so once per segment pins one [Schema] per loaded segment
+  /// for its whole life, which on a server holding tens of thousands of wide segments is hundreds of megabytes.
+  @Test
+  public void testPreprocessDoesNotBuildTheSegmentSchema()
+      throws Exception {
+    // The forward-index handler skips segments older than v3, so the preprocess only reaches it on a v3 segment.
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+
+    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    Set<String> physical = metadata.getPhysicalColumnNames();
+    assertFalse(metadata.isSchemaMaterialized(), "listing physical columns must not build the segment schema");
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
+    assertEquals(physical, metadata.getSchema().getPhysicalColumnNames(),
+        "the derived names must equal what the schema reports");
+    assertFalse(physical.contains(BuiltInVirtualColumn.DOCID));
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, metadata.getSchema());
+    indexLoadingConfig.setReadMode(ReadMode.mmap);
+    long beforePreprocess = SegmentMetadataImpl.getNumSchemaMaterializations();
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_segmentDirectory, ReadMode.mmap);
+        SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      preProcessor.process();
+    }
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), beforePreprocess,
+        "segment preprocess must not build any segment schema");
   }
 
   /// Loading a segment registers the built-in virtual columns in the column metadata, so the schema derived afterwards

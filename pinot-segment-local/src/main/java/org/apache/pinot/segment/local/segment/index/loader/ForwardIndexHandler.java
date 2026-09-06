@@ -248,7 +248,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     Map<String, List<Operation>> columnOperationsMap = new HashMap<>();
-    Set<String> existingAllColumns = segmentMetadata.getSchema().getPhysicalColumnNames();
+    Set<String> existingAllColumns = segmentMetadata.getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
     Set<String> existingInvertedIndexColumns =
