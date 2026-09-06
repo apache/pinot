@@ -43,20 +43,37 @@ import static com.google.common.base.Preconditions.checkArgument;
 /// writes: [SegmentMetadataImpl] replaces its arrays when its columns change, which leaves an already-returned view
 /// as the snapshot taken at the time of the call.
 ///
+/// `subSet`/`headSet`/`tailSet` are ranges of the same array, and like every [NavigableSet] range view they reject
+/// an argument outside their own range rather than silently widening it.
+///
 /// Immutable and thread-safe as long as the backing array is not written in place.
 final class SortedStringArraySet extends AbstractSet<String> implements NavigableSet<String> {
   private final String[] _elements;
   private final int _from;
   private final int _to;
+  /// The bounds this view was created with, `null` on the side it is unbounded on. A range view has to reject an
+  /// argument outside its own range, as [NavigableSet] requires, which the array indices alone cannot tell: an
+  /// exclusive endpoint that is not in the array leaves no trace in them.
+  @Nullable
+  private final String _low;
+  private final boolean _lowInclusive;
+  @Nullable
+  private final String _high;
+  private final boolean _highInclusive;
 
   SortedStringArraySet(String[] elements) {
-    this(elements, 0, elements.length);
+    this(elements, 0, elements.length, null, false, null, false);
   }
 
-  private SortedStringArraySet(String[] elements, int from, int to) {
+  private SortedStringArraySet(String[] elements, int from, int to, @Nullable String low, boolean lowInclusive,
+      @Nullable String high, boolean highInclusive) {
     _elements = elements;
     _from = from;
     _to = to;
+    _low = low;
+    _lowInclusive = lowInclusive;
+    _high = high;
+    _highInclusive = highInclusive;
   }
 
   @Override
@@ -193,9 +210,11 @@ final class SortedStringArraySet extends AbstractSet<String> implements Navigabl
   @Override
   public NavigableSet<String> subSet(String from, boolean fromInclusive, String to, boolean toInclusive) {
     checkArgument(from.compareTo(to) <= 0, "from: %s > to: %s", from, to);
+    checkInRange(from, fromInclusive);
+    checkInRange(to, toInclusive);
     int start = fromInclusive ? ceilingIndex(from) : higherIndex(from);
     int end = toInclusive ? higherIndex(to) : ceilingIndex(to);
-    return new SortedStringArraySet(_elements, start, Math.max(start, end));
+    return new SortedStringArraySet(_elements, start, Math.max(start, end), from, fromInclusive, to, toInclusive);
   }
 
   @Override
@@ -205,7 +224,9 @@ final class SortedStringArraySet extends AbstractSet<String> implements Navigabl
 
   @Override
   public NavigableSet<String> headSet(String to, boolean inclusive) {
-    return new SortedStringArraySet(_elements, _from, inclusive ? higherIndex(to) : ceilingIndex(to));
+    checkInRange(to, inclusive);
+    return new SortedStringArraySet(_elements, _from, inclusive ? higherIndex(to) : ceilingIndex(to), _low,
+        _lowInclusive, to, inclusive);
   }
 
   @Override
@@ -215,12 +236,40 @@ final class SortedStringArraySet extends AbstractSet<String> implements Navigabl
 
   @Override
   public NavigableSet<String> tailSet(String from, boolean inclusive) {
-    return new SortedStringArraySet(_elements, inclusive ? ceilingIndex(from) : higherIndex(from), _to);
+    checkInRange(from, inclusive);
+    return new SortedStringArraySet(_elements, inclusive ? ceilingIndex(from) : higherIndex(from), _to, from,
+        inclusive, _high, _highInclusive);
   }
 
   @Override
   public SortedSet<String> tailSet(String from) {
     return tailSet(from, true);
+  }
+
+  /// Rejects an argument that a further range call cannot reach from this view, as [java.util.TreeSet]'s range views
+  /// do: an endpoint the view excludes is still a legal *exclusive* argument, since the range it asks for is empty
+  /// on that side rather than wider.
+  private void checkInRange(String element, boolean inclusive) {
+    boolean inRange = inclusive ? !tooLow(element) && !tooHigh(element)
+        : (_low == null || element.compareTo(_low) >= 0) && (_high == null || _high.compareTo(element) >= 0);
+    checkArgument(inRange, "element: %s is out of range: %s%s, %s%s", element, _lowInclusive ? "[" : "(", _low, _high,
+        _highInclusive ? "]" : ")");
+  }
+
+  private boolean tooLow(String element) {
+    if (_low == null) {
+      return false;
+    }
+    int comparison = element.compareTo(_low);
+    return comparison < 0 || (comparison == 0 && !_lowInclusive);
+  }
+
+  private boolean tooHigh(String element) {
+    if (_high == null) {
+      return false;
+    }
+    int comparison = element.compareTo(_high);
+    return comparison > 0 || (comparison == 0 && !_highInclusive);
   }
 
   /// Unlike the range sets above this is a copy, not a view, since the backing array is ascending. Nothing on the
