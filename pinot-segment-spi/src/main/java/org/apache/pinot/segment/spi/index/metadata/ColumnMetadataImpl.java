@@ -74,43 +74,53 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 /// as immutable: a setter call on one would bleed into every other segment and table that shares it, and would
 /// corrupt the interner's hash bucket (nothing ever mutated one; copy via a JSON round-trip before mutating).
 ///
-/// The object layout is kept at 64 bytes for an ordinary column for the same reason: the six booleans, the
-/// forward-index encoding and the two min/max representation bits are packed into one [#_flags] short; the refs only
-/// a partitioned column or an OPEN_STRUCT parent/child carries (partition function and partitions, parent column,
-/// sparse keys) live in a lazily allocated [Extras] holder that stays `null` for every other column; the four ints
-/// that are not column-distinguishing live in a shared [SharedShape]; and the three element-length ints share their
-/// two words with the numeric min/max (see [#_minWord]). The compression stats stay a direct ref because the segment
-/// creator writes them for every raw column. None of this is visible through the public getters, so the
-/// `/tables/{table}/segments/{segment}/metadata` payload (bean-serialized from the getters) is unchanged.
+/// The object layout is kept at 72 bytes for every column for the same reason: the six booleans, the forward-index
+/// encoding, the two min/max representation bits and `bitsPerElement` are packed into one [#_flags] int; the refs
+/// only a partitioned column or an OPEN_STRUCT parent/child carries (partition function and partitions, parent
+/// column, sparse keys) live in a lazily allocated [Extras] holder that stays `null` for every other column; and the
+/// three element-length ints share their two words with the numeric min/max (see [#_minWord]). The compression stats
+/// stay a direct ref because the segment creator writes them for every raw column. None of this is visible through
+/// the public getters, so the `/tables/{table}/segments/{segment}/metadata` payload (bean-serialized from the
+/// getters) is unchanged.
 ///
 /// | bytes | field(s) |
 /// |------:|----------|
 /// |    12 | object header |
-/// |     4 | `_cardinality` |
 /// |    16 | `_minWord`, `_maxWord` |
-/// |   2+2 | `_flags` plus alignment padding |
-/// |    28 | `_fieldSpec`, `_shape`, `_minValue`, `_maxValue`, `_extras`, `_compressionMetadata`, `_indexTypeSizes` |
-/// |    64 | total (was 72: eight ints, six refs and a flags byte) |
+/// |    16 | `_totalDocs`, `_cardinality`, `_totalNumberOfEntries`, `_maxNumberOfMultiValues` |
+/// |     4 | `_flags` |
+/// |    24 | `_fieldSpec`, `_minValue`, `_maxValue`, `_extras`, `_compressionMetadata`, `_indexTypeSizes` |
+/// |    72 | total |
 ///
-/// On top of the eight bytes this saves directly, a fixed-width column no longer retains a box per min/max value
-/// (~30 bytes and two objects per column for a nullable INT column), and the [SharedShape] is amortized over every
-/// column of the segment that has the same shape.
+/// The saving over the eight ints, six refs and flags byte this replaced is not in the object itself, which is the
+/// same 72 bytes, but in what it no longer retains: a fixed-width column holds no box per min/max value, which is
+/// ~32 bytes and two surviving objects per numeric column.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
 
   // Bits of _flags
-  private static final short HAS_DICTIONARY = 1;
-  private static final short DICTIONARY_ENCODED_FORWARD_INDEX = 1 << 1;
-  private static final short SORTED = 1 << 2;
-  private static final short NON_NULL = 1 << 3;
-  private static final short MIN_MAX_VALUE_INVALID = 1 << 4;
-  private static final short ASCII = 1 << 5;
-  private static final short AUTO_GENERATED = 1 << 6;
+  private static final int HAS_DICTIONARY = 1;
+  private static final int DICTIONARY_ENCODED_FORWARD_INDEX = 1 << 1;
+  private static final int SORTED = 1 << 2;
+  private static final int NON_NULL = 1 << 3;
+  private static final int MIN_MAX_VALUE_INVALID = 1 << 4;
+  private static final int ASCII = 1 << 5;
+  private static final int AUTO_GENERATED = 1 << 6;
   /// Set when the min (max) value is held as raw bits in [#_minWord] ([#_maxWord]) rather than as an object in
   /// [#_minValue] ([#_maxValue]); an absent value sets neither.
-  private static final short MIN_VALUE_IN_WORD = 1 << 7;
-  private static final short MAX_VALUE_IN_WORD = 1 << 8;
+  private static final int MIN_VALUE_IN_WORD = 1 << 7;
+  private static final int MAX_VALUE_IN_WORD = 1 << 8;
+
+  // The remaining 23 bits of _flags hold bitsPerElement + 1, so that the UNAVAILABLE sentinel encodes as 0. The
+  // segment creator writes getNumBitsPerValue(cardinality - 1), which never exceeds Integer.SIZE, but the value is
+  // read verbatim from metadata.properties and the Builder is public, so a value outside the encodable range falls
+  // back to Extras rather than being truncated.
+  private static final int BITS_PER_ELEMENT_SHIFT = 9;
+  private static final int BITS_PER_ELEMENT_MASK = (1 << 23) - 1;
+  /// Encoded value meaning the real one did not fit and is held in [Extras#_bitsPerElement].
+  private static final int BITS_PER_ELEMENT_IN_EXTRAS = BITS_PER_ELEMENT_MASK;
+  private static final int MAX_ENCODABLE_BITS_PER_ELEMENT = BITS_PER_ELEMENT_MASK - 2;
 
   /// Canonical instances of the [FieldSpec]s parsed from `metadata.properties`, keyed by [FieldSpec#equals] /
   /// [FieldSpec#hashCode] (name, data type, single-value, default null value, max length, date-time format and
@@ -119,14 +129,11 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   /// any of them and is released once the last one is unloaded. Thread-safe.
   private static final Interner<FieldSpec> FIELD_SPEC_INTERNER = Interners.newWeakInterner();
 
-  /// Canonical instances of the [SharedShape]s, held weakly exactly like [#FIELD_SPEC_INTERNER]: the canonical
-  /// instance is one of the instances the loaded segments retain, so it lives as long as any of them.
-  private static final Interner<SharedShape> SHAPE_INTERNER = Interners.newWeakInterner();
-
   private final FieldSpec _fieldSpec;
-  /// The ints that are not column-distinguishing, shared with every other column that has the same shape.
-  private final SharedShape _shape;
+  private final int _totalDocs;
   private final int _cardinality;
+  private final int _totalNumberOfEntries;
+  private final int _maxNumberOfMultiValues;
   /// Two words with a use that depends on whether the stored type is fixed width, which is exactly the condition
   /// under which the other use is dead:
   /// - fixed-width stored type (INT, LONG, FLOAT, DOUBLE, and BOOLEAN/TIMESTAMP through their stored type): the raw
@@ -145,9 +152,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   private final Comparable _minValue;
   @Nullable
   private final Comparable _maxValue;
-  /// hasDictionary, forward-index encoding, sorted, nonNull, minMaxValueInvalid, ascii, autoGenerated and the two
-  /// min/max representation bits, see the bit constants above.
-  private final short _flags;
+  /// hasDictionary, forward-index encoding, sorted, nonNull, minMaxValueInvalid, ascii, autoGenerated, the two
+  /// min/max representation bits and the encoded `bitsPerElement`, see the bit constants above.
+  private final int _flags;
   @Nullable
   private final Extras _extras;
   @Nullable
@@ -158,12 +165,15 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   @Nullable
   private LongArrayList _indexTypeSizes;
 
-  private ColumnMetadataImpl(FieldSpec fieldSpec, SharedShape shape, int cardinality, long minWord, long maxWord,
-      @Nullable Comparable minValue, @Nullable Comparable maxValue, short flags, @Nullable Extras extras,
+  private ColumnMetadataImpl(FieldSpec fieldSpec, int totalDocs, int cardinality, int totalNumberOfEntries,
+      int maxNumberOfMultiValues, long minWord, long maxWord, @Nullable Comparable minValue,
+      @Nullable Comparable maxValue, int flags, @Nullable Extras extras,
       @Nullable CompressionMetadata compressionMetadata) {
     _fieldSpec = fieldSpec;
-    _shape = shape;
+    _totalDocs = totalDocs;
     _cardinality = cardinality;
+    _totalNumberOfEntries = totalNumberOfEntries;
+    _maxNumberOfMultiValues = maxNumberOfMultiValues;
     _minWord = minWord;
     _maxWord = maxWord;
     _minValue = minValue;
@@ -173,7 +183,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     _compressionMetadata = compressionMetadata;
   }
 
-  private boolean hasFlag(short flag) {
+  private boolean hasFlag(int flag) {
     return (_flags & flag) != 0;
   }
 
@@ -188,7 +198,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int getTotalDocs() {
-    return _shape._totalDocs;
+    return _totalDocs;
   }
 
   @Override
@@ -220,12 +230,20 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   /// than retained: a server keeps one instance of this class per (segment, column) for the segment lifetime, while
   /// the callers (segment pruners, aggregation rewrites, range-index construction) read it a handful of times per
   /// query and let the box die in the young generation.
+  ///
+  /// The value returned is [Object#equals]-equal to the one handed in, and bit-identical to it for every value but
+  /// a FLOAT/DOUBLE `NaN`: [Float#floatToIntBits] collapses the NaN payload and signalling bit onto the canonical
+  /// quiet NaN, so a `NaN` comes back canonicalized. That is deliberate rather than incidental - it keeps
+  /// [#equals(Object)] on the raw words agreeing with [Float#equals] / [Double#equals], which likewise treat all
+  /// NaNs as one value - and it is unobservable to the callers above, which compare and range-check the value.
+  /// `-0.0` is not affected: it keeps its own bits and stays distinct from `0.0`, exactly as [Float#equals] has it.
   @Nullable
   @Override
   public Comparable<?> getMinValue() {
     return hasFlag(MIN_VALUE_IN_WORD) ? boxValueWord(_minWord) : _minValue;
   }
 
+  /// Boxed on read like [#getMinValue()], with the same guarantees.
   @Nullable
   @Override
   public Comparable<?> getMaxValue() {
@@ -271,17 +289,19 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int getBitsPerElement() {
-    return _shape._bitsPerElement;
+    int encoded = (_flags >>> BITS_PER_ELEMENT_SHIFT) & BITS_PER_ELEMENT_MASK;
+    // The fallback is only encoded when the value was handed to Extras, which is therefore non-null here.
+    return encoded != BITS_PER_ELEMENT_IN_EXTRAS ? encoded - 1 : _extras._bitsPerElement;
   }
 
   @Override
   public int getTotalNumberOfEntries() {
-    return _shape._totalNumberOfEntries;
+    return _totalNumberOfEntries;
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return _shape._maxNumberOfMultiValues;
+    return _maxNumberOfMultiValues;
   }
 
   /// [Builder#build()] pins this to `lengthOfLongestElement` for an SV column and to
@@ -291,7 +311,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   public int getMaxRowLengthInBytes() {
     if (isFixedWidth()) {
       int size = _fieldSpec.getDataType().getStoredType().size();
-      return _fieldSpec.isSingleValueField() ? size : _shape._maxNumberOfMultiValues * size;
+      return _fieldSpec.isSingleValueField() ? size : _maxNumberOfMultiValues * size;
     }
     return (int) _maxWord;
   }
@@ -411,11 +431,13 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     // The representation two equal columns pick is a function of their field spec and their values, so comparing the
     // raw words and flags is equivalent to comparing the boxed min/max and the unpacked lengths.
     ColumnMetadataImpl that = (ColumnMetadataImpl) o;
-    return _cardinality == that._cardinality
+    return _totalDocs == that._totalDocs
+        && _cardinality == that._cardinality
+        && _totalNumberOfEntries == that._totalNumberOfEntries
+        && _maxNumberOfMultiValues == that._maxNumberOfMultiValues
         && _flags == that._flags
         && _minWord == that._minWord
         && _maxWord == that._maxWord
-        && Objects.equals(_shape, that._shape)
         && Objects.equals(_fieldSpec, that._fieldSpec)
         && Objects.equals(_minValue, that._minValue)
         && Objects.equals(_maxValue, that._maxValue)
@@ -426,8 +448,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_fieldSpec, _shape, _cardinality, _flags, _minWord, _maxWord, _minValue, _maxValue, _extras,
-        _compressionMetadata, _indexTypeSizes);
+    return Objects.hash(_fieldSpec, _totalDocs, _cardinality, _totalNumberOfEntries, _maxNumberOfMultiValues, _flags,
+        _minWord, _maxWord, _minValue, _maxValue, _extras, _compressionMetadata, _indexTypeSizes);
   }
 
   // Keeps the pre-packing field names and order, which tests and log consumers match on
@@ -719,54 +741,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return new Builder();
   }
 
-  /// The ints of a column that are not column-distinguishing, interned through [#SHAPE_INTERNER] so the columns of a
-  /// segment that have the same shape hold one instance instead of four ints each.
-  ///
-  /// `totalDocs` is identical for every column of a segment; `totalNumberOfEntries` and `maxNumberOfMultiValues` are
-  /// pinned by [Builder#build()] to `totalDocs` and `0` for every SV column; and `bitsPerElement` is `UNAVAILABLE`
-  /// for every raw column and takes one of at most 33 values (`1..32`) for a dictionary-encoded one. So the SV
-  /// columns of a segment share at most ~34 instances however wide the segment is, and a wide external table of raw
-  /// columns shares exactly one. The remaining four ints are not held here: `cardinality` is distinguishing, and the
-  /// three element lengths are derived or packed into [#_minWord] / [#_maxWord].
-  ///
-  /// Immutable and thread-safe.
-  private static final class SharedShape {
-    private final int _totalDocs;
-    private final int _totalNumberOfEntries;
-    private final int _maxNumberOfMultiValues;
-    private final int _bitsPerElement;
-
-    private SharedShape(int totalDocs, int totalNumberOfEntries, int maxNumberOfMultiValues, int bitsPerElement) {
-      _totalDocs = totalDocs;
-      _totalNumberOfEntries = totalNumberOfEntries;
-      _maxNumberOfMultiValues = maxNumberOfMultiValues;
-      _bitsPerElement = bitsPerElement;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      SharedShape that = (SharedShape) o;
-      return _totalDocs == that._totalDocs
-          && _totalNumberOfEntries == that._totalNumberOfEntries
-          && _maxNumberOfMultiValues == that._maxNumberOfMultiValues
-          && _bitsPerElement == that._bitsPerElement;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(_totalDocs, _totalNumberOfEntries, _maxNumberOfMultiValues, _bitsPerElement);
-    }
-  }
-
   /// The refs that only a partitioned column (partition function and partitions) or an OPEN_STRUCT parent/child
-  /// (sparse keys / parent column) carries. Ordinary columns hold no holder at all, so they never pay for the four
-  /// slots; a column that has any of them pays one extra object.
+  /// (sparse keys / parent column) carries, plus a `bitsPerElement` too large to encode in [#_flags]. Ordinary
+  /// columns hold no holder at all, so they never pay for the slots; a column that has any of them pays one extra
+  /// object. The int fits in the padding the four refs leave, so it costs nothing.
   private static final class Extras {
     @Nullable
     private final PartitionFunction _partitionFunction;
@@ -776,20 +754,25 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     private final String _parentColumn;
     @Nullable
     private final List<String> _sparseKeys;
+    /// Only read when [#_flags] encodes [#BITS_PER_ELEMENT_IN_EXTRAS]; [ColumnMetadata#UNAVAILABLE] (which is always
+    /// encodable, so it never reaches here) stands for "not held".
+    private final int _bitsPerElement;
 
     private Extras(@Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
-        @Nullable String parentColumn, @Nullable List<String> sparseKeys) {
+        @Nullable String parentColumn, @Nullable List<String> sparseKeys, int bitsPerElement) {
       _partitionFunction = partitionFunction;
       _partitions = partitions;
       _parentColumn = parentColumn;
       _sparseKeys = sparseKeys;
+      _bitsPerElement = bitsPerElement;
     }
 
     @Nullable
     private static Extras create(@Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
-        @Nullable String parentColumn, @Nullable List<String> sparseKeys) {
-      return partitionFunction == null && partitions == null && parentColumn == null && sparseKeys == null ? null
-          : new Extras(partitionFunction, partitions, parentColumn, sparseKeys);
+        @Nullable String parentColumn, @Nullable List<String> sparseKeys, int bitsPerElement) {
+      return partitionFunction == null && partitions == null && parentColumn == null && sparseKeys == null
+          && bitsPerElement == UNAVAILABLE ? null
+          : new Extras(partitionFunction, partitions, parentColumn, sparseKeys, bitsPerElement);
     }
 
     @Override
@@ -801,7 +784,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         return false;
       }
       Extras that = (Extras) o;
-      return Objects.equals(_partitionFunction, that._partitionFunction)
+      return _bitsPerElement == that._bitsPerElement
+          && Objects.equals(_partitionFunction, that._partitionFunction)
           && Objects.equals(_partitions, that._partitions)
           && Objects.equals(_parentColumn, that._parentColumn)
           && Objects.equals(_sparseKeys, that._sparseKeys);
@@ -809,7 +793,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
     @Override
     public int hashCode() {
-      return Objects.hash(_partitionFunction, _partitions, _parentColumn, _sparseKeys);
+      return Objects.hash(_partitionFunction, _partitions, _parentColumn, _sparseKeys, _bitsPerElement);
     }
   }
 
@@ -867,6 +851,11 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     }
   }
 
+  /// Not a segment-load-only path: a column that a segment predates is served by a virtual column, and
+  /// `IndexSegment#getDataSource(String, Schema)` rebuilds its metadata through this builder on every call, so
+  /// [#build()] runs per query per segment. It must therefore stay allocation-cheap and lock-free - in particular,
+  /// it must not intern anything: a shared side table would turn a query into a global map lookup and, held weakly,
+  /// into reference-queue churn.
   public static class Builder {
     private FieldSpec _fieldSpec;
     private int _totalDocs;
@@ -1065,7 +1054,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         _bitsPerElement = UNAVAILABLE;
       }
 
-      short flags = 0;
+      int flags = 0;
       if (_hasDictionary) {
         flags |= HAS_DICTIONARY;
       }
@@ -1087,6 +1076,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       if (_autoGenerated) {
         flags |= AUTO_GENERATED;
       }
+      boolean encodableBitsPerElement =
+          _bitsPerElement >= UNAVAILABLE && _bitsPerElement <= MAX_ENCODABLE_BITS_PER_ELEMENT;
+      flags |= (encodableBitsPerElement ? _bitsPerElement + 1 : BITS_PER_ELEMENT_IN_EXTRAS) << BITS_PER_ELEMENT_SHIFT;
 
       // Fill the two words with whichever of the two uses this column has (see ColumnMetadataImpl#_minWord).
       long minWord = 0;
@@ -1111,10 +1103,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         maxWord = _maxRowLengthInBytes & 0xffffffffL;
       }
 
-      SharedShape shape = SHAPE_INTERNER.intern(
-          new SharedShape(_totalDocs, _totalNumberOfEntries, _maxNumberOfMultiValues, _bitsPerElement));
-      return new ColumnMetadataImpl(_fieldSpec, shape, _cardinality, minWord, maxWord, minValue, maxValue, flags,
-          Extras.create(_partitionFunction, _partitions, _parentColumn, _sparseKeys),
+      return new ColumnMetadataImpl(_fieldSpec, _totalDocs, _cardinality, _totalNumberOfEntries,
+          _maxNumberOfMultiValues, minWord, maxWord, minValue, maxValue, flags,
+          Extras.create(_partitionFunction, _partitions, _parentColumn, _sparseKeys,
+              encodableBitsPerElement ? UNAVAILABLE : _bitsPerElement),
           CompressionMetadata.create(_uncompressedValueSizeInBytes, _forwardIndexChunkCompressionType,
               _dictionaryUncompressedValueSizeInBytes));
     }
