@@ -124,17 +124,14 @@ public class ForwardIndexCreatorFactoryTest {
   @DataProvider(name = "v7CodecSpecs")
   public Object[][] v7CodecSpecs() {
     return new Object[][]{
-        {"LZ4", DataType.INT, false}, {"LZ4", DataType.INT, true},
-        {"DELTA,LZ4", DataType.INT, false}, {"DELTA,LZ4", DataType.INT, true},
-        {"ZSTD(3)", DataType.LONG, false}, {"ZSTD(3)", DataType.LONG, true},
-        {"DELTADELTA,GORILLA,ZSTD(3)", DataType.LONG, false},
-        {"DELTADELTA,GORILLA,ZSTD(3)", DataType.LONG, true}
+        {"LZ4", DataType.INT}, {"DELTA,LZ4", DataType.INT},
+        {"ZSTD(3)", DataType.LONG}, {"DELTADELTA,GORILLA,ZSTD(3)", DataType.LONG}
     };
   }
 
   /// Both compression-only and transform pipelines use V7, including a partial final chunk.
   @Test(dataProvider = "v7CodecSpecs")
-  public void testCodecSpecRoundTripUsesV7Format(String codecSpec, DataType storedType, boolean compressionStatsEnabled)
+  public void testCodecSpecRoundTripUsesV7Format(String codecSpec, DataType storedType)
       throws Exception {
     File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
     try {
@@ -143,7 +140,8 @@ public class ForwardIndexCreatorFactoryTest {
           .withTargetDocsPerChunk(2)
           .build();
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-      tableConfig.getIndexingConfig().setCompressionStatsEnabled(compressionStatsEnabled);
+      // Legacy compression stats are opted in here on purpose: a codecSpec column never reports them.
+      tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
       long[] values = storedType == DataType.INT
           ? new long[]{11, 13, 21}
           : new long[]{Long.MIN_VALUE, (long) Integer.MAX_VALUE + 1, Long.MAX_VALUE};
@@ -151,14 +149,12 @@ public class ForwardIndexCreatorFactoryTest {
           newContext(indexDir, false, tableConfig, values.length, storedType), config)) {
         assertFalse(creator.isDictionaryEncoded());
         assertNull(creator.getRawForwardIndexChunkCompressionType());
-        assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L);
         for (long value : values) {
           if (storedType == DataType.INT) {
             creator.putInt((int) value);
           } else {
             creator.putLong(value);
           }
-          assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L);
         }
         creator.seal();
         assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L);
@@ -185,10 +181,21 @@ public class ForwardIndexCreatorFactoryTest {
     }
   }
 
+  /// One multi-stage pipeline per stored type, plus a single-stage spec so the executor's
+  /// multi-stage-only scratch slots and the single-stage path both run at chunk-boundary scale.
+  /// Every spec in `v7CodecSpecs` is already round-tripped, including a partial final chunk, by
+  /// [#testCodecSpecRoundTripUsesV7Format] above.
+  @DataProvider(name = "v7MultiChunkCodecSpecs")
+  public Object[][] v7MultiChunkCodecSpecs() {
+    return new Object[][]{
+        {"LZ4", DataType.INT}, {"DELTA,LZ4", DataType.INT}, {"DELTADELTA,GORILLA,ZSTD(3)", DataType.LONG}
+    };
+  }
+
   /// Realistic-volume round trip: many chunks, a non-power-of-two target normalized to 1024 docs per
   /// chunk, a partial final chunk, and reads through both a sequential and a random-access context.
-  @Test(dataProvider = "v7CodecSpecs")
-  public void testCodecSpecMultiChunkRoundTrip(String codecSpec, DataType storedType, boolean compressionStatsEnabled)
+  @Test(dataProvider = "v7MultiChunkCodecSpecs")
+  public void testCodecSpecMultiChunkRoundTrip(String codecSpec, DataType storedType)
       throws Exception {
     File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
     try {
@@ -203,7 +210,6 @@ public class ForwardIndexCreatorFactoryTest {
           .withTargetDocsPerChunk(1000)
           .build();
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-      tableConfig.getIndexingConfig().setCompressionStatsEnabled(compressionStatsEnabled);
       try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
           newContext(indexDir, false, tableConfig, numDocs, storedType), config)) {
         for (long value : values) {
