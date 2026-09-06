@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -34,6 +35,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// - the underlying segments this particular worker needs to execute.
 /// - the mailbox info required to construct data transfer linkages.
 /// - the partition mechanism of the data being execute on this worker.
+/// - the materialized partition handles assigned by staged dispatch.
 ///
 /// The segment maps are held as plain objects: they are only encoded for the wire in [QueryPlanSerDeUtils] when a
 /// request is built for the server that runs the worker, so the planner never pays for encoding on the compile path.
@@ -61,6 +63,7 @@ public class WorkerMetadata {
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
   private final Map<String, String> _customProperties;
+  private final List<Worker.MaterializedPartitionHandle> _materializedInputs;
   @Nullable
   private volatile Map<String, List<String>> _tableSegmentsMap;
   @Nullable
@@ -78,9 +81,21 @@ public class WorkerMetadata {
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap,
       Map<String, String> customProperties) {
+    this(workerId, mailboxInfosMap, customProperties, List.of());
+  }
+
+  /// Creates metadata for one worker with its late-bound materialized inputs.
+  ///
+  /// @param workerId dense worker id within the stage
+  /// @param mailboxInfosMap mailbox routing grouped by peer stage id
+  /// @param customProperties worker-level execution properties
+  /// @param materializedInputs immutable snapshot of materialized partitions assigned to this worker
+  public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap,
+      Map<String, String> customProperties, List<Worker.MaterializedPartitionHandle> materializedInputs) {
     _workerId = workerId;
     _mailboxInfosMap = mailboxInfosMap;
     _customProperties = customProperties;
+    _materializedInputs = List.copyOf(materializedInputs);
   }
 
   public int getWorkerId() {
@@ -93,6 +108,22 @@ public class WorkerMetadata {
 
   public Map<String, String> getCustomProperties() {
     return _customProperties;
+  }
+
+  /// Copies this worker's routing and segment metadata, replacing only its materialized inputs.
+  /// Segment maps retain their existing shared, read-only representation, including unparsed legacy JSON.
+  public WorkerMetadata withMaterializedInputs(List<Worker.MaterializedPartitionHandle> materializedInputs) {
+    WorkerMetadata copy = new WorkerMetadata(_workerId, _mailboxInfosMap, _customProperties, materializedInputs);
+    copy._tableSegmentsMap = _tableSegmentsMap;
+    copy._logicalTableSegmentsMap = _logicalTableSegmentsMap;
+    copy._tableSegmentsMapJson = _tableSegmentsMapJson;
+    copy._logicalTableSegmentsMapJson = _logicalTableSegmentsMapJson;
+    return copy;
+  }
+
+  /// Returns the materialized partition handles assigned by the broker before this stage was dispatched.
+  public List<Worker.MaterializedPartitionHandle> getMaterializedInputs() {
+    return _materializedInputs;
   }
 
   /// Segments to scan keyed by table type (`OFFLINE` / `REALTIME`), or `null` for a worker that scans no physical

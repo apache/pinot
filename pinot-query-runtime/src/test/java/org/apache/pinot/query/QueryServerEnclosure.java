@@ -25,6 +25,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -62,6 +63,12 @@ public class QueryServerEnclosure {
     _queryRunner = new QueryRunner();
     _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager.getInstanceId(), instanceDataManager,
         null, () -> true, () -> true);
+  }
+
+  /// Exposes this test runner through the production dispatch RPC. The caller owns the returned server lifecycle.
+  /// Start and stop the returned server instead of calling this enclosure's start and shutdown methods.
+  public QueryServer createQueryServer(int port) {
+    return new QueryServer(port, _queryRunner);
   }
 
   public int getPort() {

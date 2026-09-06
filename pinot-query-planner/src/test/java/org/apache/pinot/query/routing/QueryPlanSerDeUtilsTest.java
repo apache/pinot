@@ -216,6 +216,27 @@ public class QueryPlanSerDeUtilsTest {
         "{\"OFFLINE\":[\"seg_0\",\"seg-1.tar.gz\",\"s\u00ebg_2\"]}");
   }
 
+  @Test(dataProvider = "encodings")
+  public void testMaterializedInputsRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    Worker.MaterializedPartitionHandle handle = Worker.MaterializedPartitionHandle.newBuilder()
+        .setRequestId(7L)
+        .setProducerStageId(1)
+        .setProducerWorkerId(2)
+        .setLogicalPartitionId(3)
+        .setHost("producer")
+        .setTransferPort(1234)
+        .build();
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), CUSTOM_PROPERTIES, List.of(handle));
+    workerMetadata.setTableSegmentsMap(TABLE_SEGMENTS_MAP);
+    workerMetadata.setLogicalTableSegmentsMap(LOGICAL_TABLE_SEGMENTS_MAP);
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(workerMetadata, protoSegmentList));
+    assertEquals(decoded.getTableSegmentsMap(), TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getLogicalTableSegmentsMap(), LOGICAL_TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+    assertEquals(decoded.getMaterializedInputs(), List.of(handle));
+  }
+
   private static WorkerMetadata leafWorker(@Nullable Map<String, List<String>> tableSegmentsMap,
       @Nullable Map<String, List<String>> logicalTableSegmentsMap) {
     MailboxInfos mailboxInfos = new MailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));

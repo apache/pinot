@@ -101,6 +101,7 @@ message WorkerMetadata {
   SegmentsMap tableSegmentsMap = 4;
   // Leaf-stage segments of a logical table, keyed by physical table name (with type suffix). Same encoding rules.
   SegmentsMap logicalTableSegmentsMap = 5;
+  repeated MaterializedPartitionHandle materialized_input = 6;
 }
 
 // Segment names to scan per table type or physical table name, see WorkerMetadata.

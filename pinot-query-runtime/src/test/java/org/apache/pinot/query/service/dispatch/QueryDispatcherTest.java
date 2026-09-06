@@ -376,7 +376,8 @@ public class QueryDispatcherTest extends QueryTestSet {
       int port = ports.get(stageId == 2 ? 0 : 1);
       QueryServerInstance server = new QueryServerInstance("server_" + port, "localhost", port, port);
       stages.put(stageId, new DispatchablePlanFragment(new PlanFragment(stageId, root, List.of()),
-          List.of(new WorkerMetadata(0, Map.of())), stageId == 0 ? Map.of() : Map.of(server, List.of(0)), Map.of()));
+          new ArrayList<>(List.of(new WorkerMetadata(0, Map.of()))),
+          stageId == 0 ? Map.of() : Map.of(server, List.of(0)), Map.of()));
     }
     return new DispatchableSubPlan(PairList.of(0, "col"), stages, Set.of(), Map.of(), 0L);
   }

@@ -93,7 +93,8 @@ public class QueryPlanSerDeUtils {
       customProperties = Collections.unmodifiableMap(strippedProperties);
     }
     WorkerMetadata workerMetadata =
-        new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap, customProperties);
+        new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap, customProperties,
+            protoWorkerMetadata.getMaterializedInputList());
     if (protoWorkerMetadata.hasTableSegmentsMap()) {
       workerMetadata.setTableSegmentsMap(fromProtoSegmentsMap(protoWorkerMetadata.getTableSegmentsMap()));
     } else if (tableSegmentsJson != null) {
@@ -149,7 +150,8 @@ public class QueryPlanSerDeUtils {
       boolean protoSegmentList) {
     Worker.WorkerMetadata.Builder builder = Worker.WorkerMetadata.newBuilder()
         .setWorkedId(workerMetadata.getWorkerId())
-        .putAllCustomProperty(workerMetadata.getCustomProperties());
+        .putAllCustomProperty(workerMetadata.getCustomProperties())
+        .addAllMaterializedInput(workerMetadata.getMaterializedInputs());
     for (Map.Entry<Integer, MailboxInfos> entry : workerMetadata.getMailboxInfosMap().entrySet()) {
       builder.putMailboxInfos(entry.getKey(), entry.getValue().toProtoBytes());
     }

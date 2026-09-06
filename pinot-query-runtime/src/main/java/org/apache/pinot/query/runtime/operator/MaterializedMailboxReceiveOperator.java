@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -36,11 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Reads one logical materialized HASH partition from every worker of the completed producer stage.
+/// Reads broker-assigned materialized HASH partitions from workers of the completed producer stage.
 ///
-/// The static materialized-exchange phase keeps the existing worker assignment, so consumer worker `p` owns logical
-/// partition `p`. Producer identity remains independent of the consumer, which lets later phases replace this
-/// implicit binding with broker-provided handles. This class is not thread-safe.
+/// Staged dispatch supplies explicit handles through worker metadata. Static materialized exchange remains supported:
+/// when no handles are assigned, consumer worker `p` reads logical partition `p` from every producer. This class is
+/// not thread-safe.
 public final class MaterializedMailboxReceiveOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MaterializedMailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MATERIALIZED_MAILBOX_RECEIVE";
@@ -127,11 +128,27 @@ public final class MaterializedMailboxReceiveOperator extends MultiStageOperator
       }
       PartitionSource source = _sources.get(_sourceIndex++);
       _current = _mailboxService.readMaterializedPartition(source._hostname, source._port, _context.getRequestId(),
-          _senderStageId, source._producerWorkerId, _context.getWorkerId(), _context.getPassiveDeadlineMs());
+          _senderStageId, source._producerWorkerId, source._logicalPartitionId, _context.getPassiveDeadlineMs());
     }
   }
 
   private static List<PartitionSource> getSources(OpChainExecutionContext context, int senderStageId) {
+    List<Worker.MaterializedPartitionHandle> assignedHandles =
+        context.getWorkerMetadata().getMaterializedInputs();
+    if (!assignedHandles.isEmpty()) {
+      List<PartitionSource> assignedSources = new ArrayList<>();
+      for (Worker.MaterializedPartitionHandle handle : assignedHandles) {
+        if (handle.getProducerStageId() == senderStageId) {
+          Preconditions.checkState(handle.getRequestId() == context.getRequestId(),
+              "Materialized input request id %s does not match query %s", handle.getRequestId(),
+              context.getRequestId());
+          assignedSources.add(new PartitionSource(handle.getHost(), handle.getTransferPort(),
+              handle.getProducerWorkerId(), handle.getLogicalPartitionId()));
+        }
+      }
+      return assignedSources;
+    }
+
     MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(senderStageId);
     if (mailboxInfos == null) {
       return List.of();
@@ -139,7 +156,8 @@ public final class MaterializedMailboxReceiveOperator extends MultiStageOperator
     List<PartitionSource> sources = new ArrayList<>();
     for (MailboxInfo mailboxInfo : mailboxInfos.getMailboxInfos()) {
       for (int producerWorkerId : mailboxInfo.getWorkerIds()) {
-        sources.add(new PartitionSource(mailboxInfo.getHostname(), mailboxInfo.getPort(), producerWorkerId));
+        sources.add(new PartitionSource(mailboxInfo.getHostname(), mailboxInfo.getPort(), producerWorkerId,
+            context.getWorkerId()));
       }
     }
     return sources;
@@ -149,11 +167,13 @@ public final class MaterializedMailboxReceiveOperator extends MultiStageOperator
     private final String _hostname;
     private final int _port;
     private final int _producerWorkerId;
+    private final int _logicalPartitionId;
 
-    private PartitionSource(String hostname, int port, int producerWorkerId) {
+    private PartitionSource(String hostname, int port, int producerWorkerId, int logicalPartitionId) {
       _hostname = hostname;
       _port = port;
       _producerWorkerId = producerWorkerId;
+      _logicalPartitionId = logicalPartitionId;
     }
   }
 }

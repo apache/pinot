@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -140,6 +141,31 @@ public class MaterializedMailboxOperatorTest {
   }
 
   @Test
+  public void testMaterializedReceiveUsesAssignedHandles() {
+    MseBlock.Data block0 = OperatorTestUtil.block(DATA_SCHEMA, new Object[]{10});
+    MseBlock.Data block1 = OperatorTestUtil.block(DATA_SCHEMA, new Object[]{11});
+    when(_mailboxService.readMaterializedPartition("assigned-a", 3333, REQUEST_ID, PRODUCER_STAGE_ID, 2, 7,
+        Long.MAX_VALUE)).thenReturn(List.of(block0).iterator());
+    when(_mailboxService.readMaterializedPartition("assigned-b", 4444, REQUEST_ID, PRODUCER_STAGE_ID, 5, 8,
+        Long.MAX_VALUE)).thenReturn(List.of(block1).iterator());
+    List<Worker.MaterializedPartitionHandle> handles = List.of(
+        materializedHandle(2, 7, "assigned-a", 3333),
+        materializedHandle(5, 8, "assigned-b", 4444));
+    WorkerMetadata worker = new WorkerMetadata(0, Map.of(PRODUCER_STAGE_ID,
+        new SharedMailboxInfos(new MailboxInfo("fallback", 9999, List.of(9)))), Map.of(), handles);
+    StageMetadata stage = new StageMetadata(CONSUMER_STAGE_ID, List.of(worker), Map.of());
+
+    MaterializedMailboxReceiveOperator operator = new MaterializedMailboxReceiveOperator(
+        context(stage, worker, Long.MAX_VALUE), receiveNode(RelDistribution.Type.HASH_DISTRIBUTED));
+
+    assertSame(operator.nextBlock(), block0);
+    assertSame(operator.nextBlock(), block1);
+    assertTrue(operator.nextBlock().isSuccess());
+    verify(_mailboxService, times(0)).readMaterializedPartition(eq("fallback"), eq(9999), eq(REQUEST_ID),
+        eq(PRODUCER_STAGE_ID), eq(9), eq(0), eq(Long.MAX_VALUE));
+  }
+
+  @Test
   public void testEarlyTerminationDrainsUnreadPartitions() {
     @SuppressWarnings("unchecked")
     Iterator<MseBlock.Data> first = mock(Iterator.class);
@@ -189,6 +215,18 @@ public class MaterializedMailboxOperatorTest {
   private static MailboxReceiveNode receiveNode(RelDistribution.Type distributionType) {
     return new MailboxReceiveNode(CONSUMER_STAGE_ID, DATA_SCHEMA, PRODUCER_STAGE_ID,
         PinotRelExchangeType.STREAMING, distributionType, List.of(0), List.of(), false, false, null, true);
+  }
+
+  private static Worker.MaterializedPartitionHandle materializedHandle(
+      int producerWorkerId, int logicalPartitionId, String host, int port) {
+    return Worker.MaterializedPartitionHandle.newBuilder()
+        .setRequestId(REQUEST_ID)
+        .setProducerStageId(PRODUCER_STAGE_ID)
+        .setProducerWorkerId(producerWorkerId)
+        .setLogicalPartitionId(logicalPartitionId)
+        .setHost(host)
+        .setTransferPort(port)
+        .build();
   }
 
   private OpChainExecutionContext context(StageMetadata stage, WorkerMetadata worker) {

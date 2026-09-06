@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,26 +29,35 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.assertj.core.api.Assertions;
 import org.intellij.lang.annotations.Language;
@@ -57,10 +67,62 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+
 
 /// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
 /// pattern goes here.
 public class QueryRunnerTest extends QueryRunnerTestBase {
+  private final List<QueryServer> _dispatchRpcServers = new ArrayList<>();
+  private final Map<QueryServerInstance, QueryServerInstance> _dispatchInstances = new HashMap<>();
+  private QueryDispatcher _dispatcher;
+
+  @DataProvider
+  public Object[][] materializedQueries() {
+    return new Object[][]{
+        {"SELECT col1, COUNT(*) FROM a GROUP BY col1 ORDER BY col1"},
+        {"SELECT col1, COUNT(*) FROM a WHERE col1 = 'dave' GROUP BY col1 ORDER BY col1"}
+    };
+  }
+
+  @Test(dataProvider = "materializedQueries")
+  public void testMaterializedStagedQuery(String sql)
+      throws Exception {
+    QueryDispatcher.QueryResult baseline = queryRunner(sql, false);
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    String materializedSql = "SET materializedExchange=true; SET stagedDispatch=true; " + sql;
+    SqlNodeAndOptions parsed = CalciteSqlParser.compileToSqlNodeAndOptions(materializedSql);
+    DispatchableSubPlan plan;
+    try (var compiled = _queryEnvironment.compile(materializedSql, parsed)) {
+      plan = compiled.planQuery(requestId).getQueryPlan();
+    }
+    for (DispatchablePlanFragment stage : plan.getQueryStagesWithoutRoot()) {
+      Map<QueryServerInstance, List<Integer>> workers = new HashMap<>();
+      stage.getServerInstanceToWorkerIdMap().forEach((server, ids) -> workers.put(_dispatchInstances.get(server), ids));
+      stage.setServerInstanceToWorkerIdMap(workers);
+    }
+    long now = System.currentTimeMillis();
+    QueryExecutionContext execution = new QueryExecutionContext(QueryExecutionContext.QueryType.MSE,
+        requestId, Long.toString(requestId), null, now, now + 10_000, now + 20_000, "broker", "broker", "");
+    DefaultRequestContext request = new DefaultRequestContext();
+    request.setRequestId(requestId);
+    QueryDispatcher.QueryResult result;
+    try (QueryThreadContext ignored = QueryThreadContext.open(execution, new QueryThreadContext.MseWorkerInfo(0, 0),
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      result = _dispatcher.submitAndReduce(request, plan, 10_000, parsed.getOptions());
+    }
+    assertNull(baseline.getProcessingException());
+    assertNull(result.getProcessingException(), "Materialized query failed: " + result.getProcessingException());
+    assertTrue(plan.getQueryStagesWithoutRoot().stream()
+        .flatMap(stage -> stage.getWorkerMetadataList().stream())
+        .anyMatch(worker -> !worker.getMaterializedInputs().isEmpty()), "Expected late-bound materialized inputs");
+    assertEquals(result.getResultTable().getDataSchema(), baseline.getResultTable().getDataSchema());
+    compareRowEquals(result.getResultTable(), baseline.getResultTable().getRows(), true);
+  }
+
   //@formatter:off
   public static final Object[][] ROWS = new Object[][]{
       new Object[]{"foo", "foo", 1},
@@ -145,12 +207,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1, getConfiguration());
-    server1.start();
+    startQueryServer(server1);
     // Start server1 to ensure the next server will have a different port.
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2, getConfiguration());
-    server2.start();
-    // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
-    // this is only use for test identifier purpose.
+    startQueryServer(server2);
+    // Keep the existing logical server identifiers; RPC dispatch uses _dispatchInstances for the service ports.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
     _servers.put(new QueryServerInstance("Server_localhost_" + port1, "localhost", port1, port1), server1);
@@ -159,14 +220,26 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
         null);
+    _dispatcher = new QueryDispatcher(_mailboxService, mock(FailureDetector.class), null, true, Duration.ofSeconds(1));
+  }
+
+  private void startQueryServer(QueryServerEnclosure enclosure) {
+    int queryPort = QueryTestUtils.getAvailablePort();
+    QueryServer rpc = enclosure.createQueryServer(queryPort);
+    // QueryServer owns the runner's start/stop lifecycle, including its mailbox server.
+    rpc.start();
+    _dispatchRpcServers.add(rpc);
+    int mailboxPort = enclosure.getPort();
+    QueryServerInstance server = new QueryServerInstance("Server_localhost_" + mailboxPort,
+        "localhost", mailboxPort, mailboxPort);
+    _dispatchInstances.put(server, new QueryServerInstance(server.getInstanceId(), server.getHostname(),
+        queryPort, mailboxPort));
   }
 
   @AfterClass
   public void tearDown() {
-    for (QueryServerEnclosure server : _servers.values()) {
-      server.shutDown();
-    }
-    _mailboxService.shutdown();
+    _dispatchRpcServers.forEach(QueryServer::shutdown);
+    _dispatcher.shutdown();
   }
 
   /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from
