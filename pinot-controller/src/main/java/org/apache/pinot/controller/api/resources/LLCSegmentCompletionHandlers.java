@@ -122,7 +122,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
@@ -155,7 +155,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -189,7 +189,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -282,7 +282,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
       FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
         || streamPartitionMsgOffset == null) {

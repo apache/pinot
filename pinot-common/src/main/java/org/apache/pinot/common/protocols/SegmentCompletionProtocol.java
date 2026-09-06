@@ -373,6 +373,14 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withReasonCodeParam(@Nullable Integer reasonCode) {
+        ReasonCode parsedReasonCode = reasonCode != null ? ReasonCode.fromCode(reasonCode) : null;
+        if (parsedReasonCode != null) {
+          return withReasonCode(parsedReasonCode);
+        }
+        return this;
+      }
+
       /// Sets the typed stop reason. A known code also sets the legacy reason string so older controllers can ignore
       /// `reasonCode` and still use `reason`. Passing `null` clears only the typed code.
       public Params withReasonCode(@Nullable ReasonCode reasonCode) {

@@ -21,15 +21,16 @@ package org.apache.pinot.controller.api.resources;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.mockito.ArgumentCaptor;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
+/// Tests reason-code binding at the segment-completion REST resource boundary.
 public class LLCSegmentCompletionHandlersTest {
   private static final String INSTANCE_ID = "Server_localhost_8099";
   private static final String SEGMENT_NAME = "foo__0__0__12345Z";
@@ -42,12 +43,11 @@ public class LLCSegmentCompletionHandlersTest {
     LLCSegmentCompletionHandlers handler = new LLCSegmentCompletionHandlers();
     handler._segmentCompletionManager = segmentCompletionManager;
 
-    handler.segmentCommitStart(INSTANCE_ID, SEGMENT_NAME, OFFSET, 4000, 1000, 2000, 6000, 5000,
-        "legacyReason", "100");
+    handler.segmentCommitStart(INSTANCE_ID, SEGMENT_NAME, OFFSET, 4000, 1000, 2000, 6000, 5000, "legacyReason", 100);
 
     SegmentCompletionProtocol.Request.Params params = captureSegmentCommitStartParams(segmentCompletionManager);
-    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
-    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+    assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
   }
 
   @Test
@@ -58,11 +58,11 @@ public class LLCSegmentCompletionHandlersTest {
     handler._segmentCompletionManager = segmentCompletionManager;
 
     handler.segmentCommitStart(INSTANCE_ID, SEGMENT_NAME, OFFSET, 4000, 1000, 2000, 6000, 5000,
-        SegmentCompletionProtocol.REASON_TIME_LIMIT, "999");
+        SegmentCompletionProtocol.REASON_TIME_LIMIT, 999);
 
     SegmentCompletionProtocol.Request.Params params = captureSegmentCommitStartParams(segmentCompletionManager);
-    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
-    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
+    assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
   }
 
   @Test
@@ -72,14 +72,14 @@ public class LLCSegmentCompletionHandlersTest {
     LLCSegmentCompletionHandlers handler = new LLCSegmentCompletionHandlers();
     handler._segmentCompletionManager = segmentCompletionManager;
 
-    handler.segmentConsumed(INSTANCE_ID, SEGMENT_NAME, OFFSET, "legacyReason", "100", 4000, 6000);
+    handler.segmentConsumed(INSTANCE_ID, SEGMENT_NAME, OFFSET, "legacyReason", 100, 4000, 6000);
 
     ArgumentCaptor<SegmentCompletionProtocol.Request.Params> paramsCaptor =
         ArgumentCaptor.forClass(SegmentCompletionProtocol.Request.Params.class);
     verify(segmentCompletionManager).segmentConsumed(paramsCaptor.capture());
     SegmentCompletionProtocol.Request.Params params = paramsCaptor.getValue();
-    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
-    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+    assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
   }
 
   private static SegmentCompletionProtocol.Request.Params captureSegmentCommitStartParams(
