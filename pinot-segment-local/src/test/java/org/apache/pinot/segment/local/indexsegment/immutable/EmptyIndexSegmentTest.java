@@ -103,7 +103,7 @@ public class EmptyIndexSegmentTest {
       columnMetadataMap.put(column,
           new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.INT, true), null, null));
     }
-    when(metadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    MockSegmentMetadata.withColumns(metadata, columnMetadataMap);
     EmptyIndexSegment segment = new EmptyIndexSegment(metadata);
 
     assertEquals(new ArrayList<>(segment.getColumnNames()), List.of("a", "b"));
