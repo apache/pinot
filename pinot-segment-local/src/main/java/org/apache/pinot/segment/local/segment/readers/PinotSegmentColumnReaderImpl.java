@@ -59,10 +59,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   ///                              the segment's stored value (which contains the default).
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName,
       boolean skipDefaultNullValues) {
+    // The data source's field spec is the column's own, so this never builds the segment schema (which an immutable
+    // segment derives on demand) and also covers a mutable segment, whose metadata has no column metadata map
     this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
         indexSegment.getSegmentMetadata().getTotalDocs(),
-        indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName).getDataType(),
-        skipDefaultNullValues);
+        indexSegment.getDataSource(columnName).getDataSourceMetadata().getDataType(), skipDefaultNullValues);
   }
 
   /// Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
