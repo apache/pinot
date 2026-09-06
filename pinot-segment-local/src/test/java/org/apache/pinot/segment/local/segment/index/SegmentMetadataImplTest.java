@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -80,6 +81,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class SegmentMetadataImplTest {
@@ -447,12 +449,63 @@ public class SegmentMetadataImplTest {
     assertEquals(metadata.getAllColumns().first(), column, "must be inserted in natural order, not appended");
     assertTrue(metadata.getSchema().hasColumn(column));
 
-    // Re-registering replaces in place rather than duplicating the column
+    // Re-registering replaces the column rather than duplicating it
     ColumnMetadata replacement =
         new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.LONG, true), null, null);
     metadata.addColumnMetadata(column, replacement);
     assertEquals(metadata.getNumColumns(), numColumns + 1);
     assertSame(metadata.getColumnMetadataFor(column), replacement);
+  }
+
+  /// The column arrays are replaced as a whole, never written in place, so a collection handed out earlier stays the
+  /// snapshot it is documented to be — through an insertion and through a replacement of a column already there —
+  /// and every name stays paired with its own metadata.
+  @Test
+  public void testColumnMetadataViewIsASnapshot()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    int numColumns = metadata.getNumColumns();
+    Collection<ColumnMetadata> snapshot = metadata.getAllColumnMetadata();
+    String column = metadata.getAllColumns().first();
+    ColumnMetadata original = metadata.getColumnMetadataFor(column);
+    assertSame(new ArrayList<>(snapshot).get(0), original);
+
+    metadata.addColumnMetadata(column,
+        new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.INT, true), null, null));
+    metadata.addColumnMetadata("$aVirtualColumn",
+        new EmptyColumnMetadata(new DimensionFieldSpec("$aVirtualColumn", FieldSpec.DataType.INT, true), null, null));
+    assertEquals(snapshot.size(), numColumns);
+    assertSame(new ArrayList<>(snapshot).get(0), original, "a replacement must not reach the earlier snapshot");
+    assertNotSame(metadata.getColumnMetadataFor(column), original);
+
+    assertEquals(metadata.getNumColumns(), numColumns + 1);
+    assertEquals(metadata.getAllColumnMetadata().size(), numColumns + 1);
+    metadata.forEachColumn((name, columnMetadata) -> assertEquals(columnMetadata.getColumnName(), name));
+  }
+
+  /// A CONSUMING segment holds no column metadata: its column names come from the explicit schema, the column
+  /// metadata accessors are empty, and both mutators reject it rather than drop the schema it was given.
+  @Test
+  public void testConsumingSegmentHoldsNoColumnMetadata() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("consuming")
+        .addSingleValueDimension("dim", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.LONG)
+        .build();
+    SegmentMetadataImpl metadata =
+        new SegmentMetadataImpl("testTable", "testTable__0__0__20240101T0000Z", schema, 123L);
+    assertEquals(metadata.getAllColumns(), schema.getColumnNames());
+    assertEquals(metadata.getNumColumns(), schema.size());
+    assertTrue(metadata.getAllColumnMetadata().isEmpty());
+    assertNull(metadata.getColumnMetadataMap());
+    assertNull(metadata.getColumnMetadataFor("dim"));
+    metadata.forEachColumn((column, columnMetadata) -> fail("no column metadata to visit, got: " + column));
+
+    ColumnMetadata added =
+        new EmptyColumnMetadata(new DimensionFieldSpec("added", FieldSpec.DataType.INT, true), null, null);
+    assertThrows(IllegalStateException.class, () -> metadata.addColumnMetadata("added", added));
+    assertThrows(IllegalStateException.class, () -> metadata.removeColumn("dim"));
+    assertSame(metadata.getSchema(), schema, "the explicit schema survives a rejected mutation");
+    assertEquals(metadata.getAllColumns(), schema.getColumnNames());
   }
 
   /// The metadata JSON is a public REST payload: it must list the columns in the same natural order the map view

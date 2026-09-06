@@ -122,18 +122,24 @@ public interface SegmentMetadata {
     return getSchema().getColumnNames();
   }
 
-  /// Number of columns the segment metadata holds.
+  /// Number of columns in [#getAllColumns()].
+  ///
+  /// A segment that holds no column metadata (a CONSUMING one, built from an explicit schema) still reports its
+  /// schema's columns here, so this is not the size of [#getAllColumnMetadata()]: do not pair the two.
   default int getNumColumns() {
     return getColumnMetadataMap().size();
   }
 
-  /// The column metadata of every column, in the natural column-name order of [#getAllColumns()].
+  /// The column metadata of every column that has some, in the natural column-name order of [#getAllColumns()], and
+  /// empty for a segment that holds none (a CONSUMING one, which answers [#getColumnMetadataFor(String)] with `null`
+  /// for every column of its schema).
   default Collection<ColumnMetadata> getAllColumnMetadata() {
     return getColumnMetadataMap().values();
   }
 
   /// Applies `action` to every (column name, column metadata) pair, in the natural column-name order of
-  /// [#getAllColumns()].
+  /// [#getAllColumns()], and to nothing at all for a segment that holds no column metadata, exactly as
+  /// [#getAllColumnMetadata()] is empty for one.
   default void forEachColumn(BiConsumer<String, ColumnMetadata> action) {
     getColumnMetadataMap().forEach(action);
   }
@@ -155,12 +161,14 @@ public interface SegmentMetadata {
     return getColumnMetadataMap().get(column);
   }
 
-  /// Registers the metadata of a column, replacing any metadata already registered under the same name.
+  /// Registers the metadata of a column, replacing any metadata already registered under the same name. An
+  /// implementation that holds no column metadata (a CONSUMING segment) may reject this.
   default void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
     getColumnMetadataMap().put(column, columnMetadata);
   }
 
-  /// Removes a column from the segment metadata.
+  /// Removes a column from the segment metadata. An implementation that holds no column metadata (a CONSUMING
+  /// segment) may reject this.
   void removeColumn(String column);
 
   /// Converts segment metadata to json.

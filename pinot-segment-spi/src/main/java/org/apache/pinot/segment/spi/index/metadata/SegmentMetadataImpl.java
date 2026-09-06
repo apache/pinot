@@ -90,11 +90,16 @@ import org.slf4j.LoggerFactory;
 ///
 /// Once the loader has registered the built-in virtual columns through [#addColumnMetadata(String, ColumnMetadata)],
 /// the derived schema includes them, exactly as the eagerly built one did. [#removeColumn(String)] and
-/// [#addColumnMetadata(String, ColumnMetadata)] replace the arrays and drop both derived views. The explicit-schema
-/// constructor keeps the caller's Schema as is and holds no column metadata at all.
+/// [#addColumnMetadata(String, ColumnMetadata)] replace both arrays at once and drop both derived views. The
+/// explicit-schema constructor keeps the caller's Schema as is and holds no column metadata at all, so those two
+/// mutators reject such a metadata rather than drop the schema it was given: a CONSUMING segment answers
+/// [#getAllColumns()] and [#getNumColumns()] from that schema and reports no column metadata at all
+/// ([#getColumnMetadataFor(String)] `null`, [#getAllColumnMetadata()] empty, [#forEachColumn(BiConsumer)] a no-op,
+/// [#getColumnMetadataMap()] `null`).
 ///
-/// Thread-safe for the derived schema and map (double-checked on volatiles, so one instance per metadata); the
-/// columns themselves are populated at load before the metadata is published.
+/// Thread-safe: the two arrays are published together in one immutable holder, so no reader can see the names of
+/// one version beside the metadata of another, and the derived schema and map are built under the instance monitor
+/// the mutators hold as well, so neither can be cached from columns that have already been replaced.
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
@@ -106,15 +111,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final AtomicLong NUM_COLUMN_METADATA_MAP_MATERIALIZATIONS = new AtomicLong();
 
   private final File _indexDir;
-  /// Column names in natural order, and their metadata at the same index. Both `null` for a CONSUMING segment, which
-  /// is constructed with an explicit schema and holds no column metadata. Replaced (never written in place) by
+  /// The columns of a metadata-backed segment, or `null` for a CONSUMING segment, which is constructed with an
+  /// explicit schema and holds no column metadata. Replaced as a whole (never written in place) by
   /// [#addColumnMetadata(String, ColumnMetadata)] and [#removeColumn(String)], so a view handed out earlier stays a
   /// consistent snapshot, and volatile so a metadata published without other synchronization is seen with its
   /// columns.
   @Nullable
-  private volatile String[] _columnNames;
-  @Nullable
-  private volatile ColumnMetadata[] _columnMetadata;
+  private volatile Columns _columns;
   /// The explicit schema of a CONSUMING segment, or the lazily derived schema of a metadata-backed segment (null
   /// until [#getSchema()] builds it, and again whenever the columns change).
   @Nullable
@@ -275,12 +278,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build the sorted column arrays (the map view and the schema are derived from them on demand, see
     // getColumnMetadataMap() and getSchema()). Empty segments use a stripped-down [EmptyColumnMetadata] since the
-    // shape stats (cardinality, element lengths, etc.) are meaningless when there are no rows.
+    // shape stats (cardinality, element lengths, etc.) are meaningless when there are no rows. Both arrays are
+    // filled before they are published below, so a reader never sees a half-built one.
     String[] columns = physicalColumns.toArray(new String[0]);
     Arrays.sort(columns);
     ColumnMetadata[] columnMetadata = new ColumnMetadata[columns.length];
-    _columnNames = columns;
-    _columnMetadata = columnMetadata;
     if (_totalDocs > 0) {
       for (int i = 0; i < columns.length; i++) {
         columnMetadata[i] = ColumnMetadataImpl.fromPropertiesConfiguration(segmentMetadata, _totalDocs, columns[i]);
@@ -298,8 +300,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
               String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
               if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
                 short indexType = indexService.getNumericId(parsedKeys[1]);
-                ((ColumnMetadataImpl) getColumnMetadataFor(parsedKeys[0])).addIndexSize(indexType,
-                    mapConfig.getLong(key));
+                // The arrays are not published yet, so this looks the column up in the local one
+                int index = Arrays.binarySearch(columns, parsedKeys[0]);
+                Preconditions.checkState(index >= 0, "Column: %s is not in the segment metadata", parsedKeys[0]);
+                ((ColumnMetadataImpl) columnMetadata[index]).addIndexSize(indexType, mapConfig.getLong(key));
               }
             } catch (Exception e) {
               LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
@@ -312,6 +316,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         columnMetadata[i] = EmptyColumnMetadata.fromPropertiesConfiguration(segmentMetadata, columns[i]);
       }
     }
+    _columns = new Columns(columns, columnMetadata);
 
     // Build star-tree v2 metadata
     int starTreeV2Count =
@@ -450,8 +455,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private Schema buildSchema() {
     NUM_SCHEMA_MATERIALIZATIONS.incrementAndGet();
+    // Only a metadata-backed segment gets here: a CONSUMING one is constructed with its schema, so getSchema()
+    // returns before building one
+    Columns columns = Preconditions.checkNotNull(_columns, "Segment: %s holds no column metadata", _segmentName);
     Schema schema = new Schema();
-    for (ColumnMetadata columnMetadata : _columnMetadata) {
+    for (ColumnMetadata columnMetadata : columns._metadata) {
       schema.addField(columnMetadata.getFieldSpec());
     }
     return schema;
@@ -476,48 +484,48 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /// metadata. The view is a snapshot: it does not reflect columns added or removed after this call.
   @Override
   public NavigableSet<String> getAllColumns() {
-    String[] columnNames = _columnNames;
-    return columnNames != null ? new SortedStringArraySet(columnNames) : getSchema().getColumnNames();
+    Columns columns = _columns;
+    return columns != null ? new SortedStringArraySet(columns._names) : getSchema().getColumnNames();
   }
 
   @Override
   public int getNumColumns() {
-    String[] columnNames = _columnNames;
-    return columnNames != null ? columnNames.length : getSchema().size();
+    Columns columns = _columns;
+    return columns != null ? columns._names.length : getSchema().size();
   }
 
   /// An unmodifiable view of the column metadata array, in the natural column-name order of [#getAllColumns()], and
-  /// empty for a CONSUMING segment. Like [#getAllColumns()] it is a snapshot.
+  /// empty for a CONSUMING segment, which holds no column metadata (see the class documentation). Like
+  /// [#getAllColumns()] it is a snapshot.
   @Override
   public Collection<ColumnMetadata> getAllColumnMetadata() {
-    ColumnMetadata[] columnMetadata = _columnMetadata;
-    return columnMetadata != null ? Collections.unmodifiableList(Arrays.asList(columnMetadata)) : List.of();
+    Columns columns = _columns;
+    return columns != null ? Collections.unmodifiableList(Arrays.asList(columns._metadata)) : List.of();
   }
 
+  /// Visits every column and its metadata in natural column-name order, and visits nothing for a CONSUMING segment,
+  /// which holds no column metadata (see the class documentation). The pair comes from one snapshot of the columns,
+  /// so a concurrent change cannot pair a name with another column's metadata.
   @Override
   public void forEachColumn(BiConsumer<String, ColumnMetadata> action) {
-    String[] columnNames = _columnNames;
-    if (columnNames == null) {
+    Columns columns = _columns;
+    if (columns == null) {
       return;
     }
-    ColumnMetadata[] columnMetadata = _columnMetadata;
-    for (int i = 0; i < columnNames.length; i++) {
-      action.accept(columnNames[i], columnMetadata[i]);
+    for (int i = 0; i < columns._names.length; i++) {
+      action.accept(columns._names[i], columns._metadata[i]);
     }
   }
 
   @Nullable
   @Override
   public ColumnMetadata getColumnMetadataFor(String column) {
-    int index = indexOf(column);
-    return index >= 0 ? _columnMetadata[index] : null;
-  }
-
-  /// Index of the column in the two arrays, or `-(insertion point) - 1`; always negative when there is no column
-  /// metadata at all (CONSUMING segment).
-  private int indexOf(String column) {
-    String[] columnNames = _columnNames;
-    return columnNames != null ? Arrays.binarySearch(columnNames, column) : -1;
+    Columns columns = _columns;
+    if (columns == null) {
+      return null;
+    }
+    int index = columns.indexOf(column);
+    return index >= 0 ? columns._metadata[index] : null;
   }
 
   @Override
@@ -623,7 +631,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Nullable
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    if (_columnNames == null) {
+    if (_columns == null) {
       return null;
     }
     TreeMap<String, ColumnMetadata> columnMetadataMap = _columnMetadataMapView;
@@ -661,35 +669,48 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   /// {@inheritDoc}
   ///
-  /// Inserts the column in natural order, which is a copy of both arrays; the loader adds a handful of virtual
-  /// columns once per segment, so this is not a hot path.
+  /// Inserts the column in natural order, or replaces the metadata already registered under the name, either way by
+  /// copying both arrays: a view handed out earlier is documented as a snapshot, and the loader adds a handful of
+  /// virtual columns once per segment, so this is not a hot path.
+  ///
+  /// Throws for a CONSUMING segment, which was given an explicit schema and holds no column metadata to add to.
   @Override
-  public void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
-    String[] columnNames = _columnNames;
-    Preconditions.checkState(columnNames != null, "Segment: %s holds no column metadata", _segmentName);
-    int index = Arrays.binarySearch(columnNames, column);
+  public synchronized void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
+    Columns columns = _columns;
+    Preconditions.checkState(columns != null, "Segment: %s holds no column metadata", _segmentName);
+    int index = columns.indexOf(column);
     if (index >= 0) {
-      _columnMetadata[index] = columnMetadata;
+      ColumnMetadata[] metadata = columns._metadata.clone();
+      metadata[index] = columnMetadata;
+      _columns = new Columns(columns._names, metadata);
     } else {
       int insertionPoint = -index - 1;
-      _columnMetadata = insert(_columnMetadata, insertionPoint, columnMetadata);
-      _columnNames = insert(columnNames, insertionPoint, column);
+      _columns = new Columns(insert(columns._names, insertionPoint, column),
+          insert(columns._metadata, insertionPoint, columnMetadata));
     }
     invalidateDerivedViews();
   }
 
+  /// {@inheritDoc}
+  ///
+  /// Throws for a CONSUMING segment, which holds no column metadata: dropping its explicit schema instead would
+  /// leave it with neither.
   @Override
-  public void removeColumn(String column) {
+  public synchronized void removeColumn(String column) {
     Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
-    int index = indexOf(column);
-    if (index >= 0) {
-      _columnMetadata = delete(_columnMetadata, index);
-      _columnNames = delete(_columnNames, index);
+    Columns columns = _columns;
+    Preconditions.checkState(columns != null, "Segment: %s holds no column metadata", _segmentName);
+    int index = columns.indexOf(column);
+    if (index < 0) {
+      return;
     }
+    _columns = new Columns(delete(columns._names, index), delete(columns._metadata, index));
     invalidateDerivedViews();
   }
 
-  /// Drops the schema and the map derived from the columns, so the next caller rebuilds them from the current arrays.
+  /// Drops the schema and the map derived from the columns, so the next caller rebuilds them from the current
+  /// arrays. Called while holding the instance monitor, which [#getSchema()] and [#getColumnMetadataMap()] also hold
+  /// while they build and cache, so a view derived from the replaced columns cannot survive this.
   private void invalidateDerivedViews() {
     _schema = null;
     _columnMetadataMapView = null;
@@ -753,7 +774,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
 
-    if (_columnNames != null) {
+    if (_columns != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
       forEachColumn((column, columnMetadata) -> {
         if (columnFilter == null || columnFilter.contains(column)) {
@@ -769,5 +790,25 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String toString() {
     return toJson(null).toString();
+  }
+
+  /// The columns of a metadata-backed segment: the names in natural order, and their metadata at the same index.
+  ///
+  /// The two arrays live in one immutable object so that every publication is atomic — a reader that sees a name
+  /// array never sees the metadata array of another version beside it — and so that the arrays a view was handed
+  /// stay exactly as they were.
+  private static final class Columns {
+    final String[] _names;
+    final ColumnMetadata[] _metadata;
+
+    Columns(String[] names, ColumnMetadata[] metadata) {
+      _names = names;
+      _metadata = metadata;
+    }
+
+    /// Index of the column in both arrays, or `-(insertion point) - 1`.
+    int indexOf(String column) {
+      return Arrays.binarySearch(_names, column);
+    }
   }
 }
