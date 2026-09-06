@@ -350,8 +350,8 @@ public class SegmentMetadataImplTest {
     Set<String> physical = metadata.getPhysicalColumnNames();
     assertFalse(metadata.isSchemaMaterialized(), "listing physical columns must not build the segment schema");
     assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
-    assertEquals(physical, metadata.getSchema().getPhysicalColumnNames(),
-        "the derived names must equal what the schema reports");
+    assertEquals(List.copyOf(physical), List.copyOf(metadata.getSchema().getPhysicalColumnNames()),
+        "the derived names must equal what the schema reports, in the same order");
     assertFalse(physical.contains(BuiltInVirtualColumn.DOCID));
 
     TableConfig tableConfig =
