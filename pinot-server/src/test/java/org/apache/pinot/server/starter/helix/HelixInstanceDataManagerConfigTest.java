@@ -26,9 +26,21 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_ID;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class HelixInstanceDataManagerConfigTest {
+
+  @Test
+  public void testLazyColumnMaterializationIsOffByDefault() throws ConfigurationException {
+    Map<String, Object> props = new HashMap<>();
+    props.put(INSTANCE_ID, "testInstance");
+    assertFalse(new HelixInstanceDataManagerConfig(new PinotConfiguration(props)).isLazyColumnMaterialization());
+
+    props.put(HelixInstanceDataManagerConfig.LAZY_COLUMN_MATERIALIZATION, "true");
+    assertTrue(new HelixInstanceDataManagerConfig(new PinotConfiguration(props)).isLazyColumnMaterialization());
+  }
 
   @Test
   public void testTierConfigsWithMultipleTiers() throws ConfigurationException {
