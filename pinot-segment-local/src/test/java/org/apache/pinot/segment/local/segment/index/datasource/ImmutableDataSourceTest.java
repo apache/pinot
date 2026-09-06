@@ -75,9 +75,11 @@ public class ImmutableDataSourceTest {
     assertEquals(metadata.getNumValues(), NUM_DOCS);
     assertEquals(metadata.getNumValues(), columnMetadata.getTotalNumberOfEntries());
     assertEquals(metadata.getCardinality(), 37);
-    assertSame(metadata.getMinValue(), columnMetadata.getMinValue());
+    // The min/max of a fixed-width column is held as raw bits and boxed on read, so the data source view delegates
+    // an equal value rather than the same instance.
+    assertEquals(metadata.getMinValue(), columnMetadata.getMinValue());
     assertEquals(metadata.getMinValue(), -5);
-    assertSame(metadata.getMaxValue(), columnMetadata.getMaxValue());
+    assertEquals(metadata.getMaxValue(), columnMetadata.getMaxValue());
     assertEquals(metadata.getMaxValue(), 123456);
     assertSame(metadata.getPartitionFunction(), partitionFunction);
     assertSame(metadata.getPartitions(), partitions);
