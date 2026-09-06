@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
@@ -52,6 +53,14 @@ public class StarTreeLoaderUtils {
   public static List<StarTreeV2> loadStarTreeV2(SegmentDirectory.Reader segmentReader,
       SegmentMetadataImpl segmentMetadata, Map<String, ColumnIndexContainer> indexContainerMap)
       throws IOException {
+    return loadStarTreeV2(segmentReader, segmentMetadata, indexContainerMap::get);
+  }
+
+  /// `indexContainerProvider` returns the index container of a dimension column; it is applied once per dimension
+  /// of each star-tree to fetch the dictionary the star-tree data source shares with the column.
+  public static List<StarTreeV2> loadStarTreeV2(SegmentDirectory.Reader segmentReader,
+      SegmentMetadataImpl segmentMetadata, Function<String, ColumnIndexContainer> indexContainerProvider)
+      throws IOException {
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     assert starTreeMetadataList != null;
     int numStarTrees = starTreeMetadataList.size();
@@ -72,7 +81,7 @@ public class StarTreeLoaderUtils {
         FixedBitSVForwardIndexReaderV2 forwardIndex =
             new FixedBitSVForwardIndexReaderV2(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
         dataSourceMap.put(dimension, new StarTreeDataSource(columnMetadata.getFieldSpec(), numDocs, forwardIndex,
-            indexContainerMap.get(dimension).getIndex(StandardIndexes.dictionary())));
+            indexContainerProvider.apply(dimension).getIndex(StandardIndexes.dictionary())));
       }
 
       // Load metric (function-column pair) forward indexes
