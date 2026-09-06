@@ -19,14 +19,15 @@
 package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -151,12 +152,14 @@ public interface SegmentMetadata {
   /// a server holding tens of thousands of wide segments a schema built there would be cached for the segment's whole
   /// life: one [Schema] per segment, each with a tree entry and two list slots per column. A segment that holds no
   /// column metadata (a CONSUMING one) still answers from its schema, which it was constructed with.
-  default Set<String> getPhysicalColumnNames() {
+  ///
+  /// Sorted, like the [Schema#getPhysicalColumnNames()] this replaces, and the same set for both segment kinds.
+  default SortedSet<String> getPhysicalColumnNames() {
     Collection<ColumnMetadata> columnMetadata = getAllColumnMetadata();
     if (columnMetadata.isEmpty()) {
       return getSchema().getPhysicalColumnNames();
     }
-    Set<String> physicalColumnNames = Sets.newHashSetWithExpectedSize(columnMetadata.size());
+    TreeSet<String> physicalColumnNames = new TreeSet<>();
     for (ColumnMetadata metadata : columnMetadata) {
       FieldSpec fieldSpec = metadata.getFieldSpec();
       if (!fieldSpec.isVirtualColumn()) {
