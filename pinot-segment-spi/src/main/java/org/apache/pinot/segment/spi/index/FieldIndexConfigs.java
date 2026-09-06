@@ -58,6 +58,24 @@ public class FieldIndexConfigs {
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
   }
 
+  /// Two instances are equal when they declare the same config for the same index types: index types compare by
+  /// identity (they are singletons) and index configs by value.
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof FieldIndexConfigs)) {
+      return false;
+    }
+    return _configMap.equals(((FieldIndexConfigs) o)._configMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return _configMap.hashCode();
+  }
+
   @Override
   public String toString() {
     try {
