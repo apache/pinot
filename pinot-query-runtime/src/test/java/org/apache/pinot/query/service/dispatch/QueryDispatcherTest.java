@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import io.grpc.Deadline;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,22 +27,44 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.runtime.PairList;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -52,9 +75,11 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -62,12 +87,21 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -80,6 +114,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
+  private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
@@ -142,9 +177,12 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
+      when(queryRunner.processQuery(any(), any(), any()))
+          .thenReturn(CompletableFuture.completedFuture(null));
       QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner));
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
+      _queryRunnerMap.put(availablePort, queryRunner);
     }
     List<Integer> portList = new ArrayList<>(_queryServerMap.keySet());
 
@@ -212,6 +250,135 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+  }
+
+  @Test
+  public void testStagedDispatchOption() {
+    assertFalse(QueryOptionsUtils.isStagedDispatch(Map.of()));
+    assertFalse(QueryOptionsUtils.isStagedDispatch(Map.of("stagedDispatch", "false")));
+    assertTrue(QueryOptionsUtils.isStagedDispatch(Map.of("stagedDispatch", "TrUe")));
+  }
+
+  @DataProvider
+  public Object[][] stagedSubmissionFailures() {
+    // Success, producer submission failure, consumer submission failure.
+    return new Object[][]{{0}, {2}, {1}};
+  }
+
+  @Test(dataProvider = "stagedSubmissionFailures")
+  public void testStagedDispatchOrdersGroupsAndCleansCompletedProducers(int failingStage)
+      throws Exception {
+    List<Integer> ports = new ArrayList<>(_queryServerMap.keySet());
+    DispatchableSubPlan plan = stagedPlan(ports);
+    QueryDispatcher dispatcher = spy(_queryDispatcher);
+    List<Set<Integer>> submittedGroups = new ArrayList<>();
+    List<Deadline> deadlines = new ArrayList<>();
+    doAnswer(invocation -> {
+      Set<DispatchablePlanFragment> stages = invocation.getArgument(1);
+      Set<Integer> stageIds = new HashSet<>();
+      for (DispatchablePlanFragment stage : stages) {
+        stageIds.add(stage.getPlanFragment().getFragmentId());
+      }
+      StreamingQuerySession session = invocation.getArgument(5);
+      if (stageIds.contains(1)) {
+        session.awaitSuccessfulStages(Set.of(2), 0, TimeUnit.NANOSECONDS);
+        session.awaitStreamsClosed(0, TimeUnit.NANOSECONDS);
+      }
+      submittedGroups.add(stageIds);
+      deadlines.add(invocation.getArgument(2));
+      return invocation.callRealMethod();
+    }).when(dispatcher).submitWithStream(anyLong(), anySet(), any(), anySet(), anyMap(), any());
+
+    // Use real server submission and stream observers; only opchain execution is simulated.
+    for (QueryRunner queryRunner : _queryRunnerMap.values()) {
+      AtomicReference<OpChainCompletionListener> listener = new AtomicReference<>();
+      doAnswer(invocation -> {
+        listener.set(invocation.getArgument(1));
+        return null;
+      }).when(queryRunner).registerOpChainCompletionListener(anyLong(), any());
+      doAnswer(invocation -> {
+        WorkerMetadata worker = invocation.getArgument(0);
+        StagePlan stage = invocation.getArgument(1);
+        int stageId = stage.getStageMetadata().getStageId();
+        if (stageId == failingStage) {
+          throw new IllegalStateException("submission failure for stage " + stageId);
+        }
+        long requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+        OpChainExecutionContext context = mock(OpChainExecutionContext.class);
+        when(context.getMaterializedOutputHandles()).thenReturn(stageId == 2
+            ? List.of(materializedHandle(requestId, 2, worker.getWorkerId(), 0))
+            : List.of());
+        MultiStageOperator root = mock(MultiStageOperator.class);
+        when(root.getOperatorType()).thenReturn(MultiStageOperator.Type.MAILBOX_SEND);
+        listener.get().onOpChainComplete(new OpChainId(requestId, worker.getWorkerId(), stageId),
+            root, null, context, null);
+        return CompletableFuture.completedFuture(null);
+      }).when(queryRunner).processQuery(any(), any(), any());
+    }
+    for (QueryServer server : _queryServerMap.values()) {
+      clearInvocations(server);
+    }
+
+    Map<String, String> options = Map.of("stagedDispatch", "true", "materializedExchange", "true");
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest();
+        MockedStatic<QueryDispatcher> statics = mockStatic(QueryDispatcher.class, CALLS_REAL_METHODS)) {
+      long requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext request = new DefaultRequestContext();
+      request.setRequestId(requestId);
+      DataSchema schema = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema();
+      ResultTable table = new ResultTable(schema, List.of());
+      statics.when(() -> QueryDispatcher.runReducer(any(), anyMap(), any())).thenAnswer(invocation -> {
+        assertEquals(submittedGroups, List.of(Set.of(2), Set.of(1)));
+        return new QueryDispatcher.QueryResult(table, MultiStageQueryStats.emptyStats(0), 0L);
+      });
+
+      if (failingStage == 0) {
+        QueryDispatcher.QueryResult result = dispatcher.submitAndReduce(request, plan, 10_000L, options);
+        assertNull(result.getProcessingException());
+        assertSame(result.getResultTable(), table);
+        assertEquals(result.getStageCoverage().get(2).getResponded(), 1);
+        for (QueryServer server : _queryServerMap.values()) {
+          verify(server, never()).cancel(any(), any());
+        }
+      } else {
+        RuntimeException error = expectThrows(RuntimeException.class,
+            () -> dispatcher.submitAndReduce(request, plan, 10_000L, options));
+        assertTrue(error.getMessage().contains("submission failure for stage " + failingStage));
+        statics.verify(() -> QueryDispatcher.runReducer(any(), anyMap(), any()), never());
+        // Server 0 only ran the producer. On consumer failure its stream is already closed, so this must be unary.
+        verify(_queryServerMap.get(ports.get(0)), timeout(5000))
+            .cancel(argThat(cancel -> cancel.getRequestId() == requestId), any());
+      }
+      assertEquals(submittedGroups, failingStage == 2 ? List.of(Set.of(2)) : List.of(Set.of(2), Set.of(1)));
+      if (deadlines.size() == 2) {
+        assertSame(deadlines.get(0), deadlines.get(1), "Every group must use the same absolute deadline");
+      }
+    } finally {
+      for (QueryRunner queryRunner : _queryRunnerMap.values()) {
+        reset(queryRunner);
+        when(queryRunner.processQuery(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+      }
+    }
+  }
+
+  private static DispatchableSubPlan stagedPlan(List<Integer> ports) {
+    DataSchema schema = new DataSchema(new String[]{"col"}, new ColumnDataType[]{ColumnDataType.INT});
+    Map<Integer, DispatchablePlanFragment> stages = new HashMap<>();
+    for (int stageId = 0; stageId <= 2; stageId++) {
+      PlanNode input = stageId == 2
+          ? new ValueNode(stageId, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of())
+          : new MailboxReceiveNode(stageId, schema, stageId + 1, PinotRelExchangeType.STREAMING,
+              RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), List.of(), false, false, null, stageId == 1);
+      PlanNode root = stageId == 0
+          ? input
+          : new MailboxSendNode(stageId, schema, List.of(input), List.of(stageId - 1), PinotRelExchangeType.STREAMING,
+              RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), false, List.of(), false, "absHashCode", stageId == 2);
+      int port = ports.get(stageId == 2 ? 0 : 1);
+      QueryServerInstance server = new QueryServerInstance("server_" + port, "localhost", port, port);
+      stages.put(stageId, new DispatchablePlanFragment(new PlanFragment(stageId, root, List.of()),
+          List.of(new WorkerMetadata(0, Map.of())), stageId == 0 ? Map.of() : Map.of(server, List.of(0)), Map.of()));
+    }
+    return new DispatchableSubPlan(PairList.of(0, "col"), stages, Set.of(), Map.of(), 0L);
   }
 
   private static Worker.MaterializedPartitionHandle materializedHandle(long requestId, int stageId, int workerId,

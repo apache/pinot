@@ -23,7 +23,11 @@ import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datatable.StatMap;
@@ -34,13 +38,84 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.expectThrows;
 
 
 /// Unit tests for [StreamingDispatchObserver]. Drives ServerToBroker messages directly into
 /// [StreamObserver#onNext] on a real [StreamingQuerySession] and verifies the right session methods are
 /// called and the session completes when expected.
 public class StreamingDispatchObserverTest {
+
+  @DataProvider
+  public Object[][] terminalOutcomes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "terminalOutcomes")
+  public void testDoneWaitsForTerminalOutcome(boolean transportFailure)
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 1, Map.of(1, Set.of(0)));
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 1, (resp, err) -> { });
+    session.registerStream(observer);
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 0, 5)).build());
+    session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS);
+    observer.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+
+    assertThrows(TimeoutException.class, () -> session.awaitStreamsClosed(0, TimeUnit.NANOSECONDS));
+    if (transportFailure) {
+      RuntimeException error = new RuntimeException("stream reset after DONE");
+      observer.onError(error);
+      IllegalStateException failure = expectThrows(IllegalStateException.class,
+          () -> session.awaitStreamsClosed(0, TimeUnit.NANOSECONDS));
+      assertSame(failure.getCause(), error);
+    } else {
+      observer.onCompleted();
+      session.awaitStreamsClosed(0, TimeUnit.NANOSECONDS);
+    }
+  }
+
+  @Test
+  public void testDuplicateReportDoesNotConsumeAnotherWorkersSlot()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 3, Map.of(1, Set.of(0, 1), 2, Set.of(0)));
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 2, (resp, err) -> { });
+    Worker.MaterializedPartitionHandle output = Worker.MaterializedPartitionHandle.newBuilder()
+        .setRequestId(1L).setProducerStageId(1).setProducerWorkerId(0).setLogicalPartitionId(0).build();
+    Worker.ServerToBroker first = Worker.ServerToBroker.newBuilder()
+        .setOpchain(buildOpChainComplete(1, 0, 5).toBuilder().addMaterializedOutput(output)).build();
+
+    observer.onNext(first);
+    observer.onNext(first);
+    assertThrows(TimeoutException.class, () -> session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS));
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 1, 7)).build());
+
+    session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS);
+    assertEquals(session.getOutstandingCount(), 1L, "The other stage still owes a report");
+    assertEquals(session.getMaterializedOutputs(), List.of(output));
+    assertEquals(session.snapshotCoverage().getRespondedByStage(), Map.of(1, 2));
+  }
+
+  @Test
+  public void testUnexpectedWorkerFailsExactStageBarrier()
+      throws Exception {
+    StreamingQuerySession session =
+        new StreamingQuerySession(1L, 1, Map.of(1, Set.of(0)));
+    StreamingDispatchObserver observer =
+        new StreamingDispatchObserver(mockServer(), session, 1, (resp, err) -> { });
+
+    observer.onNext(Worker.ServerToBroker.newBuilder()
+        .setOpchain(buildOpChainComplete(1, 1, 5))
+        .build());
+
+    assertThrows(IllegalStateException.class,
+        () -> session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS));
+  }
 
   /// Happy path: submit_ack, then 2 OpChainCompletes, then ServerDone. ackCallback fires once with the response, the
   /// session's latch drains to zero, and the stream is unregistered.

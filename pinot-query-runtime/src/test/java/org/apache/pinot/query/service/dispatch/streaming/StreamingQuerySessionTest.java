@@ -24,8 +24,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
@@ -37,6 +40,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -44,6 +48,63 @@ import static org.testng.Assert.assertTrue;
 /// as soon as all expected opchains have reported, without waiting for the timeout), timeout fall-through, and
 /// fan-out cancel behaviour.
 public class StreamingQuerySessionTest {
+
+  @Test
+  public void testEmptyStageNeedsNoReportsButOtherStagesStillDo()
+      throws Exception {
+    StreamingQuerySession session =
+        new StreamingQuerySession(1L, 1, Map.of(1, Set.of(), 2, Set.of(0)));
+
+    session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS);
+    assertThrows(TimeoutException.class,
+        () -> session.awaitSuccessfulStages(Set.of(1, 2), 0, TimeUnit.NANOSECONDS));
+    session.recordOpChainComplete(buildOpChainComplete(2, 0, 1, 11));
+    session.awaitSuccessfulStages(Set.of(1, 2), 0, TimeUnit.NANOSECONDS);
+  }
+
+  @Test
+  public void testAwaitSuccessfulStagesRejectsExecutionFailure() {
+    StreamingQuerySession session =
+        new StreamingQuerySession(1L, 1, Map.of(1, Set.of(0)));
+    AtomicInteger cancelled = new AtomicInteger();
+    session.registerStream(requestId -> cancelled.incrementAndGet());
+
+    session.recordOpChainComplete(buildOpChainCompleteWithoutStats(1, 0, false));
+
+    assertThrows(IllegalStateException.class,
+        () -> session.awaitSuccessfulStages(Set.of(1), 0, TimeUnit.NANOSECONDS));
+    assertEquals(cancelled.get(), 1);
+  }
+
+  @Test
+  public void testStatsDecodeFailureStillSatisfiesExecutionBarrier()
+      throws Exception {
+    StreamingQuerySession session =
+        new StreamingQuerySession(1L, 1, Map.of(1, Set.of(0)));
+
+    session.recordOpChainComplete(buildOpChainCompleteWithTypeId(1, 0, 9999, ByteString.EMPTY));
+
+    session.awaitSuccessfulStages(Set.of(1), 1, TimeUnit.SECONDS);
+  }
+
+  @Test
+  public void testAwaitStreamsClosedTracksRegistrationAndTransportFailure()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 0, Map.of());
+    StreamingServerHandle stream = requestId -> { };
+    session.registerStream(stream);
+
+    assertThrows(TimeoutException.class,
+        () -> session.awaitStreamsClosed(0, TimeUnit.NANOSECONDS));
+
+    session.unregisterStream(stream);
+    session.awaitStreamsClosed(1, TimeUnit.SECONDS);
+
+    session.registerStream(stream);
+    session.recordStreamError(stream, new RuntimeException("transport"), 0);
+    assertThrows(IllegalStateException.class,
+        () -> session.awaitStreamsClosed(1, TimeUnit.SECONDS));
+  }
 
   @Test
   public void testCollectsMaterializedOutputsFromSuccessfulOpChains() {
@@ -382,6 +443,15 @@ public class StreamingQuerySessionTest {
         .setWorkerId(workerId)
         .setSuccess(false)
         .setErrorMsg(errorMsg)
+        .build();
+  }
+
+  private static Worker.OpChainComplete buildOpChainCompleteWithoutStats(
+      int stageId, int workerId, boolean success) {
+    return Worker.OpChainComplete.newBuilder()
+        .setStageId(stageId)
+        .setWorkerId(workerId)
+        .setSuccess(success)
         .build();
   }
 

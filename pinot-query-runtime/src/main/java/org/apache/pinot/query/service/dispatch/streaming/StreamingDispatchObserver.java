@@ -136,8 +136,9 @@ public class StreamingDispatchObserver
               _server, _expectedOpChainsForThisServer);
           break;
         }
-        _session.recordOpChainComplete(message.getOpchain());
-        _opChainsReportedForThisServer++;
+        if (_session.recordOpChainCompleteIfNew(message.getOpchain())) {
+          _opChainsReportedForThisServer++;
+        }
         break;
       case DONE:
         int remaining = Math.max(0, _expectedOpChainsForThisServer - _opChainsReportedForThisServer);
@@ -150,9 +151,9 @@ public class StreamingDispatchObserver
           // Advance the reported counter so a subsequent onError (stream reset after DONE) sees remaining==0
           // and does not double-drain the latch.
           _opChainsReportedForThisServer = _expectedOpChainsForThisServer;
-        } else {
-          _session.unregisterStream(this);
         }
+        // ServerDone is not the terminal gRPC outcome. Keep the stream registered until onCompleted so a
+        // transport failure after DONE cannot race the next dispatch group.
         break;
       case PAYLOAD_NOT_SET:
       default:
