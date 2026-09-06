@@ -24,11 +24,9 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -88,20 +86,17 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     List<String> partitionInfo = new ArrayList<>();
     SegmentMetadata segmentMetadata = context.getSegmentMetadata();
 
-    if (segmentMetadata != null && segmentMetadata.getColumnMetadataMap() != null) {
+    if (segmentMetadata != null) {
       // Get partition info from all partitioned columns in the segment metadata
-      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-      for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-        String columnName = entry.getKey();
-        ColumnMetadata columnMetadata = entry.getValue();
+      segmentMetadata.forEachColumn((columnName, columnMetadata) -> {
         Set<Integer> partitions = columnMetadata.getPartitions();
-        if (partitions != null && !partitions.isEmpty()) {
+        if (partitions != null) {
           // Add all partition IDs for this column
           for (Integer partitionId : partitions) {
             partitionInfo.add(columnName + "_" + partitionId);
           }
         }
-      }
+      });
     }
 
     // Ensure we always have at least one entry for multi-value columns
