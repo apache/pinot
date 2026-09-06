@@ -19,20 +19,29 @@
 package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -460,6 +469,132 @@ public class ColumnMetadataImplTest {
     String column = new String("plain");
     FieldSpec spec = ColumnMetadataImpl.extractFieldSpec(column, baseConfigWithoutName(column));
     assertSame(spec.getName(), "plain");
+  }
+
+  /// A server retains one FieldSpec per (segment, column) and every segment of a table parses the same column
+  /// definition, so the parse path interns the spec: two loads of the same metadata, or of two segments whose column
+  /// parses to an equal spec, alias one instance that is still equal to the spec the table schema builds.
+  @Test
+  public void equalSpecsAreInterned() {
+    PropertiesConfiguration config = baseConfig("col");
+    FieldSpec spec = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col").getFieldSpec();
+    assertSame(ColumnMetadataImpl.fromPropertiesConfiguration(config, 2, "col").getFieldSpec(), spec);
+    assertSame(ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 3, "col").getFieldSpec(), spec);
+    assertEquals(spec, new DimensionFieldSpec("col", DataType.STRING, true));
+
+    // A custom default and a max length are part of the key and are shared as well.
+    FieldSpec custom = parse(FieldType.DIMENSION, DataType.INT, "-1");
+    assertSame(parse(FieldType.DIMENSION, DataType.INT, "-1"), custom);
+    assertEquals(custom, new DimensionFieldSpec("col", DataType.INT, true, -1));
+    PropertiesConfiguration bounded = configFor(FieldType.DIMENSION, DataType.STRING, null);
+    bounded.setProperty(Column.getKeyFor("col", Column.SCHEMA_MAX_LENGTH), 10);
+    FieldSpec boundedSpec = ColumnMetadataImpl.extractFieldSpec("col", bounded);
+    assertSame(ColumnMetadataImpl.extractFieldSpec("col", bounded), boundedSpec);
+    assertEquals(boundedSpec, new DimensionFieldSpec("col", DataType.STRING, true, 10, null));
+  }
+
+  @Test
+  public void metricTimeAndDateTimeSpecsAreInterned() {
+    FieldSpec metric = parse(FieldType.METRIC, DataType.LONG, null);
+    assertSame(parse(FieldType.METRIC, DataType.LONG, null), metric);
+    assertEquals(metric, new MetricFieldSpec("col", DataType.LONG));
+
+    PropertiesConfiguration hours = configFor(FieldType.TIME, DataType.INT, null);
+    hours.setProperty(Segment.TIME_UNIT, "HOURS");
+    FieldSpec time = ColumnMetadataImpl.extractFieldSpec("col", hours);
+    assertSame(ColumnMetadataImpl.extractFieldSpec("col", hours), time);
+    assertEquals(time, new TimeFieldSpec(new TimeGranularitySpec(DataType.INT, TimeUnit.HOURS, "col")));
+    // The time unit is part of the TimeFieldSpec key.
+    PropertiesConfiguration days = configFor(FieldType.TIME, DataType.INT, null);
+    days.setProperty(Segment.TIME_UNIT, "DAYS");
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", days), time);
+
+    FieldSpec dateTime = parse(FieldType.DATE_TIME, DataType.LONG, null);
+    assertSame(parse(FieldType.DATE_TIME, DataType.LONG, null), dateTime);
+    assertEquals(dateTime, new DateTimeFieldSpec("col", DataType.LONG, DATETIME_FORMAT, DATETIME_GRANULARITY));
+  }
+
+  /// Interning is keyed by [FieldSpec#equals], so a column whose definition changed (schema evolution) parses to a
+  /// distinct canonical instance instead of aliasing the previous one.
+  @Test
+  public void differingSpecsAreNotInterned() {
+    FieldSpec base = parse(FieldType.DIMENSION, DataType.INT, null);
+    assertNotSame(parse(FieldType.DIMENSION, DataType.INT, "-1"), base, "default null value");
+    assertNotSame(parse(FieldType.DIMENSION, DataType.LONG, null), base, "data type");
+    assertNotSame(parse(FieldType.METRIC, DataType.INT, null), base, "field type");
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("other", baseConfig("other")),
+        ColumnMetadataImpl.extractFieldSpec("col", baseConfig("col")), "name");
+    PropertiesConfiguration multiValue = configFor(FieldType.DIMENSION, DataType.INT, null);
+    multiValue.setProperty(Column.getKeyFor("col", Column.IS_SINGLE_VALUED), false);
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", multiValue), base, "single value");
+    PropertiesConfiguration maxLength = configFor(FieldType.DIMENSION, DataType.INT, null);
+    maxLength.setProperty(Column.getKeyFor("col", Column.SCHEMA_MAX_LENGTH), 10);
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", maxLength), base, "max length");
+
+    FieldSpec dateTime = parse(FieldType.DATE_TIME, DataType.LONG, null);
+    PropertiesConfiguration otherFormat = configFor(FieldType.DATE_TIME, DataType.LONG, null);
+    otherFormat.setProperty(Column.getKeyFor("col", Column.DATETIME_FORMAT), "1:SECONDS:EPOCH");
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", otherFormat), dateTime, "format");
+    PropertiesConfiguration otherGranularity = configFor(FieldType.DATE_TIME, DataType.LONG, null);
+    otherGranularity.setProperty(Column.getKeyFor("col", Column.DATETIME_GRANULARITY), "1:SECONDS");
+    assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", otherGranularity), dateTime, "granularity");
+  }
+
+  /// [ComplexFieldSpec] does not override equals/hashCode, so two structs with the same name but different children
+  /// are equal under [FieldSpec#equals]; interning the parent would alias them. Only the children are interned.
+  @Test
+  public void complexParentIsNotInternedWhileChildrenAre() {
+    PropertiesConfiguration twoChildren = complexConfig("metrics", "cpu", "host");
+    ComplexFieldSpec first = (ComplexFieldSpec) ColumnMetadataImpl.extractFieldSpec("metrics", twoChildren);
+    ComplexFieldSpec second = (ComplexFieldSpec) ColumnMetadataImpl.extractFieldSpec("metrics", twoChildren);
+    ComplexFieldSpec narrower =
+        (ComplexFieldSpec) ColumnMetadataImpl.extractFieldSpec("metrics", complexConfig("metrics", "cpu"));
+    assertNotSame(second, first);
+    assertNotSame(narrower, first);
+    // The guard is real: the parents are equal despite their different children.
+    assertEquals(narrower, first);
+    assertEquals(first.getChildFieldSpecs().keySet(), Set.of("cpu", "host"));
+    assertEquals(narrower.getChildFieldSpecs().keySet(), Set.of("cpu"));
+    assertSame(second.getChildFieldSpec("cpu"), first.getChildFieldSpec("cpu"));
+    assertSame(second.getChildFieldSpec("host"), first.getChildFieldSpec("host"));
+    assertSame(narrower.getChildFieldSpec("cpu"), first.getChildFieldSpec("cpu"));
+    assertEquals(first.getChildFieldSpec("cpu"),
+        new DimensionFieldSpec(ComplexFieldSpec.getFullChildName("metrics", "cpu"), DataType.DOUBLE, true));
+  }
+
+  /// The interner holds its specs weakly, so a spec is released once the last segment referencing it is unloaded; an
+  /// interner that pinned them would leak one spec per column definition ever loaded.
+  @Test
+  public void unreferencedSpecIsReleased()
+      throws InterruptedException {
+    WeakReference<FieldSpec> spec = internUnreferencedSpec();
+    for (int i = 0; i < 100 && spec.get() != null; i++) {
+      System.gc();
+      Thread.sleep(10);
+    }
+    assertNull(spec.get(), "the interner must not keep an unloaded segment's spec alive");
+  }
+
+  /// Parses a spec no other test builds (a random custom default) and hands back only a weak reference to it.
+  private static WeakReference<FieldSpec> internUnreferencedSpec() {
+    return new WeakReference<>(parse(FieldType.DIMENSION, DataType.STRING, "unreferenced-" + UUID.randomUUID()));
+  }
+
+  /// A COMPLEX parent with DOUBLE children, written the way the segment creator writes it.
+  private static PropertiesConfiguration complexConfig(String parent, String... children) {
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setProperty(Column.getKeyFor(parent, Column.COLUMN_NAME), parent);
+    config.setProperty(Column.getKeyFor(parent, Column.COLUMN_TYPE), FieldType.COMPLEX.name());
+    config.setProperty(Column.getKeyFor(parent, Column.DATA_TYPE), DataType.OPEN_STRUCT.name());
+    config.setProperty(Column.getKeyFor(parent, Column.IS_SINGLE_VALUED), true);
+    config.setProperty(Column.getKeyFor(parent, Column.COMPLEX_CHILD_FIELD_NAMES), List.of(children));
+    for (String child : children) {
+      String column = ComplexFieldSpec.getFullChildName(parent, child);
+      config.setProperty(Column.getKeyFor(column, Column.COLUMN_TYPE), FieldType.DIMENSION.name());
+      config.setProperty(Column.getKeyFor(column, Column.DATA_TYPE), DataType.DOUBLE.name());
+      config.setProperty(Column.getKeyFor(column, Column.IS_SINGLE_VALUED), true);
+    }
+    return config;
   }
 
   private static FieldSpec parse(FieldType fieldType, DataType dataType, @Nullable String defaultNullValue) {

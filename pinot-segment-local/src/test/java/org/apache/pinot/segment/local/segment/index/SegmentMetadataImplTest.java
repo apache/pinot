@@ -63,6 +63,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.assertSame;
 
@@ -224,6 +227,60 @@ public class SegmentMetadataImplTest {
         assertSame(childSpec.getDefaultNullValue(),
             FieldSpec.getDefaultNullValue(childSpec.getFieldType(), childSpec.getDataType(), null));
       }
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  /// Every segment of a table parses the same column definitions, so the FieldSpecs are interned: two loads alias one
+  /// instance per column, in the column metadata and in the segment Schema alike, while the Schema object itself stays
+  /// per segment and the specs stay equal to the schema the segment was built from.
+  @Test
+  public void testFieldSpecsSharedAcrossLoads()
+      throws Exception {
+    SegmentMetadataImpl first = new SegmentMetadataImpl(_segmentDirectory);
+    SegmentMetadataImpl second = new SegmentMetadataImpl(_segmentDirectory);
+    assertEquals(first.getSchema(), second.getSchema());
+    assertNotSame(first.getSchema(), second.getSchema());
+    for (String column : first.getColumnMetadataMap().keySet()) {
+      FieldSpec fieldSpec = first.getColumnMetadataFor(column).getFieldSpec();
+      assertSame(second.getColumnMetadataFor(column).getFieldSpec(), fieldSpec, column);
+      assertSame(first.getSchema().getFieldSpecFor(column), fieldSpec, column);
+      assertSame(second.getSchema().getFieldSpecFor(column), fieldSpec, column);
+    }
+    Schema inputSchema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(_avroFile);
+    for (FieldSpec inputFieldSpec : inputSchema.getAllFieldSpecs()) {
+      assertEquals(first.getSchema().getFieldSpecFor(inputFieldSpec.getName()), inputFieldSpec);
+    }
+
+    // Only the specs are shared: removing a column from one segment's schema leaves the other segment intact.
+    String column = first.getColumnMetadataMap().firstKey();
+    first.getSchema().removeField(column);
+    assertNull(first.getSchema().getFieldSpecFor(column));
+    assertNotNull(second.getSchema().getFieldSpecFor(column));
+    assertSame(second.getSchema().getFieldSpecFor(column), second.getColumnMetadataFor(column).getFieldSpec());
+  }
+
+  /// A COMPLEX parent is not interned (ComplexFieldSpec does not override equals, so two structs with different
+  /// children would alias), but its children and the materialized child columns are.
+  @Test
+  public void testOpenStructChildSpecsSharedButParentIsNot()
+      throws Exception {
+    String parent = "metrics";
+    File segmentDir = buildOpenStructSegment(parent);
+    try {
+      SegmentMetadataImpl first = new SegmentMetadataImpl(segmentDir);
+      SegmentMetadataImpl second = new SegmentMetadataImpl(segmentDir);
+      ComplexFieldSpec firstParent = (ComplexFieldSpec) first.getColumnMetadataFor(parent).getFieldSpec();
+      ComplexFieldSpec secondParent = (ComplexFieldSpec) second.getColumnMetadataFor(parent).getFieldSpec();
+      assertNotSame(secondParent, firstParent);
+      assertEquals(secondParent.getChildFieldSpecs(), firstParent.getChildFieldSpecs());
+      for (Map.Entry<String, FieldSpec> entry : firstParent.getChildFieldSpecs().entrySet()) {
+        assertSame(secondParent.getChildFieldSpec(entry.getKey()), entry.getValue(), entry.getKey());
+      }
+      String child = OpenStructNaming.materializedColumnName(parent, "cpu");
+      assertSame(second.getColumnMetadataFor(child).getFieldSpec(), first.getColumnMetadataFor(child).getFieldSpec());
+      assertSame(second.getColumnMetadataFor("dim").getFieldSpec(), first.getColumnMetadataFor("dim").getFieldSpec());
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }

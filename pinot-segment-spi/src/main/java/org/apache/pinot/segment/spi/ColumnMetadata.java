@@ -25,12 +25,22 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /// The `ColumnMetadata` class holds the column level management information and data statistics.
 @InterfaceAudience.Private
 public interface ColumnMetadata extends ColumnShape {
   int UNAVAILABLE = -1;
+
+  /// Returns the [FieldSpec] of the column.
+  ///
+  /// A spec derived from segment metadata (`metadata.properties`) is shared: every loaded segment whose column parses
+  /// to an equal spec, in this table or any other, holds the same instance, so it must be treated as immutable. Never
+  /// call a setter on it; copy it (e.g. through a JSON round-trip) before mutating. Compare specs with
+  /// [FieldSpec#equals], never by identity.
+  @Override
+  FieldSpec getFieldSpec();
 
   /// Returns `true` when the column has a dictionary, `false` otherwise.
   @JsonProperty("hasDictionary")
