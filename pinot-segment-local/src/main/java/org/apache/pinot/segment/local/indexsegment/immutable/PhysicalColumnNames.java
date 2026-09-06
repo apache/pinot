@@ -30,25 +30,25 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 ///
 /// It is a view rather than a copy so a segment retains nothing per column for it: the segment schema this replaces
 /// held a `TreeMap` entry per column, and a cached `TreeSet` would hold the same. `contains` is one column lookup and
-/// iteration is a filtered pass over the column metadata. The virtual column count is taken once at construction,
-/// which is sound only because every change to the columns precedes it: the loader registers the built-in virtual
-/// columns and removes the columns the table schema dropped before it constructs the segment, and nothing changes
-/// them afterwards.
+/// iteration is a filtered pass over the column metadata. The size is counted once at construction, from the same
+/// column metadata the iteration reads, which is sound only because every change to the columns precedes it: the
+/// loader registers the built-in virtual columns and removes the columns the table schema dropped before it
+/// constructs the segment, and nothing changes them afterwards.
 ///
 /// Thread-safe for reads, like the underlying segment metadata once loaded.
 final class PhysicalColumnNames extends AbstractSet<String> {
   private final SegmentMetadata _segmentMetadata;
-  private final int _numVirtualColumns;
+  private final int _numPhysicalColumns;
 
   PhysicalColumnNames(SegmentMetadata segmentMetadata) {
     _segmentMetadata = segmentMetadata;
-    int numVirtualColumns = 0;
+    int numPhysicalColumns = 0;
     for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
-      if (!isPhysical(columnMetadata)) {
-        numVirtualColumns++;
+      if (isPhysical(columnMetadata)) {
+        numPhysicalColumns++;
       }
     }
-    _numVirtualColumns = numVirtualColumns;
+    _numPhysicalColumns = numPhysicalColumns;
   }
 
   private static boolean isPhysical(ColumnMetadata columnMetadata) {
@@ -66,7 +66,7 @@ final class PhysicalColumnNames extends AbstractSet<String> {
 
   @Override
   public int size() {
-    return _segmentMetadata.getNumColumns() - _numVirtualColumns;
+    return _numPhysicalColumns;
   }
 
   @Override

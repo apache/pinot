@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
+import java.util.function.Function;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -102,5 +103,51 @@ public class SortedStringArraySetTest {
     assertThrows(UnsupportedOperationException.class, set::pollLast);
     assertThrows(UnsupportedOperationException.class, () -> set.iterator().remove());
     assertThrows(IllegalArgumentException.class, () -> set.subSet("f", true, "b", true));
+  }
+
+  /// A range view is a [NavigableSet] in its own right, so its own range calls must answer — and refuse — exactly
+  /// what the same range of a `TreeSet` does, rather than reaching back outside their bounds.
+  @Test
+  public void testRangeOfARangeMatchesTreeSet() {
+    for (boolean lowInclusive : List.of(true, false)) {
+      for (boolean highInclusive : List.of(true, false)) {
+        NavigableSet<String> view = set().subSet("c", lowInclusive, "g", highInclusive);
+        NavigableSet<String> reference = reference().subSet("c", lowInclusive, "g", highInclusive);
+        assertEquals(new ArrayList<>(view), new ArrayList<>(reference));
+        for (String probe : List.of("a", "b", "c", "d", "e", "f", "g", "h", "i")) {
+          assertRangeMatches(reference, view, probe, true);
+          assertRangeMatches(reference, view, probe, false);
+        }
+      }
+    }
+
+    NavigableSet<String> head = set().headSet("f", false);
+    assertEquals(new ArrayList<>(head.tailSet("b", true)), List.of("b", "d"));
+    assertThrows(IllegalArgumentException.class, () -> head.tailSet("h", true));
+    assertThrows(IllegalArgumentException.class, () -> head.subSet("b", true, "h", false));
+    NavigableSet<String> tail = set().tailSet("d", true);
+    assertEquals(new ArrayList<>(tail.headSet("h", true)), List.of("d", "f", "h"));
+    assertThrows(IllegalArgumentException.class, () -> tail.headSet("b", true));
+  }
+
+  /// Asserts that `view` answers the three range calls the way `reference` does, an [IllegalArgumentException] for an
+  /// out-of-range argument included.
+  private static void assertRangeMatches(NavigableSet<String> reference, NavigableSet<String> view, String probe,
+      boolean inclusive) {
+    assertRangeMatches(reference, view, probe, set -> set.headSet(probe, inclusive));
+    assertRangeMatches(reference, view, probe, set -> set.tailSet(probe, inclusive));
+    assertRangeMatches(reference, view, probe, set -> set.subSet(probe, inclusive, "h", true));
+  }
+
+  private static void assertRangeMatches(NavigableSet<String> reference, NavigableSet<String> view, String probe,
+      Function<NavigableSet<String>, NavigableSet<String>> range) {
+    List<String> expected;
+    try {
+      expected = new ArrayList<>(range.apply(reference));
+    } catch (IllegalArgumentException e) {
+      assertThrows(IllegalArgumentException.class, () -> range.apply(view));
+      return;
+    }
+    assertEquals(new ArrayList<>(range.apply(view)), expected, probe);
   }
 }
