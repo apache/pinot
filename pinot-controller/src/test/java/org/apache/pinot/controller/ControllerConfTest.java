@@ -252,4 +252,19 @@ public class ControllerConfTest {
     controllerConf.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
     Assert.assertTrue(controllerConf.isIngestFromUriLocalFileSystemAllowed());
   }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionDefault() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(true);
+    Assert.assertTrue(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(false);
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
 }
