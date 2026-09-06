@@ -167,16 +167,14 @@ public class SegmentZKMetadataUtils {
 
     // Set partition metadata
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      ColumnMetadata columnMetadata = entry.getValue();
+    segmentMetadata.forEachColumn((column, columnMetadata) -> {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
-        ColumnPartitionMetadata columnPartitionMetadata =
+        columnPartitionMap.put(column,
             new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
-                columnMetadata.getPartitions(), partitionFunction.getFunctionConfig());
-        columnPartitionMap.put(entry.getKey(), columnPartitionMetadata);
+                columnMetadata.getPartitions(), partitionFunction.getFunctionConfig()));
       }
-    }
+    });
     segmentZKMetadata.setPartitionMetadata(
         !columnPartitionMap.isEmpty() ? new SegmentPartitionMetadata(columnPartitionMap) : null);
 

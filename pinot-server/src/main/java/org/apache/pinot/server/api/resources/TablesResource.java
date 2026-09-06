@@ -245,7 +245,9 @@ public class TablesResource {
 
             Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
             if (columnSet == null) {
-              columnSet = allSegmentColumns;
+              // Copy: getAllColumns() is an unmodifiable view of the segment's own columns, and retainAll below
+              // would otherwise narrow the first segment's metadata rather than the running intersection.
+              columnSet = new HashSet<>(allSegmentColumns);
             } else {
               columnSet.retainAll(allSegmentColumns);
             }
@@ -253,7 +255,7 @@ public class TablesResource {
 
             // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
-              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
               if (columnLength < 0) {
                 // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
@@ -385,10 +387,10 @@ public class TablesResource {
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+      additionalCount = segment.getSegmentMetadata().getNumColumns();
     } else {
       for (String column : columnFilter) {
-        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+        if (segment.getSegmentMetadata().getColumnMetadataFor(column) != null) {
           additionalCount++;
         }
       }

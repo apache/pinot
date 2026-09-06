@@ -25,13 +25,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -156,19 +154,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _columnMaterializer = null;
     _openStructChildren = null;
     _materializationLock = null;
-    TreeMap<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-    _columnNames = Collections.unmodifiableSet(columnMetadataMap.keySet());
-    _physicalColumnNames = new PhysicalColumnNames(columnMetadataMap);
-    _dataSources = new Object2ObjectOpenHashMap<>(columnMetadataMap.size());
+    _columnNames = segmentMetadata.getAllColumns();
+    _physicalColumnNames = new PhysicalColumnNames(segmentMetadata);
+    _dataSources = new Object2ObjectOpenHashMap<>(segmentMetadata.getNumColumns());
 
     Map<String, Map<String, DataSource>> openStructDenseChildren = new HashMap<>();
     Map<String, DataSource> openStructSparseChildren = new HashMap<>();
     Set<String> openStructParents = new HashSet<>();
 
-    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-      String colName = entry.getKey();
-      ColumnMetadata columnMetadata = entry.getValue();
-
+    segmentMetadata.forEachColumn((colName, columnMetadata) -> {
       if (columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild()) {
         String parent = ((ColumnMetadataImpl) columnMetadata).getParentColumn();
         openStructParents.add(parent);
@@ -179,7 +173,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           openStructDenseChildren.computeIfAbsent(parent, k -> new HashMap<>())
               .put(OpenStructNaming.parseKey(colName), childDs);
         }
-        continue;
+        return;
       }
 
       if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
@@ -187,11 +181,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       } else {
         _dataSources.put(colName, new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName)));
       }
-    }
+    });
 
     for (String parent : openStructParents) {
       // The parent's spec comes from its column metadata, not from the segment schema (see _columnNames)
-      ColumnMetadata parentMetadata = columnMetadataMap.get(parent);
+      ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataFor(parent);
       FieldSpec fieldSpec = parentMetadata != null ? parentMetadata.getFieldSpec() : null;
       if (!(fieldSpec instanceof ComplexFieldSpec)) {
         continue;
@@ -231,9 +225,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _columnMaterializer = columnMaterializer;
     _openStructChildren = groupOpenStructChildren(segmentMetadata);
     _materializationLock = new ReentrantReadWriteLock();
-    TreeMap<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-    _columnNames = Collections.unmodifiableSet(columnMetadataMap.keySet());
-    _physicalColumnNames = new PhysicalColumnNames(columnMetadataMap);
+    _columnNames = segmentMetadata.getAllColumns();
+    _physicalColumnNames = new PhysicalColumnNames(segmentMetadata);
     _dataSources = new ConcurrentHashMap<>();
     for (String column : materializedIndexContainers.keySet()) {
       materializeDataSource(column);
@@ -244,21 +237,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   /// metadata declares them complex (the same rule the eager constructor applies).
   @Nullable
   private static Map<String, List<String>> groupOpenStructChildren(SegmentMetadataImpl segmentMetadata) {
-    Map<String, List<String>> children = null;
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-      if (entry.getValue() instanceof ColumnMetadataImpl impl && impl.isMaterializedChild()) {
-        if (children == null) {
-          children = new HashMap<>();
-        }
-        children.computeIfAbsent(impl.getParentColumn(), k -> new ArrayList<>()).add(entry.getKey());
+    Map<String, List<String>> children = new HashMap<>();
+    segmentMetadata.forEachColumn((column, columnMetadata) -> {
+      if (columnMetadata instanceof ColumnMetadataImpl impl && impl.isMaterializedChild()) {
+        children.computeIfAbsent(impl.getParentColumn(), k -> new ArrayList<>()).add(column);
       }
-    }
-    if (children == null) {
-      return null;
-    }
+    });
     children.keySet().removeIf(parent -> {
-      ColumnMetadata parentMetadata = columnMetadataMap.get(parent);
+      ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataFor(parent);
       return parentMetadata == null || !(parentMetadata.getFieldSpec() instanceof ComplexFieldSpec);
     });
     return children.isEmpty() ? null : children;
@@ -268,7 +254,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   /// such column. OPEN_STRUCT child columns are reachable only through their parent, as in the eager mode.
   @Nullable
   private DataSource materializeDataSource(String column) {
-    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataMap().get(column);
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
     boolean openStructParent = _openStructChildren != null && _openStructChildren.containsKey(column);
     if (!openStructParent && (columnMetadata == null || isMaterializedChild(columnMetadata))) {
       return null;
@@ -294,11 +280,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   private DataSource createOpenStructDataSource(String parent) {
-    Map<String, ColumnMetadata> columnMetadataMap = _segmentMetadata.getColumnMetadataMap();
     Map<String, DataSource> denseChildren = new HashMap<>();
     DataSource sparseChild = null;
     for (String child : _openStructChildren.get(parent)) {
-      ColumnMetadata childMetadata = columnMetadataMap.get(child);
+      ColumnMetadata childMetadata = _segmentMetadata.getColumnMetadataFor(child);
       DataSource childDataSource =
           new ImmutableDataSource(childMetadata, materializedIndexContainer(child, childMetadata));
       if (OpenStructNaming.isSparseColumn(child)) {
@@ -307,7 +292,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         denseChildren.put(OpenStructNaming.parseKey(child), childDataSource);
       }
     }
-    ColumnMetadata parentMetadata = columnMetadataMap.get(parent);
+    ColumnMetadata parentMetadata = _segmentMetadata.getColumnMetadataFor(parent);
     ComplexFieldSpec fieldSpec = (ComplexFieldSpec) parentMetadata.getFieldSpec();
     List<String> sparseKeys = parentMetadata instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
     return new ImmutableOpenStructDataSource(fieldSpec, denseChildren, sparseChild, _segmentMetadata.getTotalDocs(),
@@ -412,7 +397,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public <I extends IndexReader> I getIndex(String column, IndexType<?, I, ?> type) {
     ColumnIndexContainer container = _indexContainerMap.get(column);
     if (container == null && _columnMaterializer != null) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataMap().get(column);
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         Lock lock = _materializationLock.readLock();
         lock.lock();

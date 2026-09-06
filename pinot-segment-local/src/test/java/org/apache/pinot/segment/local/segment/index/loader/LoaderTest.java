@@ -237,6 +237,10 @@ public class LoaderTest {
     // path would re-inflate the per-column schema footprint of every segment a server loads.
     assertFalse(((SegmentMetadataImpl) indexSegment.getSegmentMetadata()).isSchemaMaterialized(),
         "the load path must not build the segment schema");
+    // Likewise for the column metadata map: the metadata holds sorted arrays, and the map is derived on demand, so a
+    // stray getColumnMetadataMap() on the load path would cost a map entry per column of every segment loaded.
+    assertFalse(((SegmentMetadataImpl) indexSegment.getSegmentMetadata()).isColumnMetadataMapMaterialized(),
+        "the load path must not build the column metadata map");
 
     // Segment metadata that this segment carries is exposed as a real value, and is not marked null
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
