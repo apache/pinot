@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -35,7 +36,15 @@ public class StarTreeIndexContainer implements Closeable {
   public StarTreeIndexContainer(SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap)
       throws IOException {
-    _starTrees = StarTreeLoaderUtils.loadStarTreeV2(segmentReader, segmentMetadata, indexContainerMap);
+    this(segmentReader, segmentMetadata, indexContainerMap::get);
+  }
+
+  /// `indexContainerProvider` returns the index container of a star-tree dimension column, which lets a segment that
+  /// materializes columns lazily create the container of each dimension while the star-tree is loaded.
+  public StarTreeIndexContainer(SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
+      Function<String, ColumnIndexContainer> indexContainerProvider)
+      throws IOException {
+    _starTrees = StarTreeLoaderUtils.loadStarTreeV2(segmentReader, segmentMetadata, indexContainerProvider);
   }
 
   public List<StarTreeV2> getStarTrees() {
