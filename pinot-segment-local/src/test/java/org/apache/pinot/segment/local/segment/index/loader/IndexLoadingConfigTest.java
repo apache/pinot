@@ -73,6 +73,18 @@ public class IndexLoadingConfigTest {
   }
 
   @Test
+  public void testLazyColumnMaterializationIsSourcedFromInstanceConfig() {
+    assertFalse(new IndexLoadingConfig().isLazyColumnMaterialization());
+
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceConfig.isLazyColumnMaterialization()).thenReturn(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig config = new IndexLoadingConfig(instanceConfig, tableConfig, null);
+    assertTrue(config.isLazyColumnMaterialization());
+    assertTrue(config.withSegmentTier("coldTier").isLazyColumnMaterialization());
+  }
+
+  @Test
   public void testCalculateIndexConfigsWithoutTierOverwrites()
       throws IOException {
     InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
