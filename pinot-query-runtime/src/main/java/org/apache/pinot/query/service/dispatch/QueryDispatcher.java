@@ -69,6 +69,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -225,7 +226,8 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
-    if (QueryOptionsUtils.isStreamStats(queryOptions, _streamStatsDefault)) {
+    if (QueryOptionsUtils.isMaterializedExchange(queryOptions)
+        || QueryOptionsUtils.isStreamStats(queryOptions, _streamStatsDefault)) {
       return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions, statsManager);
     }
     long requestId = context.getRequestId();
@@ -277,9 +279,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   /// most of the budget, the per-stage stats may end up partial (visible via the per-stage `mergeFailed` /
   /// `missing` counts the session exposes).
   ///
-  /// Cancel is handled via [StreamingQuerySession#fanOutCancel()] — no unary Cancel RPCs are issued for this
-  /// query path. On any error, fan-out cancel is broadcast over the open streams, then the broker waits for remaining
-  /// stats before building the final result.
+  /// Cancel is broadcast over open streams via [StreamingQuerySession#fanOutCancel()]. Materialized queries also
+  /// cancel all participating servers on failure, including completed producers whose streams have already closed.
+  /// The broker waits for remaining stats before building the final result.
   ///
   /// **Mixed-version policy.** No automatic fallback to the unary [#submit] path. Enabling
   /// [CommonConstants.Broker.Request.QueryOptionKey#STREAM_STATS] requires every server in the
@@ -312,6 +314,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     }
     StreamingQuerySession session = new StreamingQuerySession(requestId, totalExpected);
 
+    boolean successful = false;
     try {
       submitWithStream(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, session);
       // Increment after submitWithStream populates the server list, mirroring the legacy path (which increments
@@ -338,14 +341,24 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       if (!fullCoverage) {
         LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
             requestId);
+      } else if (brokerResult.getProcessingException() == null
+          && QueryOptionsUtils.isMaterializedExchange(queryOptions)) {
+        validateMaterializedOutputs(requestId, expectedMaterializedOutputs(dispatchableSubPlan),
+            session.getMaterializedOutputs());
       }
-      return mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
+      QueryResult result = mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
+      successful = result.getProcessingException() == null;
+      return result;
     } catch (Exception ex) {
       return tryRecoverWithStream(session, expectedByStage, deadlineMs, ex);
     } catch (Throwable e) {
       session.fanOutCancel();
       throw e;
     } finally {
+      if (!successful && QueryOptionsUtils.isMaterializedExchange(queryOptions)) {
+        // Completed producers have closed their streams but may still own unread output files.
+        cancel(requestId, servers);
+      }
       if (statsManager != null) {
         for (QueryServerInstance server : incrementedServers) {
           statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
@@ -355,6 +368,55 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
         _serversByQuery.remove(requestId);
       }
     }
+  }
+
+  private static Set<String> expectedMaterializedOutputs(DispatchableSubPlan dispatchableSubPlan) {
+    Set<String> expected = new HashSet<>();
+    Map<Integer, DispatchablePlanFragment> stages = dispatchableSubPlan.getQueryStageMap();
+    for (DispatchablePlanFragment producer : stages.values()) {
+      PlanNode root = producer.getPlanFragment().getFragmentRoot();
+      if (!(root instanceof MailboxSendNode) || !((MailboxSendNode) root).isMaterialized()) {
+        continue;
+      }
+      MailboxSendNode send = (MailboxSendNode) root;
+      int consumerStageId = send.getReceiverStageIds().iterator().next();
+      int partitionCount = stages.get(consumerStageId).getWorkerMetadataList().size();
+      int producerStageId = producer.getPlanFragment().getFragmentId();
+      for (WorkerMetadata producerWorker : producer.getWorkerMetadataList()) {
+        for (int partitionId = 0; partitionId < partitionCount; partitionId++) {
+          expected.add(materializedOutputIdentity(producerStageId, producerWorker.getWorkerId(), partitionId));
+        }
+      }
+    }
+    return expected;
+  }
+
+  @VisibleForTesting
+  static void validateMaterializedOutputs(long requestId, Set<String> expected,
+      List<Worker.MaterializedPartitionHandle> actual) {
+    Set<String> actualIdentities = new HashSet<>();
+    for (Worker.MaterializedPartitionHandle handle : actual) {
+      if (handle.getRequestId() != requestId) {
+        throw new IllegalStateException("Unexpected materialized output request id: " + handle.getRequestId());
+      }
+      String identity = materializedOutputIdentity(handle.getProducerStageId(), handle.getProducerWorkerId(),
+          handle.getLogicalPartitionId());
+      if (!actualIdentities.add(identity)) {
+        throw new IllegalStateException("Duplicate materialized output: " + identity);
+      }
+    }
+    if (!actualIdentities.equals(expected)) {
+      Set<String> missing = new HashSet<>(expected);
+      missing.removeAll(actualIdentities);
+      Set<String> unexpected = new HashSet<>(actualIdentities);
+      unexpected.removeAll(expected);
+      throw new IllegalStateException(
+          "Incomplete materialized output coverage; missing=" + missing + ", unexpected=" + unexpected);
+    }
+  }
+
+  private static String materializedOutputIdentity(int stageId, int workerId, int partitionId) {
+    return stageId + "/" + workerId + "/" + partitionId;
   }
 
   /// Streaming variant of [#submit]: opens one `SubmitWithStream` bidi RPC per server, registers each

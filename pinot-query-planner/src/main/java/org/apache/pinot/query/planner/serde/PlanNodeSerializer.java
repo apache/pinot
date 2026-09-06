@@ -183,6 +183,7 @@ public class PlanNodeSerializer {
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
           .setSortedOnSender(node.isSortedOnSender())
+          .setMaterialized(node.isMaterialized())
           .build();
       builder.setMailboxReceiveNode(mailboxReceiveNode);
       return null;
@@ -207,6 +208,7 @@ public class PlanNodeSerializer {
           .setHashFunction(node.getHashFunction())
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
+          .setMaterialized(node.isMaterialized())
           .build();
       builder.setMailboxSendNode(mailboxSendNode);
       return null;

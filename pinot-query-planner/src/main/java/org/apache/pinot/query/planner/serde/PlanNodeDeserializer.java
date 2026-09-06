@@ -158,7 +158,7 @@ public class PlanNodeDeserializer {
         protoMailboxReceiveNode.getSenderStageId(), convertExchangeType(protoMailboxReceiveNode.getExchangeType()),
         convertDistributionType(protoMailboxReceiveNode.getDistributionType()), protoMailboxReceiveNode.getKeysList(),
         convertCollations(protoMailboxReceiveNode.getCollationsList()), protoMailboxReceiveNode.getSort(),
-        protoMailboxReceiveNode.getSortedOnSender(), null);
+        protoMailboxReceiveNode.getSortedOnSender(), null, protoMailboxReceiveNode.getMaterialized());
   }
 
   private static MailboxSendNode deserializeMailboxSendNode(Plan.PlanNode protoNode) {
@@ -181,7 +181,7 @@ public class PlanNodeDeserializer {
         receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
-        protoMailboxSendNode.getSort(), hashFunction);
+        protoMailboxSendNode.getSort(), hashFunction, protoMailboxSendNode.getMaterialized());
   }
 
   private static ProjectNode deserializeProjectNode(Plan.PlanNode protoNode) {

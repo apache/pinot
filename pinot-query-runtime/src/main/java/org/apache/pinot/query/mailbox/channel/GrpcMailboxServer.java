@@ -20,7 +20,9 @@ package org.apache.pinot.query.mailbox.channel;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import io.grpc.Server;
+import io.grpc.Status;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
@@ -30,6 +32,9 @@ import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.SocketTimeoutException;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
@@ -43,6 +48,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.materialized.MaterializedMailboxStore.RecordIterator;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -57,6 +63,7 @@ import org.slf4j.LoggerFactory;
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000L;
+  private static final int PROTOBUF_OVERHEAD_BYTES = 1024;
 
   private final MailboxService _mailboxService;
   private final Server _server;
@@ -66,6 +73,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final boolean _manualInboundFlowControlEnabled;
   private final int _permitKeepAliveTimeMs;
   private final boolean _permitKeepAliveWithoutCalls;
+  private final int _materializedChunkSize;
 
   /// Constructs a gRPC-based mailbox server.
   ///
@@ -152,6 +160,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     int maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES);
+    _materializedChunkSize = Math.max(1, maxInboundMessageSize - PROTOBUF_OVERHEAD_BYTES);
     Preconditions.checkArgument(_inboundMessageCredit > 0,
         "%s must be positive, got: %s",
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
@@ -254,5 +263,115 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     // behaviour, retained as a rollback knob via KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED.
     return new MailboxContentObserver(_mailboxService, mailboxId, serverCallObserver,
         _manualInboundFlowControlEnabled);
+  }
+
+  @Override
+  public void readMaterializedPartition(Mailbox.MaterializedPartitionRequest request,
+      StreamObserver<Mailbox.MaterializedPartitionContent> responseObserver) {
+    ServerCallStreamObserver<Mailbox.MaterializedPartitionContent> serverObserver =
+        (ServerCallStreamObserver<Mailbox.MaterializedPartitionContent>) responseObserver;
+    RecordIterator records;
+    try {
+      records = _mailboxService.readMaterializedPartitionRecords(
+          request.getRequestId(), request.getProducerStageId(), request.getProducerWorkerId(),
+          request.getLogicalPartitionId(), request.getDeadlineMs());
+    } catch (RuntimeException e) {
+      responseObserver.onError(toStatus(e));
+      return;
+    }
+    new MaterializedPartitionPump(records, serverObserver, _materializedChunkSize).start();
+  }
+
+  private static RuntimeException toStatus(RuntimeException e) {
+    if (e instanceof CancellationException) {
+      return Status.CANCELLED.withDescription(e.getMessage()).withCause(e).asRuntimeException();
+    }
+    if (e instanceof UncheckedIOException && e.getCause() instanceof SocketTimeoutException) {
+      return Status.DEADLINE_EXCEEDED.withDescription(e.getMessage()).withCause(e).asRuntimeException();
+    }
+    return Status.INTERNAL.withDescription("Failed to read materialized partition").withCause(e).asRuntimeException();
+  }
+
+  /// Serializes ready/cancel callbacks on this pump; the draining flag also prevents synchronous reentry.
+  @VisibleForTesting
+  static final class MaterializedPartitionPump implements Runnable {
+    private final RecordIterator _records;
+    private final ServerCallStreamObserver<Mailbox.MaterializedPartitionContent> _observer;
+    private final int _chunkSize;
+    private boolean _draining;
+    private boolean _terminated;
+    private byte[] _record;
+    private int _offset;
+
+    MaterializedPartitionPump(RecordIterator records,
+        ServerCallStreamObserver<Mailbox.MaterializedPartitionContent> observer, int chunkSize) {
+      _records = records;
+      _observer = observer;
+      _chunkSize = chunkSize;
+    }
+
+    void start() {
+      _observer.setOnCancelHandler(this::cancel);
+      _observer.setOnReadyHandler(this);
+      if (_observer.isCancelled()) {
+        cancel();
+      } else {
+        run();
+      }
+    }
+
+    @Override
+    public synchronized void run() {
+      if (_draining || _terminated) {
+        return;
+      }
+      _draining = true;
+      try {
+        while (!_terminated && _observer.isReady()) {
+          if (_observer.isCancelled()) {
+            cancel();
+            return;
+          }
+          if (_record == null) {
+            if (!_records.hasNext()) {
+              _terminated = true;
+              _observer.onCompleted();
+              return;
+            }
+            _record = _records.next();
+            _offset = 0;
+          }
+          int length = Math.min(_chunkSize, _record.length - _offset);
+          boolean endOfBlock = _offset + length == _record.length;
+          _observer.onNext(Mailbox.MaterializedPartitionContent.newBuilder()
+              .setPayload(ByteString.copyFrom(_record, _offset, length))
+              .setEndOfBlock(endOfBlock)
+              .build());
+          _offset += length;
+          if (endOfBlock) {
+            _record = null;
+          }
+        }
+      } catch (RuntimeException e) {
+        if (!_terminated) {
+          cancel();
+          _observer.onError(toStatus(e));
+        }
+      } finally {
+        _draining = false;
+      }
+    }
+
+    private synchronized void cancel() {
+      if (!_terminated) {
+        _terminated = true;
+        _record = null;
+        try {
+          _records.close();
+        } catch (IOException e) {
+          LOGGER.debug("Failed to close materialized partition reader", e);
+        }
+      }
+    }
   }
 }
