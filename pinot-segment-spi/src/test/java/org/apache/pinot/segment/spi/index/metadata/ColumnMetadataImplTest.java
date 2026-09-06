@@ -20,7 +20,9 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +56,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -346,6 +349,251 @@ public class ColumnMetadataImplTest {
     }
     assertTrue(none.toString().contains("_hasDictionary=false, _forwardIndexEncoding=RAW, _sorted=false"),
         none.toString());
+  }
+
+  /// The min/max value of a fixed-width stored type is held as raw bits and boxed on read, so every stored type must
+  /// come back as the very value [ColumnMetadataImpl#fromPropertiesConfiguration] parsed: same class, same value.
+  @Test
+  public void minMaxValuesRoundTripForEveryDataType() {
+    Map<DataType, List<Object>> expected = new LinkedHashMap<>();
+    expected.put(DataType.INT, List.of("-5", "7", -5, 7));
+    expected.put(DataType.LONG, List.of("-5000000000", "7000000000", -5000000000L, 7000000000L));
+    expected.put(DataType.FLOAT, List.of("-1.5", "2.5", -1.5f, 2.5f));
+    expected.put(DataType.DOUBLE, List.of("-1.5", "2.5", -1.5d, 2.5d));
+    // BOOLEAN is stored as INT and TIMESTAMP as LONG, so their min/max are the stored type's box.
+    expected.put(DataType.BOOLEAN, List.of("0", "1", 0, 1));
+    expected.put(DataType.TIMESTAMP, List.of("1000", "2000", 1000L, 2000L));
+    expected.put(DataType.STRING, List.of("aa", "zz", "aa", "zz"));
+    expected.put(DataType.JSON, List.of("{}", "{}", "{}", "{}"));
+    expected.put(DataType.BIG_DECIMAL, List.of("-1.50", "2.5", new BigDecimal("-1.50"), new BigDecimal("2.5")));
+
+    expected.forEach((dataType, values) -> {
+      ColumnMetadataImpl metadata = withMinMax(dataType, (String) values.get(0), (String) values.get(1));
+      assertEquals(metadata.getMinValue(), values.get(2), dataType.name());
+      assertEquals(metadata.getMaxValue(), values.get(3), dataType.name());
+      assertEquals(metadata.getMinValue().getClass(), values.get(2).getClass(), dataType.name());
+      assertEquals(metadata.getMaxValue().getClass(), values.get(3).getClass(), dataType.name());
+      assertFalse(metadata.isMinMaxValueInvalid(), dataType.name());
+      // The REST payload is serialized from the getters, so it carries exactly the node the value serializes to.
+      JsonNode json = JsonUtils.objectToJsonNode(metadata);
+      assertEquals(json.get("minValue"), JsonUtils.objectToJsonNode(values.get(2)), dataType.name());
+      assertEquals(json.get("maxValue"), JsonUtils.objectToJsonNode(values.get(3)), dataType.name());
+    });
+
+    // BYTES parses to a ByteArray, which is var-width and therefore always kept as an object.
+    ColumnMetadataImpl bytes = withMinMax(DataType.BYTES, "0a0b", "ff");
+    assertEquals(bytes.getMinValue(), BytesUtils.toByteArray("0a0b"));
+    assertEquals(bytes.getMaxValue(), BytesUtils.toByteArray("ff"));
+  }
+
+  /// A column with no min/max keeps reporting `null` for both, and the min-max-invalid flag is independent of them.
+  @Test
+  public void minMaxValuesAbsentOrInvalid() {
+    for (DataType dataType : List.of(DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BOOLEAN,
+        DataType.TIMESTAMP, DataType.STRING, DataType.BYTES, DataType.BIG_DECIMAL)) {
+      ColumnMetadataImpl absent = withMinMax(dataType, null, null);
+      assertNull(absent.getMinValue(), dataType.name());
+      assertNull(absent.getMaxValue(), dataType.name());
+      assertFalse(absent.isMinMaxValueInvalid(), dataType.name());
+
+      PropertiesConfiguration invalidConfig = minMaxConfig(dataType, null, null);
+      invalidConfig.setProperty(Column.getKeyFor("col", Column.MIN_MAX_VALUE_INVALID), true);
+      ColumnMetadataImpl invalid = ColumnMetadataImpl.fromPropertiesConfiguration(invalidConfig, 10, "col");
+      assertNull(invalid.getMinValue(), dataType.name());
+      assertNull(invalid.getMaxValue(), dataType.name());
+      assertTrue(invalid.isMinMaxValueInvalid(), dataType.name());
+      assertNotEquals(invalid, absent, dataType.name());
+
+      // Only one of the two present: the other stays null rather than reading back the packed zero.
+      String value = dataType == DataType.BYTES ? "0a" : "1";
+      ColumnMetadataImpl minOnly = withMinMax(dataType, value, null);
+      assertNotNull(minOnly.getMinValue(), dataType.name());
+      assertNull(minOnly.getMaxValue(), dataType.name());
+      ColumnMetadataImpl maxOnly = withMinMax(dataType, null, value);
+      assertNull(maxOnly.getMinValue(), dataType.name());
+      assertNotNull(maxOnly.getMaxValue(), dataType.name());
+      assertNotEquals(maxOnly, minOnly, dataType.name());
+    }
+
+    // A COMPLEX column has no min/max at all and is flagged invalid.
+    PropertiesConfiguration complexConfig = complexConfig("metrics", "cpu");
+    complexConfig.setProperty(Column.getKeyFor("metrics", Column.CARDINALITY), 1);
+    ColumnMetadataImpl complex = ColumnMetadataImpl.fromPropertiesConfiguration(complexConfig, 10, "metrics");
+    assertNull(complex.getMinValue());
+    assertNull(complex.getMaxValue());
+    assertTrue(complex.isMinMaxValueInvalid());
+  }
+
+  /// A packed min/max takes part in equality, hashCode and toString exactly as the boxed value did, including the
+  /// FLOAT/DOUBLE corner cases where bit equality and [Float#equals] must agree.
+  @Test
+  public void packedMinMaxValuesParticipateInValueObjectMethods() {
+    ColumnMetadataImpl first = withMinMax(DataType.INT, "-5", "7");
+    assertEquals(first, withMinMax(DataType.INT, "-5", "7"));
+    assertEquals(first.hashCode(), withMinMax(DataType.INT, "-5", "7").hashCode());
+    assertNotEquals(first, withMinMax(DataType.INT, "-5", "8"));
+    assertNotEquals(first, withMinMax(DataType.INT, "-5", null));
+    assertTrue(first.toString().contains("_minValue=-5, _maxValue=7"), first.toString());
+
+    // Zero is the value the words hold when a value is absent, so it must stay distinguishable from absence.
+    ColumnMetadataImpl zero = withMinMax(DataType.INT, "0", "0");
+    assertEquals(zero.getMinValue(), 0);
+    assertNotEquals(zero, withMinMax(DataType.INT, null, null));
+
+    // -0.0 is not equal to 0.0 for Float/Double, and NaN is equal to itself: bit equality agrees with both.
+    assertNotEquals(withMinMax(DataType.FLOAT, "-0.0", "1").getMinValue(),
+        withMinMax(DataType.FLOAT, "0.0", "1").getMinValue());
+    assertNotEquals(withMinMax(DataType.DOUBLE, "-0.0", "1"), withMinMax(DataType.DOUBLE, "0.0", "1"));
+    ColumnMetadataImpl nan = withMinMax(DataType.DOUBLE, "NaN", "NaN");
+    assertEquals(nan.getMinValue(), Double.NaN);
+    assertEquals(nan, withMinMax(DataType.DOUBLE, "NaN", "NaN"));
+    assertEquals(nan.hashCode(), withMinMax(DataType.DOUBLE, "NaN", "NaN").hashCode());
+  }
+
+  /// [ColumnMetadataImpl.Builder] is public, so a caller may hand a fixed-width column a min/max that is not the box
+  /// class of its stored type. Such a value cannot be packed and must survive as the object it is.
+  @Test
+  public void minMaxOfUnexpectedTypeIsKeptVerbatim() {
+    ColumnMetadataImpl metadata = unexpectedMinMax();
+    assertEquals(metadata.getMinValue(), "not-an-int");
+    assertEquals(metadata.getMaxValue(), 3L);
+    assertEquals(metadata, unexpectedMinMax());
+    assertEquals(metadata.hashCode(), unexpectedMinMax().hashCode());
+    // The lengths of a fixed-width column are derived, so the fallback cannot disturb them.
+    assertEquals(metadata.getLengthOfLongestElement(), Integer.BYTES);
+  }
+
+  private static ColumnMetadataImpl unexpectedMinMax() {
+    return ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setTotalDocs(10)
+        .setMinValue("not-an-int")
+        .setMaxValue(3L)
+        .build();
+  }
+
+  /// The element lengths share their two words with the numeric min/max, so a var-width column must round-trip all
+  /// three of them while a fixed-width column derives them from its stored type and its multi-value count.
+  @Test
+  public void elementLengthsRoundTrip() {
+    ColumnMetadataImpl varWidthMv = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, false))
+        .setTotalDocs(10)
+        .setLengthOfShortestElement(2)
+        .setLengthOfLongestElement(7)
+        .setMaxNumberOfMultiValues(3)
+        .setMaxRowLengthInBytes(15)
+        .setTotalNumberOfEntries(30)
+        .setMinValue("aa")
+        .setMaxValue("zz")
+        .build();
+    assertEquals(varWidthMv.getLengthOfShortestElement(), 2);
+    assertEquals(varWidthMv.getLengthOfLongestElement(), 7);
+    assertEquals(varWidthMv.getMaxRowLengthInBytes(), 15);
+    assertEquals(varWidthMv.getMaxNumberOfMultiValues(), 3);
+    assertEquals(varWidthMv.getTotalNumberOfEntries(), 30);
+    assertEquals(varWidthMv.getMinValue(), "aa");
+    assertEquals(varWidthMv.getMaxValue(), "zz");
+    assertFalse(varWidthMv.isFixedLength());
+
+    // A var-width SV column: the max row length is the longest element.
+    ColumnMetadataImpl varWidthSv = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true))
+        .setTotalDocs(10).setLengthOfShortestElement(4).setLengthOfLongestElement(4).build();
+    assertEquals(varWidthSv.getMaxRowLengthInBytes(), 4);
+    assertEquals(varWidthSv.getTotalNumberOfEntries(), 10);
+    assertEquals(varWidthSv.getMaxNumberOfMultiValues(), 0);
+    assertTrue(varWidthSv.isFixedLength());
+
+    // Pre-1.6.0 raw var-width columns write no lengths at all: the UNAVAILABLE sentinel must survive the packing.
+    ColumnMetadataImpl unavailable = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 10, "col");
+    assertEquals(unavailable.getLengthOfShortestElement(), ColumnMetadata.UNAVAILABLE);
+    assertEquals(unavailable.getLengthOfLongestElement(), ColumnMetadata.UNAVAILABLE);
+    assertEquals(unavailable.getMaxRowLengthInBytes(), ColumnMetadata.UNAVAILABLE);
+
+    // Fixed-width columns derive all three from the stored type, min/max being packed in the same words.
+    ColumnMetadataImpl fixedSv = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.TIMESTAMP, true))
+        .setTotalDocs(10).setMinValue(1L).setMaxValue(2L).build();
+    assertEquals(fixedSv.getLengthOfShortestElement(), Long.BYTES);
+    assertEquals(fixedSv.getLengthOfLongestElement(), Long.BYTES);
+    assertEquals(fixedSv.getMaxRowLengthInBytes(), Long.BYTES);
+    assertEquals(fixedSv.getMinValue(), 1L);
+
+    ColumnMetadataImpl fixedMv = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, false))
+        .setTotalDocs(10).setMaxNumberOfMultiValues(3).setTotalNumberOfEntries(25).setMinValue(1).setMaxValue(2)
+        .build();
+    assertEquals(fixedMv.getLengthOfLongestElement(), Integer.BYTES);
+    assertEquals(fixedMv.getMaxRowLengthInBytes(), 3 * Integer.BYTES);
+    assertEquals(fixedMv.getTotalNumberOfEntries(), 25);
+    assertEquals(fixedMv.getMinValue(), 1);
+  }
+
+  /// The ints that are not column-distinguishing are interned, so the columns of one segment hold one instance
+  /// instead of four ints each. This is the whole point of the indirection, so pin it on the private field.
+  @Test
+  public void columnsOfASegmentShareTheirShape()
+      throws Exception {
+    ColumnMetadataImpl intColumn = rawColumn(DataType.INT, 1000);
+    ColumnMetadataImpl stringColumn = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("other", DataType.STRING, true))
+        .setTotalDocs(1000).setCardinality(900).setLengthOfShortestElement(1).setLengthOfLongestElement(17).build();
+    assertSame(shapeOf(stringColumn), shapeOf(intColumn),
+        "columns of one segment must share their shape whatever their type, cardinality or element lengths");
+
+    assertNotSame(shapeOf(rawColumn(DataType.INT, 1001)), shapeOf(intColumn), "total docs");
+    ColumnMetadataImpl dictionary = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setTotalDocs(1000).setHasDictionary(true).setBitsPerElement(8).build();
+    assertNotSame(shapeOf(dictionary), shapeOf(intColumn), "bits per element");
+    assertEquals(dictionary.getBitsPerElement(), 8);
+    assertEquals(intColumn.getBitsPerElement(), ColumnMetadata.UNAVAILABLE);
+    ColumnMetadataImpl multiValue = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, false))
+        .setTotalDocs(1000).setMaxNumberOfMultiValues(3).setTotalNumberOfEntries(2000).build();
+    assertNotSame(shapeOf(multiValue), shapeOf(intColumn), "multi-value counts");
+  }
+
+  /// The shapes are held weakly, so a segment's shape is released with the last column that holds it; an interner
+  /// that pinned them would leak one per distinct segment shape ever loaded.
+  @Test
+  public void unreferencedShapeIsReleased()
+      throws Exception {
+    WeakReference<Object> shape = new WeakReference<>(shapeOf(rawColumn(DataType.INT, 987654321)));
+    for (int i = 0; i < 100 && shape.get() != null; i++) {
+      System.gc();
+      Thread.sleep(10);
+    }
+    assertNull(shape.get(), "the interner must not keep an unloaded segment's shape alive");
+  }
+
+  private static ColumnMetadataImpl rawColumn(DataType dataType, int totalDocs) {
+    return ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", dataType, true))
+        .setTotalDocs(totalDocs).setCardinality(5).build();
+  }
+
+  private static Object shapeOf(ColumnMetadataImpl metadata)
+      throws Exception {
+    Field field = ColumnMetadataImpl.class.getDeclaredField("_shape");
+    field.setAccessible(true);
+    return field.get(metadata);
+  }
+
+  private static ColumnMetadataImpl withMinMax(DataType dataType, @Nullable String min, @Nullable String max) {
+    return ColumnMetadataImpl.fromPropertiesConfiguration(minMaxConfig(dataType, min, max), 10, "col");
+  }
+
+  private static PropertiesConfiguration minMaxConfig(DataType dataType, @Nullable String min, @Nullable String max) {
+    PropertiesConfiguration config = configFor(FieldType.DIMENSION, dataType, null);
+    if (min != null) {
+      config.setProperty(Column.getKeyFor("col", Column.MIN_VALUE), min);
+    }
+    if (max != null) {
+      config.setProperty(Column.getKeyFor("col", Column.MAX_VALUE), max);
+    }
+    return config;
   }
 
   private static Set<String> flags(ColumnMetadataImpl metadata) {

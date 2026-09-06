@@ -74,24 +74,43 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 /// as immutable: a setter call on one would bleed into every other segment and table that shares it, and would
 /// corrupt the interner's hash bucket (nothing ever mutated one; copy via a JSON round-trip before mutating).
 ///
-/// The object layout is kept at 72 bytes for an ordinary column for the same reason: the six booleans and the
-/// forward-index encoding are packed into one [#_flags] byte, and the refs only a partitioned column or an OPEN_STRUCT
-/// parent/child carries (partition function and partitions, parent column, sparse keys) live in a lazily allocated
-/// [Extras] holder that stays `null` for every other column. The compression stats stay a direct ref because the
-/// segment creator writes them for every raw column. None of this is visible through the public getters, so the
+/// The object layout is kept at 64 bytes for an ordinary column for the same reason: the six booleans, the
+/// forward-index encoding and the two min/max representation bits are packed into one [#_flags] short; the refs only
+/// a partitioned column or an OPEN_STRUCT parent/child carries (partition function and partitions, parent column,
+/// sparse keys) live in a lazily allocated [Extras] holder that stays `null` for every other column; the four ints
+/// that are not column-distinguishing live in a shared [SharedShape]; and the three element-length ints share their
+/// two words with the numeric min/max (see [#_minWord]). The compression stats stay a direct ref because the segment
+/// creator writes them for every raw column. None of this is visible through the public getters, so the
 /// `/tables/{table}/segments/{segment}/metadata` payload (bean-serialized from the getters) is unchanged.
+///
+/// | bytes | field(s) |
+/// |------:|----------|
+/// |    12 | object header |
+/// |     4 | `_cardinality` |
+/// |    16 | `_minWord`, `_maxWord` |
+/// |   2+2 | `_flags` plus alignment padding |
+/// |    28 | `_fieldSpec`, `_shape`, `_minValue`, `_maxValue`, `_extras`, `_compressionMetadata`, `_indexTypeSizes` |
+/// |    64 | total (was 72: eight ints, six refs and a flags byte) |
+///
+/// On top of the eight bytes this saves directly, a fixed-width column no longer retains a box per min/max value
+/// (~30 bytes and two objects per column for a nullable INT column), and the [SharedShape] is amortized over every
+/// column of the segment that has the same shape.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
 
   // Bits of _flags
-  private static final byte HAS_DICTIONARY = 1;
-  private static final byte DICTIONARY_ENCODED_FORWARD_INDEX = 1 << 1;
-  private static final byte SORTED = 1 << 2;
-  private static final byte NON_NULL = 1 << 3;
-  private static final byte MIN_MAX_VALUE_INVALID = 1 << 4;
-  private static final byte ASCII = 1 << 5;
-  private static final byte AUTO_GENERATED = 1 << 6;
+  private static final short HAS_DICTIONARY = 1;
+  private static final short DICTIONARY_ENCODED_FORWARD_INDEX = 1 << 1;
+  private static final short SORTED = 1 << 2;
+  private static final short NON_NULL = 1 << 3;
+  private static final short MIN_MAX_VALUE_INVALID = 1 << 4;
+  private static final short ASCII = 1 << 5;
+  private static final short AUTO_GENERATED = 1 << 6;
+  /// Set when the min (max) value is held as raw bits in [#_minWord] ([#_maxWord]) rather than as an object in
+  /// [#_minValue] ([#_maxValue]); an absent value sets neither.
+  private static final short MIN_VALUE_IN_WORD = 1 << 7;
+  private static final short MAX_VALUE_IN_WORD = 1 << 8;
 
   /// Canonical instances of the [FieldSpec]s parsed from `metadata.properties`, keyed by [FieldSpec#equals] /
   /// [FieldSpec#hashCode] (name, data type, single-value, default null value, max length, date-time format and
@@ -100,22 +119,35 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   /// any of them and is released once the last one is unloaded. Thread-safe.
   private static final Interner<FieldSpec> FIELD_SPEC_INTERNER = Interners.newWeakInterner();
 
+  /// Canonical instances of the [SharedShape]s, held weakly exactly like [#FIELD_SPEC_INTERNER]: the canonical
+  /// instance is one of the instances the loaded segments retain, so it lives as long as any of them.
+  private static final Interner<SharedShape> SHAPE_INTERNER = Interners.newWeakInterner();
+
   private final FieldSpec _fieldSpec;
-  private final int _totalDocs;
+  /// The ints that are not column-distinguishing, shared with every other column that has the same shape.
+  private final SharedShape _shape;
   private final int _cardinality;
+  /// Two words with a use that depends on whether the stored type is fixed width, which is exactly the condition
+  /// under which the other use is dead:
+  /// - fixed-width stored type (INT, LONG, FLOAT, DOUBLE, and BOOLEAN/TIMESTAMP through their stored type): the raw
+  ///   bits of the min and max value, boxed on demand by [#getMinValue()] / [#getMaxValue()], with presence carried
+  ///   by [#MIN_VALUE_IN_WORD] / [#MAX_VALUE_IN_WORD]. The element lengths are dead here because [Builder#build()]
+  ///   pins them to `storedType.size()`.
+  /// - otherwise: `_minWord` packs `lengthOfShortestElement` (high half) and `lengthOfLongestElement` (low half),
+  ///   `_maxWord` holds `maxRowLengthInBytes`. The value words are dead here because a STRING, BYTES, BIG_DECIMAL or
+  ///   COMPLEX min/max is an object, kept in [#_minValue] / [#_maxValue].
+  ///
+  /// A fixed-width column whose builder was handed a min/max that is not the box class of its stored type falls back
+  /// to [#_minValue] / [#_maxValue] as well, so no caller can lose a value by handing over an unexpected type.
+  private final long _minWord;
+  private final long _maxWord;
   @Nullable
   private final Comparable _minValue;
   @Nullable
   private final Comparable _maxValue;
-  private final int _lengthOfShortestElement;
-  private final int _lengthOfLongestElement;
-  private final int _totalNumberOfEntries;
-  private final int _maxNumberOfMultiValues;
-  private final int _maxRowLengthInBytes;
-  private final int _bitsPerElement;
-  /// hasDictionary, forward-index encoding, sorted, nonNull, minMaxValueInvalid, ascii and autoGenerated, see the
-  /// bit constants above.
-  private final byte _flags;
+  /// hasDictionary, forward-index encoding, sorted, nonNull, minMaxValueInvalid, ascii, autoGenerated and the two
+  /// min/max representation bits, see the bit constants above.
+  private final short _flags;
   @Nullable
   private final Extras _extras;
   @Nullable
@@ -126,28 +158,27 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   @Nullable
   private LongArrayList _indexTypeSizes;
 
-  private ColumnMetadataImpl(FieldSpec fieldSpec, int totalDocs, int cardinality, @Nullable Comparable minValue,
-      @Nullable Comparable maxValue, int lengthOfShortestElement, int lengthOfLongestElement,
-      int totalNumberOfEntries, int maxNumberOfMultiValues, int maxRowLengthInBytes, int bitsPerElement, byte flags,
-      @Nullable Extras extras, @Nullable CompressionMetadata compressionMetadata) {
+  private ColumnMetadataImpl(FieldSpec fieldSpec, SharedShape shape, int cardinality, long minWord, long maxWord,
+      @Nullable Comparable minValue, @Nullable Comparable maxValue, short flags, @Nullable Extras extras,
+      @Nullable CompressionMetadata compressionMetadata) {
     _fieldSpec = fieldSpec;
-    _totalDocs = totalDocs;
+    _shape = shape;
     _cardinality = cardinality;
+    _minWord = minWord;
+    _maxWord = maxWord;
     _minValue = minValue;
     _maxValue = maxValue;
-    _lengthOfShortestElement = lengthOfShortestElement;
-    _lengthOfLongestElement = lengthOfLongestElement;
-    _totalNumberOfEntries = totalNumberOfEntries;
-    _maxNumberOfMultiValues = maxNumberOfMultiValues;
-    _maxRowLengthInBytes = maxRowLengthInBytes;
-    _bitsPerElement = bitsPerElement;
     _flags = flags;
     _extras = extras;
     _compressionMetadata = compressionMetadata;
   }
 
-  private boolean hasFlag(byte flag) {
+  private boolean hasFlag(short flag) {
     return (_flags & flag) != 0;
+  }
+
+  private boolean isFixedWidth() {
+    return _fieldSpec.getDataType().getStoredType().isFixedWidth();
   }
 
   @Override
@@ -157,7 +188,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int getTotalDocs() {
-    return _totalDocs;
+    return _shape._totalDocs;
   }
 
   @Override
@@ -185,16 +216,37 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return hasFlag(NON_NULL);
   }
 
+  /// Returns the value equal to the one the builder was handed. A fixed-width min/max is boxed on every call rather
+  /// than retained: a server keeps one instance of this class per (segment, column) for the segment lifetime, while
+  /// the callers (segment pruners, aggregation rewrites, range-index construction) read it a handful of times per
+  /// query and let the box die in the young generation.
   @Nullable
   @Override
   public Comparable<?> getMinValue() {
-    return _minValue;
+    return hasFlag(MIN_VALUE_IN_WORD) ? boxValueWord(_minWord) : _minValue;
   }
 
   @Nullable
   @Override
   public Comparable<?> getMaxValue() {
-    return _maxValue;
+    return hasFlag(MAX_VALUE_IN_WORD) ? boxValueWord(_maxWord) : _maxValue;
+  }
+
+  /// Boxes a value word written by [Builder#toValueWord]; only reached for a fixed-width stored type.
+  private Comparable<?> boxValueWord(long word) {
+    DataType storedType = _fieldSpec.getDataType().getStoredType();
+    switch (storedType) {
+      case INT:
+        return (int) word;
+      case LONG:
+        return word;
+      case FLOAT:
+        return Float.intBitsToFloat((int) word);
+      case DOUBLE:
+        return Double.longBitsToDouble(word);
+      default:
+        throw new IllegalStateException("Unsupported stored type for a packed min/max value: " + storedType);
+    }
   }
 
   @Override
@@ -204,12 +256,12 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int getLengthOfShortestElement() {
-    return _lengthOfShortestElement;
+    return isFixedWidth() ? _fieldSpec.getDataType().getStoredType().size() : (int) (_minWord >> 32);
   }
 
   @Override
   public int getLengthOfLongestElement() {
-    return _lengthOfLongestElement;
+    return isFixedWidth() ? _fieldSpec.getDataType().getStoredType().size() : (int) _minWord;
   }
 
   @Override
@@ -219,22 +271,29 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int getBitsPerElement() {
-    return _bitsPerElement;
+    return _shape._bitsPerElement;
   }
 
   @Override
   public int getTotalNumberOfEntries() {
-    return _totalNumberOfEntries;
+    return _shape._totalNumberOfEntries;
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return _maxNumberOfMultiValues;
+    return _shape._maxNumberOfMultiValues;
   }
 
+  /// [Builder#build()] pins this to `lengthOfLongestElement` for an SV column and to
+  /// `maxNumberOfMultiValues * storedType.size()` for a fixed-width MV column, so only a var-width MV column needs
+  /// the value stored (in [#_maxWord]).
   @Override
   public int getMaxRowLengthInBytes() {
-    return _maxRowLengthInBytes;
+    if (isFixedWidth()) {
+      int size = _fieldSpec.getDataType().getStoredType().size();
+      return _fieldSpec.isSingleValueField() ? size : _shape._maxNumberOfMultiValues * size;
+    }
+    return (int) _maxWord;
   }
 
   @Nullable
@@ -349,16 +408,14 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
+    // The representation two equal columns pick is a function of their field spec and their values, so comparing the
+    // raw words and flags is equivalent to comparing the boxed min/max and the unpacked lengths.
     ColumnMetadataImpl that = (ColumnMetadataImpl) o;
-    return _totalDocs == that._totalDocs
-        && _cardinality == that._cardinality
+    return _cardinality == that._cardinality
         && _flags == that._flags
-        && _lengthOfShortestElement == that._lengthOfShortestElement
-        && _lengthOfLongestElement == that._lengthOfLongestElement
-        && _totalNumberOfEntries == that._totalNumberOfEntries
-        && _maxNumberOfMultiValues == that._maxNumberOfMultiValues
-        && _maxRowLengthInBytes == that._maxRowLengthInBytes
-        && _bitsPerElement == that._bitsPerElement
+        && _minWord == that._minWord
+        && _maxWord == that._maxWord
+        && Objects.equals(_shape, that._shape)
         && Objects.equals(_fieldSpec, that._fieldSpec)
         && Objects.equals(_minValue, that._minValue)
         && Objects.equals(_maxValue, that._maxValue)
@@ -369,9 +426,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_fieldSpec, _totalDocs, _cardinality, _flags, _minValue, _maxValue, _lengthOfShortestElement,
-        _lengthOfLongestElement, _totalNumberOfEntries, _maxNumberOfMultiValues, _maxRowLengthInBytes, _bitsPerElement,
-        _extras, _compressionMetadata, _indexTypeSizes);
+    return Objects.hash(_fieldSpec, _shape, _cardinality, _flags, _minWord, _maxWord, _minValue, _maxValue, _extras,
+        _compressionMetadata, _indexTypeSizes);
   }
 
   // Keeps the pre-packing field names and order, which tests and log consumers match on
@@ -379,21 +435,21 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   public String toString() {
     return "ColumnMetadataImpl{"
         + "_fieldSpec=" + _fieldSpec
-        + ", _totalDocs=" + _totalDocs
+        + ", _totalDocs=" + getTotalDocs()
         + ", _cardinality=" + _cardinality
         + ", _hasDictionary=" + hasDictionary()
         + ", _forwardIndexEncoding=" + getForwardIndexEncoding()
         + ", _sorted=" + isSorted() + ", _nonNull=" + isNonNull()
-        + ", _minValue=" + _minValue
-        + ", _maxValue=" + _maxValue
+        + ", _minValue=" + getMinValue()
+        + ", _maxValue=" + getMaxValue()
         + ", _minMaxValueInvalid=" + isMinMaxValueInvalid()
-        + ", _lengthOfShortestElement=" + _lengthOfShortestElement
-        + ", _lengthOfLongestElement=" + _lengthOfLongestElement
+        + ", _lengthOfShortestElement=" + getLengthOfShortestElement()
+        + ", _lengthOfLongestElement=" + getLengthOfLongestElement()
         + ", _isAscii=" + isAscii()
-        + ", _totalNumberOfEntries=" + _totalNumberOfEntries
-        + ", _maxNumberOfMultiValues=" + _maxNumberOfMultiValues
-        + ", _maxRowLengthInBytes=" + _maxRowLengthInBytes
-        + ", _bitsPerElement=" + _bitsPerElement
+        + ", _totalNumberOfEntries=" + getTotalNumberOfEntries()
+        + ", _maxNumberOfMultiValues=" + getMaxNumberOfMultiValues()
+        + ", _maxRowLengthInBytes=" + getMaxRowLengthInBytes()
+        + ", _bitsPerElement=" + getBitsPerElement()
         + ", _partitionFunction=" + getPartitionFunction()
         + ", _partitions=" + getPartitions()
         + ", _autoGenerated=" + isAutoGenerated()
@@ -661,6 +717,51 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  /// The ints of a column that are not column-distinguishing, interned through [#SHAPE_INTERNER] so the columns of a
+  /// segment that have the same shape hold one instance instead of four ints each.
+  ///
+  /// `totalDocs` is identical for every column of a segment; `totalNumberOfEntries` and `maxNumberOfMultiValues` are
+  /// pinned by [Builder#build()] to `totalDocs` and `0` for every SV column; and `bitsPerElement` is `UNAVAILABLE`
+  /// for every raw column and takes one of at most 33 values (`1..32`) for a dictionary-encoded one. So the SV
+  /// columns of a segment share at most ~34 instances however wide the segment is, and a wide external table of raw
+  /// columns shares exactly one. The remaining four ints are not held here: `cardinality` is distinguishing, and the
+  /// three element lengths are derived or packed into [#_minWord] / [#_maxWord].
+  ///
+  /// Immutable and thread-safe.
+  private static final class SharedShape {
+    private final int _totalDocs;
+    private final int _totalNumberOfEntries;
+    private final int _maxNumberOfMultiValues;
+    private final int _bitsPerElement;
+
+    private SharedShape(int totalDocs, int totalNumberOfEntries, int maxNumberOfMultiValues, int bitsPerElement) {
+      _totalDocs = totalDocs;
+      _totalNumberOfEntries = totalNumberOfEntries;
+      _maxNumberOfMultiValues = maxNumberOfMultiValues;
+      _bitsPerElement = bitsPerElement;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      SharedShape that = (SharedShape) o;
+      return _totalDocs == that._totalDocs
+          && _totalNumberOfEntries == that._totalNumberOfEntries
+          && _maxNumberOfMultiValues == that._maxNumberOfMultiValues
+          && _bitsPerElement == that._bitsPerElement;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_totalDocs, _totalNumberOfEntries, _maxNumberOfMultiValues, _bitsPerElement);
+    }
   }
 
   /// The refs that only a partitioned column (partition function and partitions) or an OPEN_STRUCT parent/child
@@ -964,7 +1065,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         _bitsPerElement = UNAVAILABLE;
       }
 
-      byte flags = 0;
+      short flags = 0;
       if (_hasDictionary) {
         flags |= HAS_DICTIONARY;
       }
@@ -986,12 +1087,57 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       if (_autoGenerated) {
         flags |= AUTO_GENERATED;
       }
-      return new ColumnMetadataImpl(_fieldSpec, _totalDocs, _cardinality, _minValue, _maxValue,
-          _lengthOfShortestElement, _lengthOfLongestElement, _totalNumberOfEntries, _maxNumberOfMultiValues,
-          _maxRowLengthInBytes, _bitsPerElement, flags,
+
+      // Fill the two words with whichever of the two uses this column has (see ColumnMetadataImpl#_minWord).
+      long minWord = 0;
+      long maxWord = 0;
+      Comparable<?> minValue = _minValue;
+      Comparable<?> maxValue = _maxValue;
+      if (storedType.isFixedWidth()) {
+        Long minBits = toValueWord(storedType, minValue);
+        if (minBits != null) {
+          minWord = minBits;
+          minValue = null;
+          flags |= MIN_VALUE_IN_WORD;
+        }
+        Long maxBits = toValueWord(storedType, maxValue);
+        if (maxBits != null) {
+          maxWord = maxBits;
+          maxValue = null;
+          flags |= MAX_VALUE_IN_WORD;
+        }
+      } else {
+        minWord = ((long) _lengthOfShortestElement << 32) | (_lengthOfLongestElement & 0xffffffffL);
+        maxWord = _maxRowLengthInBytes & 0xffffffffL;
+      }
+
+      SharedShape shape = SHAPE_INTERNER.intern(
+          new SharedShape(_totalDocs, _totalNumberOfEntries, _maxNumberOfMultiValues, _bitsPerElement));
+      return new ColumnMetadataImpl(_fieldSpec, shape, _cardinality, minWord, maxWord, minValue, maxValue, flags,
           Extras.create(_partitionFunction, _partitions, _parentColumn, _sparseKeys),
           CompressionMetadata.create(_uncompressedValueSizeInBytes, _forwardIndexChunkCompressionType,
               _dictionaryUncompressedValueSizeInBytes));
+    }
+
+    /// Returns the raw bits of a min/max value of a fixed-width stored type, or `null` when there is no value or the
+    /// value is not the box class of the stored type (in which case it stays an object ref, so an unexpected type
+    /// from a [Builder] caller is preserved rather than dropped or mistranslated). FLOAT and DOUBLE go through
+    /// [Float#floatToIntBits] / [Double#doubleToLongBits] rather than the raw variants, so a NaN keeps comparing
+    /// equal to a NaN exactly as [Float#equals] does today.
+    @Nullable
+    private static Long toValueWord(DataType storedType, @Nullable Comparable<?> value) {
+      switch (storedType) {
+        case INT:
+          return value instanceof Integer ? (long) (Integer) value : null;
+        case LONG:
+          return value instanceof Long ? (Long) value : null;
+        case FLOAT:
+          return value instanceof Float ? (long) Float.floatToIntBits((Float) value) : null;
+        case DOUBLE:
+          return value instanceof Double ? Double.doubleToLongBits((Double) value) : null;
+        default:
+          return null;
+      }
     }
   }
 }
