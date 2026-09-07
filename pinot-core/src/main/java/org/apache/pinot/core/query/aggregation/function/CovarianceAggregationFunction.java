@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -50,31 +49,18 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// The calculations here are based on the second definition shown above.
 /// Sample covariance = covarPop(X, Y) \* besselCorrection
 /// @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
-public class CovarianceAggregationFunction implements AggregationFunction<CovarianceTuple, Double> {
+public class CovarianceAggregationFunction extends BaseAggregationFunction<CovarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;
   protected final ExpressionContext _expression2;
   protected final boolean _isSample;
-  protected final boolean _nullHandlingEnabled;
 
   public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample,
       boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     _expression1 = arguments.get(0);
     _expression2 = arguments.get(1);
     _isSample = isSample;
-    _nullHandlingEnabled = nullHandlingEnabled;
-  }
-
-  /// Runs `consumer` over the row ranges where **both** input columns are non-null.
-  ///
-  /// A covariance pairs two values per row, so a row contributes only when neither is null. The null positions of the
-  /// two blocks are merged as a stream rather than into a new bitmap, which keeps this allocation-free on the
-  /// aggregation path.
-  private void forEachNotNull(int length, BlockValSet blockValSet1, BlockValSet blockValSet2,
-      RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmapUtils.forEachUnset(length,
-        NullableSingleInputAggregationFunction.orNullIterator(_nullHandlingEnabled, blockValSet1, blockValSet2),
-        consumer);
   }
 
   @Override

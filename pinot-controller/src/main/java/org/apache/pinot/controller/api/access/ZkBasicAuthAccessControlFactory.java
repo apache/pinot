@@ -20,10 +20,7 @@ package org.apache.pinot.controller.api.access;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
@@ -32,10 +29,11 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
+import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Zookeeper Basic Authentication based on Pinot Controller UI.
@@ -45,6 +43,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /// and these changes happen immediately.
 /// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
 public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasicAuthAccessControlFactory.class);
   private static final String HEADER_AUTHORIZATION = "Authorization";
 
   private AccessControl _accessControl;
@@ -63,8 +62,7 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
   }
 
   /// Access Control using header-based basic http authentication
-  private static class BasicAuthAccessControl implements AccessControl {
-    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+  private static class BasicAuthAccessControl extends BaseBasicAuthAccessControl<ZkBasicAuthPrincipal> {
     private final AccessControlUserCache _userCache;
 
     public BasicAuthAccessControl(AccessControlUserCache userCache) {
@@ -72,34 +70,10 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean protectAnnotatedOnly() {
-      return false;
-    }
-
-    @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).filter(
-          p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName))
-              && p.hasPermission(Objects.toString(accessType))).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
-      return getPrincipal(httpHeaders).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).isPresent();
-    }
-
-    private Optional<ZkBasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
+    protected Optional<ZkBasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
       if (headers == null) {
         return Optional.empty();
       }
-
-      _name2principal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig())
-          .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
       if (authHeaders == null) {
@@ -107,14 +81,31 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
       }
 
       for (String authHeader : authHeaders) {
-        String username = BasicAuthTokenUtils.extractUsername(authHeader);
-        String password = BasicAuthTokenUtils.extractPassword(authHeader);
+        String username;
+        String password;
+        try {
+          username = BasicAuthTokenUtils.extractUsername(authHeader);
+          password = BasicAuthTokenUtils.extractPassword(authHeader);
+        } catch (RuntimeException e) {
+          continue;
+        }
         if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
           continue;
         }
 
-        ZkBasicAuthPrincipal principal = _name2principal.get(username);
-        if (principal == null) {
+        UserConfig userConfig = _userCache.getControllerUserConfigForUsername(username);
+        if (userConfig == null) {
+          continue;
+        }
+
+        ZkBasicAuthPrincipal principal;
+        try {
+          principal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(userConfig)).get(0);
+        } catch (RuntimeException e) {
+          // The cached user config is server-side state. Surface corrupt records without logging usernames, passwords,
+          // authorization headers, or serialized user configs.
+          LOGGER.warn("Failed to construct a BasicAuth principal from a cached controller user config due to {}",
+              e.getClass().getSimpleName());
           continue;
         }
 
@@ -130,11 +121,6 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
           password,
           principal.getPassword(),
           _userCache.getUserPasswordAuthCache());
-    }
-
-    @Override
-    public AuthWorkflowInfo getAuthWorkflowInfo() {
-      return new AuthWorkflowInfo(AccessControl.WORKFLOW_BASIC);
     }
   }
 }

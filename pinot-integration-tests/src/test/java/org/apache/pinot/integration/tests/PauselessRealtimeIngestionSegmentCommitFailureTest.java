@@ -31,9 +31,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
-import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -60,7 +58,7 @@ import static org.testng.Assert.assertNotNull;
 /// Verifies recovery from server-side segment commit and consuming-transition failures with one shared cluster.
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
   private static final String REFERENCE_TABLE_NAME = DEFAULT_TABLE_NAME + "_reference";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
+  private static final long VALIDATION_RERUN_INTERVAL_MS = 10_000L;
 
   private FailureScenario _failureScenario;
   private File _sampleAvroFile;
@@ -112,7 +110,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     List<File> avroFiles = unpackAvroData(_tempDir);
     _sampleAvroFile = avroFiles.get(0);
     pushAvroIntoKafka(avroFiles);
-    setMaxSegmentCompletionTimeMillis();
     setupReferenceTable();
   }
 
@@ -237,34 +234,44 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
   }
 
-  private void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
-          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
-  }
-
-  private void verifyRecovery(FailureScenario failureScenario)
-      throws Exception {
+  private void verifyRecovery(FailureScenario failureScenario) {
     String pauselessTableName = TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName(failureScenario));
 
     List<String> erroredSegments = getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR);
     assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
 
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    Properties periodicTaskProperties = new Properties();
-    periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
-    _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
+    // Segments in ERROR state are repaired by the segment-level validation (re-ingestion for COMMITTING segments,
+    // reset for IN_PROGRESS segments), which runs periodically in production. Run it periodically here as well
+    // instead of asserting on a single pass: the failure injection keeps producing new ERROR states past any single
+    // pass — replicas hit the injected failures independently while the table is still consuming, and every reset of
+    // a consuming segment creates a new segment data manager that draws from the remaining failure budget. The
+    // re-runs are spaced out so that a pass does not re-trigger repairs (re-ingestion, reset) that are still in
+    // flight from the previous pass, while the ERROR-empty check itself polls at the usual 1s granularity.
+    long[] lastValidationRunMs = new long[1];
+    TestUtils.waitForCondition(aVoid -> {
+      if (getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty()) {
+        return true;
+      }
+      long nowMs = System.currentTimeMillis();
+      if (nowMs - lastValidationRunMs[0] >= VALIDATION_RERUN_INTERVAL_MS) {
+        lastValidationRunMs[0] = nowMs;
+        runSegmentLevelValidation();
+      }
+      return false;
+    }, 1000L, 600_000L, "Some segments are still in ERROR state after repeated validation runs");
 
-    TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty(),
-        600_000L, "Some segments are still in ERROR state after resetSegments()");
     TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.OFFLINE).isEmpty(),
         30_000L, "Some segments are in OFFLINE state after resetSegments()");
 
     compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(pauselessTableName),
         _helixResourceManager.getSegmentsZKMetadata(
             TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName())));
+  }
+
+  private void runSegmentLevelValidation() {
+    Properties periodicTaskProperties = new Properties();
+    periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+    _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
   }
 
   private List<String> getSegmentsInEV(String realtimeTableName, String status) {

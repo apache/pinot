@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
@@ -63,6 +64,8 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final int _flowControlWindowBytes;
   private final int _inboundMessageCredit;
   private final boolean _manualInboundFlowControlEnabled;
+  private final int _permitKeepAliveTimeMs;
+  private final boolean _permitKeepAliveWithoutCalls;
 
   /// Constructs a gRPC-based mailbox server.
   ///
@@ -160,11 +163,25 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
         "%s (%s) must be >= %s (%s)",
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes,
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, maxInboundMessageSize);
+    // Keep-alive enforcement. A peer configured with a keep-alive time below permitKeepAliveTime has its pings
+    // counted as "bad" and, past the server's strike threshold, gets GOAWAY(ENHANCE_YOUR_CALM) — which drops the
+    // mailbox channel mid-query. Defaults match Netty's own so that a peer left at the default keep-alive time is
+    // never punished; both sides have to be tuned down together.
+    _permitKeepAliveTimeMs = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS);
+    _permitKeepAliveWithoutCalls = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS);
+    if (_permitKeepAliveTimeMs > 0) {
+      builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
+    }
     builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
         .maxInboundMessageSize(maxInboundMessageSize)
+        .permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls)
         .flowControlWindow(_flowControlWindowBytes);
 
     // Add SSL context only if TLS is configured
@@ -177,10 +194,21 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     _server = builder.build();
   }
 
+  @VisibleForTesting
+  int getPermitKeepAliveTimeMs() {
+    return _permitKeepAliveTimeMs;
+  }
+
+  @VisibleForTesting
+  boolean isPermitKeepAliveWithoutCalls() {
+    return _permitKeepAliveWithoutCalls;
+  }
+
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes, inboundMessageCredit={}, "
-            + "manualInboundFlowControlEnabled={}",
-        _flowControlWindowBytes, _inboundMessageCredit, _manualInboundFlowControlEnabled);
+            + "manualInboundFlowControlEnabled={}, permitKeepAliveTimeMs={}, permitKeepAliveWithoutCalls={}",
+        _flowControlWindowBytes, _inboundMessageCredit, _manualInboundFlowControlEnabled, _permitKeepAliveTimeMs,
+        _permitKeepAliveWithoutCalls);
     try {
       _server.start();
     } catch (IOException e) {

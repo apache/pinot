@@ -453,18 +453,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     handleDedupPreload(zkMetadata, indexLoadingConfig);
   }
 
-  /// Handles upsert preload if the upsert preload is enabled.
-  private void handleUpsertPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    if (_tableUpsertMetadataManager == null || !_tableUpsertMetadataManager.getContext().isPreloadEnabled()) {
-      return;
-    }
-    Integer partitionId = SegmentUtils.getSegmentPartitionId(zkMetadata, null);
-    Preconditions.checkState(partitionId != null,
-        "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
-        _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
-  }
-
   /// Handles dedup preload if the dedup preload is enabled.
   private void handleDedupPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
     if (_tableDedupMetadataManager == null || !_tableDedupMetadataManager.getContext().isPreloadEnabled()) {

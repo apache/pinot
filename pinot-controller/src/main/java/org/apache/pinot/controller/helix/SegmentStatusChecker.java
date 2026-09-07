@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,6 +79,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   // log messages about disabled tables at most once a day
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
   private static final int MAX_SEGMENTS_TO_LOG = 10;
+  // Number of segments whose ZK metadata is read per batched request, see updateSegmentMetrics()
+  private static final int SEGMENT_METADATA_BATCH_SIZE = 10_000;
 
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
@@ -88,6 +91,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private final Map<String, Set<String>> _tableTenantMap = new HashMap<>();
 
   private long _lastDisabledTableLogTimestamp = 0;
+  // Overridden by the tests so that the batching can be exercised without a table larger than the batch size
+  @VisibleForTesting
+  int _segmentMetadataBatchSize = SEGMENT_METADATA_BATCH_SIZE;
 
   /// Constructs the segment status checker.
   /// @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -382,10 +388,36 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> unavailableSegmentsByState = new ArrayList<>();
     List<String> unavailableSegmentsByInstance = new ArrayList<>();
 
-    for (String segment : segments) {
+    // The segment ZK metadata and the znode stats are read with one batched request per SEGMENT_METADATA_BATCH_SIZE
+    // segments instead of one request per segment. The batch is bounded because the metadata of a whole batch is held
+    // in heap while it is being checked, which does not scale to tables with hundreds of thousands of segments.
+    List<String> segmentsToCheck = new ArrayList<>(segments);
+    List<SegmentZKMetadata> batchSegmentsZKMetadata = List.of();
+    List<Stat> batchSegmentStats = List.of();
+    int batchStartIndex = 0;
+    // Number of segments whose ZK metadata was read back, tracked over all the batches so that a table whose metadata
+    // could not be read at all is told apart from a table that is genuinely unhealthy
+    int numSegmentsWithZKMetadata = 0;
+
+    for (int i = 0; i < numSegments; i++) {
+      // The batches are aligned to multiples of the batch size, so a new one starts exactly on these indexes
+      if (i % _segmentMetadataBatchSize == 0) {
+        batchStartIndex = i;
+        int batchEndIndex = Math.min(i + _segmentMetadataBatchSize, numSegments);
+        batchSegmentStats = new ArrayList<>(batchEndIndex - batchStartIndex);
+        batchSegmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType,
+            segmentsToCheck.subList(batchStartIndex, batchEndIndex), batchSegmentStats);
+        for (SegmentZKMetadata segmentZKMetadata : batchSegmentsZKMetadata) {
+          if (segmentZKMetadata != null) {
+            numSegmentsWithZKMetadata++;
+          }
+        }
+      }
+      String segment = segmentsToCheck.get(i);
+      Map<String, String> isStateMap = idealState.getInstanceStateMap(segment);
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
-      for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
+      for (Map.Entry<String, String> entry : isStateMap.entrySet()) {
         String state = entry.getValue();
         if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
           numISReplicasUp++;
@@ -397,7 +429,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       maxISReplicasUp = Math.max(maxISReplicasUp, numISReplicasUp);
 
-      SegmentZKMetadata segmentZKMetadata = _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segment);
+      SegmentZKMetadata segmentZKMetadata = batchSegmentsZKMetadata.get(i - batchStartIndex);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
       if (segmentZKMetadata == null) {
         segmentsWithoutZKMetadata.add(segment);
@@ -419,11 +451,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
       //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
-      //       with many segments, the status check can take several minutes. A segment updated after
-      //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
-      //       OFFLINE when using current time.
-      Stat segmentStat = propertyStore == null ? null : propertyStore.getStat(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment), AccessOption.PERSISTENT);
+      //       with many segments, the status check can still take a while. A segment updated after the EV snapshot was
+      //       taken but before this individual segment check runs could be incorrectly flagged as OFFLINE when using
+      //       current time.
+      Stat segmentStat = batchSegmentStats.get(i - batchStartIndex);
       long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
       if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
@@ -472,8 +503,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
       // Total number of replicas in ideal state (including ERROR/OFFLINE states)
-      int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
+      int numISReplicasTotal = Math.max(isStateMap.size(), 1);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
+    }
+
+    // Not a single segment's ZK metadata could be read, so the gauges computed above describe nothing. Leave the
+    // table's gauges alone instead of publishing all-green values that would silence the alerts a stale gauge fires.
+    if (numSegmentsWithZKMetadata == 0) {
+      LOGGER.error("Failed to read the ZK metadata of all {} segments of table: {}, skipping the metric update",
+          numSegments, tableNameWithType);
+      return false;
     }
 
     // Log unavailable segments in batches

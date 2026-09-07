@@ -121,6 +121,7 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
@@ -503,15 +504,7 @@ public class PinotTableRestletResource {
                       : _pinotHelixResourceManager.getAllOfflineTables(database));
 
       if (StringUtils.isNotBlank(taskType)) {
-        Set<String> tableNamesForTaskType = new HashSet<>();
-        for (String tableNameWithType : tableNamesWithType) {
-          TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-          if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
-              .isTaskTypeEnabled(taskType)) {
-            tableNamesForTaskType.add(tableNameWithType);
-          }
-        }
-        tableNamesWithType.retainAll(tableNamesForTaskType);
+        tableNamesWithType.retainAll(_pinotTaskManager.getTablesForTaskType(taskType, tableNamesWithType));
       }
 
       List<String> tableNames;
@@ -859,7 +852,8 @@ public class PinotTableRestletResource {
     return validationResponse;
   }
 
-  private ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
+  @VisibleForTesting
+  ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
     String tableNameWithType = tableConfig.getTableName();
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
@@ -869,6 +863,7 @@ public class PinotTableRestletResource {
       TableConfigUtils.validate(tableConfig, schema, typesToSkip,
           _pinotHelixResourceManager.getTableConfig(tableNameWithType));
       TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+      TableConfigValidatorRegistry.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
@@ -1098,7 +1093,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
+  @Authenticate(AccessType.READ)
   @Path("/rebalanceStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",

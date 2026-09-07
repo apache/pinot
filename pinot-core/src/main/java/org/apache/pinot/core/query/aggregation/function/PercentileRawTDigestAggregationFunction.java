@@ -58,7 +58,8 @@ public class PercentileRawTDigestAggregationFunction
 
   protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
       PercentileTDigestAggregationFunction percentileTDigestAggregationFunction) {
-    super(expression);
+    // This wrapper only serializes what the delegate produced, so the delegate owns the option
+    super(expression, percentileTDigestAggregationFunction._nullHandlingEnabled);
     _percentileTDigestAggregationFunction = percentileTDigestAggregationFunction;
   }
 

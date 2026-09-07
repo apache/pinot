@@ -462,13 +462,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _consecutiveErrorCount, e);
       throw e;
     } else {
-      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
-        _segmentLogger.debug("Interrupted to stop consumption", e);
-      } else {
+      if (!_shouldStop) {
         _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
             _consecutiveErrorCount, e);
+        Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       }
-      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      // Consumption being stopped is checked both before and after the uninterruptible retry backoff: the transient
+      // exception is usually the interrupt from the stop, and stop() can also interrupt the backoff itself. Either
+      // way the consume loop exits on the next check, so skip the stream consumer recreation. Closing the current
+      // consumer from the interrupted consumer thread would just fail with another interrupt; it is closed by the
+      // regular shutdown path instead.
+      if (_shouldStop) {
+        _segmentLogger.debug("Interrupted to stop consumption, skipping stream consumer recreation", e);
+        return;
+      }
       recreateStreamConsumer("Too many transient errors");
     }
   }
@@ -1257,7 +1264,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       FileUtils.deleteQuietly(indexDir);
 
       File[] tempFiles = tempSegmentFolder.listFiles();
-      assert tempFiles != null;
+      if (tempFiles == null || tempFiles.length == 0) {
+        String errorMessage = "Temp segment folder is empty or unreadable: " + tempSegmentFolder;
+        reportSegmentBuildFailure(errorMessage, null);
+        throw new SegmentBuildFailureException(errorMessage);
+      }
       File tempIndexDir = tempFiles[0];
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);

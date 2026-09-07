@@ -88,8 +88,9 @@ public class PinotHintOptions {
 
   /// Hint options for set operations (UNION / UNION ALL / INTERSECT / EXCEPT).
   public static class SetOpHintOptions {
-    /// Forces (or disables) a colocated, pre-partitioned exchange on every input of a set operation
-    /// (UNION / UNION ALL / INTERSECT / EXCEPT), so the inputs are processed in place without a network shuffle.
+    /// Forces (or disables) a colocated, pre-partitioned exchange on every input of an INTERSECT, EXCEPT or
+    /// distinct UNION, so the inputs are processed in place without a network shuffle. On a UNION ALL only
+    /// `'false'` has an effect; see below.
     ///
     /// This is opt-in and honored only by the default (V1) query planner; the V2 physical planner determines
     /// colocation on its own. Like the join hint [JoinHintOptions#IS_COLOCATED_BY_JOIN_KEYS], it trusts the user:
@@ -98,8 +99,13 @@ public class PinotHintOptions {
     /// operation matches rows on the entire output row, so forcing `'true'` is only correct when all inputs are
     /// partitioned the same way (same partition function and count) on one or more of the projected columns, so that
     /// rows which are equal across all projected columns are guaranteed to land on the same worker. Forcing it when
-    /// that does not hold silently produces wrong results for INTERSECT, EXCEPT and distinct UNION; UNION ALL only
-    /// concatenates and is unaffected.
+    /// that does not hold silently produces wrong results for INTERSECT, EXCEPT and distinct UNION.
+    ///
+    /// UNION ALL is different: it only concatenates, so it is correct under ANY row-to-worker mapping and never
+    /// needs a shuffle. Its inputs always get a local exchange, and `'true'` is therefore a no-op on a UNION ALL.
+    /// Only `'false'` changes anything there -- it restores the full-row shuffle. Note that a partitioning assertion
+    /// made *above* a UNION ALL (e.g. `aggOptions` on an aggregation over it) is never established by the union's own
+    /// exchanges; it must hold on the physical data.
     public static final String IS_COLOCATED_BY_SET_OP_KEYS = "is_colocated_by_set_op_keys";
 
     /// Reads the hint from a hint list. Unlike [JoinHintOptions#isColocatedByJoinKeys], this takes the hint list

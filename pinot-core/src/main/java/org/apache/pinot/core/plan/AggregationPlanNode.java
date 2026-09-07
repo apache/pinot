@@ -304,15 +304,14 @@ public class AggregationPlanNode implements PlanNode {
     DataSource columnDs = segment.getDataSource(columnName, schema);
     if (columnDs instanceof OpenStructDataSource) {
       OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
-      DataSource keyDs = osDs.isMaterialized(key) ? osDs.getDataSource(key) : null;
-      if (keyDs == null) {
+      if (!osDs.isMaterialized(key)) {
         return null;
       }
       // A consuming key column's dictionary can contain a phantom entry (the reserved default,
       // never observed in any doc); dictionary-based aggregation over it would diverge from the
       // sealed segment. The segment layer owns that invariant — force the scan path when the
       // dictionary is not exact.
-      return osDs.isKeyDictionaryExact(key) ? keyDs : null;
+      return osDs.isKeyDictionaryExact(key) ? osDs.getDataSource(key) : null;
     }
     return null;
   }

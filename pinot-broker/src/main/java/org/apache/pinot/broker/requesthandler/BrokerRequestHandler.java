@@ -47,6 +47,16 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
+  /// Opens broker-to-server channels ahead of traffic so the first real query does not pay the blocking
+  /// connect -- and, when broker-to-server TLS is on, the handshake -- on its critical path. Called once
+  /// at startup after Helix has converged, when `pinot.broker.startup.preconnect.enabled` is set.
+  ///
+  /// Only the single-connection SSE handler opens Netty channels, so the default is a no-op. Returns the
+  /// number of channels connected before `deadlineMs` (an absolute [System#currentTimeMillis] value).
+  default int preConnectServers(long deadlineMs) {
+    return 0;
+  }
+
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception;

@@ -32,11 +32,13 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -290,9 +292,16 @@ public class BytesDistinctTable extends DistinctTable {
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(ByteArray[] values, int length, List<Object[]> rows) {
-    for (int i = 0; i < length; i++) {
-      rows.add(new Object[]{values[i].toHexString()});
+  private void addRows(ByteArray[] values, int length, List<Object[]> rows) {
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
+    if (columnDataType == ColumnDataType.UUID) {
+      for (int i = 0; i < length; i++) {
+        rows.add(new Object[]{UuidUtils.toString(values[i])});
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        rows.add(new Object[]{values[i].toHexString()});
+      }
     }
   }
 
@@ -311,9 +320,16 @@ public class BytesDistinctTable extends DistinctTable {
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
-    for (ByteArray value : values) {
-      rows.add(new Object[]{value.toHexString()});
+  private void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
+    if (columnDataType == ColumnDataType.UUID) {
+      for (ByteArray value : values) {
+        rows.add(new Object[]{UuidUtils.toString(value)});
+      }
+    } else {
+      for (ByteArray value : values) {
+        rows.add(new Object[]{value.toHexString()});
+      }
     }
   }
 }

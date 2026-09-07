@@ -22,6 +22,7 @@ import java.util.function.BooleanSupplier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
 import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -53,7 +54,7 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
         llcSegmentName, consumerCoordinator, serverMetrics, null /* no PartitionUpsertMetadataManager */,
         partitionDedupMetadataManager, isTableReadyToConsumeData);
     if (failConsumingTransition) {
-      throw new RuntimeException("Forced to fail the consuming transition");
+      throw new FailureInjectionUtils.InjectedFailureException("Forced to fail the consuming transition");
     }
     _failCommit = failCommit;
   }
@@ -61,7 +62,7 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
     if (_failCommit) {
-      throw new RuntimeException("Forced failure in buildSegmentInternal");
+      throw new FailureInjectionUtils.InjectedFailureException("Forced failure in buildSegmentInternal");
     }
     return super.buildSegmentInternal(forCommit);
   }

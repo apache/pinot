@@ -57,7 +57,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///   There is a variation of the function (**PERCENTILE_RAW_KLL**) that returns the Base64 encoded
 ///   sketch object to be used externally.
 public class PercentileKLLAggregationFunction
-    extends NullableSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
+    extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
 
   protected final double _percentile;
   protected int _kValue;
@@ -98,11 +98,11 @@ public class PercentileKLLAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
     KllDoublesSketch sketch = getOrCreateSketch(aggregationResultHolder);
 
-    if (valueType == DataType.BYTES) {
-      // Assuming the column contains serialized data sketch
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       forEachNotNull(length, valueSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -112,15 +112,14 @@ public class PercentileKLLAggregationFunction
       return;
     }
 
-    if (valueSet.isSingleValue()) {
-      aggregateSV(length, aggregationResultHolder, valueSet, sketch);
+    if (singleValue) {
+      aggregateSV(length, valueSet, sketch);
     } else {
-      aggregateMV(length, aggregationResultHolder, valueSet, sketch);
+      aggregateMV(length, valueSet, sketch);
     }
   }
 
-  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet valueSet,
-      KllDoublesSketch sketch) {
+  protected void aggregateSV(int length, BlockValSet valueSet, KllDoublesSketch sketch) {
     double[] values = valueSet.getDoubleValuesSV();
     forEachNotNull(length, valueSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -129,8 +128,7 @@ public class PercentileKLLAggregationFunction
     });
   }
 
-  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet valueSet,
-      KllDoublesSketch sketch) {
+  protected void aggregateMV(int length, BlockValSet valueSet, KllDoublesSketch sketch) {
     double[][] values = valueSet.getDoubleValuesMV();
     forEachNotNull(length, valueSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -145,10 +143,10 @@ public class PercentileKLLAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
 
-    if (valueType == DataType.BYTES) {
-      // serialized sketch
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       forEachNotNull(length, valueSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -159,7 +157,7 @@ public class PercentileKLLAggregationFunction
       return;
     }
 
-    if (valueSet.isSingleValue()) {
+    if (singleValue) {
       aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, valueSet);
     } else {
       aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, valueSet);
@@ -194,10 +192,10 @@ public class PercentileKLLAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    DataType valueType = valueSet.getValueType();
 
-    if (valueType == DataType.BYTES) {
-      // serialized sketch
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
       forEachNotNull(length, valueSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -210,7 +208,7 @@ public class PercentileKLLAggregationFunction
       return;
     }
 
-    if (valueSet.isSingleValue()) {
+    if (singleValue) {
       aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, valueSet);
     } else {
       aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, valueSet);

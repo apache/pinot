@@ -76,6 +76,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK)
   @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
   public Response runPeriodicTask(

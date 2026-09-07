@@ -142,6 +142,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// desynchronize brokers on shared storage.
   private static final int RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR = 4;
 
+  /// How often the pre-connect thread re-checks whether Helix has converged. Short enough not to add
+  /// meaningful delay to a fast startup, long enough not to hammer the Helix data accessor.
+  private static final long HELIX_CONVERGENCE_POLL_INTERVAL_MS = 200L;
+
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
   protected String _clusterName;
@@ -189,6 +193,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
   protected ThreadAccountant _threadAccountant;
+  /// The Helix-convergence half of the service-status composite, held so startup pre-connect can wait
+  /// on exactly that signal -- convergence is the point at which routing, and the servers it
+  /// references, first exist.
+  @Nullable
+  private volatile ServiceStatus.ServiceStatusCallback _helixConvergenceCallback;
+  /// The background pre-connect thread, tracked so shutdown can interrupt it.
+  @Nullable
+  private volatile Thread _preConnectThread;
+  /// Whether startup pre-connect is enabled, and its budget. Read once in `start()`.
+  private boolean _preConnectEnabled;
+  private long _preConnectTimeoutMs;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -669,10 +684,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
         _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
-    // Register the service status handler
+    // Only the Netty single-stage transport has broker-to-server channels to open; the gRPC single-stage
+    // handler, the multi-stage engine and the time-series path all use different transports and are
+    // unaffected by this flag.
+    _preConnectEnabled = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED,
+        Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED);
+    _preConnectTimeoutMs = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS,
+        Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS);
     registerServiceStatusHandler();
-
-    _isStarting = false;
+    if (_preConnectEnabled) {
+      // Startup is not finished until the broker-to-server channels are open, so `_isStarting` stays set
+      // and the existing lifecycle callback keeps reporting STARTING -- no query is routed here before the
+      // connect and TLS handshake have been paid. "Still pre-connecting" is not a new kind of statement,
+      // it is the same one, so it reuses the same flag rather than a second parallel gate. The flag was
+      // set before the status handler was registered, so there is structurally no window in which
+      // readiness is granted un-gated. The pre-connect thread clears it when it finishes.
+      startPreConnect();
+    } else {
+      _isStarting = false;
+    }
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
@@ -852,13 +882,90 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        List.of(
+    // The two Helix callbacks are grouped into their own composite so startup pre-connect can wait on
+    // exactly the "Helix has converged" signal. CurrentState only reports ONLINE once the
+    // OFFLINE->ONLINE transition has returned, and that transition is what builds routing -- so
+    // convergence is the precondition for routing entries, and the servers they reference, existing.
+    // Behaviour is unchanged: MultipleCallbackServiceStatusCallback surfaces the first non-GOOD
+    // callback, so nesting the two Helix callbacks reports the same status as listing them flat.
+    _helixConvergenceCallback = new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
+        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+            _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
+            _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup)));
+
+    ServiceStatus.setServiceStatusCallback(_instanceId,
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
             new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown),
-            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup))));
+            _helixConvergenceCallback)));
+  }
+
+  /// Runs startup server pre-connect on a background thread and ends startup ([#_isStarting]) when it
+  /// finishes. Asynchronous so `start()` still returns promptly -- readiness is withheld through
+  /// `ServiceStatus`, not by blocking startup. The flag is cleared in a `finally` so startup ends even if
+  /// pre-connect throws or is interrupted: readiness withheld indefinitely would stall a rolling restart,
+  /// a worse failure than serving a broker whose channels are not yet warm.
+  ///
+  /// Only called when pre-connect is enabled; otherwise `start()` ends startup itself and readiness
+  /// behaves exactly as before.
+  private void startPreConnect() {
+    _preConnectThread = new Thread(() -> {
+      // Set once Helix converges. Both the budget and the duration metric are measured from here, not
+      // from thread start, so the deliberately unbounded convergence wait is charged against neither: the
+      // Helix callbacks withhold readiness until convergence anyway, so it costs nothing.
+      long preConnectStartMs = 0L;
+      try {
+        long threadStartMs = System.currentTimeMillis();
+        awaitHelixConvergence();
+        preConnectStartMs = System.currentTimeMillis();
+        LOGGER.info("Helix converged after {} ms; pre-connecting server channels",
+            preConnectStartMs - threadStartMs);
+        int connected = _brokerRequestHandler.preConnectServers(preConnectStartMs + _preConnectTimeoutMs);
+        LOGGER.info("Startup server pre-connect opened {} channel(s); ending startup", connected);
+      } catch (InterruptedException e) {
+        // Normal on shutdown; stopPreConnect() interrupts us.
+        Thread.currentThread().interrupt();
+        LOGGER.info("Startup server pre-connect interrupted before completion; ending startup");
+      } catch (Throwable t) {
+        LOGGER.warn("Startup server pre-connect threw; ending startup anyway", t);
+      } finally {
+        _isStarting = false;
+        // Record the duration only if convergence was reached, so the metric measures the pre-connect work
+        // itself and never the (unbounded) convergence wait -- e.g. when shutdown interrupts the wait.
+        if (preConnectStartMs > 0L) {
+          _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_PRECONNECT_DURATION_MS,
+              System.currentTimeMillis() - preConnectStartMs, TimeUnit.MILLISECONDS);
+        }
+      }
+    }, "broker-startup-preconnect");
+    _preConnectThread.setDaemon(true);
+    _preConnectThread.start();
+  }
+
+  /// Blocks until the Helix-convergence callbacks report GOOD -- the point at which routing entries and
+  /// the servers they reference exist. Deliberately **unbounded** and interruptible: a broker that never
+  /// converges is never Ready regardless of pre-connect, and shutdown interrupts this thread. Monitors
+  /// `brokerResource` only (partitions in {OFFLINE, ONLINE, DROPPED}); segment states live in the table
+  /// resources that servers monitor and cannot hold this up.
+  private void awaitHelixConvergence()
+      throws InterruptedException {
+    ServiceStatus.ServiceStatusCallback callback = _helixConvergenceCallback;
+    if (callback == null) {
+      return;
+    }
+    while (callback.getServiceStatus() != ServiceStatus.Status.GOOD) {
+      Thread.sleep(HELIX_CONVERGENCE_POLL_INTERVAL_MS);
+    }
+  }
+
+  /// Interrupts an in-flight pre-connect so shutdown never waits on it. Best effort: the thread is a
+  /// daemon and records its metric in a `finally` regardless.
+  private void stopPreConnect() {
+    Thread thread = _preConnectThread;
+    if (thread != null && thread.isAlive()) {
+      LOGGER.info("Interrupting in-flight startup server pre-connect for shutdown");
+      thread.interrupt();
+    }
   }
 
   private String getDefaultBrokerId() {
@@ -893,6 +1000,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
     _isShuttingDown = true;
+    stopPreConnect();
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();

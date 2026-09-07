@@ -27,13 +27,16 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 /// Base implementation of [AggregationFunction] with single input expression.
-public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable> implements AggregationFunction<I, F> {
+public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable>
+    extends BaseAggregationFunction<I, F> {
   protected final ExpressionContext _expression;
 
   /// Constructor for the class.
   ///
   /// @param expression Expression to aggregate on.
-  public BaseSingleInputAggregationFunction(ExpressionContext expression) {
+  /// @param nullHandlingEnabled the query's null handling option, which decides whether null rows are skipped.
+  public BaseSingleInputAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     _expression = expression;
   }
 

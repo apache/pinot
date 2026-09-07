@@ -45,7 +45,7 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFuncti
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -71,8 +71,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.DOUBLE;
+    public DataType getValueType() {
+      return DataType.DOUBLE;
     }
   }
 
@@ -94,8 +94,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.LONG;
+    public DataType getValueType() {
+      return DataType.LONG;
     }
   }
 
@@ -117,8 +117,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.INT;
+    public DataType getValueType() {
+      return DataType.INT;
     }
   }
 
@@ -140,8 +140,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.FLOAT;
+    public DataType getValueType() {
+      return DataType.FLOAT;
     }
   }
 
@@ -163,8 +163,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
   }
 
@@ -198,8 +198,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testLongArrayAggMvMultipleBlocks() {
-    ArrayAggDistinctLongFunction distinctFn = new ArrayAggDistinctLongFunction(
-        ExpressionContext.forIdentifier("myField"), FieldSpec.DataType.LONG, false);
+    ArrayAggDistinctLongFunction distinctFn =
+        new ArrayAggDistinctLongFunction(ExpressionContext.forIdentifier("myField"), DataType.LONG, false);
     AggregationResultHolder holder = distinctFn.createAggregationResultHolder();
 
     distinctFn.aggregate(2, holder,
@@ -209,8 +209,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     LongOpenHashSet distinct = holder.getResult();
     assertEquals(distinct.size(), 3);
 
-    ArrayAggLongFunction fn = new ArrayAggLongFunction(ExpressionContext.forIdentifier("myField"),
-        FieldSpec.DataType.LONG, false);
+    ArrayAggLongFunction fn =
+        new ArrayAggLongFunction(ExpressionContext.forIdentifier("myField"), DataType.LONG, false);
     holder = fn.createAggregationResultHolder();
     fn.aggregate(2, holder,
         Map.of(ExpressionContext.forIdentifier("myField"), new TestLongMVBlock(new long[][]{{1L, 2L}, {2L}})));
@@ -229,8 +229,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testIntArrayAggMvMultipleBlocks() {
-    ArrayAggDistinctIntFunction distinctFn = new ArrayAggDistinctIntFunction(
-        ExpressionContext.forIdentifier("myField"), FieldSpec.DataType.INT, false);
+    ArrayAggDistinctIntFunction distinctFn =
+        new ArrayAggDistinctIntFunction(ExpressionContext.forIdentifier("myField"), DataType.INT, false);
     AggregationResultHolder holder = distinctFn.createAggregationResultHolder();
 
     distinctFn.aggregate(2, holder,
@@ -240,8 +240,7 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     IntOpenHashSet distinct = holder.getResult();
     assertEquals(distinct.size(), 3);
 
-    ArrayAggIntFunction fn = new ArrayAggIntFunction(ExpressionContext.forIdentifier("myField"),
-        FieldSpec.DataType.INT, false);
+    ArrayAggIntFunction fn = new ArrayAggIntFunction(ExpressionContext.forIdentifier("myField"), DataType.INT, false);
     holder = fn.createAggregationResultHolder();
     fn.aggregate(2, holder,
         Map.of(ExpressionContext.forIdentifier("myField"), new TestIntMVBlock(new int[][]{{1, 2}, {2}})));

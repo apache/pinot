@@ -41,7 +41,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -59,16 +59,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Usage examples:
 ///
 /// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
-///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+///   argument. The second argument is the nominal entries, and defaults to 16384.
 ///   The "raw" equivalents return serialised sketches in base64-encoded strings.
 ///
 ///   DISTINCT_COUNT_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_TUPLE_SKETCH(col, 16384)
 ///
 ///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 16384)
 /// - Extracting a cardinality estimate from a CPC sketch:
 ///
 ///   GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)
@@ -96,7 +96,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+    extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
@@ -117,7 +117,7 @@ public class IntegerTupleSketchAggregationFunction
           "Tuple Sketch Aggregation Function expects the second argument to be a literal (parameters)," + " but got: ",
           secondArgument.getType());
 
-      if (secondArgument.getLiteral().getType() == FieldSpec.DataType.STRING) {
+      if (secondArgument.getLiteral().getType() == DataType.STRING) {
         Parameters parameters = new Parameters(secondArgument.getLiteral().getStringValue());
         // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
         _accumulatorThreshold = parameters.getAccumulatorThreshold();
@@ -152,56 +152,38 @@ public class IntegerTupleSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      try {
-        // The accumulator is created inside the range, so an all-null block leaves the holder untouched and
-        // extractFinalResult sees the null that means nothing was aggregated
-        forEachNotNull(length, blockValSet, (from, to) -> {
-          // An empty range still reaches here, for a zero-length block. Creating the accumulator for it would mark
-          // the holder as aggregated and lose the signal this whole arrangement exists to carry.
-          if (to == from) {
-            return;
-          }
-          TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
-          for (int i = from; i < to; i++) {
-            tupleIntSketchAccumulator.apply(deserializeSketch(bytesValues[i]));
-          }
-        });
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
+    DataType dataType = blockValSet.getValueType();
+    boolean singleValue = blockValSet.isSingleValue();
+    Preconditions.checkState(dataType == DataType.BYTES && singleValue,
+        "INTEGER_TUPLE_SKETCH only supports SV BYTES column");
+    byte[][] bytesValues = blockValSet.getBytesValuesSV();
+    // The accumulator is created inside the range, so an all-null block leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      // An empty range still reaches here, for a zero-length block. Creating the accumulator for it would mark
+      // the holder as aggregated and lose the signal this whole arrangement exists to carry.
+      TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
+      for (int i = from; i < to; i++) {
+        tupleIntSketchAccumulator.apply(deserializeSketch(bytesValues[i]));
       }
-    } else {
-      throw new IllegalStateException("Illegal data type for " + getType() + " aggregation function: " + storedType);
-    }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
-
-    if (storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      try {
-        forEachNotNull(length, blockValSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            getAccumulator(groupByResultHolder, groupKeyArray[i]).apply(deserializeSketch(bytesValues[i]));
-          }
-        });
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
+    DataType dataType = blockValSet.getValueType();
+    boolean singleValue = blockValSet.isSingleValue();
+    Preconditions.checkState(dataType == DataType.BYTES && singleValue,
+        "INTEGER_TUPLE_SKETCH only supports SV BYTES column");
+    byte[][] bytesValues = blockValSet.getBytesValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        getAccumulator(groupByResultHolder, groupKeyArray[i]).apply(deserializeSketch(bytesValues[i]));
       }
-    } else {
-      throw new IllegalStateException(
-          "Illegal data type for INTEGER_TUPLE_SKETCH_UNION aggregation function: " + storedType);
-    }
+    });
   }
 
   @Override
@@ -209,29 +191,20 @@ public class IntegerTupleSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized Integer Tuple Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
-
-    if (singleValue && storedType == FieldSpec.DataType.BYTES) {
-      byte[][] bytesValues = blockValSetMap.get(_expression).getBytesValuesSV();
-      try {
-        forEachNotNull(length, blockValSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            // Deserialized once per row, not once per group key the row belongs to
-            TupleSketch<IntegerSummary> sketch = deserializeSketch(bytesValues[i]);
-            for (int groupKey : groupKeysArray[i]) {
-              getAccumulator(groupByResultHolder, groupKey).apply(sketch);
-            }
-          }
-        });
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
+    Preconditions.checkState(dataType == DataType.BYTES && singleValue,
+        "INTEGER_TUPLE_SKETCH only supports SV BYTES column");
+    byte[][] bytesValues = blockValSet.getBytesValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        // Deserialized once per row, not once per group key the row belongs to
+        TupleSketch<IntegerSummary> sketch = deserializeSketch(bytesValues[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          getAccumulator(groupByResultHolder, groupKey).apply(sketch);
+        }
       }
-    } else {
-      throw new IllegalStateException(
-          "Illegal data type for INTEGER_TUPLE_SKETCH_UNION aggregation function: " + storedType);
-    }
+    });
   }
 
   @Override

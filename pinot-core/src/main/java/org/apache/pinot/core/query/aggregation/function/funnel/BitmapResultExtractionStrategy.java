@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.aggregation.function.funnel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -105,7 +105,7 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
   private RoaringBitmap convertToValueBitmap(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    FieldSpec.DataType storedType = dictionary.getValueType();
+    DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         while (iterator.hasNext()) {

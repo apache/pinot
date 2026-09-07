@@ -113,4 +113,21 @@ public class BrokerResponseNativeTest {
   public void testServerStatsDefaultsToNull() {
     Assert.assertNull(new BrokerResponseNative().getServerStats());
   }
+
+  /// Regression test for backward-compatible deserialization: [BrokerResponseNative] does not
+  /// override `getResponseMetadata()`, so the interface default (marked `@JsonIgnore`) must keep
+  /// `responseMetadata` an unknown property. Otherwise Jackson would treat it as a known setterless
+  /// Map property and try to populate the immutable `Map.of()` default via USE_GETTERS_AS_SETTERS,
+  /// failing with an [UnsupportedOperationException] when a response produced by a newer broker
+  /// (e.g. `BrokerResponseNativeV2`) carries a non-empty `responseMetadata`.
+  @Test
+  public void testResponseMetadataDeserializationCompatibility()
+      throws IOException {
+    String json = "{\"responseMetadata\":{\"note\":\"executed with fallback strategy\","
+        + "\"details\":{\"count\":2}},\"numDocsScanned\":5}";
+    BrokerResponseNative actual = BrokerResponseNative.fromJsonString(json);
+    // The unknown field is ignored on the legacy impl; other fields still deserialize correctly.
+    Assert.assertEquals(actual.getNumDocsScanned(), 5);
+    Assert.assertTrue(actual.getResponseMetadata().isEmpty());
+  }
 }

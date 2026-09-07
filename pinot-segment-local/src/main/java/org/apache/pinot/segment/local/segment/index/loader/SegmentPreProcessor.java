@@ -22,7 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.ServiceLoader;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -54,6 +57,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +71,41 @@ import org.slf4j.LoggerFactory;
 /// - Use [ColumnMinMaxValueGenerator] to add min/max value to column metadata
 public class SegmentPreProcessor implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
+
+  // The highest-priority ServiceLoader-registered provider, or null to use this class directly. Resolved once, at
+  // first use (segment loading), by which point PluginManager has loaded the plugin classloaders.
+  @Nullable
+  private static final SegmentPreProcessorProvider PROVIDER = loadProvider();
+
+  @Nullable
+  private static SegmentPreProcessorProvider loadProvider() {
+    // Enumerate this class's own classloader plus every plugin classloader: new-style plugins live in isolated
+    // realms whose services a plain ServiceLoader.load() cannot see (see PluginManager#getPluginClassLoaders).
+    Set<ClassLoader> classLoaders = new LinkedHashSet<>();
+    classLoaders.add(SegmentPreProcessorProvider.class.getClassLoader());
+    classLoaders.addAll(PluginManager.get().getPluginClassLoaders());
+    SegmentPreProcessorProvider best = null;
+    for (ClassLoader classLoader : classLoaders) {
+      for (SegmentPreProcessorProvider provider : ServiceLoader.load(SegmentPreProcessorProvider.class,
+          classLoader)) {
+        if (best == null || provider.getPriority() > best.getPriority()) {
+          best = provider;
+        }
+      }
+    }
+    if (best != null) {
+      LOGGER.info("Using segment pre-processor provider: {}", best.getClass().getName());
+    }
+    return best;
+  }
+
+  /// Creates the segment pre-processor: the highest-priority [SegmentPreProcessorProvider]'s instance, or a plain
+  /// [SegmentPreProcessor] when no provider is registered.
+  public static SegmentPreProcessor create(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    return PROVIDER != null
+        ? PROVIDER.create(segmentDirectory, indexLoadingConfig)
+        : new SegmentPreProcessor(segmentDirectory, indexLoadingConfig);
+  }
 
   private final SegmentDirectory _segmentDirectory;
   private final IndexLoadingConfig _indexLoadingConfig;

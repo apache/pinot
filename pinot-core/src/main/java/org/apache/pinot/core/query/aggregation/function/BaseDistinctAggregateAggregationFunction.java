@@ -52,7 +52,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// functions.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
-    extends NullableSingleInputAggregationFunction<Set, T> {
+    extends BaseSingleInputAggregationFunction<Set, T> {
   // Use empty IntOpenHashSet as a placeholder for empty result
   private static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
   private static final byte[] SERIALIZED_EMPTY_PLACEHOLDER =

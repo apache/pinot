@@ -89,7 +89,6 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
     startController();
     startBroker();
     startServer();
-    setMaxSegmentCompletionTimeMillis();
     // setupNonPauselessTable() also unpacks and publishes the source records. All scenarios consume the immutable
     // topic from the smallest offset and compare their recovered metadata with this reference table.
     _scenario = Scenario.NO_FAILURE;

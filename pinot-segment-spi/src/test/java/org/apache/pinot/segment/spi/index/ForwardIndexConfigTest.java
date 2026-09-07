@@ -191,4 +191,104 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
     assertEquals(config.getEncodingType(), FieldConfig.EncodingType.RAW);
   }
+
+  @Test
+  public void codecSpecRoundTripsInWrapperlessCanonicalForm()
+      throws JsonProcessingException {
+    ForwardIndexConfig config = JsonUtils.stringToObject(
+        "{\"encodingType\":\"RAW\",\"codecSpec\":\" delta , zstd( 3 ) \"}", ForwardIndexConfig.class);
+
+    assertEquals(config.getCodecSpec(), "DELTA,ZSTD(3)");
+    assertNull(config.getCompressionCodec());
+
+    ForwardIndexConfig restored = JsonUtils.stringToObject(JsonUtils.objectToString(config), ForwardIndexConfig.class);
+    assertEquals(restored, config);
+    assertEquals(restored.getCodecSpec(), "DELTA,ZSTD(3)");
+  }
+
+  @Test
+  public void codecSpecIsNullable()
+      throws JsonProcessingException {
+    ForwardIndexConfig config = JsonUtils.stringToObject(
+        "{\"encodingType\":\"RAW\",\"codecSpec\":null}", ForwardIndexConfig.class);
+
+    assertNull(config.getCodecSpec());
+  }
+
+  @Test
+  public void codecSpecRequiresRawEncoding() {
+    IllegalArgumentException builderException = expectThrows(IllegalArgumentException.class,
+        () -> new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
+            .withCodecSpec("ZSTD(3)").build());
+    assertEquals(builderException.getMessage(), "codecSpec requires RAW forward-index encoding");
+
+    JsonProcessingException jsonException = expectThrows(JsonProcessingException.class,
+        () -> JsonUtils.stringToObject(
+            "{\"encodingType\":\"DICTIONARY\",\"codecSpec\":\"ZSTD(3)\"}", ForwardIndexConfig.class));
+    assertTrue(jsonException.getMessage().contains("codecSpec requires RAW forward-index encoding"));
+  }
+
+  @Test
+  public void codecSpecAndCompressionCodecAreMutuallyExclusiveInJson() {
+    JsonProcessingException exception = expectThrows(JsonProcessingException.class,
+        () -> JsonUtils.stringToObject(
+            "{\"encodingType\":\"RAW\",\"compressionCodec\":\"LZ4\",\"codecSpec\":\"ZSTD(3)\"}",
+            ForwardIndexConfig.class));
+
+    assertTrue(exception.getMessage().contains("compressionCodec and codecSpec are mutually exclusive"));
+  }
+
+  @Test
+  public void builderUsesTheLastNonNullCompressionConfiguration() {
+    ForwardIndexConfig codecSpec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(FieldConfig.CompressionCodec.LZ4)
+        .withCodecSpec("ZSTD(3)")
+        .build();
+    assertEquals(codecSpec.getCodecSpec(), "ZSTD(3)");
+    assertNull(codecSpec.getCompressionCodec());
+
+    ForwardIndexConfig legacy = new ForwardIndexConfig.Builder(codecSpec)
+        .withCompressionCodec(FieldConfig.CompressionCodec.SNAPPY)
+        .build();
+    assertNull(legacy.getCodecSpec());
+    assertEquals(legacy.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+
+    ForwardIndexConfig codecSpecAfterNullLegacyCodec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .withCompressionCodec(null)
+        .build();
+    assertEquals(codecSpecAfterNullLegacyCodec.getCodecSpec(), "ZSTD(3)");
+    assertNull(codecSpecAfterNullLegacyCodec.getCompressionCodec());
+
+    ForwardIndexConfig legacyCodecAfterNullCodecSpec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(FieldConfig.CompressionCodec.LZ4)
+        .withCodecSpec(null)
+        .build();
+    assertNull(legacyCodecAfterNullCodecSpec.getCodecSpec());
+    assertEquals(legacyCodecAfterNullCodecSpec.getCompressionCodec(), FieldConfig.CompressionCodec.LZ4);
+  }
+
+  @Test
+  public void builderCopyAndEqualityPreserveCodecSpec() {
+    ForwardIndexConfig original = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("DELTA,ZSTD(3)")
+        .build();
+    ForwardIndexConfig copy = new ForwardIndexConfig.Builder(original).build();
+    ForwardIndexConfig different = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .build();
+
+    assertEquals(copy, original);
+    assertEquals(copy.hashCode(), original.hashCode());
+    assertNotEquals(different, original);
+  }
+
+  @Test
+  public void removedCodecWrapperIsRejected() {
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+            .withCodecSpec("CODEC(DELTA,ZSTD(3))").build());
+
+    assertTrue(exception.getMessage().contains("wrapper is not supported"));
+  }
 }
