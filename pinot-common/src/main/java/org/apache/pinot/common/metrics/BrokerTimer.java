@@ -54,6 +54,15 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   REALTIME_TOTAL_CPU_TIME_NS(false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS(true),
+  // How long the startup server pre-connect (open broker->server channels, including TLS handshake)
+  // took, from Helix convergence to the last channel connecting or the budget expiring.
+  STARTUP_PRECONNECT_DURATION_MS(true),
+  // Time to establish a single broker->server Netty channel (TCP connect, plus the TLS handshake on the
+  // startup pre-connect path). Complements the NETTY_CONNECTION_CONNECT_TIME_MS gauge, which only keeps
+  // the last value, by keeping a burst of connections on a cold broker analyzable across the whole
+  // distribution. NOTE: must not be named after that gauge -- both derive their metric name from the
+  // enum constant, and a gauge and a timer sharing one name collide in the metrics registry.
+  NETTY_CONNECTION_CONNECT_LATENCY_MS(true),
   // GRPC query execution time
   GRPC_QUERY_EXECUTION_MS(true),
   // Audit logging timers
