@@ -258,7 +258,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         // false), making transient metadata-push failures permanently stuck. Delete the staged tar so the retry can
         // re-stage it and self-heal.
         try {
-          outputFileFS.delete(outputSegmentTarURI, true);
+          cleanupMetadataPushFailure(outputFileFS, outputSegmentTarURI);
         } catch (Exception deleteException) {
           LOGGER.warn("Failed to delete staged segment tar: {} after metadata push failure, the next retry may fail "
               + "with 'Output file already exists'", outputSegmentTarURI, deleteException);
@@ -266,6 +266,13 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         throw e;
       }
     }
+  }
+
+  /// Cleans up an output after metadata push throws. Executors that publish immutable output URIs can defer cleanup
+  /// until they have reconciled controller metadata: a lost response does not prove the controller rejected the push.
+  protected void cleanupMetadataPushFailure(PinotFS outputFileFS, URI outputSegmentTarURI)
+      throws Exception {
+    outputFileFS.delete(outputSegmentTarURI, true);
   }
 
   // For tests only.

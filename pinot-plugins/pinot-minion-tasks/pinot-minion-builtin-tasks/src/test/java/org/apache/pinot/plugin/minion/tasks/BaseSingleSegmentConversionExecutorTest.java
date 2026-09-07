@@ -179,6 +179,32 @@ public class BaseSingleSegmentConversionExecutorTest {
     }
   }
 
+  @Test
+  public void testMetadataPushFailureCleanupCanBeDeferred()
+      throws Exception {
+    PinotFS outputFS = Mockito.mock(PinotFS.class);
+    try (MockedStatic<MinionTaskUtils> minionTaskUtils =
+            Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS);
+        MockedStatic<SegmentPushUtils> segmentPushUtils =
+            Mockito.mockStatic(SegmentPushUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      minionTaskUtils.when(() -> MinionTaskUtils.getOutputPinotFS(Mockito.any(), Mockito.any()))
+          .thenReturn(outputFS);
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
+              Mockito.any(), Mockito.anyList(), Mockito.anyList()))
+          .thenThrow(new RuntimeException("response lost after registration"));
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor() {
+        @Override
+        protected void cleanupMetadataPushFailure(PinotFS outputFileFS, URI outputSegmentTarURI) {
+          // Immutable outputs are reconciled by this executor's task generator.
+        }
+      };
+      RuntimeException failure = Assert.expectThrows(RuntimeException.class,
+          () -> executor.executeTask(createMetadataPushTaskConfig(new File(TEMP_DIR, "immutable-output"))));
+      Assert.assertEquals(failure.getMessage(), "response lost after registration");
+      Mockito.verify(outputFS, Mockito.never()).delete(Mockito.any(), Mockito.anyBoolean());
+    }
+  }
+
   private PinotTaskConfig createMetadataPushTaskConfig(File outputDir) {
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_TYPE);
