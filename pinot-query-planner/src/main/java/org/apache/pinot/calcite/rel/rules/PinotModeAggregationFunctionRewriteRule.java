@@ -36,7 +36,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 
-/// Supplies string and timestamp MODE calls with an inferred type argument after an explicit rollout opt-in.
+/// Supplies string and timestamp MODE calls with an inferred type argument.
 /// This stateless rule keeps the reducer and type as projected literals so distributed stages retain both arguments.
 public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
   public static PinotModeAggregationFunctionRewriteRule instanceWithDescription(String description) {

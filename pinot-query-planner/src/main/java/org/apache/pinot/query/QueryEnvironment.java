@@ -167,7 +167,7 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, false);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -199,16 +199,11 @@ public class QueryEnvironment {
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
     }
-    boolean enableTypedMode = Boolean.parseBoolean(options.get(QueryOptionKey.ENABLE_TYPED_MODE));
-    if (enableTypedMode) {
-      useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.TYPED_MODE_REWRITE);
-    }
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
-            enableTypedMode);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
       }
     }
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
@@ -551,15 +546,9 @@ public class QueryEnvironment {
   /// @param skipRuleSet parsed skipped rule name set from query options
   /// @param useRuleSet parsed use rule set from query options
   /// @param defaultDisabledRuleSet parsed default disabled rule set from broker config
-  /// @param enableTypedMode whether the query explicitly opted into typed MODE implementations
   /// @return HepProgram that performs logical transformations
   private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
-      Set<String> defaultDisabledRuleSet, boolean enableTypedMode) {
-    if (!enableTypedMode) {
-      // Rollout safety must not depend on customized default-disabled rules or usePlannerRules overrides.
-      skipRuleSet = new HashSet<>(skipRuleSet);
-      skipRuleSet.add(CommonConstants.Broker.PlannerRuleNames.TYPED_MODE_REWRITE);
-    }
+      Set<String> defaultDisabledRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.

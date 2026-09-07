@@ -31,7 +31,7 @@
     "queries": [
       {
         "description": "Grouped modes ignore nulls, retain empty strings, and break ties by the smallest value",
-        "sql": "SET enableTypedMode=true; SELECT lpn_id, MODE(pallet_id), MODE(created_on) FROM {items} GROUP BY lpn_id",
+        "sql": "SELECT lpn_id, MODE(pallet_id), MODE(created_on) FROM {items} GROUP BY lpn_id",
         "outputs": [
           ["a", "p2", "2026-09-03 09:00:00.123"],
           ["nulls", null, null],
@@ -41,12 +41,12 @@
       },
       {
         "description": "Typed MAX tie reducers select the largest original value",
-        "sql": "SET enableTypedMode=true; SELECT MODE(pallet_id, 'MAX'), MODE(created_on, 'MAX') FROM {items} WHERE lpn_id = 'ties'",
+        "sql": "SELECT MODE(pallet_id, 'MAX'), MODE(created_on, 'MAX') FROM {items} WHERE lpn_id = 'ties'",
         "outputs": [["z", "1970-01-01 00:00:00.001"]]
       },
       {
         "description": "Empty aggregate inputs return null for both types",
-        "sql": "SET enableTypedMode=true; SELECT MODE(pallet_id), MODE(created_on) FROM {items} WHERE lpn_id = 'missing'",
+        "sql": "SELECT MODE(pallet_id), MODE(created_on) FROM {items} WHERE lpn_id = 'missing'",
         "outputs": [[null, null]]
       }
     ]

@@ -20,19 +20,14 @@ package org.apache.pinot.query.queries;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.routing.MockRoutingManagerFactory;
-import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -42,7 +37,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Verifies distributed MODE arguments and the independent rollout opt-in with both physical planners.
+/// Verifies automatic distributed MODE type inference with both physical planners.
 public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @DataProvider
   public Object[][] physicalOptimizers() {
@@ -52,7 +47,6 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "physicalOptimizers")
   public void testDistributedModeTypes(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET enableTypedMode=true; "
         + "SELECT MODE(NULLIF(col1, '')), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG') FROM a");
     PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
     assertEquals(root.getDataSchema().getColumnDataTypes(),
@@ -81,52 +75,6 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     }
     assertTrue(sawIntermediate, "Distributed MODE must exchange frequency counts");
     assertTrue(sawFinal, "Distributed MODE must retain its final result types");
-  }
-
-  @Test(dataProvider = "physicalOptimizers")
-  public void testTypedModeRequiresOptIn(boolean usePhysicalOptimizer) {
-    // Even clearing the broker's disabled-rule defaults or explicitly selecting the rule cannot bypass the opt-in.
-    QueryEnvironment environment = buildQueryEnvironment(Set.of());
-    for (String options : List.of("", "SET autoRewriteAggregationType=true; ",
-        "SET enableTypedMode=false; SET usePlannerRules='TypedModeRewrite'; ",
-        "SET enableTypedMode=true; SET skipPlannerRules='TypedModeRewrite'; ")) {
-      assertModeCalls(environment, usePhysicalOptimizer, options, false);
-    }
-    assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ", true);
-  }
-
-  private static QueryEnvironment buildQueryEnvironment(Set<String> disabledRules) {
-    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
-    TABLE_SCHEMAS.forEach((name, schema) -> factory.registerTable(schema, name));
-    SERVER1_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(1, table, s)));
-    SERVER2_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(2, table, s)));
-    return new QueryEnvironment(QueryEnvironment.configBuilder()
-        .requestId(-1L)
-        .database(CommonConstants.DEFAULT_DATABASE)
-        .tableCache(factory.buildTableCache())
-        .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, factory.buildRoutingManager(null)))
-        .defaultDisabledPlannerRules(disabledRules)
-        .build());
-  }
-
-  private static void assertModeCalls(QueryEnvironment environment, boolean usePhysicalOptimizer, String options,
-      boolean typed) {
-    DispatchableSubPlan plan = environment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + options + "SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
-    List<AggregateNode> aggregates = findAggregates(plan);
-    assertFalse(aggregates.isEmpty());
-    for (AggregateNode aggregate : aggregates) {
-      assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          List.of("MODE", "MODE", "MODE"), options);
-      if (typed) {
-        assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
-        assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
-      } else {
-        for (RexExpression.FunctionCall mode : aggregate.getAggCalls()) {
-          assertEquals(mode.getFunctionOperands().size(), 1, options);
-        }
-      }
-    }
   }
 
   @Test

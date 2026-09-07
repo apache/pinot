@@ -35,10 +35,9 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
-/// When `enableTypedMode` is enabled, adds an inferred type argument to string and timestamp MODE expressions
+/// Adds an inferred type argument to string and timestamp MODE expressions
 /// so the result type is fixed before execution.
 /// This also supplies the broker with the correct result type when no rows match or groups are trimmed before
 /// finalization. Type inference reads schema and function metadata only: server-dependent transforms such as LOOKUP
@@ -46,9 +45,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 public class ModeAggregationFunctionRewriteOptimizer implements StatementOptimizer {
   @Override
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
-    // Keep existing timestamp MODE requests compatible with older servers during rolling upgrades.
-    if (schema == null || pinotQuery.getQueryOptions() == null
-        || !Boolean.parseBoolean(pinotQuery.getQueryOptions().get(QueryOptionKey.ENABLE_TYPED_MODE))) {
+    if (schema == null) {
       return;
     }
     rewriteExpressions(pinotQuery.getSelectList(), schema);

@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/// Covers inferred MODE arguments and the independent rollout opt-in.
+/// Covers automatic MODE type inference and unchanged numeric calls.
 public class ModeAggregationFunctionRewriteOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
@@ -55,25 +55,21 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
 
   @Test(dataProvider = "modeExpressions")
   public void testModeExpressions(String original, String rewritten) {
-    String prefix = "SET enableTypedMode=true; SELECT ";
+    String prefix = "SELECT ";
     TestHelper.assertEqualsQuery(prefix + original + " FROM testTable", prefix + rewritten + " FROM testTable", SCHEMA);
   }
 
   @Test
   public void testLegacyCallsAndOtherRewritesAreUnchanged() {
-    for (String options : new String[]{"", "SET enableTypedMode=false; ", "SET autoRewriteAggregationType=true; "}) {
-      assertUnchanged(options + "SELECT MODE(stringCol), MODE(timestampCol), MODE(longCol, 'AVG') FROM testTable",
-          SCHEMA);
-    }
-    assertUnchanged("SET enableTypedMode=true; SELECT MODE(longCol, 'AVG'), MIN(stringCol), SUM(longCol), "
+    assertUnchanged("SELECT MODE(longCol, 'AVG'), MIN(stringCol), SUM(longCol), "
         + "MODE(stringCol, 'MAX', 'STRING'), MODE(timestampCol, 'MIN', 'TIMESTAMP') FROM testTable", SCHEMA);
   }
 
   @Test
   public void testUnknownTypesDoNotInitializeServerTransforms() {
-    assertUnchanged("SET enableTypedMode=true; SELECT MODE(unknownCol), MODE(mvStringCol), "
+    assertUnchanged("SELECT MODE(unknownCol), MODE(mvStringCol), "
         + "MODE(LOOKUP('baseballTeams', 'teamInteger', 'teamID', stringCol)) FROM testTable", SCHEMA);
-    assertUnchanged("SET enableTypedMode=true; SELECT MODE(stringCol) FROM testTable", null);
+    assertUnchanged("SELECT MODE(stringCol) FROM testTable", null);
   }
 
   private static void assertUnchanged(String sql, Schema schema) {
