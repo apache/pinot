@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -238,6 +239,52 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   /// the stat map the operator keeps.
   public abstract StatMap<?> copyStatMaps();
 
+  /// Drops the per-query row and hash state this operator is holding — whatever it accumulated while running, plus
+  /// any input it is still pointing at — so that it becomes collectable even while the operator itself stays
+  /// reachable.
+  ///
+  /// Both [#close()] and [#cancel(Throwable)] call this, so the state is released on *every* termination path: end
+  /// of stream, error and cancellation alike. Operators that can release earlier (when they produce their
+  /// end-of-stream block, say) should keep doing that as well — this is the backstop, not the prompt path.
+  ///
+  /// **Threading.** Like the rest of teardown, this runs on the thread that executes the op chain (see [OpChain]) —
+  /// either the worker thread itself, via the scheduler's direct-executor callback, or a thread holding a chain that
+  /// never started. It is therefore safe to touch operator state without synchronization, and callers must not
+  /// invoke [#close()] or [#cancel(Throwable)] from anywhere else: nulling a field that a concurrently running
+  /// `getNextBlock()` is dereferencing would be a use-after-free, not a missed release.
+  ///
+  /// Rules for implementations:
+  ///
+  ///  1. **Be idempotent.** This can run more than once, and it runs after [#cancel(Throwable)] on the error path.
+  ///  2. **Leave the stats alone.** [#calculateStats()] and [#copyStatMaps()] are called after termination.
+  ///  3. **Never mutate something whose identity left the operator.** A block sitting in a local mailbox still
+  ///     points at the list it was built from, and emptying that list silently drops rows rather than failing.
+  ///     Drop or replace the reference; do not `clear()` in place. The same goes for state an external consumer
+  ///     reads after termination — see [org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator], whose
+  ///     buffer is its output and which therefore releases nothing.
+  ///  4. **Prefer replacing to clearing.** `clear()` drops the elements but keeps the backing table at whatever
+  ///     capacity it grew to — `HashMap`, `ObjectOpenHashSet`, `ArrayList` and `PriorityQueue` all behave this way,
+  ///     which for a large buffer leaves tens of megabytes of empty slots reachable. Assign a fresh, empty instance
+  ///     (or `null`) instead.
+  ///  5. **Do not let a released field double as control flow.** After release the operator is done, so a field that
+  ///     also serves as a mode discriminator or a "have I read the input yet" marker must not be the one being
+  ///     dropped. Keep the discriminator in a separate final field.
+  ///
+  /// An operator that overrides [#close()] or [#cancel(Throwable)] must chain to `super`, or its state is never
+  /// released — that is not a compile error, so it is on the implementer.
+  protected void releaseBuffers() {
+  }
+
+  /// Whether this operator is currently holding any of the state that [#releaseBuffers()] drops.
+  ///
+  /// The two are a pair: an operator that overrides one must override the other, and
+  /// `releaseBuffers(); assert !hasBufferedState();` must hold. It exists so the release invariant can be asserted
+  /// without reflecting into private fields; nothing in production reads it.
+  @VisibleForTesting
+  protected boolean hasBufferedState() {
+    return false;
+  }
+
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
@@ -250,6 +297,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
+    releaseBuffersSafely();
   }
 
   public void cancel(Throwable e) {
@@ -260,6 +308,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
+    }
+    releaseBuffersSafely();
+  }
+
+  private void releaseBuffersSafely() {
+    try {
+      releaseBuffers();
+    } catch (Throwable t) {
+      // Releasing buffers is best-effort cleanup; never let it break the rest of the teardown. Throwable rather than
+      // Exception so that an AssertionError from an implementation (tests run with -ea) cannot abort a parent's
+      // close loop and leave its siblings unclosed.
+      logger().error("Failed to release the buffers of operator: {}", this, t);
     }
   }
 
