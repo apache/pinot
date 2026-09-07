@@ -82,6 +82,11 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
   private LogicalTableRouteInfo _logicalTableRouteInfo;
 
+  @Nullable
+  private Map<Integer, Map<String, List<String>>> _workerIdToOptionalSegmentsMap;
+  @Nullable
+  private Map<Integer, Map<String, List<String>>> _workerIdToOptionalTableSegmentsMap;
+
   public List<String> getScannedTables() {
     return _scannedTables;
   }
@@ -199,4 +204,25 @@ public class DispatchablePlanMetadata implements Serializable {
       Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
     _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalSegmentsMap() {
+    return _workerIdToOptionalSegmentsMap;
+  }
+
+  public void setWorkerIdToOptionalSegmentsMap(
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap) {
+    _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalTableSegmentsMap() {
+    return _workerIdToOptionalTableSegmentsMap;
+  }
+
+  public void setWorkerIdToOptionalTableSegmentsMap(
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalTableSegmentsMap) {
+    _workerIdToOptionalTableSegmentsMap = workerIdToOptionalTableSegmentsMap;
+  }
+
 }

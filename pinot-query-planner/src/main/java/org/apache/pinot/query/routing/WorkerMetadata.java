@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
+  public static final String OPTIONAL_TABLE_SEGMENTS_MAP_KEY = "optionalTableSegmentsMap";
 
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
@@ -118,5 +119,20 @@ public class WorkerMetadata {
       throw new RuntimeException("Unable to serialize table segments map: " + logicalTableSegmentsMap, e);
     }
     _customProperties.put(LOGICAL_TABLE_SEGMENTS_MAP_KEY, logicalTableSegmentsMapStr);
+  }
+
+  @Nullable
+  public Map<String, List<String>> getOptionalTableSegmentsMap() {
+    return deserializeStringSegmentListMap(OPTIONAL_TABLE_SEGMENTS_MAP_KEY);
+  }
+
+  public void setOptionalTableSegmentsMap(Map<String, List<String>> optionalTableSegmentsMap) {
+    String json;
+    try {
+      json = JsonUtils.objectToString(optionalTableSegmentsMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Unable to serialize optional table segments map: " + optionalTableSegmentsMap, e);
+    }
+    _customProperties.put(OPTIONAL_TABLE_SEGMENTS_MAP_KEY, json);
   }
 }

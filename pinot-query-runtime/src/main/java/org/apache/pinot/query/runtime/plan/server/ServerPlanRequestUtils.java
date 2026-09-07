@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -156,12 +157,15 @@ public class ServerPlanRequestUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
     Map<String, List<String>> tableSegmentsMap = executionContext.getWorkerMetadata().getTableSegmentsMap();
     assert tableSegmentsMap != null;
+    Map<String, List<String>> optionalSegmentsMap =
+        executionContext.getWorkerMetadata().getOptionalTableSegmentsMap();
     TimeBoundaryInfo timeBoundary = stageMetadata.getTimeBoundary();
     int numRequests = tableSegmentsMap.size();
     if (numRequests == 1) {
       Map.Entry<String, List<String>> entry = tableSegmentsMap.entrySet().iterator().next();
       String tableType = entry.getKey();
       List<String> segments = entry.getValue();
+      List<String> optionalSegments = optionalListOrNull(optionalSegmentsMap, tableType);
       if (tableType.equals(TableType.OFFLINE.name())) {
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
         TableDataManager tableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
@@ -170,7 +174,7 @@ public class ServerPlanRequestUtils {
         Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
         return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.OFFLINE,
             tableDataManager.getTableName(), tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight(), segments,
-            null));
+            null, optionalSegments));
       } else {
         assert tableType.equals(TableType.REALTIME.name());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
@@ -180,12 +184,14 @@ public class ServerPlanRequestUtils {
         Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
         return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME,
             tableDataManager.getTableName(), tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight(), segments,
-            null));
+            null, optionalSegments));
       }
     } else {
       assert numRequests == 2;
       List<String> offlineSegments = tableSegmentsMap.get(TableType.OFFLINE.name());
       List<String> realtimeSegments = tableSegmentsMap.get(TableType.REALTIME.name());
+      List<String> offlineOptional = optionalListOrNull(optionalSegmentsMap, TableType.OFFLINE.name());
+      List<String> realtimeOptional = optionalListOrNull(optionalSegmentsMap, TableType.REALTIME.name());
       assert offlineSegments != null && realtimeSegments != null;
       String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
       TableDataManager offlineTableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
@@ -202,10 +208,10 @@ public class ServerPlanRequestUtils {
       return List.of(
           compileInstanceRequest(executionContext, new PinotQuery(pinotQuery), timeBoundary, TableType.OFFLINE,
               offlineTableDataManager.getTableName(), offlineTableConfigAndSchema.getLeft(),
-              offlineTableConfigAndSchema.getRight(), offlineSegments, null),
+              offlineTableConfigAndSchema.getRight(), offlineSegments, null, offlineOptional),
           compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME,
               realtimeTableDataManager.getTableName(), realtimeTableConfigAndSchema.getLeft(),
-              realtimeTableConfigAndSchema.getRight(), realtimeSegments, null));
+              realtimeTableConfigAndSchema.getRight(), realtimeSegments, null, realtimeOptional));
     }
   }
 
@@ -213,7 +219,7 @@ public class ServerPlanRequestUtils {
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
       String tableNameWithType, TableConfig tableConfig, Schema schema, @Nullable List<String> segmentList,
-      @Nullable List<TableSegmentsInfo> tableRouteInfoList) {
+      @Nullable List<TableSegmentsInfo> tableRouteInfoList, @Nullable List<String> optionalSegmentList) {
     Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
         "Either segmentList OR tableRouteInfoList should be set");
 
@@ -257,6 +263,9 @@ public class ServerPlanRequestUtils {
       instanceRequest.setSearchSegments(segmentList);
     } else {
       instanceRequest.setTableSegmentsInfoList(tableRouteInfoList);
+    }
+    if (CollectionUtils.isNotEmpty(optionalSegmentList)) {
+      instanceRequest.setOptionalSegments(optionalSegmentList);
     }
     instanceRequest.setQuery(brokerRequest);
 
@@ -420,6 +429,8 @@ public class ServerPlanRequestUtils {
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
     List<TableSegmentsInfo> offlineTableRouteInfoList = new ArrayList<>();
     List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
+    Map<String, List<String>> optionalLogicalTableSegmentsMap =
+        executionContext.getWorkerMetadata().getOptionalTableSegmentsMap();
 
     Preconditions.checkNotNull(logicalTableSegmentsMap);
     for (Map.Entry<String, List<String>> entry : logicalTableSegmentsMap.entrySet()) {
@@ -428,6 +439,12 @@ public class ServerPlanRequestUtils {
       TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
       tableSegmentsInfo.setTableName(physicalTableName);
       tableSegmentsInfo.setSegments(entry.getValue());
+      if (optionalLogicalTableSegmentsMap != null) {
+        List<String> optionalSegments = optionalLogicalTableSegmentsMap.get(physicalTableName);
+        if (CollectionUtils.isNotEmpty(optionalSegments)) {
+          tableSegmentsInfo.setOptionalSegments(new ArrayList<>(optionalSegments));
+        }
+      }
       if (tableType == TableType.REALTIME) {
         realtimeTableRouteInfoList.add(tableSegmentsInfo);
       } else {
@@ -447,14 +464,14 @@ public class ServerPlanRequestUtils {
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.OFFLINE, offlineTableName,
                 logicalTableContext.getRefOfflineTableConfig(), logicalTableContext.getLogicalTableSchema(), null,
-                routeInfoList));
+                routeInfoList,null));
       } else {
         Preconditions.checkNotNull(logicalTableContext.getRefRealtimeTableConfig());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.REALTIME,
                 realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
-                logicalTableContext.getLogicalTableSchema(), null, routeInfoList));
+                logicalTableContext.getLogicalTableSchema(), null, routeInfoList,null));
       }
     } else {
       Preconditions.checkNotNull(logicalTableContext.getRefOfflineTableConfig());
@@ -466,10 +483,20 @@ public class ServerPlanRequestUtils {
       return List.of(
           compileInstanceRequest(executionContext, offlinePinotQuery, timeBoundaryInfo, TableType.OFFLINE,
               offlineTableName, logicalTableContext.getRefOfflineTableConfig(),
-              logicalTableContext.getLogicalTableSchema(), null, offlineTableRouteInfoList),
+              logicalTableContext.getLogicalTableSchema(), null, offlineTableRouteInfoList,null),
           compileInstanceRequest(executionContext, realtimePinotQuery, timeBoundaryInfo, TableType.REALTIME,
               realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
-              logicalTableContext.getLogicalTableSchema(), null, realtimeTableRouteInfoList));
+              logicalTableContext.getLogicalTableSchema(), null, realtimeTableRouteInfoList,null));
     }
+  }
+
+  @Nullable
+  private static List<String> optionalListOrNull(@Nullable Map<String, List<String>> optionalSegmentsMap,
+      String tableTypeKey) {
+    if (optionalSegmentsMap == null) {
+      return null;
+    }
+    List<String> list = optionalSegmentsMap.get(tableTypeKey);
+    return CollectionUtils.isEmpty(list) ? null : list;
   }
 }
