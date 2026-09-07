@@ -602,13 +602,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   ///
   /// Connecting an already-open channel is a no-op that still counts, so the expected count holds
   /// regardless of channels the preceding tests' queries already opened lazily.
+  ///
+  /// Pre-connect opens only the (server, table type) pairs routing derives. This cluster's offline table
+  /// has no segments uploaded -- only the realtime table is fed, via Kafka -- so only the REALTIME channel
+  /// is routed: one per serving server, and no OFFLINE channel. The old cross product would have opened an
+  /// OFFLINE channel here too, to a server holding no offline segment: exactly the wasted TLS handshake and
+  /// idle socket this change removes.
   @Test
   public void testPreConnectOpensTlsChannelsToEveryServer() {
-    int expectedChannels = _serverStarters.size() * TableType.values().length;
+    int expectedChannels = _serverStarters.size();
     int connected = _brokerStarters.get(0).getBrokerRequestHandler()
         .preConnectServers(System.currentTimeMillis() + 30_000L);
     Assert.assertEquals(connected, expectedChannels,
-        "Pre-connect should complete the TLS handshake for every (server, table type) channel");
+        "Pre-connect should complete the TLS handshake for the realtime channel each server serves, and open "
+            + "no offline channel");
   }
 
   @Test

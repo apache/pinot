@@ -43,7 +43,8 @@ import static org.mockito.Mockito.mock;
 /// an offline table, then verifies end-to-end that:
 ///
 ///  1. The production pre-connect path (`RoutingManager` -> `QueryRouter` -> `ServerChannels` -> a live
-///     server) opens one channel per (server, table type).
+///     server) opens exactly the channels routing derives -- for this offline-only table, one OFFLINE
+///     channel per serving server and no REALTIME channels.
 ///  2. The readiness gate genuinely holds and then releases -- exercised directly against
 ///     [ServerPreConnector] with a slow connector, because the broker's own gate is fast enough that
 ///     asserting on its terminal status could not distinguish a working gate from one stuck open.
@@ -104,13 +105,14 @@ public class BrokerServerPreConnectIntegrationTest extends BaseClusterIntegratio
 
   @Test
   public void preConnectOpensChannelsToEveryLiveServer() {
-    // Connecting an already-open channel is a no-op that still counts as connected, so the expected
-    // count holds regardless of any earlier lazy connects from setUp's queries.
-    int expectedChannels = _serverStarters.size() * TableType.values().length;
+    // Routing-derived targets: an offline-only table yields one OFFLINE channel per serving server and no
+    // REALTIME channels. Connecting an already-open channel is a no-op that still counts as connected, so
+    // the expected count holds regardless of any earlier lazy connects from setUp's queries.
+    int expectedChannels = _serverStarters.size();
     int connected = _brokerStarters.get(0).getBrokerRequestHandler()
         .preConnectServers(System.currentTimeMillis() + PRECONNECT_TIMEOUT_MS);
     Assert.assertEquals(connected, expectedChannels,
-        "Pre-connect should open a channel to every routable server for both table types");
+        "Pre-connect should open one OFFLINE channel per serving server and no REALTIME channels");
   }
 
   /// The readiness gate is the highest-risk part of the feature, and the broker's own pre-connect
@@ -119,10 +121,11 @@ public class BrokerServerPreConnectIntegrationTest extends BaseClusterIntegratio
   /// assert both halves of the contract: the wait is bounded, and it ends.
   @Test
   public void preConnectBoundsTheGateWhenServersAreSlow() {
-    List<ServerInstance> servers = List.of(mock(ServerInstance.class));
+    List<ServerPreConnector.ChannelTarget> targets =
+        List.of(new ServerPreConnector.ChannelTarget(mock(ServerInstance.class), TableType.OFFLINE));
     long budgetMs = 500L;
     long startMs = System.currentTimeMillis();
-    int connected = new ServerPreConnector(() -> servers, (server, tableType, timeoutMs) -> {
+    int connected = new ServerPreConnector(() -> targets, (server, tableType, timeoutMs) -> {
       try {
         Thread.sleep(30_000L);
       } catch (InterruptedException e) {

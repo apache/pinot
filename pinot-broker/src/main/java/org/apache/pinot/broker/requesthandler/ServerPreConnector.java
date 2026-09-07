@@ -42,15 +42,21 @@ import org.slf4j.LoggerFactory;
 /// the blocking `connect()` -- and, when broker-to-server TLS is on, the handshake -- on its critical
 /// path.
 ///
-/// `ServerRoutingInstance` identity includes the table type, so OFFLINE and REALTIME are **separate**
-/// channels to the same physical server; both are connected here. Connecting only the table types a
-/// server serves today would leave a table added later cold, since pre-connect is one-shot at startup.
-/// Connecting an already-active channel is a no-op, so this is safe to call more than once.
+/// A channel's identity includes the table type, so OFFLINE and REALTIME are **separate** channels
+/// (separate sockets, separate handshakes) to the same physical server. The caller supplies the exact
+/// (server, table type) pairs to open, derived from what this broker actually routes -- so an offline-only
+/// cluster opens no REALTIME channels, and a broker serving one tenant does not connect to another
+/// tenant's servers. A table that lands on a server later is left to the lazy connect path (one query pays
+/// the connect) rather than pre-warmed here on the chance it appears: the would-be second channel shares
+/// nothing with the first, so pre-warming it amortizes nothing. Connecting an already-active channel is a
+/// no-op, so this is safe to call more than once.
 ///
-/// Bounded on three axes so it can never stall startup: a capped thread pool, a per-channel connect
-/// bound derived from the remaining budget, and a per-channel wait clamped to the caller's deadline. A
-/// server that is unreachable or itself restarting is logged and skipped -- the existing lazy-connect
-/// path still serves it. This class is stateless and thread-safe.
+/// Bounded so it can never stall startup: a capped thread pool, a per-channel connect bound derived from
+/// the remaining budget, a per-channel wait clamped to the caller's deadline, and a straggler grace window
+/// ([#STRAGGLER_GRACE_MS]) that, once at least one channel is up, releases the caller when the rest stop
+/// arriving rather than waiting out the whole budget on one stuck server. A server that is unreachable or
+/// itself restarting is logged and skipped -- the existing lazy-connect path still serves it. This class
+/// is stateless and thread-safe.
 ///
 /// It takes its dependencies as functions rather than concrete `RoutingManager`/`QueryRouter` types so
 /// the parallelism, budget and failure handling can be unit-tested without a live broker.
@@ -69,6 +75,14 @@ public class ServerPreConnector {
   @VisibleForTesting
   static final int MAX_CONNECT_THREADS = 16;
 
+  /// How long to keep waiting, once at least one channel is up, for the next one before concluding the
+  /// rest are stuck. A quiet window this long means what is left is stuck rather than merely slow, so the
+  /// caller is released and the stragglers finish -- or time out -- on their own daemon threads. Until the
+  /// first *successful* connect the whole budget is available: with nothing up yet there is no way to tell
+  /// "every server is slow" from "a few are stuck", and a fast failure must not start the clock.
+  @VisibleForTesting
+  static final long STRAGGLER_GRACE_MS = 2_000L;
+
   /// Opens one broker-to-server channel. Implementations must bound their own wait by `timeoutMs` and
   /// must not throw; the return value reports whether the channel is connected.
   @FunctionalInterface
@@ -76,31 +90,40 @@ public class ServerPreConnector {
     boolean connect(ServerInstance serverInstance, TableType tableType, long timeoutMs);
   }
 
-  private final Supplier<Collection<ServerInstance>> _routableServersSupplier;
+  /// A (server, table type) channel to open. The table type is part of the channel identity: OFFLINE and
+  /// REALTIME are separate channels (separate sockets) to the same physical server.
+  public record ChannelTarget(ServerInstance serverInstance, TableType tableType) {
+  }
+
+  private final Supplier<Collection<ChannelTarget>> _targetsSupplier;
   private final ChannelConnector _connector;
 
-  /// @param routableServersSupplier supplies the servers to connect, evaluated once per [#preConnect]
-  ///     call after the caller has ensured routing is built
+  /// @param targetsSupplier supplies the (server, table type) channels to open, evaluated once per
+  ///     [#preConnect] call after the caller has ensured routing is built. Derive these from routing so
+  ///     only channels this broker actually uses are opened. Must return a non-null collection and must
+  ///     not throw (it is evaluated before the failure-handling loop); the production supplier reads
+  ///     routing, which cannot do either.
   /// @param connector opens the channel for one (server, table type) within a timeout
-  public ServerPreConnector(Supplier<Collection<ServerInstance>> routableServersSupplier,
-      ChannelConnector connector) {
-    _routableServersSupplier = routableServersSupplier;
+  public ServerPreConnector(Supplier<Collection<ChannelTarget>> targetsSupplier, ChannelConnector connector) {
+    _targetsSupplier = targetsSupplier;
     _connector = connector;
   }
 
-  /// Opens a channel to every routable server, for both table types, in parallel, bounded by
-  /// `deadlineMs` (an absolute [System#currentTimeMillis] value). Returns the number of channels
-  /// successfully connected. Never throws: a channel that fails or times out is logged and skipped.
+  /// Opens the supplied (server, table type) channels in parallel, bounded by `deadlineMs` (an absolute
+  /// [System#currentTimeMillis] value). Returns the number of channels connected **before the caller was
+  /// released** -- so a straggler that connects after the grace window (see [#STRAGGLER_GRACE_MS]) is not
+  /// counted, even though its channel is still published for the first query to reuse. Never throws: a
+  /// channel that fails or times out is logged and skipped.
   public int preConnect(long deadlineMs) {
-    // Snapshot the routable-server view once. The supplier may return a live map view that another thread
+    // Snapshot the target view once. The supplier may derive from a live routing view that another thread
     // updates during startup; snapshotting keeps the channel count consistent with the tasks actually
     // submitted below, so we never poll for phantom channels or under-count real ones.
-    List<ServerInstance> servers = new ArrayList<>(_routableServersSupplier.get());
-    if (servers.isEmpty() || System.currentTimeMillis() >= deadlineMs) {
+    List<ChannelTarget> targets = new ArrayList<>(_targetsSupplier.get());
+    if (targets.isEmpty() || System.currentTimeMillis() >= deadlineMs) {
       return 0;
     }
     long startMs = System.currentTimeMillis();
-    int channelCount = servers.size() * TableType.values().length;
+    int channelCount = targets.size();
     ExecutorService executor = Executors.newFixedThreadPool(Math.min(channelCount, MAX_CONNECT_THREADS),
         new ThreadFactoryBuilder().setNameFormat("broker-preconnect-%d").setDaemon(true).build());
     // A completion service hands channels back in the order they finish, not the order submitted, so a
@@ -109,22 +132,35 @@ public class ServerPreConnector {
     // still queues for a worker, which is what the per-channel timeout bounds.
     CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executor);
     int connected = 0;
+    boolean releasedEarly = false;
     try {
-      for (ServerInstance server : servers) {
-        for (TableType tableType : TableType.values()) {
-          completionService.submit(
-              () -> _connector.connect(server, tableType, Math.max(0L, deadlineMs - System.currentTimeMillis())));
-        }
+      for (ChannelTarget target : targets) {
+        completionService.submit(() -> _connector.connect(target.serverInstance(), target.tableType(),
+            Math.max(0L, deadlineMs - System.currentTimeMillis())));
       }
       for (int i = 0; i < channelCount; i++) {
         long remainingMs = deadlineMs - System.currentTimeMillis();
         if (remainingMs <= 0) {
           break;
         }
+        // Keep the whole budget available until the first *successful* connect: a quiet window only means
+        // "the rest are stuck" once at least one channel has actually come up. Keying the exemption on the
+        // first completion instead would let a single fast event -- an instantly refused connect, or one
+        // nearby server -- start the grace clock before the healthy-but-slower channels return, abandoning
+        // them. Once one channel is up, a quiet grace window is the signal that what is left is stuck rather
+        // than slow, and the caller is released -- one unreachable server otherwise holds the gate for the
+        // entire budget. (A cluster where no server ever connects still exits promptly when connects fail
+        // fast, and waits the budget only when every connect black-holes, which is the correct thing to do
+        // for a broker that can reach nothing.)
+        long waitMs = connected == 0 ? remainingMs : Math.min(remainingMs, STRAGGLER_GRACE_MS);
         try {
-          Future<Boolean> future = completionService.poll(remainingMs, TimeUnit.MILLISECONDS);
+          Future<Boolean> future = completionService.poll(waitMs, TimeUnit.MILLISECONDS);
           if (future == null) {
-            // Budget elapsed before the next channel finished; the rest fall back to the lazy path.
+            // The grace cap was binding (we could have waited longer but chose not to) only when waitMs was
+            // clamped below the remaining budget; otherwise this is plain budget exhaustion.
+            releasedEarly = waitMs < remainingMs;
+            LOGGER.info("No pre-connect channel completed in {} ms with {}/{} still outstanding; releasing startup "
+                + "and leaving them to the lazy connect path", waitMs, channelCount - i, channelCount);
             break;
           }
           if (Boolean.TRUE.equals(future.get())) {
@@ -140,15 +176,20 @@ public class ServerPreConnector {
         }
       }
     } finally {
-      executor.shutdownNow();
+      // shutdown(), not shutdownNow(): a channel we stopped waiting on is still connecting on a daemon
+      // thread. Interrupting a worker parked in connect().sync() abandons a ChannelFuture that can still
+      // complete, leaking a socket nobody references or closes. Letting the workers run means a late
+      // channel is still published for the first query to reuse, and each task is already bounded by its
+      // own deadline-derived timeout, so none outlives the budget.
+      executor.shutdown();
     }
     long elapsedMs = System.currentTimeMillis() - startMs;
     if (connected < channelCount) {
-      LOGGER.warn("Broker pre-connected only {}/{} channel(s) across {} server(s) in {} ms; the rest fall back to the "
-          + "lazy connect path", connected, channelCount, servers.size(), elapsedMs);
+      LOGGER.warn("Broker pre-connected {}/{} channel(s) in {} ms ({}); the rest fall back to the lazy connect "
+          + "path", connected, channelCount, elapsedMs, releasedEarly ? "released early on a straggler grace window"
+          : "budget elapsed");
     } else {
-      LOGGER.info("Broker pre-connected {}/{} channel(s) across {} server(s) in {} ms", connected, channelCount,
-          servers.size(), elapsedMs);
+      LOGGER.info("Broker pre-connected {}/{} channel(s) in {} ms", connected, channelCount, elapsedMs);
     }
     return connected;
   }

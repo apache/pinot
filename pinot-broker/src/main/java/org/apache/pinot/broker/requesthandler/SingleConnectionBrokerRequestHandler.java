@@ -21,9 +21,12 @@ package org.apache.pinot.broker.requesthandler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -53,6 +56,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -113,15 +117,46 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     _brokerReduceService.shutDown();
   }
 
-  /// Opens a channel to every routable server, for both table types, taking the blocking connect -- and,
-  /// when broker-to-server TLS is on, the handshake -- off the first real query's critical path. The
-  /// caller guarantees Helix has converged, so [RoutingManager#getRoutableServerInstanceMap] already
-  /// reflects the servers this broker will route to. Never throws; returns the number of channels
-  /// connected before `deadlineMs`.
+  /// Opens the broker-to-server channels this broker actually routes to, taking the blocking connect --
+  /// and, when broker-to-server TLS is on, the handshake -- off the first real query's critical path. The
+  /// channels opened are derived from routing (see [#routableChannelTargets]), so an offline-only cluster
+  /// opens no REALTIME channels and a broker serving one tenant does not connect to another tenant's
+  /// servers. The caller guarantees Helix has converged, so routing reflects the tables and servers this
+  /// broker serves. Never throws; returns the number of channels connected before `deadlineMs`.
   @Override
   public int preConnectServers(long deadlineMs) {
-    return new ServerPreConnector(() -> _routingManager.getRoutableServerInstanceMap().values(),
+    return new ServerPreConnector(() -> routableChannelTargets(_routingManager),
         _queryRouter::preConnect).preConnect(deadlineMs);
+  }
+
+  /// Derives the (server, table type) channels this broker actually routes to, so pre-connect opens
+  /// exactly those. Iterates the broker's routable tables (each name carries its type) and resolves each
+  /// table's serving instances to `ServerInstance`s, deduping across tables. This deliberately does **not**
+  /// use `getRoutableServerInstanceMap()` as the server set: that is every enabled server in the whole
+  /// cluster, not this broker's, and crossing it with both table types would open a duplicate socket per
+  /// server (OFFLINE and REALTIME are separate channels) plus channels to servers this broker never
+  /// queries. Static and package-private for unit testing against a mocked [RoutingManager].
+  @VisibleForTesting
+  static Collection<ServerPreConnector.ChannelTarget> routableChannelTargets(RoutingManager routingManager) {
+    Map<String, ServerInstance> serverInstanceMap = routingManager.getRoutableServerInstanceMap();
+    Set<ServerPreConnector.ChannelTarget> targets = new HashSet<>();
+    for (String tableNameWithType : routingManager.getRoutableTables()) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == null) {
+        continue;
+      }
+      Set<String> servingInstances = routingManager.getServingInstances(tableNameWithType);
+      if (servingInstances == null) {
+        continue;
+      }
+      for (String instanceId : servingInstances) {
+        ServerInstance serverInstance = serverInstanceMap.get(instanceId);
+        if (serverInstance != null) {
+          targets.add(new ServerPreConnector.ChannelTarget(serverInstance, tableType));
+        }
+      }
+    }
+    return targets;
   }
 
   @Override
