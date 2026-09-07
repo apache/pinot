@@ -48,8 +48,10 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///   - `DISTINCTCOUNTTUPLESKETCH`, `SUMVALUESINTEGERSUMTUPLESKETCH`,
 ///     `AVGVALUEINTEGERSUMTUPLESKETCH` / `DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH`
 ///
-/// Each raw variant is also registered user-side, so a query wanting the merged sketch itself can
-/// be served from an MV storing it.
+/// The Theta, CPC and integer-sum tuple raw variants (`DISTINCTCOUNTRAWTHETASKETCH`,
+/// `DISTINCTCOUNTRAWCPCSKETCH`, `DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH`) are also registered
+/// user-side, so a query wanting the merged sketch itself can be served from an MV storing it. The
+/// raw HLL variants are not.
 ///
 /// Trailing literal parameters injected by broker overrides (e.g. HLL
 /// `log2m`) are preserved in the rewritten expression.
