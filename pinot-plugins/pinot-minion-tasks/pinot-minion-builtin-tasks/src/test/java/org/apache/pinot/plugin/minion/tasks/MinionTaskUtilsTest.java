@@ -41,6 +41,7 @@ import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -691,10 +692,11 @@ public class MinionTaskUtilsTest {
     taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.URI.toString());
     Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
         getMockClusterInfo("hdfs://data/dir", "http://localhost:9000"));
-    assertEquals(pushTaskConfigs.size(), 3);
+    assertEquals(pushTaskConfigs.size(), 4);
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
         BatchConfigProperties.SegmentPushType.METADATA.toString());
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertNotNull(pushTaskConfigs.get(SegmentReplacementUtils.ROOT_REFERENCES_CONFIG_KEY));
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
   }
 
@@ -706,9 +708,10 @@ public class MinionTaskUtilsTest {
     Map<String, String> pushTaskConfigs =
         MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig, mockClusterInfo);
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertNotNull(pushTaskConfigs.get(SegmentReplacementUtils.ROOT_REFERENCES_CONFIG_KEY));
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
         BatchConfigProperties.SegmentPushType.METADATA.toString());
-    assertEquals(pushTaskConfigs.size(), 3);
+    assertEquals(pushTaskConfigs.size(), 4);
   }
 
   @Test
@@ -720,10 +723,11 @@ public class MinionTaskUtilsTest {
         getMockClusterInfo("/data/dir", "http://localhost:9000"));
 
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "hdfs://data/dir/myTable");
+    assertNotNull(pushTaskConfigs.get(SegmentReplacementUtils.ROOT_REFERENCES_CONFIG_KEY));
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
         BatchConfigProperties.SegmentPushType.METADATA.toString());
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
-    assertEquals(pushTaskConfigs.size(), 3);
+    assertEquals(pushTaskConfigs.size(), 4);
   }
 
   @Test
@@ -751,7 +755,7 @@ public class MinionTaskUtilsTest {
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
         BatchConfigProperties.SegmentPushType.METADATA.toString());
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
-    assertEquals(pushTaskConfigs.size(), 4);
+    assertEquals(pushTaskConfigs.size(), 5);
   }
 
   private static SegmentZKMetadata makeSegmentWithEndTimeMs(String name, long endTimeMs) {

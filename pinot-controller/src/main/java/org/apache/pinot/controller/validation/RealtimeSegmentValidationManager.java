@@ -39,6 +39,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -65,6 +66,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final StorageQuotaChecker _storageQuotaChecker;
   private final ResourceUtilizationManager _resourceUtilizationManager;
   private final int _segmentLevelValidationIntervalInSeconds;
+  private final String _dataDir;
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -85,6 +87,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _resourceUtilizationManager = resourceUtilizationManager;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _dataDir = config.getDataDir();
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
     _disasterRecoveryMode = config.getDisasterRecoveryMode();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
@@ -217,6 +220,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     String realtimeTableName = tableConfig.getTableName();
 
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    // Reuse this already-required snapshot; cleanup must not trigger another metadata read.
+    SegmentReplacementUtils.cleanup(_dataDir, realtimeTableName, segmentsZKMetadata);
 
     // Delete tmp segments
     if (_llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {

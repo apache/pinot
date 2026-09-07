@@ -34,6 +34,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -56,6 +57,7 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
   private final boolean _segmentAutoResetOnErrorAtValidation;
   private final ResourceUtilizationManager _resourceUtilizationManager;
   private final int _segmentLevelValidationIntervalInSeconds;
+  private final String _dataDir;
   // Legacy frequency setting maintained for backward compatibility
   private final int _offlineSegmentIntervalCheckerFrequencyInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -70,6 +72,7 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
     _resourceUtilizationManager = resourceUtilizationManager;
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _dataDir = config.getDataDir();
     _offlineSegmentIntervalCheckerFrequencyInSeconds = config.getOfflineSegmentIntervalCheckerFrequencyInSeconds();
   }
 
@@ -132,6 +135,8 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
   private void validateOfflineSegmentPush(TableConfig tableConfig) {
     String offlineTableName = tableConfig.getTableName();
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    // Reuse this already-required snapshot; cleanup must not trigger another metadata read.
+    SegmentReplacementUtils.cleanup(_dataDir, offlineTableName, segmentsZKMetadata);
 
     // Compute the missing segments if there are at least two segments and the table has time column
     int numMissingSegments = 0;

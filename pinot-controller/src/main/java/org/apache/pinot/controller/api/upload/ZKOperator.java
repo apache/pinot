@@ -45,6 +45,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -81,6 +82,9 @@ public class ZKOperator {
     String segmentName = segmentMetadata.getName();
     boolean refreshOnly =
         Boolean.parseBoolean(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY));
+    checkReplacementRegistration(tableNameWithType, segmentName, uploadType, sourceDownloadURIStr,
+        segmentDownloadURIStr, finalSegmentLocationURI, enableParallelPushProtection, headers);
+
 
     ZNRecord existingSegmentMetadataZNRecord =
         _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
@@ -134,6 +138,9 @@ public class ZKOperator {
     for (SegmentUploadMetadata segmentUploadMetadata: segmentUploadMetadataList) {
       SegmentMetadata segmentMetadata = segmentUploadMetadata.getSegmentMetadata();
       String segmentName = segmentMetadata.getName();
+      checkReplacementRegistration(tableNameWithType, segmentName, uploadType,
+          segmentUploadMetadata.getSourceDownloadURIStr(), segmentUploadMetadata.getSegmentDownloadURIStr(),
+          segmentUploadMetadata.getFinalSegmentLocationURI(), enableParallelPushProtection, headers);
 
       ZNRecord existingSegmentMetadataZNRecord =
           _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
@@ -293,6 +300,10 @@ public class ZKOperator {
     segmentZKMetadata.setSegmentUploadStartTime(-1);
 
     try {
+      // Recheck after acquiring the existing upload lock. Collection retains candidates while this lock is held,
+      // covering a controller pause between this deadline check and the versioned metadata update.
+      checkReplacementRegistration(tableNameWithType, segmentName, uploadType, sourceDownloadURIStr,
+          segmentDownloadURIStr, finalSegmentLocationURI, enableParallelPushProtection, headers);
       // Construct the segment ZK metadata custom map modifier
       String customMapModifierStr =
           headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
@@ -399,6 +410,33 @@ public class ZKOperator {
       processExistingSegment(tableConfig, segmentMetadata, uploadType, existingSegmentMetadataZNRecord,
           finalSegmentLocationURI, segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName,
           segmentSizeInBytes, enableParallelPushProtection, headers);
+    }
+  }
+
+  /// Managed replacements have a finite registration window. Enforce it in both single and batch paths, and require
+  /// the existing refresh guards/upload lock so expired objects cannot be registered after collection has begun.
+  private void checkReplacementRegistration(String tableNameWithType, String segmentName, FileUploadType uploadType,
+      String sourceUri, String downloadUri, URI finalLocation, boolean parallelPushProtection, HttpHeaders headers) {
+    Long deadline;
+    try {
+      deadline = SegmentReplacementUtils.registrationDeadline(sourceUri, tableNameWithType, segmentName);
+    } catch (RuntimeException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid replacement URI: " + sourceUri,
+          Response.Status.BAD_REQUEST, e);
+    }
+    if (deadline == null) {
+      return;
+    }
+    if (uploadType != FileUploadType.METADATA || finalLocation != null || !sourceUri.equals(downloadUri)
+        || !parallelPushProtection || headers.getHeaderString(HttpHeaders.IF_MATCH) == null
+        || !Boolean.parseBoolean(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY))) {
+      throw new ControllerApplicationException(LOGGER,
+          "Managed replacement requires direct METADATA push, If-Match, REFRESH_ONLY and parallel push protection",
+          Response.Status.BAD_REQUEST);
+    }
+    if (System.currentTimeMillis() >= deadline) {
+      throw new ControllerApplicationException(LOGGER, "Replacement upload expired; retry with a fresh output URI",
+          Response.Status.GONE);
     }
   }
 

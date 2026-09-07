@@ -52,6 +52,7 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -264,6 +265,13 @@ public class MinionTaskUtils {
 
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
           clusterInfoAccessor.getVipUrlForLeadController(tableName));
+      // A single-segment replacement records its output root here before uploading, so controller validation can
+      // discover custom roots without new ZK records or reading task history. Other executors ignore this key.
+      if (BatchConfigProperties.SegmentPushType.METADATA.name().equalsIgnoreCase(
+          singleFileGenerationTaskConfig.get(BatchConfigProperties.PUSH_MODE))) {
+        singleFileGenerationTaskConfig.put(SegmentReplacementUtils.ROOT_REFERENCES_CONFIG_KEY,
+            SegmentReplacementUtils.referencesDir(clusterInfoAccessor.getDataDir(), tableName).toString());
+      }
       return singleFileGenerationTaskConfig;
     } catch (Exception e) {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,

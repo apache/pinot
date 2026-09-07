@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.NameValuePair;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -43,6 +45,7 @@ import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutor;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.segment.local.utils.SegmentReplacementUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -200,7 +203,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
                 uploadURL, convertedTarredSegmentFile);
             break;
           case METADATA:
-            uploadSegmentWithMetadata(configs, pinotTaskConfig, segmentConversionResult, authProvider, parameters,
+            uploadSegmentWithMetadata(configs, httpHeaders, parameters,
                 tableNameWithType, convertedTarredSegmentFile);
             break;
           default:
@@ -227,8 +230,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   /// Pushes the segment in METADATA (or URI) mode: copies the tarred segment to the output PinotFS and sends segment
   /// URI and metadata to the controller. Requires [BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI] and
   /// [BatchConfigProperties#PUSH_CONTROLLER_URI] in configs.
-  private void uploadSegmentWithMetadata(Map<String, String> configs, PinotTaskConfig pinotTaskConfig,
-      SegmentConversionResult segmentConversionResult, AuthProvider authProvider, List<NameValuePair> parameters,
+  private void uploadSegmentWithMetadata(Map<String, String> configs, List<Header> httpHeaders,
+      List<NameValuePair> parameters,
       String tableNameWithType, File convertedTarredSegmentFile)
       throws Exception {
     if (!configs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
@@ -243,36 +246,45 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     SegmentGenerationJobSpec spec = generateSegmentGenerationJobSpec(
         TableNameBuilder.extractRawTableName(tableNameWithType), configs, pushJobSpec);
 
-    List<Header> metadataHeaders = getSegmentPushMetadataHeaders(pinotTaskConfig, authProvider,
-        segmentConversionResult);
-
+    // The TAR and metadata paths must use the same If-Match, REFRESH_ONLY, custom-map and authentication headers.
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
           pushJobSpec, new String[]{outputSegmentTarURI.toString()});
+      // An exception can follow successful registration (e.g. a lost response). Preserve the immutable output;
+      // controller validation collects it after it becomes obsolete. A retry always uses a fresh output URI.
+      SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, httpHeaders, parameters);
+    }
+  }
+
+  @Override
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile) throws Exception {
+    Preconditions.checkState(StringUtils.isEmpty(configs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX))
+            && StringUtils.isEmpty(configs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX)),
+        "Same-name metadata replacement requires physical output URIs without push URI prefix/suffix remapping");
+    String references = configs.get(SegmentReplacementUtils.ROOT_REFERENCES_CONFIG_KEY);
+    Preconditions.checkState(references != null,
+        "Missing replacement output root registry; regenerate this metadata-push task with the updated controller");
+    URI root = SegmentReplacementUtils.outputRoot(
+        URI.create(configs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)),
+        configs.get(MinionConstants.TABLE_NAME_KEY));
+    SegmentReplacementUtils.rememberRoot(URI.create(references), root);
+    long registrationDeadline = System.currentTimeMillis() + SegmentReplacementUtils.REGISTRATION_WINDOW_MS;
+    URI output = URI.create(root + Long.toString(registrationDeadline) + "/" + UUID.randomUUID()
+        + "/" + URIUtils.encode(localSegmentTarFile.getName()));
+    try (PinotFS fs = MinionTaskUtils.getOutputPinotFS(configs, root)) {
       try {
-        SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
-            parameters);
+        fs.copyFromLocalFile(localSegmentTarFile, output);
       } catch (Exception e) {
-        // The tar was already staged to the output PinotFS before this failure. If the task is retried, the next
-        // moveSegmentToOutputPinotFS() would fail with "Output file already exists" (overwriteOutput defaults to
-        // false), making transient metadata-push failures permanently stuck. Delete the staged tar so the retry can
-        // re-stage it and self-heal.
+        // The fresh URI has not been submitted to the controller, so this partial copy can be removed immediately.
         try {
-          cleanupMetadataPushFailure(outputFileFS, outputSegmentTarURI);
-        } catch (Exception deleteException) {
-          LOGGER.warn("Failed to delete staged segment tar: {} after metadata push failure, the next retry may fail "
-              + "with 'Output file already exists'", outputSegmentTarURI, deleteException);
+          fs.delete(output, false);
+        } catch (Exception cleanupFailure) {
+          e.addSuppressed(cleanupFailure);
         }
         throw e;
       }
     }
-  }
-
-  /// Cleans up an output after metadata push throws. Executors that publish immutable output URIs can defer cleanup
-  /// until they have reconciled controller metadata: a lost response does not prove the controller rejected the push.
-  protected void cleanupMetadataPushFailure(PinotFS outputFileFS, URI outputSegmentTarURI)
-      throws Exception {
-    outputFileFS.delete(outputSegmentTarURI, true);
+    return output;
   }
 
   // For tests only.
