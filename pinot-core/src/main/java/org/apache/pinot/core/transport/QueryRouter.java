@@ -157,6 +157,9 @@ public class QueryRouter {
   }
 
   /// Connects to the given server, returns `true` if the server is successfully connected.
+  ///
+  /// Unchanged: this is the reachability probe the failure detector uses, opening the OFFLINE channel
+  /// with a TCP connect only. Startup pre-connect uses [#preConnect] instead.
   public boolean connect(ServerInstance serverInstance) {
     try {
       if (_serverChannelsTls != null) {
@@ -169,6 +172,29 @@ public class QueryRouter {
       return true;
     } catch (Exception e) {
       LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      return false;
+    }
+  }
+
+  /// Opens the channel used for the given table type ahead of query traffic, including the TLS
+  /// handshake, bounded by `timeoutMs`. Returns `true` if it is connected.
+  ///
+  /// [ServerRoutingInstance] includes the table type in its `equals`/`hashCode`, so OFFLINE and REALTIME
+  /// map to **separate** channels for the same physical server; the caller decides which of them this
+  /// broker actually routes to. Whatever is left out is still established lazily by the first query that
+  /// needs it.
+  public boolean preConnect(ServerInstance serverInstance, TableType tableType, long timeoutMs) {
+    try {
+      if (_serverChannelsTls != null) {
+        _serverChannelsTls.preConnect(
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS), timeoutMs);
+      } else {
+        _serverChannels.preConnect(
+            serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY), timeoutMs);
+      }
+      return true;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to pre-connect to server: {} for table type: {}", serverInstance, tableType, e);
       return false;
     }
   }

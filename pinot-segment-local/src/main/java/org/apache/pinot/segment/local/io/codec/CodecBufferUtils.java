@@ -74,9 +74,4 @@ final class CodecBufferUtils {
       CleanerUtil.cleanQuietly(converted);
     }
   }
-
-  /// Releases an owned direct buffer after a failed codec operation.
-  static void cleanQuietly(ByteBuffer buffer) {
-    CleanerUtil.cleanQuietly(buffer);
-  }
 }

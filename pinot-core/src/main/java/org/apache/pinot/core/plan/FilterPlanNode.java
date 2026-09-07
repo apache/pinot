@@ -391,6 +391,7 @@ public class FilterPlanNode implements PlanNode {
     }
 
     if (vectorIndex != null) {
+      VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
       // A required candidate scope can only be honored by a reader that does filtered search. When it cannot, the
       // ANN index is unusable for this query and an exact scan over the allowed documents is the correct plan --
       // decided here, where both the reader capability and the forward index availability are known.
@@ -403,9 +404,29 @@ public class FilterPlanNode implements PlanNode {
             getFilteredSearchUnsupportedReason(isMutableSegment), searchParams, _requiredVectorDocIds);
       }
 
+      // Mutable HNSW filtered search materializes the full NumericDocValues view before applying the bitmap. For a
+      // selective required scope, scanning only the visible forward-index rows is both exact and substantially
+      // cheaper. Preserve correctness for the other strategy outcomes by continuing to pass the required scope to
+      // candidate generation -- a required scope must never be applied as a post-filter. If the forward index is
+      // disabled, retain filtered ANN so this optimization does not make a previously executable query fail.
+      if (_requiredVectorDocIds != null && isMutableSegment) {
+        VectorSearchMode mode = VectorSearchStrategy.decideMode(numDocs,
+            _requiredVectorDocIds.getCardinality(),
+            /* hasVectorIndex= */ true,
+            /* indexSupportsPreFilter= */ true,
+            /* isMutableSegment= */ true,
+            backendType, searchParams);
+        if (mode == VectorSearchMode.EXACT_SCAN) {
+          ForwardIndexReader<?> exactScanReader = dataSource.getForwardIndex();
+          if (exactScanReader != null) {
+            return new ExactVectorScanFilterOperator(exactScanReader, predicate, column, numDocs, vectorIndexConfig,
+                "required_doc_ids_strategy_exact_scan", searchParams, _requiredVectorDocIds);
+          }
+        }
+      }
+
       // ANN index path: pass the forward index when rerank or threshold needs exact distances.
       ForwardIndexReader<?> forwardIndexReader = null;
-      VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
       if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
         forwardIndexReader = dataSource.getForwardIndex();
         Preconditions.checkState(!searchParams.hasDistanceThreshold() || forwardIndexReader != null,
@@ -575,7 +596,7 @@ public class FilterPlanNode implements PlanNode {
     // stage we are deciding whether to activate pre-filtering at all, not per-backend tuning.
     // The strategy currently uses only selectivity (numDocs, estimatedFilteredDocs) for this
     // decision. Per-backend and per-query-option tuning is handled later inside the operator.
-    VectorSearchStrategy.Decision decision = VectorSearchStrategy.decide(
+    VectorSearchMode mode = VectorSearchStrategy.decideMode(
         numDocs, estimatedFilteredDocs,
         /* hasVectorIndex= */ true,
         /* indexSupportsPreFilter= */ true,
@@ -583,7 +604,7 @@ public class FilterPlanNode implements PlanNode {
         /* backendType= */ null,
         /* searchParams= */ null);
 
-    if (decision.getMode() != VectorSearchMode.FILTER_THEN_ANN) {
+    if (mode != VectorSearchMode.FILTER_THEN_ANN) {
       return;
     }
 
