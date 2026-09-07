@@ -27,11 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -171,8 +173,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList,
-              validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode);
+          processValidDocIdsMetadata(tableNameWithType, taskConfigs, completedSegmentsMap, validDocIdsMetadataList,
+              validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode,
+              _clusterInfoAccessor.getControllerMetrics());
       int skippedSegmentsCount = validDocIdsMetadataList.size()
               - segmentSelectionResult.getSegmentsForCompaction().size()
               - segmentSelectionResult.getSegmentsForDeletion().size();
@@ -217,10 +220,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
-      Map<String, SegmentZKMetadata> completedSegmentsMap,
+  public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
+      Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> completedSegmentsMap,
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap,
-      Map<String, Integer> segmentToReplicaCount, MinionConstants.ValidDocIdsConsensusMode consensusMode) {
+      Map<String, Integer> segmentToReplicaCount, MinionConstants.ValidDocIdsConsensusMode consensusMode,
+      @Nullable ControllerMetrics controllerMetrics) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -242,7 +246,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       List<ValidDocIdsMetadataInfo> replicas = validDocIdsMetadataInfoMap.get(segmentName);
       ValidDocIdsMetadataInfo validDocIdsMetadata = MinionTaskUtils.selectValidDocIdsMetadataForConsensus(
           MinionConstants.UpsertCompactionTask.TASK_TYPE, segment, replicas,
-          segmentToReplicaCount.getOrDefault(segmentName, replicas.size()), consensusMode);
+          segmentToReplicaCount.getOrDefault(segmentName, replicas.size()), consensusMode, controllerMetrics,
+          tableNameWithType);
       if (validDocIdsMetadata == null) {
         continue;
       }
