@@ -62,7 +62,7 @@ public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
     }
     RexBuilder rexBuilder = input.getCluster().getRexBuilder();
     List<AggregateCall> originalCalls = aggregate.getAggCallList();
-    List<List<Integer>> rewrittenArguments = new ArrayList<>(originalCalls.size());
+    List<AggregateCall> rewrittenCalls = new ArrayList<>(originalCalls.size());
     boolean changed = false;
     for (AggregateCall originalCall : originalCalls) {
       List<Integer> arguments = originalCall.getArgList();
@@ -81,7 +81,7 @@ public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
           changed = true;
         }
       }
-      rewrittenArguments.add(rewritten);
+      rewrittenCalls.add(originalCall.withArgList(rewritten));
     }
     if (!changed) {
       return;
@@ -98,14 +98,6 @@ public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
       rewrittenInput = project.copy(project.getTraitSet(), project.getInput(), projects, rowType.build());
     } else {
       rewrittenInput = LogicalProject.create(input, List.of(), projects, names);
-    }
-    List<AggregateCall> rewrittenCalls = new ArrayList<>(originalCalls.size());
-    for (int i = 0; i < originalCalls.size(); i++) {
-      AggregateCall original = originalCalls.get(i);
-      rewrittenCalls.add(AggregateCall.create(original.getAggregation(), original.isDistinct(),
-          original.isApproximate(), original.ignoreNulls(), rewrittenArguments.get(i), original.filterArg,
-          original.distinctKeys, original.getCollation(), aggregate.getGroupCount(), rewrittenInput, original.getType(),
-          original.getName()));
     }
     call.transformTo(aggregate.copy(aggregate.getTraitSet(), rewrittenInput, aggregate.getGroupSet(),
         aggregate.getGroupSets(), rewrittenCalls));

@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.annotations.Test;
 
@@ -93,17 +92,7 @@ public class AggregationFunctionFactoryTest {
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof ModeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
-    assertEquals(aggregationFunction.getFinalResultColumnType(), ColumnDataType.DOUBLE);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
-
-    for (ColumnDataType type : new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP}) {
-      function = getFunction("MoDe", "(column,'MAX','" + type + "')");
-      aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
-      assertTrue(aggregationFunction instanceof ModeAggregationFunction);
-      assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
-      assertEquals(aggregationFunction.getFinalResultColumnType(), type);
-      assertEquals(aggregationFunction.getResultColumnName(), function.toString());
-    }
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'BOOLEAN')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);

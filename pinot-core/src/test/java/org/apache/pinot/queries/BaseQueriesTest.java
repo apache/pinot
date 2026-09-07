@@ -195,22 +195,13 @@ public abstract class BaseQueriesTest {
   /// This can be particularly useful to test statistical aggregation functions.
   /// @see StatisticalQueriesTest for an example use case.
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
-    return getBrokerResponse(pinotQuery, planMaker, false, null);
-  }
-
-  private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker, boolean optimize,
-      @Nullable Schema schema) {
-    // Match the broker's order: retain the original gapfill query while optimizing the stripped server query.
-    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
-    if (optimize) {
-      OPTIMIZER.optimize(serverPinotQuery, schema);
-    }
     List<List<IndexSegment>> instances = getDistinctInstances();
     if (instances.size() == 2) {
-      return getBrokerResponseDistinctInstances(pinotQuery, serverPinotQuery, planMaker);
+      return getBrokerResponseDistinctInstances(pinotQuery, planMaker);
     }
 
     // Server side
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
         serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
@@ -275,7 +266,8 @@ public abstract class BaseQueriesTest {
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
       @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    return getBrokerResponse(pinotQuery, PLAN_MAKER, true, schema);
+    OPTIMIZER.optimize(pinotQuery, schema);
+    return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 
   /// Run query on multiple index segments with custom plan maker.
@@ -288,9 +280,9 @@ public abstract class BaseQueriesTest {
   /// overriding getDistinctInstances.
   /// This can be particularly useful to test statistical aggregation functions.
   /// @see StatisticalQueriesTest for an example use case.
-  private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
-      PlanMaker planMaker) {
+  private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
     // Server side
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
         serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);

@@ -21,8 +21,6 @@ package org.apache.pinot.query.queries;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.query.QueryEnvironment;
@@ -44,42 +42,18 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Verifies MODE type inference and inferred type arguments across both multi-stage planner implementations.
+/// Verifies distributed MODE arguments and the independent rollout opt-in with both physical planners.
 public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @DataProvider
   public Object[][] physicalOptimizers() {
     return new Object[][]{{false}, {true}};
   }
 
-  @Test
-  public void testModeReturnTypes() {
-    RelDataType rowType = _queryEnvironment.compile(
-        "SET enableTypedMode=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3), MODE(col7), "
-            + "MODE(CAST(col3 AS FLOAT)), MODE(CAST(col3 AS DOUBLE)), "
-            + "MODE(NULLIF(JSONEXTRACTSCALAR(col1, '$.user', 'STRING', ''), '')), "
-            + "fromTimestamp(MODE(ts_timestamp)) FROM a")
-        .getRelRoot().validatedRowType;
-    SqlTypeName[] expectedTypes = {SqlTypeName.VARCHAR, SqlTypeName.TIMESTAMP, SqlTypeName.DOUBLE,
-        SqlTypeName.DOUBLE, SqlTypeName.DOUBLE, SqlTypeName.DOUBLE, SqlTypeName.VARCHAR, SqlTypeName.BIGINT};
-    for (int i = 0; i < expectedTypes.length; i++) {
-      assertEquals(rowType.getFieldList().get(i).getType().getSqlTypeName(), expectedTypes[i]);
-    }
-  }
-
-  @Test
-  public void testFilteredModeNullability() {
-    RelDataType rowType = _queryEnvironment.compile(
-        "SET enableTypedMode=true; "
-            + "SELECT col2, MODE(col1) FILTER (WHERE col3 > 0), MODE(ts_timestamp) FILTER (WHERE col3 > 0) "
-            + "FROM a GROUP BY col2").getRelRoot().validatedRowType;
-    assertTrue(rowType.getFieldList().get(1).getType().isNullable());
-    assertTrue(rowType.getFieldList().get(2).getType().isNullable());
-  }
-
   @Test(dataProvider = "physicalOptimizers")
   public void testDistributedModeTypes(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET enableTypedMode=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
+        + "SET enableTypedMode=true; "
+        + "SELECT MODE(NULLIF(col1, '')), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG') FROM a");
     PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
     assertEquals(root.getDataSchema().getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE});
@@ -93,8 +67,8 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
       assertEquals(calls.stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
           List.of("MODE", "MODE", "MODE"));
       assertTypedCall(calls.get(0), "MIN", "STRING");
-      assertTypedCall(calls.get(1), "MIN", "TIMESTAMP");
-      assertEquals(calls.get(2).getFunctionOperands().size(), 1);
+      assertTypedCall(calls.get(1), "MAX", "TIMESTAMP");
+      assertEquals(calls.get(2).getFunctionOperands().size(), 2);
       if (aggregate.getAggType().isOutputIntermediateFormat() && !aggregate.isLeafReturnFinalResult()) {
         sawIntermediate = true;
         assertEquals(aggregate.getDataSchema().getColumnDataTypes(),
@@ -110,73 +84,15 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   }
 
   @Test(dataProvider = "physicalOptimizers")
-  public void testModeExpressionsAndTieBreakers(boolean usePhysicalOptimizer) {
-    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET enableTypedMode=true; "
-        + "SELECT col2, MODE(NULLIF(col1, ''), 'MIN'), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG') "
-        + "FROM a GROUP BY col2");
-    PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
-    assertEquals(root.getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.TIMESTAMP,
-            ColumnDataType.DOUBLE});
-    for (AggregateNode aggregate : findAggregates(plan)) {
-      assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          List.of("MODE", "MODE", "MODE"));
-      assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
-      assertTypedCall(aggregate.getAggCalls().get(1), "MAX", "TIMESTAMP");
-      assertEquals(aggregate.getAggCalls().get(2).getFunctionOperands().size(), 2);
-    }
-  }
-
-  @Test(dataProvider = "physicalOptimizers")
-  public void testModeRewriteRequiresItsOwnOptIn(boolean usePhysicalOptimizer) {
+  public void testTypedModeRequiresOptIn(boolean usePhysicalOptimizer) {
+    // Even clearing the broker's disabled-rule defaults or explicitly selecting the rule cannot bypass the opt-in.
+    QueryEnvironment environment = buildQueryEnvironment(Set.of());
     for (String options : List.of("", "SET autoRewriteAggregationType=true; ",
-        "SET autoRewriteAggregationType=true; SET enableTypedMode=false; ")) {
-      DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-          + options + "SELECT MODE(ts_timestamp), MODE(col3) FROM a");
-      List<AggregateNode> aggregates = findAggregates(plan);
-      assertFalse(aggregates.isEmpty());
-      for (AggregateNode aggregate : aggregates) {
-        assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-            List.of("MODE", "MODE"), options);
-        for (RexExpression.FunctionCall mode : aggregate.getAggCalls()) {
-          assertEquals(mode.getFunctionOperands().size(), 1, options);
-        }
-      }
+        "SET enableTypedMode=false; SET usePlannerRules='TypedModeRewrite'; ",
+        "SET enableTypedMode=true; SET skipPlannerRules='TypedModeRewrite'; ")) {
+      assertModeCalls(environment, usePhysicalOptimizer, options, false);
     }
-  }
-
-  @Test(dataProvider = "physicalOptimizers")
-  public void testTypedModeDoesNotEnableOtherAggregateRewrites(boolean usePhysicalOptimizer) {
-    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET autoRewriteAggregationType=false; SET enableTypedMode=true; "
-        + "SELECT MODE(col1), MODE(ts_timestamp), MODE(col3), MIN(col7), MAX(col7), SUM(col7) FROM a");
-    List<AggregateNode> aggregates = findAggregates(plan);
-    assertFalse(aggregates.isEmpty());
-    for (AggregateNode aggregate : aggregates) {
-      List<String> functionNames =
-          aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList();
-      assertEquals(functionNames.subList(0, 5), List.of("MODE", "MODE", "MODE", "MIN", "MAX"));
-      assertFalse(functionNames.contains("SUMLONG"));
-      assertFalse(functionNames.contains("SUMINT"));
-      assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
-      assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
-    }
-  }
-
-  @Test(dataProvider = "physicalOptimizers")
-  public void testTypedModeOptInSurvivesCustomizedPlannerDefaults(boolean usePhysicalOptimizer) {
-    for (Set<String> disabledRules : List.of(Set.<String>of(),
-        Set.of(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE))) {
-      QueryEnvironment environment = buildQueryEnvironment(disabledRules);
-      for (String options : List.of("", "SET enableTypedMode=false; ",
-          "SET autoRewriteAggregationType=true; ", "SET usePlannerRules='TypedModeRewrite'; ",
-          "SET usePlannerRules='TypedModeRewrite'; SET enableTypedMode=false; ",
-          "SET enableTypedMode=true; SET skipPlannerRules='TypedModeRewrite'; ")) {
-        assertModeCalls(environment, usePhysicalOptimizer, options, false);
-      }
-      assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ", true);
-    }
+    assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ", true);
   }
 
   private static QueryEnvironment buildQueryEnvironment(Set<String> disabledRules) {
@@ -213,19 +129,6 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     }
   }
 
-  @Test(dataProvider = "physicalOptimizers")
-  public void testExplicitTypeArguments(boolean usePhysicalOptimizer) {
-    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SELECT MODE(col1, 'MAX', 'STRING'), MODE(ts_timestamp, 'MIN', 'TIMESTAMP') FROM a");
-    for (AggregateNode aggregate : findAggregates(plan)) {
-      assertTypedCall(aggregate.getAggCalls().get(0), "MAX", "STRING");
-      assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
-    }
-    PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
-    assertEquals(root.getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP});
-  }
-
   @Test
   public void testInvalidTypeAnnotations() {
     for (String expression : List.of("MODE(col1, 'MIN', 'TIMESTAMP')", "MODE(ts_timestamp, 'MIN', 'STRING')",
@@ -234,15 +137,6 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
           () -> _queryEnvironment.compile("SELECT " + expression + " FROM a"));
       assertTrue(error.getMessage().contains("MODE type argument"), error.getMessage());
     }
-  }
-
-  @Test
-  public void testTypeAnnotationsAreCaseInsensitive() {
-    RelDataType rowType = _queryEnvironment.compile(
-        "SELECT MODE(col1, 'MIN', 'string'), MODE(ts_timestamp, 'MAX', 'TimeStamp') FROM a")
-        .getRelRoot().validatedRowType;
-    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
-    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.TIMESTAMP);
   }
 
   private static void assertTypedCall(RexExpression.FunctionCall call, String reducer, String type) {

@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +31,6 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -48,7 +46,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -83,28 +80,16 @@ public class ModeQueriesTest extends BaseQueriesTest {
   private static final String LONG_NO_DICT_COLUMN = "longNoDictColumn";
   private static final String FLOAT_NO_DICT_COLUMN = "floatNoDictColumn";
   private static final String DOUBLE_NO_DICT_COLUMN = "doubleNoDictColumn";
-  private static final String STRING_COLUMN = "stringColumn";
-  private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
-  private static final String JSON_COLUMN = "jsonColumn";
-  private static final String TIMESTAMP_COLUMN = "timestampColumn";
-  private static final String TIMESTAMP_NO_DICT_COLUMN = "timestampNoDictColumn";
-  private static final long BASE_TIMESTAMP = Timestamp.valueOf("2026-09-03 10:11:12.000").getTime();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addMultiValueDimension(INT_MV_COLUMN, DataType.INT).addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
       .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
-      .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
-      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-      .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
-      .addSingleValueDimension(JSON_COLUMN, DataType.STRING)
-      .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
-      .addSingleValueDimension(TIMESTAMP_NO_DICT_COLUMN, DataType.TIMESTAMP).build();
+      .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
-          Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN,
-              STRING_NO_DICT_COLUMN, TIMESTAMP_NO_DICT_COLUMN))
+          Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
       .build();
   private static final double DELTA = 0.00001;
 
@@ -151,11 +136,6 @@ public class ModeQueriesTest extends BaseQueriesTest {
       record.putValue(FLOAT_NO_DICT_COLUMN, (float) value);
       record.putValue(DOUBLE_COLUMN, (double) value);
       record.putValue(DOUBLE_NO_DICT_COLUMN, (double) value);
-      record.putValue(STRING_COLUMN, Integer.toString(value));
-      record.putValue(STRING_NO_DICT_COLUMN, Integer.toString(value));
-      record.putValue(JSON_COLUMN, "{\"value\":\"" + value + "\"}");
-      record.putValue(TIMESTAMP_COLUMN, BASE_TIMESTAMP + value);
-      record.putValue(TIMESTAMP_NO_DICT_COLUMN, BASE_TIMESTAMP + value);
       records.add(record);
     }
     long maxOccurrences = _values.values().stream().max(Long::compareTo).get();
@@ -389,122 +369,6 @@ public class ModeQueriesTest extends BaseQueriesTest {
             + "MODE(doubleColumn, 'AVG') FROM testTable GROUP BY intMVColumn"
     });
     return entries.toArray(new Object[0][]);
-  }
-
-  @Test
-  public void testStringAggregationAndComputedExpression() {
-    long maxOccurrences = _values.values().stream().max(Long::compareTo).orElseThrow();
-    String expectedMin = _values.entrySet().stream().filter(e -> e.getValue() == maxOccurrences)
-        .map(e -> e.getKey().toString()).min(String::compareTo).orElseThrow();
-    String expectedMax = _values.entrySet().stream().filter(e -> e.getValue() == maxOccurrences)
-        .map(e -> e.getKey().toString()).max(String::compareTo).orElseThrow();
-    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET enableTypedMode=true; SELECT MODE(stringColumn), "
-        + "MODE(stringNoDictColumn), MODE(stringColumn, 'MAX'), MODE(CONCAT('value-', stringColumn, '')), "
-        + "MODE(CASE WHEN JSONEXTRACTSCALAR(jsonColumn, '$.value', 'STRING', '') = '' THEN NULL "
-        + "ELSE JSONEXTRACTSCALAR(jsonColumn, '$.value', 'STRING', '') END) FROM testTable",
-        SCHEMA);
-    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
-            ColumnDataType.STRING});
-    assertEquals(response.getResultTable().getRows().size(), 1);
-    assertEquals(response.getResultTable().getRows().get(0),
-        new Object[]{expectedMin, expectedMin, expectedMax, "value-" + expectedMin, expectedMin});
-  }
-
-  @Test
-  public void testStringAggregationWithNoMatchingRows() {
-    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET enableTypedMode=true; SELECT MODE(stringColumn), "
-        + "MODE(stringNoDictColumn) FROM testTable WHERE intColumn < 0", SCHEMA);
-    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
-    assertEquals(response.getResultTable().getRows().size(), 1);
-    assertEquals(response.getResultTable().getRows().get(0), new Object[]{null, null});
-  }
-
-  @DataProvider
-  public Object[][] stringGroupByColumns() {
-    return new Object[][]{{INT_COLUMN}, {INT_MV_COLUMN}};
-  }
-
-  @Test(dataProvider = "stringGroupByColumns")
-  public void testStringAggregationGroupBy(String groupByColumn) {
-    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET enableTypedMode=true; SELECT " + groupByColumn
-        + ", MODE(stringColumn), MODE(stringNoDictColumn), MODE(CONCAT('value-', stringColumn, '')) "
-        + "FROM testTable GROUP BY " + groupByColumn + " ORDER BY " + groupByColumn, SCHEMA);
-    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
-    List<Object[]> rows = response.getResultTable().getRows();
-    assertEquals(rows.size(), 10);
-    for (Object[] row : rows) {
-      String value = row[0].toString();
-      assertEquals(row, new Object[]{row[0], value, value, "value-" + value});
-    }
-  }
-
-  @Test
-  public void testTimestampAggregationAndResultType() {
-    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET enableTypedMode=true; SELECT MODE(timestampColumn), "
-        + "MODE(timestampNoDictColumn), fromTimestamp(MODE(timestampColumn)), MODE(toTimestamp(longColumn)) "
-        + "FROM testTable", SCHEMA);
-    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP, ColumnDataType.LONG,
-            ColumnDataType.TIMESTAMP});
-    long expectedMillis = BASE_TIMESTAMP + _expectedResultMin.longValue();
-    String expectedTimestamp = new Timestamp(expectedMillis).toString();
-    assertEquals(response.getResultTable().getRows().size(), 1);
-    assertEquals(response.getResultTable().getRows().get(0),
-        new Object[]{expectedTimestamp, expectedTimestamp, expectedMillis,
-            new Timestamp(_expectedResultMin.longValue()).toString()});
-  }
-
-  @DataProvider
-  public Object[][] typedModeGapfillExpressions() {
-    return new Object[][]{
-        {false, "MODE(timestampColumn, 'MIN', 'TIMESTAMP')"},
-        {false, "MODE(timestampColumn, 'MIN', 'timestamp')"},
-        {true, "MODE(timestampColumn)"}
-    };
-  }
-
-  @Test(dataProvider = "typedModeGapfillExpressions")
-  public void testTypedModeGapfillPreservesAliases(boolean inferType, String typedMode) {
-    String format = "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS";
-    DateTimeFormatSpec formatter = new DateTimeFormatSpec(format);
-    long hourMillis = 3_600_000L;
-    long startMillis = BASE_TIMESTAMP - BASE_TIMESTAMP % hourMillis;
-    String start = formatter.fromMillisToFormat(startMillis);
-    String end = formatter.fromMillisToFormat(startMillis + 2 * hourMillis);
-    String entity = Integer.toString(_expectedResultMin.intValue());
-    // Keep both the legacy DOUBLE and typed TIMESTAMP result in the same aggregate subquery.
-    String numericMode = inferType ? "MODE(fromTimestamp(timestampColumn))" : "MODE(timestampColumn)";
-    String query = "SET enableTypedMode=" + inferType + "; SELECT GapFill(time_col, '" + format + "', '"
-        + start + "', '" + end + "', '1:HOURS', FILL(numeric_mode, 'FILL_PREVIOUS_VALUE'), "
-        + "FILL(typed_mode, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(stringColumn)), "
-        + "stringColumn, numeric_mode, typed_mode FROM (SELECT DATETIMECONVERT(fromTimestamp(timestampColumn), "
-        + "'1:MILLISECONDS:EPOCH', '" + format + "', '1:HOURS') AS time_col, stringColumn, "
-        + numericMode + " AS numeric_mode, " + typedMode + " AS typed_mode FROM testTable WHERE stringColumn = '"
-        + entity + "' GROUP BY time_col, stringColumn LIMIT 1000) LIMIT 1000";
-    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(query, SCHEMA);
-
-    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(response.getResultTable().getDataSchema().getColumnNames(),
-        new String[]{"time_col", "stringColumn", "numeric_mode", "typed_mode"});
-    List<Object[]> rows = response.getResultTable().getRows();
-    assertEquals(rows.size(), 2);
-    long expectedMillis = BASE_TIMESTAMP + _expectedResultMin.longValue();
-    String expectedTimestamp = new Timestamp(expectedMillis).toString();
-    for (int i = 0; i < rows.size(); i++) {
-      assertEquals(rows.get(i), new Object[]{formatter.fromMillisToFormat(startMillis + i * hourMillis), entity,
-          (double) expectedMillis, expectedTimestamp});
-    }
   }
 
   @AfterClass

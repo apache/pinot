@@ -28,8 +28,6 @@ import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.context.LiteralContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -100,8 +98,7 @@ public class ModeAggregationFunctionRewriteOptimizer implements StatementOptimiz
           : null;
     }
     if (operand.isSetLiteral()) {
-      LiteralContext literal = RequestContextUtils.getExpression(operand).getLiteral();
-      return ColumnDataType.fromDataType(literal.getType(), literal.isSingleValue());
+      return RequestUtils.getLiteralTypeAndValue(operand.getLiteral()).getLeft();
     }
     if (!operand.isSetFunctionCall()) {
       return null;
@@ -168,25 +165,19 @@ public class ModeAggregationFunctionRewriteOptimizer implements StatementOptimiz
       return null;
     }
     String type = arguments.get(position).getLiteral().getStringValue().toUpperCase(Locale.ROOT);
-    switch (type) {
-      case "VARCHAR":
-      case "CHAR":
-      case "JSON":
-        return ColumnDataType.STRING;
-      case "BIGINT":
-        return ColumnDataType.LONG;
-      case "INTEGER":
-        return ColumnDataType.INT;
-      case "REAL":
-        return ColumnDataType.FLOAT;
-      case "DECIMAL":
-        return ColumnDataType.BIG_DECIMAL;
-      default:
+    return switch (type) {
+      case "VARCHAR", "CHAR", "JSON" -> ColumnDataType.STRING;
+      case "BIGINT" -> ColumnDataType.LONG;
+      case "INTEGER" -> ColumnDataType.INT;
+      case "REAL" -> ColumnDataType.FLOAT;
+      case "DECIMAL" -> ColumnDataType.BIG_DECIMAL;
+      default -> {
         try {
-          return ColumnDataType.valueOf(type);
+          yield ColumnDataType.valueOf(type);
         } catch (IllegalArgumentException e) {
-          return null;
+          yield null;
         }
-    }
+      }
+    };
   }
 }

@@ -118,17 +118,6 @@ public abstract class BaseGapfillProcessor {
       queryContext = _queryContext.getSubquery();
     }
     List<String> aliasList = queryContext.getAliasList();
-    String[] columnNames = dataSchema.getColumnNames();
-    if (columnNames.length == aliasList.size()) {
-      // Reduced results follow SELECT order. Server rewrites can change expression names (for example, inferred
-      // MODE type arguments), so bind aliases by position as in BaseReduceService.updateAlias.
-      for (int i = 0; i < columnNames.length; i++) {
-        if (aliasList.get(i) != null) {
-          columnNames[i] = aliasList.get(i);
-        }
-      }
-      return;
-    }
     Map<String, String> columnNameToAliasMap = new HashMap<>();
     for (int i = 0; i < aliasList.size(); i++) {
       if (aliasList.get(i) != null) {
