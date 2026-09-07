@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,14 +44,12 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -246,22 +243,6 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
       outputFileFS.delete(fileURI, true);
     } catch (Exception e) {
       LOGGER.warn("Failed to delete: {} from the output PinotFS", fileURI, e);
-    }
-  }
-
-  /// Tars only metadata.properties and creation.meta from the local segment, which is all a METADATA push sends.
-  protected File createSegmentMetadataTarFile(File segmentDir, File outputDir, String segmentName)
-      throws IOException {
-    File metadataDir = new File(outputDir, segmentName + "-metadata");
-    File metadataTarFile = new File(outputDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
-    try {
-      FileUtils.forceMkdir(metadataDir);
-      FileUtils.copyFileToDirectory(SegmentDirectoryPaths.findMetadataFile(segmentDir), metadataDir);
-      FileUtils.copyFileToDirectory(SegmentDirectoryPaths.findCreationMetaFile(segmentDir), metadataDir);
-      TarCompressionUtils.createCompressedTarFile(metadataDir, metadataTarFile);
-      return metadataTarFile;
-    } finally {
-      FileUtils.deleteQuietly(metadataDir);
     }
   }
 
