@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -48,6 +49,7 @@ import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX;
@@ -610,6 +612,44 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 0);
+  }
+
+  @DataProvider
+  public Object[][] gapfillParentResultTypes() {
+    return new Object[][]{
+        // Parent aggregates expose timestamp children through their stored LONG type.
+        {TIMESTAMP_COLUMN, 1683138373878L},
+        {BYTES_COLUMN, "31"},
+        {BIG_DECIMAL_COLUMN, "1199"}
+    };
+  }
+
+  @Test(dataProvider = "gapfillParentResultTypes")
+  public void testGapfillFormatsNativeParentResults(String column, Object expectedValue) {
+    String format = "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS";
+    DateTimeFormatSpec formatter = new DateTimeFormatSpec(format);
+    long hourMillis = 3_600_000L;
+    long startMillis = 1683138373878L - 1683138373878L % hourMillis;
+    String start = formatter.fromMillisToFormat(startMillis);
+    String end = formatter.fromMillisToFormat(startMillis + 2 * hourMillis);
+    // Parent aggregate projections are referenced by their canonical names because AS is not supported.
+    String expression = "exprmin(" + column + ",intColumn)";
+    String projection = "\"" + expression + "\"";
+    String query = "SELECT GapFill(time_col, '" + format + "', '" + start + "', '" + end
+        + "', '1:HOURS', FILL(" + projection + ", 'FILL_PREVIOUS_VALUE'), TIMESERIESON(groupByIntColumn)), "
+        + "groupByIntColumn, " + projection + " FROM (SELECT DATETIMECONVERT(fromTimestamp(timestampColumn), "
+        + "'1:MILLISECONDS:EPOCH', '" + format + "', '1:HOURS') AS time_col, groupByIntColumn, "
+        + expression + " FROM testTable WHERE intColumn = 1 GROUP BY time_col, groupByIntColumn LIMIT 1000) LIMIT 1000";
+
+    BrokerResponseNative response = getBrokerResponse(query);
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    List<Object[]> rows = response.getResultTable().getRows();
+    // The shared fixture returns the parent projection once per server, followed by one filled row.
+    assertEquals(rows.size(), 3);
+    assertEquals(rows.get(0), new Object[]{start, 1, expectedValue});
+    assertEquals(rows.get(1), new Object[]{start, 1, expectedValue});
+    assertEquals(rows.get(2),
+        new Object[]{formatter.fromMillisToFormat(startMillis + hourMillis), 1, expectedValue});
   }
 
   @Test

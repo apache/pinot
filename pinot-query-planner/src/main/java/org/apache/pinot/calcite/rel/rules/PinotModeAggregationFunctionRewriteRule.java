@@ -25,17 +25,19 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.sql.SqlAggFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 
 
-/// Rewrites string and timestamp MODE calls to typed implementations after an explicit rollout opt-in.
-/// Numeric MODE and the separate MIN, MAX and SUM rewrite rule are unaffected.
+/// Supplies string and timestamp MODE calls with an inferred type argument after an explicit rollout opt-in.
+/// This stateless rule keeps the reducer and type as projected literals so distributed stages retain both arguments.
 public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
   public static PinotModeAggregationFunctionRewriteRule instanceWithDescription(String description) {
     return new PinotModeAggregationFunctionRewriteRule(description);
@@ -48,41 +50,75 @@ public class PinotModeAggregationFunctionRewriteRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Aggregate aggregate = call.rel(0);
-    RelNode input = aggregate.getInput();
+    RelNode input = PinotRuleUtils.unboxRel(aggregate.getInput());
+    List<RexNode> projects = new ArrayList<>();
+    List<String> names = new ArrayList<>(input.getRowType().getFieldNames());
+    if (input instanceof Project) {
+      projects.addAll(((Project) input).getProjects());
+    } else {
+      for (int i = 0; i < names.size(); i++) {
+        projects.add(RexInputRef.of(i, input.getRowType()));
+      }
+    }
+    RexBuilder rexBuilder = input.getCluster().getRexBuilder();
     List<AggregateCall> originalCalls = aggregate.getAggCallList();
-    List<AggregateCall> rewrittenCalls = new ArrayList<>(originalCalls.size());
+    List<List<Integer>> rewrittenArguments = new ArrayList<>(originalCalls.size());
     boolean changed = false;
     for (AggregateCall originalCall : originalCalls) {
-      AggregateCall rewrittenCall = maybeRewriteAggCall(originalCall, input, aggregate.getGroupCount());
-      changed |= rewrittenCall != originalCall;
-      rewrittenCalls.add(rewrittenCall);
+      List<Integer> arguments = originalCall.getArgList();
+      List<Integer> rewritten = arguments;
+      if (originalCall.getAggregation().getKind() == SqlKind.MODE && !arguments.isEmpty() && arguments.size() < 3) {
+        SqlTypeName operandType = input.getRowType().getFieldList().get(arguments.get(0)).getType().getSqlTypeName();
+        String type = SqlTypeName.STRING_TYPES.contains(operandType)
+            ? "STRING"
+            : operandType == SqlTypeName.TIMESTAMP ? "TIMESTAMP" : null;
+        if (type != null) {
+          rewritten = new ArrayList<>(arguments);
+          if (arguments.size() == 1) {
+            rewritten.add(addLiteral(rexBuilder, projects, names, "MIN"));
+          }
+          rewritten.add(addLiteral(rexBuilder, projects, names, type));
+          changed = true;
+        }
+      }
+      rewrittenArguments.add(rewritten);
     }
-    if (changed) {
-      call.transformTo(aggregate.copy(aggregate.getTraitSet(), input, aggregate.getGroupSet(), aggregate.getGroupSets(),
-          rewrittenCalls));
+    if (!changed) {
+      return;
     }
+
+    RelNode rewrittenInput;
+    if (input instanceof Project) {
+      // Extend the existing projection: wrapping it in identity refs would hide the original reducer literals.
+      Project project = (Project) input;
+      RelDataTypeFactory.Builder rowType = input.getCluster().getTypeFactory().builder();
+      for (int i = 0; i < projects.size(); i++) {
+        rowType.add(names.get(i), projects.get(i).getType());
+      }
+      rewrittenInput = project.copy(project.getTraitSet(), project.getInput(), projects, rowType.build());
+    } else {
+      rewrittenInput = LogicalProject.create(input, List.of(), projects, names);
+    }
+    List<AggregateCall> rewrittenCalls = new ArrayList<>(originalCalls.size());
+    for (int i = 0; i < originalCalls.size(); i++) {
+      AggregateCall original = originalCalls.get(i);
+      rewrittenCalls.add(AggregateCall.create(original.getAggregation(), original.isDistinct(),
+          original.isApproximate(), original.ignoreNulls(), rewrittenArguments.get(i), original.filterArg,
+          original.distinctKeys, original.getCollation(), aggregate.getGroupCount(), rewrittenInput, original.getType(),
+          original.getName()));
+    }
+    call.transformTo(aggregate.copy(aggregate.getTraitSet(), rewrittenInput, aggregate.getGroupSet(),
+        aggregate.getGroupSets(), rewrittenCalls));
   }
 
-  private static AggregateCall maybeRewriteAggCall(AggregateCall call, RelNode input, int numGroups) {
-    SqlAggFunction aggregation = call.getAggregation();
-    List<Integer> arguments = call.getArgList();
-    if (aggregation.getKind() != SqlKind.MODE || arguments.isEmpty()) {
-      return call;
+  private static int addLiteral(RexBuilder rexBuilder, List<RexNode> projects, List<String> names, String value) {
+    RexNode literal = rexBuilder.makeLiteral(value);
+    int index = projects.indexOf(literal);
+    if (index < 0) {
+      index = projects.size();
+      projects.add(literal);
+      names.add("$mode$" + index);
     }
-    SqlTypeName operandType = input.getRowType().getFieldList().get(arguments.get(0)).getType().getSqlTypeName();
-    String functionName;
-    if (SqlTypeName.STRING_TYPES.contains(operandType)) {
-      functionName = "MODESTRING";
-    } else if (operandType == SqlTypeName.TIMESTAMP) {
-      functionName = "MODETIMESTAMP";
-    } else {
-      return call;
-    }
-    SqlAggFunction rewrittenAggregation = new PinotSqlAggFunction(functionName, SqlKind.OTHER_FUNCTION,
-        ReturnTypes.explicit(call.getType()), aggregation.getOperandTypeChecker(),
-        SqlFunctionCategory.USER_DEFINED_FUNCTION);
-    return AggregateCall.create(rewrittenAggregation, call.isDistinct(), call.isApproximate(), call.ignoreNulls(),
-        arguments, call.filterArg, call.distinctKeys, call.getCollation(), numGroups, input, call.getType(),
-        call.getName());
+    return index;
   }
 }

@@ -58,7 +58,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
         .onFirstInstance("myField", "apple", "apple", "apple", "banana", "banana", "null")
         .andSegment("myField", "banana")
         .andOnSecondInstance("myField", "cherry", "cherry", "cherry", "banana", "banana", "null")
-        .whenQuery("select modeString(myField) as mode from testTable")
+        .whenQuery("select mode(myField, 'MIN', 'STRING') as mode from testTable")
         .thenResultTextIs("mode[STRING]\nbanana");
   }
 
@@ -67,8 +67,8 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField", "zebra", "apple", "zebra", "banana", "null")
         .andOnSecondInstance("myField", "apple", "apple", "zebra", "null")
-        .whenQuery("select modeString(myField), modeString(myField, 'MIN'), modeString(myField, 'MAX') from testTable")
-        .thenResultIs("STRING | STRING | STRING", "apple | apple | zebra");
+        .whenQuery("select mode(myField, 'MIN', 'STRING'), mode(myField, 'MAX', 'STRING') from testTable")
+        .thenResultIs("STRING | STRING", "apple | zebra");
   }
 
   @Test(dataProvider = "stringScenarios")
@@ -77,12 +77,14 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField", "null", "empty", "empty", "apple")
         .andOnSecondInstance("myField", "null", "null", "apple")
-        .whenQuery("select modeString(case when myField = 'empty' then '' else myField end) as mode from testTable")
+        .whenQuery("select mode(case when myField = 'empty' then '' else myField end, 'MIN', 'STRING') as mode "
+            + "from testTable")
         .thenResultIs(new Object[]{""})
-        .whenQuery("select modeString(case when myField = 'empty' then null else myField end) as mode from testTable")
+        .whenQuery("select mode(case when myField = 'empty' then null else myField end, 'MIN', 'STRING') as mode "
+            + "from testTable")
         .thenResultTextIs("mode[STRING]\napple")
-        .whenQuery("select myField, modeString(case when myField = 'empty' then '' else myField end) from testTable "
-            + "group by myField order by myField")
+        .whenQuery("select myField, mode(case when myField = 'empty' then '' else myField end, 'MIN', 'STRING') "
+            + "from testTable group by myField order by myField")
         .thenResultIs(new Object[]{"apple", "apple"}, new Object[]{"empty", ""}, new Object[]{null, null});
   }
 
@@ -91,11 +93,11 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null")
         .andOnSecondInstance("myField", "null")
-        .whenQuery("select modeString(myField) as mode from testTable")
+        .whenQuery("select mode(myField, 'MIN', 'STRING') as mode from testTable")
         .thenResultIs(new Object[]{null})
-        .whenQuery("select modeString(myField) as mode from testTable where myField = 'absent'")
+        .whenQuery("select mode(myField, 'MIN', 'STRING') as mode from testTable where myField = 'absent'")
         .thenResultIs(new Object[]{null})
-        .whenQuery("select 'group', modeString(myField) as mode from testTable group by 'group'")
+        .whenQuery("select 'group', mode(myField, 'MIN', 'STRING') as mode from testTable group by 'group'")
         .thenResultIs("STRING | STRING", "group | null");
   }
 
@@ -105,9 +107,9 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField", "null", "null", "null", "apple")
         .andOnSecondInstance("myField", "apple")
-        .whenQuery("select modeString(myField) as mode from testTable")
+        .whenQuery("select mode(myField, 'MIN', 'STRING') as mode from testTable")
         .thenResultIs(new Object[]{"null"})
-        .whenQuery("select modeString(myField) as mode from testTable where myField = 'absent'")
+        .whenQuery("select mode(myField, 'MIN', 'STRING') as mode from testTable where myField = 'absent'")
         .thenResultIs(new Object[]{null});
   }
 
@@ -116,13 +118,15 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField", "2026-09-03 10:11:12.123", "2026-09-04 10:11:12.456", "null")
         .andOnSecondInstance("myField", "2026-09-04 10:11:12.456", "2026-09-03 10:11:12.123", "null")
-        .whenQuery("select modeTimestamp(myField) as mode, modeTimestamp(myField, 'MAX') as latest from testTable")
+        .whenQuery("select mode(myField, 'MIN', 'TIMESTAMP') as mode, mode(myField, 'MAX', 'TIMESTAMP') as latest "
+            + "from testTable")
         .thenResultTextIs("mode[TIMESTAMP] | latest[TIMESTAMP]\n"
             + "2026-09-03 10:11:12.123 | 2026-09-04 10:11:12.456")
-        .whenQuery("select myField, modeTimestamp(myField) as mode from testTable group by myField order by myField")
+        .whenQuery("select myField, mode(myField, 'MIN', 'TIMESTAMP') as mode "
+            + "from testTable group by myField order by myField")
         .thenResultIs(new Object[]{"2026-09-03 10:11:12.123", "2026-09-03 10:11:12.123"},
             new Object[]{"2026-09-04 10:11:12.456", "2026-09-04 10:11:12.456"}, new Object[]{null, null})
-        .whenQuery("select fromTimestamp(modeTimestamp(myField)) as epochMillis from testTable")
+        .whenQuery("select fromTimestamp(mode(myField, 'MIN', 'TIMESTAMP')) as epochMillis from testTable")
         .thenResultIs(new Object[]{Timestamp.valueOf("2026-09-03 10:11:12.123").getTime()});
   }
 
@@ -131,9 +135,10 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null")
         .andOnSecondInstance("myField", "null")
-        .whenQuery("select modeTimestamp(myField) as mode from testTable")
+        .whenQuery("select mode(myField, 'MIN', 'TIMESTAMP') as mode from testTable")
         .thenResultIs(new Object[]{null})
-        .whenQuery("select modeTimestamp(myField) as mode from testTable where myField > '2026-09-03 00:00:00'")
+        .whenQuery("select mode(myField, 'MIN', 'TIMESTAMP') as mode "
+            + "from testTable where myField > '2026-09-03 00:00:00'")
         .thenResultIs(new Object[]{null});
   }
 

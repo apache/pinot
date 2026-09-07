@@ -45,17 +45,17 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
   @DataProvider
   public Object[][] modeExpressions() {
     return new Object[][]{
-        {"MODE(stringCol)", "modeString(stringCol)"},
-        {"MODE(timestampCol, 'MAX')", "modeTimestamp(timestampCol, 'MAX')"},
-        {"MODE(CONCAT(stringCol, 'suffix'))", "modeString(CONCAT(stringCol, 'suffix'))"},
+        {"MODE(stringCol)", "MODE(stringCol, 'MIN', 'STRING')"},
+        {"MODE(timestampCol, 'MAX')", "MODE(timestampCol, 'MAX', 'TIMESTAMP')"},
+        {"MODE(CONCAT(stringCol, 'suffix'))", "MODE(CONCAT(stringCol, 'suffix'), 'MIN', 'STRING')"},
         {"MODE(JSONEXTRACTSCALAR(stringCol, '$.user', 'STRING', ''))",
-            "modeString(JSONEXTRACTSCALAR(stringCol, '$.user', 'STRING', ''))"},
-        {"MODE(CAST(intCol AS STRING))", "modeString(CAST(intCol AS STRING))"},
-        {"MODE(CAST(stringCol AS TIMESTAMP))", "modeTimestamp(CAST(stringCol AS TIMESTAMP))"},
+            "MODE(JSONEXTRACTSCALAR(stringCol, '$.user', 'STRING', ''), 'MIN', 'STRING')"},
+        {"MODE(CAST(intCol AS STRING))", "MODE(CAST(intCol AS STRING), 'MIN', 'STRING')"},
+        {"MODE(CAST(stringCol AS TIMESTAMP))", "MODE(CAST(stringCol AS TIMESTAMP), 'MIN', 'TIMESTAMP')"},
         {"MODE(CASE WHEN intCol > 0 THEN stringCol ELSE 'other' END)",
-            "modeString(CASE WHEN intCol > 0 THEN stringCol ELSE 'other' END)"},
-        {"MODE('literal')", "modeString('literal')"},
-        {"fromTimestamp(MODE(timestampCol))", "fromTimestamp(modeTimestamp(timestampCol))"}
+            "MODE(CASE WHEN intCol > 0 THEN stringCol ELSE 'other' END, 'MIN', 'STRING')"},
+        {"MODE('literal')", "MODE('literal', 'MIN', 'STRING')"},
+        {"fromTimestamp(MODE(timestampCol))", "fromTimestamp(MODE(timestampCol, 'MIN', 'TIMESTAMP'))"}
     };
   }
 
@@ -77,9 +77,9 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
             + "HAVING MODE(CASE WHEN stringCol = '' THEN NULL ELSE stringCol END) = 'value' "
             + "ORDER BY MODE(timestampCol) DESC",
         "SET enableTypedMode=true; "
-            + "SELECT intCol, modeString(stringCol) AS commonValue FROM testTable GROUP BY intCol "
-            + "HAVING modeString(CASE WHEN stringCol = '' THEN NULL ELSE stringCol END) = 'value' "
-            + "ORDER BY modeTimestamp(timestampCol) DESC", SCHEMA);
+            + "SELECT intCol, MODE(stringCol, 'MIN', 'STRING') AS commonValue FROM testTable GROUP BY intCol "
+            + "HAVING MODE(CASE WHEN stringCol = '' THEN NULL ELSE stringCol END, 'MIN', 'STRING') = 'value' "
+            + "ORDER BY MODE(timestampCol, 'MIN', 'TIMESTAMP') DESC", SCHEMA);
   }
 
   @Test
@@ -101,7 +101,20 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
     TestHelper.assertEqualsQuery("SET autoRewriteAggregationType=true; SET enableTypedMode=true; "
             + "SELECT MODE(timestampCol), MODE(stringCol), MIN(stringCol) FROM testTable",
         "SET autoRewriteAggregationType=true; SET enableTypedMode=true; "
-            + "SELECT MODETIMESTAMP(timestampCol), MODESTRING(stringCol), MINSTRING(stringCol) FROM testTable", SCHEMA);
+            + "SELECT MODE(timestampCol, 'MIN', 'TIMESTAMP'), MODE(stringCol, 'MIN', 'STRING'), "
+            + "MINSTRING(stringCol) FROM testTable", SCHEMA);
+  }
+
+  @Test
+  public void testExplicitTypesAndRepeatedOptimization() {
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(stringCol, 'MAX', 'STRING'), "
+        + "MODE(timestampCol, 'MIN', 'TIMESTAMP') FROM testTable", SCHEMA);
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
+        "SET enableTypedMode=true; SELECT MODE(stringCol), MODE(timestampCol, 'MAX') FROM testTable");
+    OPTIMIZER.optimize(query, SCHEMA);
+    PinotQuery once = query.deepCopy();
+    OPTIMIZER.optimize(query, SCHEMA);
+    assertEquals(query, once);
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nullable;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -38,8 +40,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
-/// When `enableTypedMode` is enabled, resolves string and timestamp MODE expressions to implementations
-/// with fixed result types before execution.
+/// When `enableTypedMode` is enabled, adds an inferred type argument to string and timestamp MODE expressions
+/// so the result type is fixed before execution.
 /// This also supplies the broker with the correct result type when no rows match or groups are trimmed before
 /// finalization. Type inference reads schema and function metadata only: server-dependent transforms such as LOOKUP
 /// must not be initialized on the broker. Expressions whose type is unknown retain the legacy MODE implementation.
@@ -73,15 +75,19 @@ public class ModeAggregationFunctionRewriteOptimizer implements StatementOptimiz
     Function function = expression.getFunctionCall();
     List<Expression> operands = function.getOperands();
     rewriteExpressions(operands, schema);
-    if (!AggregationFunctionType.MODE.getName().equalsIgnoreCase(function.getOperator()) || operands.isEmpty()) {
+    if (!AggregationFunctionType.MODE.getName().equalsIgnoreCase(function.getOperator()) || operands.isEmpty()
+        || operands.size() >= 3) {
       return;
     }
 
     ColumnDataType operandType = getOperandType(operands.get(0), schema);
-    if (operandType == ColumnDataType.STRING) {
-      function.setOperator("modestring");
-    } else if (operandType == ColumnDataType.TIMESTAMP) {
-      function.setOperator("modetimestamp");
+    if (operandType == ColumnDataType.STRING || operandType == ColumnDataType.TIMESTAMP) {
+      List<Expression> typedOperands = new ArrayList<>(operands);
+      if (typedOperands.size() == 1) {
+        typedOperands.add(RequestUtils.getLiteralExpression("MIN"));
+      }
+      typedOperands.add(RequestUtils.getLiteralExpression(operandType.name()));
+      function.setOperands(typedOperands);
     }
   }
 

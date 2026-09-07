@@ -20,12 +20,14 @@ package org.apache.pinot.segment.spi;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
@@ -37,6 +39,8 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 
 /// NOTES:
@@ -67,12 +71,9 @@ public enum AggregationFunctionType {
       OperandTypes.NUMERIC, OperandTypes.CHARACTER, OperandTypes.TIMESTAMP,
       OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 1),
       OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i == 1),
-      OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1)),
+      OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
       ReturnTypes.explicit(SqlTypeName.OTHER), null, SqlKind.MODE),
-  MODESTRING("modeString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
-      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
-  MODETIMESTAMP("modeTimestamp", ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
-      OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -427,6 +428,17 @@ public enum AggregationFunctionType {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
       RelDataType operandType = opBinding.getOperandType(0);
+      // Aggregate bindings contain operand types only. Validate the annotation while SQL literals are available;
+      // later planning derives the same result type from the original input and carries it through merge stages.
+      if (opBinding.getOperandCount() == 3 && opBinding instanceof SqlCallBinding) {
+        checkArgument(opBinding.isOperandLiteral(2, false),
+            "MODE type argument must be a STRING or TIMESTAMP literal");
+        String type = opBinding.getOperandLiteralValue(2, String.class);
+        type = type != null ? type.toUpperCase(Locale.ROOT) : null;
+        boolean matches = "STRING".equals(type) && SqlTypeName.STRING_TYPES.contains(operandType.getSqlTypeName())
+            || "TIMESTAMP".equals(type) && operandType.getSqlTypeName() == SqlTypeName.TIMESTAMP;
+        checkArgument(matches, "MODE type argument must match the STRING or TIMESTAMP input, got: %s", type);
+      }
       if (SqlTypeName.STRING_TYPES.contains(operandType.getSqlTypeName())
           || operandType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
         return ReturnTypes.ARG0_NULLABLE_IF_EMPTY.inferReturnType(opBinding);

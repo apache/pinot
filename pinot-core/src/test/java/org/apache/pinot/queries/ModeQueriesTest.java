@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -462,6 +463,48 @@ public class ModeQueriesTest extends BaseQueriesTest {
     assertEquals(response.getResultTable().getRows().get(0),
         new Object[]{expectedTimestamp, expectedTimestamp, expectedMillis,
             new Timestamp(_expectedResultMin.longValue()).toString()});
+  }
+
+  @DataProvider
+  public Object[][] typedModeGapfillExpressions() {
+    return new Object[][]{
+        {false, "MODE(timestampColumn, 'MIN', 'TIMESTAMP')"},
+        {false, "MODE(timestampColumn, 'MIN', 'timestamp')"},
+        {true, "MODE(timestampColumn)"}
+    };
+  }
+
+  @Test(dataProvider = "typedModeGapfillExpressions")
+  public void testTypedModeGapfillPreservesAliases(boolean inferType, String typedMode) {
+    String format = "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS";
+    DateTimeFormatSpec formatter = new DateTimeFormatSpec(format);
+    long hourMillis = 3_600_000L;
+    long startMillis = BASE_TIMESTAMP - BASE_TIMESTAMP % hourMillis;
+    String start = formatter.fromMillisToFormat(startMillis);
+    String end = formatter.fromMillisToFormat(startMillis + 2 * hourMillis);
+    String entity = Integer.toString(_expectedResultMin.intValue());
+    // Keep both the legacy DOUBLE and typed TIMESTAMP result in the same aggregate subquery.
+    String numericMode = inferType ? "MODE(fromTimestamp(timestampColumn))" : "MODE(timestampColumn)";
+    String query = "SET enableTypedMode=" + inferType + "; SELECT GapFill(time_col, '" + format + "', '"
+        + start + "', '" + end + "', '1:HOURS', FILL(numeric_mode, 'FILL_PREVIOUS_VALUE'), "
+        + "FILL(typed_mode, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(stringColumn)), "
+        + "stringColumn, numeric_mode, typed_mode FROM (SELECT DATETIMECONVERT(fromTimestamp(timestampColumn), "
+        + "'1:MILLISECONDS:EPOCH', '" + format + "', '1:HOURS') AS time_col, stringColumn, "
+        + numericMode + " AS numeric_mode, " + typedMode + " AS typed_mode FROM testTable WHERE stringColumn = '"
+        + entity + "' GROUP BY time_col, stringColumn LIMIT 1000) LIMIT 1000";
+    BrokerResponseNative response = getBrokerResponseForOptimizedQuery(query, SCHEMA);
+
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertEquals(response.getResultTable().getDataSchema().getColumnNames(),
+        new String[]{"time_col", "stringColumn", "numeric_mode", "typed_mode"});
+    List<Object[]> rows = response.getResultTable().getRows();
+    assertEquals(rows.size(), 2);
+    long expectedMillis = BASE_TIMESTAMP + _expectedResultMin.longValue();
+    String expectedTimestamp = new Timestamp(expectedMillis).toString();
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i), new Object[]{formatter.fromMillisToFormat(startMillis + i * hourMillis), entity,
+          (double) expectedMillis, expectedTimestamp});
+    }
   }
 
   @AfterClass

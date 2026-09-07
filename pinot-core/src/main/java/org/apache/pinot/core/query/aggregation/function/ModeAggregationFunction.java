@@ -29,9 +29,14 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMaps;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMaps;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
@@ -54,25 +59,59 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///
 /// Following arguments are supported:
 ///
-/// - Expression: expression that contains the column to be calculated mode on, can be any Numeric column
+/// - Expression: expression that contains the column to be calculated mode on
 /// - MultiModeReducerType (optional): the reducer to use in case of multiple modes present in data
+///
+/// Numeric calls retain a DOUBLE result and support MIN, MAX and AVG tie reducers. The planner supplies an internal
+/// third STRING or TIMESTAMP literal for non-numeric inputs, which retain their type and support MIN and MAX.
+/// The result type is immutable so a function can be shared across segments and reconstructed on reducing stages.
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<?, Long>, Comparable<?>> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final MultiModeReducerType _multiModeReducerType;
+  private final ColumnDataType _resultType;
+  private final String _resultColumnName;
 
   public ModeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(arguments.get(0), nullHandlingEnabled);
+    super(checkArguments(arguments), nullHandlingEnabled);
 
     int numArguments = arguments.size();
-    Preconditions.checkArgument(numArguments <= 2, "Mode expects at most 2 arguments, got: %s", numArguments);
+    if (numArguments == 3) {
+      ExpressionContext typeArgument = arguments.get(2);
+      Preconditions.checkArgument(typeArgument.getType() == ExpressionContext.Type.LITERAL
+              && typeArgument.getLiteral().getType() == DataType.STRING,
+          "MODE result type must be a STRING or TIMESTAMP string literal");
+      String resultType = typeArgument.getLiteral().getStringValue();
+      Preconditions.checkArgument(resultType != null, "MODE result type must be STRING or TIMESTAMP, got: null");
+      resultType = resultType.toUpperCase(Locale.ROOT);
+      Preconditions.checkArgument("STRING".equals(resultType) || "TIMESTAMP".equals(resultType),
+          "MODE result type must be STRING or TIMESTAMP, got: %s", resultType);
+      _resultType = ColumnDataType.valueOf(resultType);
+    } else {
+      _resultType = ColumnDataType.DOUBLE;
+    }
     if (numArguments > 1) {
+      Preconditions.checkArgument(arguments.get(1).getType() == ExpressionContext.Type.LITERAL,
+          "MODE tie reducer must be a literal");
       _multiModeReducerType = MultiModeReducerType.valueOf(arguments.get(1).getLiteral().getStringValue());
     } else {
       _multiModeReducerType = MultiModeReducerType.MIN;
     }
+    Preconditions.checkArgument(
+        _resultType == ColumnDataType.DOUBLE || _multiModeReducerType != MultiModeReducerType.AVG,
+        "MODE for %s supports only MIN or MAX tie reducers, got: %s", _resultType, _multiModeReducerType);
+    // Gapfill resolves aliases by matching the complete selection expression, including literal spelling.
+    _resultColumnName = numArguments == 3
+        ? "mode(" + _expression + "," + arguments.get(1) + "," + arguments.get(2) + ")"
+        : super.getResultColumnName();
+  }
+
+  private static ExpressionContext checkArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(!arguments.isEmpty() && arguments.size() <= 3,
+        "MODE expects one to three arguments, got: %s", arguments.size());
+    return arguments.get(0);
   }
 
   /// Helper method to create a value map for the given value type.
@@ -206,7 +245,11 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   /// Helper method to extract segment level intermediate result from the inner segment result.
-  private static Map<? extends Number, Long> extractIntermediateResult(@Nullable Object result) {
+  @Nullable
+  private Map<?, Long> extractIntermediateResult(@Nullable Object result) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      return extractComparableCounts(result);
+    }
     if (result == null) {
       // NOTE: Return an empty Int2LongOpenHashMap for empty result.
       return new Int2LongOpenHashMap();
@@ -227,6 +270,11 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
+  public String getResultColumnName() {
+    return _resultColumnName;
+  }
+
+  @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
@@ -239,6 +287,10 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      aggregateComparable(length, aggregationResultHolder, blockValSetMap);
+      return;
+    }
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the dictId map
@@ -303,6 +355,10 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      aggregateComparableGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
+      return;
+    }
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the dictId map
@@ -361,6 +417,10 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      aggregateComparableGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
+      return;
+    }
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the dictId map
@@ -425,19 +485,23 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
+  @Nullable
   @Override
-  public Map<? extends Number, Long> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public Map<?, Long> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return extractIntermediateResult(aggregationResultHolder.getResult());
   }
 
+  @Nullable
   @Override
-  public Map<? extends Number, Long> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Map<?, Long> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return extractIntermediateResult(groupByResultHolder.getResult(groupKey));
   }
 
   @Override
-  public Map<? extends Number, Long> merge(Map<? extends Number, Long> intermediateResult1,
-      Map<? extends Number, Long> intermediateResult2) {
+  public Map<?, Long> merge(Map<?, Long> intermediateResult1, Map<?, Long> intermediateResult2) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      return mergeComparableCounts(intermediateResult1, intermediateResult2);
+    }
     if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
@@ -473,7 +537,16 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Map<? extends Number, Long> longMap) {
+  @SuppressWarnings("deprecation")
+  public SerializedIntermediateResult serializeIntermediateResult(Map<?, Long> longMap) {
+    if (_resultType == ColumnDataType.STRING) {
+      // Reuse the existing map wire encoding for generic aggregation bridges.
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Map.getValue(),
+          ObjectSerDeUtils.MAP_SER_DE.serialize((Map) longMap));
+    }
+    if (_resultType == ColumnDataType.TIMESTAMP && !(longMap instanceof Long2LongMap)) {
+      longMap = new Long2LongOpenHashMap((Map<Long, Long>) longMap);
+    }
     if (longMap instanceof Int2LongMap) {
       return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Int2LongMap.getValue(),
           ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE.serialize((Int2LongMap) longMap));
@@ -494,18 +567,22 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public Map<? extends Number, Long> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+  public Map<?, Long> deserializeIntermediateResult(CustomObject customObject) {
+    Map<?, Long> counts = ObjectSerDeUtils.deserialize(customObject);
+    return _resultType == ColumnDataType.STRING ? new StringModeCounts((Map<String, Long>) counts) : counts;
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.DOUBLE;
+    return _resultType;
   }
 
   @Nullable
   @Override
-  public Double extractFinalResult(@Nullable Map<? extends Number, Long> intermediateResult) {
+  public Comparable<?> extractFinalResult(@Nullable Map<?, Long> intermediateResult) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      return extractComparableFinalResult(intermediateResult);
+    }
     // A null intermediate result means nothing was aggregated, and the mode of nothing is NULL. An empty map is a
     // different thing: it is what an untouched single-stage result holder produces, and it keeps its historical
     // sentinel below so that path is not silently changed.
@@ -519,13 +596,13 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         return DEFAULT_FINAL_RESULT;
       }
     } else if (intermediateResult instanceof Int2LongOpenHashMap) {
-      return extractFinalResult((Int2LongOpenHashMap) intermediateResult);
+      return extractNumericFinalResult((Int2LongOpenHashMap) intermediateResult);
     } else if (intermediateResult instanceof Long2LongOpenHashMap) {
-      return extractFinalResult((Long2LongOpenHashMap) intermediateResult);
+      return extractNumericFinalResult((Long2LongOpenHashMap) intermediateResult);
     } else if (intermediateResult instanceof Float2LongOpenHashMap) {
-      return extractFinalResult((Float2LongOpenHashMap) intermediateResult);
+      return extractNumericFinalResult((Float2LongOpenHashMap) intermediateResult);
     } else if (intermediateResult instanceof Double2LongOpenHashMap) {
-      return extractFinalResult((Double2LongOpenHashMap) intermediateResult);
+      return extractNumericFinalResult((Double2LongOpenHashMap) intermediateResult);
     } else {
       throw new IllegalStateException(
           "Illegal data type for Intermediate Result of MODE aggregation function: " + intermediateResult.getClass()
@@ -533,7 +610,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
-  public double extractFinalResult(Int2LongOpenHashMap intermediateResult) {
+  private double extractNumericFinalResult(Int2LongOpenHashMap intermediateResult) {
     ObjectIterator<Int2LongMap.Entry> iterator = intermediateResult.int2LongEntrySet().fastIterator();
     Int2LongMap.Entry first = iterator.next();
     long maxFrequency = first.getLongValue();
@@ -578,7 +655,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
-  public double extractFinalResult(Long2LongOpenHashMap intermediateResult) {
+  private double extractNumericFinalResult(Long2LongOpenHashMap intermediateResult) {
     ObjectIterator<Long2LongMap.Entry> iterator = intermediateResult.long2LongEntrySet().fastIterator();
     Long2LongMap.Entry first = iterator.next();
     long maxFrequency = first.getLongValue();
@@ -625,7 +702,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
-  public double extractFinalResult(Float2LongOpenHashMap intermediateResult) {
+  private double extractNumericFinalResult(Float2LongOpenHashMap intermediateResult) {
     ObjectIterator<Float2LongMap.Entry> iterator = intermediateResult.float2LongEntrySet().fastIterator();
     Float2LongMap.Entry first = iterator.next();
     long maxFrequency = first.getLongValue();
@@ -672,7 +749,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
-  public Double extractFinalResult(Double2LongOpenHashMap intermediateResult) {
+  private Double extractNumericFinalResult(Double2LongOpenHashMap intermediateResult) {
     ObjectIterator<Double2LongMap.Entry> iterator = intermediateResult.double2LongEntrySet().fastIterator();
     Double2LongMap.Entry first = iterator.next();
     long maxFrequency = first.getLongValue();
@@ -716,6 +793,266 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         return sum / count;
       default:
         throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
+    }
+  }
+
+  private Map<?, Long> newComparableValueMap() {
+    return _resultType == ColumnDataType.STRING ? new StringModeCounts() : new Long2LongOpenHashMap();
+  }
+
+  private ValueCounter comparableValueCounter(BlockValSet blockValSet) {
+    if (_resultType == ColumnDataType.STRING) {
+      String[] values = blockValSet.getStringValuesSV();
+      return (counts, row) -> ((StringModeCounts) counts).addTo(values[row], 1L);
+    }
+    long[] values = blockValSet.getLongValuesSV();
+    return (counts, row) -> ((Long2LongOpenHashMap) counts).addTo(values[row], 1L);
+  }
+
+  @FunctionalInterface
+  private interface ValueCounter {
+    void add(Map<?, Long> counts, int row);
+  }
+
+  private void aggregateComparable(int length, AggregationResultHolder holder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet values = blockValSetMap.get(_expression);
+    Dictionary dictionary = values.isDictionaryEncoded() ? values.getDictionary() : null;
+    if (dictionary != null) {
+      int[] ids = values.getDictionaryIdsSV();
+      forEachNotNull(length, values, (from, to) -> {
+        DictionaryCounts counts = getValue(holder, () -> new DictionaryCounts(dictionary));
+        for (int i = from; i < to; i++) {
+          counts._counts.addTo(ids[i], 1L);
+        }
+      });
+    } else {
+      ValueCounter counter = comparableValueCounter(values);
+      forEachNotNull(length, values, (from, to) -> {
+        Map<?, Long> counts = getValue(holder, this::newComparableValueMap);
+        for (int i = from; i < to; i++) {
+          counter.add(counts, i);
+        }
+      });
+    }
+  }
+
+  private void aggregateComparableGroupBySV(int length, int[] groupKeys, GroupByResultHolder holder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet values = blockValSetMap.get(_expression);
+    Dictionary dictionary = values.isDictionaryEncoded() ? values.getDictionary() : null;
+    if (dictionary != null) {
+      int[] ids = values.getDictionaryIdsSV();
+      forEachNotNull(length, values, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          DictionaryCounts counts = getValue(holder, groupKeys[i], () -> new DictionaryCounts(dictionary));
+          counts._counts.addTo(ids[i], 1L);
+        }
+      });
+    } else {
+      ValueCounter counter = comparableValueCounter(values);
+      forEachNotNull(length, values, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Map<?, Long> counts = getValue(holder, groupKeys[i], this::newComparableValueMap);
+          counter.add(counts, i);
+        }
+      });
+    }
+  }
+
+  private void aggregateComparableGroupByMV(int length, int[][] groupKeys, GroupByResultHolder holder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet values = blockValSetMap.get(_expression);
+    Dictionary dictionary = values.isDictionaryEncoded() ? values.getDictionary() : null;
+    if (dictionary != null) {
+      int[] ids = values.getDictionaryIdsSV();
+      forEachNotNull(length, values, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeys[i]) {
+            DictionaryCounts counts = getValue(holder, groupKey, () -> new DictionaryCounts(dictionary));
+            counts._counts.addTo(ids[i], 1L);
+          }
+        }
+      });
+    } else {
+      ValueCounter counter = comparableValueCounter(values);
+      forEachNotNull(length, values, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeys[i]) {
+            Map<?, Long> counts = getValue(holder, groupKey, this::newComparableValueMap);
+            counter.add(counts, i);
+          }
+        }
+      });
+    }
+  }
+
+  @Nullable
+  private Map<?, Long> extractComparableCounts(@Nullable Object result) {
+    if (!(result instanceof DictionaryCounts)) {
+      return (Map<?, Long>) result;
+    }
+    DictionaryCounts dictionaryCounts = (DictionaryCounts) result;
+    Dictionary dictionary = dictionaryCounts._dictionary;
+    if (_resultType == ColumnDataType.STRING) {
+      StringModeCounts counts = new StringModeCounts();
+      dictionaryCounts._counts.int2LongEntrySet().fastForEach(entry ->
+          counts.put(dictionary.getStringValue(entry.getIntKey()), entry.getLongValue()));
+      return counts;
+    }
+    Long2LongOpenHashMap counts = new Long2LongOpenHashMap();
+    dictionaryCounts._counts.int2LongEntrySet().fastForEach(entry ->
+        counts.put(dictionary.getLongValue(entry.getIntKey()), entry.getLongValue()));
+    return counts;
+  }
+
+  private Map<?, Long> mergeComparableCounts(Map<?, Long> left, Map<?, Long> right) {
+    if (_resultType == ColumnDataType.STRING && left instanceof Object2LongOpenHashMap
+        && right instanceof Object2LongMap) {
+      Object2LongOpenHashMap<String> counts = (Object2LongOpenHashMap<String>) left;
+      ObjectIterator<Object2LongMap.Entry<String>> iterator =
+          Object2LongMaps.fastIterator((Object2LongMap<String>) right);
+      while (iterator.hasNext()) {
+        Object2LongMap.Entry<String> entry = iterator.next();
+        counts.addTo(entry.getKey(), entry.getLongValue());
+      }
+      return left;
+    }
+    if (_resultType == ColumnDataType.TIMESTAMP && left instanceof Long2LongOpenHashMap
+        && right instanceof Long2LongMap) {
+      Long2LongOpenHashMap counts = (Long2LongOpenHashMap) left;
+      ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator((Long2LongMap) right);
+      while (iterator.hasNext()) {
+        Long2LongMap.Entry entry = iterator.next();
+        counts.addTo(entry.getLongKey(), entry.getLongValue());
+      }
+      return left;
+    }
+    Map<Object, Long> counts = (Map<Object, Long>) left;
+    right.forEach((value, count) -> counts.merge(value, count, Long::sum));
+    return left;
+  }
+
+  @Nullable
+  private Comparable<?> extractComparableFinalResult(@Nullable Map<?, Long> counts) {
+    if (counts == null || counts.isEmpty()) {
+      return null;
+    }
+    boolean minimum = _multiModeReducerType == MultiModeReducerType.MIN;
+    if (_resultType == ColumnDataType.STRING && counts instanceof Object2LongMap) {
+      String mode = null;
+      long maxCount = 0;
+      ObjectIterator<Object2LongMap.Entry<String>> iterator =
+          Object2LongMaps.fastIterator((Object2LongMap<String>) counts);
+      while (iterator.hasNext()) {
+        Object2LongMap.Entry<String> entry = iterator.next();
+        String value = entry.getKey();
+        long count = entry.getLongValue();
+        if (mode == null || count > maxCount || (count == maxCount
+            && (minimum ? value.compareTo(mode) < 0 : value.compareTo(mode) > 0))) {
+          mode = value;
+          maxCount = count;
+        }
+      }
+      return mode;
+    }
+    if (_resultType == ColumnDataType.TIMESTAMP && counts instanceof Long2LongMap) {
+      ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator((Long2LongMap) counts);
+      Long2LongMap.Entry first = iterator.next();
+      long mode = first.getLongKey();
+      long maxCount = first.getLongValue();
+      while (iterator.hasNext()) {
+        Long2LongMap.Entry entry = iterator.next();
+        long value = entry.getLongKey();
+        long count = entry.getLongValue();
+        if (count > maxCount || (count == maxCount && (minimum ? value < mode : value > mode))) {
+          mode = value;
+          maxCount = count;
+        }
+      }
+      return mode;
+    }
+    Comparable mode = null;
+    long maxCount = 0;
+    for (Map.Entry<?, Long> entry : counts.entrySet()) {
+      Comparable value = (Comparable) entry.getKey();
+      long count = entry.getValue();
+      if (mode == null || count > maxCount || (count == maxCount
+          && (minimum ? value.compareTo(mode) < 0 : value.compareTo(mode) > 0))) {
+        mode = value;
+        maxCount = count;
+      }
+    }
+    return mode;
+  }
+
+  private static final class DictionaryCounts {
+    private final Dictionary _dictionary;
+    private final Int2LongOpenHashMap _counts = new Int2LongOpenHashMap();
+
+    private DictionaryCounts(Dictionary dictionary) {
+      _dictionary = dictionary;
+    }
+  }
+
+  /// Frequency state with an O(1) conservative estimate of the retained string-key payload.
+  /// Accumulation uses [#addTo] and dictionary extraction and boxed [Map#merge] use [#put].
+  /// Each distinct key is charged once, assuming UTF-16 storage plus object and array overhead.
+  /// Instances belong to one result holder and are not thread-safe.
+  public static final class StringModeCounts extends Object2LongOpenHashMap<String> {
+    private long _retainedStringBytes;
+
+    public StringModeCounts() {
+    }
+
+    /// Restores accounting once when a generic map is deserialized from the existing wire format.
+    public StringModeCounts(Map<String, Long> counts) {
+      super(counts.size());
+      counts.forEach((value, count) -> put(value, count.longValue()));
+    }
+
+    public long getRetainedStringBytes() {
+      return _retainedStringBytes;
+    }
+
+    @Override
+    public long addTo(String value, long increment) {
+      int previousSize = size();
+      long previousCount = super.addTo(value, increment);
+      if (size() != previousSize) {
+        _retainedStringBytes += retainedStringBytes(value);
+      }
+      return previousCount;
+    }
+
+    @Override
+    public long put(String value, long count) {
+      int previousSize = size();
+      long previousCount = super.put(value, count);
+      if (size() != previousSize) {
+        _retainedStringBytes += retainedStringBytes(value);
+      }
+      return previousCount;
+    }
+
+    @Override
+    public long removeLong(Object value) {
+      int previousSize = size();
+      long previousCount = super.removeLong(value);
+      if (size() != previousSize) {
+        _retainedStringBytes -= retainedStringBytes((String) value);
+      }
+      return previousCount;
+    }
+
+    @Override
+    public void clear() {
+      super.clear();
+      _retainedStringBytes = 0;
+    }
+
+    private static long retainedStringBytes(String value) {
+      return 48 + 2L * value.length();
     }
   }
 

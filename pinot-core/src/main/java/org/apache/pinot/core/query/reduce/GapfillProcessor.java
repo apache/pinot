@@ -179,7 +179,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     if (rawRowsForBucket != null) {
       for (Object[] resultRow : rawRowsForBucket) {
         for (int i = 0; i < resultColumnDataTypes.length; i++) {
-          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+          // Broker reducers format values as strings, while parent aggregates can still return native values.
+          if (resultRow[i] != null && !(resultRow[i] instanceof String)) {
+            resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+          }
         }
 
         long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[_timeBucketColumnIndex]));

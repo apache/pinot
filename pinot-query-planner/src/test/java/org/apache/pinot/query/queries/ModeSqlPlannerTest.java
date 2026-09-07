@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -40,9 +41,10 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
-/// Verifies MODE type inference and type-specific dispatch across both multi-stage planner implementations.
+/// Verifies MODE type inference and inferred type arguments across both multi-stage planner implementations.
 public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @DataProvider
   public Object[][] physicalOptimizers() {
@@ -89,7 +91,10 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     for (AggregateNode aggregate : aggregates) {
       List<RexExpression.FunctionCall> calls = aggregate.getAggCalls();
       assertEquals(calls.stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          List.of("MODESTRING", "MODETIMESTAMP", "MODE"));
+          List.of("MODE", "MODE", "MODE"));
+      assertTypedCall(calls.get(0), "MIN", "STRING");
+      assertTypedCall(calls.get(1), "MIN", "TIMESTAMP");
+      assertEquals(calls.get(2).getFunctionOperands().size(), 1);
       if (aggregate.getAggType().isOutputIntermediateFormat() && !aggregate.isLeafReturnFinalResult()) {
         sawIntermediate = true;
         assertEquals(aggregate.getDataSchema().getColumnDataTypes(),
@@ -116,7 +121,10 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
             ColumnDataType.DOUBLE});
     for (AggregateNode aggregate : findAggregates(plan)) {
       assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          List.of("MODESTRING", "MODETIMESTAMP", "MODE"));
+          List.of("MODE", "MODE", "MODE"));
+      assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
+      assertTypedCall(aggregate.getAggCalls().get(1), "MAX", "TIMESTAMP");
+      assertEquals(aggregate.getAggCalls().get(2).getFunctionOperands().size(), 2);
     }
   }
 
@@ -131,6 +139,9 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
       for (AggregateNode aggregate : aggregates) {
         assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
             List.of("MODE", "MODE"), options);
+        for (RexExpression.FunctionCall mode : aggregate.getAggCalls()) {
+          assertEquals(mode.getFunctionOperands().size(), 1, options);
+        }
       }
     }
   }
@@ -145,9 +156,11 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     for (AggregateNode aggregate : aggregates) {
       List<String> functionNames =
           aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList();
-      assertEquals(functionNames.subList(0, 5), List.of("MODESTRING", "MODETIMESTAMP", "MODE", "MIN", "MAX"));
+      assertEquals(functionNames.subList(0, 5), List.of("MODE", "MODE", "MODE", "MIN", "MAX"));
       assertFalse(functionNames.contains("SUMLONG"));
       assertFalse(functionNames.contains("SUMINT"));
+      assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
+      assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
     }
   }
 
@@ -160,10 +173,9 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
           "SET autoRewriteAggregationType=true; ", "SET usePlannerRules='TypedModeRewrite'; ",
           "SET usePlannerRules='TypedModeRewrite'; SET enableTypedMode=false; ",
           "SET enableTypedMode=true; SET skipPlannerRules='TypedModeRewrite'; ")) {
-        assertModeCalls(environment, usePhysicalOptimizer, options, List.of("MODE", "MODE", "MODE"));
+        assertModeCalls(environment, usePhysicalOptimizer, options, false);
       }
-      assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ",
-          List.of("MODESTRING", "MODETIMESTAMP", "MODE"));
+      assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ", true);
     }
   }
 
@@ -182,15 +194,65 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   }
 
   private static void assertModeCalls(QueryEnvironment environment, boolean usePhysicalOptimizer, String options,
-      List<String> expectedCalls) {
+      boolean typed) {
     DispatchableSubPlan plan = environment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
         + options + "SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
     List<AggregateNode> aggregates = findAggregates(plan);
     assertFalse(aggregates.isEmpty());
     for (AggregateNode aggregate : aggregates) {
       assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          expectedCalls, options);
+          List.of("MODE", "MODE", "MODE"), options);
+      if (typed) {
+        assertTypedCall(aggregate.getAggCalls().get(0), "MIN", "STRING");
+        assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
+      } else {
+        for (RexExpression.FunctionCall mode : aggregate.getAggCalls()) {
+          assertEquals(mode.getFunctionOperands().size(), 1, options);
+        }
+      }
     }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testExplicitTypeArguments(boolean usePhysicalOptimizer) {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
+        + "SELECT MODE(col1, 'MAX', 'STRING'), MODE(ts_timestamp, 'MIN', 'TIMESTAMP') FROM a");
+    for (AggregateNode aggregate : findAggregates(plan)) {
+      assertTypedCall(aggregate.getAggCalls().get(0), "MAX", "STRING");
+      assertTypedCall(aggregate.getAggCalls().get(1), "MIN", "TIMESTAMP");
+    }
+    PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
+    assertEquals(root.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP});
+  }
+
+  @Test
+  public void testInvalidTypeAnnotations() {
+    for (String expression : List.of("MODE(col1, 'MIN', 'TIMESTAMP')", "MODE(ts_timestamp, 'MIN', 'STRING')",
+        "MODE(col1, 'MIN', 'INVALID')", "MODE(col1, 'MIN', col1)")) {
+      QueryException error = expectThrows(QueryException.class,
+          () -> _queryEnvironment.compile("SELECT " + expression + " FROM a"));
+      assertTrue(error.getMessage().contains("MODE type argument"), error.getMessage());
+    }
+  }
+
+  @Test
+  public void testTypeAnnotationsAreCaseInsensitive() {
+    RelDataType rowType = _queryEnvironment.compile(
+        "SELECT MODE(col1, 'MIN', 'string'), MODE(ts_timestamp, 'MAX', 'TimeStamp') FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.TIMESTAMP);
+  }
+
+  private static void assertTypedCall(RexExpression.FunctionCall call, String reducer, String type) {
+    assertEquals(call.getFunctionName(), "MODE");
+    List<RexExpression> arguments = call.getFunctionOperands();
+    assertEquals(arguments.size(), 3);
+    assertTrue(arguments.get(1) instanceof RexExpression.Literal);
+    assertTrue(arguments.get(2) instanceof RexExpression.Literal);
+    assertEquals(((RexExpression.Literal) arguments.get(1)).getValue(), reducer);
+    assertEquals(((RexExpression.Literal) arguments.get(2)).getValue(), type);
   }
 
   private static List<AggregateNode> findAggregates(DispatchableSubPlan plan) {
