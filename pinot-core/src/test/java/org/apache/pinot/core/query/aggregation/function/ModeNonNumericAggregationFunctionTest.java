@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.CustomObject;
@@ -37,6 +39,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -79,6 +82,31 @@ public class ModeNonNumericAggregationFunctionTest {
   }
 
   @Test
+  public void testTimestampMergesPrimitiveAndGenericStates() {
+    ModeTimestampAggregationFunction minFunction =
+        new ModeTimestampAggregationFunction(List.of(EXPRESSION), true);
+    ModeTimestampAggregationFunction maxFunction =
+        new ModeTimestampAggregationFunction(argumentsWithReducer("MAX"), true);
+    for (boolean primitiveLeft : new boolean[]{false, true}) {
+      for (boolean primitiveRight : new boolean[]{false, true}) {
+        Map<Long, Long> left = primitiveLeft ? new Long2LongOpenHashMap() : new HashMap<>();
+        Map<Long, Long> right = primitiveRight ? new Long2LongOpenHashMap() : new HashMap<>();
+        left.put(Long.MIN_VALUE, 2L);
+        left.put(0L, 1L);
+        right.put(Long.MIN_VALUE, 1L);
+        right.put(Long.MAX_VALUE, 3L);
+
+        Map<Long, Long> merged = minFunction.merge(left, right);
+        assertSame(merged, left);
+        assertEquals(merged, Map.of(Long.MIN_VALUE, 3L, 0L, 1L, Long.MAX_VALUE, 3L));
+        assertEquals(minFunction.extractFinalResult(merged), Long.valueOf(Long.MIN_VALUE));
+        assertEquals(maxFunction.extractFinalResult(merged), Long.valueOf(Long.MAX_VALUE));
+        assertEquals(right, Map.of(Long.MIN_VALUE, 1L, Long.MAX_VALUE, 3L));
+      }
+    }
+  }
+
+  @Test
   public void testStringModeSkipsNullRowsForMultiValueGroupKeys() {
     ModeStringAggregationFunction function = new ModeStringAggregationFunction(List.of(EXPRESSION), true);
     GroupByResultHolder holder = function.createGroupByResultHolder(3, 3);
@@ -101,6 +129,8 @@ public class ModeNonNumericAggregationFunctionTest {
           new ModeTimestampAggregationFunction(List.of(EXPRESSION), nullHandlingEnabled);
       assertNull(stringFunction.extractFinalResult(null));
       assertNull(timestampFunction.extractFinalResult(null));
+      assertNull(timestampFunction.extractFinalResult(new Long2LongOpenHashMap()));
+      assertNull(timestampFunction.extractFinalResult(Map.of()));
       assertNull(stringFunction.extractFinalResult(
           stringFunction.extractAggregationResult(stringFunction.createAggregationResultHolder())));
       assertNull(timestampFunction.extractFinalResult(

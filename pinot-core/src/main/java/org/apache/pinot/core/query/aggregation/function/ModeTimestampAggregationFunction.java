@@ -19,9 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMaps;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -60,8 +63,47 @@ public class ModeTimestampAggregationFunction extends BaseComparableModeAggregat
   }
 
   @Override
-  protected Long dictionaryValue(Dictionary dictionary, int dictionaryId) {
-    return dictionary.getLongValue(dictionaryId);
+  protected void putDictionaryCount(Map<Long, Long> counts, Dictionary dictionary, int dictionaryId, long count) {
+    ((Long2LongOpenHashMap) counts).put(dictionary.getLongValue(dictionaryId), count);
+  }
+
+  @Override
+  public Map<Long, Long> merge(Map<Long, Long> left, Map<Long, Long> right) {
+    if (!(left instanceof Long2LongOpenHashMap) || !(right instanceof Long2LongMap)) {
+      return super.merge(left, right);
+    }
+    Long2LongOpenHashMap counts = (Long2LongOpenHashMap) left;
+    ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator((Long2LongMap) right);
+    while (iterator.hasNext()) {
+      Long2LongMap.Entry entry = iterator.next();
+      counts.addTo(entry.getLongKey(), entry.getLongValue());
+    }
+    return counts;
+  }
+
+  @Nullable
+  @Override
+  public Long extractFinalResult(@Nullable Map<Long, Long> counts) {
+    if (!(counts instanceof Long2LongMap)) {
+      return super.extractFinalResult(counts);
+    }
+    ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator((Long2LongMap) counts);
+    if (!iterator.hasNext()) {
+      return null;
+    }
+    Long2LongMap.Entry first = iterator.next();
+    long mode = first.getLongKey();
+    long maxCount = first.getLongValue();
+    while (iterator.hasNext()) {
+      Long2LongMap.Entry entry = iterator.next();
+      long value = entry.getLongKey();
+      long count = entry.getLongValue();
+      if (count > maxCount || (count == maxCount && (isMinimum() ? value < mode : value > mode))) {
+        mode = value;
+        maxCount = count;
+      }
+    }
+    return mode;
   }
 
   @Override

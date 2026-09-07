@@ -73,7 +73,11 @@ abstract class BaseComparableModeAggregationFunction<T extends Comparable<T>>
     void add(Map<V, Long> counts, int row);
   }
 
-  protected abstract T dictionaryValue(Dictionary dictionary, int dictionaryId);
+  protected abstract void putDictionaryCount(Map<T, Long> counts, Dictionary dictionary, int dictionaryId, long count);
+
+  protected final boolean isMinimum() {
+    return _minimum;
+  }
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
@@ -179,8 +183,8 @@ abstract class BaseComparableModeAggregationFunction<T extends Comparable<T>>
     if (result instanceof DictionaryCounts) {
       DictionaryCounts dictionaryCounts = (DictionaryCounts) result;
       Map<T, Long> counts = newValueMap();
-      dictionaryCounts._counts.int2LongEntrySet().fastForEach(entry -> counts.put(
-          dictionaryValue(dictionaryCounts._dictionary, entry.getIntKey()), entry.getLongValue()));
+      dictionaryCounts._counts.int2LongEntrySet().fastForEach(entry -> putDictionaryCount(
+          counts, dictionaryCounts._dictionary, entry.getIntKey(), entry.getLongValue()));
       return counts;
     }
     return (Map<T, Long>) result;
