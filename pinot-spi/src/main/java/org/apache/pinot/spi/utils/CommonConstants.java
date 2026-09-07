@@ -434,6 +434,43 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+
+    // Startup data-plane warmup: before readiness is granted, run probe queries so the JIT-compiled query
+    // path and per-query caches are warm before the first real traffic. Off by default; opt-in per
+    // deployment.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_ENABLED = "pinot.broker.startup.warmup.enabled";
+    public static final boolean DEFAULT_BROKER_STARTUP_WARMUP_ENABLED = false;
+    // Hard ceiling on the whole warmup (measured from Helix convergence): readiness opens when it expires
+    // whatever the probe progress, so a slow or unreachable server cannot stall a rolling restart.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_BUDGET_MS = "pinot.broker.startup.warmup.budgetMs";
+    public static final long DEFAULT_BROKER_STARTUP_WARMUP_BUDGET_MS = 15_000L;
+    // Minimum number of successful probe queries before the default probe declares the broker warm. This is
+    // a depth floor, not a latency guess: enough probe invocations to drive the query path's JIT to its top
+    // tier. Warmup exits when this many probes have run OR the budget expires -- whichever comes first.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_MIN_ITERATIONS =
+        "pinot.broker.startup.warmup.minIterations";
+    public static final int DEFAULT_BROKER_STARTUP_WARMUP_MIN_ITERATIONS = 1000;
+    // Upper bound on the number of tables probed by the default (auto-select) probe: a greedy set-cover
+    // picks at most this many tables that between them cover every routable server.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_MAX_TABLES = "pinot.broker.startup.warmup.maxTables";
+    public static final int DEFAULT_BROKER_STARTUP_WARMUP_MAX_TABLES = 5;
+    // Optional probe query. Empty means auto-select: probe `SELECT * FROM "<t>" LIMIT 1` over the set-cover
+    // of tables. When set, this complete query (it names its own table) is used instead, warming that
+    // query's shape; its exit then switches to latency stability since its warm latency is not known
+    // upfront. warmup.tables is ignored when this is set.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY = "pinot.broker.startup.warmup.query";
+    public static final String DEFAULT_BROKER_STARTUP_WARMUP_QUERY = "";
+    // Optional comma-separated list of tables (raw or with type) to probe with the default query. Empty
+    // means auto-select via set-cover. Ignored when warmup.query is set.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_TABLES = "pinot.broker.startup.warmup.tables";
+    public static final String DEFAULT_BROKER_STARTUP_WARMUP_TABLES = "";
+    // Number of probe queries fired concurrently per round. Serial (1) warms the serve path; a higher value
+    // additionally warms the concurrency step (channel-lock contention, concurrent scatter/gather/reduce)
+    // that the first real traffic burst hits. Default 1 (serial); raise it to warm closer to the expected
+    // burst.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_CONCURRENCY =
+        "pinot.broker.startup.warmup.concurrency";
+    public static final int DEFAULT_BROKER_STARTUP_WARMUP_CONCURRENCY = 1;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     // Config for number of threads to use for Broker reduce-phase.

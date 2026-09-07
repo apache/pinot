@@ -87,6 +87,14 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     }
   }
 
+  /// Warms only the single-stage handler. It owns the broker-to-server netty channels, which is the data
+  /// plane that starts empty on a fresh broker; the multi-stage handler already warms its own compile path
+  /// in `start()`, and the time-series handler shares the single-stage transport.
+  @Override
+  public boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return _singleStageBrokerRequestHandler.warmUp(config, deadlineMs);
+  }
+
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)

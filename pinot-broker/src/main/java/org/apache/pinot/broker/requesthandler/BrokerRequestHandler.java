@@ -47,6 +47,20 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
+  /// Warms this handler's data plane so the first real query does not pay for it, and reports whether the
+  /// handler reached its warmth floor. Called during startup after Helix convergence, before readiness is
+  /// granted. Implementations must be **best effort and bounded**: they must return by `deadlineMs` and
+  /// must never throw, because the caller gates readiness on this and a stuck warmup would stall a rolling
+  /// restart. `deadlineMs` is an absolute [System#currentTimeMillis] value; time already spent waiting for
+  /// the cluster view to converge counts against the same budget, so the rolling-restart cost stays
+  /// bounded by one number.
+  ///
+  /// @return `true` if the handler reached its warmth floor, `false` if the deadline passed first. Either
+  ///         way the caller proceeds; the result is for logging and metrics.
+  default boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return true;
+  }
+
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception;

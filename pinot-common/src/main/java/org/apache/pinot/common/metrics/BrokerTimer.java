@@ -54,6 +54,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   REALTIME_TOTAL_CPU_TIME_NS(false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS(true),
+  // Wall-clock duration of startup warmup, from the moment it begins (Helix convergence) to the moment
+  // readiness is released. Distinguishes "warmed to the floor" from "hit the budget ceiling".
+  STARTUP_WARMUP_DURATION_MS(true),
   // GRPC query execution time
   GRPC_QUERY_EXECUTION_MS(true),
   // Audit logging timers
