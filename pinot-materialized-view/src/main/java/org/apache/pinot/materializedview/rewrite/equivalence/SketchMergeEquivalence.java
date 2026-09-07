@@ -22,7 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /// Equivalence for sketch-based aggregation functions where the user query
@@ -96,4 +100,103 @@ public class SketchMergeEquivalence implements AggregationEquivalence {
     return RequestUtils.getFunctionExpression(_reAggFunctionName.toLowerCase(),
         operands.toArray(new Expression[0]));
   }
+
+  @Override
+  public boolean operandsCompatible(@Nullable List<Expression> userOperands,
+      @Nullable List<Expression> materializedViewOperands) {
+    Family family = family();
+    if (family == null) {
+      return true;
+    }
+    return effectiveNominalEntries(family, userOperands) <= effectiveNominalEntries(family, materializedViewOperands);
+  }
+
+  @Nullable
+  private Family family() {
+    if (_userFunctionName.contains("CPC")) {
+      return Family.CPC;
+    }
+    if (_userFunctionName.contains("THETA")) {
+      return Family.THETA;
+    }
+    if (_userFunctionName.contains("TUPLE")) {
+      return Family.TUPLE;
+    }
+    return null;
+  }
+
+  private static long effectiveNominalEntries(Family family, @Nullable List<Expression> operands) {
+    Literal param = literalAt(operands, 1);
+    switch (family) {
+      case CPC:
+        if (param == null) {
+          return 1L << CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+        }
+        if (param.isSetStringValue()) {
+          return nominalEntriesFromString(param.getStringValue(), 1L << CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+        }
+        return 1L << numeric(param, CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+      case THETA:
+        if (param == null) {
+          return DEFAULT_THETA_NOMINAL_ENTRIES;
+        }
+        return param.isSetStringValue()
+            ? nominalEntriesFromString(param.getStringValue(), DEFAULT_THETA_NOMINAL_ENTRIES)
+            : numeric(param, DEFAULT_THETA_NOMINAL_ENTRIES);
+      case TUPLE:
+      default:
+        long tupleDefault = 1L << CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK;
+        if (param == null) {
+          return tupleDefault;
+        }
+        return param.isSetStringValue()
+            ? nominalEntriesFromString(param.getStringValue(), tupleDefault)
+            : numeric(param, (int) tupleDefault);
+    }
+  }
+
+  @Nullable
+  private static Literal literalAt(@Nullable List<Expression> operands, int index) {
+    if (operands == null || operands.size() <= index) {
+      return null;
+    }
+    Expression op = operands.get(index);
+    return op.getType() == ExpressionType.LITERAL ? op.getLiteral() : null;
+  }
+
+  private static long nominalEntriesFromString(String params, long defaultValue) {
+    for (String pair : params.split(";")) {
+      String[] keyValue = pair.split("=", 2);
+      if (keyValue.length == 2 && keyValue[0].trim().equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+        try {
+          return Long.parseLong(keyValue[1].trim());
+        } catch (NumberFormatException e) {
+          return defaultValue;
+        }
+      }
+    }
+    return defaultValue;
+  }
+
+  private static int numeric(Literal literal, int defaultValue) {
+    if (literal.isSetIntValue()) {
+      return literal.getIntValue();
+    }
+    if (literal.isSetLongValue()) {
+      return (int) literal.getLongValue();
+    }
+    if (literal.isSetDoubleValue()) {
+      return (int) literal.getDoubleValue();
+    }
+    return defaultValue;
+  }
+
+  private enum Family {
+    CPC, THETA, TUPLE
+  }
+
+  /// The theta aggregation-function default (`ThetaUtil.DEFAULT_NOMINAL_ENTRIES`), which is what an
+  /// MV stores. This is intentionally NOT `CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES`
+  /// (16384), which is the star-tree ingestion default.
+  private static final int DEFAULT_THETA_NOMINAL_ENTRIES = 1 << 12;
 }
