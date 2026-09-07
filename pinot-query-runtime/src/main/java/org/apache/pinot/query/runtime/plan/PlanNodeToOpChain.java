@@ -398,7 +398,7 @@ public class PlanNodeToOpChain {
       MultiStageOperator child = null;
       try {
         child = visit(node.getInputs().get(0), context);
-        return new SortOperator(context, child, node);
+        return SortOperator.create(context, child, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }

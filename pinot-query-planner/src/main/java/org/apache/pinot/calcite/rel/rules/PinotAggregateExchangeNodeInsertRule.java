@@ -38,6 +38,7 @@ import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
@@ -313,8 +314,14 @@ public class PinotAggregateExchangeNodeInsertRule {
     RelDistribution distribution = RelDistributions.hash(groupSet.asList());
     RelNode exchange;
     if (withinGroupCollation != null) {
-      // Insert a LogicalSort node between exchange and aggregate whe collation exists.
-      exchange = PinotLogicalSortExchange.create(input, distribution, withinGroupCollation, false, true);
+      // Insert a Sort between the exchange and the aggregate when a collation exists. The ordered aggregate requires
+      // ordered input and does no ordering of its own, and SortOperator - not the deprecated
+      // SortedMailboxReceiveOperator - is where that work belongs, because it is the operator that knows
+      // fetch/offset. The Sort carries no fetch, so it keeps every row, matching the unbounded list the receive
+      // operator used.
+      exchange = LogicalSort.create(
+          PinotLogicalSortExchange.create(input, distribution, withinGroupCollation, false, false),
+          withinGroupCollation, null, null);
     } else {
       exchange = PinotLogicalExchange.create(input, distribution);
     }

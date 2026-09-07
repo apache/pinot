@@ -39,6 +39,19 @@ import org.slf4j.LoggerFactory;
 ///
 ///  TODO: Once sorting on the `MailboxSendOperator` is available, modify this to use a k-way merge instead of
 ///        resorting via the PriorityQueue.
+///
+/// @deprecated This operator establishes the global order by buffering every row from every mailbox and sorting once,
+/// because it has no access to the `fetch`/`offset` of the [org.apache.pinot.query.planner.plannode.SortNode] above
+/// it. Its peak memory is therefore the whole input even for a `SELECT ... ORDER BY k LIMIT 10`. It exists because
+/// sender-side sorting was unavailable when it was written (see the TODO above, unchanged since #10408), and the work
+/// belongs in [SortOperator], which knows the bound and can pick
+/// [TopNSortOperator] instead.
+///
+/// `PinotSortExchangeNodeInsertRule` no longer marks a receive as sort-on-receiver, so this class is only reached
+/// through the window and ordered-aggregate exchange rules, and through plans built by a broker that predates that
+/// change. Do not add usages. It cannot be deleted until those rules emit an explicit `SortNode` and no supported
+/// broker sets `MailboxReceiveNode.sort`.
+@Deprecated
 public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
 
