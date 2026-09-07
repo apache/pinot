@@ -44,6 +44,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -52,6 +53,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// Class that executes the keyed group by aggregations for the multistage AggregateOperator.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
+  private static final String EXPORT_SPILL_ROWS_SCOPE = "MultistageGroupByExecutor#getIntermediateResultIterator";
+  private static final String MERGE_SPILL_ROWS_SCOPE = "MultistageGroupByExecutor#processSpillBlock";
+
   private final int[] _groupKeyIds;
   private final AggregationFunction[] _aggFunctions;
   private final int[] _filterArgIds;
@@ -75,6 +79,28 @@ public class MultistageGroupByExecutor {
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
       int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
       Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+    this(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult, resultSchema,
+        opChainMetadata, nodeHint, null, null);
+  }
+
+  static MultistageGroupByExecutor forSpillInput(int[] groupKeyIds, AggregationFunction[] aggFunctions,
+      int[] filterArgIds, int maxFilterArgId, AggType aggType, DataSchema resultSchema,
+      Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, int spillThreshold) {
+    return new MultistageGroupByExecutor(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, false,
+        resultSchema, opChainMetadata, nodeHint, Integer.MAX_VALUE, spillThreshold);
+  }
+
+  static MultistageGroupByExecutor forSpillMerge(int[] groupKeyIds, AggregationFunction[] aggFunctions,
+      int[] filterArgIds, int maxFilterArgId, AggType aggType, DataSchema resultSchema,
+      Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, int maxInitialCapacity) {
+    return new MultistageGroupByExecutor(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, false,
+        resultSchema, opChainMetadata, nodeHint, null, maxInitialCapacity);
+  }
+
+  private MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
+      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
+      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint, @Nullable Integer numGroupsLimit,
+      @Nullable Integer maxInitialCapacity) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -84,8 +110,11 @@ public class MultistageGroupByExecutor {
     _resultSchema = resultSchema;
 
     int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    if (maxInitialCapacity != null) {
+      maxInitialResultHolderCapacity = Math.min(maxInitialResultHolderCapacity, maxInitialCapacity);
+    }
 
-    _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
+    _numGroupsLimit = numGroupsLimit != null ? numGroupsLimit : getNumGroupsLimit(opChainMetadata, nodeHint);
     _numGroupsWarningLimit = getNumGroupsWarningLimit(opChainMetadata);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
@@ -110,7 +139,7 @@ public class MultistageGroupByExecutor {
             _numGroupsLimit, maxInitialResultHolderCapacity);
   }
 
-  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+  static int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
@@ -184,6 +213,70 @@ public class MultistageGroupByExecutor {
     } else {
       processMerge(block);
     }
+  }
+
+  /// Returns all current groups with mergeable aggregation intermediate states.
+  Iterator<Object[]> getIntermediateResultIterator() {
+    int numGroups = _groupIdGenerator.getNumGroups();
+    if (numGroups == 0) {
+      return List.<Object[]>of().iterator();
+    }
+    int numKeys = _groupKeyIds.length;
+    int numFunctions = _aggFunctions.length;
+    Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
+        _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
+    return new Iterator<>() {
+      private int _numGroupsProcessed;
+
+      @Override
+      public boolean hasNext() {
+        return groupKeyIterator.hasNext();
+      }
+
+      @Override
+      public Object[] next() {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numGroupsProcessed++,
+            EXPORT_SPILL_ROWS_SCOPE);
+        GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
+        Object[] row = groupKey._row;
+        int groupId = groupKey._groupId;
+        for (int i = 0; i < numFunctions; i++) {
+          row[numKeys + i] = _aggregateResultHolders != null
+              ? _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId)
+              : _mergeResultHolder.get(groupId)[i];
+        }
+        return row;
+      }
+    };
+  }
+
+  /// Merges a block produced by [#getIntermediateResultIterator()]. Group keys occupy the first columns, followed by
+  /// one intermediate-state column per aggregation function.
+  void processSpillBlock(MseBlock.Data block) {
+    int[] groupByKeys = generateGroupByKeys(block);
+    int numRows = groupByKeys.length;
+    int numFunctions = _aggFunctions.length;
+    int numKeys = _groupKeyIds.length;
+    Object[][] intermediateResults = new Object[numFunctions][];
+    if (block.isRowHeap()) {
+      List<Object[]> rows = block.asRowHeap().getRows();
+      for (int functionId = 0; functionId < numFunctions; functionId++) {
+        intermediateResults[functionId] = new Object[numRows];
+        Object[] values = intermediateResults[functionId];
+        int columnId = numKeys + functionId;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, MERGE_SPILL_ROWS_SCOPE);
+          values[rowId] = rows.get(rowId)[columnId];
+        }
+      }
+    } else {
+      DataBlock dataBlock = block.asSerialized().getDataBlock();
+      for (int functionId = 0; functionId < numFunctions; functionId++) {
+        intermediateResults[functionId] =
+            DataBlockExtractUtils.extractAggResult(dataBlock, numKeys + functionId, _aggFunctions[functionId]);
+      }
+    }
+    mergeIntermediateResults(groupByKeys, intermediateResults);
   }
 
   /// Get aggregation result limited to first `maxRows` rows, ordered with `comparator`.
@@ -376,6 +469,12 @@ public class MultistageGroupByExecutor {
     for (int i = 0; i < numFunctions; i++) {
       intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
     }
+    mergeIntermediateResults(groupByKeys, intermediateResults);
+  }
+
+  private void mergeIntermediateResults(int[] groupByKeys, Object[][] intermediateResults) {
+    int numRows = groupByKeys.length;
+    int numFunctions = _aggFunctions.length;
     if (_leafReturnFinalResult) {
       for (int i = 0; i < numRows; i++) {
         int groupByKey = groupByKeys[i];

@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -61,21 +63,28 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
 
   public abstract boolean isSendStats();
 
+  /// Returns whether all broker and server versions have been successfully read and match this Pinot version.
+  public boolean isClusterVersionCompatible() {
+    return false;
+  }
+
   public abstract boolean needWatchForInstanceConfigChange();
 
   // NOTE: When this method is called, the helix manager is not yet connected.
   public static SendStatsPredicate create(PinotConfiguration serverConf, HelixManager helixManager) {
+    return getMode(serverConf).create(helixManager);
+  }
+
+  public static Mode getMode(PinotConfiguration serverConf) {
     String modeStr = serverConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE,
         CommonConstants.MultiStageQueryRunner.DEFAULT_SEND_STATS_MODE).toUpperCase(Locale.ENGLISH);
-    Mode mode;
     try {
-      mode = Mode.valueOf(modeStr.trim().toUpperCase(Locale.ENGLISH));
+      return Mode.valueOf(modeStr.trim().toUpperCase(Locale.ENGLISH));
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Invalid value " + modeStr + " for "
           + CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE, e);
     }
-    return mode.create(helixManager);
   }
 
   public enum Mode {
@@ -139,9 +148,12 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
     private final HelixManager _helixManager;
     private final String _clusterName;
     private final Map<String, String> _problematicVersionsById = new HashMap<>();
+    private final Set<String> _unknownVersionInstances = new HashSet<>();
 
     private HelixAdmin _helixAdmin;
     private volatile boolean _sendStats = true;
+    private volatile boolean _clusterVersionCompatible;
+    private boolean _initialized;
 
     public Safe(HelixManager helixManager) {
       _helixManager = helixManager;
@@ -151,6 +163,11 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
     @Override
     public boolean isSendStats() {
       return _sendStats;
+    }
+
+    @Override
+    public boolean isClusterVersionCompatible() {
+      return _clusterVersionCompatible;
     }
 
     @Override
@@ -168,8 +185,12 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         LOGGER.warn("Ignoring notification type: {} for instance config change", type);
         return;
       }
-      if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
+      boolean fullScan = type == NotificationContext.Type.INIT || context.getIsChildChange();
+      if (fullScan) {
+        _initialized = false;
+        _clusterVersionCompatible = false;
         _problematicVersionsById.clear();
+        _unknownVersionInstances.clear();
         for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
           if (needVersionCheck(instance)) {
             InstanceConfig instanceConfig;
@@ -177,6 +198,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
               instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
             } catch (Exception e) {
               LOGGER.warn("Failed to get instance config for instance: {}, continue", instance, e);
+              _unknownVersionInstances.add(instance);
               continue;
             }
             String version = getVersion(instanceConfig);
@@ -185,6 +207,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
             }
           }
         }
+        _initialized = true;
       } else {
         String pathChanged = context.getPathChanged();
         String instanceName = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
@@ -198,10 +221,12 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
             } else {
               _problematicVersionsById.remove(instanceName);
             }
+            _unknownVersionInstances.remove(instanceName);
           } catch (Exception e) {
             LOGGER.warn("Failed to get instance config for instance: {}, treating it as non-problematic", instanceName,
                 e);
             _problematicVersionsById.remove(instanceName);
+            _unknownVersionInstances.add(instanceName);
           }
         }
       }
@@ -216,6 +241,8 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
       } else if (!_sendStats) {
         LOGGER.info("Send MSE stats is still disabled (problematic versions: {})", _problematicVersionsById);
       }
+      _clusterVersionCompatible =
+          _initialized && _problematicVersionsById.isEmpty() && _unknownVersionInstances.isEmpty();
     }
 
     private boolean needVersionCheck(String instanceName) {

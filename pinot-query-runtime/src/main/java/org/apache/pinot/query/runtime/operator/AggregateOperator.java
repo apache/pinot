@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.DataBlockValSet;
@@ -52,6 +54,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.RoaringBitmap;
@@ -71,6 +74,13 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
   private final AggregationFunction<?, ?>[] _aggFunctions;
+  private final int[] _groupKeyIds;
+  private final int[] _filterArgIds;
+  private final int _maxFilterArgId;
+  private final AggregateNode.AggType _aggType;
+  private final boolean _leafReturnFinalResult;
+  private final Map<String, String> _opChainMetadata;
+  private final PlanNode.NodeHint _nodeHint;
   @Nullable
   private MultistageAggregationExecutor _aggregationExecutor;
   @Nullable
@@ -78,9 +88,19 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Nullable
   private MseBlock.Eos _eosBlock;
+  private boolean _inputConsumed;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private final boolean _errorOnNumGroupsLimit;
+  private final int _numGroupsLimit;
+  private final int _spillThreshold;
+  private final int _spillPartitions;
+  @Nullable
+  private AggregationSpillManager _spillManager;
+  @Nullable
+  private Path _spillDirectory;
+  private int _nextSpillPartition;
+  private int _numSpilledGroupsProduced;
 
   // trimming - related members
   private final int _groupTrimSize;
@@ -97,17 +117,23 @@ public class AggregateOperator extends MultiStageOperator {
 
     // Process the filter argument indices
     List<Integer> filterArgs = node.getFilterArgs();
-    int[] filterArgIds = new int[numFunctions];
+    _filterArgIds = new int[numFunctions];
     int maxFilterArgId = -1;
     for (int i = 0; i < numFunctions; i++) {
-      filterArgIds[i] = filterArgs.get(i);
-      maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
+      _filterArgIds[i] = filterArgs.get(i);
+      maxFilterArgId = Math.max(maxFilterArgId, _filterArgIds[i]);
     }
+    _maxFilterArgId = maxFilterArgId;
 
     /// Grouping-set aggregates never reach this operator directly: PlanNodeToOpChain pre-wraps the input in a
     /// RepeatOperator and rewrites the node into the equivalent plain GROUP BY over the expanded input.
     List<Integer> groupKeys = node.getGroupKeys();
+    _groupKeyIds = getGroupKeyIds(groupKeys);
     _input = input;
+    _aggType = node.getAggType();
+    _leafReturnFinalResult = node.isLeafReturnFinalResult();
+    _opChainMetadata = context.getOpChainMetadata();
+    _nodeHint = node.getNodeHint();
 
     int groupTrimSize = Integer.MAX_VALUE;
     Comparator<Object[]> comparator = null;
@@ -131,21 +157,56 @@ public class AggregateOperator extends MultiStageOperator {
     _comparator = comparator;
 
     _errorOnNumGroupsLimit = getErrorOnNumGroupsLimit(node.getNodeHint(), context.getOpChainMetadata());
+    _numGroupsLimit = MultistageGroupByExecutor.getNumGroupsLimit(_opChainMetadata, _nodeHint);
+    int spillThreshold = 0;
+    int spillPartitions = Server.DEFAULT_MSE_AGGREGATION_SPILL_PARTITIONS;
+    boolean spillEligible = !groupKeys.isEmpty() && !_leafReturnFinalResult
+        && groupTrimSize == Integer.MAX_VALUE && QueryOptionsUtils.isMSEAggregationSpillEnabled(_opChainMetadata);
+    if (spillEligible) {
+      Integer configuredSpillThreshold = QueryOptionsUtils.getMSEAggregationSpillThreshold(_opChainMetadata);
+      if (configuredSpillThreshold != null) {
+        spillThreshold = configuredSpillThreshold;
+        Integer configuredSpillPartitions = QueryOptionsUtils.getMSEAggregationSpillPartitions(_opChainMetadata);
+        if (configuredSpillPartitions != null) {
+          spillPartitions = configuredSpillPartitions;
+        }
+      }
+    }
+    _spillThreshold = spillThreshold;
+    _spillPartitions = spillPartitions;
 
     // Initialize the appropriate executor.
-    AggregateNode.AggType aggType = node.getAggType();
     // TODO: Allow leaf return final result for non-group-by queries
-    boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     if (groupKeys.isEmpty()) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
+          new MultistageAggregationExecutor(_aggFunctions, _filterArgIds, _maxFilterArgId, _aggType, _resultSchema);
       _groupByExecutor = null;
     } else {
-      _groupByExecutor =
-          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+      _groupByExecutor = newInputGroupByExecutor();
       _aggregationExecutor = null;
     }
+  }
+
+  private MultistageGroupByExecutor newInputGroupByExecutor() {
+    if (_spillThreshold > 0) {
+      return MultistageGroupByExecutor.forSpillInput(_groupKeyIds, _aggFunctions, _filterArgIds, _maxFilterArgId,
+          _aggType, _resultSchema, _opChainMetadata, _nodeHint, _spillThreshold);
+    }
+    return new MultistageGroupByExecutor(_groupKeyIds, _aggFunctions, _filterArgIds, _maxFilterArgId, _aggType,
+        _leafReturnFinalResult, _resultSchema, _opChainMetadata, _nodeHint);
+  }
+
+  private MultistageGroupByExecutor newSpillMergeGroupByExecutor() {
+    AggregateNode.AggType mergeAggType =
+        _aggType.isOutputIntermediateFormat() ? AggregateNode.AggType.INTERMEDIATE : AggregateNode.AggType.FINAL;
+    int[] spillGroupKeyIds = new int[_groupKeyIds.length];
+    for (int i = 0; i < spillGroupKeyIds.length; i++) {
+      spillGroupKeyIds[i] = i;
+    }
+    int expectedPartitionGroups =
+        (int) Math.max(1L, ((long) _spillThreshold + _spillPartitions - 1) / _spillPartitions);
+    return MultistageGroupByExecutor.forSpillMerge(spillGroupKeyIds, _aggFunctions, _filterArgIds, _maxFilterArgId,
+        mergeAggType, _resultSchema, _opChainMetadata, _nodeHint, expectedPartitionGroups);
   }
 
   private static int getMinGroupTrimSize(PlanNode.NodeHint nodeHint, Map<String, String> opChainMetadata) {
@@ -197,20 +258,53 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected MseBlock getNextBlock() {
-    if (_eosBlock != null) {
-      return _eosBlock;
+  protected MseBlock getNextBlock()
+      throws Exception {
+    try {
+      return getNextBlockInternal();
+    } catch (Exception e) {
+      try {
+        closeSpillManager();
+      } catch (Exception cleanupException) {
+        e.addSuppressed(cleanupException);
+      }
+      throw e;
     }
-    MseBlock.Eos finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
-    _eosBlock = finalBlock;
+  }
 
-    if (finalBlock.isError()) {
-      return finalBlock;
+  private MseBlock getNextBlockInternal() {
+    if (!_inputConsumed) {
+      _eosBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+      _inputConsumed = true;
+      if (_eosBlock.isError()) {
+        try {
+          closeSpillManager();
+        } catch (Exception e) {
+          LOGGER.warn("Failed to clean up aggregation spill after upstream error", e);
+        }
+        return _eosBlock;
+      }
+      if (_spillManager == null) {
+        MseBlock block = produceAggregatedBlock();
+        _aggregationExecutor = null;
+        _groupByExecutor = null;
+        return block;
+      }
+      spillCurrentGroups();
+      _groupByExecutor = null;
     }
-    MseBlock mseBlock = produceAggregatedBlock();
-    _aggregationExecutor = null;
-    _groupByExecutor = null;
-    return mseBlock;
+
+    if (_spillManager != null) {
+      while (_nextSpillPartition < _spillManager.getNumPartitions()) {
+        MseBlock.Data block = restoreSpillPartition(_nextSpillPartition++);
+        if (block != null) {
+          return block;
+        }
+      }
+      closeSpillManagerQuietly("end of stream");
+    }
+    assert _eosBlock != null;
+    return _eosBlock;
   }
 
   private MseBlock produceAggregatedBlock() {
@@ -219,14 +313,17 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       assert _groupByExecutor != null;
       List<Object[]> rows;
+      int maxRows = _spillThreshold > 0 ? Math.min(_groupTrimSize, _numGroupsLimit) : _groupTrimSize;
       if (_comparator != null) {
-        rows = _groupByExecutor.getResult(_comparator, _groupTrimSize);
+        rows = _groupByExecutor.getResult(_comparator, maxRows);
       } else {
-        rows = _groupByExecutor.getResult(_groupTrimSize);
+        rows = _groupByExecutor.getResult(maxRows);
       }
 
       // Record stat before we check for limit so we can propagate to query response
-      _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
+      int numGroups = _spillThreshold > 0
+          ? Math.min(_groupByExecutor.getNumGroups(), _numGroupsLimit) : _groupByExecutor.getNumGroups();
+      _statMap.merge(StatKey.NUM_GROUPS, numGroups);
 
       if (rows.isEmpty()) {
         return _eosBlock;
@@ -236,7 +333,9 @@ public class AggregateOperator extends MultiStageOperator {
           _statMap.merge(StatKey.GROUPS_TRIMMED, true);
         }
 
-        if (_groupByExecutor.isNumGroupsLimitReached()) {
+        boolean numGroupsLimitReached = _spillThreshold > 0
+            ? _groupByExecutor.getNumGroups() >= _numGroupsLimit : _groupByExecutor.isNumGroupsLimitReached();
+        if (numGroupsLimitReached) {
           if (_errorOnNumGroupsLimit) {
             throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
                 "NUM_GROUPS_LIMIT has been reached at: " + _operatorId);
@@ -245,9 +344,9 @@ public class AggregateOperator extends MultiStageOperator {
             _input.earlyTerminate();
           }
         }
-        if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
+        if (numGroups >= _groupByExecutor.getNumGroupsWarningLimit()) {
           LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
-              _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
+              _groupByExecutor.getNumGroupsWarningLimit(), numGroups);
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
         }
         return dataBlock;
@@ -268,10 +367,85 @@ public class AggregateOperator extends MultiStageOperator {
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _groupByExecutor.processBlock((MseBlock.Data) block);
+      if (_spillThreshold > 0 && _groupByExecutor.getNumGroups() >= _spillThreshold) {
+        spillCurrentGroups();
+      }
       checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
     return (MseBlock.Eos) block;
+  }
+
+  private void spillCurrentGroups() {
+    assert _groupByExecutor != null;
+    if (_groupByExecutor.getNumGroups() == 0) {
+      return;
+    }
+    if (_spillManager == null) {
+      _spillManager =
+          new AggregationSpillManager(_spillPartitions, _groupKeyIds.length, getSpillSchema(), _aggFunctions);
+      _spillDirectory = _spillManager.getSpillDirectory();
+    }
+    AggregationSpillManager.SpillResult spillResult =
+        _spillManager.spill(_groupByExecutor.getIntermediateResultIterator());
+    _statMap.merge(StatKey.SPILL_COUNT, 1L);
+    _statMap.merge(StatKey.SPILLED_ROWS, spillResult.getRows());
+    _statMap.merge(StatKey.SPILLED_BYTES, spillResult.getBytes());
+    _groupByExecutor = newInputGroupByExecutor();
+  }
+
+  private DataSchema getSpillSchema() {
+    String[] columnNames = _resultSchema.getColumnNames().clone();
+    ColumnDataType[] columnDataTypes = _resultSchema.getColumnDataTypes().clone();
+    int numKeys = _groupKeyIds.length;
+    for (int i = 0; i < _aggFunctions.length; i++) {
+      columnDataTypes[numKeys + i] = _aggFunctions[i].getType() == AggregationFunctionType.ANYVALUE
+          ? ColumnDataType.OBJECT : _aggFunctions[i].getIntermediateResultColumnType();
+    }
+    return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  @Nullable
+  private MseBlock.Data restoreSpillPartition(int partitionId) {
+    assert _spillManager != null;
+    if (!_spillManager.hasPartition(partitionId)) {
+      return null;
+    }
+    MultistageGroupByExecutor executor = newSpillMergeGroupByExecutor();
+    _spillManager.consumePartition(partitionId, block -> {
+      executor.processSpillBlock(block);
+      if (executor.getNumGroups() > _spillThreshold) {
+        throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+            "Aggregation spill partition exceeds the configured threshold at: " + _operatorId
+                + ". Increase mseAggregationSpillThreshold or mseAggregationSpillPartitions");
+      }
+    });
+    int numGroups = executor.getNumGroups();
+    if (numGroups == 0) {
+      return null;
+    }
+
+    int numGroupsLimit = executor.getNumGroupsLimit();
+    int remainingGroups = numGroupsLimit - _numSpilledGroupsProduced;
+    List<Object[]> rows = remainingGroups > 0 ? executor.getResult(remainingGroups) : List.of();
+    _numSpilledGroupsProduced += rows.size();
+    _statMap.merge(StatKey.NUM_GROUPS, _numSpilledGroupsProduced);
+
+    if (_numSpilledGroupsProduced >= numGroupsLimit) {
+      if (_errorOnNumGroupsLimit) {
+        throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+            "NUM_GROUPS_LIMIT has been reached at: " + _operatorId);
+      }
+      _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
+      _input.earlyTerminate();
+      _nextSpillPartition = _spillManager.getNumPartitions();
+    }
+    if (_numSpilledGroupsProduced >= executor.getNumGroupsWarningLimit()) {
+      LOGGER.warn("numGroups reached warning limit: {} (actual: {})", executor.getNumGroupsWarningLimit(),
+          _numSpilledGroupsProduced);
+      _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
+    }
+    return rows.isEmpty() ? null : new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
   }
 
   /// Consumes the input blocks as an aggregation
@@ -477,7 +651,10 @@ public class AggregateOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    SPILL_COUNT(StatMap.Type.LONG),
+    SPILLED_ROWS(StatMap.Type.LONG),
+    SPILLED_BYTES(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
@@ -494,5 +671,44 @@ public class AggregateOperator extends MultiStageOperator {
   @VisibleForTesting
   int getGroupTrimSize() {
     return _groupTrimSize;
+  }
+
+  @VisibleForTesting
+  @Nullable
+  Path getSpillDirectory() {
+    return _spillDirectory;
+  }
+
+  private void closeSpillManager() {
+    if (_spillManager != null) {
+      _spillManager.close();
+      _spillManager = null;
+    }
+  }
+
+  private void closeSpillManagerQuietly(String action) {
+    try {
+      closeSpillManager();
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to clean up aggregation spill during {}", action, e);
+    }
+  }
+
+  @Override
+  protected void earlyTerminate() {
+    closeSpillManagerQuietly("early termination");
+    super.earlyTerminate();
+  }
+
+  @Override
+  public void close() {
+    closeSpillManagerQuietly("close");
+    super.close();
+  }
+
+  @Override
+  public void cancel(Throwable e) {
+    closeSpillManagerQuietly("cancellation");
+    super.cancel(e);
   }
 }

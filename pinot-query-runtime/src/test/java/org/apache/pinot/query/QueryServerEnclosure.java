@@ -61,7 +61,7 @@ public class QueryServerEnclosure {
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
     _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager.getInstanceId(), instanceDataManager,
-        null, () -> true, () -> true);
+        null, () -> true, () -> true, () -> true);
   }
 
   public int getPort() {

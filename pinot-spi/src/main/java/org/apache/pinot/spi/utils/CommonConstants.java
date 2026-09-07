@@ -808,6 +808,20 @@ public class CommonConstants {
         /// Flush threshold for streaming group-by on MSE leaf stages.
         public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
 
+        /// Maximum number of groups retained by a keyed MSE aggregation executor before its intermediate states are
+        /// spilled to local disk. This option is honored only when the server-level aggregation spill gate is enabled.
+        /// An absent value disables spilling. The first spill version does not apply to global aggregation,
+        /// leaf-final-result, or group-trim modes.
+        public static final String MSE_AGGREGATION_SPILL_THRESHOLD = "mseAggregationSpillThreshold";
+
+        /// Number of hash partitions used by MSE aggregation spilling. Must be between 1 and
+        /// [Server#MAX_MSE_AGGREGATION_SPILL_PARTITIONS].
+        public static final String MSE_AGGREGATION_SPILL_PARTITIONS = "mseAggregationSpillPartitions";
+
+        /// Internal metadata populated from the server-level MSE aggregation spill gate. Query-supplied values are
+        /// overwritten by the server.
+        public static final String MSE_AGGREGATION_SPILL_ENABLED = "mseAggregationSpillEnabled";
+
         /// Flush threshold for streaming distinct on MSE leaf stages. When positive, the leaf flushes its
         /// accumulated distinct values downstream once they reach this count and starts a fresh table, bounding
         /// server memory and pushing the residual de-duplication into the partitioned intermediate stage.
@@ -1492,6 +1506,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
+    // Spill adds AggregateOperator stat keys that older nodes cannot deserialize. QueryRunner requires SAFE stats
+    // mode and a homogeneous cluster before enabling spill.
+    public static final String CONFIG_OF_MSE_AGGREGATION_SPILL_ENABLED =
+        MSE_CONFIG_PREFIX + ".aggregation.spill.enabled";
+    public static final boolean DEFAULT_MSE_AGGREGATION_SPILL_ENABLED = false;
+    public static final int DEFAULT_MSE_AGGREGATION_SPILL_PARTITIONS = 8;
+    public static final int MAX_MSE_AGGREGATION_SPILL_PARTITIONS = 64;
 
     // TODO: Merge this with "mse"
     /// The ExecutorServiceProvider to use for execution threads, which are the ones that execute

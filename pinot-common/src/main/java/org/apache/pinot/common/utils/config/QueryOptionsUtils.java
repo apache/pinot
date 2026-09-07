@@ -550,6 +550,29 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMSEAggregationSpillThreshold(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, value);
+  }
+
+  public static boolean isMSEAggregationSpillEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED));
+  }
+
+  @Nullable
+  public static Integer getMSEAggregationSpillPartitions(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS);
+    Integer partitions = uncheckedParseInt(QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, value);
+    if (partitions != null
+        && (partitions < 1 || partitions > CommonConstants.Server.MAX_MSE_AGGREGATION_SPILL_PARTITIONS)) {
+      throw new IllegalArgumentException(
+          QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS + " must be a number between 1 and "
+              + CommonConstants.Server.MAX_MSE_AGGREGATION_SPILL_PARTITIONS + ", got: " + value);
+    }
+    return partitions;
+  }
+
+  @Nullable
   public static Integer getStreamingDistinctFlushThreshold(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD);
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);

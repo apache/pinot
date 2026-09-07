@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -38,7 +39,7 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, MSE_AGGREGATION_SPILL_THRESHOLD);
   private static final List<String> NON_NEGATIVE_INT_KEYS =
       List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
@@ -208,6 +209,35 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void testMSEAggregationSpillPartitions() {
+    int maxPartitions = CommonConstants.Server.MAX_MSE_AGGREGATION_SPILL_PARTITIONS;
+    assertNull(QueryOptionsUtils.getMSEAggregationSpillPartitions(Map.of()));
+    assertEquals(QueryOptionsUtils.getMSEAggregationSpillPartitions(
+        Map.of(MSE_AGGREGATION_SPILL_PARTITIONS, "1")), Integer.valueOf(1));
+    assertEquals(QueryOptionsUtils.getMSEAggregationSpillPartitions(
+        Map.of(MSE_AGGREGATION_SPILL_PARTITIONS, Integer.toString(maxPartitions))), Integer.valueOf(maxPartitions));
+
+    for (String value : new String[]{"0", Integer.toString(maxPartitions + 1), Integer.toString(Integer.MAX_VALUE)}) {
+      try {
+        QueryOptionsUtils.getMSEAggregationSpillPartitions(Map.of(MSE_AGGREGATION_SPILL_PARTITIONS, value));
+        fail();
+      } catch (IllegalArgumentException e) {
+        assertEquals(e.getMessage(),
+            MSE_AGGREGATION_SPILL_PARTITIONS + " must be a number between 1 and " + maxPartitions + ", got: " + value);
+      }
+    }
+  }
+
+  @Test
+  public void testMSEAggregationSpillEnabled() {
+    assertFalse(QueryOptionsUtils.isMSEAggregationSpillEnabled(Map.of()));
+    assertFalse(QueryOptionsUtils.isMSEAggregationSpillEnabled(
+        Map.of(MSE_AGGREGATION_SPILL_ENABLED, "false")));
+    assertTrue(QueryOptionsUtils.isMSEAggregationSpillEnabled(
+        Map.of(MSE_AGGREGATION_SPILL_ENABLED, "true")));
+  }
+
+  @Test
   public void testGetQueryHashWithValue() {
     Map<String, String> queryOptions = Map.of(QUERY_HASH, "abc123def456");
     String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
@@ -334,6 +364,10 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
+      case MSE_AGGREGATION_SPILL_THRESHOLD:
+        return QueryOptionsUtils.getMSEAggregationSpillThreshold(map);
+      case MSE_AGGREGATION_SPILL_PARTITIONS:
+        return QueryOptionsUtils.getMSEAggregationSpillPartitions(map);
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);

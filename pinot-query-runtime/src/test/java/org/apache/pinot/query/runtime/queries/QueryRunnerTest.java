@@ -35,6 +35,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
+import org.apache.pinot.query.runtime.SendStatsPredicate.Mode;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -46,6 +47,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
@@ -97,7 +99,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   protected Map<String, Object> getConfiguration() {
-    return Map.of();
+    return Map.of(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_ENABLED, true,
+        MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE, Mode.SAFE.name());
   }
 
   @BeforeClass
@@ -185,6 +188,28 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     int checked = assertSelfStatsAreNotNegative(statsTree);
     Assert.assertTrue(checked > 0, "expected some self stats to check, got: " + statsTree);
+  }
+
+  @Test
+  public void testMSEAggregationSpill() {
+    String query = "SELECT col1, SUM(col3), AVG(col3) FROM a GROUP BY col1 ORDER BY col1";
+    ResultTable expected = queryRunner(query, false).getResultTable();
+    String spillQuery =
+        "SET mseAggregationSpillThreshold = 2; SET mseAggregationSpillPartitions = 8; " + query;
+    QueryDispatcher.QueryResult queryResult = queryRunner(spillQuery, true);
+    ResultTable actual = queryResult.getResultTable();
+
+    Assertions.assertThat(actual.getDataSchema()).isEqualTo(expected.getDataSchema());
+    Assertions.assertThat(actual.getRows()).containsExactlyElementsOf(expected.getRows());
+
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(spillQuery).getQueryPlan().getQueryStageMap();
+    ObjectNode statsTree =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+    ObjectNode spillStats = findFieldOwner(statsTree, "spillCount");
+    Assertions.assertThat(spillStats).isNotNull();
+    Assertions.assertThat(spillStats.path("spillCount").asLong()).isPositive();
+    Assertions.assertThat(spillStats.path("spilledRows").asLong()).isPositive();
+    Assertions.assertThat(spillStats.path("spilledBytes").asLong()).isPositive();
   }
 
   /// Asserts that no self stat in the tree is negative, and returns how many were checked.
