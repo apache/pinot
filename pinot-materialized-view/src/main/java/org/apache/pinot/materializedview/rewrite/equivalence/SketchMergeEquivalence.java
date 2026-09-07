@@ -108,7 +108,18 @@ public class SketchMergeEquivalence implements AggregationEquivalence {
     if (family == null) {
       return true;
     }
+    if (family == Family.THETA
+        && (!isThetaSimpleUnion(userOperands) || !isThetaSimpleUnion(materializedViewOperands))) {
+      return false;
+    }
     return effectiveNominalEntries(family, userOperands) <= effectiveNominalEntries(family, materializedViewOperands);
+  }
+
+  /// A theta sketch query with filter predicates and a post-aggregation (set) expression cannot be
+  /// served by a collapsed MV sketch. This mirrors the aggregation function's own threshold, which
+  /// treats fewer than 4 arguments (column, params, filter(s), post-aggregation) as a simple union.
+  private static boolean isThetaSimpleUnion(@Nullable List<Expression> operands) {
+    return operands == null || operands.size() < THETA_POST_AGGREGATION_MIN_ARGUMENTS;
   }
 
   @Nullable
@@ -199,4 +210,6 @@ public class SketchMergeEquivalence implements AggregationEquivalence {
   /// MV stores. This is intentionally NOT `CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES`
   /// (16384), which is the star-tree ingestion default.
   private static final int DEFAULT_THETA_NOMINAL_ENTRIES = 1 << 12;
+
+  private static final int THETA_POST_AGGREGATION_MIN_ARGUMENTS = 4;
 }

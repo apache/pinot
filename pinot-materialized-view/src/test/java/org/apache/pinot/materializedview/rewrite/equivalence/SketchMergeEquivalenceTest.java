@@ -134,6 +134,21 @@ public class SketchMergeEquivalenceTest {
     assertTrue(tuple.operandsCompatible(ops(id("c"), lit("nominalEntries=16384")), ops(id("c"))));
   }
 
+  /// A theta query with filter predicates and a post-aggregation set expression (4+ operands)
+  /// cannot be reconstructed from a collapsed MV sketch, so the rewrite must be rejected on either
+  /// side; the simple-union shape is still served.
+  @Test
+  public void testThetaFilteredOrPostAggregationFormIsRejected() {
+    AggregationEquivalence resultTheta = rule("DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTRAWTHETASKETCH");
+    AggregationEquivalence rawTheta = rule("DISTINCTCOUNTRAWTHETASKETCH", "DISTINCTCOUNTRAWTHETASKETCH");
+    List<Expression> filtered = ops(id("c"), lit("nominalEntries=4096"), lit("c = 'x'"), lit("SET_DIFF($1,$2)"));
+    List<Expression> simple = ops(id("c"), lit("nominalEntries=4096"));
+    assertFalse(resultTheta.operandsCompatible(filtered, simple), "filtered query must not be served");
+    assertFalse(rawTheta.operandsCompatible(filtered, simple), "filtered raw query must not be served");
+    assertFalse(rawTheta.operandsCompatible(simple, filtered), "filtered MV must not serve a simple query");
+    assertTrue(rawTheta.operandsCompatible(simple, simple), "simple-union shape is still served");
+  }
+
   /// HLL is not precision-gated (its default log2m is not modeled here); behavior is unchanged.
   @Test
   public void testHllIsNotGated() {
