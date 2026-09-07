@@ -49,6 +49,9 @@ public class DispatchablePlanFragment {
   // used for passing custom properties to build StageMetadata on the server.
   private final Map<String, String> _customProperties;
 
+  // Broker-only classification — not shipped to servers.
+  private FragmentType _fragmentType;
+
   public DispatchablePlanFragment(PlanFragment planFragment) {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
   }
@@ -131,5 +134,13 @@ public class DispatchablePlanFragment {
 
   public Set<QueryServerInstance> getServerInstances() {
     return _serverInstanceToWorkerIdMap.keySet();
+  }
+
+  public FragmentType getFragmentType() {
+    return _fragmentType;
+  }
+
+  public void setFragmentType(FragmentType fragmentType) {
+    _fragmentType = fragmentType;
   }
 }
