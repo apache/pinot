@@ -63,7 +63,7 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
   public void testModeExpressions(String original, String rewritten) {
     for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
       String prefix =
-          "SET autoRewriteAggregationType=true; SET enableNullHandling=" + nullHandlingEnabled + "; SELECT ";
+          "SET enableTypedMode=true; SET enableNullHandling=" + nullHandlingEnabled + "; SELECT ";
       TestHelper.assertEqualsQuery(prefix + original + " AS commonValue FROM testTable",
           prefix + rewritten + " AS commonValue FROM testTable", SCHEMA);
     }
@@ -72,11 +72,11 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
   @Test
   public void testModeInHavingAndOrderBy() {
     TestHelper.assertEqualsQuery(
-        "SET autoRewriteAggregationType=true; "
+        "SET enableTypedMode=true; "
             + "SELECT intCol, MODE(stringCol) AS commonValue FROM testTable GROUP BY intCol "
             + "HAVING MODE(CASE WHEN stringCol = '' THEN NULL ELSE stringCol END) = 'value' "
             + "ORDER BY MODE(timestampCol) DESC",
-        "SET autoRewriteAggregationType=true; "
+        "SET enableTypedMode=true; "
             + "SELECT intCol, modeString(stringCol) AS commonValue FROM testTable GROUP BY intCol "
             + "HAVING modeString(CASE WHEN stringCol = '' THEN NULL ELSE stringCol END) = 'value' "
             + "ORDER BY modeTimestamp(timestampCol) DESC", SCHEMA);
@@ -84,27 +84,39 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
 
   @Test
   public void testNumericModeAndOptInRewritesRemainUnchanged() {
-    assertUnchanged("SELECT MODE(intCol), MODE(longCol), MODE(floatCol), MODE(doubleCol), "
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(intCol), MODE(longCol), MODE(floatCol), MODE(doubleCol), "
         + "MODE(CAST(stringCol AS LONG)), MODE(fromDateTime(stringCol, 'yyyy-MM-dd HH:mm:ss')), "
         + "MIN(stringCol), MAX(longCol), SUM(intCol) FROM testTable", SCHEMA);
-    assertUnchanged("SET autoRewriteAggregationType=false; SELECT MODE(stringCol), MODE(timestampCol) FROM testTable",
+    assertUnchanged("SET enableTypedMode=false; SELECT MODE(stringCol), MODE(timestampCol) FROM testTable",
         SCHEMA);
     assertUnchanged("SELECT MODE(stringCol), MODE(timestampCol) FROM testTable", SCHEMA);
   }
 
   @Test
-  public void testServerDependentModeDoesNotInitializeOnBroker() {
+  public void testExistingRewriteOptionPreservesLegacyMode() {
     assertUnchanged("SET autoRewriteAggregationType=true; "
+        + "SELECT MODE(timestampCol), MODE(timestampCol, 'AVG'), MODE(stringCol) FROM testTable", SCHEMA);
+    assertUnchanged("SET autoRewriteAggregationType=true; SET enableTypedMode=false; "
+        + "SELECT MODE(timestampCol), MODE(timestampCol, 'AVG'), MODE(stringCol) FROM testTable", SCHEMA);
+    TestHelper.assertEqualsQuery("SET autoRewriteAggregationType=true; SET enableTypedMode=true; "
+            + "SELECT MODE(timestampCol), MODE(stringCol), MIN(stringCol) FROM testTable",
+        "SET autoRewriteAggregationType=true; SET enableTypedMode=true; "
+            + "SELECT MODETIMESTAMP(timestampCol), MODESTRING(stringCol), MINSTRING(stringCol) FROM testTable", SCHEMA);
+  }
+
+  @Test
+  public void testServerDependentModeDoesNotInitializeOnBroker() {
+    assertUnchanged("SET enableTypedMode=true; "
         + "SELECT MODE(LOOKUP('baseballTeams', 'teamInteger', 'teamID', stringCol)) FROM testTable", SCHEMA);
   }
 
   @Test
   public void testMissingSchemaAndColumns() {
-    assertUnchanged("SET autoRewriteAggregationType=true; SELECT MODE(stringCol) FROM testTable", null);
-    assertUnchanged("SET autoRewriteAggregationType=true; SELECT MODE(unknownCol) FROM testTable", SCHEMA);
-    assertUnchanged("SET autoRewriteAggregationType=true; SELECT MODE(CONCAT(unknownCol, 'suffix')) FROM testTable",
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(stringCol) FROM testTable", null);
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(unknownCol) FROM testTable", SCHEMA);
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(CONCAT(unknownCol, 'suffix')) FROM testTable",
         SCHEMA);
-    assertUnchanged("SET autoRewriteAggregationType=true; SELECT MODE(mvStringCol) FROM testTable", SCHEMA);
+    assertUnchanged("SET enableTypedMode=true; SELECT MODE(mvStringCol) FROM testTable", SCHEMA);
   }
 
   private static void assertUnchanged(String sql, Schema schema) {

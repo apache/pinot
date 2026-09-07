@@ -38,7 +38,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
-/// When `autoRewriteAggregationType` is enabled, resolves string and timestamp MODE expressions to implementations
+/// When `enableTypedMode` is enabled, resolves string and timestamp MODE expressions to implementations
 /// with fixed result types before execution.
 /// This also supplies the broker with the correct result type when no rows match or groups are trimmed before
 /// finalization. Type inference reads schema and function metadata only: server-dependent transforms such as LOOKUP
@@ -48,7 +48,7 @@ public class ModeAggregationFunctionRewriteOptimizer implements StatementOptimiz
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
     // Keep existing timestamp MODE requests compatible with older servers during rolling upgrades.
     if (schema == null || pinotQuery.getQueryOptions() == null
-        || !Boolean.parseBoolean(pinotQuery.getQueryOptions().get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
+        || !Boolean.parseBoolean(pinotQuery.getQueryOptions().get(QueryOptionKey.ENABLE_TYPED_MODE))) {
       return;
     }
     rewriteExpressions(pinotQuery.getSelectList(), schema);

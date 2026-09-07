@@ -1044,6 +1044,10 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+
+        /// Opts into string and TIMESTAMP MODE implementations after all query components have been upgraded.
+        /// Kept separate from existing aggregate rewrites to preserve timestamp MODE semantics during rolling upgrades.
+        public static final String ENABLE_TYPED_MODE = "enableTypedMode";
         // When enabled, allows multi cluster/federated queries to be executed.
         public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";
 
@@ -1116,6 +1120,7 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
+      public static final String TYPED_MODE_REWRITE = "TypedModeRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
       public static final String PROJECT_MERGE = "ProjectMerge";
@@ -1162,6 +1167,7 @@ public class CommonConstants {
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
         PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+        PlannerRuleNames.TYPED_MODE_REWRITE,
         // Stock Calcite rule kept opt-in via usePlannerRules — see SORT_PROJECT_TRANSPOSE javadoc
         // above for the rationale (firing in BASIC_RULES disrupts ProjectToSemiJoinRule on
         // partition-hinted IN(SELECT) queries, breaking colocated broadcast semi-joins).

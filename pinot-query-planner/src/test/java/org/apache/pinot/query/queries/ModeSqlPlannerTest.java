@@ -20,15 +20,20 @@ package org.apache.pinot.query.queries;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -47,7 +52,7 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test
   public void testModeReturnTypes() {
     RelDataType rowType = _queryEnvironment.compile(
-        "SET autoRewriteAggregationType=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3), MODE(col7), "
+        "SET enableTypedMode=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3), MODE(col7), "
             + "MODE(CAST(col3 AS FLOAT)), MODE(CAST(col3 AS DOUBLE)), "
             + "MODE(NULLIF(JSONEXTRACTSCALAR(col1, '$.user', 'STRING', ''), '')), "
             + "fromTimestamp(MODE(ts_timestamp)) FROM a")
@@ -62,7 +67,7 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test
   public void testFilteredModeNullability() {
     RelDataType rowType = _queryEnvironment.compile(
-        "SET autoRewriteAggregationType=true; "
+        "SET enableTypedMode=true; "
             + "SELECT col2, MODE(col1) FILTER (WHERE col3 > 0), MODE(ts_timestamp) FILTER (WHERE col3 > 0) "
             + "FROM a GROUP BY col2").getRelRoot().validatedRowType;
     assertTrue(rowType.getFieldList().get(1).getType().isNullable());
@@ -72,7 +77,7 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "physicalOptimizers")
   public void testDistributedModeTypes(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET autoRewriteAggregationType=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
+        + "SET enableTypedMode=true; SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
     PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
     assertEquals(root.getDataSchema().getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE});
@@ -102,7 +107,7 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "physicalOptimizers")
   public void testModeExpressionsAndTieBreakers(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SET autoRewriteAggregationType=true; "
+        + "SET enableTypedMode=true; "
         + "SELECT col2, MODE(NULLIF(col1, ''), 'MIN'), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG') "
         + "FROM a GROUP BY col2");
     PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
@@ -112,6 +117,79 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     for (AggregateNode aggregate : findAggregates(plan)) {
       assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
           List.of("MODESTRING", "MODETIMESTAMP", "MODE"));
+    }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testModeRewriteRequiresItsOwnOptIn(boolean usePhysicalOptimizer) {
+    for (String options : List.of("", "SET autoRewriteAggregationType=true; ",
+        "SET autoRewriteAggregationType=true; SET enableTypedMode=false; ")) {
+      DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
+          + options + "SELECT MODE(ts_timestamp), MODE(col3) FROM a");
+      List<AggregateNode> aggregates = findAggregates(plan);
+      assertFalse(aggregates.isEmpty());
+      for (AggregateNode aggregate : aggregates) {
+        assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
+            List.of("MODE", "MODE"), options);
+      }
+    }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testTypedModeDoesNotEnableOtherAggregateRewrites(boolean usePhysicalOptimizer) {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
+        + "SET autoRewriteAggregationType=false; SET enableTypedMode=true; "
+        + "SELECT MODE(col1), MODE(ts_timestamp), MODE(col3), MIN(col7), MAX(col7), SUM(col7) FROM a");
+    List<AggregateNode> aggregates = findAggregates(plan);
+    assertFalse(aggregates.isEmpty());
+    for (AggregateNode aggregate : aggregates) {
+      List<String> functionNames =
+          aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList();
+      assertEquals(functionNames.subList(0, 5), List.of("MODESTRING", "MODETIMESTAMP", "MODE", "MIN", "MAX"));
+      assertFalse(functionNames.contains("SUMLONG"));
+      assertFalse(functionNames.contains("SUMINT"));
+    }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testTypedModeOptInSurvivesCustomizedPlannerDefaults(boolean usePhysicalOptimizer) {
+    for (Set<String> disabledRules : List.of(Set.<String>of(),
+        Set.of(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE))) {
+      QueryEnvironment environment = buildQueryEnvironment(disabledRules);
+      for (String options : List.of("", "SET enableTypedMode=false; ",
+          "SET autoRewriteAggregationType=true; ", "SET usePlannerRules='TypedModeRewrite'; ",
+          "SET usePlannerRules='TypedModeRewrite'; SET enableTypedMode=false; ",
+          "SET enableTypedMode=true; SET skipPlannerRules='TypedModeRewrite'; ")) {
+        assertModeCalls(environment, usePhysicalOptimizer, options, List.of("MODE", "MODE", "MODE"));
+      }
+      assertModeCalls(environment, usePhysicalOptimizer, "SET enableTypedMode=true; ",
+          List.of("MODESTRING", "MODETIMESTAMP", "MODE"));
+    }
+  }
+
+  private static QueryEnvironment buildQueryEnvironment(Set<String> disabledRules) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
+    TABLE_SCHEMAS.forEach((name, schema) -> factory.registerTable(schema, name));
+    SERVER1_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(1, table, s)));
+    SERVER2_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(2, table, s)));
+    return new QueryEnvironment(QueryEnvironment.configBuilder()
+        .requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE)
+        .tableCache(factory.buildTableCache())
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, factory.buildRoutingManager(null)))
+        .defaultDisabledPlannerRules(disabledRules)
+        .build());
+  }
+
+  private static void assertModeCalls(QueryEnvironment environment, boolean usePhysicalOptimizer, String options,
+      List<String> expectedCalls) {
+    DispatchableSubPlan plan = environment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
+        + options + "SELECT MODE(col1), MODE(ts_timestamp), MODE(col3) FROM a");
+    List<AggregateNode> aggregates = findAggregates(plan);
+    assertFalse(aggregates.isEmpty());
+    for (AggregateNode aggregate : aggregates) {
+      assertEquals(aggregate.getAggCalls().stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
+          expectedCalls, options);
     }
   }
 

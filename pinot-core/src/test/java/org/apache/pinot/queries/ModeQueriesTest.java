@@ -398,7 +398,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
     String expectedMax = _values.entrySet().stream().filter(e -> e.getValue() == maxOccurrences)
         .map(e -> e.getKey().toString()).max(String::compareTo).orElseThrow();
     BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET autoRewriteAggregationType=true; SELECT MODE(stringColumn), "
+        "SET enableTypedMode=true; SELECT MODE(stringColumn), "
         + "MODE(stringNoDictColumn), MODE(stringColumn, 'MAX'), MODE(CONCAT('value-', stringColumn, '')), "
         + "MODE(CASE WHEN JSONEXTRACTSCALAR(jsonColumn, '$.value', 'STRING', '') = '' THEN NULL "
         + "ELSE JSONEXTRACTSCALAR(jsonColumn, '$.value', 'STRING', '') END) FROM testTable",
@@ -415,7 +415,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   @Test
   public void testStringAggregationWithNoMatchingRows() {
     BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET autoRewriteAggregationType=true; SELECT MODE(stringColumn), "
+        "SET enableTypedMode=true; SELECT MODE(stringColumn), "
         + "MODE(stringNoDictColumn) FROM testTable WHERE intColumn < 0", SCHEMA);
     assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
     assertEquals(response.getResultTable().getDataSchema().getColumnDataTypes(),
@@ -432,7 +432,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   @Test(dataProvider = "stringGroupByColumns")
   public void testStringAggregationGroupBy(String groupByColumn) {
     BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET autoRewriteAggregationType=true; SELECT " + groupByColumn
+        "SET enableTypedMode=true; SELECT " + groupByColumn
         + ", MODE(stringColumn), MODE(stringNoDictColumn), MODE(CONCAT('value-', stringColumn, '')) "
         + "FROM testTable GROUP BY " + groupByColumn + " ORDER BY " + groupByColumn, SCHEMA);
     assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
@@ -449,7 +449,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   @Test
   public void testTimestampAggregationAndResultType() {
     BrokerResponseNative response = getBrokerResponseForOptimizedQuery(
-        "SET autoRewriteAggregationType=true; SELECT MODE(timestampColumn), "
+        "SET enableTypedMode=true; SELECT MODE(timestampColumn), "
         + "MODE(timestampNoDictColumn), fromTimestamp(MODE(timestampColumn)), MODE(toTimestamp(longColumn)) "
         + "FROM testTable", SCHEMA);
     assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
