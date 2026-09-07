@@ -238,8 +238,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
-  // 8 min max timeout for the retry policy
-  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+  // 8 min max timeout for the retry policy. Used for both mid-consume recreate (#17062) and first
+  // consumer creation on the consumer thread, so a retryable Kafka/DNS init failure does not mark
+  // the replica OFFLINE after the short Helix-thread path (~10s).
+  @VisibleForTesting
+  static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
       RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
@@ -317,7 +320,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
-  private PartitionGroupConsumer _partitionGroupConsumer = null;
+  private final AtomicReference<PartitionGroupConsumer> _partitionGroupConsumer = new AtomicReference<>();
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -512,7 +515,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
+        messageBatch =
+            _partitionGroupConsumer.get().fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
@@ -820,6 +824,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.info("Starting consumption on segment: {}, maxRowCount: {}, maxEndTime: {}.", _llcSegmentName,
             _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
 
+        // Create the stream consumer here (consumer thread) with CONSUMER_RECREATE_RETRY_POLICY. Doing this in
+        // the Helix constructor would either block the state-transition thread for the long retry window or keep
+        // the short Kafka 5x2s path and mark the replica OFFLINE. See
+        // https://github.com/apache/pinot/issues/11314 and https://github.com/apache/pinot/pull/17062.
+        if (_shouldStop) {
+          return;
+        }
+        makeStreamConsumer("Starting");
+        if (_shouldStop) {
+          // Leave a successfully created consumer in place so CONSUMING -> ONLINE can catch up.
+          return;
+        }
+        if (_partitionGroupConsumer.get() == null) {
+          throw new IllegalStateException("Stream consumer was not created for " + _clientId);
+        }
+
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
         //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
@@ -957,7 +977,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
             case COMMIT: {
               _state = State.COMMITTING;
-              _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+              _currentOffset = _partitionGroupConsumer.get().checkpoint(_currentOffset);
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
               // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
@@ -1454,11 +1474,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// Closes the current consumer in place and leaves the reference set. COMMIT/CATCH_UP may still
+  /// call [PartitionGroupConsumer#checkpoint] on that closed instance (the default is identity).
   private void closePartitionGroupConsumer() {
-    try {
-      _partitionGroupConsumer.close();
-    } catch (Exception e) {
-      _segmentLogger.warn("Could not close stream consumer", e);
+    PartitionGroupConsumer consumer = _partitionGroupConsumer.get();
+    if (consumer != null) {
+      closeQuietly(consumer);
     }
   }
 
@@ -1680,16 +1701,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
           } else {
             boolean success = false;
-            // Since online helix transition for a segment can arrive before segment's consumer acquires the
-            // semaphore, check _consumerSemaphoreAcquired before catching up.
-            // This is to avoid consuming in parallel to another segment's consumer.
-            if (_consumerSemaphoreAcquired.get()) {
+            // ONLINE can arrive before the consumer thread has acquired the semaphore or finished first
+            // create. Catch up only when both are true; otherwise download. The semaphore used to imply a
+            // live consumer because the Helix constructor created it. It no longer does.
+            if (_consumerSemaphoreAcquired.get() && _partitionGroupConsumer.get() != null) {
               _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
               success = catchupToFinalOffset(endOffset,
                   TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
             } else {
-              _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
-                  _currentOffset, endOffset);
+              _segmentLogger.warn(
+                  "Skipping catch up from offset {} to {} (consumerSemaphoreAcquired={}, consumerPresent={})",
+                  _currentOffset, endOffset, _consumerSemaphoreAcquired.get(),
+                  _partitionGroupConsumer.get() != null);
             }
 
             if (success) {
@@ -1978,7 +2001,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Initialize stopOnDecodeError configuration with proper validation
       _stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
 
-      makeStreamConsumer("Starting");
+      // Stream consumer creation is deferred to PartitionConsumer.run() so a retryable init failure
+      // uses CONSUMER_RECREATE_RETRY_POLICY on the consumer thread instead of blocking Helix.
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
@@ -2152,16 +2176,33 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Creates a new stream consumer
+  /// Creates a new stream consumer using [CONSUMER_RECREATE_RETRY_POLICY].
+  ///
+  /// Called from the consumer thread at the start of [PartitionConsumer#run], not from the Helix
+  /// constructor, so a retryable stream/init error does not block the state-transition thread.
   private void makeStreamConsumer(String reason) {
-    if (_partitionGroupConsumer != null) {
+    if (_streamConsumerClosed.get()) {
+      return;
+    }
+    if (_partitionGroupConsumer.get() != null) {
       closePartitionGroupConsumer();
     }
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     try {
-      _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-      _partitionGroupConsumer.start(_currentOffset);
+      PartitionGroupConsumer consumer =
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+              CONSUMER_RECREATE_RETRY_POLICY);
+      consumer.start(_currentOffset);
+      // Offload may have closed a still-null field while create was in flight. Do not close on
+      // _shouldStop: stop() is also used for CONSUMING -> ONLINE catchup.
+      if (_streamConsumerClosed.get()) {
+        closeQuietly(consumer);
+        return;
+      }
+      _partitionGroupConsumer.set(consumer);
+      if (_streamConsumerClosed.get()) {
+        closePartitionGroupConsumer();
+      }
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
@@ -2170,17 +2211,26 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  private void closeQuietly(PartitionGroupConsumer consumer) {
+    try {
+      consumer.close();
+    } catch (Exception e) {
+      _segmentLogger.warn("Could not close stream consumer", e);
+    }
+  }
+
   /// Checkpoints existing consumer before creating a new consumer instance
   /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    _currentOffset = _partitionGroupConsumer.get().checkpoint(_currentOffset);
     closePartitionGroupConsumer();
     try {
-      _partitionGroupConsumer =
+      PartitionGroupConsumer consumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
               CONSUMER_RECREATE_RETRY_POLICY);
-      _partitionGroupConsumer.start(_currentOffset);
+      consumer.start(_currentOffset);
+      _partitionGroupConsumer.set(consumer);
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
           e);
@@ -2283,6 +2333,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   AtomicBoolean getConsumerSemaphoreAcquired() {
     return _consumerSemaphoreAcquired;
+  }
+
+  @VisibleForTesting
+  @Nullable
+  PartitionGroupConsumer getPartitionGroupConsumer() {
+    return _partitionGroupConsumer.get();
+  }
+
+  @VisibleForTesting
+  void setPartitionGroupConsumer(@Nullable PartitionGroupConsumer partitionGroupConsumer) {
+    _partitionGroupConsumer.set(partitionGroupConsumer);
   }
 
   /// Parses the stopOnDecodeError configuration with proper validation and type safety.
