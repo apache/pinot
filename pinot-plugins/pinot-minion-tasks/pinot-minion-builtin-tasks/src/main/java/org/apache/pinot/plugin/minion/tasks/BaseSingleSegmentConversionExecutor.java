@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -147,12 +148,16 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(configs);
       boolean copyToDeepStore =
           pushType == BatchConfigProperties.SegmentPushType.METADATA && isCopyToDeepStoreForMetadataPush();
-      // Controller-copy pushes send only metadata.properties and creation.meta, built from the local converted
-      // segment. An unchanged segment (same CRC) skips the tar and the staging and only re-registers its metadata.
+      // METADATA pushes send only metadata.properties and creation.meta, built here from the local converted segment
+      // so the staged tar is never downloaded back. A controller-copy push of an unchanged segment (same CRC) skips
+      // the tar and the staging and only re-registers its metadata.
       File segmentMetadataTarFile = null;
       boolean reuseExistingSegment = false;
+      if (pushType == BatchConfigProperties.SegmentPushType.METADATA) {
+        segmentMetadataTarFile =
+            SegmentPushUtils.generateSegmentMetadataFile(convertedSegmentDir, tempDataDir, segmentName);
+      }
       if (copyToDeepStore) {
-        segmentMetadataTarFile = createSegmentMetadataTarFile(convertedSegmentDir, tempDataDir, segmentName);
         long convertedSegmentCrc = Long.parseLong(new SegmentMetadataImpl(convertedSegmentDir).getCrc());
         reuseExistingSegment =
             convertedSegmentCrc == Long.parseLong(originalSegmentCrc) && StringUtils.isNotEmpty(downloadURL);
@@ -224,7 +229,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
                   uploadURL, downloadURL, convertedTarredSegmentFile, segmentMetadataTarFile);
             } else {
               uploadSegmentWithMetadata(configs, pinotTaskConfig, segmentConversionResult, authProvider, parameters,
-                  tableNameWithType, convertedTarredSegmentFile);
+                  tableNameWithType, convertedTarredSegmentFile, segmentMetadataTarFile);
             }
             break;
           default:
@@ -262,7 +267,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   /// [BatchConfigProperties#PUSH_CONTROLLER_URI] in configs.
   private void uploadSegmentWithMetadata(Map<String, String> configs, PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult, AuthProvider authProvider, List<NameValuePair> parameters,
-      String tableNameWithType, File convertedTarredSegmentFile)
+      String tableNameWithType, File convertedTarredSegmentFile, File segmentMetadataTarFile)
       throws Exception {
     if (!configs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       throw new RuntimeException("Output dir URI missing for metadata push. Set "
@@ -282,9 +287,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
           pushJobSpec, new String[]{outputSegmentTarURI.toString()});
+      Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
+      segmentUriToTarPathMap.keySet().forEach(uri -> segmentUriToMetadataFileMap.put(uri, segmentMetadataTarFile));
       try {
-        SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
-            parameters);
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, segmentUriToMetadataFileMap, metadataHeaders, parameters);
       } catch (Exception e) {
         // The tar was already staged to the output PinotFS before this failure. If the task is retried, the next
         // moveSegmentToOutputPinotFS() would fail with "Output file already exists" (overwriteOutput defaults to

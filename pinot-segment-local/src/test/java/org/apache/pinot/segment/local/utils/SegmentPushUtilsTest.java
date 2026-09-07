@@ -34,13 +34,17 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,6 +62,7 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -372,6 +377,113 @@ public class SegmentPushUtilsTest {
     httpExchange.sendResponseHeaders(HttpStatus.SC_OK, response.length);
     try (OutputStream os = httpExchange.getResponseBody()) {
       os.write(response);
+    }
+  }
+
+  @Test
+  public void testGenerateSegmentMetadataFileFromLocalSegment()
+      throws Exception {
+    // A v3 segment layout with a data file that must not be included
+    File segmentDir = new File(_tempDir, TEST_SEGMENT_NAME);
+    File v3Dir = new File(segmentDir, "v3");
+    FileUtils.forceMkdir(v3Dir);
+    FileUtils.writeStringToFile(new File(v3Dir, "metadata.properties"), "segment.name = " + TEST_SEGMENT_NAME,
+        StandardCharsets.UTF_8);
+    FileUtils.writeStringToFile(new File(v3Dir, "creation.meta"), "crc", StandardCharsets.UTF_8);
+    FileUtils.writeStringToFile(new File(v3Dir, "columns.psf"), "data", StandardCharsets.UTF_8);
+
+    File metadataTar = SegmentPushUtils.generateSegmentMetadataFile(segmentDir, _tempDir, TEST_SEGMENT_NAME);
+
+    assertEquals(metadataTar.getName(), TEST_SEGMENT_NAME + Constants.METADATA_TAR_GZ_FILE_EXT);
+    File untarred = TarCompressionUtils.untar(metadataTar, new File(_tempDir, "untar")).get(0);
+    assertEquals(new HashSet<>(Arrays.asList(untarred.list())), Set.of("metadata.properties", "creation.meta"));
+    assertEquals(FileUtils.readFileToString(new File(untarred, "metadata.properties"), StandardCharsets.UTF_8),
+        "segment.name = " + TEST_SEGMENT_NAME);
+  }
+
+  @Test
+  public void testSendSegmentUriAndMetadataWithLocalMetadataFiles()
+      throws Exception {
+    List<Headers> requests = new CopyOnWriteArrayList<>();
+    HttpsServer httpsServer = createHttpsServer("/v2/segments", new RecordingHandler(requests));
+    try {
+      URI controllerUri = new URI("https://localhost:" + httpsServer.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, createTlsSpec());
+      spec.getPushJobSpec().setCopyToDeepStoreForMetadataPush(true);
+      File metadataTar = createMetadataTar(TEST_SEGMENT_NAME);
+
+      SegmentPushUtils.sendSegmentUriAndMetadata(spec, Map.of(TEST_SEGMENT_URI, metadataTar), new ArrayList<>(),
+          new ArrayList<>());
+
+      assertEquals(requests.size(), 1);
+      Headers headers = requests.get(0);
+      assertEquals(headers.getFirst(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE),
+          FileUploadDownloadClient.FileUploadType.METADATA.toString());
+      assertEquals(headers.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI), TEST_SEGMENT_URI);
+      assertEquals(headers.getFirst(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE), "true");
+      // The caller owns the metadata file
+      assertTrue(metadataTar.isFile());
+    } finally {
+      httpsServer.stop(0);
+    }
+  }
+
+  @Test
+  public void testSendSegmentsUriAndMetadataWithLocalMetadataFiles()
+      throws Exception {
+    List<Headers> requests = new CopyOnWriteArrayList<>();
+    HttpsServer httpsServer = createHttpsServer("/segments/batchUpload", new RecordingHandler(requests));
+    try {
+      URI controllerUri = new URI("https://localhost:" + httpsServer.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, createTlsSpec());
+      Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
+      segmentUriToMetadataFileMap.put("file:///tmp/segment1.tar.gz", createMetadataTar("segment1"));
+      segmentUriToMetadataFileMap.put("file:///tmp/segment2.tar.gz", createMetadataTar("segment2"));
+
+      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, segmentUriToMetadataFileMap, new ArrayList<>(),
+          new ArrayList<>());
+
+      // One batch request for both segments, and the caller still owns the metadata files
+      assertEquals(requests.size(), 1);
+      assertEquals(requests.get(0).getFirst(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE),
+          FileUploadDownloadClient.FileUploadType.METADATA.toString());
+      segmentUriToMetadataFileMap.values().forEach(file -> assertTrue(file.isFile()));
+    } finally {
+      httpsServer.stop(0);
+    }
+  }
+
+  @Test
+  public void testSendSegmentUriAndMetadataRejectsUnnamedMetadataFile() {
+    SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(URI.create("https://localhost:1"), null);
+    File notAMetadataTar = new File(_tempDir, "segment.tar.gz");
+    assertThrows(IllegalArgumentException.class, () -> SegmentPushUtils.sendSegmentUriAndMetadata(spec,
+        Map.of(TEST_SEGMENT_URI, notAMetadataTar), new ArrayList<>(), new ArrayList<>()));
+  }
+
+  private File createMetadataTar(String segmentName)
+      throws IOException {
+    File segmentDir = new File(_tempDir, segmentName);
+    FileUtils.forceMkdir(segmentDir);
+    FileUtils.touch(new File(segmentDir, "metadata.properties"));
+    FileUtils.touch(new File(segmentDir, "creation.meta"));
+    return SegmentPushUtils.generateSegmentMetadataFile(segmentDir, _tempDir, segmentName);
+  }
+
+  /// Records request headers and answers OK, for both single and batch metadata pushes.
+  private static class RecordingHandler implements HttpHandler {
+    private final List<Headers> _requests;
+
+    private RecordingHandler(List<Headers> requests) {
+      _requests = requests;
+    }
+
+    @Override
+    public void handle(HttpExchange httpExchange)
+        throws IOException {
+      _requests.add(httpExchange.getRequestHeaders());
+      httpExchange.getRequestBody().readAllBytes();
+      writeResponse(httpExchange, OK_RESPONSE);
     }
   }
 
