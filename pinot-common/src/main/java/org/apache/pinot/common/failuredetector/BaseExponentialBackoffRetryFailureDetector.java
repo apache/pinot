@@ -43,9 +43,18 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseExponentialBackoffRetryFailureDetector implements FailureDetector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseExponentialBackoffRetryFailureDetector.class);
 
+  /// How long a consecutive-timeout count stays valid. Well beyond any sane query timeout, but short enough that
+  /// counts do not survive an idle period or a rolling restart and eject a server on its first miss afterwards.
+  private static final long TIMEOUT_COUNT_EXPIRY_NS = TimeUnit.MINUTES.toNanos(5);
+
   protected final String _name = getClass().getSimpleName();
   protected final ConcurrentHashMap<String, RetryInfo> _unhealthyServerRetryInfoMap = new ConcurrentHashMap<>();
   protected final DelayQueue<RetryInfo> _retryInfoDelayQueue = new DelayQueue<>();
+
+  /// Per-server count of consecutive requests left unanswered, keyed by instance id. An entry is dropped as soon as
+  /// the server answers anything, and a count older than [#TIMEOUT_COUNT_EXPIRY_NS] restarts from one so that
+  /// "consecutive" stays consecutive in time and not merely in arrival order.
+  protected final ConcurrentHashMap<String, TimeoutCount> _consecutiveTimeoutCountMap = new ConcurrentHashMap<>();
 
   protected final List<Function<String, ServerState>> _unhealthyServerRetriers = new ArrayList<>();
   protected Consumer<String> _healthyServerNotifier;
@@ -54,6 +63,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   protected long _retryInitialDelayNs;
   protected double _retryDelayFactor;
   protected int _maxRetries;
+  protected int _consecutiveTimeoutThreshold;
   protected Thread _retryThread;
 
   protected volatile boolean _running;
@@ -68,8 +78,11 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
         Broker.FailureDetector.DEFAULT_RETRY_DELAY_FACTOR);
     _maxRetries =
         config.getProperty(Broker.FailureDetector.CONFIG_OF_MAX_RETRIES, Broker.FailureDetector.DEFAULT_MAX_RETRIES);
-    LOGGER.info("Initialized {} with retry initial delay: {}ms, exponential backoff factor: {}, max retries: {}", _name,
-        retryInitialDelayMs, _retryDelayFactor, _maxRetries);
+    _consecutiveTimeoutThreshold = config.getProperty(Broker.FailureDetector.CONFIG_OF_CONSECUTIVE_TIMEOUT_THRESHOLD,
+        Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUT_THRESHOLD);
+    LOGGER.info("Initialized {} with retry initial delay: {}ms, exponential backoff factor: {}, max retries: {}, "
+            + "consecutive timeout threshold: {}", _name, retryInitialDelayMs, _retryDelayFactor, _maxRetries,
+        _consecutiveTimeoutThreshold);
   }
 
   @Override
@@ -139,6 +152,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
   @Override
   public void markServerHealthy(String instanceId, @Nullable String hostName) {
+    _consecutiveTimeoutCountMap.remove(instanceId);
     _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
       LOGGER.info("Mark server: {} {} as healthy", instanceId, hostName);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
@@ -160,6 +174,37 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
+  public void notifyServerResponded(String instanceId) {
+    _consecutiveTimeoutCountMap.remove(instanceId);
+  }
+
+  /// {@inheritDoc}
+  ///
+  /// Marks the server unhealthy once it has left
+  /// [Broker.FailureDetector#CONFIG_OF_CONSECUTIVE_TIMEOUT_THRESHOLD] consecutive requests unanswered. Any number of
+  /// servers may be held out this way: given the caller reports only sole non-responders, a shared cause accuses
+  /// nobody, while servers going silent independently should all come out.
+  @Override
+  public void notifyServerNotResponded(String instanceId, @Nullable String hostName) {
+    if (_consecutiveTimeoutThreshold <= 0) {
+      return;
+    }
+    long nowNs = System.nanoTime();
+    // compute() applies the whole update under the map's per-key lock, so it cannot interleave with the remove() in
+    // notifyServerResponded and drop a reset on the floor.
+    TimeoutCount timeoutCount = _consecutiveTimeoutCountMap.compute(instanceId,
+        (id, current) -> current == null || nowNs - current._lastTimeoutNs > TIMEOUT_COUNT_EXPIRY_NS
+            ? new TimeoutCount(1, nowNs) : new TimeoutCount(current._count + 1, nowNs));
+    // Only act on the crossing: past it the server is already unhealthy, so re-marking would just re-log every query.
+    if (timeoutCount._count != _consecutiveTimeoutThreshold) {
+      return;
+    }
+    LOGGER.warn("Server: {} {} left {} consecutive requests unanswered while staying connected, marking it unhealthy",
+        instanceId, hostName, timeoutCount._count);
+    markServerUnhealthy(instanceId, hostName);
+  }
+
+  @Override
   public Set<String> getUnhealthyServers() {
     return _unhealthyServerRetryInfoMap.keySet();
   }
@@ -174,6 +219,18 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
       _retryThread.join();
     } catch (InterruptedException e) {
       throw new RuntimeException("Interrupted while waiting for retry thread to finish", e);
+    }
+  }
+
+  /// A count of consecutive unanswered requests, with the time of the last one so that the count can expire.
+  /// Not a record: pinot-common still targets Java 11 bytecode.
+  private static class TimeoutCount {
+    final int _count;
+    final long _lastTimeoutNs;
+
+    TimeoutCount(int count, long lastTimeoutNs) {
+      _count = count;
+      _lastTimeoutNs = lastTimeoutNs;
     }
   }
 

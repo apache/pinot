@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -44,8 +45,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class ServerChannelsTest {
@@ -79,7 +82,7 @@ public class ServerChannelsTest {
           new ServerRoutingInstance("localhost", dummyServer.getAddress().getPort(), TableType.REALTIME);
       ServerChannels serverChannels =
           new ServerChannels(queryRouter, nettyConfig, null, ThreadAccountantUtils.getNoOpAccountant());
-      serverChannels.connect(serverRoutingInstance);
+      assertTrue(serverChannels.probeConnection(serverRoutingInstance));
 
       final long requestId = System.currentTimeMillis();
 
@@ -92,6 +95,29 @@ public class ServerChannelsTest {
       serverChannels.shutDown();
     } finally {
       dummyServer.stop(0);
+    }
+  }
+
+  /// The probe must ignore the pooled channel. A server whose node disappears without sending a FIN or an RST
+  /// leaves that channel `isActive()` forever, so a probe that consulted it would call every wedged server healthy —
+  /// which is exactly how the broker kept routing queries to a dead server for minutes.
+  @Test
+  public void testProbeIgnoresAnActivePooledChannel()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      // Nothing is listening on this port, so any real connection attempt must fail.
+      ServerRoutingInstance serverRoutingInstance =
+          new ServerRoutingInstance("localhost", NetUtils.findOpenPort(), TableType.OFFLINE);
+      Channel activeChannel = mock(Channel.class);
+      when(activeChannel.isActive()).thenReturn(true);
+      serverChannels.getOrCreateServerChannel(serverRoutingInstance).setChannel(activeChannel);
+
+      assertFalse(serverChannels.probeConnection(serverRoutingInstance),
+          "A pooled channel reporting isActive() must not make the probe succeed");
+    } finally {
+      serverChannels.shutDown();
     }
   }
 

@@ -236,6 +236,12 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should time out
     assertTrue(System.currentTimeMillis() - startTimeMs >= 1000);
+    // A request left unanswered until the deadline produces a timeout and nothing else: the send succeeded and the
+    // channel was never torn down, so no failed server is reported. This is why the broker's failure detector cannot
+    // rely on getFailedServer() alone -- see FailureDetector#notifyServerNotResponded.
+    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(asyncQueryResponse.getException());
+    assertNull(asyncQueryResponse.getFailedServer());
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);

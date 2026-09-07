@@ -147,30 +147,31 @@ public class QueryRouter {
   }
 
   public boolean hasChannel(ServerInstance serverInstance) {
-    if (_serverChannelsTls != null) {
-      return _serverChannelsTls.hasChannel(
-          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
-    } else {
-      return _serverChannels.hasChannel(
-          serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
+    return channels().hasChannel(offlineRoutingInstance(serverInstance));
+  }
+
+  /// Tests whether the given server still accepts connections, on a fresh connection.
+  /// See [ServerChannels#probeConnection]. Note this is a plain TCP probe even for a TLS server: it deliberately
+  /// tests reachability of the query port rather than the TLS handshake.
+  public boolean probeConnection(ServerInstance serverInstance) {
+    try {
+      return channels().probeConnection(offlineRoutingInstance(serverInstance));
+    } catch (Exception e) {
+      // toServerRoutingInstance() rejects a server that has not advertised the port, which happens mid-rollout.
+      // The caller is the failure detector's retry loop: letting this escape would abandon the RetryInfo and strand
+      // the server as unhealthy forever.
+      LOGGER.debug("Failed to probe server: {}", serverInstance, e);
+      return false;
     }
   }
 
-  /// Connects to the given server, returns `true` if the server is successfully connected.
-  public boolean connect(ServerInstance serverInstance) {
-    try {
-      if (_serverChannelsTls != null) {
-        _serverChannelsTls.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
-      } else {
-        _serverChannels.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
-      }
-      return true;
-    } catch (Exception e) {
-      LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
-      return false;
-    }
+  private ServerChannels channels() {
+    return _serverChannelsTls != null ? _serverChannelsTls : _serverChannels;
+  }
+
+  private ServerRoutingInstance offlineRoutingInstance(ServerInstance serverInstance) {
+    return serverInstance.toServerRoutingInstance(TableType.OFFLINE,
+        _serverChannelsTls != null ? ServerInstance.RoutingType.NETTY_TLS : ServerInstance.RoutingType.NETTY);
   }
 
   public void shutDown() {

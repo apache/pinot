@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -157,9 +158,51 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         serversNotResponded.add(entry.getKey());
       }
     }
+    reportScatterOutcomeToFailureDetector(timedOut, dataTableMap.keySet(), serversNotResponded);
+
     ScatterResultStats stats = new ScatterResultStats(
         dataTableMap.size() + serversNotResponded.size(), dataTableMap.size(), totalResponseSize);
     return new ScatterResult(dataTableMap, serversNotResponded, stats, timedOut, asyncQueryResponse.getException());
+  }
+
+  /// Reports the per-server outcome of a scatter-gather to the failure detector, which is how a server that stops
+  /// answering while keeping its connection open is detected at all — see
+  /// [FailureDetector#notifyServerNotResponded], whose sole-non-responder contract this honours.
+  ///
+  /// Nothing is attributed unless the query timed out: a `FAILED` response was aborted early by a send failure or a
+  /// channel teardown, both already reported through [AsyncQueryResponse#getFailedServer()], and aborting leaves
+  /// servers that were never given a chance to answer in `serversNotResponded`.
+  private void reportScatterOutcomeToFailureDetector(boolean timedOut,
+      Collection<ServerRoutingInstance> serversResponded, Collection<ServerRoutingInstance> serversNotResponded) {
+    // Any response clears the server's accumulated unanswered-request count, so this runs on every query and not just
+    // on timed-out ones.
+    for (ServerRoutingInstance serverRoutingInstance : serversResponded) {
+      _failureDetector.notifyServerResponded(serverRoutingInstance.getInstanceId());
+    }
+    if (timedOut) {
+      ServerRoutingInstance soleServerNotResponded = getSoleServerNotResponded(serversNotResponded);
+      if (soleServerNotResponded != null) {
+        _failureDetector.notifyServerNotResponded(soleServerNotResponded.getInstanceId(),
+            soleServerNotResponded.getHostname());
+      }
+    }
+  }
+
+  /// Returns the single server behind `serversNotResponded`, or `null` if it is empty or covers more than one server.
+  /// A hybrid query sends a separate request to the OFFLINE and REALTIME halves of the same server, so two routing
+  /// instances sharing one instance id are one server, not two.
+  @Nullable
+  private static ServerRoutingInstance getSoleServerNotResponded(
+      Collection<ServerRoutingInstance> serversNotResponded) {
+    ServerRoutingInstance sole = null;
+    for (ServerRoutingInstance serverRoutingInstance : serversNotResponded) {
+      if (sole == null) {
+        sole = serverRoutingInstance;
+      } else if (!sole.getInstanceId().equals(serverRoutingInstance.getInstanceId())) {
+        return null;
+      }
+    }
+    return sole;
   }
 
   /// Executes the reduce step on the scatter result and populates the response with server stats.
@@ -241,8 +284,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     Map<ServerRoutingInstance, ServerResponse> baseFinalResponses = baseAsyncResponse.getFinalResponses();
     Map<ServerRoutingInstance, ServerResponse> viewFinalResponses = materializedViewAsyncResponse.getFinalResponses();
 
-    if (baseAsyncResponse.getStatus() == QueryResponse.Status.TIMED_OUT
-        || materializedViewAsyncResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
+    boolean timedOut = baseAsyncResponse.getStatus() == QueryResponse.Status.TIMED_OUT
+        || materializedViewAsyncResponse.getStatus() == QueryResponse.Status.TIMED_OUT;
+    if (timedOut) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
     }
 
@@ -272,6 +316,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
             totalResponseSizeHolder);
     long totalResponseSize = totalResponseSizeHolder[0];
     int numServersResponded = dataTableMap.size();
+
+    // Report here too, not only from doScatter. Reporting the responders is what resets their unanswered-request
+    // counts, so a path that stays silent would let a server accumulate counts from other queries while it is
+    // answering these ones perfectly well, and eventually get it ejected.
+    reportScatterOutcomeToFailureDetector(timedOut, dataTableMap.keySet(), serversNotResponded);
 
     /// On a SPLIT query, base and MV scatter-gathers cover DISJOINT halves of the timeline
     /// (base covers `ts < boundary`, MV covers `ts >= boundary`).  Partial failure on either
@@ -437,11 +486,13 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       return FailureDetector.ServerState.UNKNOWN;
     }
 
-    if (_queryRouter.connect(serverInstance)) {
-      LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
+    // A fresh connection proves the server is reachable, not that it can answer a query: a process that is alive
+    // but wedged passes this. Erring that way keeps a merely busy server from being stranded.
+    if (_queryRouter.probeConnection(serverInstance)) {
+      LOGGER.info("Server: {} accepted a new connection, marking it healthy", instanceId);
       return FailureDetector.ServerState.HEALTHY;
     } else {
-      LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);
+      LOGGER.warn("Server: {} still does not accept connections, retry later", instanceId);
       return FailureDetector.ServerState.UNHEALTHY;
     }
   }

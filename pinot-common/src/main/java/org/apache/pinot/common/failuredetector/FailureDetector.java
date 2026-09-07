@@ -73,6 +73,28 @@ public interface FailureDetector {
   /// Marks a server as unhealthy.
   void markServerUnhealthy(String instanceId, @Nullable String hostName);
 
+  /// Notifies the detector that a server answered a request, clearing whatever [#notifyServerNotResponded] has
+  /// accumulated for it. Called for every responding server on the query path, so it must be cheap when nothing is
+  /// being tracked.
+  default void notifyServerResponded(String instanceId) {
+  }
+
+  /// Notifies the detector that a server left a request unanswered until the query deadline, without its connection
+  /// ever breaking.
+  ///
+  /// A server that stays connected but stops serving — a wedged process, a blackholed network path, a disk-stalled
+  /// JVM — produces no other signal. Writing into an open socket succeeds even when the peer is gone, so there is no
+  /// send exception, the channel is never torn down, and connection-failure detection cannot see it at all. The
+  /// query simply times out.
+  ///
+  /// Callers must only report a server that was the **sole** non-responder of its query. When several servers miss
+  /// the same deadline a shared cause — the broker, the query, the network — is far more likely than every server
+  /// failing at once, and this method cannot tell the difference. Implementations rely on that, and must further
+  /// require several consecutive unanswered requests before acting, since one is a normal consequence of a slow
+  /// query.
+  default void notifyServerNotResponded(String instanceId, @Nullable String hostName) {
+  }
+
   /// Returns all the unhealthy servers.
   Set<String> getUnhealthyServers();
 
