@@ -245,6 +245,10 @@ public class AggregationFunctionFactory {
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
             return new ModeAggregationFunction(arguments, nullHandlingEnabled);
+          case MODESTRING:
+            return new ModeStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MODETIMESTAMP:
+            return new ModeTimestampAggregationFunction(arguments, nullHandlingEnabled);
           case ANYVALUE:
             return new AnyValueAggregationFunction(arguments, nullHandlingEnabled);
           case FIRSTWITHTIME: {

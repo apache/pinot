@@ -1,0 +1,150 @@
+{
+  "mode_string_timestamp_distributed": {
+    "comments": "Exercise typed MODE partial-state serialization across four partitions on two servers. The most frequent pallet and action user in group a never occur on the same input row.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "items": {
+        "schema": [
+          {"name": "lpn_id", "type": "STRING"},
+          {"name": "pallet_id", "type": "STRING"},
+          {"name": "created_on", "type": "TIMESTAMP"},
+          {"name": "meta", "type": "STRING"},
+          {"name": "first_name", "type": "STRING"},
+          {"name": "last_name", "type": "STRING"},
+          {"name": "manifest_id", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "p2", "2026-09-03 08:00:00.001", "{\"action_user\":\"u2\"}", "Bob", "Smith", 1],
+          ["a", "p2", "2026-09-03 08:00:00.001", "{\"action_user\":\"u3\"}", "Cara", "Jones", 1],
+          ["a", "p2", "2026-09-03 09:00:00.123", "{\"action_user\":\"u2\"}", "Bob", "Smith", 2],
+          ["a", "p1", "2026-09-03 09:00:00.123", "{\"action_user\":\"u1\"}", "Alice", "Jones", 2],
+          ["a", "p1", "2026-09-03 09:00:00.123", "{\"action_user\":\"u1\"}", "Alice", "Jones", 1],
+          ["a", "p3", "2026-09-03 10:00:00.999", "{\"action_user\":\"u1\"}", "Alice", "Jones", 2],
+          ["nulls", null, null, "{}", null, null, 99],
+          ["nulls", null, null, "{\"action_user\":\"\"}", null, null, 99],
+          ["ties", "z", "1970-01-01 00:00:00.001", "{}", null, null, 99],
+          ["ties", "a", "1969-12-31 23:59:59.999", "{}", null, null, 99],
+          ["ties", "z", "1970-01-01 00:00:00.001", "{}", null, null, 99],
+          ["ties", "a", "1969-12-31 23:59:59.999", "{}", null, null, 99],
+          ["empty", "", "2026-09-03 00:00:00.001", "{}", null, null, 99],
+          ["empty", "z", null, "{}", null, null, 99],
+          ["empty", "", null, "{}", null, null, 99]
+        ]
+      },
+      "manifests": {
+        "schema": [
+          {"name": "id", "type": "INT"},
+          {"name": "code", "type": "STRING"},
+          {"name": "status", "type": "STRING"},
+          {"name": "created_on", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          [1, "Z", "shipped", "2026-09-03 12:00:00.999"],
+          [2, "A", "pending", "2026-09-03 11:00:00.123"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Global string and timestamp modes preserve the argument types",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id), MODE(created_on) FROM {items} WHERE lpn_id = 'a'",
+        "outputs": [["p2", "2026-09-03 09:00:00.123"]]
+      },
+      {
+        "description": "Grouped modes ignore nulls, retain empty strings, and break ties by the smallest value",
+        "sql": "SET autoRewriteAggregationType=true; SELECT lpn_id, MODE(pallet_id), MODE(created_on) FROM {items} GROUP BY lpn_id",
+        "outputs": [
+          ["a", "p2", "2026-09-03 09:00:00.123"],
+          ["nulls", null, null],
+          ["ties", "a", "1969-12-31 23:59:59.999"],
+          ["empty", "", "2026-09-03 00:00:00.001"]
+        ]
+      },
+      {
+        "description": "MODE applies independently to a stored string and computed JSON string",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id), MODE(NULLIF(JSONEXTRACTSCALAR(meta, '$.action_user', 'STRING', ''), '')) FROM {items} WHERE lpn_id = 'a'",
+        "outputs": [["p2", "u1"]]
+      },
+      {
+        "description": "Typed MAX tie reducers select the largest original value",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id, 'MAX'), MODE(created_on, 'MAX') FROM {items} WHERE lpn_id = 'ties'",
+        "outputs": [["z", "1970-01-01 00:00:00.001"]]
+      },
+      {
+        "description": "Existing numeric modes retain DOUBLE results and MIN, MAX, and AVG reducers",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(manifest_id), MODE(manifest_id, 'MAX'), MODE(manifest_id, 'AVG') FROM {items} WHERE lpn_id = 'a'",
+        "outputs": [[1.0, 2.0, 1.5]]
+      },
+      {
+        "description": "Computed null inputs do not become a string mode",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(NULLIF(JSONEXTRACTSCALAR(meta, '$.action_user', 'STRING', ''), '')) FROM {items} WHERE lpn_id = 'nulls'",
+        "outputs": [[null]]
+      },
+      {
+        "description": "String expressions and post-aggregation transforms use the string result type",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(CONCAT(first_name, last_name, ' ')), UPPER(MODE(pallet_id)) FROM {items} WHERE lpn_id = 'a'",
+        "outputs": [["Alice Jones", "P2"]]
+      },
+      {
+        "description": "Empty aggregate inputs return null for both types",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id), MODE(created_on) FROM {items} WHERE lpn_id = 'missing'",
+        "outputs": [[null, null]]
+      },
+      {
+        "description": "Filtered typed modes return null while preserving their group",
+        "sql": "SET autoRewriteAggregationType=true; SELECT lpn_id, MODE(pallet_id) FILTER (WHERE manifest_id < 0), MODE(created_on) FILTER (WHERE manifest_id < 0) FROM {items} WHERE lpn_id = 'a' GROUP BY lpn_id",
+        "outputs": [["a", null, null]]
+      },
+      {
+        "description": "Timestamp mode can feed a parent comparison; fixture ingestion uses Los Angeles time and the SQL literal uses UTC",
+        "sql": "SET autoRewriteAggregationType=true; SELECT lpn_id FROM (SELECT lpn_id, MODE(created_on) AS mode_time FROM {items} GROUP BY lpn_id) WHERE mode_time = TIMESTAMP '2026-09-03 16:00:00.123'",
+        "outputs": [["a"]]
+      },
+      {
+        "description": "Joined grouping supports independent string, JSON, and timestamp modes, including unmatched outer rows",
+        "sql": "SET autoRewriteAggregationType=true; SELECT i.lpn_id, MODE(i.pallet_id), MODE(NULLIF(JSONEXTRACTSCALAR(i.meta, '$.action_user', 'STRING', ''), '')), MODE(m.code), MODE(m.status), MODE(m.created_on) FROM {items} i LEFT JOIN {manifests} m ON m.id = i.manifest_id GROUP BY i.lpn_id",
+        "outputs": [
+          ["a", "p2", "u1", "A", "pending", "2026-09-03 11:00:00.123"],
+          ["nulls", null, null, null, null, null],
+          ["ties", "a", null, null, null, null],
+          ["empty", "", null, null, null, null]
+        ]
+      }
+    ]
+  },
+  "mode_string_timestamp_direct": {
+    "comments": "Replicated input exercises AGGREGATE_DIRECT finalization when the physical optimizer colocates a global aggregate on one server.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "items": {
+        "replicated": true,
+        "schema": [
+          {"name": "pallet_id", "type": "STRING"},
+          {"name": "created_on", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          ["p2", "2026-09-03 08:00:00.001"],
+          ["p2", "2026-09-03 09:00:00.123"],
+          ["p1", "2026-09-03 09:00:00.123"],
+          [null, null]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Direct aggregate emits scalar string and timestamp values instead of frequency-map intermediates",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id), MODE(created_on) FROM {items}",
+        "outputs": [["p2", "2026-09-03 09:00:00.123"]]
+      },
+      {
+        "description": "Direct aggregate with no matching values emits typed nulls",
+        "sql": "SET autoRewriteAggregationType=true; SELECT MODE(pallet_id) FILTER (WHERE pallet_id = 'missing'), MODE(created_on) FILTER (WHERE pallet_id = 'missing') FROM {items}",
+        "outputs": [[null, null]]
+      }
+    ]
+  }
+}

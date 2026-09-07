@@ -44,6 +44,8 @@ import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 /// - MAX(longType) -> MAXLONG
 /// - SUM(longType) -> SUMLONG
 /// - SUM(intType) -> SUMINT
+/// - MODE(stringType) -> MODESTRING
+/// - MODE(timestampType) -> MODETIMESTAMP
 public class PinotAggregateFunctionRewriteRule extends RelOptRule {
   public static final PinotAggregateFunctionRewriteRule INSTANCE =
       new PinotAggregateFunctionRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
@@ -98,6 +100,19 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
 
     SqlAggFunction newAgg;
     switch (aggKind) {
+      case MODE: {
+        if (SqlTypeName.STRING_TYPES.contains(operandType)) {
+          newAgg = new PinotSqlAggFunction("MODESTRING", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),
+              aggFunction.getOperandTypeChecker(), SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else if (operandType == SqlTypeName.TIMESTAMP) {
+          newAgg = new PinotSqlAggFunction("MODETIMESTAMP", SqlKind.OTHER_FUNCTION,
+              ReturnTypes.explicit(call.getType()), aggFunction.getOperandTypeChecker(),
+              SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        } else {
+          return call;
+        }
+        break;
+      }
       case MIN: {
         if (SqlTypeName.STRING_TYPES.contains(operandType)) {
           newAgg = new PinotSqlAggFunction("MINSTRING", SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(call.getType()),

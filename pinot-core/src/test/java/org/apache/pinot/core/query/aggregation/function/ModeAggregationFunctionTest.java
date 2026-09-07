@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.sql.Timestamp;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -38,6 +39,102 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
         new Scenario(DataType.FLOAT, false),
         new Scenario(DataType.DOUBLE, false),
     };
+  }
+
+  @DataProvider(name = "stringScenarios")
+  Object[] stringScenarios() {
+    return new Object[]{new Scenario(DataType.STRING, true), new Scenario(DataType.STRING, false)};
+  }
+
+  @DataProvider(name = "timestampScenarios")
+  Object[] timestampScenarios() {
+    return new Object[]{new Scenario(DataType.TIMESTAMP, true), new Scenario(DataType.TIMESTAMP, false)};
+  }
+
+  @Test(dataProvider = "stringScenarios")
+  void stringModeMergesValueCountsAcrossSegments(Scenario scenario) {
+    // Each server has a different local mode. The shared value wins after merging the counts.
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "apple", "apple", "apple", "banana", "banana", "null")
+        .andSegment("myField", "banana")
+        .andOnSecondInstance("myField", "cherry", "cherry", "cherry", "banana", "banana", "null")
+        .whenQuery("select modeString(myField) as mode from testTable")
+        .thenResultTextIs("mode[STRING]\nbanana");
+  }
+
+  @Test(dataProvider = "stringScenarios")
+  void stringModeTieReducers(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "zebra", "apple", "zebra", "banana", "null")
+        .andOnSecondInstance("myField", "apple", "apple", "zebra", "null")
+        .whenQuery("select modeString(myField), modeString(myField, 'MIN'), modeString(myField, 'MAX') from testTable")
+        .thenResultIs("STRING | STRING | STRING", "apple | apple | zebra");
+  }
+
+  @Test(dataProvider = "stringScenarios")
+  void stringModeWithNullAndComputedEmptyString(Scenario scenario) {
+    // The CSV-backed fixture treats empty cells as null. Generate an actual empty string in the query instead.
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "empty", "empty", "apple")
+        .andOnSecondInstance("myField", "null", "null", "apple")
+        .whenQuery("select modeString(case when myField = 'empty' then '' else myField end) as mode from testTable")
+        .thenResultIs(new Object[]{""})
+        .whenQuery("select modeString(case when myField = 'empty' then null else myField end) as mode from testTable")
+        .thenResultTextIs("mode[STRING]\napple")
+        .whenQuery("select myField, modeString(case when myField = 'empty' then '' else myField end) from testTable "
+            + "group by myField order by myField")
+        .thenResultIs(new Object[]{"apple", "apple"}, new Object[]{"empty", ""}, new Object[]{null, null});
+  }
+
+  @Test(dataProvider = "stringScenarios")
+  void stringModeAllNullAndEmptyInput(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select modeString(myField) as mode from testTable")
+        .thenResultIs(new Object[]{null})
+        .whenQuery("select modeString(myField) as mode from testTable where myField = 'absent'")
+        .thenResultIs(new Object[]{null})
+        .whenQuery("select 'group', modeString(myField) as mode from testTable group by 'group'")
+        .thenResultIs("STRING | STRING", "group | null");
+  }
+
+  @Test(dataProvider = "stringScenarios")
+  void stringModeWithoutNullHandling(Scenario scenario) {
+    // Without null handling, three null defaults must beat the two ordinary values.
+    scenario.getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "null", "null", "apple")
+        .andOnSecondInstance("myField", "apple")
+        .whenQuery("select modeString(myField) as mode from testTable")
+        .thenResultIs(new Object[]{"null"})
+        .whenQuery("select modeString(myField) as mode from testTable where myField = 'absent'")
+        .thenResultIs(new Object[]{null});
+  }
+
+  @Test(dataProvider = "timestampScenarios")
+  void timestampModePreservesTypeAndTieOrdering(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "2026-09-03 10:11:12.123", "2026-09-04 10:11:12.456", "null")
+        .andOnSecondInstance("myField", "2026-09-04 10:11:12.456", "2026-09-03 10:11:12.123", "null")
+        .whenQuery("select modeTimestamp(myField) as mode, modeTimestamp(myField, 'MAX') as latest from testTable")
+        .thenResultTextIs("mode[TIMESTAMP] | latest[TIMESTAMP]\n"
+            + "2026-09-03 10:11:12.123 | 2026-09-04 10:11:12.456")
+        .whenQuery("select myField, modeTimestamp(myField) as mode from testTable group by myField order by myField")
+        .thenResultIs(new Object[]{"2026-09-03 10:11:12.123", "2026-09-03 10:11:12.123"},
+            new Object[]{"2026-09-04 10:11:12.456", "2026-09-04 10:11:12.456"}, new Object[]{null, null})
+        .whenQuery("select fromTimestamp(modeTimestamp(myField)) as epochMillis from testTable")
+        .thenResultIs(new Object[]{Timestamp.valueOf("2026-09-03 10:11:12.123").getTime()});
+  }
+
+  @Test(dataProvider = "timestampScenarios")
+  void timestampModeAllNullAndEmptyInput(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select modeTimestamp(myField) as mode from testTable")
+        .thenResultIs(new Object[]{null})
+        .whenQuery("select modeTimestamp(myField) as mode from testTable where myField > '2026-09-03 00:00:00'")
+        .thenResultIs(new Object[]{null});
   }
 
   public class Scenario {

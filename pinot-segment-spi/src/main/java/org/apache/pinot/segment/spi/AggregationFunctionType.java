@@ -63,7 +63,16 @@ public enum AggregationFunctionType {
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  MODE("mode", new ModeReturnTypeInference(), OperandTypes.or(
+      OperandTypes.NUMERIC, OperandTypes.CHARACTER, OperandTypes.TIMESTAMP,
+      OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 1),
+      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i == 1),
+      OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1)),
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, SqlKind.MODE),
+  MODESTRING("modeString", ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
+      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+  MODETIMESTAMP("modeTimestamp", ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
+      OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -410,6 +419,20 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
+    }
+  }
+
+  /// Preserves the legacy DOUBLE result for numeric MODE while retaining the type of string and timestamp inputs.
+  private static class ModeReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataType operandType = opBinding.getOperandType(0);
+      if (SqlTypeName.STRING_TYPES.contains(operandType.getSqlTypeName())
+          || operandType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
+        return ReturnTypes.ARG0_NULLABLE_IF_EMPTY.inferReturnType(opBinding);
+      }
+      return opBinding.getTypeFactory().createTypeWithNullability(
+          opBinding.getTypeFactory().createSqlType(SqlTypeName.DOUBLE), true);
     }
   }
 
