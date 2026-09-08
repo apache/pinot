@@ -2121,11 +2121,27 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       new ForwardIndexHandler(segmentDirectory, indexLoadingConfig).updateIndices(segmentDirectory.createWriter());
     }
 
-    // The stale star-tree is still in the segment, but it must be skipped rather than fail the load
+    // Pre-processing would repair the segment, so it has to be off for the loader to ever see the stale star-tree.
+    // 'skipSegmentPreprocess' is the knob that turns it off, and it takes effect through
+    // ImmutableSegmentLoader#needPreprocess, not SegmentPreProcessor#needProcess. It resolves live through the
+    // table config, so both assertions below use the same IndexLoadingConfig.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
+      indexingConfig.setSkipSegmentPreprocess(true);
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
+    }
+
+    // Load without pre-processing, as a caller does once needPreprocess() answers false. Note the flag alone is not
+    // enough: ImmutableSegmentLoader#preprocess does not re-check it, so a caller that asks for pre-processing
+    // unconditionally still repairs the segment.
     ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
     try {
       assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
-      assertTrue(segment.getStarTrees() == null || segment.getStarTrees().isEmpty());
+      // The stale star-tree is still on disk; it is skipped at load time, not removed
+      assertNotNull(segment.getSegmentMetadata().getStarTreeV2MetadataList());
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertTrue(starTrees.isEmpty());
     } finally {
       segment.destroy();
     }
@@ -2201,6 +2217,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      // The forward index still has to be flipped to RAW, so there is work to do
+      assertTrue(processor.needProcess());
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
@@ -2213,6 +2231,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       assertNotNull(segmentMetadata.getStarTreeV2MetadataList());
       assertTrue(StarTreeBuilderUtils.findUnloadableDimensions(segmentMetadata.getStarTreeV2MetadataList(),
           segmentMetadata).isEmpty());
+    }
+
+    // Pre-processing must be idempotent here: neither the star-tree nor the forward index and dictionary handlers
+    // may ask for more work on a second round.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertFalse(processor.needProcess());
     }
 
     ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
