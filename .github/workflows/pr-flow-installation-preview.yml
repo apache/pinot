@@ -46,7 +46,16 @@ jobs:
           FORCE: 'true'
           PREVIEW: 'true'
           PR_FLOW_OUTPUT_DIR: ${{ runner.temp }}/pr-flow
-        run: python .github/scripts/pr_flow/main.py run
+        run: |
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, '.github/scripts/pr_flow')
+          from main import GitHub
+          client = GitHub(os.environ['GITHUB_TOKEN'])
+          client.history(19489)
+          print('GitHub Actions publication identity and edit-history access verified')
+          PY
+          python .github/scripts/pr_flow/main.py run
       - name: Retain preview
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

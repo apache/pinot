@@ -84,6 +84,7 @@ class GitHub:
         self.token = token
         self.calls = 0
         self.viewer = None
+        self.history_metadata = {}
 
     def request(self, path, payload=None, graphql=False):
         self.calls += 1
@@ -124,7 +125,11 @@ class GitHub:
           viewer { login }
           repository(owner:"apache", name:"pinot") {
             pullRequest(number:$number) {
-              userContentEdits(first:20) { nodes { id editedAt diff editor { login } } }
+              createdAt
+              userContentEdits(first:20) {
+                includesCreatedEdit
+                nodes { id editedAt diff editor { login } }
+              }
             }
           }
         }"""
@@ -135,10 +140,19 @@ class GitHub:
         self.viewer = response["data"]["viewer"]["login"]
         if not isinstance(self.viewer, str) or not self.viewer:
             raise FlowError("Cannot verify the publication identity")
-        nodes = response["data"]["repository"]["pullRequest"]["userContentEdits"]["nodes"]
+        pull = response["data"]["repository"]["pullRequest"]
+        history = pull["userContentEdits"]
+        nodes = history["nodes"]
         if not isinstance(nodes, list) or any(not isinstance(item, dict) or not isinstance(item.get("id"), str)
-                                              or not isinstance(item.get("diff"), str) for item in nodes):
+                                              or "diff" not in item
+                                              or item["diff"] is not None and not isinstance(item["diff"], str)
+                                              for item in nodes):
             raise FlowError("PR edit history cannot be audited; preserving the description")
+        if (not isinstance(pull.get("createdAt"), str) or not pull["createdAt"]
+                or type(history.get("includesCreatedEdit")) is not bool):
+            raise FlowError("PR edit history metadata is unavailable; preserving the description")
+        self.history_metadata[number(pr_number)] = {
+            "created_at": pull["createdAt"], "includes_created_edit": history["includesCreatedEdit"]}
         return nodes
 
     def pages(self, suffix, maximum):
@@ -373,7 +387,7 @@ def save(directory, name, value):
     (directory / name).write_text(value if isinstance(value, str) else packed(value) + "\n", encoding="utf-8")
 
 
-def audit_publication(client, pr_number, before, desired, directory):
+def audit_publication(client, pr_number, before, original, desired, directory):
     """Detect the non-atomic PATCH race and retain any intervening author edits."""
     anchor = before[0]["id"] if before else None
     for attempt in range(3):
@@ -385,7 +399,15 @@ def audit_publication(client, pr_number, before, desired, directory):
                 reached_anchor = True
                 break
             new.append(edit)
-        save(directory, "publication-edit-history.json", {"before": before, "after": after})
+        metadata = client.history_metadata.get(pr_number, {})
+        # The first edit can expose the creation snapshot for the first time.
+        # Only the oldest entry can be that baseline; retain every intervening edit.
+        if (not before and new and metadata.get("includes_created_edit") is True
+                and new[-1].get("editedAt") == metadata.get("created_at")
+                and (new[-1]["diff"] if new[-1]["diff"] is not None else "") == original):
+            new = new[:-1]
+        save(directory, "publication-edit-history.json", {
+            "before": before, "after": after, "after_metadata": metadata})
         # GitHub can expose the edit history shortly after the PR body update.
         if not new and attempt < 2:
             time.sleep(1)
@@ -434,7 +456,7 @@ def run(client, key, model, pr_number, directory, force=False, preview=False, ex
             or last["head"]["sha"] != fresh["head"]["sha"] or last["base"]["sha"] != fresh["base"]["sha"]):
         return "deferred_pr_changed_before_publication"
     client.update(pr_number, desired)
-    audit_publication(client, pr_number, before_history, desired, directory)
+    audit_publication(client, pr_number, before_history, original, desired, directory)
     verified = client.pr(pr_number)
     if (verified.get("body") != desired or verified["head"]["sha"] != evidence["head_sha"]
             or verified["title"] != fresh["title"] or verified["base"]["sha"] != fresh["base"]["sha"]):

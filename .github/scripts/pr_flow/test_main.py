@@ -59,6 +59,7 @@ def client():
     api.pages.return_value = [{"filename": "src/Cache.java", "status": "modified", "additions": 1,
                                "deletions": 1, "patch": "@@ -1 +1 @@\n-old\n+new"}]
     api.history.return_value = []
+    api.history_metadata = {}
     api.viewer = "github-actions[bot]"
     return api
 
@@ -294,6 +295,23 @@ class CollectionTest(unittest.TestCase):
             api.pages("pulls", 100)
 
 
+class HistoryTest(unittest.TestCase):
+    def test_nullable_old_diff_and_creation_metadata_are_preserved(self):
+        api = flow.GitHub("test-token")
+        nodes = [{"id": "old-empty", "editedAt": "2026-09-08T00:00:00Z", "diff": None,
+                  "editor": {"login": "contributor"}}]
+        api.request = Mock(return_value={"data": {
+            "viewer": {"login": "github-actions[bot]"}, "repository": {"pullRequest": {
+                "createdAt": "2026-09-08T00:00:00Z",
+                "userContentEdits": {"includesCreatedEdit": True, "nodes": nodes}}}}})
+        self.assertEqual(api.history(42), nodes)
+        self.assertEqual(api.history_metadata[42], {
+            "created_at": "2026-09-08T00:00:00Z", "includes_created_edit": True})
+        query = api.request.call_args.args[1]["query"]
+        self.assertIn("createdAt", query)
+        self.assertIn("includesCreatedEdit", query)
+
+
 class PublicationTest(unittest.TestCase):
     def execute(self, api, directory, **options):
         with patch("main.generate", return_value=({"graph": "validated"}, {"total_tokens": 123})), \
@@ -350,6 +368,91 @@ class PublicationTest(unittest.TestCase):
             self.assertEqual(saved["body"], pr()["body"])
             self.assertEqual(flow.author_body(server, KEY), pr()["body"])
             self.assertTrue(flow.section(server["body"], 42, KEY))
+
+    def creation_history(self, api, server, original, creation_diff, intervening=None):
+        created_at = "2026-09-08T00:00:00Z"
+
+        def history(value):
+            published = server["body"] != original
+            api.history_metadata[value] = {"created_at": created_at, "includes_created_edit": published}
+            if not published:
+                return []
+            return ([{"id": "own-edit", "diff": server["body"], "editor": {"login": "github-actions[bot]"},
+                      "editedAt": "2026-09-08T01:00:00Z"}]
+                    + ([intervening] if intervening else [])
+                    + [{"id": "creation", "diff": creation_diff, "editor": {"login": "contributor"},
+                        "editedAt": created_at}])
+
+        api.pr.side_effect = lambda value: copy.deepcopy(server)
+        api.update.side_effect = lambda value, body: server.update(body=body)
+        api.history.side_effect = history
+
+    def test_first_publication_accepts_lazily_exposed_creation_snapshot(self):
+        api, server = client(), pr()
+        original = server["body"]
+        self.creation_history(api, server, original, original)
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(self.execute(api, directory), "published")
+            self.assertEqual(flow.author_body(server, KEY), original)
+            saved = json.loads((Path(directory) / "publication-edit-history.json").read_text())
+            self.assertEqual(saved["before"], [])
+            self.assertEqual([edit["id"] for edit in saved["after"]], ["own-edit", "creation"])
+            self.assertTrue(saved["after_metadata"]["includes_created_edit"])
+
+    def test_empty_original_accepts_null_creation_snapshot(self):
+        for original in ("", None):
+            with self.subTest(original=original):
+                api, server = client(), pr()
+                server["body"] = original
+                self.creation_history(api, server, original, None)
+                with tempfile.TemporaryDirectory() as directory:
+                    self.assertEqual(self.execute(api, directory), "published")
+                    self.assertEqual(flow.author_body(server, KEY), "")
+
+    def test_older_null_history_does_not_block_publication(self):
+        api, server = client(), pr()
+        original = server["body"]
+        old = {"id": "old-empty", "diff": None, "editor": {"login": "contributor"}}
+        api.pr.side_effect = lambda value: copy.deepcopy(server)
+        api.update.side_effect = lambda value, body: server.update(body=body)
+        api.history.side_effect = lambda value: ([old] if server["body"] == original else [
+            {"id": "own-edit", "diff": server["body"], "editor": {"login": "github-actions[bot]"}}, old])
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(self.execute(api, directory), "published")
+
+    def test_creation_snapshot_does_not_hide_a_genuine_intervening_edit(self):
+        api, server = client(), pr()
+        original = server["body"]
+        late = {"id": "late-edit", "diff": "Intervening human edit", "editor": {"login": "contributor"},
+                "editedAt": "2026-09-08T00:59:59Z"}
+        self.creation_history(api, server, original, original, intervening=late)
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(flow.FlowError, "Concurrent edit"):
+                self.execute(api, directory)
+            saved = json.loads((Path(directory) / "publication-edit-history.json").read_text())
+            self.assertEqual(saved["after"][1], late)
+
+    def test_creation_baseline_requires_exact_metadata_and_original_content(self):
+        own = {"id": "own-edit", "diff": "Desired", "editor": {"login": "github-actions[bot]"},
+               "editedAt": "2026-09-08T01:00:00Z"}
+        baseline = {"id": "creation", "diff": "Original", "editor": {"login": "contributor"},
+                    "editedAt": "2026-09-08T00:00:00Z"}
+        for mismatch in ("timestamp", "content", "includes_created_edit"):
+            with self.subTest(mismatch=mismatch):
+                api = client()
+                creation = copy.deepcopy(baseline)
+                metadata = {"created_at": baseline["editedAt"], "includes_created_edit": True}
+                if mismatch == "timestamp":
+                    creation["editedAt"] = "2026-09-08T00:00:01Z"
+                elif mismatch == "content":
+                    creation["diff"] = "A different original body"
+                else:
+                    metadata["includes_created_edit"] = False
+                api.history_metadata[42] = metadata
+                api.history.return_value = [own, creation]
+                with tempfile.TemporaryDirectory() as directory:
+                    with self.assertRaisesRegex(flow.FlowError, "Concurrent edit"):
+                        flow.audit_publication(api, 42, [], "Original", "Desired", Path(directory))
 
     def test_edit_between_final_read_and_patch_is_retained_and_reported(self):
         api = client()
