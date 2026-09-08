@@ -85,6 +85,8 @@ import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
@@ -138,6 +140,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryDispatcher _queryDispatcher;
   @Nullable
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
+  /// Statistics provider for cost-based planning. Never `null`; defaults to NoOp when not configured.
+  private final PinotStatisticsProvider _pinotStatisticsProvider;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
@@ -173,9 +177,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
       @Nullable ServerRoutingStatsManager statsManager) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        queryThrottler, failureDetector, threadAccountant, multiClusterRoutingContext, workerManager,
+        multiClusterWorkerManager, statsManager, null);
+  }
+
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
+      @Nullable ServerRoutingStatsManager statsManager,
+      @Nullable PinotStatisticsProvider statisticsProvider) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     _serverRoutingStatsManager = statsManager;
+    _pinotStatisticsProvider = statisticsProvider != null ? statisticsProvider : NoOpStatisticsProvider.INSTANCE;
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
 
@@ -521,7 +539,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+  @VisibleForTesting
+  ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
       long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
@@ -599,6 +618,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultHashFunction(defaultHashFunction)
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
+        .statisticsProvider(_pinotStatisticsProvider)
         .build();
   }
 

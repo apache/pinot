@@ -37,6 +37,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.TableReplicaHealth;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
@@ -427,6 +428,16 @@ public class BrokerRoutingManagerTest {
       List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, TimeBoundaryManager timeBoundaryManager,
       SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos, boolean disabled)
       throws Exception {
+    return createRoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector,
+        timeBoundaryManager, partitionMetadataManager, samplerInfos, disabled,
+        mock(SegmentZkMetadataFetcher.class));
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
+      List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos, boolean disabled,
+      SegmentZkMetadataFetcher segmentZkMetadataFetcher)
+      throws Exception {
     Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
@@ -436,7 +447,7 @@ public class BrokerRoutingManagerTest {
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
         "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), segmentSelector, segmentPruners,
         instanceSelector, 1, 1,
-        mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
+        segmentZkMetadataFetcher, timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
         disabled);
   }
 
@@ -467,6 +478,42 @@ public class BrokerRoutingManagerTest {
     for (BrokerGauge gauge : REPLICA_HEALTH_GAUGES) {
       verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TEST_TABLE), eq(gauge), anyLong());
     }
+  }
+
+  /// Removing routing is the only thing that tells a listener to release per-table state it holds
+  /// outside the routing entry (persisted statistics, caches), so the dispatch itself must be
+  /// covered — not just the listener implementations.
+  @Test
+  public void testRemoveRoutingNotifiesListeners()
+      throws Exception {
+    SegmentZkMetadataFetchListener listener = mock(SegmentZkMetadataFetchListener.class);
+    SegmentZkMetadataFetcher fetcher = mock(SegmentZkMetadataFetcher.class);
+    when(fetcher.getListeners()).thenReturn(List.of(listener));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, mock(SegmentSelector.class), List.of(),
+        mock(InstanceSelector.class), null, null, Map.of(), false, fetcher));
+
+    _routingManager.removeRouting(TEST_TABLE);
+
+    verify(listener).onRoutingRemoved();
+  }
+
+  /// One misbehaving listener must not strand the routing entry or block the others: the entry's
+  /// gauges would keep being exported for a table this broker no longer serves.
+  @Test
+  public void testRemoveRoutingIsolatesAThrowingListener()
+      throws Exception {
+    SegmentZkMetadataFetchListener throwing = mock(SegmentZkMetadataFetchListener.class);
+    doThrow(new RuntimeException("boom")).when(throwing).onRoutingRemoved();
+    SegmentZkMetadataFetchListener healthy = mock(SegmentZkMetadataFetchListener.class);
+    SegmentZkMetadataFetcher fetcher = mock(SegmentZkMetadataFetcher.class);
+    when(fetcher.getListeners()).thenReturn(List.of(throwing, healthy));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, mock(SegmentSelector.class), List.of(),
+        mock(InstanceSelector.class), null, null, Map.of(), false, fetcher));
+
+    _routingManager.removeRouting(TEST_TABLE);
+
+    verify(healthy).onRoutingRemoved();
+    verifyReplicaHealthGaugesRemoved();
   }
 
   @Test

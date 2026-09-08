@@ -41,6 +41,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -64,6 +66,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
 public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
@@ -319,5 +322,38 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
       return QueryDispatcher.runReducer(rewrittenPlan, Map.of(), Mockito.mock(MailboxService.class));
     }
+  }
+
+  /// The statistics provider reaching QueryEnvironment.Config is the single wire that makes
+  /// cost-based planning do anything. Every planner-side test builds a QueryEnvironment directly,
+  /// so if this forwarding were dropped they would all still pass and the feature would silently
+  /// be off in production.
+  @Test
+  public void testStatisticsProviderIsForwardedToTheQueryEnvironment() {
+    PinotStatisticsProvider provider = mock(PinotStatisticsProvider.class);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, "12345");
+    config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    BrokerQueryEventListenerFactory.init(config);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+
+    MultiStageBrokerRequestHandler withStats =
+        new MultiStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+            mock(RoutingManager.class), new AllowAllAccessControlFactory(), quotaManager,
+            mock(TableCache.class), mock(MultiStageQueryThrottler.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, mock(WorkerManager.class),
+            mock(WorkerManager.class), null, provider);
+    assertSame(withStats.getQueryEnvConf(null, Map.of(), 1L).getStatisticsProvider(), provider);
+
+    // The pre-existing constructor must keep planning on Calcite's heuristics.
+    MultiStageBrokerRequestHandler withoutStats =
+        new MultiStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+            mock(RoutingManager.class), new AllowAllAccessControlFactory(), quotaManager,
+            mock(TableCache.class), mock(MultiStageQueryThrottler.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, mock(WorkerManager.class),
+            mock(WorkerManager.class));
+    assertSame(withoutStats.getQueryEnvConf(null, Map.of(), 1L).getStatisticsProvider(),
+        NoOpStatisticsProvider.INSTANCE);
   }
 }
