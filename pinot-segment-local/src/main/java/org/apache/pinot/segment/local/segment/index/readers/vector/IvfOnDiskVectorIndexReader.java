@@ -220,7 +220,7 @@ public class IvfOnDiskVectorIndexReader
 
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
-    Preconditions.checkArgument(preFilterBitmap != null, "preFilterBitmap must not be null");
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
     if (preFilterBitmap.isEmpty()) {
       return new MutableRoaringBitmap();
     }
@@ -498,7 +498,7 @@ public class IvfOnDiskVectorIndexReader
     info.put("totalSearches", _totalSearches.get());
     info.put("filteredSearches", _filteredSearches.get());
     info.put("unfilteredSearches", _unfilteredSearches.get());
-    info.put("supportsPreFilter", true);
+    info.put("supportsPreFilter", supportsPreFilter());
     info.put("storageMode", "pinotDataBuffer");
 
     // Compute cache warmth estimate: fraction of centroids accessed at least once

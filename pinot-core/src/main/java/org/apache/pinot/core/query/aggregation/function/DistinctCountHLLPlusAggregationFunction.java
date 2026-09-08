@@ -41,8 +41,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class DistinctCountHLLPlusAggregationFunction
-    extends NullableSingleInputAggregationFunction<HyperLogLogPlus, Long> {
+public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLogPlus, Long> {
   // The parameter "p" determines the precision of the sparse list in HyperLogLogPlus.
   protected final int _p;
   // The "sp" parameter specifies the number of standard deviations that the sparse list's precision should be set to.

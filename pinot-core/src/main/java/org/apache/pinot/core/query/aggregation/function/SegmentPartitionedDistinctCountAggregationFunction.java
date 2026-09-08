@@ -47,8 +47,7 @@ import org.roaringbitmap.RoaringBitmap;
 ///
 /// This function calculates the exact number of distinct values within the segment, then simply sums up the results
 /// from different segments to get the final result.
-public class SegmentPartitionedDistinctCountAggregationFunction extends NullableSingleInputAggregationFunction<Long,
-    Long> {
+public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
 
   public SegmentPartitionedDistinctCountAggregationFunction(List<ExpressionContext> arguments,
       boolean nullHandlingEnabled) {

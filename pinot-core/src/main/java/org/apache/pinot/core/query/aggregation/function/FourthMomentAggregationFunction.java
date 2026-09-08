@@ -35,8 +35,7 @@ import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class FourthMomentAggregationFunction
-    extends NullableSingleInputAggregationFunction<PinotFourthMoment, Double> {
+public class FourthMomentAggregationFunction extends BaseSingleInputAggregationFunction<PinotFourthMoment, Double> {
 
   private final Type _type;
 
@@ -82,9 +81,6 @@ public class FourthMomentAggregationFunction
     // The moment is created inside the range, so a block with no non-null row leaves the holder untouched and
     // extractFinalResult sees the null that means nothing was aggregated
     forEachNotNull(length, blockValSetMap.get(_expression), (from, to) -> {
-      if (to == from) {
-        return;
-      }
       PinotFourthMoment m4 = aggregationResultHolder.getResult();
       if (m4 == null) {
         m4 = new PinotFourthMoment();

@@ -720,10 +720,14 @@ public class WorkerManagerTest {
   }
 
   @Test
-  public void testBrokerPruningPartitionedLeafSkippedForColocatedJoin() {
-    // A pre-partitioned leaf (here both sides of a colocated self-join) feeds a 1-to-1 direct exchange wired by worker
-    // id. Compacting a side's workers for pruned partitions could pair mismatched partitions across the exchange, so
-    // pruning is skipped for any pre-partitioned leaf and all partitions stay assigned on every scan.
+  public void testBrokerPruningColocatedJoinDropsClassesBothSidesPrune() {
+    // A pre-partitioned leaf feeds a 1-to-1 direct exchange wired by worker id, so no leaf may decide on its own what
+    // to drop. The colocation pre-pass decides for the whole group instead: a class survives when ANY member still
+    // holds a segment its own filter leaves, so dropping one is safe without knowing which operator sits above.
+    //
+    // This is the shape the reduction is worth having for. The filter is on the partition key, so it transfers across
+    // the join equality to both sides, both prune every class but 2, and the group's class list shrinks to [2]: one
+    // worker per leaf, and the query is dispatched to the single server holding partition 2 instead of all four.
     QueryEnvironment queryEnvironment =
         newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, List.of("seg2"), 3);
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
@@ -733,13 +737,76 @@ public class WorkerManagerTest {
             + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ t2 "
             + "ON t1.col1 = t2.col1 WHERE t1.col1 = 'foo'")) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
-      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
       List<DispatchablePlanFragment> leafFragments = leafFragments(dispatchableSubPlan);
-      assertFalse(leafFragments.isEmpty());
+      assertEquals(leafFragments.size(), 2);
       for (DispatchablePlanFragment leaf : leafFragments) {
-        assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 4, "Expected all partitions assigned for a pruned-gated "
-            + "colocated join leaf");
+        assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 1);
+        // Worker 0 stands for class 2 on both members, and carries that class's whole segment list.
+        assertEquals(assignedSegments(leaf, 0), List.of("seg2"));
       }
+      // Three classes dropped, one segment each, counted once per member of the group rather than from the routing
+      // table's own self-reported count (the fixture reports 3).
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 6);
+      // The point of the exercise: partition 2 lives only on server 3, so that is the whole dispatched set.
+      assertEquals(dispatchedServers(dispatchableSubPlan), Set.of(getServerInstance("localhost", 3).getInstanceId()));
+    }
+  }
+
+  @Test
+  public void testBrokerPruningSelfJoinKeepsTheTwoSidesVerdictsApart() {
+    // Two leaves scanning ONE table under two different filters. The pruning verdict is memoised per leaf fragment,
+    // and this is what says so: keyed by table instead, one side would inherit the other's verdict and the union would
+    // be computed from one filter applied twice.
+    //
+    // Left keeps only class 1, right only class 2, so the union is {1, 2} -- a result neither side's verdict produces
+    // on its own, and neither does either verdict applied to both sides ({1} or {2}).
+    QueryEnvironment queryEnvironment =
+        newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, 1, List.of(), List.of(), 0, false, Set.of(), Set.of(),
+            Map.of("left", List.of("seg1"), "right", List.of("seg2")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT t1.col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ t1 "
+            + "JOIN testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ t2 "
+            + "ON t1.col1 = t2.col1 WHERE t1.col2 = 'left' AND t2.col2 = 'right'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      List<DispatchablePlanFragment> leafFragments = leafFragments(dispatchableSubPlan);
+      assertEquals(leafFragments.size(), 2);
+      Map<Integer, Integer> workerIdToClass = new HashMap<>();
+      for (DispatchablePlanFragment leaf : leafFragments) {
+        // Both classes survive on both sides, and a class the group keeps dispatches all of its segments even on the
+        // member whose own filter excluded them.
+        assertEquals(workerIdToPartitions(leaf, "seg"), Map.of(0, Set.of(1), 1, Set.of(2)));
+        mergeWorkerIdToClass(workerIdToClass, leaf, "seg", 4);
+      }
+      assertEquals(workerIdToClass, Map.of(0, 1, 1, 2));
+      // Classes 0 and 3 dropped, one segment each, on each of the two leaves.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 4);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinKeepsClassOnlyOneSidePrunes() {
+    // The union rule, and the reason it is not an intersection: only t1 is filtered, t2 still holds every class, so
+    // every class keeps its worker and the fan-out is unchanged. Dropping the classes t1's filter empties would be
+    // wrong the moment the operator above is a RIGHT or FULL join, a union, or an anti-join -- and the worker
+    // assignment deliberately knows nothing about which one it is. A one-sided filter buying nothing is the price.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("a_seg1")),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("b_seg0", "b_seg1", "b_seg2", "b_seg3")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
+      DispatchablePlanFragment leafB = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B);
+      assertEquals(leafA.getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(leafB.getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+      // A kept class dispatches all of its segments on every member, including the ones the member's own filter
+      // excluded, so worker 0 of the filtered side still scans a_seg0.
+      assertEquals(workerIdToPartitions(leafA, "a_seg"),
+          Map.of(0, Set.of(0), 1, Set.of(1), 2, Set.of(2), 3, Set.of(3)));
+      assertEquals(workerIdToServer(leafA), workerIdToServer(leafB));
     }
   }
 
@@ -911,6 +978,29 @@ public class WorkerManagerTest {
       assertNotNull(leaf);
       assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 1);
       assertEquals(assignedSegments(leaf), List.of("seg2"));
+    }
+  }
+
+  @Test
+  public void testPlainPartitionedLeafWithEmptyPartitionPlansWhenNothingIsPruned() {
+    // Partition 3 holds no segment at all and the filter prunes nothing, so the pruning verdict is an EMPTY set rather
+    // than an absent one. It still has to be acted on: without a verdict every partition gets a worker, and the one
+    // with no segment has no server to place it on, which fails a query that plans perfectly well with 3 workers.
+    // Hence the verdict distinguishes "a filter ran and proved nothing" from "there was no filter".
+    QueryEnvironment queryEnvironment =
+        newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, 1, List.of("seg0", "seg1", "seg2"), List.of(), 0,
+            false, Set.of(3), Set.of());
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leaf = leafFragment(dispatchableSubPlan);
+      assertNotNull(leaf);
+      assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 3);
+      assertEquals(assignedSegments(leaf), List.of("seg0", "seg1", "seg2"));
+      // Nothing was pruned, only skipped for holding nothing, so nothing is reported as pruned either.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
     }
   }
 
@@ -1320,36 +1410,176 @@ public class WorkerManagerTest {
   }
 
   @Test
-  public void testColocatedJoinReducedGroupIgnoresBrokerPruning() {
-    // A reduced group's worker id is a position in the group's surviving class list, not a running counter over what a
-    // filter leaves behind, so broker pruning has to be off for its leaves. This shape is the only one that reaches
-    // that gate: a join written with is_colocated_by_join_keys marks its leaves pre-partitioned and is gated one step
-    // earlier (see testBrokerPruningPartitionedLeafSkippedForColocatedJoin), while a fact table joined with a
-    // replicated dimension table over an explicit local exchange is not marked pre-partitioned.
+  public void testBrokerPruningColocatedJoinDropsClassWhosePartitionsListNoSegment() {
+    // A partition whose entry lists no segment holds no rows, so its class is dropped even though the pruners proved
+    // nothing about any segment -- emptiness the planner can see for itself, not a pruning verdict. It is reported as
+    // such: numSegmentsPrunedByBroker stays 0 because no segment was pruned.
     //
-    // The fact table's class 3 is empty, so the group is reduced to [0, 1, 2], and the filter leaves only class 0. Were
-    // pruning left on, assignMultiplePartitionsPerWorker would find no segment for classes 1 and 2 and skip them
-    // WITHOUT consuming a worker id, leaving the leaf one worker while its class list still claimed three.
+    // The broker does not publish this shape today (a partition's entry is created together with its first segment),
+    // so this pins the behaviour rather than describing something reachable. It is what the golden physical plans
+    // record for a leaf whose fixture builds partitions this way.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).partitionsWithoutSegments(Set.of(2, 3))
+            .survivingSegments(List.of("a_seg0", "a_seg1")),
+        new ColocatedTableSpec(4, false).partitionsWithoutSegments(Set.of(2, 3))
+            .survivingSegments(List.of("b_seg0", "b_seg1")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo' AND "
+            + COLOCATED_TABLE_B + ".col2 = 'bar'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
+      assertEquals(workerIdToPartitions(leafA, "a_seg"), Map.of(0, Set.of(0), 1, Set.of(1)));
+      assertEquals(leafA.getWorkerIdToSegmentsMap().keySet(), Set.of(0, 1));
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinAllPrunedKeepsEveryPopulatedClass() {
+    // Both sides prune everything, so the filtered union is empty and the group falls back to its populated classes.
+    // A group reduced to zero workers would leave a 1-to-1 exchange with no worker to wire on either side, and the
+    // server-side filter returns the same empty result from the unreduced plan anyway. So the most selective query
+    // gets the least reduction, which is the same trade the leaf-level fallback makes.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of()),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of()));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinDisabledByQueryOption() {
+    // The existing useBrokerPruning switch is the kill switch for this too: with it off no routing query is built, so
+    // nothing is provably pruned and every populated class keeps its worker.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("a_seg1")),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("b_seg1")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=false; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinFallsBackOnRoutingFailure() {
+    // Pruning is best-effort on this path too: a routing call that throws must leave the group with every populated
+    // class rather than fail a query that would otherwise plan.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("a_seg1")),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("b_seg1")), TableType.OFFLINE, true);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B).getWorkerIdToSegmentsMap().size(), 4);
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinKeepsClassWithUnavailableSegment() {
+    // An unavailable segment was selected and not pruned, so the broker cannot prove its class empty. Class 2 keeps
+    // its worker on the strength of a_seg2 being unavailable rather than eliminated; only class 3, which both sides
+    // prune, is dropped. Reading "absent from the routing table" as "pruned" instead would silently drop the rows a
+    // transient outage hid.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("a_seg0", "a_seg1"))
+            .unavailableSegments(List.of("a_seg2")),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("b_seg0", "b_seg1")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo' AND "
+            + COLOCATED_TABLE_B + ".col2 = 'bar'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
+      DispatchablePlanFragment leafB = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B);
+      assertEquals(workerIdToPartitions(leafA, "a_seg"), Map.of(0, Set.of(0), 1, Set.of(1), 2, Set.of(2)));
+      assertEquals(workerIdToPartitions(leafB, "b_seg"), Map.of(0, Set.of(0), 1, Set.of(1), 2, Set.of(2)));
+      // Only class 3 dropped: one segment on each side.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 2);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningColocatedJoinStillPadsAMemberWithNoDataInASurvivingClass() {
+    // Emptiness padding and filter reduction have to compose. Table A holds nothing in class 3 while B does, and B's
+    // filter keeps class 3, so the class survives and A gets an empty worker for it -- placed on the server B picks
+    // for that class, so the exchange stays in process. Classes 1 and 2 are dropped because BOTH sides prune them.
+    //
+    // Padding is decided from unfiltered presence on purpose: a member that holds data the filter excludes dispatches
+    // it rather than being padded, so a surviving class always has the same segment list it would have unpruned.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).emptyPartitions(Set.of(3)).survivingSegments(List.of("a_seg0")),
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("b_seg0", "b_seg3")));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; " + colocatedJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo' AND "
+            + COLOCATED_TABLE_B + ".col2 = 'bar'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
+      DispatchablePlanFragment leafB = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B);
+      // Class list [0, 3]: worker 1 of A is the padded one, so it has an entry with no segment in it.
+      assertEquals(leafA.getWorkerIdToSegmentsMap().keySet(), Set.of(0, 1));
+      assertEquals(workerIdToPartitions(leafA, "a_seg"), Map.of(0, Set.of(0)));
+      assertEquals(workerIdToPartitions(leafB, "b_seg"), Map.of(0, Set.of(0), 1, Set.of(3)));
+      Map<Integer, Integer> workerIdToClass = new HashMap<>();
+      mergeWorkerIdToClass(workerIdToClass, leafA, "a_seg", 4);
+      mergeWorkerIdToClass(workerIdToClass, leafB, "b_seg", 4);
+      assertEquals(workerIdToClass, Map.of(0, 0, 1, 3));
+      // Worker 0 stands on the same server on both sides, which is what the 1-to-1 exchange is for.
+      assertEquals(workerIdToServer(leafA).get(0), workerIdToServer(leafB).get(0));
+      // Worker 1 is A's padded one. It would rather land on B's server for class 3 to keep the exchange in process,
+      // but here A holds no data on that server at all -- partition 3 lives only on server 4 and A is empty there --
+      // and a server with no data manager for the table fails the query outright, so it falls back to a server that
+      // provably hosts A and accepts one cross-server send.
+      assertEquals(workerIdToServer(leafB).get(1), getServerInstance("localhost", 4).getInstanceId());
+      assertTrue(Set.of(getServerInstance("localhost", 1).getInstanceId(),
+              getServerInstance("localhost", 2).getInstanceId(), getServerInstance("localhost", 3).getInstanceId())
+          .contains(workerIdToServer(leafA).get(1)), workerIdToServer(leafA).toString());
+      // Classes 1 and 2 dropped, one segment each on each side.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 4);
+    }
+  }
+
+  @Test
+  public void testColocatedJoinReducedGroupPrunesWholeClasses() {
+    // Emptiness reduction and filter reduction compose, on the one shape whose partitioned leaf is not marked
+    // pre-partitioned: a fact table joined with a replicated dimension table over an explicit local exchange.
+    //
+    // 8 partitions over 4 classes, so class c holds partitions c and c+4. The fact table's class 3 is empty, and the
+    // filter leaves only a_seg0 and a_seg4, which are both class 0. Emptiness drops class 3, the filter drops classes
+    // 1 and 2, and the class list ends up [0] -- a single worker holding the whole of class 0.
+    //
+    // This is the shape that used to be gated: reducing to [0] by dropping classes from the SHARED list keeps the
+    // worker id equal to its index in that list. Compacting at the leaf instead -- which is what
+    // assignMultiplePartitionsPerWorker would do if a per-leaf verdict ever reached it -- would leave the leaf one
+    // worker while its class list still claimed three.
     QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
         new ColocatedTableSpec(8, false).emptyPartitions(Set.of(3, 7)).survivingSegments(List.of("a_seg0", "a_seg4")),
         new ColocatedTableSpec(8, false));
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile("SET useBrokerPruning=true; "
         + replicatedDimensionJoinQuery(4) + " WHERE " + COLOCATED_TABLE_A + ".col2 = 'foo'")) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
-      // Nothing was pruned, even though the filtered routing query would have dropped 2 of the 3 surviving classes.
-      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+      // Classes 1 and 2, two segments each. Class 3 is empty, not pruned, so it is not counted.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 4);
       DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
       DispatchablePlanFragment leafB = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B);
-      // One worker per surviving class, holding both partitions of that class, and no worker dropped or padded.
-      assertEquals(workerIdToPartitions(leafA, "a_seg"), Map.of(0, Set.of(0, 4), 1, Set.of(1, 5), 2, Set.of(2, 6)));
-      assertEquals(leafA.getWorkerIdToSegmentsMap().keySet(), Set.of(0, 1, 2));
+      // One worker for the one surviving class, holding both of its partitions, and no worker dropped or padded.
+      assertEquals(workerIdToPartitions(leafA, "a_seg"), Map.of(0, Set.of(0, 4)));
+      assertEquals(leafA.getWorkerIdToSegmentsMap().keySet(), Set.of(0));
       Map<Integer, Integer> workerIdToClass = new HashMap<>();
       mergeWorkerIdToClass(workerIdToClass, leafA, "a_seg", 4);
-      assertEquals(workerIdToClass, Map.of(0, 0, 1, 1, 2, 2));
+      assertEquals(workerIdToClass, Map.of(0, 0));
       // The replicated leaf and the join derive their workers from the fact leaf, so they follow it class for class.
       assertEquals(leafB.getWorkerIdToSegmentsMap().keySet(), leafA.getWorkerIdToSegmentsMap().keySet());
       assertEquals(workerIdToServer(leafB), workerIdToServer(leafA));
-      assertEquals(joinFragment(dispatchableSubPlan).getWorkerMetadataList().size(), 3);
+      assertEquals(joinFragment(dispatchableSubPlan).getWorkerMetadataList().size(), 1);
     }
   }
 
@@ -1516,7 +1746,7 @@ public class WorkerManagerTest {
     Map<Integer, Map<String, List<String>>> segmentsMap =
         Map.of(0, offlineSegments("seg0"), 2, offlineSegments("seg2"));
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", serverMap, segmentsMap));
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, serverMap, segmentsMap));
     assertTrue(e.getMessage().contains("Missing server instance for worker: 1"), e.getMessage());
   }
 
@@ -1526,7 +1756,7 @@ public class WorkerManagerTest {
     Map<Integer, Map<String, List<String>>> segmentsMap =
         Map.of(0, offlineSegments("seg0"), 5, offlineSegments("seg5"));
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", serverMap, segmentsMap));
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, serverMap, segmentsMap));
     assertTrue(e.getMessage().contains("Missing segments for worker: 1"), e.getMessage());
   }
 
@@ -1535,7 +1765,7 @@ public class WorkerManagerTest {
     Map<String, List<String>> nullList = new HashMap<>();
     nullList.put(TableType.OFFLINE.name(), null);
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", Map.of(0, queryServerInstance(1)),
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
             Map.of(0, nullList)));
     assertTrue(e.getMessage().contains("Null segment list for table type: OFFLINE"), e.getMessage());
   }
@@ -1545,7 +1775,7 @@ public class WorkerManagerTest {
     // The server splits the request on the number of entries in this map, so a worker with no table type at all would
     // produce no server request.
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", Map.of(0, queryServerInstance(1)),
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
             Map.of(0, Map.of())));
     assertTrue(e.getMessage().contains("Expected 1 or 2 table types for worker: 0, got: 0"), e.getMessage());
   }
@@ -1557,7 +1787,7 @@ public class WorkerManagerTest {
     threeTypes.put(TableType.REALTIME.name(), List.of());
     threeTypes.put("HYBRID", List.of());
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", Map.of(0, queryServerInstance(1)),
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
             Map.of(0, threeTypes)));
     assertTrue(e.getMessage().contains("Expected 1 or 2 table types for worker: 0, got: 3"), e.getMessage());
   }
@@ -1566,9 +1796,28 @@ public class WorkerManagerTest {
   public void testCheckLeafWorkerAssignmentRejectsUnknownTableType() {
     // The server resolves one table data manager per key in this map, and reports a missing table for an unknown one.
     IllegalStateException e = expectThrows(IllegalStateException.class,
-        () -> WorkerManager.checkLeafWorkerAssignment("testTable", Map.of(0, queryServerInstance(1)),
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
             Map.of(0, Map.of("HYBRID", List.of()))));
     assertTrue(e.getMessage().contains("Unexpected table type: HYBRID for worker: 0"), e.getMessage());
+  }
+
+  @Test
+  public void testCheckLeafWorkerAssignmentRejectsFewerWorkersThanPartitionClasses() {
+    // A worker id of a colocated leaf IS an index into the group's shared class list, so a member that assigned fewer
+    // workers than the list has renumbered every class after the gap. checkPartitionClassAgreement cannot see it: it
+    // compares the shared array against itself, and both sides still hold the same instance.
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> WorkerManager.checkLeafWorkerAssignment("testTable", new int[]{0, 2, 5},
+            Map.of(0, queryServerInstance(1), 1, queryServerInstance(2)),
+            Map.of(0, offlineSegments("seg0"), 1, offlineSegments("seg2"))));
+    assertTrue(e.getMessage().contains("Got 2 workers for partition classes: [0, 2, 5]"), e.getMessage());
+  }
+
+  @Test
+  public void testCheckLeafWorkerAssignmentAcceptsOneWorkerPerPartitionClass() {
+    WorkerManager.checkLeafWorkerAssignment("testTable", new int[]{0, 2},
+        Map.of(0, queryServerInstance(1), 1, queryServerInstance(2)),
+        Map.of(0, offlineSegments("seg0"), 1, offlineSegments("seg2")));
   }
 
   @Test
@@ -1578,7 +1827,7 @@ public class WorkerManagerTest {
     Map<String, List<String>> hybridSegments = new HashMap<>();
     hybridSegments.put(TableType.OFFLINE.name(), List.of("segO0"));
     hybridSegments.put(TableType.REALTIME.name(), List.of("segR0"));
-    WorkerManager.checkLeafWorkerAssignment("testTable",
+    WorkerManager.checkLeafWorkerAssignment("testTable", null,
         Map.of(0, queryServerInstance(1), 1, queryServerInstance(2)),
         Map.of(0, hybridSegments, 1, Map.of(TableType.OFFLINE.name(), new ArrayList<>())));
   }
@@ -1694,6 +1943,13 @@ public class WorkerManagerTest {
   /// tables are registered under, so that the realtime-only shape can be covered too.
   private static QueryEnvironment newColocatedJoinQueryEnvironment(ColocatedTableSpec specA, ColocatedTableSpec specB,
       TableType tableType) {
+    return newColocatedJoinQueryEnvironment(specA, specB, tableType, false);
+  }
+
+  /// Same as [#newColocatedJoinQueryEnvironment(ColocatedTableSpec, ColocatedTableSpec, TableType)], with a routing
+  /// manager that throws on every routing call, to exercise the best-effort fallback.
+  private static QueryEnvironment newColocatedJoinQueryEnvironment(ColocatedTableSpec specA, ColocatedTableSpec specB,
+      TableType tableType, boolean throwOnRouting) {
     int numServers = 4;
     ServerInstance[] servers = new ServerInstance[numServers];
     Map<String, ServerInstance> enabledServers = new HashMap<>();
@@ -1710,13 +1966,15 @@ public class WorkerManagerTest {
         colocatedTablePartitionInfo(tableBWithType, "b_seg", servers, specB));
     Map<String, RoutingTable> routingTableByTable = new HashMap<>();
     if (specA._survivingSegments != null) {
-      routingTableByTable.put(tableAWithType, colocatedRoutingTable(servers, "a_seg", specA._survivingSegments));
+      routingTableByTable.put(tableAWithType,
+          colocatedRoutingTable(servers, "a_seg", specA._survivingSegments, specA._unavailableSegments));
     }
     if (specB._survivingSegments != null) {
-      routingTableByTable.put(tableBWithType, colocatedRoutingTable(servers, "b_seg", specB._survivingSegments));
+      routingTableByTable.put(tableBWithType,
+          colocatedRoutingTable(servers, "b_seg", specB._survivingSegments, specB._unavailableSegments));
     }
     PartitionedRoutingManager routingManager =
-        new PartitionedRoutingManager(enabledServers, partitionInfoByTable, routingTableByTable, false);
+        new PartitionedRoutingManager(enabledServers, partitionInfoByTable, routingTableByTable, throwOnRouting);
 
     Map<String, String> tableNameMap = new HashMap<>();
     tableNameMap.put(tableAWithType, tableAWithType);
@@ -1764,8 +2022,9 @@ public class WorkerManagerTest {
               : Set.of(servers[p % servers.length].getInstanceId());
         }
         // Mutable, like the lists the broker publishes: the assignment must hand out a copy rather than this instance.
-        partitionInfoMap[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers,
-            new ArrayList<>(List.of(segmentPrefix + p)));
+        List<String> segments = spec._partitionsWithoutSegments.contains(p) ? new ArrayList<>()
+            : new ArrayList<>(List.of(segmentPrefix + p));
+        partitionInfoMap[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers, segments);
       }
     }
     return new TablePartitionReplicatedServersInfo(tableNameWithType, "col1", "Hashcode", numPartitions,
@@ -1775,7 +2034,7 @@ public class WorkerManagerTest {
   /// Buckets the given surviving segments onto the server hosting their partition (partition `p` lives on server
   /// `p % 4`), i.e. builds what the routing manager returns for one colocated table's filtered routing query.
   private static RoutingTable colocatedRoutingTable(ServerInstance[] servers, String segmentPrefix,
-      List<String> survivingSegments) {
+      List<String> survivingSegments, List<String> unavailableSegments) {
     Map<ServerInstance, List<String>> serverToSegmentList = new HashMap<>();
     for (String segment : survivingSegments) {
       int partition = Integer.parseInt(segment.substring(segmentPrefix.length()));
@@ -1784,7 +2043,7 @@ public class WorkerManagerTest {
     Map<ServerInstance, SegmentsToQuery> serverToSegments = new HashMap<>();
     serverToSegmentList.forEach((server, segments) -> serverToSegments.put(server,
         new SegmentsToQuery(segments, List.of())));
-    return new RoutingTable(serverToSegments, List.of(), 0);
+    return new RoutingTable(serverToSegments, new ArrayList<>(unavailableSegments), 0);
   }
 
   /// How one side of a colocated join is laid out, for [#newColocatedJoinQueryEnvironment(ColocatedTableSpec,
@@ -1809,6 +2068,8 @@ public class WorkerManagerTest {
     /// null rather than a silently empty answer.
     @Nullable
     List<String> _survivingSegments;
+    List<String> _unavailableSegments = List.of();
+    Set<Integer> _partitionsWithoutSegments = Set.of();
 
     ColocatedTableSpec(int numPartitions, boolean everyServerHostsEveryPartition) {
       _numPartitions = numPartitions;
@@ -1842,6 +2103,21 @@ public class WorkerManagerTest {
 
     ColocatedTableSpec survivingSegments(List<String> survivingSegments) {
       _survivingSegments = survivingSegments;
+      return this;
+    }
+
+    /// Partitions that get an entry listing no segment, as opposed to no entry at all. The broker never publishes
+    /// this shape today -- a partition's entry is created together with its first segment -- so it exists only to pin
+    /// what the assignment does if one ever appears.
+    ColocatedTableSpec partitionsWithoutSegments(Set<Integer> partitionsWithoutSegments) {
+      _partitionsWithoutSegments = partitionsWithoutSegments;
+      return this;
+    }
+
+    /// Segments the routing table reports as unavailable. They were selected and not pruned, so the broker cannot
+    /// prove them empty and their partition class has to survive.
+    ColocatedTableSpec unavailableSegments(List<String> unavailableSegments) {
+      _unavailableSegments = unavailableSegments;
       return this;
     }
   }
@@ -2054,6 +2330,18 @@ public class WorkerManagerTest {
       int replicasPerPartition, List<String> survivingSegments, List<String> unavailableSegments,
       int reportedPrunedByRouting, boolean throwOnRouting, Set<Integer> emptyPartitions,
       Set<Integer> partitionsWithOnlyDeferredSegments) {
+    return newPartitionedQueryEnvironment(serverIdxPerPartition, numServers, replicasPerPartition, survivingSegments,
+        unavailableSegments, reportedPrunedByRouting, throwOnRouting, emptyPartitions,
+        partitionsWithOnlyDeferredSegments, Map.of());
+  }
+
+  /// Same again, with the surviving segments a leaf sees when its own filter carries a given string literal. Lets two
+  /// leaves scanning the SAME table be given different verdicts, which is the only way to tell a per-leaf pruning
+  /// verdict from a per-table one.
+  private static QueryEnvironment newPartitionedQueryEnvironment(int[] serverIdxPerPartition, int numServers,
+      int replicasPerPartition, List<String> survivingSegments, List<String> unavailableSegments,
+      int reportedPrunedByRouting, boolean throwOnRouting, Set<Integer> emptyPartitions,
+      Set<Integer> partitionsWithOnlyDeferredSegments, Map<String, List<String>> survivingSegmentsByFilterLiteral) {
     int numPartitions = serverIdxPerPartition.length;
     ServerInstance[] servers = new ServerInstance[numServers];
     Map<String, ServerInstance> enabledServers = new HashMap<>();
@@ -2095,6 +2383,7 @@ public class WorkerManagerTest {
     PartitionedRoutingManager routingManager = new PartitionedRoutingManager(enabledServers,
         Map.of(PARTITIONED_TABLE_OFFLINE, tablePartitionInfo),
         Map.of(PARTITIONED_TABLE_OFFLINE, prunedRoutingTable), throwOnRouting);
+    survivingSegmentsByFilterLiteral.forEach(routingManager::survivingSegmentsForFilterLiteral);
 
     Map<String, String> tableNameMap = new HashMap<>();
     tableNameMap.put(PARTITIONED_TABLE_OFFLINE, PARTITIONED_TABLE_OFFLINE);
@@ -2494,6 +2783,9 @@ public class WorkerManagerTest {
     private final Map<String, ServerInstance> _enabledServers;
     private final Map<String, TablePartitionReplicatedServersInfo> _partitionInfoByTable;
     private final Map<String, RoutingTable> _routingTableByTable;
+    /// Surviving segments for a leaf whose filter carries the given string literal, which is how a test gives two
+    /// leaves scanning ONE table two different verdicts. Falls back to the per-table routing table when absent.
+    private final Map<String, List<String>> _survivingSegmentsByFilterLiteral = new HashMap<>();
     private final boolean _throwOnRouting;
     @Nullable
     private final TimeBoundaryInfo _timeBoundaryInfo;
@@ -2541,8 +2833,67 @@ public class WorkerManagerTest {
     @Nullable
     @Override
     public List<String> getSegments(BrokerRequest brokerRequest) {
-      TablePartitionReplicatedServersInfo partitionInfo =
-          _partitionInfoByTable.get(brokerRequest.getQuerySource().getTableName());
+      return allSegments(brokerRequest.getQuerySource().getTableName());
+    }
+
+    /// Derives the pruned set the way `BaseBrokerRoutingManager` does -- everything selection offered minus what the
+    /// pruners kept -- from the same configured routing table. Unavailable segments were selected and not pruned, so
+    /// they stay out of it and keep their partition alive. A table with no routing table registered proves nothing,
+    /// which is what an unexpected routing call should look like.
+    @Override
+    public Set<String> getPrunedSegments(BrokerRequest brokerRequest) {
+      if (_throwOnRouting) {
+        throw new RuntimeException("Simulated routing failure");
+      }
+      validatePrunableFilter(brokerRequest.getPinotQuery().getFilterExpression());
+      String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+      Set<String> prunedSegments = new HashSet<>(allSegments(tableNameWithType));
+      String filterLiteral = firstStringLiteral(brokerRequest.getPinotQuery().getFilterExpression());
+      List<String> survivingSegments =
+          filterLiteral != null ? _survivingSegmentsByFilterLiteral.get(filterLiteral) : null;
+      if (survivingSegments != null) {
+        prunedSegments.removeAll(survivingSegments);
+        return prunedSegments;
+      }
+      RoutingTable routingTable = _routingTableByTable.get(tableNameWithType);
+      if (routingTable == null) {
+        return Set.of();
+      }
+      for (SegmentsToQuery segmentsToQuery : routingTable.getServerInstanceToSegmentsMap().values()) {
+        prunedSegments.removeAll(segmentsToQuery.getSegments());
+      }
+      prunedSegments.removeAll(routingTable.getUnavailableSegments());
+      return prunedSegments;
+    }
+
+    PartitionedRoutingManager survivingSegmentsForFilterLiteral(String filterLiteral, List<String> segments) {
+      _survivingSegmentsByFilterLiteral.put(filterLiteral, segments);
+      return this;
+    }
+
+    /// The first string literal in the filter, which the tests use as a stand-in for "which filter is this".
+    @Nullable
+    private static String firstStringLiteral(@Nullable Expression expression) {
+      if (expression == null) {
+        return null;
+      }
+      if (expression.getLiteral() != null && expression.getLiteral().isSetStringValue()) {
+        return expression.getLiteral().getStringValue();
+      }
+      Function function = expression.getFunctionCall();
+      if (function != null) {
+        for (Expression operand : function.getOperands()) {
+          String literal = firstStringLiteral(operand);
+          if (literal != null) {
+            return literal;
+          }
+        }
+      }
+      return null;
+    }
+
+    private List<String> allSegments(String tableNameWithType) {
+      TablePartitionReplicatedServersInfo partitionInfo = _partitionInfoByTable.get(tableNameWithType);
       if (partitionInfo == null) {
         return List.of();
       }

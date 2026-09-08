@@ -499,9 +499,9 @@ public class AggregationFunctionFactory {
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
                 nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMAX:
-            return new ParentExprMinMaxAggregationFunction(arguments, true);
+            return new ParentExprMinMaxAggregationFunction(arguments, true, nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMIN:
-            return new ParentExprMinMaxAggregationFunction(arguments, false);
+            return new ParentExprMinMaxAggregationFunction(arguments, false, nullHandlingEnabled);
           case PINOTCHILDAGGEXPRMAX:
             return new ChildExprMinMaxAggregationFunction(arguments, true);
           case PINOTCHILDAGGEXPRMIN:
@@ -535,7 +535,7 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWULL:
             return new DistinctCountRawULLAggregationFunction(arguments, nullHandlingEnabled);
           case TIMESERIESAGGREGATE:
-            return new TimeSeriesAggregationFunction(arguments);
+            return new TimeSeriesAggregationFunction(arguments, nullHandlingEnabled);
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }

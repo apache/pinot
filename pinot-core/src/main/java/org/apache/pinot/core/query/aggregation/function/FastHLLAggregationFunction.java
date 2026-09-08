@@ -37,7 +37,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /// Use [DistinctCountHLLAggregationFunction] on byte\[\] for serialized HyperLogLog.
 @Deprecated
-public class FastHLLAggregationFunction extends NullableSingleInputAggregationFunction<HyperLogLog, Long> {
+public class FastHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
   public static final int DEFAULT_LOG2M = 8;
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 

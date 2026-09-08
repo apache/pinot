@@ -42,8 +42,7 @@ import org.apache.pinot.spi.utils.ArrayCopyUtils;
 /// usage example:
 /// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
 /// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
-public class HistogramAggregationFunction
-    extends NullableSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
   private static final int INVALID_BIN = -1;
@@ -148,10 +147,6 @@ public class HistogramAggregationFunction
     return ret;
   }
 
-  /// Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
-  ///
-  /// @param val input value
-  /// @return bin id
   /// Counts one value into the supplied histogram, ignoring values that fall outside every bin.
   private void increment(double[] histogram, double value) {
     int binId = getBinId(value);
@@ -160,6 +155,10 @@ public class HistogramAggregationFunction
     }
   }
 
+  /// Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
+  ///
+  /// @param val input value
+  /// @return bin id
   private int getBinId(double val) {
     if (val > _upper || val < _lower) {
       return INVALID_BIN;

@@ -202,6 +202,12 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
 
     disableFailure();
 
+    // The repair performed by the validation run below discovers the server hosting each stranded segment through
+    // the external view, so wait for the external view to catch up with the ideal state first. E.g. when commit-end
+    // fails, the stranded segments are already ONLINE in the ideal state, but on a loaded host the server may not
+    // have processed the CONSUMING -> ONLINE transitions yet, and the one-shot repair would permanently miss them.
+    PauselessRealtimeTestUtils.waitForExternalViewToConverge(_helixResourceManager, tableNameWithType, 100_000L);
+
     // Force-expire the segments stranded by the injected failure instead of waiting out the max segment completion
     // time: they become immediately eligible for repair, and their in-flight commit attempts keep getting rejected,
     // so the single validation run below stays the only recovery path under test. Segments created afterwards keep

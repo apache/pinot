@@ -38,7 +38,6 @@ import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
@@ -82,7 +81,7 @@ import org.roaringbitmap.RoaringBitmap;
 ///     )
 @SuppressWarnings({"rawtypes"})
 public class DistinctCountCPCSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<CpcSketchAccumulator, Comparable> {
+    extends BaseSingleInputAggregationFunction<CpcSketchAccumulator, Comparable> {
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
   protected int _lgNominalEntries;
@@ -102,7 +101,7 @@ public class DistinctCountCPCSketchAggregationFunction
           "CPC Sketch Aggregation Function expects the second argument to be a literal (parameters)," + " but got: ",
           secondArgument.getType());
 
-      if (secondArgument.getLiteral().getType() == FieldSpec.DataType.STRING) {
+      if (secondArgument.getLiteral().getType() == DataType.STRING) {
         Parameters parameters = new Parameters(secondArgument.getLiteral().getStringValue());
         // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
         _accumulatorThreshold = parameters.getAccumulatorThreshold();

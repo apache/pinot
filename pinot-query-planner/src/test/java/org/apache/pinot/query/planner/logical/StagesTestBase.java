@@ -34,12 +34,14 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 
@@ -152,6 +154,67 @@ public class StagesTestBase {
   public SimpleChildBuilder<TableScanNode> tableScan(String tableName) {
     return (stageId, mySchema, myHints) -> new TableScanNode(stageId, mySchema, myHints, List.of(), tableName,
         List.of());
+  }
+
+  /// Creates an ASOF join node whose whole comparison lives in the match condition, as ASOF joins require.
+  public SimpleChildBuilder<JoinNode> asofJoin(
+      SimpleChildBuilder<? extends PlanNode> leftBuilder,
+      SimpleChildBuilder<? extends PlanNode> rightBuilder,
+      RexExpression matchCondition) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode left = leftBuilder.build(stageId);
+      PlanNode right = rightBuilder.build(stageId);
+      return new JoinNode(stageId, mySchema, myHints, List.of(left, right), JoinRelType.LEFT, List.of(0), List.of(0),
+          List.of(), JoinNode.JoinStrategy.ASOF, matchCondition);
+    };
+  }
+
+  /// Creates a `COUNT` aggregate node grouping on the first two columns with the given grouping sets.
+  public SimpleChildBuilder<AggregateNode> aggregate(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      List<List<Integer>> groupingSets) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      RexExpression.FunctionCall count =
+          new RexExpression.FunctionCall(DataSchema.ColumnDataType.LONG, "COUNT", List.of());
+      return new AggregateNode(stageId, schema, myHints, List.of(input), List.of(count), List.of(), List.of(0, 1),
+          AggregateNode.AggType.DIRECT, false, List.of(), -1, groupingSets);
+    };
+  }
+
+  /// Creates a window node over the given child with a single aggregate call and no frame exclusion.
+  public SimpleChildBuilder<WindowNode> window(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      RexExpression.FunctionCall aggCall) {
+    return window(childBuilder, aggCall, WindowNode.WindowExclusion.NO_OTHERS);
+  }
+
+  /// Creates a window node over the given child with a single aggregate call.
+  ///
+  /// The frame is `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` partitioned on the first column with no
+  /// collations. Only the fields that tests need to vary are exposed as parameters; add more if a test needs them.
+  public SimpleChildBuilder<WindowNode> window(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      RexExpression.FunctionCall aggCall, WindowNode.WindowExclusion exclude) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new WindowNode(stageId, schema, myHints, List.of(input), List.of(0), List.of(), List.of(aggCall),
+          WindowNode.WindowFrameType.ROWS, Integer.MIN_VALUE, 0, exclude, List.of());
+    };
+  }
+
+  /// Creates a `LAST_VALUE` window aggregate call over the first input column that respects nulls.
+  public static RexExpression.FunctionCall lastValueRespectingNulls() {
+    return lastValue(false);
+  }
+
+  /// Creates a `LAST_VALUE` window aggregate call over the first input column that ignores nulls.
+  public static RexExpression.FunctionCall lastValueIgnoringNulls() {
+    return lastValue(true);
+  }
+
+  private static RexExpression.FunctionCall lastValue(boolean ignoreNulls) {
+    return new RexExpression.FunctionCall(DataSchema.ColumnDataType.INT, "LAST_VALUE",
+        List.of(new RexExpression.InputRef(0)), false, ignoreNulls);
   }
 
   /// Looks for the mailbox that corresponds to the given stageId.

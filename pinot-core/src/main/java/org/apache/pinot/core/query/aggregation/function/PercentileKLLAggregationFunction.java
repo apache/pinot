@@ -57,7 +57,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///   There is a variation of the function (**PERCENTILE_RAW_KLL**) that returns the Base64 encoded
 ///   sketch object to be used externally.
 public class PercentileKLLAggregationFunction
-    extends NullableSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
+    extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
 
   protected final double _percentile;
   protected int _kValue;

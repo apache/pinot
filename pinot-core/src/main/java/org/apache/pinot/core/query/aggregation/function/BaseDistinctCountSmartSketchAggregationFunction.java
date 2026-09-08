@@ -48,7 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// Subclasses provide the sketch-specific behavior (conversion and dictionary handling).
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseDistinctCountSmartSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<Object, Integer> {
+    extends BaseSingleInputAggregationFunction<Object, Integer> {
   // Use empty IntOpenHashSet as a placeholder for empty result
   protected static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
 

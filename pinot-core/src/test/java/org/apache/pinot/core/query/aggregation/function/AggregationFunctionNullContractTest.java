@@ -97,8 +97,13 @@ public class AggregationFunctionNullContractTest {
   /// Types that cannot be constructed from a bare [FunctionContext] at all, and so cannot be checked here.
   ///
   /// - `EXPRMIN` / `EXPRMAX` are rejected by the factory outright; they are only legal in a selection without an alias,
-  ///   and are rewritten into the parent/child pair above before execution.
-  /// - `TIMESERIESAGGREGATE` needs time-series plan context that a bare function context cannot supply.
+  ///   and are rewritten into the parent/child pair above before execution. Covered by `ExprMinMaxNullHandlingTest`,
+  ///   which drives the parent directly.
+  /// - `TIMESERIESAGGREGATE` needs time-series plan context that a bare function context cannot supply. Covered by
+  ///   `TimeSeriesAggregationNullHandlingTest`.
+  ///
+  /// Being here means the contract is checked by the named test instead, not that it goes unchecked. A new entry
+  /// needs a test of its own before it is added.
   ///
   /// [#testEverySkippedTypeIsAccountedFor] pins this exactly, in both directions, so a newly added function cannot drop
   /// out of the contract unnoticed.

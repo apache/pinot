@@ -73,12 +73,12 @@ jobs:
       # JAVA_HOME_11_<arch>, which the script falls back on if this step's output is unavailable.
       - name: Set up Java 11 (verification runtime)
         id: java11
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 11
           distribution: ${{ matrix.distribution }}
       - name: Set up JDK ${{ matrix.build-java }} (build)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: ${{ matrix.build-java }}
           distribution: ${{ matrix.distribution }}

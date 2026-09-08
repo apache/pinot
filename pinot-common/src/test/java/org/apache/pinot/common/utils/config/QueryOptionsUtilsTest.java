@@ -39,7 +39,8 @@ public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
-  private static final List<String> NON_NEGATIVE_INT_KEYS = List.of(MULTI_STAGE_LEAF_LIMIT);
+  private static final List<String> NON_NEGATIVE_INT_KEYS =
+      List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
@@ -336,6 +337,10 @@ public class QueryOptionsUtilsTest {
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
+      case STREAMING_GROUP_BY_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingGroupByFlushThreshold(map);
+      case STREAMING_DISTINCT_FLUSH_THRESHOLD:
+        return QueryOptionsUtils.getStreamingDistinctFlushThreshold(map);
       // Unbounded ints
       case MIN_SEGMENT_GROUP_TRIM_SIZE:
         return QueryOptionsUtils.getMinSegmentGroupTrimSize(map);

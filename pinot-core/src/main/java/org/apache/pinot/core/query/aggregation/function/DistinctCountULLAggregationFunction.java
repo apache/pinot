@@ -42,8 +42,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class DistinctCountULLAggregationFunction extends NullableSingleInputAggregationFunction<UltraLogLog,
-    Comparable> {
+public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregationFunction<UltraLogLog, Comparable> {
   protected final int _p;
 
   public DistinctCountULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

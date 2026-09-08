@@ -19,12 +19,14 @@
 package org.apache.pinot.core.auth;
 
 import java.lang.reflect.Method;
+import java.net.URI;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -102,6 +104,40 @@ public class FineGrainedAuthUtilsTest {
     }
   }
 
+  @Test
+  public void testMissingTableParameterIsBadRequest() {
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
+
+    WebApplicationException exception = Assert.expectThrows(WebApplicationException.class,
+        () -> FineGrainedAuthUtils.validateFineGrainedAuth(getTableAnnotatedMethod(), mockUriInfo,
+            Mockito.mock(HttpHeaders.class), Mockito.mock(FineGrainedAccessControl.class)));
+
+    Assert.assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    Assert.assertTrue(exception.getMessage().contains("Missing required table parameter 'tableName'"));
+  }
+
+  @Test
+  public void testInvalidTableParameterIsBadRequest() {
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    MultivaluedHashMap<String, String> queryParameters = new MultivaluedHashMap<>();
+    queryParameters.putSingle("tableName", "databaseB.testTable");
+    Mockito.when(mockUriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    Mockito.when(mockUriInfo.getQueryParameters()).thenReturn(queryParameters);
+    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/v2/segments"));
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    Mockito.when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("databaseA");
+
+    WebApplicationException exception = Assert.expectThrows(WebApplicationException.class,
+        () -> FineGrainedAuthUtils.validateFineGrainedAuth(getTableAnnotatedMethod(), mockUriInfo, headers,
+            Mockito.mock(FineGrainedAccessControl.class)));
+
+    Assert.assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    Assert.assertTrue(exception.getMessage().contains("Invalid table parameter 'tableName'"));
+  }
+
   static class TestResource {
     @Authorize(targetType = TargetType.CLUSTER, action = "getCluster")
     void getCluster() {
@@ -110,11 +146,23 @@ public class FineGrainedAuthUtilsTest {
     @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "getTable")
     void getTable() {
     }
+
+    @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "uploadSegment")
+    void uploadSegment() {
+    }
   }
 
   private Method getAnnotatedMethod() {
     try {
       return TestResource.class.getDeclaredMethod("getCluster");
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Method getTableAnnotatedMethod() {
+    try {
+      return TestResource.class.getDeclaredMethod("uploadSegment");
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }

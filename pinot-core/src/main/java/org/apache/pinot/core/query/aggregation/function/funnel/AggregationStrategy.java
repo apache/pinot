@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.NullSkippingUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -311,15 +312,7 @@ public abstract class AggregationStrategy<A> {
   /// a composite key a null in any component leaves the whole key undefined, so the row is skipped.
   private void forEachNotNullCorrelation(int length, Map<ExpressionContext, BlockValSet> blockValSetMap,
       RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmap nullBitmap = correlationNullBitmap(blockValSetMap);
-    if (nullBitmap == null) {
-      consumer.consume(0, length);
-      return;
-    }
-    // Skip if the entire block is null
-    if (!nullBitmap.contains(0, length)) {
-      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
-    }
+    NullSkippingUtils.forEachNotNull(_nullHandlingEnabled, length, correlationNullBitmap(blockValSetMap), consumer);
   }
 
   /// Returns the union of the correlation columns' null bitmaps, or `null` when no row is null.

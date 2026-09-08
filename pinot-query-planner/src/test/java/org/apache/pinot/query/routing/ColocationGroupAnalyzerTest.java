@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -54,7 +55,7 @@ public class ColocationGroupAnalyzerTest {
 
     assertEquals(groups.size(), 1);
     assertEquals(groups.get(0)._partitionSize, 4);
-    assertEquals(Set.copyOf(groups.get(0)._partitionedLeafFragmentIds), Set.of(2, 3));
+    assertEquals(Set.copyOf(fragmentIds(groups.get(0))), Set.of(2, 3));
   }
 
   /// A member that also receives a shuffled send must keep today's worker count, or that sender's rows land on
@@ -78,7 +79,7 @@ public class ColocationGroupAnalyzerTest {
         ColocationGroupAnalyzer.findReducibleGroups(twoLeafPlan(RelDistribution.Type.SINGLETON), metadataMap);
 
     assertEquals(groups.size(), 1);
-    assertEquals(Set.copyOf(groups.get(0)._partitionedLeafFragmentIds), Set.of(2, 3));
+    assertEquals(Set.copyOf(fragmentIds(groups.get(0))), Set.of(2, 3));
   }
 
   /// Reducing the worker count must not turn mismatched counts into a match for a pre-partitioned BROADCAST send, which
@@ -227,7 +228,7 @@ public class ColocationGroupAnalyzerTest {
 
     assertEquals(groups.size(), 1);
     // Only the partitioned leaf decides which classes survive.
-    assertEquals(groups.get(0)._partitionedLeafFragmentIds, List.of(2));
+    assertEquals(fragmentIds(groups.get(0)), List.of(2));
   }
 
   /// A lookup join's workers come from its single local exchange child, so its own hints (a different partition size
@@ -249,7 +250,7 @@ public class ColocationGroupAnalyzerTest {
 
     assertEquals(groups.size(), 1);
     assertEquals(groups.get(0)._partitionSize, 4);
-    assertEquals(groups.get(0)._partitionedLeafFragmentIds, List.of(2));
+    assertEquals(fragmentIds(groups.get(0)), List.of(2));
   }
 
   /// A group of intermediate stages only has nothing to reduce: only a partitioned leaf's data decides the classes.
@@ -287,7 +288,11 @@ public class ColocationGroupAnalyzerTest {
 
     // One group, and the spooled leaf is listed once rather than once per receiver.
     assertEquals(groups.size(), 1);
-    assertEquals(groups.get(0)._partitionedLeafFragmentIds, List.of(3));
+    assertEquals(fragmentIds(groups.get(0)), List.of(3));
+  }
+
+  private static List<Integer> fragmentIds(ColocationGroupAnalyzer.ColocationGroup group) {
+    return group._partitionedLeafFragments.stream().map(PlanFragment::getFragmentId).collect(Collectors.toList());
   }
 
   /// Builds a 4 stage plan: 2 partitioned leaves (stages 2 and 3) sending to a join stage (stage 1), which sends

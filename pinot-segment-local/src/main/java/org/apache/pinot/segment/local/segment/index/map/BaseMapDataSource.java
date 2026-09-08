@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
-import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
@@ -35,13 +35,9 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseMapDataSource extends BaseDataSource implements MapDataSource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseMapDataSource.class);
-
   protected final Map<String, DataSource> _keyDataSources;
 
   public BaseMapDataSource(DataSourceMetadata dataSourceMetadata, ColumnIndexContainer indexContainer) {
@@ -60,30 +56,22 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
     return null;
   }
 
-  /// Get the Data Source representation of a single key within this map column.
-  ///
-  /// @param key to get the DataSource for
-  /// @return DataSource for the key
+  /// Returns the data source for a single key within this map column. A key absent from the map resolves to an
+  /// all-null [NullDataSource] typed as the map's value field.
   public DataSource getDataSource(String key) {
-    if (_keyDataSources.containsKey(key)) {
-      return _keyDataSources.get(key);
-    }
-    Map<IndexType, IndexReader> indexes = getMapIndexReader().getIndexes(key);
-
-    if (indexes == null) {
-      // The key does not exist in the map
-      return new NullDataSource(key);
-    }
-
-    try (ColumnIndexContainer indexContainer = new ColumnIndexContainer.FromMap(indexes)) {
-      ColumnMetadata keyMeta = getMapIndexReader().getColumnMetadata(key);
-      ImmutableDataSource dataSource = new ImmutableDataSource(keyMeta, indexContainer);
-      _keyDataSources.put(key, dataSource);
+    DataSource dataSource = _keyDataSources.get(key);
+    if (dataSource != null) {
       return dataSource;
-    } catch (Exception ex) {
-      LOGGER.error("Caught exception while creating key data source for key: {}", key, ex);
     }
-    return null;
+    MapIndexReader mapIndexReader = getMapIndexReader();
+    Map<IndexType, IndexReader> indexes = mapIndexReader.getIndexes(key);
+    if (indexes == null) {
+      return new NullDataSource(getFieldSpec().getValueFieldSpec(), getDataSourceMetadata().getNumDocs());
+    }
+    dataSource =
+        new ImmutableDataSource(mapIndexReader.getColumnMetadata(key), new ColumnIndexContainer.FromMap(indexes));
+    _keyDataSources.put(key, dataSource);
+    return dataSource;
   }
 
   public abstract MapIndexReader getMapIndexReader();

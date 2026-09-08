@@ -44,6 +44,9 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       MailboxSendNode sendNode = (MailboxSendNode) node;
       // NOTE: Using Integer to avoid boxing
       Integer senderStageId = sendNode.getStageId();
+      // Captured before the loop because the branches below rewrite it, and one send node can serve several
+      // receiver stages (spools) -- reading it per iteration would make the wiring depend on visit order.
+      RelDistribution.Type originalDistributionType = sendNode.getDistributionType();
       for (Integer receiverStageId : sendNode.getReceiverStageIds()) {
         Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
         DispatchablePlanMetadata senderMetadata = metadataMap.get(senderStageId);
@@ -55,23 +58,37 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
 
         int numSenders = senderServerMap.size();
         int numReceivers = receiverServerMap.size();
-        if (sendNode.getDistributionType() == RelDistribution.Type.SINGLETON) {
-          // NOTE: We use SINGLETON to represent a local exchange. The actual distribution type is determined by the
-          //       parallelism: 1-to-1 when sender and receiver have the same number of workers, otherwise the data is
-          //       hash distributed to the parallel receivers on each server. computeDirectExchange handles the
-          //       co-location assumption and its cross-server fallback.
-          if (numSenders != numReceivers) {
-            // Local exchange with parallelism: hash distribute to the parallel receivers, so keys are required.
+        if (originalDistributionType == RelDistribution.Type.SINGLETON) {
+          // NOTE: We use SINGLETON to represent a local exchange. 1-to-1 when sender and receiver have the same
+          //       number of workers, otherwise each sender fans out to the parallel receivers on its OWN server.
+          if (numSenders == 0) {
+            // A fully pruned sender stage has nothing to wire, and the parallelism below would divide by zero.
+            connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
+            connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
+          } else if (numSenders == numReceivers) {
+            computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
+                senderServerMap, receiverServerMap, numSenders, 1, senderMetadata, receiverMetadata);
+          } else {
+            // Redistributing across several receivers needs keys. A keyless local exchange here is the colocated
+            // dynamic-broadcast semi-join build side, which needs EVERY receiver to see the whole build side.
             // TODO: Support local exchange with parallelism but no key
             Preconditions.checkState(!sendNode.getKeys().isEmpty(), "Local exchange with parallelism requires keys");
             sendNode.setDistributionType(RelDistribution.Type.HASH_DISTRIBUTED);
-            Preconditions.checkState(numReceivers % numSenders == 0,
-                "Number of receivers: %s should be a multiple of number of senders: %s for local exchange",
-                numReceivers, numSenders);
+            // The parallel wiring addresses a whole receiver range at the range's first host, which only holds when
+            // the receiver map was derived from the sender by WorkerManager#assignWorkersForLocalExchange. Otherwise
+            // a range spans hosts and blocks would land on the wrong one, stalling the receiver until the deadline.
+            // So verify co-residency, and fall back to a hash shuffle when it does not hold -- correct for every
+            // local exchange kind, since HashExchange routes each key consistently.
+            if (numReceivers % numSenders == 0
+                && isEachRangeCoResident(senderServerMap, receiverServerMap, numSenders, numReceivers / numSenders)) {
+              computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
+                  senderServerMap, receiverServerMap, numSenders, numReceivers / numSenders, senderMetadata,
+                  receiverMetadata);
+            } else {
+              connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
+              connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
+            }
           }
-          int parallelism = numReceivers / numSenders;
-          computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
-              senderServerMap, receiverServerMap, numSenders, parallelism, senderMetadata, receiverMetadata);
         } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
           // Direct exchange: the data is already pre-partitioned, so send it 1-to-1 to the worker with the same worker
           // id (with parallelism, fan out each sender worker to a contiguous range of receiver workers). The
@@ -181,6 +198,21 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         Arrays.toString(receiverPartitionClassIds));
   }
 
+  /// Whether every sender's contiguous receiver range sits entirely on that sender's own server, which is what
+  /// [#computeDirectExchangeWithParallelism] assumes when it addresses a whole range at a single host.
+  private static boolean isEachRangeCoResident(Map<Integer, QueryServerInstance> senderServerMap,
+      Map<Integer, QueryServerInstance> receiverServerMap, int numSenders, int parallelism) {
+    for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
+      QueryServerInstance senderServer = senderServerMap.get(senderWorkerId);
+      for (int i = 0; i < parallelism; i++) {
+        if (!senderServer.equals(receiverServerMap.get(senderWorkerId * parallelism + i))) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   /// Wires one sender worker of a direct exchange to the contiguous range of `parallelism` receiver workers it fans out
   /// to. See [#computeDirectExchange].
   private void computeDirectExchangeWithParallelism(Map<Integer, Map<Integer, MailboxInfos>> senderMailboxesMap,
@@ -205,7 +237,9 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       DispatchablePlanMetadata receiver) {
     int numSenders = sender.getWorkerIdToServerInstanceMap().size();
     int numReceivers = receiver.getWorkerIdToServerInstanceMap().size();
-    if (numSenders * sender.getPartitionParallelism() != numReceivers) {
+    // numSenders is 0 when every segment of a leaf stage was pruned. Guard it: with numReceivers also 0 it
+    // passes the multiplication check and then divides by zero computing the parallelism.
+    if (numSenders == 0 || numSenders * sender.getPartitionParallelism() != numReceivers) {
       return false;
     }
     // A sender whose worker ids stand for partition classes may only be wired 1-to-1 to a receiver whose worker ids
