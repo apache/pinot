@@ -167,7 +167,11 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      if (skipSegmentOutOfTTL(segment, true)) {
+      // Bump watermark after doPreloadSegment; a concurrent removeExpiredPrimaryKeys sweep reading a pre-bumped
+      // watermark could expire keys this preload is about to insert. On the skip path no rows are added, so it is
+      // safe to bump before returning.
+      if (skipSegmentOutOfTTL(segment)) {
+        updateLargestSeenTime(segment);
         return;
       }
       try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
@@ -177,6 +181,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         doPreloadSegment(segment, dedupRecordInfoIterator);
         updatePrimaryKeyGauge();
       }
+      updateLargestSeenTime(segment);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s of table: %s in %s", segmentName,
@@ -203,8 +208,12 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      if (!skipSegmentOutOfTTL(segment, true)) {
+      // Bump watermark after add; see preloadSegment.
+      if (skipSegmentOutOfTTL(segment)) {
+        updateLargestSeenTime(segment);
+      } else {
         addOrReplaceSegment(null, segment);
+        updateLargestSeenTime(segment);
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -223,8 +232,12 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      if (!skipSegmentOutOfTTL(newSegment, true)) {
+      // Bump watermark after replace; see preloadSegment.
+      if (skipSegmentOutOfTTL(newSegment)) {
+        updateLargestSeenTime(newSegment);
+      } else {
         addOrReplaceSegment(oldSegment, newSegment);
+        updateLargestSeenTime(newSegment);
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -236,16 +249,13 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     }
   }
 
-  protected boolean skipSegmentOutOfTTL(IndexSegment segment, boolean updateWatermark) {
+  protected boolean skipSegmentOutOfTTL(IndexSegment segment) {
     if (_metadataTTL <= 0) {
       return false;
     }
     // If metadataTTL is enabled, we can skip adding dedup metadata for segment already out of the TTL. Different
     // from upsert table, there is no need to initialize things like validDocIds bitmap for those skipped segments.
     double maxDedupTime = getMaxDedupTime(segment);
-    if (updateWatermark) {
-      _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
-    }
     if (!isOutOfMetadataTTL(maxDedupTime)) {
       return false;
     }
@@ -253,6 +263,18 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         _metadataTTL);
     // Return true if skipped. Boolean value allows subclasses to disable skipping.
     return true;
+  }
+
+  protected void updateLargestSeenTime(IndexSegment segment) {
+    if (_metadataTTL > 0) {
+      updateLargestSeenTime(getMaxDedupTime(segment));
+    }
+  }
+
+  protected void updateLargestSeenTime(double dedupTime) {
+    if (_metadataTTL > 0) {
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
+    }
   }
 
   private void addOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment)
@@ -281,7 +303,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      if (skipSegmentOutOfTTL(segment, false)) {
+      if (skipSegmentOutOfTTL(segment)) {
         return;
       }
       try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
