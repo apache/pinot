@@ -86,6 +86,46 @@ class OwnershipTest(unittest.TestCase):
         with self.assertRaises(flow.FlowError):
             flow.section(pull["body"].replace("Diagram", "edited"), 42, KEY)
 
+    def test_crlf_normalized_block_preserves_ownership_and_author_text(self):
+        pull = pr()
+        meta = metadata(pull)
+        first = flow.make_block("### PR flow\nfirst", meta, 42, KEY).replace("\n", "\r\n")
+        prefix, suffix = "Preface\r\n\n", "Author text\r\n\nSuffix\r\n"
+        for checked in ("[ ]", "[x]", "[X]"):
+            with self.subTest(checked=checked):
+                block = first.replace("[ ]", checked)
+                pull["body"] = prefix + block + suffix
+                owned = flow.section(pull["body"], 42, KEY)
+                self.assertEqual(owned["metadata"], meta)
+                self.assertEqual(owned["requested"], checked != "[ ]")
+                self.assertEqual(owned["span"], (len(prefix), len(prefix) + len(block)))
+                self.assertEqual(flow.author_body(pull, KEY), prefix + suffix)
+                second = flow.make_block("### PR flow\nsecond", meta, 42, KEY)
+                pull["body"] = flow.upsert(pull["body"], second, 42, KEY)
+                self.assertEqual(pull["body"], prefix + second + suffix)
+                self.assertEqual(flow.author_body(pull, KEY), prefix + suffix)
+
+    def test_crlf_content_is_signed_in_normalized_form(self):
+        pull = pr()
+        block = flow.make_block("### PR flow\r\nDiagram", metadata(pull), 42, KEY)
+        self.assertEqual(flow.section(block, 42, KEY)["metadata"], metadata(pull))
+        self.assertEqual(flow.section(block.replace("\r\n", "\n"), 42, KEY)["metadata"], metadata(pull))
+
+    def test_crlf_normalization_does_not_allow_other_block_edits(self):
+        for newline in ("\n", "\r\n"):
+            body = with_flow()["body"].replace("\n", newline)
+            for changed in (body.replace("Diagram", "edited"), body.replace("Diagram", "Diagram "),
+                            body.replace("Diagram", "Dia\rgram"),
+                            body.replace("Diagram" + newline, "Diagram\r\r\n"),
+                            body.replace(newline + "<!-- pinot-pr-flow:signature",
+                                         "\r\r\n<!-- pinot-pr-flow:signature"),
+                            body.replace(flow.END + newline * 2, flow.END + newline)):
+                with self.subTest(body=changed), self.assertRaises(flow.FlowError):
+                    flow.section(changed, 42, KEY)
+            for number, key in ((43, KEY), (42, "rotated-key")):
+                with self.subTest(newline=newline, number=number, key=key), self.assertRaises(flow.FlowError):
+                    flow.section(body, number, key)
+
     def test_copying_or_key_rotation_cannot_adopt_a_block(self):
         body = with_flow()["body"]
         for number, key in ((43, KEY), (42, "rotated-key")):
@@ -370,6 +410,24 @@ class PublicationTest(unittest.TestCase):
             self.assertEqual(saved["body"], pr()["body"])
             self.assertEqual(flow.author_body(server, KEY), pr()["body"])
             self.assertTrue(flow.section(server["body"], 42, KEY))
+
+    def test_publication_recovers_after_a_crlf_normalizing_edit(self):
+        api, server = client(), with_flow()
+        server["body"] = server["body"].replace("\n", "\r\n")
+        original = server["body"]
+        api.pr.side_effect = lambda value: copy.deepcopy(server)
+        api.update.side_effect = lambda value, body: server.update(body=body)
+        api.history.side_effect = lambda value: ([] if server["body"] == original else [
+            {"id": "own-edit", "diff": server["body"], "editor": {"login": "github-actions[bot]"}}])
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(self.execute(api, directory), "published")
+            saved = json.loads((Path(directory) / "previous-description.json").read_text())
+            self.assertEqual(saved["body"], original)
+            self.assertEqual(flow.author_body(server, KEY), pr()["body"].replace("\n", "\r\n"))
+            self.assertEqual(server["body"].count(flow.START), 1)
+            self.assertTrue(flow.current(api, server, KEY, MODEL))
+            self.assertEqual(self.execute(api, directory), "current")
+            api.update.assert_called_once()
 
     def creation_history(self, api, server, original, creation_diff, intervening=None):
         created_at = "2026-09-08T00:00:00Z"

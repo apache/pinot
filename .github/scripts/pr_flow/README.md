@@ -43,7 +43,9 @@ branch; adding the files in an unmerged PR does not deploy it.
 - Check the regenerate checkbox inside an existing bot block to request another
   generation. A signature made with an HMAC key derived from the OpenRouter
   secret identifies the bot-owned block. The raw secret is never embedded in the
-  PR. Author text edits refresh the explanation; bot-only updates and unrelated
+  PR. Block signatures tolerate LF/CRLF line-ending conversion by description
+  editors; replacement preserves the author's text and its line endings exactly.
+  Author text edits refresh the explanation; bot-only updates and unrelated
   commits to `master` do not spend quota when the PR diff is unchanged.
 - Set repository variable `PR_FLOW_ENABLED=false` to stop generation. Any other
   value, including an unset variable, enables it. `PR_FLOW_MODEL` selects the

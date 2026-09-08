@@ -39,6 +39,7 @@ END = "<!-- pinot-pr-flow:end -->"
 CHECKBOX = "- [ ] Regenerate PR flow"
 META_RE = re.compile(r"<!-- pinot-pr-flow:meta ([A-Za-z0-9_-]+) -->")
 SIGNATURE_RE = re.compile(r"\n<!-- pinot-pr-flow:signature ([a-f0-9]{64}) -->")
+SEPARATOR_RE = re.compile(r"\r?\n\r?\n")
 MAX_EVIDENCE_BYTES = 180_000
 MAX_PATCH_BYTES = 24_000
 MAX_PR_FILES = 3_000
@@ -176,25 +177,29 @@ def bounds(body):
     if body.count(START) != 1 or body.count(END) != 1:
         raise FlowError("Duplicate or incomplete PR flow markers; preserving the description")
     start, end = body.index(START), body.index(END) + len(END)
-    if start >= end - len(END) or not body.startswith("\n\n", end):
+    separator = SEPARATOR_RE.match(body, end)
+    if start >= end - len(END) or separator is None:
         raise FlowError("Malformed PR flow boundaries; preserving the description")
-    return start, end + 2
+    return start, separator.end()
 
 
 def signature(unsigned, pr_number, key):
     signing_key = hashlib.sha256(("apache-pinot-pr-flow-signing-v1\0" + key).encode()).digest()
-    normalized = unsigned.replace("- [x] Regenerate PR flow", CHECKBOX).replace(
+    normalized = unsigned.replace("\r\n", "\n").replace("- [x] Regenerate PR flow", CHECKBOX).replace(
         "- [X] Regenerate PR flow", CHECKBOX)
     return hmac.new(signing_key, packed([REPOSITORY, number(pr_number), normalized]).encode(),
                     hashlib.sha256).hexdigest()
 
 
 def section(body, pr_number, key):
-    """Authenticate the complete block, allowing only the regeneration checkbox to change."""
+    """Authenticate the block, allowing checkbox changes and LF/CRLF conversion."""
     span = bounds(body)
     if span is None:
         return None
-    block = body[span[0]:span[1]]
+    # Keep the span in the original body so replacement preserves all author text exactly.
+    block = body[span[0]:span[1]].replace("\r\n", "\n")
+    if "\r" in block:
+        raise FlowError("Malformed PR flow line endings; preserving the description")
     signatures, metadata = SIGNATURE_RE.findall(block), META_RE.findall(block)
     if len(signatures) != 1 or len(metadata) != 1:
         raise FlowError("Unrecognized PR flow ownership; preserving the description")
