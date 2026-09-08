@@ -34,6 +34,12 @@ public class ImmutableDataSource extends BaseDataSource {
     super(new ImmutableDataSourceMetadata(columnMetadata), columnIndexContainer);
   }
 
+  /// The data-source metadata for a column, without a data source. It delegates to [ColumnMetadata] and holds no
+  /// index readers, so a caller that needs only the column's statistics can avoid materializing the column.
+  public static DataSourceMetadata metadataOf(ColumnMetadata columnMetadata) {
+    return new ImmutableDataSourceMetadata(columnMetadata);
+  }
+
   /// Exposes the segment's [ColumnMetadata] through the [DataSourceMetadata] view by delegating every accessor.
   /// Holding a single reference instead of copying the ten fields the view exposes keeps this object at one
   /// reference per column, which matters for wide segments where every loaded column retains one. The delegation
