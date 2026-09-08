@@ -67,6 +67,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.RetryableMetadataRemovalException;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -265,6 +266,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicBoolean _consumerSemaphoreAcquired = new AtomicBoolean(false);
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private volatile boolean _metadataRemovalRetryable;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
@@ -1783,14 +1785,33 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // When the parallel consumption policy allowed the next segment to start during build or download, the semaphore
     // was already released there and the release below is a no-op.
     // Release the semaphore even on failure, but prevent new consumers and queries from using inconsistent metadata.
+    boolean retryable = false;
     try {
       _realtimeSegment.offload();
     } catch (RuntimeException | Error e) {
-      _realtimeTableDataManager.onSegmentMetadataRemovalFailure(_segmentNameStr);
+      // A backend retry contract does not establish serial consumption if the permit was released during build.
+      retryable = _consumerSemaphoreAcquired.get() && e instanceof RetryableMetadataRemovalException;
+      _realtimeTableDataManager.onSegmentMetadataRemovalFailure(this);
       throw e;
     } finally {
       releaseConsumerSemaphore();
       cleanupMetrics();
+      // Publish retry readiness only after the original offload finishes its cleanup.
+      _metadataRemovalRetryable = retryable;
+    }
+  }
+
+  /// Retries only the unfinished metadata operation, after consumption has already stopped. The table manager
+  /// serializes recovery attempts and keeps the partition unavailable until this succeeds and resources are released.
+  void retryMetadataRemoval() {
+    Preconditions.checkState(_metadataRemovalRetryable,
+        "Metadata removal for segment: %s cannot be retried safely; rebuild the partition metadata", _segmentNameStr);
+    try {
+      _realtimeSegment.offload();
+      _metadataRemovalRetryable = false;
+    } catch (RuntimeException | Error e) {
+      _metadataRemovalRetryable = e instanceof RetryableMetadataRemovalException;
+      throw e;
     }
   }
 

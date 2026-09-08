@@ -42,8 +42,10 @@ import org.apache.pinot.core.query.request.context.TableSegmentsContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.upsert.RetryableMetadataRemovalException;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -54,6 +56,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -65,11 +68,12 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Tests the table failure boundary after metadata removal throws, including concurrent consumer admission.
+/// Tests partition isolation and recovery after metadata removal throws, including concurrent consumer admission.
 public class RealtimeMetadataFailureTest {
   private static final String TABLE_NAME = "testTable_REALTIME";
   private static final LLCSegmentName FAILED_SEGMENT = new LLCSegmentName("testTable", 0, 0, 0);
   private static final LLCSegmentName NEXT_SEGMENT = new LLCSegmentName("testTable", 0, 1, 0);
+  private static final LLCSegmentName OTHER_PARTITION = new LLCSegmentName("testTable", 1, 0, 0);
 
   @BeforeClass
   public void setUp() {
@@ -92,7 +96,7 @@ public class RealtimeMetadataFailureTest {
         assertTrue(continueAcquire.await(5, TimeUnit.SECONDS));
       }
       return null;
-    }).when(table).checkMetadataHealthy();
+    }).when(table).checkMetadataHealthy(0);
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
@@ -101,7 +105,7 @@ public class RealtimeMetadataFailureTest {
         return null;
       });
       assertTrue(checkedBeforeAcquire.await(5, TimeUnit.SECONDS));
-      table.onSegmentMetadataRemovalFailure(FAILED_SEGMENT.getSegmentName());
+      failMetadataRemoval(table);
       coordinator.release();
       continueAcquire.countDown();
 
@@ -122,7 +126,7 @@ public class RealtimeMetadataFailureTest {
   public void testFailedMetadataRejectsNewConsumersBeforeLoadingSegments()
       throws Exception {
     TestTableDataManager table = new TestTableDataManager();
-    table.onSegmentMetadataRemovalFailure(FAILED_SEGMENT.getSegmentName());
+    failMetadataRemoval(table);
     // There is no segment/ZK setup: the failure must be checked before loading or allocating the next segment.
     expectThrows(IllegalStateException.class, () -> table.addConsumingSegment(NEXT_SEGMENT.getSegmentName()));
     ConsumerCoordinator coordinator = new ConsumerCoordinator(true, table);
@@ -151,6 +155,59 @@ public class RealtimeMetadataFailureTest {
   }
 
   @Test(dataProvider = "queryModes")
+  public void testHealthyPartitionRemainsUsable(UpsertConfig.Mode mode, UpsertConfig.ConsistencyMode consistencyMode)
+      throws Exception {
+    TestTableDataManager table = new TestTableDataManager();
+    table.setUpsertMode(mode, consistencyMode);
+    failMetadataRemoval(table);
+    ConsumerCoordinator coordinator = new ConsumerCoordinator(false, table);
+    coordinator.acquire(OTHER_PARTITION);
+    coordinator.release();
+
+    SegmentDataManager healthy = mock(SegmentDataManager.class);
+    when(healthy.increaseReferenceCount()).thenReturn(true);
+    when(healthy.getSegment()).thenReturn(mock(IndexSegment.class));
+    table.addSegment(OTHER_PARTITION.getSegmentName(), healthy);
+    if (mode != UpsertConfig.Mode.NONE) {
+      // Server-discovered optional segments from the failed partition must not poison this healthy-partition request.
+      when(table.getTableUpsertMetadataManager().getNewlyAddedSegments())
+          .thenReturn(Set.of(FAILED_SEGMENT.getSegmentName()));
+    }
+    InstanceDataManager instance = mock(InstanceDataManager.class);
+    when(instance.getTableDataManager(TABLE_NAME)).thenReturn(table);
+    SingleTableExecutionInfo query = SingleTableExecutionInfo.create(instance, TABLE_NAME,
+        List.of(OTHER_PARTITION.getSegmentName()), null, mock(QueryContext.class));
+    assertEquals(query.getIndexSegments(), List.of(healthy.getSegment()));
+    query.releaseSegmentDataManagers();
+    verify(healthy).decreaseReferenceCount();
+
+    expectThrows(IllegalStateException.class, () -> table.acquireSegments(List.of(OTHER_PARTITION.getSegmentName()),
+        List.of(NEXT_SEGMENT.getSegmentName()), new ArrayList<>()));
+  }
+
+  @Test
+  public void testFailedRepairDoesNotClearPartitionAndSuccessfulRepairReleasesOnce()
+      throws Exception {
+    TestTableDataManager table = new TestTableDataManager();
+    RealtimeSegmentDataManager failed = failMetadataRemoval(table);
+    doThrow(new RetryableMetadataRemovalException("storage still unavailable", new IllegalStateException()))
+        .doNothing().when(failed).retryMetadataRemoval();
+    expectThrows(RetryableMetadataRemovalException.class,
+        () -> table.retryFailedMetadataRemoval(NEXT_SEGMENT.getSegmentName()));
+    expectThrows(IllegalStateException.class, () -> table.checkMetadataHealthy(0));
+    verify(failed, never()).decreaseReferenceCount();
+    table.checkMetadataHealthy(1);
+
+    table.retryFailedMetadataRemoval(NEXT_SEGMENT.getSegmentName());
+    table.checkMetadataHealthy(0);
+    table.retryFailedMetadataRemoval(FAILED_SEGMENT.getSegmentName());
+    verify(failed).decreaseReferenceCount();
+    ConsumerCoordinator coordinator = new ConsumerCoordinator(false, table);
+    coordinator.acquire(NEXT_SEGMENT);
+    coordinator.release();
+  }
+
+  @Test(dataProvider = "queryModes")
   public void testFailedMetadataRejectsQueryInsteadOfReturningPartialView(UpsertConfig.Mode mode,
       UpsertConfig.ConsistencyMode consistencyMode)
       throws Exception {
@@ -158,7 +215,7 @@ public class RealtimeMetadataFailureTest {
     table.setUpsertMode(mode, consistencyMode);
     SegmentDataManager segment = mock(SegmentDataManager.class);
     table.addSegment(NEXT_SEGMENT.getSegmentName(), segment);
-    table.onSegmentMetadataRemovalFailure(FAILED_SEGMENT.getSegmentName());
+    failMetadataRemoval(table);
     InstanceDataManager instance = mock(InstanceDataManager.class);
     when(instance.getTableDataManager(TABLE_NAME)).thenReturn(table);
 
@@ -180,7 +237,7 @@ public class RealtimeMetadataFailureTest {
     when(segment.increaseReferenceCount()).thenReturn(true);
     healthyTable.addSegment("healthySegment", segment);
     TestTableDataManager failedTable = new TestTableDataManager();
-    failedTable.onSegmentMetadataRemovalFailure(FAILED_SEGMENT.getSegmentName());
+    failMetadataRemoval(failedTable);
     InstanceDataManager instance = mock(InstanceDataManager.class);
     when(instance.getTableDataManager("healthyTable_REALTIME")).thenReturn(healthyTable);
     when(instance.getTableDataManager(TABLE_NAME)).thenReturn(failedTable);
@@ -200,7 +257,7 @@ public class RealtimeMetadataFailureTest {
   public void testFailedMetadataReturnsQueryErrorBlock()
       throws Exception {
     TestTableDataManager table = new TestTableDataManager();
-    table.onSegmentMetadataRemovalFailure(FAILED_SEGMENT.getSegmentName());
+    failMetadataRemoval(table);
     InstanceDataManager instance = mock(InstanceDataManager.class);
     when(instance.getTableDataManager(TABLE_NAME)).thenReturn(table);
     ServerQueryExecutorV1Impl executor = new ServerQueryExecutorV1Impl();
@@ -218,6 +275,13 @@ public class RealtimeMetadataFailureTest {
     assertTrue(response.getExceptions().get(QueryErrorCode.QUERY_EXECUTION.getId())
         .contains(FAILED_SEGMENT.getSegmentName()));
     assertNull(response.getResultsBlock());
+  }
+
+  private static RealtimeSegmentDataManager failMetadataRemoval(TestTableDataManager table) {
+    RealtimeSegmentDataManager failed = mock(RealtimeSegmentDataManager.class);
+    when(failed.getSegmentName()).thenReturn(FAILED_SEGMENT.getSegmentName());
+    table.onSegmentMetadataRemovalFailure(failed);
+    return failed;
   }
 
   private static class TestTableDataManager extends RealtimeTableDataManager {

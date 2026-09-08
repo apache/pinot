@@ -153,6 +153,32 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
+  @Test
+  public void testErrorRepairPreservesHealthyReplicas() {
+    for (Status status : List.of(Status.IN_PROGRESS, Status.DONE, Status.COMMITTING)) {
+      FakePinotLLCRealtimeSegmentManager manager = new FakePinotLLCRealtimeSegmentManager();
+      manager._numReplicas = 2;
+      manager.makeTableConfig();
+      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+      manager._idealState = new IdealState(REALTIME_TABLE_NAME);
+      manager._idealState.setPartitionState(segmentName, "failed", SegmentStateModel.CONSUMING);
+      manager._idealState.setPartitionState(segmentName, "healthy", SegmentStateModel.CONSUMING);
+      ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+      externalView.setState(segmentName, "failed", SegmentStateModel.ERROR);
+      externalView.setState(segmentName, "healthy", SegmentStateModel.CONSUMING);
+      when(manager._mockResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+      SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+      metadata.setStatus(status);
+      when(manager._mockResourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName)).thenReturn(metadata);
+
+      manager.repairSegmentsInErrorState(manager._tableConfig, false);
+
+      verify(manager._mockResourceManager).resetSegment(REALTIME_TABLE_NAME, segmentName, "failed");
+      verify(manager._mockResourceManager, never()).resetSegment(REALTIME_TABLE_NAME, segmentName, "healthy");
+      verify(manager._mockResourceManager, never()).resetSegment(REALTIME_TABLE_NAME, segmentName, null);
+    }
+  }
+
   private SegmentMetadataImpl mockSegmentMetadata() {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getTimeInterval()).thenReturn(INTERVAL);

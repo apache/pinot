@@ -27,6 +27,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,6 +233,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ERROR", to = "OFFLINE")
     public void onBecomeOfflineFromError(Message message, NotificationContext context) {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromError() : {}", message);
+      retryFailedMetadataRemoval(message);
     }
 
     @Transition(from = "ERROR", to = "DROPPED")
@@ -240,6 +242,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromError() : {}", message);
 
       try {
+        retryFailedMetadataRemoval(message);
         _instanceDataManager.deleteSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
         _logger.error(
@@ -247,6 +250,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
                 + "{}, segment: {}",
             message.getResourceName(), message.getPartitionName(), e);
         throw e;
+      }
+    }
+
+    private void retryFailedMetadataRemoval(Message message) {
+      TableDataManager table = _instanceDataManager.getTableDataManager(message.getResourceName());
+      if (table instanceof RealtimeTableDataManager) {
+        ((RealtimeTableDataManager) table).retryFailedMetadataRemoval(message.getPartitionName());
       }
     }
   }
