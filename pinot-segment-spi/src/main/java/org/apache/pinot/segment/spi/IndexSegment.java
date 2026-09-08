@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -70,6 +71,18 @@ public interface IndexSegment {
   /// [Schema] should be the latest schema of the table, not the one from [SegmentMetadata], and should contain the
   /// asked column.
   DataSource getDataSource(String column, Schema schema);
+
+  /// The metadata of a column's data source, for callers that need only the column's statistics — its data type,
+  /// min/max values, partitioning — and never read its values.
+  ///
+  /// Segment pruning is the motivating caller: it reads min/max to decide whether a segment can match at all, for
+  /// every segment the server holds. Going through [#getDataSource(String, Schema)] to reach that metadata forces an
+  /// implementation that builds its columns lazily to construct the whole index container — every index reader for
+  /// the column — for a segment it is about to discard. An implementation that can answer from column metadata alone
+  /// should override this; the default keeps the existing behaviour.
+  default DataSourceMetadata getDataSourceMetadata(String column, Schema schema) {
+    return getDataSource(column, schema).getDataSourceMetadata();
+  }
 
   /// Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.
   @Nullable
