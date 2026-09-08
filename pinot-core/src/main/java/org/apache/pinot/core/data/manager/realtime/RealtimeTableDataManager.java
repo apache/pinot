@@ -148,6 +148,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
 
+  // A failed metadata removal can leave keys and valid-doc-id bitmaps inconsistent. Keep the failure until this table
+  // manager is recreated with rebuilt metadata. Store only the segment name, without retaining its data or exception.
+  @Nullable
+  private volatile String _failedMetadataRemovalSegment;
+
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
   }
@@ -500,6 +505,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addConsumingSegment(String segmentName)
       throws Exception {
+    checkMetadataHealthy();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -814,6 +820,27 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   ConsumerCoordinator getConsumerCoordinator(int partitionId) {
     return _partitionIdToConsumerCoordinatorMap.computeIfAbsent(partitionId,
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
+  }
+
+  void onSegmentMetadataRemovalFailure(String segmentName) {
+    _failedMetadataRemovalSegment = segmentName;
+  }
+
+  void checkMetadataHealthy() {
+    String failedSegment = _failedMetadataRemovalSegment;
+    if (failedSegment != null) {
+      throw new IllegalStateException(
+          "Metadata removal failed for segment: " + failedSegment + " in table: " + _tableNameWithType
+              + ". Rebuild the table metadata before resuming consumption or queries");
+    }
+  }
+
+  @Override
+  public List<SegmentDataManager> acquireSegments(List<String> segmentNames,
+      @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
+    // Fail the query explicitly instead of reporting the affected segments as missing or returning a partial view.
+    checkMetadataHealthy();
+    return super.acquireSegments(segmentNames, optionalSegmentNames, missingSegments);
   }
 
   public boolean isEnforceConsumptionInOrderEnabled() {

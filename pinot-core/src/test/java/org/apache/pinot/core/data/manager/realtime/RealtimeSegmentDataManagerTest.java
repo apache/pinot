@@ -87,6 +87,7 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -728,9 +729,14 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      ConsumerCoordinator coordinator = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID);
+      Semaphore semaphore = coordinator.getSemaphore();
       Assert.assertTrue(semaphore.tryAcquire());
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      doCallRealMethod().when(tableDataManager).onSegmentMetadataRemovalFailure(anyString());
+      doCallRealMethod().when(tableDataManager).checkMetadataHealthy();
 
       MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
       doThrow(new RuntimeException("metadata removal failed")).when(realtimeSegment).offload();
@@ -742,9 +748,19 @@ public class RealtimeSegmentDataManagerTest {
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "metadata removal failed");
       }
-      // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
+      // Resource cleanup must not leak the semaphore, but it cannot authorize consuming against failed metadata.
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released even when metadata removal fails");
+      LLCSegmentName successor = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID + 1, SEG_TIME_MS);
+      IllegalStateException failure =
+          Assert.expectThrows(IllegalStateException.class, () -> coordinator.acquire(successor));
+      Assert.assertTrue(failure.getMessage().contains(SEGMENT_NAME_STR));
+      Assert.assertEquals(semaphore.availablePermits(), 1);
+
+      // SegmentDataManager's offload latch makes a repeated offload a no-op. That must not clear the table failure.
+      segmentDataManager.offload();
+      Assert.expectThrows(IllegalStateException.class, () -> coordinator.acquire(successor));
+      verify(realtimeSegment).offload();
     }
   }
 
