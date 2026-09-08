@@ -685,10 +685,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
       }
-      _logger.warn("Found {} primary keys not replaced for segment: {}",
-          validDocIdsForOldSegment.getCardinality(), segmentName);
-      updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
-      removeSegment(oldSegment, validDocIdsForOldSegment);
+      int numKeysStillNotReplaced =
+          removeSegmentAndGetNumKeysRemoved(oldSegment, validDocIdsForOldSegment);
+      if (numKeysStillNotReplaced > 0) {
+        _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
+        updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
+      }
     }
   }
 
@@ -738,6 +740,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   private MutableRoaringBitmap getValidDocIdsForOldSegment(IndexSegment oldSegment) {
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+  }
+
+  /// Removes candidate keys and returns how many were still owned by the segment at removal time. Implementations
+  /// backed by concurrent metadata should override this method and count only removals that pass their authoritative
+  /// ownership check. The default preserves compatibility with existing metadata-manager implementations.
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    removeSegment(segment, validDocIds);
+    return validDocIds.getCardinality();
   }
 
   protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);

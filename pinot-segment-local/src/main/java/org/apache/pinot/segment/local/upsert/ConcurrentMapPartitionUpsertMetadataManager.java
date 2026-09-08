@@ -209,11 +209,17 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator);
+  }
+
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    AtomicInteger numKeysRemoved = new AtomicInteger();
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey primaryKey = primaryKeyIterator.next();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
+              numKeysRemoved.getAndIncrement();
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
@@ -222,6 +228,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             return recordLocation;
           });
     }
+    return numKeysRemoved.get();
   }
 
   @Override
@@ -284,6 +291,18 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       } else {
         removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
       }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
+              _tableNameWithType, e.getMessage()), e);
+    }
+  }
+
+  @Override
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
+      return removeSegmentAndGetNumKeysRemoved(segment,
+          UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
