@@ -1,0 +1,57 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: PR flow installation preview
+on:
+  push:
+    branches: [xiangfu0/codex/pr-flow-openrouter]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  preview:
+    if: github.repository == 'apache/pinot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/pr_flow
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Validate trusted scripts
+        run: python -m unittest discover -s .github/scripts/pr_flow -p 'test_*.py'
+      - name: Generate a read-only installation preview
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+          PR_NUMBER: '19489'
+          FORCE: 'true'
+          PREVIEW: 'true'
+          PR_FLOW_OUTPUT_DIR: ${{ runner.temp }}/pr-flow
+        run: python .github/scripts/pr_flow/main.py run
+      - name: Retain preview
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr-flow-installation-preview
+          path: ${{ runner.temp }}/pr-flow
+          retention-days: 7
+          if-no-files-found: ignore
