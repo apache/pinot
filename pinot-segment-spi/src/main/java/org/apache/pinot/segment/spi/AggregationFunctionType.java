@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -38,6 +39,7 @@ import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,9 +50,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 /// - '$' is allowed in the name field but not in the enum name.
 ///
 /// This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
-/// The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
-/// to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
-/// the v1 and multistage engines.
+/// Both engines use the function name and argument inference. The SQL metadata also registers the aggregation
+/// function with Calcite in the multistage engine.
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -73,7 +74,19 @@ public enum AggregationFunctionType {
       OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), i -> i == 1),
       OperandTypes.family(List.of(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER), i -> i == 1),
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
-      ReturnTypes.explicit(SqlTypeName.OTHER), null, SqlKind.MODE),
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, SqlKind.MODE) {
+    @Override
+    public List<String> inferArguments(int argumentCount, IntFunction<DataType> argumentTypes) {
+      if (argumentCount == 0 || argumentCount >= 3) {
+        return List.of();
+      }
+      DataType inputType = argumentTypes.apply(0);
+      if (inputType != DataType.STRING && inputType != DataType.TIMESTAMP) {
+        return List.of();
+      }
+      return argumentCount == 1 ? List.of("MIN", inputType.name()) : List.of(inputType.name());
+    }
+  },
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
@@ -373,6 +386,13 @@ public enum AggregationFunctionType {
 
   public static String getNormalizedAggregationFunctionName(String functionName) {
     return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
+  }
+
+  /// Infers internal string literal arguments to append before execution.
+  /// Argument types are resolved lazily so functions without inferred arguments do not require expression typing.
+  /// Unknown or multi-value argument types are represented by [DataType#UNKNOWN].
+  public List<String> inferArguments(int argumentCount, IntFunction<DataType> argumentTypes) {
+    return List.of();
   }
 
   /// Returns the corresponding aggregation function type for the given function name.

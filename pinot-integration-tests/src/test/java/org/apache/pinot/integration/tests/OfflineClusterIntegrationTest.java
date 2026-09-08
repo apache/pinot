@@ -3664,7 +3664,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "          PinotLogicalAggregate(group=[{23}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
-        + "Rule: TypedModeRewrite -> Time:*\n"
         + "Rule: SortRemove -> Time:*\n"
         + "Rule: AggregateProjectMerge -> Time:*\n"
         + "Rule: AggregateProjectPullUpConstants -> Time:*\n"

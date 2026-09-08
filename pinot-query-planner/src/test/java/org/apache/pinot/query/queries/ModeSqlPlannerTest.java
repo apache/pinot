@@ -26,6 +26,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.DataProvider;
@@ -47,10 +48,12 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "physicalOptimizers")
   public void testDistributedModeTypes(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; "
-        + "SELECT MODE(NULLIF(col1, '')), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG') FROM a");
+        + "SELECT MODE(NULLIF(col1, '')), MODE(ts_timestamp, 'MAX'), MODE(col3, 'AVG'), "
+        + "MODE(col1, 'MAX', 'STRING') FROM a");
     PlanNode root = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot();
     assertEquals(root.getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE});
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE,
+            ColumnDataType.STRING});
 
     List<AggregateNode> aggregates = findAggregates(plan);
     assertFalse(aggregates.isEmpty());
@@ -59,22 +62,54 @@ public class ModeSqlPlannerTest extends QueryEnvironmentTestBase {
     for (AggregateNode aggregate : aggregates) {
       List<RexExpression.FunctionCall> calls = aggregate.getAggCalls();
       assertEquals(calls.stream().map(RexExpression.FunctionCall::getFunctionName).toList(),
-          List.of("MODE", "MODE", "MODE"));
+          List.of("MODE", "MODE", "MODE", "MODE"));
       assertTypedCall(calls.get(0), "MIN", "STRING");
       assertTypedCall(calls.get(1), "MAX", "TIMESTAMP");
       assertEquals(calls.get(2).getFunctionOperands().size(), 2);
+      assertTypedCall(calls.get(3), "MAX", "STRING");
       if (aggregate.getAggType().isOutputIntermediateFormat() && !aggregate.isLeafReturnFinalResult()) {
         sawIntermediate = true;
         assertEquals(aggregate.getDataSchema().getColumnDataTypes(),
-            new ColumnDataType[]{ColumnDataType.OBJECT, ColumnDataType.OBJECT, ColumnDataType.OBJECT});
+            new ColumnDataType[]{ColumnDataType.OBJECT, ColumnDataType.OBJECT, ColumnDataType.OBJECT,
+                ColumnDataType.OBJECT});
       } else {
         sawFinal = true;
         assertEquals(aggregate.getDataSchema().getColumnDataTypes(),
-            new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE});
+            new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.DOUBLE,
+                ColumnDataType.STRING});
       }
     }
     assertTrue(sawIntermediate, "Distributed MODE must exchange frequency counts");
     assertTrue(sawFinal, "Distributed MODE must retain its final result types");
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testGroupedModeTypes(boolean usePhysicalOptimizer) {
+    List<String> queries = List.of(
+        "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, MODE(col1), MODE(ts_timestamp, 'MAX') "
+            + "FROM a GROUP BY col2",
+        "SELECT col3, GROUPING(col3), MODE(col1), MODE(ts_timestamp, 'MAX') "
+            + "FROM a GROUP BY GROUPING SETS ((col3), ())");
+    for (int i = 0; i < queries.size(); i++) {
+      DispatchableSubPlan plan = _queryEnvironment.planQuery(
+          "SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; " + queries.get(i));
+      List<AggregateNode> aggregates = findAggregates(plan);
+      assertFalse(aggregates.isEmpty());
+      for (AggregateNode aggregate : aggregates) {
+        List<RexExpression.FunctionCall> calls = aggregate.getAggCalls();
+        assertEquals(calls.size(), 2);
+        assertTypedCall(calls.get(0), "MIN", "STRING");
+        assertTypedCall(calls.get(1), "MAX", "TIMESTAMP");
+        if (aggregate.getAggType() == AggType.FINAL) {
+          for (int j = 0; j < calls.size(); j++) {
+            RexExpression.InputRef input = (RexExpression.InputRef) calls.get(j).getFunctionOperands().get(0);
+            assertEquals(input.getIndex(), aggregate.getGroupKeys().size() + j);
+          }
+        }
+      }
+      AggType expectedType = i == 0 ? AggType.DIRECT : AggType.FINAL;
+      assertTrue(aggregates.stream().anyMatch(aggregate -> aggregate.getAggType() == expectedType));
+    }
   }
 
   @Test

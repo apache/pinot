@@ -1116,7 +1116,6 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
-      public static final String TYPED_MODE_REWRITE = "TypedModeRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
       public static final String PROJECT_MERGE = "ProjectMerge";

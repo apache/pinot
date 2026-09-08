@@ -29,8 +29,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/// Covers automatic MODE type inference and unchanged numeric calls.
-public class ModeAggregationFunctionRewriteOptimizerTest {
+/// Covers inferred aggregate arguments and unchanged legacy calls.
+public class AggregateFunctionRewriteOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
       .addSingleValueDimension("stringCol", DataType.STRING)
@@ -63,11 +63,16 @@ public class ModeAggregationFunctionRewriteOptimizerTest {
   public void testLegacyCallsAndOtherRewritesAreUnchanged() {
     assertUnchanged("SELECT MODE(longCol, 'AVG'), MIN(stringCol), SUM(longCol), "
         + "MODE(stringCol, 'MAX', 'STRING'), MODE(timestampCol, 'MIN', 'TIMESTAMP') FROM testTable", SCHEMA);
+    TestHelper.assertEqualsQuery(
+        "SET autoRewriteAggregationType=true; SELECT MODE(stringCol), MIN(stringCol), MAX(longCol), SUM(longCol), "
+            + "COUNT(*) FROM testTable",
+        "SET autoRewriteAggregationType=true; SELECT MODE(stringCol, 'MIN', 'STRING'), MINSTRING(stringCol), "
+            + "MAXLONG(longCol), SUMLONG(longCol), COUNT(*) FROM testTable", SCHEMA);
   }
 
   @Test
   public void testUnknownTypesDoNotInitializeServerTransforms() {
-    assertUnchanged("SELECT MODE(unknownCol), MODE(mvStringCol), "
+    assertUnchanged("SELECT MODE(unknownCol), MODE(mvStringCol), MODE(NULLIF(longCol, 0)), "
         + "MODE(LOOKUP('baseballTeams', 'teamInteger', 'teamID', stringCol)) FROM testTable", SCHEMA);
     assertUnchanged("SELECT MODE(stringCol) FROM testTable", null);
   }
