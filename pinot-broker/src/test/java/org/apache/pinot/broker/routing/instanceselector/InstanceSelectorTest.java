@@ -273,6 +273,51 @@ public class InstanceSelectorTest {
   }
 
   @Test
+  public void testStrictRoutingUsesHealthyReplicaDuringMetadataRecovery() {
+    String realtimeTable = "testTable_REALTIME";
+    String base = "testTable__0__0__20260908T0000Z";
+    String consuming = "testTable__0__1__20260908T0000Z";
+    String otherPartition = "testTable__1__0__20260908T0000Z";
+    Set<String> segments = Set.of(base, consuming, otherPartition);
+    IdealState idealState = new IdealState(realtimeTable);
+    ExternalView externalView = new ExternalView(realtimeTable);
+    for (String segment : List.of(base, consuming)) {
+      idealState.setPartitionState(segment, "serverA", ONLINE);
+      idealState.setPartitionState(segment, "serverB", ONLINE);
+      externalView.setState(segment, "serverA", ONLINE);
+      externalView.setState(segment, "serverB", ONLINE);
+    }
+    idealState.setPartitionState(consuming, "serverA", CONSUMING);
+    idealState.setPartitionState(consuming, "serverB", CONSUMING);
+    externalView.setState(consuming, "serverA", ERROR);
+    externalView.setState(consuming, "serverB", CONSUMING);
+    idealState.setPartitionState(otherPartition, "serverA", CONSUMING);
+    idealState.setPartitionState(otherPartition, "serverC", CONSUMING);
+    externalView.setState(otherPartition, "serverA", CONSUMING);
+    externalView.setState(otherPartition, "serverC", CONSUMING);
+    StrictReplicaGroupInstanceSelector selector = new StrictReplicaGroupInstanceSelector();
+    when(_tableConfig.getTableName()).thenReturn(realtimeTable);
+    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG,
+        Set.of("serverA", "serverB", "serverC"), EMPTY_SERVER_MAP, idealState, externalView, segments);
+    for (int requestId = 0; requestId < 4; requestId++) {
+      Map<String, String> assignment =
+          selector.select(_brokerRequest, List.of(base, consuming, otherPartition), requestId)
+              .getSegmentToInstanceMap();
+      assertEquals(assignment.get(base), "serverB");
+      assertEquals(assignment.get(consuming), "serverB");
+      assertTrue(Set.of("serverA", "serverC").contains(assignment.get(otherPartition)));
+    }
+    externalView.setState(consuming, "serverA", CONSUMING);
+    selector.onAssignmentChange(idealState, externalView, segments);
+    Set<String> recoveredCandidates = new HashSet<>();
+    for (int requestId = 0; requestId < 4; requestId++) {
+      recoveredCandidates.add(selector.select(_brokerRequest, List.of(base, consuming), requestId)
+          .getSegmentToInstanceMap().get(base));
+    }
+    assertEquals(recoveredCandidates, Set.of("serverA", "serverB"));
+  }
+
+  @Test
   public void testInstanceSelector() {
     String offlineTableName = "testTable_OFFLINE";
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);

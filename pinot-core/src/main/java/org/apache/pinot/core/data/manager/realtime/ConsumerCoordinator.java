@@ -82,7 +82,7 @@ public class ConsumerCoordinator {
   ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
   public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException, ShouldNotConsumeException {
-    _realtimeTableDataManager.checkMetadataHealthy();
+    _realtimeTableDataManager.checkMetadataHealthy(llcSegmentName.getPartitionGroupId());
     String segmentName = llcSegmentName.getSegmentName();
     if (_enforceConsumptionInOrder) {
       long startTimeMs = System.currentTimeMillis();
@@ -104,7 +104,7 @@ public class ConsumerCoordinator {
       // The previous owner can fail metadata removal while we are waiting for its semaphore. It records the failure
       // before releasing, so recheck after acquisition and return the permit if metadata cannot be used.
       try {
-        _realtimeTableDataManager.checkMetadataHealthy();
+        _realtimeTableDataManager.checkMetadataHealthy(llcSegmentName.getPartitionGroupId());
       } catch (RuntimeException | Error e) {
         _semaphore.release();
         throw e;

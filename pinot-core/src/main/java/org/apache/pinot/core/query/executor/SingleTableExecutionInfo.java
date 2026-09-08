@@ -92,7 +92,12 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
         } else {
           allSegmentsToQuery.addAll(optionalSegments);
         }
-        for (String segmentName : tumm.getNewlyAddedSegments()) {
+        Set<String> newlyAddedSegments = tumm.getNewlyAddedSegments();
+        if (tableDataManager instanceof RealtimeTableDataManager) {
+          newlyAddedSegments =
+              ((RealtimeTableDataManager) tableDataManager).getHealthyNewlyAddedSegments(newlyAddedSegments);
+        }
+        for (String segmentName : newlyAddedSegments) {
           if (!allSegmentsToQuery.contains(segmentName)) {
             optionalSegments.add(segmentName);
           }
