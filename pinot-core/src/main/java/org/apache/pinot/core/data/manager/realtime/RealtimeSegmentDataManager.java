@@ -1782,9 +1782,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // replaying while primary keys still point to this mutable segment, and merge against the un-reverted state.
     // When the parallel consumption policy allowed the next segment to start during build or download, the semaphore
     // was already released there and the release below is a no-op.
-    // The semaphore is released in a finally block so that a failure in metadata removal cannot stall the partition.
+    // Release the semaphore even on failure, but prevent new consumers and queries from using inconsistent metadata.
     try {
       _realtimeSegment.offload();
+    } catch (RuntimeException | Error e) {
+      _realtimeTableDataManager.onSegmentMetadataRemovalFailure(_segmentNameStr);
+      throw e;
     } finally {
       releaseConsumerSemaphore();
       cleanupMetrics();
