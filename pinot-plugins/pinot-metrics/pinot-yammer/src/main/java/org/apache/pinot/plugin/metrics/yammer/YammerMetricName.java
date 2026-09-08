@@ -38,6 +38,12 @@ public class YammerMetricName implements PinotMetricName {
     return _metricName;
   }
 
+  /// Overridden because [#toString()] here renders the JMX object name, not the bare metric name.
+  @Override
+  public String getName() {
+    return _metricName.getName();
+  }
+
   /// Overrides equals method by calling the equals from the actual metric name.
   @Override
   public boolean equals(Object obj) {

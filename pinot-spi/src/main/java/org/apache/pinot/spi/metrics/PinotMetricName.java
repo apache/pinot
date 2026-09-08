@@ -24,6 +24,19 @@ public interface PinotMetricName {
   /// Returns the actual metric name.
   Object getMetricName();
 
+  /// Returns the composed metric name, free of the registry-specific decoration that some implementations render
+  /// from [#toString()] (yammer renders a JMX object name there, for instance).
+  ///
+  /// This is what lets a caller reason about a series that is *already registered* without reconstructing its name
+  /// from the rules that produced it. Reconstruction cannot reach a name that carries a caller-supplied key, so a
+  /// bulk removal built on it silently strands exactly those series.
+  ///
+  /// The default returns [#toString()], which is correct for implementations whose string form is already the bare
+  /// name; implementations that decorate it must override.
+  default String getName() {
+    return toString();
+  }
+
   /// Overrides the equals method. This is needed as [PinotMetricName] is used as the key of the key-value pair
   /// inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v
   /// pairs
