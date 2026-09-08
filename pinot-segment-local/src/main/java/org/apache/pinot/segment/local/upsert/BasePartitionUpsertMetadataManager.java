@@ -742,6 +742,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
+  /// How many primary keys to name in the DEBUG log when a segment's keys are removed. Bounded because the count
+  /// alone can be large, and because primary keys are customer data.
+  protected static final int NUM_SAMPLED_REMOVED_KEYS = 8;
+
   /// Removes candidate keys and returns how many were still owned by the segment at removal time. Implementations
   /// backed by concurrent metadata should override this method and count only removals that pass their authoritative
   /// ownership check. The default preserves compatibility with existing metadata-manager implementations.

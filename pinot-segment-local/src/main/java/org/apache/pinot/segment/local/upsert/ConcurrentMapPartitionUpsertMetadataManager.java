@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -214,12 +216,19 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
     AtomicInteger numKeysRemoved = new AtomicInteger();
+    // Naming the keys is only worth its memory when someone is reading DEBUG, so the list is not allocated
+    // otherwise. Everything else in this package logs key counts rather than key values, because a primary key is
+    // customer data.
+    List<PrimaryKey> sampledKeysRemoved = _logger.isDebugEnabled() ? new ArrayList<>(NUM_SAMPLED_REMOVED_KEYS) : null;
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey primaryKey = primaryKeyIterator.next();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
               numKeysRemoved.getAndIncrement();
+              if (sampledKeysRemoved != null && sampledKeysRemoved.size() < NUM_SAMPLED_REMOVED_KEYS) {
+                sampledKeysRemoved.add(primaryKey);
+              }
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
@@ -227,6 +236,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             }
             return recordLocation;
           });
+    }
+    if (sampledKeysRemoved != null && !sampledKeysRemoved.isEmpty()) {
+      _logger.debug("Removed {} primary keys with segment: {}, first {}: {}", numKeysRemoved.get(),
+          segment.getSegmentName(), sampledKeysRemoved.size(), sampledKeysRemoved);
     }
     return numKeysRemoved.get();
   }
