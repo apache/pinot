@@ -110,7 +110,7 @@ public class BrokerWarmupTest {
   @Test
   public void queryAndTablesOverridesParse() {
     PinotConfiguration properties = new PinotConfiguration();
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY, "SELECT count(*) FROM t");
+    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES, "SELECT count(*) FROM t");
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_TABLES, " a_OFFLINE , b_REALTIME ,");
     BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
     assertTrue(config.hasCustomQuery());
@@ -124,7 +124,7 @@ public class BrokerWarmupTest {
   @Test
   public void multipleQueriesParseOnSemicolon() {
     PinotConfiguration properties = new PinotConfiguration();
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY,
+    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES,
         "SELECT count(*) FROM t1 ; SELECT max(x) FROM t2 ;");
     BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
     assertTrue(config.hasCustomQuery());
@@ -132,7 +132,7 @@ public class BrokerWarmupTest {
 
     // A single query containing a comma stays one query.
     PinotConfiguration single = new PinotConfiguration();
-    single.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY, "SELECT a, b FROM t");
+    single.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES, "SELECT a, b FROM t");
     assertEquals(BrokerWarmupConfig.from(single).queries().size(), 1);
   }
 

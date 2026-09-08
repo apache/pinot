@@ -57,7 +57,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 public record BrokerWarmupConfig(boolean enabled, long budgetMs, int minIterations, int maxTables,
                                  List<String> queries, List<String> tables, int concurrency) {
 
-  /// Separator for multiple probe queries inside the `warmup.query` config value. A semicolon, the SQL
+  /// Separator for multiple probe queries inside the `warmup.queries` config value. A semicolon, the SQL
   /// statement separator: a trailing one is dropped (blank), and the probe compiler does not accept the
   /// `SET x=y;` prefix anyway, so the only value a `;` would wrongly split is one inside a string literal,
   /// which the config layer's comma handling already makes unsafe. Comma cannot be used: the config layer
@@ -70,9 +70,9 @@ public record BrokerWarmupConfig(boolean enabled, long budgetMs, int minIteratio
   private static final int MAX_CONCURRENCY = 64;
 
   public static BrokerWarmupConfig from(PinotConfiguration config) {
-    String queryProperty = config.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY,
-        Broker.DEFAULT_BROKER_STARTUP_WARMUP_QUERY);
-    List<String> queries = splitAndTrim(queryProperty, QUERY_DELIMITER);
+    String queriesProperty = config.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES,
+        Broker.DEFAULT_BROKER_STARTUP_WARMUP_QUERIES);
+    List<String> queries = splitAndTrim(queriesProperty, QUERY_DELIMITER);
     String tablesCsv = config.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_TABLES,
         Broker.DEFAULT_BROKER_STARTUP_WARMUP_TABLES);
     List<String> tables = splitAndTrim(tablesCsv, ",");

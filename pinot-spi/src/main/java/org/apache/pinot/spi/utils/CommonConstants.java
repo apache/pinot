@@ -458,10 +458,10 @@ public class CommonConstants {
     // of tables. When set, this complete query (it names its own table) is used instead, warming that
     // query's shape; multiple queries may be given separated by ';'. warmup.tables is ignored when this is
     // set.
-    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_QUERY = "pinot.broker.startup.warmup.query";
-    public static final String DEFAULT_BROKER_STARTUP_WARMUP_QUERY = "";
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES = "pinot.broker.startup.warmup.queries";
+    public static final String DEFAULT_BROKER_STARTUP_WARMUP_QUERIES = "";
     // Optional comma-separated list of tables (raw or with type) to probe with the default query. Empty
-    // means auto-select via set-cover. Ignored when warmup.query is set.
+    // means auto-select via set-cover. Ignored when warmup.queries is set.
     public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_TABLES = "pinot.broker.startup.warmup.tables";
     public static final String DEFAULT_BROKER_STARTUP_WARMUP_TABLES = "";
     // Number of probe queries fired concurrently per round. Serial (1) warms the serve path; a higher value
