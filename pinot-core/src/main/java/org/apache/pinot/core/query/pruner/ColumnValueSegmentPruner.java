@@ -88,10 +88,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column, query.getSchema())
-        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
-    assert dataSource != null;
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
     if (!checkMinMaxRange(dataSourceMetadata, cachedValue.getComparableValue())) {
@@ -120,10 +117,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column, query.getSchema())
-        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
-    assert dataSource != null;
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
     for (ValueCache.CachedValue value : cachedValues) {
@@ -140,10 +134,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
       Map<String, DataSource> dataSourceCache, QueryContext query) {
     String column = rangePredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column, query.getSchema())
-        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
-    assert dataSource != null;
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
 
     // Get lower/upper boundary value
     DataType dataType = dataSourceMetadata.getDataType();
@@ -221,5 +212,19 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
       }
     }
     return true;
+  }
+
+  /// Pruning reads only the column's statistics, so an immutable segment answers from its column metadata rather
+  /// than materializing the column. A mutable segment keeps the per-segment data-source cache it had, where the
+  /// lookup is a map read and the metadata is not derivable without the data source.
+  private static DataSourceMetadata getDataSourceMetadata(IndexSegment segment, String column,
+      Map<String, DataSource> dataSourceCache, QueryContext query) {
+    if (segment instanceof ImmutableSegment) {
+      return segment.getDataSourceMetadata(column, query.getSchema());
+    }
+    DataSource dataSource = dataSourceCache.computeIfAbsent(column,
+        col -> segment.getDataSource(col, query.getSchema()));
+    assert dataSource != null;
+    return dataSource.getDataSourceMetadata();
   }
 }
