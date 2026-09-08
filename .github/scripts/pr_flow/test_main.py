@@ -303,13 +303,15 @@ class HistoryTest(unittest.TestCase):
         api.request = Mock(return_value={"data": {
             "viewer": {"login": "github-actions[bot]"}, "repository": {"pullRequest": {
                 "createdAt": "2026-09-08T00:00:00Z",
-                "userContentEdits": {"includesCreatedEdit": True, "nodes": nodes}}}}})
+                "includesCreatedEdit": True, "userContentEdits": {"nodes": nodes}}}}})
         self.assertEqual(api.history(42), nodes)
         self.assertEqual(api.history_metadata[42], {
             "created_at": "2026-09-08T00:00:00Z", "includes_created_edit": True})
         query = api.request.call_args.args[1]["query"]
         self.assertIn("createdAt", query)
         self.assertIn("includesCreatedEdit", query)
+        # GitHub exposes this field on PullRequest, not UserContentEditConnection.
+        self.assertRegex(query, r"createdAt\s+includesCreatedEdit\s+userContentEdits")
 
 
 class PublicationTest(unittest.TestCase):

@@ -126,8 +126,8 @@ class GitHub:
           repository(owner:"apache", name:"pinot") {
             pullRequest(number:$number) {
               createdAt
+              includesCreatedEdit
               userContentEdits(first:20) {
-                includesCreatedEdit
                 nodes { id editedAt diff editor { login } }
               }
             }
@@ -149,10 +149,10 @@ class GitHub:
                                               for item in nodes):
             raise FlowError("PR edit history cannot be audited; preserving the description")
         if (not isinstance(pull.get("createdAt"), str) or not pull["createdAt"]
-                or type(history.get("includesCreatedEdit")) is not bool):
+                or type(pull.get("includesCreatedEdit")) is not bool):
             raise FlowError("PR edit history metadata is unavailable; preserving the description")
         self.history_metadata[number(pr_number)] = {
-            "created_at": pull["createdAt"], "includes_created_edit": history["includesCreatedEdit"]}
+            "created_at": pull["createdAt"], "includes_created_edit": pull["includesCreatedEdit"]}
         return nodes
 
     def pages(self, suffix, maximum):
