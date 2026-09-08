@@ -132,6 +132,7 @@ public class QueryLoggerTest {
         + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
         + "pools=[],"
         + "rlsFiltersApplied=true,"
+        + "approximateFunctionApplied=false,"
         + "workloadName=workloadName,"
         + "query=SELECT * FROM foo");
     //@formatter:on

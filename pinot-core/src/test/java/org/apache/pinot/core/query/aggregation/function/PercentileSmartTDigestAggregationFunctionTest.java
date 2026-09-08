@@ -32,6 +32,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -176,6 +177,81 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     Object merged = function.merge(first, second);
     assertTrue(merged instanceof PercentileTDigestAccumulator);
     assertDuplicateInfinityResult((TDigest) merged, 2L * values.length);
+  }
+
+  @Test
+  public void testGroupBySvStaysExactBelowThreshold() {
+    PercentileSmartTDigestAggregationFunction function = newFunction(100);
+    int[] groupKeys = {0, 0, 1};
+
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0, 3.0})));
+
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof DoubleArrayList);
+    assertTrue(function.extractGroupByResult(holder, 1) instanceof DoubleArrayList);
+  }
+
+  /// The accumulator of a converted group must keep taking values from later batches, and it must take them into the
+  /// digest instead of into a new value list.
+  @Test
+  public void testGroupBySvKeepsFeedingTheDigestAfterConversion() {
+    PercentileSmartTDigestAggregationFunction function = newFunction(4);
+    int[] groupKeys = {0, 0, 0};
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0, 3.0})));
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof DoubleArrayList);
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{4.0, 5.0, 6.0})));
+    Object converted = function.extractGroupByResult(holder, 0);
+    assertTrue(converted instanceof TDigest);
+    assertEquals(((TDigest) converted).size(), 6L);
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{7.0, 8.0, 9.0})));
+    Object stillConverted = function.extractGroupByResult(holder, 0);
+    assertTrue(stillConverted instanceof TDigest);
+    assertEquals(((TDigest) stillConverted).size(), 9L);
+    assertEquals(function.extractFinalResult(stillConverted), 5.0, 1.0);
+  }
+
+  @Test
+  public void testGroupBySvConvertsForMultiValuedColumn() {
+    PercentileSmartTDigestAggregationFunction function = newFunction(4);
+    int[] groupKeys = {0, 0};
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+
+    function.aggregateGroupBySV(2, groupKeys, holder, Map.of(EXPRESSION,
+        SyntheticBlockValSets.DoubleMV.create(null, new double[][]{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}})));
+
+    Object result = function.extractGroupByResult(holder, 0);
+    assertTrue(result instanceof TDigest);
+    assertEquals(((TDigest) result).size(), 6L);
+  }
+
+  @Test
+  public void testGroupByMvConvertsEveryGroupTheRowBelongsTo() {
+    PercentileSmartTDigestAggregationFunction function = newFunction(4);
+    int[][] groupKeysArray = {{0, 1}, {0, 1}, {0, 1}, {0, 1}, {0, 1}};
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+
+    function.aggregateGroupByMV(5, groupKeysArray, holder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0, 3.0, 4.0, 5.0})));
+
+    for (int groupKey = 0; groupKey < 2; groupKey++) {
+      Object result = function.extractGroupByResult(holder, groupKey);
+      assertTrue(result instanceof TDigest, "Group " + groupKey + " was not converted");
+      assertEquals(((TDigest) result).size(), 5L);
+    }
+  }
+
+  private static PercentileSmartTDigestAggregationFunction newFunction(int threshold) {
+    return new PercentileSmartTDigestAggregationFunction(
+        List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0)),
+            ExpressionContext.forLiteral(Literal.stringValue("THRESHOLD=" + threshold + ";COMPRESSION=20"))), false);
   }
 
   private static PercentileSmartTDigestAggregationFunction newFunction() {

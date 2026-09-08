@@ -40,7 +40,8 @@ import org.apache.pinot.common.response.ProcessingException;
 /// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons",
+    "maxRowsInJoinReached",
     "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
@@ -53,7 +54,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed",
+    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
     "responseMetadata"
 })
@@ -91,6 +92,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  private boolean _approximateFunctionApplied = false;
   @Nullable
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
@@ -518,6 +520,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("approximateFunctionApplied")
+  @Override
+  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
+    _approximateFunctionApplied = approximateFunctionApplied;
+  }
+
+  @JsonProperty("approximateFunctionApplied")
+  @Override
+  public boolean isApproximateFunctionApplied() {
+    return _approximateFunctionApplied;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {

@@ -500,10 +500,32 @@ public class CommonConstants {
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
-    // Rewrite potential expensive functions to their approximation counterparts
-    // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
-    // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+    /// Rewrite potential expensive functions to their approximation counterparts, in both query engines:
+    /// - DISTINCT_COUNT and COUNT(DISTINCT) -> DISTINCT_COUNT_SMART_HLL
+    /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+    ///
+    /// The rewritten functions stay exact until an accumulator exceeds their conversion threshold, so this bounds
+    /// server memory without changing the answer for low-cardinality inputs.
+    ///
+    /// Settable in the broker conf, read once at startup, or in the Helix cluster config, which wins and which
+    /// brokers pick up without a restart. Both are defaults: the `useApproximateFunction` query option overrides
+    /// them, and so does `QueryConfig.useApproximateFunction`, though only in the single-stage engine, because a
+    /// multi-stage query can span tables and so resolves the setting before it knows the table set.
     public static final String USE_APPROXIMATE_FUNCTION = "pinot.broker.use.approximate.function";
+    public static final boolean DEFAULT_USE_APPROXIMATE_FUNCTION = false;
+
+    /// Parameters passed verbatim as the trailing argument of the calls the rewrite produces, for example
+    /// `threshold=10000;log2m=12;dictThreshold=10000` and `threshold=1000;compression=100`. Empty means no argument
+    /// is added, so the aggregation function defaults apply. The two functions reject each other's parameter names,
+    /// hence one key each.
+    ///
+    /// Worst-case memory for a group-by is `threshold` values per group, so size this together with
+    /// `pinot.server.query.executor.num.groups.limit` rather than in isolation.
+    public static final String APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS =
+        "pinot.broker.approximate.function.distinct.count.params";
+    public static final String APPROXIMATE_FUNCTION_PERCENTILE_PARAMS =
+        "pinot.broker.approximate.function.percentile.params";
+    public static final String DEFAULT_APPROXIMATE_FUNCTION_PARAMS = "";
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
@@ -721,6 +743,9 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        /// Per-query override of [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION], outranking both the table config
+        /// and the cluster or broker default. `false` forces exact results, `true` opts one expensive query in.
+        public static final String USE_APPROXIMATE_FUNCTION = "useApproximateFunction";
         /// Broker-internal marker set on the rewritten server-side PinotQuery after a FULL_REWRITE
         /// materialized-view rewrite. Read by BrokerReduceService to distinguish MV-rewritten
         /// queries from gapfill / future federated paths without relying on a brittle structural
@@ -1116,6 +1141,8 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
+      /// Inert unless [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION] is on; name it here to switch it off entirely.
+      public static final String APPROXIMATE_AGGREGATE_REWRITE = "ApproximateAggregateRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
       public static final String PROJECT_MERGE = "ProjectMerge";
