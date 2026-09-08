@@ -828,13 +828,13 @@ public class MutableSegmentImpl implements MutableSegment {
   /// @throws IllegalStateException if a multi-value column exceeds its maximum number of values
   private void validateNumMultiValues(GenericRow row) {
     for (MultiValueLimit limit : _multiValueLimits) {
-      Object value = row.getValue(limit._column);
+      Object value = row.getValue(limit.column());
       if (value != null) {
         int numValues = ((Object[]) value).length;
-        if (numValues > limit._maxNumMultiValues) {
+        if (numValues > limit.maxNumMultiValues()) {
           throw new IllegalStateException(
               String.format("Number of values: %d in MV column: %s exceeds the maximum allowed: %d", numValues,
-                  limit._column, limit._maxNumMultiValues));
+                  limit.column(), limit.maxNumMultiValues()));
         }
       }
     }
@@ -1688,7 +1688,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   /// Per-column cap on the number of values in a multi-value entry, as configured on the mutable index context.
-  private record MultiValueLimit(String _column, int _maxNumMultiValues) {
+  private record MultiValueLimit(String column, int maxNumMultiValues) {
   }
 
   private class IndexContainer implements Closeable {
