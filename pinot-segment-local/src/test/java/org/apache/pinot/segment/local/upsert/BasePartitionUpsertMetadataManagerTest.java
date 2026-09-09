@@ -119,13 +119,19 @@ public class BasePartitionUpsertMetadataManagerTest {
       manager.takeSnapshot("table__0__2__200", "20");
       UpsertSnapshotMetadata second = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
       assertEquals(second.startOffset(), "20");
+      assertEquals(second.attempt().lockSkippedSegments(), 1);
+      assertEquals(second.attempt().writtenSegments(), 0);
       // Partition context does not certify that each bitmap was captured in this attempt.
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
 
       // A later manual snapshot must not reuse the startup context.
       when(segmentLock.tryLock()).thenReturn(true);
       manager.takeSnapshot();
-      assertEquals(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0), second);
+      UpsertSnapshotMetadata manual = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
+      assertNull(manual.startOffset());
+      assertNull(manual.consumingSegmentName());
+      assertEquals(manual.counters().attemptsWithLockSkipsTotal(), 1);
+      assertEquals(manual.counters().attemptsTotal(), 3);
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
 
       // Failing the extra metadata write must not prevent bitmap snapshot persistence.
@@ -138,6 +144,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       manager.takeSnapshot("table__0__3__300", "30");
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 1);
       assertNull(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0));
+      assertEquals(manager.getSnapshotMetadataStatus().persistenceStatus(), "FAILED");
+      assertEquals(manager.getSnapshotMetadataStatus().publicationFailures(), 1);
+      assertEquals(manager.getSnapshotMetadataStatus().snapshot().startOffset(), "30");
     } finally {
       manager.stop();
       manager.close();
@@ -163,6 +172,144 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertFalse(upsertMetadataManager.isPreloading());
       upsertMetadataManager.stop();
     }
+  }
+
+  @Test
+  public void testSnapshotMetadataIncludesRetainedFilesAndEqualCountDifferences()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager(null);
+    try {
+      snapshotMetadataSegment(manager, "retained", 1, 2);
+      ImmutableSegmentImpl changed = snapshotMetadataSegment(manager, "changed", 1, 2);
+      manager.takeSnapshot("table__0__2__200", "20");
+      UpsertSnapshotMetadata first = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(first.content().expectedFiles(), 2);
+      assertEquals(first.content().knownFiles(), 2);
+      assertNotNull(first.content().savedFilesFingerprint());
+      changed.getValidDocIds().remove(2);
+      changed.getValidDocIds().add(3);
+      manager.markSegmentAsUpdated(changed);
+      manager.takeSnapshot("table__0__2__200", "20");
+      UpsertSnapshotMetadata second = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(second.attempt().selectedSegments(), 1);
+      assertEquals(second.attempt().writtenSegments(), 1);
+      assertEquals(second.content().knownFiles(), 2);
+      assertEquals(second.content().populationFingerprint(), first.content().populationFingerprint());
+      assertNotEquals(second.content().savedFilesFingerprint(), first.content().savedFilesFingerprint());
+      assertEquals(changed.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+      manager.takeSnapshot("table__0__3__300", "30");
+      UpsertSnapshotMetadata retained = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(retained.attempt().selectedSegments(), 0);
+      assertEquals(retained.content(), second.content());
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
+  public void testSnapshotMetadataSeparatesLockFailureFromDeferredWork()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager(null);
+    try {
+      ImmutableSegmentImpl existing = snapshotMetadataSegment(manager, "existing", 1);
+      manager.takeSnapshot("table__0__2__200", "20");
+      manager.markSegmentAsUpdated(existing);
+      snapshotMetadataSegment(manager, "new", 2);
+      Lock unavailable = mock(Lock.class);
+      when(manager.getContext().getTableDataManager().getSegmentLock("existing")).thenReturn(unavailable);
+      manager.takeSnapshot("table__0__3__300", "30");
+      UpsertSnapshotMetadata metadata = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(metadata.attempt(), new UpsertSnapshotMetadata.Attempt(2, 0, 1, 1, 0, false));
+      assertEquals(metadata.counters().attemptsWithLockSkipsTotal(), 1);
+      assertEquals(metadata.content().expectedFiles(), 2);
+      assertEquals(metadata.content().knownFiles(), 1);
+      assertNull(metadata.content().savedFilesFingerprint());
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
+  public void testSnapshotMetadataReportsPartialWritesAndAbort()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager("deleted");
+    try {
+      ImmutableSegmentImpl segment = snapshotMetadataSegment(manager, "partial", 1, 2);
+      File queryableFile = new File(new File(TEMP_DIR, "partial"), V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+      FileUtils.forceMkdir(queryableFile);
+      FileUtils.touch(new File(queryableFile, "block-replacement"));
+      manager.takeSnapshot("table__0__2__200", "20");
+      UpsertSnapshotMetadata partial = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(partial.attempt(), new UpsertSnapshotMetadata.Attempt(1, 0, 0, 0, 1, false));
+      assertEquals(partial.content().knownFiles(), 1);
+      assertNull(partial.content().savedFilesFingerprint());
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+      when(manager.getContext().getTableDataManager().getSegmentLock("partial"))
+          .thenThrow(new IllegalStateException("injected lock lookup failure"));
+      manager.takeSnapshot("table__0__3__300", "30");
+      UpsertSnapshotMetadata aborted = manager.getSnapshotMetadataStatus().snapshot();
+      assertTrue(aborted.attempt().aborted());
+      assertEquals(aborted.counters().failedAttemptsTotal(), 2);
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
+  public void testSnapshotMetadataObservesLifecycleBetweenCaptureEnds()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager(null);
+    try {
+      snapshotMetadataSegment(manager, "segment", 1);
+      Lock available = mock(Lock.class);
+      when(available.tryLock()).thenReturn(true);
+      when(manager.getContext().getTableDataManager().getSegmentLock("segment")).thenAnswer(invocation -> {
+        manager.beginSnapshotMetadataMutation(null);
+        manager.endSnapshotMetadataMutation(true);
+        return available;
+      });
+      manager.takeSnapshot("table__0__2__200", "20");
+      UpsertSnapshotMetadata metadata = manager.getSnapshotMetadataStatus().snapshot();
+      assertEquals(metadata.attempt().writtenSegments(), 1);
+      assertEquals(metadata.lifecycleAfter().activeOperations(), 0);
+      assertTrue(metadata.comparisonIssues().contains("LIFECYCLE_OVERLAP"));
+      assertEquals(metadata.getBoundaryStatus(), "UNVERIFIED");
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  private static DummyPartitionUpsertMetadataManager snapshotMetadataManager(@Nullable String deleteColumn) {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    when(context.getTableIndexDir()).thenReturn(TEMP_DIR);
+    when(context.getMetadataManagerConfigs()).thenReturn(
+        Map.of(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA, "true"));
+    when(context.getDeleteRecordColumn()).thenReturn(deleteColumn);
+    TableDataManager table = mock(TableDataManager.class);
+    when(context.getTableDataManager()).thenReturn(table);
+    Lock available = mock(Lock.class);
+    when(available.tryLock()).thenReturn(true);
+    when(table.getSegmentLock(anyString())).thenReturn(available);
+    DummyPartitionUpsertMetadataManager manager = new DummyPartitionUpsertMetadataManager("table_REALTIME", 0, context);
+    manager._gotFirstConsumingSegment = true;
+    return manager;
+  }
+
+  private static ImmutableSegmentImpl snapshotMetadataSegment(DummyPartitionUpsertMetadataManager manager, String name,
+      int... docIds)
+      throws IOException {
+    ImmutableSegmentImpl segment = createImmutableSegment(name, new File(TEMP_DIR, name), new ArrayList<>(), null);
+    segment.enableUpsert(manager, new ThreadSafeMutableRoaringBitmap(MutableRoaringBitmap.bitmapOf(docIds)),
+        manager.getContext().getDeleteRecordColumn() != null
+            ? new ThreadSafeMutableRoaringBitmap(MutableRoaringBitmap.bitmapOf(docIds)) : null);
+    manager.trackSegment(segment);
+    manager.markSegmentAsUpdated(segment);
+    return segment;
   }
 
   @Test
@@ -1108,6 +1255,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
+    when(meta.getDataCrc()).thenReturn("123456");
     return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
       public void persistDocIdsSnapshot(String fileName,
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)

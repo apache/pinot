@@ -36,7 +36,7 @@ public final class UpsertSnapshotMetadataStore {
   private UpsertSnapshotMetadataStore() {
   }
 
-  static void persist(File tableIndexDir, UpsertSnapshotMetadata metadata) {
+  static boolean persist(File tableIndexDir, UpsertSnapshotMetadata metadata) {
     try {
       File target = getMetadataFile(tableIndexDir, metadata.partitionId());
       // Do not create a table directory that may have been removed.
@@ -48,9 +48,11 @@ public final class UpsertSnapshotMetadataStore {
       } finally {
         Files.deleteIfExists(temporary.toPath());
       }
+      return true;
     } catch (Exception e) {
       LOGGER.warn("Could not persist upsert snapshot metadata for table directory: {}, partition: {}",
           tableIndexDir, metadata.partitionId(), e);
+      return false;
     }
   }
 

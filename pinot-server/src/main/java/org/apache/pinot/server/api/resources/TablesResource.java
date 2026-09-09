@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -100,6 +101,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata;
 import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadataStore;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -630,6 +633,8 @@ public class TablesResource {
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Include the SHA-256 of the saved file bytes read")
+      @QueryParam("includeSnapshotFingerprint") @DefaultValue("false") boolean includeSnapshotFingerprint,
       @Context HttpHeaders httpHeaders) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     segmentName = URIUtils.decode(segmentName);
@@ -655,8 +660,21 @@ public class TablesResource {
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
-          getValidDocIds(indexSegment, validDocIdsType);
+      Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair;
+      String snapshotFileFingerprint = null;
+      ValidDocIdsType requestedType = validDocIdsType == null ? ValidDocIdsType.SNAPSHOT
+          : ValidDocIdsType.valueOf(validDocIdsType.toUpperCase(Locale.ROOT));
+      if (includeSnapshotFingerprint
+          && (requestedType == ValidDocIdsType.SNAPSHOT || requestedType == ValidDocIdsType.SNAPSHOT_WITH_DELETE)) {
+        String fileName = requestedType == ValidDocIdsType.SNAPSHOT ? V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME
+            : V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME;
+        ImmutableSegmentImpl.SavedDocIdsSnapshot saved =
+            ((ImmutableSegmentImpl) indexSegment).loadSavedDocIdsSnapshot(fileName, true);
+        validDocIdsSnapshotPair = Pair.of(requestedType, saved != null ? saved.bitmap() : null);
+        snapshotFileFingerprint = saved != null ? saved.fileFingerprint() : null;
+      } else {
+        validDocIdsSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
+      }
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
       MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
 
@@ -671,10 +689,16 @@ public class TablesResource {
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
           toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
-          _serverInstance.getInstanceDataManager().getInstanceId(), status);
+          _serverInstance.getInstanceDataManager().getInstanceId(), status, snapshotFileFingerprint);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  /// Preserves existing in-process callers; fingerprint work is opt-in on the HTTP path too.
+  public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(String tableNameWithType, String validDocIdsType,
+      String segmentName, HttpHeaders httpHeaders) {
+    return downloadValidDocIdsBitmap(tableNameWithType, validDocIdsType, segmentName, false, httpHeaders);
   }
 
   @POST
@@ -701,7 +725,7 @@ public class TablesResource {
   @Path("/tables/{tableNameWithType}/upsertSnapshotMetadata/{partitionId}")
   @Produces(MediaType.APPLICATION_JSON)
   @Authorize(targetType = TargetType.TABLE, action = Actions.Table.GET_METADATA)
-  @ApiOperation(value = "Returns the last persisted upsert snapshot partition context",
+  @ApiOperation(value = "Returns current upsert snapshot evidence or an explicitly historical saved report",
       notes = "Reads diagnostic metadata only; never takes a snapshot. The startup offset is not a verified boundary.")
   public Map<String, Object> getUpsertSnapshotMetadata(
       @ApiParam(value = "Table name including type", required = true)
@@ -715,10 +739,22 @@ public class TablesResource {
     if (partitionId < 0) {
       throw new WebApplicationException("Partition ID must be non-negative", Response.Status.BAD_REQUEST);
     }
+    TableUpsertMetadataManager tableManager = tableDataManager.getTableUpsertMetadataManager();
+    PartitionUpsertMetadataManager manager = null;
+    if (tableManager != null) {
+      manager = tableManager.getPartitionManager(partitionId);
+    }
+    UpsertSnapshotMetadata.Status status = manager != null ? manager.getSnapshotMetadataStatus() : null;
+    if (status != null) {
+      return Map.of("availability", "AVAILABLE", "source", "LIVE", "partitionId", partitionId,
+          "snapshot", status.snapshot(), "persistenceStatus", status.persistenceStatus(),
+          "publicationFailures", status.publicationFailures(), "cleanupNow", status.cleanupNow());
+    }
     UpsertSnapshotMetadata metadata = UpsertSnapshotMetadataStore.read(tableDataManager.getTableDataDir(), partitionId);
     return metadata == null
         ? Map.of("availability", "UNAVAILABLE", "partitionId", partitionId)
-        : Map.of("availability", "AVAILABLE", "partitionId", partitionId, "snapshot", metadata);
+        : Map.of("availability", "AVAILABLE", "source", "HISTORICAL_FILE", "partitionId", partitionId,
+            "snapshot", metadata);
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,

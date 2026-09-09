@@ -42,6 +42,12 @@ public interface TableUpsertMetadataManager extends Closeable {
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
+  /// Looks up an existing producer without creating a partition or opening storage. Unsupported managers return null.
+  @Nullable
+  default PartitionUpsertMetadataManager getPartitionManager(int partitionId) {
+    return null;
+  }
+
   UpsertContext getContext();
 
   /// @deprecated Use [#getContext()] instead.

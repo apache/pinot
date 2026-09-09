@@ -92,6 +92,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   private final boolean _enableSnapshotMetadata;
+  @Nullable
+  private final UpsertSnapshotDiagnostics _snapshotDiagnostics;
+  @Nullable
+  protected final UpsertSnapshotActivity _snapshotLifecycle;
   // Scoped to the startup call so manual/shutdown snapshots cannot inherit an old startup offset. Keeping the
   // context on the calling thread also preserves overrides of the existing takeSnapshot()/doTakeSnapshot() hooks.
   private final ThreadLocal<SnapshotContext> _snapshotContext = new ThreadLocal<>();
@@ -168,6 +172,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Map<String, String> metadataManagerConfigs = context.getMetadataManagerConfigs();
     _enableSnapshotMetadata = _enableSnapshot && metadataManagerConfigs != null && Boolean.parseBoolean(
         metadataManagerConfigs.get(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA));
+    _snapshotDiagnostics = _enableSnapshotMetadata ? new UpsertSnapshotDiagnostics(partitionId, context) : null;
+    _snapshotLifecycle = _enableSnapshotMetadata ? new UpsertSnapshotActivity() : null;
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
@@ -251,6 +257,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // The thread doing the segment preloading here must complete before the other helix threads start to handle
     // segment state transitions. This is ensured by the lock here.
     _preloadLock.lock();
+    beginSnapshotMetadataMutation(null);
+    boolean mutationCompleted = true;
     try {
       // Check the flag again to ensure preloading happens only once.
       if (!_isPreloading) {
@@ -263,6 +271,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_PRELOAD_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      mutationCompleted = false;
       // We should continue even if preloading fails, so that segments not being preloaded successfully can get
       // loaded via the normal segment loading logic as done on the Helix task threads although with more costly
       // checks on the upsert metadata.
@@ -276,6 +285,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } finally {
       _isPreloading = false;
       _preloadLock.unlock();
+      endSnapshotMetadataMutation(mutationCompleted);
     }
   }
 
@@ -310,11 +320,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+    beginSnapshotMetadataMutation(immutableSegment);
+    boolean mutationCompleted = false;
     try {
       doAddSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
+      mutationCompleted = true;
     } finally {
+      endSnapshotMetadataMutation(mutationCompleted);
       finishOperation();
     }
   }
@@ -424,11 +438,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+    beginSnapshotMetadataMutation(immutableSegment);
+    boolean mutationCompleted = false;
     try {
       doPreloadSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
+      mutationCompleted = true;
     } finally {
+      endSnapshotMetadataMutation(mutationCompleted);
       finishOperation();
     }
   }
@@ -575,6 +593,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip replacing segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
+    beginSnapshotMetadataMutation(segment instanceof ImmutableSegmentImpl immutableSegment ? immutableSegment : null);
+    boolean mutationCompleted = false;
     try {
       doReplaceSegment(segment, oldSegment);
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
@@ -584,7 +604,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         trackSegmentForSnapshot(immutableSegment);
       }
       untrackSegment(oldSegment);
+      mutationCompleted = true;
     } finally {
+      endSnapshotMetadataMutation(mutationCompleted);
       finishOperation();
     }
   }
@@ -765,6 +787,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
+    beginSnapshotMetadataMutation(null);
+    boolean mutationCompleted = false;
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
@@ -774,7 +798,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         doRemoveSegment(segment);
       }
       untrackSegment(segment);
+      mutationCompleted = true;
     } finally {
+      endSnapshotMetadataMutation(mutationCompleted);
       finishOperation();
     }
   }
@@ -923,7 +949,32 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void doTakeSnapshot() {
-    SnapshotContext snapshotContext = _enableSnapshotMetadata ? _snapshotContext.get() : null;
+    UpsertSnapshotDiagnostics.Capture capture = null;
+    if (_snapshotDiagnostics != null) {
+      SnapshotContext context = _snapshotContext.get();
+      try {
+        capture = _snapshotDiagnostics.begin(context != null ? context.consumingSegmentName() : null,
+            context != null ? context.startOffset() : null, getSnapshotCleanupProgress(), _snapshotLifecycle.read());
+      } catch (RuntimeException e) {
+        _logger.warn("Could not start diagnostic snapshot observation", e);
+      }
+    }
+    boolean completed = false;
+    try {
+      doTakeSnapshot(capture);
+      completed = true;
+    } finally {
+      if (capture != null) {
+        try {
+          _snapshotDiagnostics.finish(capture, !completed, getSnapshotCleanupProgress(), _snapshotLifecycle.read());
+        } catch (RuntimeException e) {
+          _logger.warn("Could not publish diagnostic snapshot observation", e);
+        }
+      }
+    }
+  }
+
+  private void doTakeSnapshot(@Nullable UpsertSnapshotDiagnostics.Capture capture) {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
     long numQueryableDocIdsInSnapshot = 0L;
@@ -943,11 +994,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     List<ImmutableSegmentImpl> segmentsWithSnapshot = new ArrayList<>();
     List<ImmutableSegmentImpl> segmentsWithoutSnapshot = new ArrayList<>();
     for (IndexSegment segment : _trackedSegments) {
+      if (capture != null) {
+        capture.track(segment);
+      }
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
         if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
           // if no updates since last snapshot then skip
           numUnchangedSegments++;
           continue;
+        }
+        if (capture != null) {
+          capture._selected++;
         }
         if (_segmentsWithSnapshot.contains(segment)) {
           segmentsWithSnapshot.add(immutableSegment);
@@ -973,6 +1030,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
       boolean locked = segmentLock.tryLock();
       if (!locked) {
+        if (capture != null) {
+          capture._lockSkipped++;
+        }
         // The snapshot kept on disk might have become stale, so skip creating new snapshot files in the next loop to
         // keep all the snapshots on disk disjoint with each other.
         _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
@@ -986,11 +1046,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // the next snapshot round. The snapshot kept on disk for the segment might be stale though, so also skip
         // creating new snapshot files in the next loop.
         if (!_trackedSegments.contains(segment)) {
+          if (capture != null) {
+            capture._otherSkipped++;
+          }
           _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
           isSegmentSkipped = true;
           continue;
         }
         ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+        boolean requiredBitmapsPresent = validDocIds != null;
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
@@ -999,6 +1063,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
         if (_deleteRecordColumn != null) {
           ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+          requiredBitmapsPresent &= queryableDocIds != null;
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                 queryableDocIds.getBytesAndCardinality();
@@ -1008,7 +1073,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
+        if (capture != null) {
+          if (requiredBitmapsPresent) {
+            capture._written++;
+          } else {
+            capture._otherSkipped++;
+          }
+        }
       } catch (Exception e) {
+        if (capture != null) {
+          capture._failed++;
+        }
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         isSegmentSkipped = true;
       } finally {
@@ -1028,6 +1103,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // segmentLock can still be held by the thread replacing it with the immutable one.
         boolean locked = segmentLock.tryLock();
         if (!locked) {
+          if (capture != null) {
+            capture._lockSkipped++;
+          }
           _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
               segmentName);
           continue;
@@ -1036,10 +1114,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           // The segment can be replaced or removed by another thread after it was classified without snapshot.
           // The replaced segment object no longer owns the segment directory, so skip persisting its bitmaps.
           if (!_trackedSegments.contains(segment)) {
+            if (capture != null) {
+              capture._otherSkipped++;
+            }
             _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
             continue;
           }
           ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+          boolean requiredBitmapsPresent = validDocIds != null;
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
@@ -1052,6 +1134,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           }
           if (_deleteRecordColumn != null) {
             ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+            requiredBitmapsPresent &= queryableDocIds != null;
             if (queryableDocIds != null) {
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                   queryableDocIds.getBytesAndCardinality();
@@ -1061,12 +1144,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
           numImmutableSegments++;
+          if (capture != null) {
+            if (requiredBitmapsPresent) {
+              capture._written++;
+            } else {
+              capture._otherSkipped++;
+            }
+          }
         } catch (Exception e) {
+          if (capture != null) {
+            capture._failed++;
+          }
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
           segmentLock.unlock();
         }
       }
+    } else if (capture != null) {
+      capture._otherSkipped += segmentsWithoutSnapshot.size();
     }
     _updatedSegmentsSinceLastSnapshot.retainAll(_trackedSegments);
     _segmentsWithSnapshot.retainAll(_trackedSegments);
@@ -1078,11 +1173,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot,
         numTrackedSegments, numConsumingSegments, numUnchangedSegments);
-    if (snapshotContext != null) {
-      UpsertSnapshotMetadataStore.persist(_tableIndexDir,
-          new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, _partitionId,
-              snapshotContext.consumingSegmentName(), snapshotContext.startOffset(), startTimeMs));
-    }
     _logger.info("Finished taking snapshot for {} immutable segments with {} ({} queryable) primary keys "
             + "(out of {} total segments, {} are consuming segments) in {} ms", numImmutableSegments,
         numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot, numTrackedSegments,
@@ -1122,6 +1212,34 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /// Override only with observations from the actual cleanup pass. A target/preload watermark is not completed work.
+  protected UpsertSnapshotMetadata.CleanupProgress getSnapshotCleanupProgress() {
+    return isTTLEnabled() ? UpsertSnapshotMetadata.CleanupProgress.unknown()
+        : UpsertSnapshotMetadata.CleanupProgress.disabled();
+  }
+
+  @Override
+  @Nullable
+  public UpsertSnapshotMetadata.Status getSnapshotMetadataStatus() {
+    return _snapshotDiagnostics != null ? _snapshotDiagnostics.status(getSnapshotCleanupProgress()) : null;
+  }
+
+  /// Observes only coarse segment operations. Deliberately not part of startOperation(), which also runs per record.
+  protected final void beginSnapshotMetadataMutation(@Nullable ImmutableSegmentImpl segment) {
+    if (_snapshotLifecycle != null) {
+      _snapshotLifecycle.begin();
+      if (segment != null) {
+        segment.enableSnapshotFingerprints();
+      }
+    }
+  }
+
+  protected final void endSnapshotMetadataMutation(boolean succeeded) {
+    if (_snapshotLifecycle != null) {
+      _snapshotLifecycle.end(succeeded);
+    }
+  }
+
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
@@ -1145,13 +1263,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing expired primary keys because metadata manager is already stopped");
       return;
     }
+    beginSnapshotMetadataMutation(null);
+    boolean mutationCompleted = false;
     try {
       long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
           duration, TimeUnit.MILLISECONDS);
+      mutationCompleted = true;
     } finally {
+      endSnapshotMetadataMutation(mutationCompleted);
       finishOperation();
     }
   }
@@ -1291,6 +1413,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// Removes the segment from all the tracking sets. The segment is removed eagerly instead of waiting for the next
   /// snapshot round to clean it up, to not keep stale segment object references around.
   protected void untrackSegment(IndexSegment segment) {
+    if (_snapshotDiagnostics != null && segment instanceof ImmutableSegmentImpl immutableSegment) {
+      immutableSegment.invalidateSnapshotFingerprints();
+    }
     _trackedSegments.remove(segment);
     _updatedSegmentsSinceLastSnapshot.remove(segment);
     _segmentsWithSnapshot.remove(segment);

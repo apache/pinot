@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -42,6 +43,12 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
 
   private final Map<Integer, BasePartitionUpsertMetadataManager> _partitionMetadataManagerMap =
       new ConcurrentHashMap<>();
+
+  @Override
+  @Nullable
+  public BasePartitionUpsertMetadataManager getPartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.get(partitionId);
+  }
 
   @Override
   public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
