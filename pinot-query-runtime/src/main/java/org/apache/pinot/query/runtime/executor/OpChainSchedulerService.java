@@ -21,15 +21,16 @@ package org.apache.pinot.query.runtime.executor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.ExecutionList;
 import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.MseMeter;
 import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -133,26 +135,31 @@ public class OpChainSchedulerService {
 
   public void register(OpChain operatorChain) {
     QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
-    // Check if query is already terminated before acquiring the read lock.
-    checkTermination(operatorChain, executionContext);
-    // Acquire read lock for the query to ensure that the query is not cancelled while scheduling the operator chain.
-    long requestId = operatorChain.getId().getRequestId();
-    Lock readLock = getQueryLock(requestId).readLock();
-    readLock.lock();
     try {
-      // Check if query is already terminated again after acquiring the read lock.
+      // Check before taking the lock as well as inside it.
       checkTermination(operatorChain, executionContext);
-      // Do not schedule the operator chain if the query has been cancelled.
-      if (_cancelledQueryCache.getIfPresent(requestId) != null) {
-        LOGGER.debug("({}): Query has been cancelled", operatorChain);
-        executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceId);
-        throw new QueryCancelledException(
-            "Query has been cancelled before op-chain: " + operatorChain.getId() + " being scheduled");
-      } else {
+      long requestId = operatorChain.getId().getRequestId();
+      Lock readLock = getQueryLock(requestId).readLock();
+      readLock.lock();
+      try {
+        checkTermination(operatorChain, executionContext);
+        if (_cancelledQueryCache.getIfPresent(requestId) != null) {
+          LOGGER.debug("({}): Query has been cancelled", operatorChain);
+          executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceId);
+          throw new QueryCancelledException(
+              "Query has been cancelled before op-chain: " + operatorChain.getId() + " being scheduled");
+        }
         registerInternal(operatorChain, executionContext);
+      } finally {
+        readLock.unlock();
       }
-    } finally {
-      readLock.unlock();
+    } catch (QueryCancelledException e) {
+      try {
+        operatorChain.cancel(e);
+      } finally {
+        operatorChain.close();
+      }
+      throw e;
     }
   }
 
@@ -193,14 +200,16 @@ public class OpChainSchedulerService {
     // that by passing null.
     AtomicReference<MultiStageQueryStats> statsRef = new AtomicReference<>();
 
-    // Create a ListenableFutureTask to ensure the opChain is cancelled even if the task is not scheduled
-    ListenableFutureTask<Void> listenableFutureTask = ListenableFutureTask.create(new TraceRunnable() {
+    OpChainTask task = new OpChainTask(opChainId, new TraceRunnable() {
       @Override
       public void runJob() {
         _metrics.onOpChainStarted();
         LOGGER.trace("({}): Executing", operatorChain);
         MseBlock result = rootOperator.nextBlock();
         while (result.isData()) {
+          if (result instanceof ArrowBlock) {
+            ((ArrowBlock) result).release();
+          }
           result = rootOperator.nextBlock();
         }
         MultiStageQueryStats stats = rootOperator.calculateStats();
@@ -216,50 +225,109 @@ public class OpChainSchedulerService {
           _opChainCache.invalidate(opChainId);
         }
       }
-    }, null);
-    Futures.addCallback(listenableFutureTask, new FutureCallback<>() {
+    }, new FutureCallback<>() {
       @Override
       public void onSuccess(Void result) {
-        _metrics.onOpChainFinished(rootOperator);
-        decrementActiveOpChains(requestId);
-        notifyCompletionListener(opChainId, operatorChain, statsRef.get(), null);
-        operatorChain.close();
+        finishOpChain(operatorChain, statsRef.get(), null);
       }
 
       @Override
       public void onFailure(Throwable t) {
-        String logMsg = "Failed to execute operator chain: " + t.getMessage();
-        _metrics.onOpChainFinished(rootOperator);
-        if (t instanceof QueryException) {
-          switch (((QueryException) t).getErrorCode()) {
-            case UNKNOWN:
-            case INTERNAL:
-              LOGGER.error(logMsg, t);
-              break;
-            default:
-              LOGGER.warn(logMsg);
-              break;
-          }
-        } else {
-          LOGGER.error(logMsg, t);
-        }
-        decrementActiveOpChains(requestId);
-        notifyCompletionListener(opChainId, operatorChain, statsRef.get(), t);
-        operatorChain.cancel(t);
-        operatorChain.close();
+        finishOpChain(operatorChain, statsRef.get(), t);
       }
-    }, MoreExecutors.directExecutor());
+    });
 
     try {
-      _executorService.submit(listenableFutureTask);
+      // Register the inner task too: cancellation of submit()'s outer future can prevent it from ever running.
+      executionContext.addTask(task);
+      if (!task.isCancelled()) {
+        _executorService.submit(task);
+      }
     } catch (RuntimeException e) {
-      // The MSE executor is wrapped in HardLimitExecutor + heap throttling, so submit() can throw
-      // RejectedExecutionException. When it does, the task never runs and the directExecutor FutureCallback above
-      // (which decrements the active-opchain counter and removes the per-request context entry) never fires. Back
-      // out that bookkeeping here so the entry — and the QueryExecutionContext it pins — does not leak until a later
-      // cancel. Then rethrow so the caller propagates the failure as a stage error.
-      decrementActiveOpChains(requestId);
+      _opChainCache.invalidate(opChainId);
+      task.reject(e);
       throw e;
+    }
+  }
+
+  private void finishOpChain(OpChain operatorChain, @Nullable MultiStageQueryStats stats, @Nullable Throwable error) {
+    OpChainId id = operatorChain.getId();
+    try {
+      if (error != null) {
+        String logMsg = "Failed to execute operator chain: " + error.getMessage();
+        if (error instanceof QueryException && ((QueryException) error).getErrorCode() != QueryErrorCode.UNKNOWN
+            && ((QueryException) error).getErrorCode() != QueryErrorCode.INTERNAL) {
+          LOGGER.warn(logMsg);
+        } else {
+          LOGGER.error(logMsg, error);
+        }
+      }
+      _metrics.onOpChainFinished(operatorChain.getRoot());
+    } finally {
+      decrementActiveOpChains(id.getRequestId());
+      try {
+        notifyCompletionListener(id, operatorChain, stats, error);
+      } finally {
+        try {
+          if (error != null) {
+            operatorChain.cancel(error);
+          }
+        } finally {
+          operatorChain.close();
+        }
+      }
+    }
+  }
+
+  /**
+   * Completes teardown once, either before execution starts or after run() exits. Future cancellation alone does
+   * not establish quiescence: a running operator may still be unwinding after the interrupt.
+   */
+  private static final class OpChainTask extends FutureTask<Void> {
+    private final ExecutionList _completion = new ExecutionList();
+    private final AtomicBoolean _claimed = new AtomicBoolean();
+
+    private OpChainTask(OpChainId id, Runnable runnable, FutureCallback<Void> callback) {
+      super(runnable, null);
+      // ExecutionList clears callback captures and reports listener failures without aborting query cancellation.
+      _completion.add(() -> {
+        switch (state()) {
+          case SUCCESS:
+            callback.onSuccess(null);
+            break;
+          case FAILED:
+            callback.onFailure(exceptionNow());
+            break;
+          case CANCELLED:
+            callback.onFailure(new QueryCancelledException("Cancelled op-chain: " + id));
+            break;
+          default:
+            throw new IllegalStateException("Op-chain task completed while still running: " + id);
+        }
+      }, MoreExecutors.directExecutor());
+    }
+
+    @Override
+    public void run() {
+      if (!_claimed.compareAndSet(false, true)) {
+        return;
+      }
+      try {
+        super.run();
+      } finally {
+        _completion.execute();
+      }
+    }
+
+    @Override
+    protected void done() {
+      if (_claimed.compareAndSet(false, true)) {
+        _completion.execute();
+      }
+    }
+
+    private void reject(RuntimeException error) {
+      setException(error);
     }
   }
 

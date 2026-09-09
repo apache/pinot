@@ -22,12 +22,14 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.runtime.operator.ArrowHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
 import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
+import org.apache.pinot.query.runtime.operator.join.ArrowJoinSupport;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -45,6 +47,10 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
         if (joinNode.getLeftKeys().isEmpty()) {
           // TODO: Consider adding non-equi as a separate join strategy.
           return new NonEquiJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
+        } else if (context.isArrowEnabled()
+            && ArrowJoinSupport.supports(joinNode, leftSchema, rightPlanNode.getDataSchema())) {
+          return new ArrowHashJoinOperator(context, leftOperator, leftSchema, rightOperator,
+              rightPlanNode.getDataSchema(), joinNode);
         } else {
           return new HashJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
         }

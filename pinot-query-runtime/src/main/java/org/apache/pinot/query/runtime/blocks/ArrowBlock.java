@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
+import javax.annotation.Nullable;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
@@ -37,6 +38,7 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -84,13 +86,29 @@ import org.apache.pinot.spi.utils.ByteArray;
  *       program order — so the buffers are never freed while a holder is still reading them.</li>
  * </ul>
  * No extra synchronization on the block itself is required.
+ *
+ * <p>Production blocks are constructed through {@link ArrowQueryContext#createBlock(ArrowDataBlock)} so a dropped
+ * reference remains reachable for deterministic post-quiescence cleanup. No reclamation depends on the garbage
+ * collector.
  */
 public final class ArrowBlock implements MseBlock.Data {
   private final ArrowDataBlock _dataBlock;
   private final AtomicInteger _refCount = new AtomicInteger(1);
+  @Nullable
+  private final ArrowQueryContext _owner;
 
+  /** Standalone ownership for tests and benchmarks; the caller must release every reference. */
   public ArrowBlock(ArrowDataBlock dataBlock) {
+    this(dataBlock, null);
+  }
+
+  /** Construction hook used by {@link ArrowQueryContext#createBlock(ArrowDataBlock)}. */
+  public ArrowBlock(ArrowDataBlock dataBlock, @Nullable ArrowQueryContext owner) {
     _dataBlock = dataBlock;
+    _owner = owner;
+    if (owner != null) {
+      owner.registerBlock(this);
+    }
   }
 
   public ArrowDataBlock getDataBlock() {
@@ -259,6 +277,9 @@ public final class ArrowBlock implements MseBlock.Data {
       if (current == 0) {
         throw new IllegalStateException("Cannot retain an ArrowBlock that has already been freed (refcount=0)");
       }
+      if (current == Integer.MAX_VALUE) {
+        throw new IllegalStateException("ArrowBlock reference count overflow");
+      }
       if (_refCount.compareAndSet(current, current + 1)) {
         return;
       }
@@ -285,12 +306,25 @@ public final class ArrowBlock implements MseBlock.Data {
       }
       if (_refCount.compareAndSet(current, current - 1)) {
         if (current == 1) {
-          // Last holder is letting go — free the off-heap buffers now.
-          _dataBlock.close();
+          free();
         }
         return;
       }
     }
+  }
+
+  /** Query-end backstop only: all holders must be quiescent before calling this method. */
+  public void forceRelease() {
+    if (_refCount.getAndSet(0) > 0) {
+      free();
+    }
+  }
+
+  private void free() {
+    if (_owner != null) {
+      _owner.deregisterBlock(this);
+    }
+    _dataBlock.close();
   }
 
   @VisibleForTesting

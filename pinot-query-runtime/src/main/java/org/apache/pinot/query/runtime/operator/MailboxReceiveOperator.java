@@ -20,7 +20,10 @@ package org.apache.pinot.query.runtime.operator;
 
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
+import org.apache.pinot.query.runtime.blocks.ArrowBlockConverter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.join.ArrowJoinSupport;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,12 +33,18 @@ import org.slf4j.LoggerFactory;
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
  * {@link #nextBlock()} API.
  */
-public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
+public class MailboxReceiveOperator extends BaseMailboxReceiveOperator implements ArrowBlockSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
+  private boolean _arrowOutputEnabled;
 
   public MailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
     super(context, node);
+  }
+
+  @Override
+  public void enableArrowOutput() {
+    _arrowOutputEnabled = _context.isArrowEnabled();
   }
 
   @Override
@@ -56,10 +65,33 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     // next block pulled out of the ReceivingMailbox to be an already buffered normal data block. This requires the
     // MailboxReceiveOperator to continue pulling and dropping data block until an EOS block is observed.
     while (_isEarlyTerminated && block.isData()) {
+      if (block instanceof ArrowBlock) {
+        ((ArrowBlock) block).release();
+      }
       block = _multiConsumer.readMseBlockBlocking();
     }
     if (block.isData()) {
+      if (block instanceof ArrowBlock) {
+        ArrowBlock arrow = (ArrowBlock) block;
+        boolean transferred = false;
+        try {
+          checkTerminationAndSampleUsage();
+          if (_arrowOutputEnabled) {
+            transferred = true;
+            return arrow;
+          }
+          return arrow.asRowHeap();
+        } finally {
+          if (!transferred) {
+            arrow.release();
+          }
+        }
+      }
       checkTerminationAndSampleUsage();
+      MseBlock.Data data = (MseBlock.Data) block;
+      if (_arrowOutputEnabled && ArrowJoinSupport.supportsSchema(data.getDataSchema())) {
+        return ArrowBlockConverter.toArrowBlock(data, _context.getOrCreateArrowContext());
+      }
     } else {
       onEos();
     }

@@ -35,6 +35,8 @@ public class OpChain implements AutoCloseable {
   private final OpChainExecutionContext _context;
   private final MultiStageOperator _root;
   private final Consumer<OpChainId> _finishCallback;
+  private boolean _closed;
+  private boolean _cancelled;
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root) {
     this(context, root, (id) -> {
@@ -66,18 +68,26 @@ public class OpChain implements AutoCloseable {
   }
 
   /**
-   * close() is called when we finish execution successfully.
+   * close() is called after success, failure or cancellation, once execution is quiescent.
    *
    * Once the {@link OpChain} is being executed, this method should only be called from the thread that is actually
    * executing it.
    */
   @Override
-  public void close() {
+  public synchronized void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
     try {
       _root.close();
     } finally {
-      _finishCallback.accept(getId());
-      LOGGER.trace("OpChain callback called");
+      try {
+        _context.closeArrowResources();
+      } finally {
+        _finishCallback.accept(getId());
+        LOGGER.trace("OpChain callback called");
+      }
     }
   }
 
@@ -86,14 +96,13 @@ public class OpChain implements AutoCloseable {
    *
    * Once the {@link OpChain} is being executed, this method should only be called from the thread that is actually
    * executing it.
-   * @param e
+   * The scheduler must follow this with close(), even if cancellation fails.
    */
-  public void cancel(Throwable e) {
-    try {
-      _root.cancel(e);
-    } finally {
-      _finishCallback.accept(getId());
-      LOGGER.trace("OpChain callback called");
+  public synchronized void cancel(Throwable e) {
+    if (_cancelled || _closed) {
+      return;
     }
+    _cancelled = true;
+    _root.cancel(e);
   }
 }

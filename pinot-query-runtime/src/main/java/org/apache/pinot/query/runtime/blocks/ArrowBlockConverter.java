@@ -48,6 +48,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -84,11 +85,29 @@ public final class ArrowBlockConverter {
   }
 
   /**
+   * Converts and registers a new block with the context. An Arrow input returns the caller's existing reference,
+   * unchanged and without retaining or reparenting it.
+   */
+  public static ArrowBlock toArrowBlock(MseBlock.Data block, ArrowQueryContext context) {
+    if (block instanceof ArrowBlock) {
+      return (ArrowBlock) block;
+    }
+    DataSchema schema = block.getDataSchema();
+    validateColumnTypesSupported(schema);
+    return fromDataBlock(block.asSerialized().getDataBlock(), schema, context.getAllocator(), context);
+  }
+
+  /**
    * Converts a raw {@link DataBlock} with the given schema into an {@link ArrowBlock}.
    *
    * @param allocator the Arrow allocator to use for new off-heap buffers
    */
   public static ArrowBlock fromDataBlock(DataBlock dataBlock, DataSchema schema, BufferAllocator allocator) {
+    return fromDataBlock(dataBlock, schema, allocator, null);
+  }
+
+  private static ArrowBlock fromDataBlock(DataBlock dataBlock, DataSchema schema, BufferAllocator allocator,
+      @Nullable ArrowQueryContext context) {
     int numRows = dataBlock.getNumberOfRows();
     int numCols = schema.size();
     ColumnDataType[] columnTypes = schema.getColumnDataTypes();
@@ -110,13 +129,14 @@ public final class ArrowBlockConverter {
               allocator));
         } else {
           FieldVector vector = buildArrowField(columnName, columnType).createVector(allocator);
-          writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
           vectors.add(vector);
+          writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
         }
       }
       VectorSchemaRoot root = new VectorSchemaRoot(vectors);
       root.setRowCount(numRows);
-      ArrowBlock block = new ArrowBlock(new ArrowDataBlock(root, schema, dictionaryProvider));
+      ArrowDataBlock arrowDataBlock = new ArrowDataBlock(root, schema, dictionaryProvider);
+      ArrowBlock block = context == null ? new ArrowBlock(arrowDataBlock) : context.createBlock(arrowDataBlock);
       success = true;
       return block;
     } finally {

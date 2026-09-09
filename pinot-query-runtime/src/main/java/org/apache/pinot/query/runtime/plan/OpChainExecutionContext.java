@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
@@ -44,7 +46,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 /**
  *  The {@code OpChainExecutionContext} class contains the information derived from the PlanRequestContext.
- *  Members of this class should not be changed once initialized.
+ *  Plan information is immutable after initialization; Arrow ownership is initialized lazily and closed at teardown.
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
@@ -67,6 +69,10 @@ public class OpChainExecutionContext {
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
   private final boolean _keepPipelineBreakerStats;
+  private final boolean _arrowEnabled;
+  @Nullable
+  private ArrowQueryContext _arrowContext;
+  private boolean _arrowResourcesClosed;
   /**
    * Map of MultiStageOperator -> PlanNodes that compile down to that operator. Populated by
    * {@link org.apache.pinot.query.runtime.plan.PlanNodeToOpChain} during opchain construction. Cardinality is
@@ -116,6 +122,7 @@ public class OpChainExecutionContext {
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
     _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider();
     _keepPipelineBreakerStats = keepPipelineBreakerStats;
+    _arrowEnabled = mailboxService.isArrowEnabled();
   }
 
   public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
@@ -138,6 +145,31 @@ public class OpChainExecutionContext {
 
   public MailboxService getMailboxService() {
     return _mailboxService;
+  }
+
+  public boolean isArrowEnabled() {
+    return _arrowEnabled;
+  }
+
+  /** Creates at most one allocator per attempt, only when enabled Arrow execution actually needs it. */
+  public synchronized ArrowQueryContext getOrCreateArrowContext() {
+    Preconditions.checkState(_arrowEnabled, "Arrow is not enabled for this op-chain");
+    Preconditions.checkState(!_arrowResourcesClosed, "Arrow resources for op-chain %s are closed", _id);
+    if (_arrowContext == null) {
+      _arrowContext = _mailboxService.getArrowBuffers().newQueryContext(_id.toString());
+    }
+    return _arrowContext;
+  }
+
+  /** Idempotent cleanup after operator close and execution quiescence, or before an attempt has been scheduled. */
+  public synchronized void closeArrowResources() {
+    if (_arrowResourcesClosed) {
+      return;
+    }
+    _arrowResourcesClosed = true;
+    if (_arrowContext != null) {
+      _arrowContext.close();
+    }
   }
 
   public long getRequestId() {

@@ -43,6 +43,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.runtime.memory.ArrowBuffers;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -84,6 +85,7 @@ public class MailboxService {
   private final InstanceType _instanceType;
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
+  private final ArrowBuffers _arrowBuffers;
   @Nullable private final TlsConfig _tlsConfig;
   @Nullable
   private final SslContext _clientSslContext;
@@ -141,6 +143,7 @@ public class MailboxService {
         writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes);
     _accessControlFactory = accessControlFactory;
     registerMailboxClientGauges();
+    _arrowBuffers = ArrowBuffers.create(config);
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -190,8 +193,16 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
-    _grpcMailboxServer.start();
+    boolean started = false;
+    try {
+      _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
+      _grpcMailboxServer.start();
+      started = true;
+    } finally {
+      if (!started) {
+        _arrowBuffers.close();
+      }
+    }
   }
 
   /**
@@ -199,7 +210,21 @@ public class MailboxService {
    */
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
-    _grpcMailboxServer.shutdown();
+    try {
+      if (_grpcMailboxServer != null) {
+        _grpcMailboxServer.shutdown();
+      }
+    } finally {
+      _arrowBuffers.close();
+    }
+  }
+
+  public boolean isArrowEnabled() {
+    return _arrowBuffers.isEnabled();
+  }
+
+  public ArrowBuffers getArrowBuffers() {
+    return _arrowBuffers;
   }
 
   public String getHostname() {
