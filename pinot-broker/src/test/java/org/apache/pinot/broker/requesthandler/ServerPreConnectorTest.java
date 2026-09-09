@@ -276,6 +276,32 @@ public class ServerPreConnectorTest {
     assertEquals(calls.get(), count * 2, "every channel must be attempted");
   }
 
+  /// More channels than worker threads, every one HEALTHY but slower than the grace floor. The surplus
+  /// completes in waves one connect-latency apart; a fixed grace window would misread the gap between waves
+  /// as a straggler and abandon later waves (only the first ~pool-size would count). Because the effective
+  /// window scales off the first observed connect latency, every wave is waited for and all connect.
+  /// Regression test for the wave under-count (48 healthy @ 3s counted only 16/48 with a fixed window).
+  @Test
+  public void manyHealthyChannelsSlowerThanGraceFloorAllConnect() {
+    int count = ServerPreConnector.MAX_CONNECT_THREADS * 3;   // 48 channels, pool caps at 16 -> 3 waves
+    List<ServerInstance> servers = mockServers(count);
+    long slowMs = ServerPreConnector.STRAGGLER_GRACE_MS + 1000L;   // 3000 ms, slower than the 2000 ms floor
+
+    int connected = new ServerPreConnector(() -> targets(servers, TableType.OFFLINE),
+        (server, tableType, timeoutMs) -> {
+          try {
+            Thread.sleep(slowMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+          }
+          return true;
+        }).preConnect(System.currentTimeMillis() + 60_000L);
+
+    assertEquals(connected, count,
+        "all healthy channels must connect even when they complete in waves slower than the grace floor");
+  }
+
   /// The thread pool is a throughput cap, not a safety bound, so each connect has to carry its own
   /// deadline-derived timeout. Without it a channel queued behind a stuck worker could outlive the
   /// budget entirely.

@@ -75,11 +75,14 @@ public class ServerPreConnector {
   @VisibleForTesting
   static final int MAX_CONNECT_THREADS = 16;
 
-  /// How long to keep waiting, once at least one channel is up, for the next one before concluding the
-  /// rest are stuck. A quiet window this long means what is left is stuck rather than merely slow, so the
-  /// caller is released and the stragglers finish -- or time out -- on their own daemon threads. Until the
-  /// first *successful* connect the whole budget is available: with nothing up yet there is no way to tell
-  /// "every server is slow" from "a few are stuck", and a fast failure must not start the clock.
+  /// Floor for the straggler window: the minimum quiet time, once at least one channel is up, to wait for
+  /// the next one before concluding the rest are stuck. The effective window scales up off the first
+  /// observed connect latency (to twice it) so that when there are more channels than worker threads, the
+  /// gap between completion waves is not misread as a straggler. A quiet window this long means what is
+  /// left is stuck rather than merely slow, so the caller is released and the stragglers finish -- or time
+  /// out -- on their own daemon threads. Until the first *successful* connect the whole budget is
+  /// available: with nothing up yet there is no way to tell "every server is slow" from "a few are stuck",
+  /// and a fast failure must not start the clock.
   @VisibleForTesting
   static final long STRAGGLER_GRACE_MS = 2_000L;
 
@@ -133,6 +136,8 @@ public class ServerPreConnector {
     CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executor);
     int connected = 0;
     boolean releasedEarly = false;
+    // The straggler window, scaled up off the first observed connect latency (see where it is set below).
+    long graceMs = STRAGGLER_GRACE_MS;
     try {
       for (ChannelTarget target : targets) {
         completionService.submit(() -> _connector.connect(target.serverInstance(), target.tableType(),
@@ -152,7 +157,9 @@ public class ServerPreConnector {
         // entire budget. (A cluster where no server ever connects still exits promptly when connects fail
         // fast, and waits the budget only when every connect black-holes, which is the correct thing to do
         // for a broker that can reach nothing.)
-        long waitMs = connected == 0 ? remainingMs : Math.min(remainingMs, STRAGGLER_GRACE_MS);
+        // `graceMs` is scaled off the first connect's latency (set below), so with more channels than
+        // workers the gap between completion waves is not misread as a straggler.
+        long waitMs = connected == 0 ? remainingMs : Math.min(remainingMs, graceMs);
         try {
           Future<Boolean> future = completionService.poll(waitMs, TimeUnit.MILLISECONDS);
           if (future == null) {
@@ -164,6 +171,13 @@ public class ServerPreConnector {
             break;
           }
           if (Boolean.TRUE.equals(future.get())) {
+            if (connected == 0) {
+              // All tasks started together, so the first success approximates one connect's latency. With
+              // more channels than workers the surplus completes in waves one latency apart, so a window
+              // narrower than that latency would abandon healthy channels still queued behind the pool.
+              // Scale to twice the first latency, never below the floor.
+              graceMs = Math.max(STRAGGLER_GRACE_MS, 2 * (System.currentTimeMillis() - startMs));
+            }
             connected++;
           }
         } catch (InterruptedException e) {
