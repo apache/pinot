@@ -742,9 +742,8 @@ public class RealtimeSegmentDataManagerTest {
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "metadata removal failed");
       }
-      verify(segmentDataManager.getTableDataManager()).addSegmentError(eq(SEGMENT_NAME_STR),
-          argThat(error -> error.getErrorMessage().contains("REALTIME_METADATA_REMOVAL_FAILED")
-              && error.getErrorMessage().contains("manual reconstruction and replay")));
+      // A generic offload exception does not establish that a protected metadata revert failed.
+      verify(segmentDataManager.getTableDataManager(), never()).addSegmentError(anyString(), any());
       // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released even when metadata removal fails");
