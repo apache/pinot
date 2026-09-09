@@ -253,7 +253,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
+          _maxInboundMessageSize, _grpcSenderBackpressureEnabled, isArrowEnabled());
     }
   }
 

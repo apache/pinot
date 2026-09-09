@@ -22,10 +22,18 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.BufferLedger;
+import org.apache.arrow.memory.OutOfMemoryException;
+import org.apache.arrow.memory.ReferenceManager;
+import org.apache.arrow.vector.BaseVariableWidthVector;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
@@ -35,9 +43,12 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.dictionary.Dictionary;
+import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.dictionary.DictionaryProvider.MapDictionaryProvider;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.vector.util.TransferPair;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -74,15 +85,23 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   // dictionary-encoded. The dictionary vectors are off-heap and are freed by close().
   @Nullable
   private final MapDictionaryProvider _dictionaryProvider;
+  @Nullable
+  private final BufferAllocator _ownedAllocator;
 
   public ArrowDataBlock(VectorSchemaRoot root, DataSchema schema) {
     this(root, schema, null);
   }
 
   public ArrowDataBlock(VectorSchemaRoot root, DataSchema schema, @Nullable MapDictionaryProvider dictionaryProvider) {
+    this(root, schema, dictionaryProvider, null);
+  }
+
+  private ArrowDataBlock(VectorSchemaRoot root, DataSchema schema,
+      @Nullable MapDictionaryProvider dictionaryProvider, @Nullable BufferAllocator ownedAllocator) {
     _root = root;
     _dataSchema = schema;
     _dictionaryProvider = dictionaryProvider;
+    _ownedAllocator = ownedAllocator;
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -103,6 +122,142 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   @Nullable
   public MapDictionaryProvider getDictionaryProvider() {
     return _dictionaryProvider;
+  }
+
+  /**
+   * Retains an independently closeable view in an allocator with the same Arrow root. The source is not cleared;
+   * both blocks must remain read-only while their buffers are shared, and either block may be closed first.
+   * Each view reserves its full physical buffer footprint in a child of the target until closed, even while
+   * another receiver owns those allocations. Reservations can conservatively count shared memory more than once.
+   */
+  public ArrowDataBlock retainTo(BufferAllocator allocator) {
+    long reservation = retainedAllocationSize(allocator);
+    BufferAllocator child = allocator.newChildAllocator("retained-arrow-block", reservation, Long.MAX_VALUE);
+    ArrowDataBlock retained = null;
+    try {
+      retained = retainedCopy(_root, _dataSchema, _dictionaryProvider, _errCodeToExceptionMap, child, child);
+      if (retained.retainedAllocationSize(child) > reservation) {
+        throw new OutOfMemoryException("Retaining Arrow block exceeds its reserved physical buffer footprint");
+      }
+      return retained;
+    } catch (RuntimeException | Error e) {
+      try {
+        if (retained != null) {
+          retained.close();
+        } else {
+          child.close();
+        }
+      } catch (RuntimeException | Error closeError) {
+        e.addSuppressed(closeError);
+      }
+      throw e;
+    }
+  }
+
+  private long retainedAllocationSize(BufferAllocator allocator) {
+    Map<Object, Boolean> allocations = new IdentityHashMap<>();
+    long size = 0;
+    for (FieldVector vector : _root.getFieldVectors()) {
+      size = Math.addExact(size, retainedAllocationSize(vector, _root.getRowCount(), allocator, allocations));
+    }
+    if (_dictionaryProvider != null) {
+      for (long id : _dictionaryProvider.getDictionaryIds()) {
+        FieldVector vector = _dictionaryProvider.lookup(id).getVector();
+        size = Math.addExact(size, retainedAllocationSize(vector, vector.getValueCount(), allocator, allocations));
+      }
+    }
+    return size;
+  }
+
+  private static long retainedAllocationSize(FieldVector vector, int rowCount, BufferAllocator allocator,
+      Map<Object, Boolean> allocations) {
+    if (rowCount == 0) {
+      return 0;
+    }
+    long size = 0;
+    for (ArrowBuf buffer : vector.getFieldBuffers()) {
+      ReferenceManager manager = buffer.getReferenceManager();
+      Object allocation = manager instanceof BufferLedger ? ((BufferLedger) manager).getAllocationManager() : manager;
+      if (allocations.put(allocation, Boolean.TRUE) == null) {
+        size = Math.addExact(size, manager.getSize());
+      }
+    }
+    if (vector instanceof BaseVariableWidthVector && vector.getOffsetBuffer().getInt(0) != 0) {
+      // A rebased variable-width slice allocates an offset buffer in addition to retaining the original allocation.
+      size = Math.addExact(size, allocator.getRoundingPolicy().getRoundedSize((rowCount + 1L) * Integer.BYTES));
+    }
+    for (FieldVector child : vector.getChildrenFromFields()) {
+      size = Math.addExact(size, retainedAllocationSize(child, child.getValueCount(), allocator, allocations));
+    }
+    return size;
+  }
+
+  // Also used to detach a reader's borrowed vectors before the reader advances or closes.
+  static ArrowDataBlock retainedCopy(VectorSchemaRoot root, DataSchema schema,
+      @Nullable DictionaryProvider dictionaries, Map<Integer, String> exceptions, BufferAllocator allocator) {
+    return retainedCopy(root, schema, dictionaries, exceptions, allocator, null);
+  }
+
+  private static ArrowDataBlock retainedCopy(VectorSchemaRoot root, DataSchema schema,
+      @Nullable DictionaryProvider dictionaries, Map<Integer, String> exceptions, BufferAllocator allocator,
+      @Nullable BufferAllocator ownedAllocator) {
+    List<FieldVector> ownedVectors = new ArrayList<>();
+    try {
+      List<FieldVector> vectors = new ArrayList<>(root.getFieldVectors().size());
+      for (FieldVector vector : root.getFieldVectors()) {
+        vectors.add(retainVector(vector, root.getRowCount(), allocator, ownedVectors));
+      }
+      MapDictionaryProvider retainedDictionaries = null;
+      if (dictionaries != null && !dictionaries.getDictionaryIds().isEmpty()) {
+        retainedDictionaries = new MapDictionaryProvider();
+        for (long id : dictionaries.getDictionaryIds()) {
+          Dictionary dictionary = dictionaries.lookup(id);
+          FieldVector vector = dictionary.getVector();
+          retainedDictionaries.put(new Dictionary(
+              retainVector(vector, vector.getValueCount(), allocator, ownedVectors), dictionary.getEncoding()));
+        }
+      }
+      ArrowDataBlock retained = new ArrowDataBlock(
+          new VectorSchemaRoot(root.getSchema(), vectors, root.getRowCount()), schema.clone(), retainedDictionaries,
+          ownedAllocator);
+      retained._errCodeToExceptionMap.putAll(exceptions);
+      return retained;
+    } catch (RuntimeException | Error e) {
+      for (FieldVector vector : ownedVectors) {
+        try {
+          vector.close();
+        } catch (RuntimeException | Error closeError) {
+          e.addSuppressed(closeError);
+        }
+      }
+      throw e;
+    }
+  }
+
+  private static FieldVector retainVector(FieldVector vector, int rowCount, BufferAllocator allocator,
+      List<FieldVector> ownedVectors) {
+    TransferPair pair = vector.getTransferPair(vector.getField(), allocator);
+    FieldVector retained = (FieldVector) pair.getTo();
+    ownedVectors.add(retained);
+    if (rowCount == 0) {
+      return retained;
+    }
+    pair.splitAndTransfer(0, rowCount);
+    if (retained instanceof BitVector
+        && retained.getDataBuffer().getReferenceManager().getAllocator() != allocator) {
+      // Arrow 19's BitVector split retains the source ledger. Rehome the private slice, never the shared source.
+      TransferPair rehome = retained.getTransferPair(retained.getField(), allocator);
+      FieldVector rehomed = (FieldVector) rehome.getTo();
+      ownedVectors.add(rehomed);
+      rehome.transfer();
+      retained.close();
+      retained = rehomed;
+    }
+    // Arrow ownership transfers can exceed an allocator's limit without throwing.
+    if (allocator.isOverLimit()) {
+      throw new OutOfMemoryException("Retaining Arrow block exceeds allocator limit: " + allocator.getName());
+    }
+    return retained;
   }
 
   // ----- DataBlock interface -----
@@ -140,7 +295,7 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   @Override
   public List<ByteBuffer> serialize()
       throws IOException {
-    throw new UnsupportedOperationException("ArrowDataBlock does not support legacy serialization");
+    return DataBlockUtils.serialize(this);
   }
 
   @Override
@@ -309,9 +464,18 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   @Override
   public void close() {
     // Free the dictionary vectors before the root; both hold off-heap buffers under the query allocator.
-    if (_dictionaryProvider != null) {
-      _dictionaryProvider.close();
+    try {
+      if (_dictionaryProvider != null) {
+        _dictionaryProvider.close();
+      }
+    } finally {
+      try {
+        _root.close();
+      } finally {
+        if (_ownedAllocator != null) {
+          _ownedAllocator.close();
+        }
+      }
     }
-    _root.close();
   }
 }

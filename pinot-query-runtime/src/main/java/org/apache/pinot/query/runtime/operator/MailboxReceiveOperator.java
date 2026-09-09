@@ -36,15 +36,18 @@ import org.slf4j.LoggerFactory;
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator implements ArrowBlockSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
+  private final boolean _supportsArrow;
   private boolean _arrowOutputEnabled;
+  private boolean _arrowRegistered;
 
   public MailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
     super(context, node);
+    _supportsArrow = context.isArrowEnabled() && ArrowJoinSupport.supportsSchema(node.getDataSchema());
   }
 
   @Override
   public void enableArrowOutput() {
-    _arrowOutputEnabled = _context.isArrowEnabled();
+    _arrowOutputEnabled = _context.isArrowEnabled() && _supportsArrow;
   }
 
   @Override
@@ -59,6 +62,12 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator implement
 
   @Override
   protected MseBlock getNextBlock() {
+    if (_arrowOutputEnabled && !_arrowRegistered && !_isEarlyTerminated) {
+      for (String mailboxId : _mailboxIds) {
+        _mailboxService.getReceivingMailbox(mailboxId).enableArrow(_context.getOrCreateArrowContext());
+      }
+      _arrowRegistered = true;
+    }
     MseBlock block = _multiConsumer.readMseBlockBlocking();
     // When early termination flag is set, caller is expecting an EOS block to be returned, however since the 2 stages
     // between sending/receiving mailbox are setting early termination flag asynchronously, there's chances that the

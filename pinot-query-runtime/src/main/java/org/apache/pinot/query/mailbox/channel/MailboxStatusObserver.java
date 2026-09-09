@@ -37,9 +37,12 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   private final AtomicInteger _bufferSize = new AtomicInteger(DEFAULT_MAILBOX_QUEUE_CAPACITY);
   private final AtomicBoolean _finished = new AtomicBoolean();
   private volatile boolean _isEarlyTerminated;
+  private volatile boolean _arrowIpcSupported;
 
   @Override
   public void onNext(MailboxStatus mailboxStatus) {
+    _arrowIpcSupported = ChannelUtils.ARROW_IPC_VERSION
+        .equals(mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_ARROW_IPC_VERSION));
     // when receiving mailbox receives a data block it will return an updated info of the receiving end status including
     //   1. the buffer size available, for back-pressure handling
     //   2. status whether there's no need to send any additional data block b/c it considered itself finished.
@@ -60,6 +63,10 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
 
   public boolean isEarlyTerminated() {
     return _isEarlyTerminated;
+  }
+
+  public boolean isArrowIpcSupported() {
+    return _arrowIpcSupported;
   }
 
   public int getBufferSize() {

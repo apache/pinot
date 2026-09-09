@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.function.LongConsumer;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -44,33 +45,7 @@ import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 public final class DataBlockUtils {
   /**
    * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
-   *
-   * Although Pinot 1.2.0 only supports a single version of the serialization format, it is possible to support
-   * multiple versions in the future.
-   *
-   * We can imagine future version of Pinot that uses Apache Arrow to represent the data blocks.
-   * In this case, in order to communicate this future version with a node running Pinot 1.2.0 we would need to
-   * implement a new {@link DataBlockSerde} that can serialize and deserialize the Arrow data blocks into the
-   * serialization format used by Pinot 1.2.0.
-   *
-   * Although this DataBlockSerde could be used to communicate two Arrow based Pinot nodes,
-   * it would probably not be very efficient because in order to apply the conversion it would probably need to
-   * allocate a linear amount of memory.
-   * Therefore it would be recommended to have another {@link DataBlockSerde.Version} that can only be used by nodes
-   * running the new version of Pinot and a new DataBlockSerde that can serialize and deserialize the Arrow data blocks
-   * directly.
-   *
-   * Therefore that future Pinot version would have two elements in its map:
-   * - One for the version used to communicate with Pinot 1.2.0
-   * - Another for the version used to communicate with other nodes running the same version.
-   *
-   * The system right now is pretty naive and although it supports different versions at deserialization time, it
-   * always uses the same to serialize the data blocks. In the future, we could add a way to specify the version
-   * to use when serializing the data blocks, which could be negotiated between the two nodes or (given that the
-   * clusters are not expected to run with different versions for a long time) hardcoded in the configuration.
-   *
-   * Anyway, having this map is very useful to profile, test and in general support different {@link DataBlockSerde},
-   * even for the same format.
+   * Arrow blocks use IPC; existing row, columnar and metadata blocks retain their legacy wire format.
    */
   private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
   private static final Pattern CAUSE_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Caused by: ");
@@ -79,6 +54,7 @@ public final class DataBlockUtils {
   static {
     SERDES = new EnumMap<>(DataBlockSerde.Version.class);
     SERDES.put(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde());
+    SERDES.put(DataBlockSerde.Version.ARROW_IPC, new ArrowDataBlockSerde());
   }
 
   @VisibleForTesting
@@ -161,7 +137,8 @@ public final class DataBlockUtils {
 
   public static List<ByteBuffer> serialize(DataBlock dataBlock)
       throws IOException {
-    return serialize(DataBlockSerde.Version.V1_V2, dataBlock);
+    return serialize(dataBlock instanceof ArrowDataBlock ? DataBlockSerde.Version.ARROW_IPC
+        : DataBlockSerde.Version.V1_V2, dataBlock);
   }
 
   @VisibleForTesting
@@ -174,6 +151,9 @@ public final class DataBlockUtils {
     }
 
     DataBlock.Type dataBlockType = dataBlock.getDataBlockType();
+    if ((version == DataBlockSerde.Version.ARROW_IPC) != (dataBlockType == DataBlock.Type.ARROW)) {
+      throw new IOException("Incompatible data block type " + dataBlockType + " for version " + version);
+    }
     int firstInt = version.getVersion() + (dataBlockType.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
 
     DataBuffer dataBuffer = dataBlockSerde.serialize(dataBlock, firstInt);
@@ -234,6 +214,22 @@ public final class DataBlockUtils {
   }
 
   /**
+   * Deserializes without modifying the input buffers. Returned Arrow blocks own memory in {@code allocator}
+   * and must be closed by the caller.
+   */
+  public static DataBlock deserialize(List<ByteBuffer> buffers, BufferAllocator allocator)
+      throws IOException {
+    if (buffers.size() == 1) {
+      return deserialize(PinotByteBuffer.slice(buffers.get(0)), 0, null, allocator);
+    }
+    CompoundDataBuffer.Builder builder = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, false);
+    for (ByteBuffer buffer : buffers) {
+      builder.addBuffer(PinotByteBuffer.slice(buffer));
+    }
+    return deserialize(builder.build(), 0, null, allocator);
+  }
+
+  /**
    * Deserialize a list of byte buffers into a data block.
    * Contrary to {@link #readFrom(ByteBuffer)}, the given buffers will not be modified.
    */
@@ -264,25 +260,51 @@ public final class DataBlockUtils {
    */
   public static DataBlock deserialize(DataBuffer buffer, long offset, @Nullable LongConsumer finalOffsetConsumer)
       throws IOException {
-    int versionAndSubVersion = buffer.getInt(offset);
+    return deserialize(buffer, offset, finalOffsetConsumer, null);
+  }
+
+  /**
+   * Reads one block at {@code offset}, reporting its absolute end offset on success. The caller owns both the supplied
+   * allocator and any returned Arrow block; this method neither creates nor closes a process-level allocator.
+   */
+  public static DataBlock deserialize(DataBuffer buffer, long offset, @Nullable LongConsumer finalOffsetConsumer,
+      @Nullable BufferAllocator allocator)
+      throws IOException {
+    if (offset < 0 || offset > buffer.size() - Integer.BYTES) {
+      throw new IOException("Truncated data block header at offset: " + offset);
+    }
+    int versionAndSubVersion = buffer.view(offset, offset + Integer.BYTES, ByteOrder.BIG_ENDIAN).getInt(0);
     int version = getVersion(versionAndSubVersion);
     DataBlockSerde dataBlockSerde;
     try {
       dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       throw new IOException("Failed to get serde for version: " + version, e);
     }
 
     DataBlock.Type type;
     try {
       type = getType(versionAndSubVersion);
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       throw new IOException("Failed to get type for version: " + version, e);
     }
 
+    if ((version == DataBlockSerde.Version.ARROW_IPC.getVersion()) != (type == DataBlock.Type.ARROW)) {
+      throw new IOException("Incompatible data block type " + type + " for version " + version);
+    }
+    if (type == DataBlock.Type.ARROW && allocator == null) {
+      throw new IOException("Arrow IPC deserialization requires a caller-owned BufferAllocator");
+    }
+
     try {
-      return dataBlockSerde.deserialize(buffer, 0, type, finalOffsetConsumer);
-    } catch (Exception e) {
+      if (type != DataBlock.Type.ARROW) {
+        // Legacy headers contain block-relative offsets, including offsets used for metadata and finalOffset.
+        DataBuffer blockBuffer = buffer.view(offset, buffer.size(), ByteOrder.BIG_ENDIAN);
+        return dataBlockSerde.deserialize(blockBuffer, 0, type,
+            finalOffsetConsumer == null ? null : end -> finalOffsetConsumer.accept(offset + end));
+      }
+      return dataBlockSerde.deserialize(buffer, offset, type, finalOffsetConsumer, allocator);
+    } catch (IOException | RuntimeException e) {
       throw new IOException("Failed to deserialize data block with serde " + dataBlockSerde.getClass(), e);
     }
   }

@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.ThreadSafe;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -31,20 +31,30 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import org.apache.arrow.memory.OutOfMemoryException;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
@@ -105,6 +115,13 @@ public class ReceivingMailbox {
   private QueryThreadContext _receiveOperatorThreadContext;
   private long _untrackedCpuTimeNs;
   private long _untrackedAllocatedBytes;
+  @Nullable
+  private volatile ArrowQueryContext _arrowContext;
+  @GuardedBy("this")
+  private boolean _arrowClosed;
+  @Nullable
+  @GuardedBy("this")
+  private PinotMeter _arrowIpcMessagesReceived;
 
   public ReceivingMailbox(String id, int maxPendingBlocks) {
     _id = id;
@@ -148,6 +165,18 @@ public class ReceivingMailbox {
     return _id;
   }
 
+  /// Enables IPC only for an attached Arrow-native consumer, before its first pull.
+  public synchronized void enableArrow(ArrowQueryContext context) {
+    Preconditions.checkState(!_arrowClosed, "Cannot enable Arrow on closed mailbox: %s", _id);
+    Preconditions.checkState(_arrowContext == null || _arrowContext == context,
+        "Mailbox already belongs to another Arrow context: %s", _id);
+    _arrowContext = context;
+  }
+
+  public boolean canReceiveArrow() {
+    return _arrowContext != null;
+  }
+
   /// Offers a raw block into the mailbox within the timeout specified, returns the status of the mailbox.
   ///
   /// NOTE:
@@ -156,6 +185,23 @@ public class ReceivingMailbox {
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
     ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
     updateWaitCpuTime();
+    try {
+      return deserializeAndOffer(byteBuffers, timeoutMs);
+    } finally {
+      long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
+      long allocatedBytes = resourceSnapshot.getAllocatedBytes();
+      synchronized (this) {
+        if (_receiveOperatorThreadContext != null) {
+          updateResourceUsage(_receiveOperatorThreadContext, cpuTimeNs, allocatedBytes);
+        } else {
+          _untrackedCpuTimeNs += cpuTimeNs;
+          _untrackedAllocatedBytes += allocatedBytes;
+        }
+      }
+    }
+  }
+
+  private ReceivingMailboxStatus deserializeAndOffer(List<ByteBuffer> byteBuffers, long timeoutMs) {
     MseBlock block;
     List<DataBuffer> stats;
     try {
@@ -164,11 +210,30 @@ public class ReceivingMailbox {
       for (ByteBuffer bb : byteBuffers) {
         totalBytes += bb.remaining();
       }
-      DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
+      DataBuffer buffer = byteBuffers.size() == 1 ? PinotByteBuffer.wrap(byteBuffers.get(0))
+          : CompoundDataBuffer.fromByteBuffers(byteBuffers, ByteOrder.BIG_ENDIAN, false);
+      if (DataBlockUtils.getType(buffer.getInt(0)) == DataBlock.Type.ARROW) {
+        // Cancel closes the queue before acquiring this monitor, so a blocked offer cannot delay cancellation.
+        synchronized (this) {
+          if (_arrowClosed) {
+            return _blocks.dataRejectionStatus();
+          }
+          ArrowQueryContext context = _arrowContext;
+          Preconditions.checkState(context != null, "Arrow IPC was not negotiated for mailbox: %s", _id);
+          if (_arrowIpcMessagesReceived == null) {
+            _arrowIpcMessagesReceived = MseMetrics.get().getMeteredValue(MseMeter.ARROW_IPC_MESSAGES_RECEIVED);
+          }
+          ArrowDataBlock decoded =
+              (ArrowDataBlock) DataBlockUtils.deserialize(buffer, 0, null, context.getAllocator());
+          ArrowBlock arrowBlock = registerArrowBlock(context, decoded);
+          _arrowIpcMessagesReceived.mark();
+          recordDeserialization(totalBytes, startTimeMs);
+          return offerPrivate(arrowBlock, List.of(), timeoutMs);
+        }
+      }
+      DataBlock dataBlock = DataBlockUtils.deserialize(buffer);
       stats = dataBlock.getStatsByStage();
-      _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
-      _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
-      _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
+      recordDeserialization(totalBytes, startTimeMs);
 
       if (dataBlock instanceof MetadataBlock) {
         Map<Integer, String> exceptions = dataBlock.getExceptions();
@@ -194,6 +259,9 @@ public class ReceivingMailbox {
       }
       if (terminateException != null) {
         block = ErrorMseBlock.fromException(terminateException);
+      } else if (ExceptionUtils.indexOfType(e, OutOfMemoryException.class) >= 0) {
+        block = ErrorMseBlock.fromError(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED,
+            "Arrow memory limit exceeded while receiving mailbox: " + _id);
       } else {
         String errorMessage = "Caught exception while deserializing DataBlock on mailbox: " + _id;
         LOGGER.error(errorMessage, e);
@@ -201,30 +269,54 @@ public class ReceivingMailbox {
       }
       stats = List.of();
     }
-    ReceivingMailboxStatus status = offerPrivate(block, stats, timeoutMs);
-    long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
-    long allocatedBytes = resourceSnapshot.getAllocatedBytes();
-    synchronized (this) {
-      if (_receiveOperatorThreadContext != null) {
-        updateResourceUsage(_receiveOperatorThreadContext, cpuTimeNs, allocatedBytes);
-      } else {
-        _untrackedCpuTimeNs += cpuTimeNs;
-        _untrackedAllocatedBytes += allocatedBytes;
-      }
-    }
-    return status;
+    return offerPrivate(block, stats, timeoutMs);
+  }
+
+  private void recordDeserialization(int totalBytes, long startTimeMs) {
+    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
+    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - startTimeMs);
   }
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
   public ReceivingMailboxStatus offer(MseBlock block, List<DataBuffer> serializedStats, long timeoutMs) {
     updateWaitCpuTime();
     _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
+    if (block instanceof ArrowBlock) {
+      synchronized (this) {
+        if (_arrowClosed) {
+          return _blocks.dataRejectionStatus();
+        }
+        ArrowBlock source = (ArrowBlock) block;
+        ArrowQueryContext context = _arrowContext;
+        if (context != null) {
+          // Reparent retained buffers: sender-stage cleanup must not free a receiver's queued data.
+          ArrowBlock received = registerArrowBlock(context, source.getDataBlock().retainTo(context.getAllocator()));
+          return offerPrivate(received, serializedStats, timeoutMs);
+        }
+      }
+      return offerPrivate(((ArrowBlock) block).asRowHeap(), serializedStats, timeoutMs);
+    }
     return offerPrivate(block, serializedStats, timeoutMs);
+  }
+
+  private static ArrowBlock registerArrowBlock(ArrowQueryContext context, ArrowDataBlock data) {
+    boolean registered = false;
+    try {
+      ArrowBlock block = context.createBlock(data);
+      registered = true;
+      return block;
+    } finally {
+      if (!registered) {
+        data.close();
+      }
+    }
   }
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
   private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
     long start = System.currentTimeMillis();
+    boolean accepted = false;
     try {
       ReceivingMailboxStatus result;
       if (block.isEos()) {
@@ -232,6 +324,7 @@ public class ReceivingMailbox {
       } else {
         result = _blocks.offerData((MseBlock.Data) block, timeoutMs, TimeUnit.MILLISECONDS);
       }
+      accepted = result == ReceivingMailboxStatus.SUCCESS;
 
       switch (result) {
         case SUCCESS:
@@ -268,6 +361,10 @@ public class ReceivingMailbox {
 
       LOGGER.error("Caught unexpected exception on mailbox: {} while offering blocks", _id, e);
       return _blocks.offerEos(ErrorMseBlock.fromException(e), stats);
+    } finally {
+      if (!accepted && block instanceof ArrowBlock) {
+        ((ArrowBlock) block).release();
+      }
     }
   }
 
@@ -291,13 +388,29 @@ public class ReceivingMailbox {
   /// Early terminate the mailbox, called when upstream doesn't expect any more *data* block.
   public void earlyTerminate() {
     _blocks.earlyTerminate();
+    disableArrow();
   }
 
   /// Cancels the mailbox. No more blocks are accepted after calling this method and [#poll] will always return
   /// an error block.
   public void cancel() {
     LOGGER.debug("Cancelling mailbox: {}", _id);
+    if (_arrowContext != null) {
+      _blocks.earlyTerminate();
+    }
     _blocks.offerEos(ErrorMseBlock.fromException(null), List.of());
+    disableArrow();
+  }
+
+  /// Detaches the receiver after draining or rejecting queued data and waiting for an in-flight decode/offer.
+  public void closeArrow() {
+    _blocks.earlyTerminate();
+    disableArrow();
+  }
+
+  private synchronized void disableArrow() {
+    _arrowClosed = true;
+    _arrowContext = null;
   }
 
   /// Returns the number of pending **data** blocks in the mailbox.
@@ -698,9 +811,26 @@ public class ReceivingMailbox {
 
     @GuardedBy("_lock")
     private void drainDataBlocks() {
-      Arrays.fill(_dataBlocks, null);
+      for (int i = 0; i < _dataBlocks.length; i++) {
+        MseBlock.Data block = _dataBlocks[i];
+        _dataBlocks[i] = null;
+        if (block instanceof ArrowBlock) {
+          ((ArrowBlock) block).release();
+        }
+      }
       _notFull.signalAll();
       _count = 0;
+    }
+
+    ReceivingMailboxStatus dataRejectionStatus() {
+      _lock.lock();
+      try {
+        Preconditions.checkState(_state != State.FULL_OPEN, "Mailbox is still open: %s", _id);
+        return _state == State.WAITING_EOS ? ReceivingMailboxStatus.WAITING_EOS
+            : ReceivingMailboxStatus.ALREADY_TERMINATED;
+      } finally {
+        _lock.unlock();
+      }
     }
 
     public int exactSize() {

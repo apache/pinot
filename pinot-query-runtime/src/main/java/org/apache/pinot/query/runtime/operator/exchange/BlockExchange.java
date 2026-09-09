@@ -22,6 +22,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -29,6 +31,7 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,12 +66,20 @@ public abstract class BlockExchange implements AutoCloseable {
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
       RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, statsIndexChooser, hashFunction, null);
+  }
+
+  /** A non-null supplier enables native hash partitioning without acquiring an allocator during planning. */
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction,
+      @Nullable Supplier<ArrowQueryContext> arrowContextSupplier) {
     switch (distributionType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter, statsIndexChooser);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys, hashFunction), splitter,
-            statsIndexChooser);
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys, hashFunction), keys,
+            splitter, statsIndexChooser, arrowContextSupplier);
       case RANDOM_DISTRIBUTED:
         return new RandomExchange(sendingMailboxes, splitter, statsIndexChooser);
       case BROADCAST_DISTRIBUTED:
@@ -83,7 +94,14 @@ public abstract class BlockExchange implements AutoCloseable {
 
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
       List<Integer> keys, BlockSplitter splitter, String hashFunction) {
-    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction);
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, hashFunction, null);
+  }
+
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      List<Integer> keys, BlockSplitter splitter, String hashFunction,
+      @Nullable Supplier<ArrowQueryContext> arrowContextSupplier) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction,
+        arrowContextSupplier);
   }
 
   protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,

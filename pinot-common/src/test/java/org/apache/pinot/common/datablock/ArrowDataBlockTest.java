@@ -208,7 +208,6 @@ public class ArrowDataBlockTest {
         assertThrows(UnsupportedOperationException.class, block::getStringDictionary);
         assertThrows(UnsupportedOperationException.class, block::getFixedData);
         assertThrows(UnsupportedOperationException.class, block::getVarSizeData);
-        assertThrows(UnsupportedOperationException.class, block::serialize);
       }
     }
   }

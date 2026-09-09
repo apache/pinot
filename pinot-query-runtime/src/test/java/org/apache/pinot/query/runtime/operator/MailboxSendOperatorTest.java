@@ -20,11 +20,20 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
+import org.apache.pinot.query.runtime.blocks.ArrowBlockConverter;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
@@ -32,6 +41,7 @@ import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -42,6 +52,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -70,6 +81,27 @@ public class MailboxSendOperatorTest {
   public void tearDownMethod()
       throws Exception {
     _mocks.close();
+  }
+
+  @Test
+  public void shouldNotAcquireArrowContextDuringPlanning() {
+    when(_mailboxService.isArrowEnabled()).thenReturn(true);
+    when(_mailboxService.getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any()))
+        .thenReturn(mock(SendingMailbox.class));
+    WorkerMetadata worker = new WorkerMetadata(0,
+        Map.of(0, new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0)))), Map.of());
+    OpChainExecutionContext context = spy(OperatorTestUtil.getOpChainContext(
+        _mailboxService, Long.MAX_VALUE, new StageMetadata(SENDER_STAGE_ID, List.of(worker), Map.of())));
+    doThrow(new AssertionError("Planning must not acquire Arrow resources")).when(context).getOrCreateArrowContext();
+    MailboxSendNode node = mock(MailboxSendNode.class);
+    when(node.getDistributionType()).thenReturn(RelDistribution.Type.HASH_DISTRIBUTED);
+    when(node.getReceiverStageIds()).thenReturn(Set.of(0));
+    when(node.getKeys()).thenReturn(List.of(0));
+    when(node.getHashFunction()).thenReturn("absHashCode");
+    try (MailboxSendOperator ignored = new MailboxSendOperator(context, _input, node)) {
+      verify(context, never()).getOrCreateArrowContext();
+    }
+    verify(_mailboxService, never()).getArrowBuffers();
   }
 
   @Test
@@ -169,6 +201,37 @@ public class MailboxSendOperatorTest {
 
     // Then:
     verify(_input).earlyTerminate();
+  }
+
+  @Test
+  public void shouldReleaseArrowWhenSendFails() {
+    try (RootAllocator allocator = new RootAllocator(1024 * 1024);
+        QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      ArrowBlock input = ArrowBlockConverter.toArrowBlock(getDummyDataBlock(), allocator);
+      when(_input.nextBlock()).thenReturn(input);
+      when(_exchange.send(input)).thenThrow(new IllegalStateException("send failed"));
+
+      assertTrue(getOperator().nextBlock().isError());
+      assertEquals(allocator.getAllocatedMemory(), 0L);
+    }
+  }
+
+  @Test
+  public void shouldTransferArrowOutputToCaller() {
+    try (RootAllocator allocator = new RootAllocator(1024 * 1024);
+        QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      ArrowBlock input = ArrowBlockConverter.toArrowBlock(getDummyDataBlock(), allocator);
+      when(_input.nextBlock()).thenReturn(input);
+      MseBlock output = getOperator().nextBlock();
+      try {
+        assertSame(output, input);
+        assertTrue(allocator.getAllocatedMemory() > 0);
+        verify(_exchange).send(input);
+      } finally {
+        input.release();
+      }
+      assertEquals(allocator.getAllocatedMemory(), 0L);
+    }
   }
 
   private MailboxSendOperator getOperator() {

@@ -21,6 +21,7 @@ package org.apache.pinot.common.datablock;
 import java.io.IOException;
 import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
@@ -71,6 +72,15 @@ public interface DataBlockSerde {
     return deserialize(buffer, offset, type, null);
   }
 
+  /**
+   * Deserializes into caller-owned Arrow memory when the wire format requires it. Legacy serdes ignore the allocator.
+   */
+  default DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type,
+      @Nullable LongConsumer finalOffsetConsumer, BufferAllocator allocator)
+      throws IOException {
+    return deserialize(buffer, offset, type, finalOffsetConsumer);
+  }
+
   Version getVersion();
 
   /**
@@ -85,7 +95,10 @@ public interface DataBlockSerde {
      * <p>
      * Older Pinot versions use id 1 to identify their version.
      */
-    V1_V2(2);
+    V1_V2(2),
+
+    /** A length-framed Arrow IPC stream containing exactly one record batch. */
+    ARROW_IPC(3);
 
     private final int _version;
 
@@ -98,6 +111,8 @@ public interface DataBlockSerde {
         case 1:
         case 2:
           return V1_V2;
+        case 3:
+          return ARROW_IPC;
         default:
           throw new IllegalArgumentException("Unknown version: " + version);
       }

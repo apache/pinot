@@ -51,6 +51,8 @@ public interface SendingMailbox extends AutoCloseable {
    * Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
    * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
+   * Arrow data is borrowed for this synchronous call. The caller retains its reference; a local receiver owns an
+   * independent root, and a remote receiver owns the encoded bytes.
    */
   void send(MseBlock.Data data);
 

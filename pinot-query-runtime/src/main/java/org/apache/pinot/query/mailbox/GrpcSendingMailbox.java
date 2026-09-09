@@ -83,6 +83,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// `pinot.query.runner.grpc.sender.backpressure.enabled` so it can be flipped without code changes if the gate
   /// causes a regression in production, and also used by `BenchmarkGrpcMailboxSend` for A/B measurements.
   private final boolean _backpressureEnabled;
+  private final boolean _arrowEnabled;
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
   private volatile boolean _senderSideClosed;
 
@@ -101,6 +102,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled) {
+    this(id, channelManager, hostname, port, deadlineMs, statMap, maxInboundMessageSize, backpressureEnabled, false);
+  }
+
+  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled,
+      boolean arrowEnabled) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -108,6 +115,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     _backpressureEnabled = backpressureEnabled;
+    _arrowEnabled = arrowEnabled;
     // TODO: tune the maxByteStringSize based on experiments. We know the maxInboundMessageSize on the receiver side,
     //  but we want to leave some room for extra stuff for other fields like metadata, mailbox id, etc, whose size
     //  we don't know at the time of writing into the stream as it is serialized by protobuf.
@@ -217,6 +225,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
     try {
+      // Unknown and older peers receive legacy bytes until this stream advertises IPC support.
+      if (block instanceof ArrowBlock && !isArrowIpcSupported()) {
+        block = ((ArrowBlock) block).asSerialized();
+      }
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
       int sizeInBytes = processAndSend(dataBlock, bypassReady);
       if (LOGGER.isDebugEnabled()) {
@@ -520,6 +532,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
   }
 
+  boolean isArrowIpcSupported() {
+    return _arrowEnabled && _statusObserver.isArrowIpcSupported();
+  }
+
+  int getReceiverBufferSize() {
+    return _statusObserver.getBufferSize();
+  }
+
   @Override
   public String toString() {
     return "g" + _id;
@@ -552,12 +572,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
     @Override
     public DataBlock visit(ArrowBlock block, List<DataBuffer> serializedStats) {
-      // No operator currently produces ArrowBlocks, so the gRPC sender is never invoked with one.
-      // Phase 3 (wire protocol) turns this stub into the Arrow IPC path: the block's VectorSchemaRoot is
-      // serialized to Arrow IPC bytes and carried over the existing gRPC mailbox unchanged — one edge copy,
-      // not zero-copy. Arrow Flight (allocator-to-allocator zero-copy) is a deferred alternative.
-      throw new UnsupportedOperationException(
-          "GrpcSendingMailbox does not yet support ArrowBlocks; Arrow IPC over gRPC lands in the wire phase");
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        throw new UnsupportedOperationException("Cannot serialize stats with ArrowBlock");
+      }
+      return block.getDataBlock();
     }
 
     @Override

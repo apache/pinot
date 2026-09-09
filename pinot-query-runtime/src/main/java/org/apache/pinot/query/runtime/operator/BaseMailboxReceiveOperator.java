@@ -183,6 +183,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
         // TODO: Check if we should also release mailbox on not successful EOS.
         if (block.isSuccess()) {
+          _mailbox.closeArrow();
           _operator._mailboxService.releaseReceivingMailbox(_mailbox);
         }
       }

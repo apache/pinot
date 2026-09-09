@@ -44,7 +44,9 @@ public enum MseMeter implements AbstractMetrics.Meter {
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true, ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED),
   IN_MEMORY_MESSAGES("messages", true, ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES),
   RAW_MESSAGES("messages", true, ServerMeter.MULTI_STAGE_RAW_MESSAGES),
-  RAW_BYTES("bytes", true, ServerMeter.MULTI_STAGE_RAW_BYTES);
+  RAW_BYTES("bytes", true, ServerMeter.MULTI_STAGE_RAW_BYTES),
+  /// Arrow IPC data blocks decoded from remote mailbox streams.
+  ARROW_IPC_MESSAGES_RECEIVED("messages", true, ServerMeter.MULTI_STAGE_ARROW_IPC_MESSAGES_RECEIVED);
 
   private final String _meterName;
   private final String _unit;

@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Context;
 import io.grpc.Metadata;
+import org.apache.pinot.common.datablock.DataBlockSerde;
 
 public class ChannelUtils {
   private ChannelUtils() {
@@ -27,6 +28,8 @@ public class ChannelUtils {
 
   public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
   public static final String MAILBOX_METADATA_REQUEST_EARLY_TERMINATE = "request.early.terminate";
+  public static final String MAILBOX_METADATA_ARROW_IPC_VERSION = "arrow.ipc.version";
+  public static final String ARROW_IPC_VERSION = Integer.toString(DataBlockSerde.Version.ARROW_IPC.getVersion());
 
   public static final Metadata.Key<String> MAILBOX_ID_METADATA_KEY =
       Metadata.Key.of("mailboxId", Metadata.ASCII_STRING_MARSHALLER);

@@ -281,7 +281,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /// Number of MSE queries received by this server.
   /// This metric is incremented once per query, even if the server is acting as a leaf, intermediate, or both.
   MSE_QUERIES("queries", true,
-      "Number of MSE queries received by this server");
+      "Number of MSE queries received by this server"),
+  /// Arrow IPC data blocks decoded from remote mailbox streams.
+  MULTI_STAGE_ARROW_IPC_MESSAGES_RECEIVED("messages", true);
 
   private final String _meterName;
   private final String _unit;

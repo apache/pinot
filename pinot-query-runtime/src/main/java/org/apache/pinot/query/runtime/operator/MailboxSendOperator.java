@@ -25,6 +25,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.arrow.memory.OutOfMemoryException;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.MseMetrics;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -43,6 +45,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
@@ -79,6 +82,9 @@ public class MailboxSendOperator extends MultiStageOperator {
     super(context);
     _input = input;
     _exchange = exchangeFactory.apply(_statMap);
+    if (context.isArrowEnabled() && input instanceof ArrowBlockSource) {
+      ((ArrowBlockSource) input).enableArrowOutput();
+    }
   }
 
   /**
@@ -115,7 +121,8 @@ public class MailboxSendOperator extends MultiStageOperator {
 
     Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        List.of(), mainSplitter, statsIndexChooser, node.getHashFunction());
+        List.of(), mainSplitter, statsIndexChooser, node.getHashFunction(),
+        ctx.isArrowEnabled() ? ctx::getOrCreateArrowContext : null);
   }
 
   private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
@@ -174,7 +181,7 @@ public class MailboxSendOperator extends MultiStageOperator {
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
-        node.getHashFunction());
+        node.getHashFunction(), context.isArrowEnabled() ? context::getOrCreateArrowContext : null);
   }
 
   @Override
@@ -207,14 +214,17 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
+    MseBlock block = null;
+    boolean transferred = false;
     try {
-      MseBlock block = _input.nextBlock();
+      block = _input.nextBlock();
       if (block.isEos()) {
         sendEos((MseBlock.Eos) block);
       } else {
         sendMseBlock(((MseBlock.Data) block));
         checkTerminationAndSampleUsage();
       }
+      transferred = true;
       return block;
     } catch (RuntimeException e) {
       if (e instanceof QueryCancelledException) {
@@ -231,6 +241,9 @@ public class MailboxSendOperator extends MultiStageOperator {
       }
       if (queryException != null) {
         errorBlock = ErrorMseBlock.fromException(queryException);
+      } else if (e instanceof OutOfMemoryException) {
+        errorBlock = ErrorMseBlock.fromError(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED,
+            "Arrow memory limit exceeded while transferring data on opChain: " + _context.getId());
       } else {
         LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
         errorBlock = ErrorMseBlock.fromException(e);
@@ -241,6 +254,10 @@ public class MailboxSendOperator extends MultiStageOperator {
         LOGGER.error("Exception while sending error block.", e2);
       }
       return errorBlock;
+    } finally {
+      if (!transferred && block instanceof ArrowBlock) {
+        ((ArrowBlock) block).release();
+      }
     }
   }
 

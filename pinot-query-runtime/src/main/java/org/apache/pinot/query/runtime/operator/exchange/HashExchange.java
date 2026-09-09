@@ -22,13 +22,19 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.EmptyKeySelector;
+import org.apache.pinot.query.planner.partitioning.HashFunctionSelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.memory.ArrowQueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -39,13 +45,29 @@ import org.apache.pinot.spi.query.QueryThreadContext;
  */
 class HashExchange extends BlockExchange {
   private static final String ROUTE_SCOPE = "HashExchange";
+  private static final int[] EMPTY_KEY_IDS = new int[0];
 
   private final KeySelector<?> _keySelector;
+  private final int[] _keyIds;
+  private final boolean _nativeHash;
+  @Nullable
+  private final Supplier<ArrowQueryContext> _arrowContextSupplier;
 
   HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    this(sendingMailboxes, keySelector, List.of(), splitter, statsIndexChooser, null);
+  }
+
+  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, List<Integer> keyIds,
+      BlockSplitter splitter, Function<List<SendingMailbox>, Integer> statsIndexChooser,
+      @Nullable Supplier<ArrowQueryContext> arrowContextSupplier) {
     super(sendingMailboxes, splitter, statsIndexChooser);
     _keySelector = keySelector;
+    _keyIds = arrowContextSupplier == null ? EMPTY_KEY_IDS : keyIds.stream().mapToInt(Integer::intValue).toArray();
+    _nativeHash = arrowContextSupplier != null
+        && (KeySelector.DEFAULT_HASH_ALGORITHM.equalsIgnoreCase(keySelector.hashAlgorithm())
+        || HashFunctionSelector.HASH_CODE.equalsIgnoreCase(keySelector.hashAlgorithm()));
+    _arrowContextSupplier = arrowContextSupplier;
   }
 
   @VisibleForTesting
@@ -60,6 +82,14 @@ class HashExchange extends BlockExchange {
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
       sendBlock(destinations.get(0), block);
       return;
+    }
+
+    if (_arrowContextSupplier != null && _nativeHash && block.isArrow()) {
+      ArrowBlock arrowBlock = block.asArrow();
+      if (ArrowHashPartitioner.supports(arrowBlock.getDataBlock(), _keyIds)) {
+        routeArrow(destinations, arrowBlock, _arrowContextSupplier);
+        return;
+      }
     }
 
     List<Object[]>[] mailboxIdToRowsMap = new List[numMailboxes];
@@ -79,6 +109,33 @@ class HashExchange extends BlockExchange {
       if (!mailboxIdToRowsMap[i].isEmpty()) {
         sendBlock(destinations.get(i),
             new RowHeapDataBlock(mailboxIdToRowsMap[i], block.getDataSchema(), aggFunctions));
+      }
+    }
+  }
+
+  private void routeArrow(List<SendingMailbox> destinations, ArrowBlock block,
+      Supplier<ArrowQueryContext> arrowContextSupplier) {
+    int[][] partitions = ArrowHashPartitioner.partitionRows(block.getDataBlock(), _keyIds, destinations.size());
+    ArrowQueryContext arrowContext = null;
+    for (int i = 0; i < partitions.length; i++) {
+      SendingMailbox destination = destinations.get(i);
+      if (partitions[i] != null && !destination.isEarlyTerminated()) {
+        if (arrowContext == null) {
+          arrowContext = arrowContextSupplier.get();
+        }
+        ArrowDataBlock selected =
+            ArrowRowSelection.select(block.getDataBlock(), partitions[i], arrowContext.getAllocator());
+        ArrowBlock partition = null;
+        try {
+          partition = arrowContext.createBlock(selected);
+          sendBlock(destination, partition);
+        } finally {
+          if (partition == null) {
+            selected.close();
+          } else {
+            partition.release();
+          }
+        }
       }
     }
   }

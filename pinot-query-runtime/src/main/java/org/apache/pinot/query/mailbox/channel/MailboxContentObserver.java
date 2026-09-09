@@ -94,9 +94,15 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(_mailboxBuffers, timeoutMs);
       switch (status) {
         case SUCCESS:
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+          MailboxStatus.Builder response = MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
-                  Integer.toString(_mailbox.getNumPendingBlocks())).build());
+                  Integer.toString(_mailbox.getNumPendingBlocks()));
+          // Advertise only after a native consumer has installed its allocator and ownership registry.
+          if (_mailbox.canReceiveArrow()) {
+            response.putMetadata(ChannelUtils.MAILBOX_METADATA_ARROW_IPC_VERSION,
+                ChannelUtils.ARROW_IPC_VERSION);
+          }
+          _responseObserver.onNext(response.build());
           break;
         case WAITING_EOS:
           // The receiving mailbox is early terminated, inform the sender to stop sending more data. Only EOS block is
