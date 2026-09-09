@@ -1785,16 +1785,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // The semaphore is released in a finally block so that a failure in metadata removal cannot stall the partition.
     try {
       _realtimeSegment.offload();
-    } catch (RuntimeException | Error e) {
-      String message = "REALTIME_METADATA_REMOVAL_FAILED: table=" + _tableNameWithType + ", partition="
-          + _partitionGroupId + ", segment=" + _segmentNameStr
-          + ". Metadata may still include the discarded segment; manual reconstruction and replay are required.";
-      _segmentLogger.error(message, e);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_METADATA_REMOVAL_FAILURES, 1);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, e));
-      // TODO: Recover incomplete metadata removal before a later consumer uses the discarded segment's state.
-      // Keep the existing permit-release behavior. Detection and manual recovery are required after this error.
-      throw e;
     } finally {
       releaseConsumerSemaphore();
       cleanupMetrics();
