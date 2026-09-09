@@ -1788,8 +1788,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (RuntimeException | Error e) {
       String message = "REALTIME_METADATA_REMOVAL_FAILED: table=" + _tableNameWithType + ", partition="
           + _partitionGroupId + ", segment=" + _segmentNameStr
-          + ". Metadata may still include the discarded segment. Pause ingestion and follow "
-          + "pinot-core/METADATA_RECOVERY.md; a segment reset alone does not repair shared metadata.";
+          + ". Metadata may still include the discarded segment; manual reconstruction and replay are required.";
       _segmentLogger.error(message, e);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_METADATA_REMOVAL_FAILURES, 1);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, e));

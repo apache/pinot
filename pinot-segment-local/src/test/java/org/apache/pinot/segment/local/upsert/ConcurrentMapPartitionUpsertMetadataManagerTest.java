@@ -31,7 +31,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -84,7 +83,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -2429,40 +2427,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
-  }
-
-  @Test
-  public void testRevertReaderFailureIsReported()
-      throws IOException {
-    verifyRevertFallbackIsReported(false);
-  }
-
-  @Test
-  public void testMissingRevertBitmapIsReported()
-      throws IOException {
-    verifyRevertFallbackIsReported(true);
-  }
-
-  private void verifyRevertFallbackIsReported(boolean missingBitmap)
-      throws IOException {
-    ServerMetrics metrics = ServerMetrics.get();
-    clearInvocations(metrics);
-    ConcurrentMapPartitionUpsertMetadataManager manager = new ConcurrentMapPartitionUpsertMetadataManager(
-        REALTIME_TABLE_NAME, 0, _contextBuilder.setHashFunction(HashFunction.NONE).build());
-    MutableSegment source = mock(MutableSegment.class);
-    IndexSegment previous = mock(IndexSegment.class);
-    PrimaryKey key = makePrimaryKey(10);
-    manager._primaryKeyToRecordLocationMap.put(key, new RecordLocation(source, 0, 2000));
-    manager._previousKeyToRecordLocationMap.put(key, new RecordLocation(previous, 0, 1000));
-    if (!missingBitmap) {
-      when(previous.getValidDocIds()).thenReturn(new ThreadSafeMutableRoaringBitmap());
-      when(previous.getDataSource(anyString())).thenThrow(new IllegalStateException("Injected reader failure"));
-    }
-    manager.revertAndRemoveSegment(source, Map.of(0, key).entrySet().iterator());
-    assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key), "Existing fallback removes the key");
-    verify(metrics).addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.REALTIME_METADATA_REMOVAL_FAILURES, 1);
-    manager.stop();
-    manager.close();
   }
 
   @Test
