@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -29,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
@@ -55,6 +57,7 @@ import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandle
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.BrokerRequestIdGenerator;
+import org.apache.pinot.broker.requesthandler.BrokerWarmupConfig;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
@@ -145,6 +148,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// How often the pre-connect thread re-checks whether Helix has converged. Short enough not to add
   /// meaningful delay to a fast startup, long enough not to hammer the Helix data accessor.
   private static final long HELIX_CONVERGENCE_POLL_INTERVAL_MS = 200L;
+  /// How long shutdown waits for the interrupted warmup thread to unwind before
+  /// giving up on it. Bounds the teardown race without letting a stuck thread hold up shutdown.
+  private static final long STARTUP_THREAD_JOIN_TIMEOUT_MS = 1_000L;
+  /// Readiness description reported while the warmup gate holds the broker at STARTING. Shared with tests so
+  /// the exact gate transition can be asserted.
+  @VisibleForTesting
+  static final String WARMUP_GATE_STARTING_DESCRIPTION = "Warming up broker data plane";
 
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
@@ -193,6 +203,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
   protected ThreadAccountant _threadAccountant;
+  /// Startup data-plane warmup config. Read once in `start()`.
+  protected BrokerWarmupConfig _warmupConfig =
+      new BrokerWarmupConfig(false, 0L, 0, 1);
+  /// Whether the data plane has been warmed. Gates readiness when warmup is enabled; always true
+  /// otherwise, so the status callback behaves exactly as before for existing deployments.
+  private volatile boolean _isWarm;
+  @Nullable
+  private volatile Thread _warmupThread;
   /// The Helix-convergence half of the service-status composite, held so startup pre-connect can wait
   /// on exactly that signal -- convergence is the point at which routing, and the servers it
   /// references, first exist.
@@ -691,6 +709,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED);
     _preConnectTimeoutMs = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS,
         Broker.DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS);
+    // Read the warmup config before registering the status handler: the handler adds the warmup readiness
+    // gate only when warmup is enabled, and the gate must be in place before the handler is registered so
+    // there is no window where readiness is granted un-gated.
+    _warmupConfig = BrokerWarmupConfig.from(_brokerConf);
+    // Register the service status handler
     registerServiceStatusHandler();
     if (_preConnectEnabled) {
       // Startup is not finished until the broker-to-server channels are open, so `_isStarting` stays set
@@ -703,6 +726,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     } else {
       _isStarting = false;
     }
+    // Warmup gates readiness on its own _isWarm flag (added to the status handler above when enabled), so
+    // it composes with pre-connect's _isStarting gate: readiness is granted only once both are satisfied.
+    startWarmup();
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
@@ -894,10 +920,96 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
             _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup)));
 
+    List<ServiceStatus.ServiceStatusCallback> callbacks = new ArrayList<>(3);
+    callbacks.add(new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown));
+    callbacks.add(_helixConvergenceCallback);
+    if (_warmupConfig.enabled()) {
+      // The warmup readiness gate. Reports STARTING (not a new status value) until warmup completes:
+      // callers throughout the codebase test for GOOD, and a new enum constant would be visible to older
+      // mixed-version peers. MultipleCallbackServiceStatusCallback surfaces the first non-GOOD callback, so
+      // this composes without touching the Helix or lifecycle callbacks.
+      //
+      // Scope: this gates HTTP readiness only -- the /health endpoint (getBrokerHealth -> ServiceStatus)
+      // that a load balancer or Kubernetes readiness probe polls, so a warming broker is not put into
+      // rotation there. It does NOT change Helix discovery: the broker is already ONLINE in the broker
+      // resource's external view by this point, so a client that resolves brokers straight from Helix could
+      // still route to it while it warms. That is acceptable -- warmup only makes the first queries faster,
+      // never wrong -- and keeping the broker in Helix is deliberate, since removing it would be a
+      // routing/discovery change far beyond a startup latency optimization.
+      callbacks.add(warmupGateCallback(() -> _isWarm));
+    }
     ServiceStatus.setServiceStatusCallback(_instanceId,
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
-            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown),
-            _helixConvergenceCallback)));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(callbacks));
+  }
+
+  /// The startup-warmup readiness gate as a standalone callback: reports STARTING with the "warming up"
+  /// description until `isWarm` turns true, then GOOD with no description. Extracted and package-private so
+  /// the STARTING -> GOOD transition can be unit-tested deterministically, without standing up a broker or
+  /// racing an actual warmup to observe it mid-flight.
+  @VisibleForTesting
+  static ServiceStatus.ServiceStatusCallback warmupGateCallback(BooleanSupplier isWarm) {
+    return new ServiceStatus.ServiceStatusCallback() {
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        return isWarm.getAsBoolean() ? ServiceStatus.Status.GOOD : ServiceStatus.Status.STARTING;
+      }
+
+      @Override
+      public String getStatusDescription() {
+        return isWarm.getAsBoolean() ? ServiceStatus.STATUS_DESCRIPTION_NONE : WARMUP_GATE_STARTING_DESCRIPTION;
+      }
+    };
+  }
+
+  /// Runs the data-plane warmup on a background thread and flips [#_isWarm] when it finishes.
+  ///
+  /// Asynchronous so `start()` still returns promptly -- the gate is enforced through `ServiceStatus`, not
+  /// by blocking startup. The flag is set in a `finally` so the gate opens even if warmup throws:
+  /// readiness held open indefinitely would stall a rolling restart, a worse failure than serving a cold
+  /// broker. When disabled this is a no-op and readiness behaves exactly as before.
+  private void startWarmup() {
+    // The gauge is published in both branches so dashboards can rely on it always existing; with warmup
+    // disabled it simply reads 1 from the start, matching pre-change behaviour.
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.STARTUP_WARMUP_COMPLETE, () -> _isWarm ? 1L : 0L);
+    if (!_warmupConfig.enabled()) {
+      _isWarm = true;
+      return;
+    }
+    _warmupThread = new Thread(() -> {
+      // Set once Helix converges. Both the budget and the duration metric are measured from here, not from
+      // thread start, so the deliberately unbounded convergence wait is charged against neither: readiness
+      // is already withheld until convergence by the Helix callbacks, so it costs nothing.
+      long warmStartMs = 0L;
+      try {
+        long threadStartMs = System.currentTimeMillis();
+        awaitHelixConvergence();
+        warmStartMs = System.currentTimeMillis();
+        LOGGER.info("Helix converged after {} ms; starting data-plane warmup", warmStartMs - threadStartMs);
+        // Saturating add: a pathologically large budgetMs must not overflow the deadline negative (which
+        // would make warmup a silent no-op). A negative/zero budget still yields a past deadline (no-op),
+        // which is the intended fail-open behaviour.
+        long budgetMs = _warmupConfig.budgetMs();
+        long deadlineMs = budgetMs > Long.MAX_VALUE - warmStartMs ? Long.MAX_VALUE : warmStartMs + budgetMs;
+        boolean reachedFloor = _brokerRequestHandler.warmUp(_warmupConfig, deadlineMs);
+        LOGGER.info("Broker warmup finished in {} ms (reachedFloor={})", System.currentTimeMillis() - warmStartMs,
+            reachedFloor);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.info("Broker warmup interrupted before completion");
+      } catch (Throwable t) {
+        LOGGER.warn("Broker warmup threw; opening readiness anyway", t);
+      } finally {
+        _isWarm = true;
+        // Record the duration only if convergence was reached, so the metric measures the warmup work
+        // itself and never the (unbounded) convergence wait -- e.g. when shutdown interrupts the wait.
+        if (warmStartMs > 0L) {
+          _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_WARMUP_DURATION_MS,
+              System.currentTimeMillis() - warmStartMs, TimeUnit.MILLISECONDS);
+        }
+      }
+    }, "broker-startup-warmup");
+    _warmupThread.setDaemon(true);
+    _warmupThread.start();
   }
 
   /// Runs startup server pre-connect on a background thread and ends startup ([#_isStarting]) when it
@@ -958,13 +1070,38 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  /// Interrupts an in-flight pre-connect so shutdown never waits on it. Best effort: the thread is a
-  /// daemon and records its metric in a `finally` regardless.
+  /// Interrupts an in-flight warmup so a broker stopped mid-warmup does not keep issuing probe queries
+  /// against a request handler being torn down, then joins briefly so an in-flight probe unwinds before the
+  /// handler is shut down (avoiding a probe racing a closing [QueryRouter]). Bounded: the thread is a daemon
+  /// whose `finally` opens the gate regardless, so shutdown never waits on it beyond the short join.
+  private void stopWarmup() {
+    interruptAndJoin(_warmupThread, "broker warmup");
+  }
+
+  /// Interrupts an in-flight pre-connect so shutdown never waits on it. Interrupt-only (no join) so this
+  /// PR leaves the already-merged pre-connect feature's shutdown behaviour unchanged; the join added for
+  /// warmup applies to the warmup thread only. Best effort: the thread is a daemon that records its metric
+  /// in a `finally` regardless.
   private void stopPreConnect() {
     Thread thread = _preConnectThread;
     if (thread != null && thread.isAlive()) {
       LOGGER.info("Interrupting in-flight startup server pre-connect for shutdown");
       thread.interrupt();
+    }
+  }
+
+  /// Interrupts `thread` (if alive) and waits up to [#STARTUP_THREAD_JOIN_TIMEOUT_MS] for it to unwind.
+  /// Best effort: a thread that does not stop in time is left to its daemon `finally` and shutdown proceeds.
+  private static void interruptAndJoin(@Nullable Thread thread, String what) {
+    if (thread == null || !thread.isAlive()) {
+      return;
+    }
+    LOGGER.info("Interrupting in-flight {} for shutdown", what);
+    thread.interrupt();
+    try {
+      thread.join(STARTUP_THREAD_JOIN_TIMEOUT_MS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -1000,6 +1137,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
     _isShuttingDown = true;
+    stopWarmup();
     stopPreConnect();
 
     LOGGER.info("Disconnecting participant Helix manager");
