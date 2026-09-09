@@ -82,6 +82,7 @@ import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.MaterializedExchangePlanner;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PRelNodeTreeValidator;
@@ -518,19 +519,25 @@ public class QueryEnvironment {
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     long requestId = _envConfig.getRequestId();
+    DispatchableSubPlan dispatchableSubPlan;
     if (plannerContext.isUsePhysicalOptimizer()) {
       Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
           plannerContext.getPhysicalPlannerContext());
       PinotDispatchPlanner pinotDispatchPlanner = new PinotDispatchPlanner(plannerContext,
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
-      return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
+      dispatchableSubPlan = pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
+    } else {
+      SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
+          _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
+      PinotDispatchPlanner pinotDispatchPlanner =
+          new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
+              _envConfig.getTableCache());
+      dispatchableSubPlan = pinotDispatchPlanner.createDispatchableSubPlan(plan, _multiClusterRoutingContext);
     }
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
-    PinotDispatchPlanner pinotDispatchPlanner =
-        new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
-            _envConfig.getTableCache());
-    return pinotDispatchPlanner.createDispatchableSubPlan(plan, _multiClusterRoutingContext);
+    if (QueryOptionsUtils.isMaterializedExchange(plannerContext.getOptions())) {
+      MaterializedExchangePlanner.markFirstEligible(dispatchableSubPlan);
+    }
+    return dispatchableSubPlan;
   }
 
   // --------------------------------------------------------------------------

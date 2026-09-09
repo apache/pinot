@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,6 +42,44 @@ import org.testng.annotations.Test;
 /// [StreamObserver#onNext] on a real [StreamingQuerySession] and verifies the right session methods are
 /// called and the session completes when expected.
 public class StreamingDispatchObserverTest {
+
+  @Test
+  public void testDoneAndOnCompletedCloseStreamBarrier()
+      throws Exception {
+    StreamingQuerySession doneSession = new StreamingQuerySession(1L, 0, Map.of());
+    StreamingDispatchObserver doneObserver =
+        new StreamingDispatchObserver(mockServer(), doneSession, 0, (resp, err) -> { });
+    doneSession.registerStream(doneObserver);
+
+    doneObserver.onNext(Worker.ServerToBroker.newBuilder()
+        .setDone(Worker.ServerDone.getDefaultInstance())
+        .build());
+    doneSession.awaitStreamsClosed(1, TimeUnit.SECONDS);
+
+    StreamingQuerySession completedSession = new StreamingQuerySession(2L, 0, Map.of());
+    StreamingDispatchObserver completedObserver =
+        new StreamingDispatchObserver(mockServer(), completedSession, 0, (resp, err) -> { });
+    completedSession.registerStream(completedObserver);
+
+    completedObserver.onCompleted();
+    completedSession.awaitStreamsClosed(1, TimeUnit.SECONDS);
+  }
+
+  @Test
+  public void testUnexpectedWorkerFailsExactStageBarrier()
+      throws Exception {
+    StreamingQuerySession session =
+        new StreamingQuerySession(1L, 1, Map.of(1, java.util.Set.of(0)));
+    StreamingDispatchObserver observer =
+        new StreamingDispatchObserver(mockServer(), session, 1, (resp, err) -> { });
+
+    observer.onNext(Worker.ServerToBroker.newBuilder()
+        .setOpchain(buildOpChainComplete(1, 1, 5))
+        .build());
+
+    Assert.assertThrows(IllegalStateException.class,
+        () -> session.awaitSuccessfulStages(java.util.Set.of(1), 1, TimeUnit.SECONDS));
+  }
 
   /// Happy path: submit_ack, then 2 OpChainCompletes, then ServerDone. ackCallback fires once with the response, the
   /// session's latch drains to zero, and the stream is unregistered.

@@ -62,7 +62,7 @@ public class QueryPlanSerDeUtils {
       mailboxInfosMap.put(entry.getKey(), fromProtoMailboxInfos(entry.getValue()));
     }
     return new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap,
-        protoWorkerMetadata.getCustomPropertyMap());
+        protoWorkerMetadata.getCustomPropertyMap(), protoWorkerMetadata.getMaterializedInputList());
   }
 
   private static MailboxInfos fromProtoMailboxInfos(ByteString protoMailboxInfos)
@@ -84,7 +84,8 @@ public class QueryPlanSerDeUtils {
     Map<Integer, ByteString> mailboxInfosMap = workerMetadata.getMailboxInfosMap().entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toProtoBytes()));
     return Worker.WorkerMetadata.newBuilder().setWorkedId(workerMetadata.getWorkerId())
-        .putAllMailboxInfos(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties()).build();
+        .putAllMailboxInfos(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties())
+        .addAllMaterializedInput(workerMetadata.getMaterializedInputs()).build();
   }
 
   public static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {
