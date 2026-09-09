@@ -83,6 +83,59 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testSnapshotMetadataKeepsCountsAndContextTogether()
+      throws Exception {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    when(context.getTableIndexDir()).thenReturn(TEMP_DIR);
+    when(context.getMetadataManagerConfigs()).thenReturn(
+        Map.of(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA, "true"));
+    when(context.getDeleteRecordColumn()).thenReturn("deleted");
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(context.getTableDataManager()).thenReturn(tableDataManager);
+    Lock segmentLock = mock(Lock.class);
+    when(segmentLock.tryLock()).thenReturn(true);
+    when(tableDataManager.getSegmentLock(anyString())).thenReturn(segmentLock);
+    DummyPartitionUpsertMetadataManager manager = new DummyPartitionUpsertMetadataManager("table_REALTIME", 0, context);
+    try {
+      manager._gotFirstConsumingSegment = true;
+      ImmutableSegmentImpl segment = createImmutableSegment("segment", new File(TEMP_DIR, "segment"),
+          new ArrayList<>(), null);
+      segment.enableUpsert(manager, createDocIds(0, 1, 2), createDocIds(0, 2));
+      manager.trackSegment(segment);
+      manager.trackSegmentForSnapshot(segment);
+      manager.takeSnapshot("table__0__1__100", "10");
+      TestUtils.waitForCondition(aVoid -> UpsertSnapshotMetadataStore.read(TEMP_DIR, 0) != null, 5000L,
+          "Snapshot metadata was not published");
+      UpsertSnapshotMetadata first = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
+      assertEquals(first.startOffset(), "10");
+      assertEquals(first.segments().get("segment").validDocCount(), 3);
+      assertEquals(first.segments().get("segment").queryableDocCount(), Integer.valueOf(2));
+      assertEquals(first.getBoundaryStatus(), "UNVERIFIED");
+
+      segment.getValidDocIds().remove(0);
+      assertEquals(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().get("segment").validDocCount(), 3);
+      manager._updatedSegmentsSinceLastSnapshot.add(segment);
+      when(segmentLock.tryLock()).thenReturn(false);
+      manager.takeSnapshot("table__0__2__200", "20");
+      TestUtils.waitForCondition(aVoid -> {
+        UpsertSnapshotMetadata metadata = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
+        return metadata != null && metadata.startOffset().equals("20");
+      }, 5000L, "Skipped snapshot attempt was not published");
+      assertTrue(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().isEmpty());
+
+      // A later manual snapshot must not reuse the startup context or publish misleading diagnostic counts.
+      when(segmentLock.tryLock()).thenReturn(true);
+      manager.takeSnapshot();
+      assertTrue(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().isEmpty());
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
   public void testPreloadSegments()
       throws IOException {
     String realtimeTableName = "testTable_REALTIME";

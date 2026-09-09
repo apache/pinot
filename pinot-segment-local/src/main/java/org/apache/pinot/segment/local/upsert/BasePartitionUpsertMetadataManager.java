@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata.SegmentSnapshot;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
@@ -91,6 +92,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
+  private final boolean _enableSnapshotMetadata;
+  // Scoped to the startup call so manual/shutdown snapshots cannot inherit an old startup offset. Keeping the
+  // context on the calling thread also preserves overrides of the existing takeSnapshot()/doTakeSnapshot() hooks.
+  private final ThreadLocal<SnapshotContext> _snapshotContext = new ThreadLocal<>();
   protected final double _metadataTTL;
   protected final double _deletedKeysTTL;
   protected final File _tableIndexDir;
@@ -161,6 +166,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = context.getPartialUpsertHandlerSupplier();
     _partialUpsertHandler = partialUpsertHandlerSupplier != null ? partialUpsertHandlerSupplier.get() : null;
     _enableSnapshot = context.isSnapshotEnabled();
+    Map<String, String> metadataManagerConfigs = context.getMetadataManagerConfigs();
+    _enableSnapshotMetadata = _enableSnapshot && metadataManagerConfigs != null && Boolean.parseBoolean(
+        metadataManagerConfigs.get(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA));
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
@@ -871,6 +879,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
+  public void takeSnapshot(String consumingSegmentName, String startOffset) {
+    if (!_enableSnapshotMetadata) {
+      takeSnapshot();
+      return;
+    }
+    _snapshotContext.set(new SnapshotContext(consumingSegmentName, startOffset));
+    try {
+      takeSnapshot();
+    } finally {
+      _snapshotContext.remove();
+    }
+  }
+
+  private record SnapshotContext(String consumingSegmentName, String startOffset) {
+  }
+
+  @Override
   public void takeSnapshot() {
     if (!_enableSnapshot) {
       return;
@@ -899,6 +924,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void doTakeSnapshot() {
+    SnapshotContext snapshotContext = _enableSnapshotMetadata ? _snapshotContext.get() : null;
+    Map<String, SegmentSnapshot> snapshotMetadata = snapshotContext != null ? new HashMap<>() : null;
+    boolean metadataTruncated = false;
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
     long numQueryableDocIdsInSnapshot = 0L;
@@ -965,12 +993,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           isSegmentSkipped = true;
           continue;
         }
+        int validDocCount = -1;
+        int queryableDocCount = -1;
         ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
           segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
+          validDocCount = validDocIdsSnapshot.getCardinality();
         }
         if (_deleteRecordColumn != null) {
           ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
@@ -979,9 +1010,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
                 queryableDocIds.getBytesAndCardinality();
             segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
+            queryableDocCount = queryableDocIdsSnapshot.getCardinality();
           }
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
+        metadataTruncated |= addSnapshotMetadata(snapshotMetadata, segment, validDocCount, queryableDocCount);
         numImmutableSegments++;
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
@@ -1014,6 +1047,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
             continue;
           }
+          int validDocCount = -1;
+          int queryableDocCount = -1;
           ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
@@ -1024,6 +1059,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             // from now on, even if persisting the queryableDocIds snapshot below fails.
             _segmentsWithSnapshot.add(segment);
             numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
+            validDocCount = validDocIdsSnapshot.getCardinality();
           }
           if (_deleteRecordColumn != null) {
             ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
@@ -1032,9 +1068,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
                   queryableDocIds.getBytesAndCardinality();
               segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
               numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
+              queryableDocCount = queryableDocIdsSnapshot.getCardinality();
             }
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
+          metadataTruncated |= addSnapshotMetadata(snapshotMetadata, segment, validDocCount, queryableDocCount);
           numImmutableSegments++;
         } catch (Exception e) {
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
@@ -1053,10 +1091,30 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot,
         numTrackedSegments, numConsumingSegments, numUnchangedSegments);
+    if (snapshotContext != null) {
+      UpsertSnapshotMetadataStore.submit(_tableIndexDir,
+          new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, _partitionId,
+              snapshotContext.consumingSegmentName(), snapshotContext.startOffset(), startTimeMs, numTrackedSegments,
+              numConsumingSegments, numUnchangedSegments, metadataTruncated, snapshotMetadata));
+    }
     _logger.info("Finished taking snapshot for {} immutable segments with {} ({} queryable) primary keys "
             + "(out of {} total segments, {} are consuming segments) in {} ms", numImmutableSegments,
         numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static boolean addSnapshotMetadata(@Nullable Map<String, SegmentSnapshot> metadata,
+      ImmutableSegmentImpl segment, int validDocCount, int queryableDocCount) {
+    if (metadata == null || validDocCount < 0) {
+      return false;
+    }
+    if (metadata.size() == UpsertSnapshotMetadataStore.MAX_SEGMENTS) {
+      return true;
+    }
+    metadata.put(segment.getSegmentName(),
+        new SegmentSnapshot(segment.getSegmentMetadata().getCrc(), validDocCount,
+            queryableDocCount >= 0 ? queryableDocCount : null));
+    return false;
   }
 
   private void updateSnapshotMetrics(int numImmutableSegments, long numPrimaryKeysInSnapshot,

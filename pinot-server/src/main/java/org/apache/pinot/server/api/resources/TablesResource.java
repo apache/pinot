@@ -100,6 +100,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata;
+import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadataStore;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -693,6 +695,30 @@ public class TablesResource {
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/upsertSnapshotMetadata/{partitionId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.GET_METADATA)
+  @ApiOperation(value = "Returns the last published upsert snapshot count summary",
+      notes = "Reads diagnostic metadata only; never takes a snapshot. The startup offset is not a verified boundary.")
+  public Map<String, Object> getUpsertSnapshotMetadata(
+      @ApiParam(value = "Table name including type", required = true)
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Partition ID", required = true) @PathParam("partitionId") int partitionId,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, headers);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    if (partitionId < 0) {
+      throw new WebApplicationException("Partition ID must be non-negative", Response.Status.BAD_REQUEST);
+    }
+    UpsertSnapshotMetadata metadata = UpsertSnapshotMetadataStore.read(tableDataManager.getTableDataDir(), partitionId);
+    return metadata == null
+        ? Map.of("availability", "UNAVAILABLE", "partitionId", partitionId)
+        : Map.of("availability", "AVAILABLE", "partitionId", partitionId, "snapshot", metadata);
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
