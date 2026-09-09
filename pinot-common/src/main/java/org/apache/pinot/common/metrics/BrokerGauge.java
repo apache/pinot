@@ -30,13 +30,13 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
   // 1 once startup warmup has completed and readiness may be granted, 0 while still warming. Always 1
   // when warmup is disabled, so dashboards read identically on untouched deployments.
-  BROKER_WARM("brokerWarm", true),
+  STARTUP_WARMUP_COMPLETE("status", true),
   // Number of routable servers (the servers this broker's routable tables route to) that the startup
   // warmup probe tables did NOT, between them, cover. 0 means the probes span every server this broker
-  // routes to. A non-zero value means the default set-cover hit its maxTables cap (raise
-  // pinot.broker.startup.warmup.maxTables) or a custom warmup.tables list omits some servers. Recorded once
-  // per warmup run; not recorded at all when warmup is disabled or finds nothing routable.
-  BROKER_WARMUP_UNCOVERED_SERVERS("servers", true),
+  // routes to. The default auto-select always covers every server, so a non-zero value comes from a custom
+  // warmup.tables list that omits some servers. Recorded once per warmup run; not recorded at all when
+  // warmup is disabled or finds nothing routable.
+  STARTUP_WARMUP_UNCOVERED_SERVERS("servers", true),
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
   UNHEALTHY_SERVERS("servers", true),

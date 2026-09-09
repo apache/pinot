@@ -27,7 +27,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -97,12 +96,18 @@ public class BrokerStartupWarmupIntegrationTest extends BaseClusterIntegrationTe
     String instanceId = _brokerStarters.get(0).getInstanceId();
     TestUtils.waitForCondition(aVoid -> ServiceStatus.getServiceStatus(instanceId) == ServiceStatus.Status.GOOD,
         WARMUP_BUDGET_MS, "Broker with warmup enabled never reported GOOD service status");
+    // Once GOOD, the warmup gate has released: its description is no longer the "warming up" text. (The
+    // composite ServiceStatus description concatenates every callback's "<name>:<desc>;", so it is never
+    // literally "None"; the meaningful assertion is that the warming description is gone.) The full
+    // STARTING -> "Warming up broker data plane" -> GOOD transition is covered deterministically in
+    // BrokerWarmupGateTest, since a healthy cluster warms faster than this poll can observe.
+    Assert.assertFalse(ServiceStatus.getStatusDescription(instanceId).contains("Warming up broker data plane"),
+        "Once GOOD, the warmup gate must no longer report the warming-up description");
   }
 
   @Test
   public void warmUpReachesFloorAgainstLiveServer() {
-    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 5,
-        List.of(), List.of(), 1);
+    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 1);
     boolean reachedFloor = _brokerStarters.get(0).getBrokerRequestHandler()
         .warmUp(config, System.currentTimeMillis() + WARMUP_BUDGET_MS);
     Assert.assertTrue(reachedFloor,
@@ -110,53 +115,28 @@ public class BrokerStartupWarmupIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Test
-  public void warmUpReachesFloorWithMultipleCustomQueries() {
-    // Two distinct query shapes drive the custom-query path (each run every round, then reduced) against a
-    // live server; warmup should reach its probe-count floor before the budget and return true.
-    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 5,
-        List.of("SELECT COUNT(*) FROM " + getTableName(), "SELECT * FROM " + getTableName() + " LIMIT 1"),
-        List.of(), 1);
-    boolean warmed = _brokerStarters.get(0).getBrokerRequestHandler()
-        .warmUp(config, System.currentTimeMillis() + WARMUP_BUDGET_MS);
-    Assert.assertTrue(warmed,
-        "Custom multi-query warmup should reach its floor against a live server within the budget");
-  }
-
-  @Test
   public void warmUpReachesFloorWithConcurrentProbes() {
     // Concurrency 3: probes fire in parallel on a 3-thread pool, exercising the concurrent scatter/gather
     // path the serial arms do not.
-    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 5,
-        List.of(), List.of(), 3);
+    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 3);
     boolean reachedFloor = _brokerStarters.get(0).getBrokerRequestHandler()
         .warmUp(config, System.currentTimeMillis() + WARMUP_BUDGET_MS);
     Assert.assertTrue(reachedFloor, "Concurrent warmup should reach its probe-count floor within the budget");
   }
 
   @Test
-  public void warmUpWithExplicitTableListReachesFloor() {
-    // Custom tables path: filterRoutableTables keeps the configured (routable) table, then the default probe
-    // runs against it. Exercises the hasCustomTables branch that auto-select does not.
-    String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    BrokerWarmupConfig config = new BrokerWarmupConfig(true, WARMUP_BUDGET_MS, WARMUP_MIN_ITERATIONS, 5,
-        List.of(), List.of(offlineTable), 1);
-    boolean reachedFloor = _brokerStarters.get(0).getBrokerRequestHandler()
-        .warmUp(config, System.currentTimeMillis() + WARMUP_BUDGET_MS);
-    Assert.assertTrue(reachedFloor, "Warmup over an explicit table list should reach its floor within the budget");
-  }
-
-  @Test
   public void warmUpReturnsFalseWhenBudgetExpiresBeforeFloor() {
     // An unreachable floor with a short budget must exit on the budget (returning false) and must not hang.
     long shortBudgetMs = 2_000L;
-    BrokerWarmupConfig config = new BrokerWarmupConfig(true, shortBudgetMs, 100_000_000, 5,
-        List.of(), List.of(), 1);
+    BrokerWarmupConfig config = new BrokerWarmupConfig(true, shortBudgetMs, 100_000_000, 1);
     long start = System.currentTimeMillis();
     boolean reachedFloor = _brokerStarters.get(0).getBrokerRequestHandler()
         .warmUp(config, start + shortBudgetMs);
     long elapsed = System.currentTimeMillis() - start;
     Assert.assertFalse(reachedFloor, "Warmup must return false when the budget expires before the floor");
-    Assert.assertTrue(elapsed < shortBudgetMs + 10_000L,
-        "Warmup must return promptly after the budget, not hang (elapsed " + elapsed + " ms)");
+    // Tight bound: with the budget a hard ceiling (each Future.get is bounded by the remaining budget and
+    // stragglers are cancelled), warmUp returns within a small epsilon of the budget, not merely "eventually".
+    Assert.assertTrue(elapsed < shortBudgetMs + 2_000L,
+        "Warmup must return within ~budget, not hang (elapsed " + elapsed + " ms, budget " + shortBudgetMs + ")");
   }
 }

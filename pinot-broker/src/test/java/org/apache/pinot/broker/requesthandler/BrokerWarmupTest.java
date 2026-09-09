@@ -18,10 +18,18 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -43,9 +51,9 @@ import static org.testng.Assert.assertTrue;
 
 
 /// Unit coverage for broker startup warmup: config parsing (including the concurrency and minIterations
-/// knobs and their floors), the no-op interface default, the greedy table selection that keeps warmup
-/// bounded on a large tenant, and the server-coverage check that flags when `maxTables` leaves servers
-/// unprobed.
+/// knobs and their floors), the no-op interface default, the greedy table selection that always covers every
+/// routable server, the static-probe routing decision, the round-robin rotation, the server-coverage gauge,
+/// and the concurrent-round budget semantics.
 public class BrokerWarmupTest {
 
   @Test
@@ -55,12 +63,9 @@ public class BrokerWarmupTest {
     // Defaults still parse, so flipping the flag alone yields sane behavior.
     assertEquals(config.budgetMs(), Broker.DEFAULT_BROKER_STARTUP_WARMUP_BUDGET_MS);
     assertEquals(config.minIterations(), Broker.DEFAULT_BROKER_STARTUP_WARMUP_MIN_ITERATIONS);
-    assertEquals(config.maxTables(), Broker.DEFAULT_BROKER_STARTUP_WARMUP_MAX_TABLES);
     // Concurrency defaults to serial.
     assertEquals(config.concurrency(), Broker.DEFAULT_BROKER_STARTUP_WARMUP_CONCURRENCY);
     assertEquals(config.concurrency(), 1);
-    assertFalse(config.hasCustomQuery());
-    assertFalse(config.hasCustomTables());
   }
 
   @Test
@@ -69,30 +74,25 @@ public class BrokerWarmupTest {
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_ENABLED, true);
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_BUDGET_MS, 4321L);
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_MIN_ITERATIONS, 250);
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_MAX_TABLES, 3);
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_CONCURRENCY, 12);
 
     BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
     assertTrue(config.enabled());
     assertEquals(config.budgetMs(), 4321L);
     assertEquals(config.minIterations(), 250);
-    assertEquals(config.maxTables(), 3);
     assertEquals(config.concurrency(), 12);
   }
 
-  /// concurrency, minIterations and maxTables are floored at 1 even if misconfigured to 0/negative, so the
-  /// probe pool, the exit floor, and the set-cover cap are always valid (maxTables=0 would otherwise make
-  /// auto-select probe nothing and waste the whole budget backing off).
+  /// concurrency and minIterations are floored at 1 even if misconfigured to 0/negative, so the probe pool
+  /// and the exit floor are always valid.
   @Test
-  public void concurrencyMinIterationsAndMaxTablesFlooredAtOne() {
+  public void concurrencyAndMinIterationsFlooredAtOne() {
     PinotConfiguration properties = new PinotConfiguration();
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_CONCURRENCY, 0);
     properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_MIN_ITERATIONS, -5);
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_MAX_TABLES, 0);
     BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
     assertEquals(config.concurrency(), 1);
     assertEquals(config.minIterations(), 1);
-    assertEquals(config.maxTables(), 1);
   }
 
   /// concurrency is clamped to an upper bound so a fat-fingered value cannot ask for a pathological thread
@@ -106,43 +106,13 @@ public class BrokerWarmupTest {
         "concurrency must be clamped into [1, 64] but was " + config.concurrency());
   }
 
-  /// Empty query/tables mean auto-select; a set query wins and a table list parses (trimmed, no blanks).
-  @Test
-  public void queryAndTablesOverridesParse() {
-    PinotConfiguration properties = new PinotConfiguration();
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES, "SELECT count(*) FROM t");
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_TABLES, " a_OFFLINE , b_REALTIME ,");
-    BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
-    assertTrue(config.hasCustomQuery());
-    assertEquals(config.queries(), List.of("SELECT count(*) FROM t"));
-    assertTrue(config.hasCustomTables());
-    assertEquals(config.tables(), List.of("a_OFFLINE", "b_REALTIME"));
-  }
-
-  /// Multiple probe queries separate on ';' (trimmed, no blanks, trailing ';' ignored); a comma inside a
-  /// query does not split it, since ';' is the only separator (comma is the config layer's list delimiter).
-  @Test
-  public void multipleQueriesParseOnSemicolon() {
-    PinotConfiguration properties = new PinotConfiguration();
-    properties.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES,
-        "SELECT count(*) FROM t1 ; SELECT max(x) FROM t2 ;");
-    BrokerWarmupConfig config = BrokerWarmupConfig.from(properties);
-    assertTrue(config.hasCustomQuery());
-    assertEquals(config.queries(), List.of("SELECT count(*) FROM t1", "SELECT max(x) FROM t2"));
-
-    // A single query containing a comma stays one query.
-    PinotConfiguration single = new PinotConfiguration();
-    single.setProperty(Broker.CONFIG_OF_BROKER_STARTUP_WARMUP_QUERIES, "SELECT a, b FROM t");
-    assertEquals(BrokerWarmupConfig.from(single).queries().size(), 1);
-  }
-
   /// A handler that does not override warmUp must report warm immediately. If the default blocked or
   /// returned false, every non-single-stage handler would hold readiness shut forever.
   @Test
   public void defaultWarmUpIsANoOp() {
     BrokerRequestHandler handler = mock(BrokerRequestHandler.class);
     when(handler.warmUp(any(), anyLong())).thenCallRealMethod();
-    assertTrue(handler.warmUp(new BrokerWarmupConfig(true, 1L, 1, 1, List.of(), List.of(), 1),
+    assertTrue(handler.warmUp(new BrokerWarmupConfig(true, 1L, 1, 1),
         System.currentTimeMillis() + 1_000L));
   }
 
@@ -154,7 +124,7 @@ public class BrokerWarmupTest {
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2"), "c_OFFLINE", Set.of("s3")),
         Set.of("s1", "s2", "s3"));
 
-    assertEquals(new java.util.HashSet<>(SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 5)),
+    assertEquals(new java.util.HashSet<>(SingleConnectionBrokerRequestHandler.selectProbeTables(routing)),
         Set.of("a_OFFLINE", "b_OFFLINE", "c_OFFLINE"));
   }
 
@@ -166,65 +136,55 @@ public class BrokerWarmupTest {
         Set.of("s1", "s2"));
 
     // "a_OFFLINE" sorts first and already covers both servers, so nothing else is needed.
-    assertEquals(SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 5), List.of("a_OFFLINE"));
+    assertEquals(SingleConnectionBrokerRequestHandler.selectProbeTables(routing), List.of("a_OFFLINE"));
   }
 
-  /// The cap keeps a tenant with thousands of tables from turning startup into a query storm.
+  /// The one, only behavior: the set-cover always spans EVERY routable server, however many tables that
+  /// needs (there is no cap). The loop still stops at full coverage, so it picks exactly one table per
+  /// server here and no more.
   @Test
-  public void selectionRespectsMaxTables() {
+  public void selectionCoversWideFleet() {
+    // Seven servers, each served by exactly one distinct table: covering all of them needs all seven tables.
     RoutingManager routing = routing(
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2"), "c_OFFLINE", Set.of("s3"),
-            "d_OFFLINE", Set.of("s4")),
-        Set.of("s1", "s2", "s3", "s4"));
+            "d_OFFLINE", Set.of("s4"), "e_OFFLINE", Set.of("s5"), "f_OFFLINE", Set.of("s6"),
+            "g_OFFLINE", Set.of("s7")),
+        Set.of("s1", "s2", "s3", "s4", "s5", "s6", "s7"));
 
-    assertEquals(SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 2).size(), 2);
-    assertTrue(SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 0).isEmpty());
+    List<String> selected = SingleConnectionBrokerRequestHandler.selectProbeTables(routing);
+    assertEquals(selected.size(), 7);
+    assertTrue(SingleConnectionBrokerRequestHandler.uncoveredRoutableServers(routing, selected).isEmpty());
   }
 
   /// Warmup runs before the first query and may legitimately find nothing routable yet.
   @Test
   public void selectionHandlesEmptyCluster() {
-    assertTrue(SingleConnectionBrokerRequestHandler.selectProbeTables(routing(Map.of(), Set.of()), 5).isEmpty());
+    assertTrue(SingleConnectionBrokerRequestHandler.selectProbeTables(routing(Map.of(), Set.of())).isEmpty());
   }
 
   /// Must not blow up on a table whose serving-instance set is empty or unknown.
   @Test
   public void selectionIgnoresTablesWithoutServingInstances() {
     RoutingManager routing = routing(Map.of("a_OFFLINE", Set.of(), "b_OFFLINE", Set.of("s1")), Set.of("s1"));
-    assertEquals(SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 5), List.of("b_OFFLINE"));
+    assertEquals(SingleConnectionBrokerRequestHandler.selectProbeTables(routing), List.of("b_OFFLINE"));
   }
 
-  /// When maxTables caps the set-cover below the tables needed to span the servers, the leftover servers
-  /// are reported as uncovered so the operator can raise maxTables.
+  /// The auto-select set-cover always leaves nothing uncovered -- every routable server is spanned.
   @Test
-  public void coverageDetectsUncoveredServersWhenMaxTablesTooSmall() {
+  public void coverageIsCompleteForAutoSelect() {
     RoutingManager routing = routing(
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2"), "c_OFFLINE", Set.of("s3"),
             "d_OFFLINE", Set.of("s4")),
         Set.of("s1", "s2", "s3", "s4"));
 
-    List<String> selected = SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 2);
-    assertEquals(selected.size(), 2);
-    // Sorted greedy picks a_OFFLINE (s1) and b_OFFLINE (s2); s3 and s4 are left unprobed.
-    assertEquals(SingleConnectionBrokerRequestHandler.uncoveredRoutableServers(routing, selected),
-        Set.of("s3", "s4"));
-  }
-
-  /// A maxTables large enough for the set-cover to span every server leaves nothing uncovered.
-  @Test
-  public void coverageIsCompleteWhenMaxTablesSpansServers() {
-    RoutingManager routing = routing(
-        Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2"), "c_OFFLINE", Set.of("s3"),
-            "d_OFFLINE", Set.of("s4")),
-        Set.of("s1", "s2", "s3", "s4"));
-
-    List<String> selected = SingleConnectionBrokerRequestHandler.selectProbeTables(routing, 5);
+    List<String> selected = SingleConnectionBrokerRequestHandler.selectProbeTables(routing);
     assertTrue(SingleConnectionBrokerRequestHandler.uncoveredRoutableServers(routing, selected).isEmpty());
   }
 
-  /// A custom warmup.tables list that omits a server surfaces that server as uncovered.
+  /// uncoveredRoutableServers surfaces the servers a given table set misses: probing only a_OFFLINE (which
+  /// serves s1) leaves s2 uncovered.
   @Test
-  public void coverageDetectsServersMissingFromCustomTableList() {
+  public void uncoveredRoutableServersIdentifiesMissedServers() {
     RoutingManager routing = routing(
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2")), Set.of("s1", "s2"));
 
@@ -256,6 +216,14 @@ public class BrokerWarmupTest {
     assertEquals(SingleConnectionBrokerRequestHandler.roundRobinBatch(items, Integer.MAX_VALUE, 2).size(), 2);
   }
 
+  /// An empty item list must yield an empty batch, not an ArithmeticException from `floorMod(x, 0)`. Callers
+  /// guard today, but the helper must be safe for a future caller.
+  @Test
+  public void roundRobinBatchOnEmptyListIsEmpty() {
+    assertTrue(SingleConnectionBrokerRequestHandler.roundRobinBatch(List.of(), 0, 4).isEmpty());
+    assertTrue(SingleConnectionBrokerRequestHandler.roundRobinBatch(List.<String>of(), 7, 1).isEmpty());
+  }
+
   /// reportServerCoverage records the uncovered-server count as a gauge: 2 when only one of three servers
   /// is probed, 1 when a server has no table routing to it, 0 when the tables span every server.
   @Test
@@ -267,24 +235,23 @@ public class BrokerWarmupTest {
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2")), Set.of("s1", "s2", "s3"));
     BrokerMetrics metrics = mock(BrokerMetrics.class);
 
-    SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics, false, List.of("a_OFFLINE"));
+    SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics, List.of("a_OFFLINE"));
     // Only s2 uncovered; s3 (no routing) is not this broker's server and is excluded.
-    verify(metrics).setValueOfGlobalGauge(BrokerGauge.BROKER_WARMUP_UNCOVERED_SERVERS, 1L);
+    verify(metrics).setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, 1L);
 
-    SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics, false,
+    SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics,
         List.of("a_OFFLINE", "b_OFFLINE"));
-    verify(metrics).setValueOfGlobalGauge(BrokerGauge.BROKER_WARMUP_UNCOVERED_SERVERS, 0L);
+    verify(metrics).setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, 0L);
 
     RoutingManager full = routing(Map.of("a_OFFLINE", Set.of("s1", "s2")), Set.of("s1", "s2"));
     BrokerMetrics fullMetrics = mock(BrokerMetrics.class);
-    SingleConnectionBrokerRequestHandler.reportServerCoverage(full, fullMetrics, false, List.of("a_OFFLINE"));
-    verify(fullMetrics).setValueOfGlobalGauge(BrokerGauge.BROKER_WARMUP_UNCOVERED_SERVERS, 0L);
+    SingleConnectionBrokerRequestHandler.reportServerCoverage(full, fullMetrics, List.of("a_OFFLINE"));
+    verify(fullMetrics).setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, 0L);
   }
 
-  /// The offline/realtime/hybrid routing decision: a raw name (tableType null) routes every type that
-  /// exists; a type-suffixed name routes only that type; a type with no matching table routes nothing.
-  /// This is the exact matrix that broke the raw-name custom-query probe (both legs set on an offline-only
-  /// table).
+  /// The offline/realtime/hybrid routing decision the probe uses: a type-suffixed name routes only that
+  /// type; a type with no matching table routes nothing. (The untyped/`null` cases are covered too, as a
+  /// general contract of the helper, though the static probe always supplies a type-suffixed name.)
   @Test
   public void probeRoutingDecisionCoversOfflineRealtimeHybrid() {
     TableRouteInfo offlineOnly = route(true, false);
@@ -307,17 +274,111 @@ public class BrokerWarmupTest {
     assertFalse(SingleConnectionBrokerRequestHandler.shouldRouteRealtime(TableType.REALTIME, offlineOnly));
   }
 
-  /// A custom `warmup.tables` list keeps only tables this broker routes, dropping the rest.
+  /// A round collects the latencies of probes that completed with a non-negative value, and silently drops
+  /// a probe that failed (returned -1) or threw. This is the "everything finishes within budget" happy path.
   @Test
-  public void filterRoutableTablesKeepsOnlyRoutable() {
-    RoutingManager routing =
-        routing(Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2")), Set.of("s1", "s2"));
-    assertEquals(SingleConnectionBrokerRequestHandler.filterRoutableTables(routing,
-        List.of("a_OFFLINE", "missing_OFFLINE", "b_OFFLINE")), List.of("a_OFFLINE", "b_OFFLINE"));
-    assertTrue(
-        SingleConnectionBrokerRequestHandler.filterRoutableTables(routing, List.of("nope_OFFLINE")).isEmpty());
+  public void runConcurrentRoundCollectsSuccessfulLatenciesOnly() {
+    ExecutorService pool = Executors.newFixedThreadPool(4);
+    try {
+      long deadline = System.currentTimeMillis() + 5_000L;
+      List<Callable<Long>> tasks = List.of(
+          () -> 10L,
+          () -> -1L,                                       // failed probe: excluded
+          () -> 20L,
+          () -> {
+            throw new RuntimeException("probe blew up");   // threw: excluded, must not fail the round
+          });
+      List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+      assertEquals(new HashSet<>(latencies), Set.of(10L, 20L));
+      assertEquals(latencies.size(), 2);
+    } finally {
+      pool.shutdownNow();
+    }
   }
 
+  /// The budget is a hard ceiling even when more probes are submitted than the pool has threads: probes 2
+  /// and 3 queue behind probe 1, and every probe sleeps far past the budget. The round must return at ~the
+  /// budget (never sum-of-sleeps), collect nothing, and not leave the queued probes to run -- the exact
+  /// overshoot that #1/#2 fixed.
+  @Test
+  public void runConcurrentRoundReturnsByBudgetWhenTasksQueue() {
+    ExecutorService pool = Executors.newFixedThreadPool(1);
+    try {
+      AtomicInteger started = new AtomicInteger(0);
+      List<Callable<Long>> tasks = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        tasks.add(() -> {
+          started.incrementAndGet();
+          Thread.sleep(5_000L);
+          return 1L;
+        });
+      }
+      long deadline = System.currentTimeMillis() + 300L;
+      long start = System.currentTimeMillis();
+      List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+      long elapsed = System.currentTimeMillis() - start;
+      assertTrue(elapsed < 3_000L, "round must return near the 300ms budget, took " + elapsed + "ms");
+      assertTrue(latencies.isEmpty(), "no 5s probe can finish within a 300ms budget");
+      // Only the head-of-queue probe ever ran; the two queued behind it were cancelled, not fired. (<=2
+      // rather than ==1 only to tolerate the microsecond window where probe 1's interrupt frees the single
+      // pool thread before cancelAll marks probe 2 cancelled.)
+      assertTrue(started.get() <= 2, "queued probes must not run past the budget, started=" + started.get());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /// A deadline already in the past collects nothing and returns at once -- it never waits on a submitted
+  /// probe. Guards the loop's leading remaining-budget check.
+  @Test
+  public void runConcurrentRoundWithExpiredDeadlineCollectsNothing() {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      List<Callable<Long>> tasks = List.of(() -> 1L, () -> 2L);
+      List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool,
+          System.currentTimeMillis() - 1L);
+      assertTrue(latencies.isEmpty());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /// Interrupting the thread running the round (shutdown mid-warmup) must end it promptly -- not wait out the
+  /// in-flight probes -- return what it had, and preserve the interrupt status so the warmup loop above it
+  /// sees the interrupt and stops.
+  @Test
+  public void runConcurrentRoundReturnsPromptlyWhenInterrupted() throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      List<Callable<Long>> tasks = List.of(
+          () -> {
+            Thread.sleep(10_000L);
+            return 1L;
+          },
+          () -> {
+            Thread.sleep(10_000L);
+            return 2L;
+          });
+      // Deadline far off, so only the interrupt -- not the budget -- can end the round.
+      long deadline = System.currentTimeMillis() + 30_000L;
+      AtomicReference<List<Long>> result = new AtomicReference<>();
+      AtomicBoolean interruptPreserved = new AtomicBoolean(false);
+      Thread runner = new Thread(() -> {
+        List<Long> r = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+        result.set(r);
+        interruptPreserved.set(Thread.currentThread().isInterrupted());
+      });
+      runner.start();
+      Thread.sleep(200L);   // let it enter Future.get()
+      runner.interrupt();
+      runner.join(3_000L);
+      assertFalse(runner.isAlive(), "interrupt must end the round promptly, not wait 10s for the probes");
+      assertTrue(result.get().isEmpty());
+      assertTrue(interruptPreserved.get(), "interrupt status must be re-set for the caller loop to observe");
+    } finally {
+      pool.shutdownNow();
+    }
+  }
 
   private static TableRouteInfo route(boolean hasOffline, boolean hasRealtime) {
     TableRouteInfo routeInfo = mock(TableRouteInfo.class);
