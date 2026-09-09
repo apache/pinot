@@ -148,7 +148,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// How often the pre-connect thread re-checks whether Helix has converged. Short enough not to add
   /// meaningful delay to a fast startup, long enough not to hammer the Helix data accessor.
   private static final long HELIX_CONVERGENCE_POLL_INTERVAL_MS = 200L;
-  /// How long shutdown waits for an interrupted startup thread (warmup / pre-connect) to unwind before
+  /// How long shutdown waits for the interrupted warmup thread to unwind before
   /// giving up on it. Bounds the teardown race without letting a stuck thread hold up shutdown.
   private static final long STARTUP_THREAD_JOIN_TIMEOUT_MS = 1_000L;
   /// Readiness description reported while the warmup gate holds the broker at STARTING. Shared with tests so
@@ -1078,10 +1078,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     interruptAndJoin(_warmupThread, "broker warmup");
   }
 
-  /// Interrupts an in-flight pre-connect and joins briefly so shutdown does not race it, but never waits on
-  /// it beyond the short join: the thread is a daemon that records its metric in a `finally` regardless.
+  /// Interrupts an in-flight pre-connect so shutdown never waits on it. Interrupt-only (no join) so this
+  /// PR leaves the already-merged pre-connect feature's shutdown behaviour unchanged; the join added for
+  /// warmup applies to the warmup thread only. Best effort: the thread is a daemon that records its metric
+  /// in a `finally` regardless.
   private void stopPreConnect() {
-    interruptAndJoin(_preConnectThread, "startup server pre-connect");
+    Thread thread = _preConnectThread;
+    if (thread != null && thread.isAlive()) {
+      LOGGER.info("Interrupting in-flight startup server pre-connect for shutdown");
+      thread.interrupt();
+    }
   }
 
   /// Interrupts `thread` (if alive) and waits up to [#STARTUP_THREAD_JOIN_TIMEOUT_MS] for it to unwind.

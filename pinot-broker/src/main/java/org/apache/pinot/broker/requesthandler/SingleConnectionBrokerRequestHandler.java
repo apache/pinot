@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -176,28 +178,55 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   public boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
     // Stage 1: local, no-network warmup of the compile + response-serialization paths, run before the
     // network probe so they are warm even if no server is reachable. Looped enough to JIT the serialization
-    // path (a single pass leaves it interpreted), but capped well below the network-probe depth floor and
-    // deadline-guarded so it stays a quick prelude and never eats the budget the network probe needs.
+    // path (a single pass leaves it interpreted): minIterations iterations, capped at 2000
+    // (LOCAL_WARMUP_MAX_ITERATIONS -- so the cap only bites if minIterations is raised above 2000) and
+    // deadline-guarded, so it stays a quick prelude and never eats the budget the network probe needs.
     warmUpLocal(Math.min(config.minIterations(), LOCAL_WARMUP_MAX_ITERATIONS), deadlineMs);
     int concurrency = Math.max(1, config.concurrency());
     ExecutorService probePool = Executors.newFixedThreadPool(concurrency,
         new ThreadFactoryBuilder().setNameFormat("broker-warmup-probe-%d").setDaemon(true).build());
+    // Tables at least one probe actually reached the servers for (probe() adds to it from the pool threads,
+    // so it must be thread-safe). Read below to report per-server coverage -- only AFTER the pool drains, so
+    // no in-flight probe is still writing it.
+    Set<String> probedTables = ConcurrentHashMap.newKeySet();
     try {
-      return warmUpNetwork(config, deadlineMs, probePool, concurrency);
+      return warmUpNetwork(config, deadlineMs, probePool, concurrency, probedTables);
     } catch (Exception e) {
       LOGGER.warn("Broker warmup failed; proceeding without it", e);
       return false;
     } finally {
       probePool.shutdownNow();
+      awaitPoolDrain(probePool, PROBE_POOL_SHUTDOWN_WAIT_MS);
+      // Pool drained: probedTables is now stable. Report which routable servers this run warmed (0 on a
+      // clean floor exit; non-zero if the budget expired before the round-robin reached every server).
+      // Guarded so this finally can never make warmUp throw (the interface contract is "never throws").
       try {
-        // Wait briefly for interrupted probe workers to unwind before returning, so a probe cannot outlive
-        // warmUp() and race the request handler being torn down on shutdown. Bounded, so shutdown never hangs
-        // on a stuck probe.
-        if (!probePool.awaitTermination(PROBE_POOL_SHUTDOWN_WAIT_MS, TimeUnit.MILLISECONDS)) {
-          LOGGER.debug("Warmup probe pool did not fully terminate within {} ms; proceeding",
-              PROBE_POOL_SHUTDOWN_WAIT_MS);
-        }
-      } catch (InterruptedException e) {
+        reportServerCoverage(_routingManager, _brokerMetrics, probedTables);
+      } catch (Exception e) {
+        LOGGER.debug("Warmup coverage report failed (continuing)", e);
+      }
+    }
+  }
+
+  /// Waits up to `waitMs` for `pool` to terminate after a `shutdownNow`, so an interrupted probe worker
+  /// unwinds before `warmUp` returns and cannot race the request handler being torn down on shutdown.
+  ///
+  /// Crucially this **saves and clears** the interrupt flag around the wait. On the shutdown path the warmup
+  /// thread is interrupted (`stopWarmup` -> `interrupt`), and `awaitTermination` is interruptible -- with the
+  /// flag set it throws `InterruptedException` on entry and waits 0ms, skipping the drain on exactly the path
+  /// it exists for. Clearing the flag lets the bounded wait actually happen; the flag is restored afterwards.
+  /// Static and package-private so the interrupted-path behavior is unit-testable.
+  @VisibleForTesting
+  static void awaitPoolDrain(ExecutorService pool, long waitMs) {
+    boolean interrupted = Thread.interrupted();
+    try {
+      if (!pool.awaitTermination(waitMs, TimeUnit.MILLISECONDS)) {
+        LOGGER.debug("Warmup probe pool did not fully terminate within {} ms; proceeding", waitMs);
+      }
+    } catch (InterruptedException e) {
+      interrupted = true;
+    } finally {
+      if (interrupted) {
         Thread.currentThread().interrupt();
       }
     }
@@ -239,9 +268,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   /// readiness gate well past the budget.
   ///
   /// Static and package-private so the budget / cancellation / interrupt semantics can be unit-tested with
-  /// injected probe callables, without a live cluster.
+  /// injected probe callables, without a live cluster. `firstProbeThrowLogged` is a 1-element per-run latch
+  /// so a probe that *throws* is surfaced once for the whole warmup run, not once per round.
   @VisibleForTesting
-  static List<Long> runConcurrentRound(List<Callable<Long>> tasks, ExecutorService pool, long deadlineMs) {
+  static List<Long> runConcurrentRound(List<Callable<Long>> tasks, ExecutorService pool, long deadlineMs,
+      boolean[] firstProbeThrowLogged) {
     List<Future<Long>> futures = new ArrayList<>(tasks.size());
     for (Callable<Long> task : tasks) {
       futures.add(pool.submit(task));
@@ -264,9 +295,17 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         Thread.currentThread().interrupt();
         cancelAll(futures, i);
         return latencies;
+      } catch (ExecutionException e) {
+        // The probe task itself threw (not a timeout). It does not count; surface the first one of the whole
+        // run so a consistently broken probe is diagnosable without a debug rebuild.
+        if (!firstProbeThrowLogged[0]) {
+          firstProbeThrowLogged[0] = true;
+          LOGGER.warn("Broker warmup probe threw (further occurrences suppressed)", e.getCause());
+        }
+        future.cancel(true);
       } catch (Exception e) {
-        // Individual probe failed or overran the budget; it does not count, and is cancelled so it does not
-        // keep running behind the next round (no-op if it already completed).
+        // TimeoutException (probe overran the remaining budget) or CancellationException: expected, does not
+        // count, and is cancelled so it does not keep running behind the next round (no-op if already done).
         future.cancel(true);
       }
     }
@@ -298,17 +337,19 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   /// after a handful of iterations while the code is still only partially compiled, so latency is a false
   /// early-exit signal.
   private boolean warmUpNetwork(BrokerWarmupConfig config, long deadlineMs, ExecutorService pool,
-      int concurrency) {
+      int concurrency, Set<String> probedTables) {
     long successfulProbes = 0;
     int rounds = 0;
     // Select the probe tables once and reuse them across rounds. Only re-select while the result is empty
     // (routing not populated yet); recomputing the greedy set-cover every round would repeat O(tables) work
     // up to minIterations times on a large-table tenant, for a result that does not change once non-empty.
     List<String> tables = List.of();
-    boolean coverageReported = false;
     // Monotonic across rounds so the round-robin actually advances through every covered table even at
     // concurrency 1; resetting per round would probe only the first `concurrency` tables forever.
     int probeSeq = 0;
+    boolean reachedFloor = false;
+    // Per-run latch so a probe that throws is logged once for the whole run, not once per round.
+    boolean[] firstProbeThrowLogged = new boolean[1];
     while (System.currentTimeMillis() < deadlineMs && !Thread.currentThread().isInterrupted()) {
       if (tables.isEmpty()) {
         tables = selectProbeTables(_routingManager);
@@ -321,11 +362,6 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         }
         continue;
       }
-      if (!coverageReported) {
-        // Report once, now that the probe tables are settled, whether they route to every server.
-        coverageReported = true;
-        reportServerCoverage(_routingManager, _brokerMetrics, tables);
-      }
       if (System.currentTimeMillis() >= deadlineMs) {
         break;
       }
@@ -336,10 +372,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       // task that queued behind the pool cannot overrun the budget.
       List<Callable<Long>> tasks = new ArrayList<>(concurrency);
       for (String tableNameWithType : roundRobinBatch(tables, probeSeq, concurrency)) {
-        tasks.add(() -> probeWithinDeadline(compileProbe(tableNameWithType), deadlineMs));
+        tasks.add(() -> probeWithinDeadline(compileProbe(tableNameWithType), deadlineMs, probedTables));
       }
       probeSeq += concurrency;
-      List<Long> latencies = runConcurrentRound(tasks, pool, deadlineMs);
+      List<Long> latencies = runConcurrentRound(tasks, pool, deadlineMs, firstProbeThrowLogged);
       if (latencies.isEmpty()) {
         if (!warmupBackoff()) {
           return false;
@@ -348,10 +384,16 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       }
       successfulProbes += latencies.size();
       if (successfulProbes >= config.minIterations()) {
-        LOGGER.info("Broker warmup completed after {} round(s) at concurrency {}; {} probes (floor {})", rounds,
-            concurrency, successfulProbes, config.minIterations());
-        return true;
+        reachedFloor = true;
+        break;
       }
+    }
+    // Coverage is reported by the caller after the pool drains (probedTables must be stable). Here we only
+    // signal floor vs. budget.
+    if (reachedFloor) {
+      LOGGER.info("Broker warmup completed after {} round(s) at concurrency {}; {} probes (floor {})", rounds,
+          concurrency, successfulProbes, config.minIterations());
+      return true;
     }
     logBudgetExpiry(rounds, concurrency, successfulProbes, config.minIterations());
     return false;
@@ -380,14 +422,16 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   /// and a queued task may not start until much of the budget is already gone; deriving the timeout here
   /// (rather than when the round was built) is what keeps the budget a hard ceiling. Returns -1 (uncounted)
   /// if the budget is already spent when the task starts, so no probe is fired past the deadline.
-  private long probeWithinDeadline(BrokerRequest brokerRequest, long deadlineMs) {
+  private long probeWithinDeadline(BrokerRequest brokerRequest, long deadlineMs, Set<String> probedTables) {
     long timeoutMs = Math.min(deadlineMs - System.currentTimeMillis(), WARMUP_PROBE_TIMEOUT_MS);
-    return timeoutMs <= 0 ? -1 : probe(brokerRequest, timeoutMs);
+    return timeoutMs <= 0 ? -1 : probe(brokerRequest, timeoutMs, probedTables);
   }
 
   /// Issues one probe query through [QueryRouter] and returns its wall-clock duration in ms, or -1 on
-  /// failure. Builds the route the same way the normal path does, minus auth/quota/logging.
-  private long probe(BrokerRequest brokerRequest, long timeoutMs) {
+  /// failure. Builds the route the same way the normal path does, minus auth/quota/logging. When at least
+  /// one server responds, records the (type-suffixed) table name in `probedTables` so the caller can tell,
+  /// at exit, which routable servers were actually warmed.
+  private long probe(BrokerRequest brokerRequest, long timeoutMs, Set<String> probedTables) {
     String tableName = brokerRequest.getQuerySource().getTableName();
     try {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -434,6 +478,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       // selector starting with no per-server history at all.
       AsyncQueryResponse response = _queryRouter.submitQuery(requestId, rawTableName, routeInfo, timeoutMs);
       Map<ServerRoutingInstance, ServerResponse> finalResponses = response.getFinalResponses();
+      // Coverage: if at least one server returned data, this table's servers were reached this run. A table
+      // whose servers all timed out is deliberately NOT recorded, so it counts as uncovered at exit.
+      for (ServerResponse serverResponse : finalResponses.values()) {
+        if (serverResponse.getDataTable() != null) {
+          probedTables.add(tableName);
+          break;
+        }
+      }
       // Best-effort: also warm the broker reduce path (result discarded) so the first real query of this
       // shape does not pay it. Isolated in its own try -- reduceOnDataTable requires a QueryThreadContext
       // and could fail for edge cases; a reduce failure must never fail the probe, since the
@@ -523,21 +575,29 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     return selected;
   }
 
-  /// Records [BrokerGauge#STARTUP_WARMUP_UNCOVERED_SERVERS] -- the routable servers the chosen probe tables
-  /// do not route to. Since [#selectProbeTables] always spans every routable server, this is normally 0; it
-  /// is emitted as an observability signal confirming full coverage (and would flag a coverage regression).
-  /// Static (taking its collaborators as parameters) so the gauge emission is unit-testable against a mocked
-  /// [RoutingManager] and [BrokerMetrics].
+  /// Records [BrokerGauge#STARTUP_WARMUP_UNCOVERED_SERVERS] on warmup exit: the routable servers that
+  /// `probedTables` (the tables at least one probe actually reached this run) do NOT, between them, route
+  /// to. The set-cover guarantees the *selected* tables span every server, so this is `0` when warmup reaches
+  /// its floor (every table probed); it goes non-zero only when warmup exits early -- the budget expired, or
+  /// servers were too slow, before the round-robin reached every table.
+  ///
+  /// It is a warmup **completeness** signal, not "these servers are stone cold": the broker's serve-path JIT
+  /// is warmed per-JVM (not per-server) and channels are opened by pre-connect, so an unreached server is
+  /// only marginally colder. Read a non-zero value as "warmup ran out of budget before its intended
+  /// coverage", most meaningful alongside whether the floor was reached.
+  ///
+  /// Uncovered is derived from a single [#routableServers] read (via [#uncoveredRoutableServers]) so the
+  /// count is self-consistent. Static (collaborators as parameters) so the emission is unit-testable against
+  /// a mocked [RoutingManager] and [BrokerMetrics].
   @VisibleForTesting
   static void reportServerCoverage(RoutingManager routingManager, BrokerMetrics brokerMetrics,
-      List<String> tables) {
-    int totalServers = routableServers(routingManager).size();
-    Set<String> uncovered = uncoveredRoutableServers(routingManager, tables);
+      Collection<String> probedTables) {
+    Set<String> uncovered = uncoveredRoutableServers(routingManager, probedTables);
     brokerMetrics.setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, uncovered.size());
     if (!uncovered.isEmpty()) {
-      LOGGER.warn("Broker warmup probes {} table(s) covering {}/{} routable server(s); {} unexpectedly left "
-          + "unprobed: {}", tables.size(), totalServers - uncovered.size(), totalServers, uncovered.size(),
-          uncovered);
+      LOGGER.warn("Broker warmup did not reach {} routable server(s) before it exited (budget expired or "
+          + "servers too slow): {}. Serve-path JIT is warmed regardless; those servers are only marginally "
+          + "colder.", uncovered.size(), uncovered);
     }
   }
 

@@ -25,8 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -224,8 +226,9 @@ public class BrokerWarmupTest {
     assertTrue(SingleConnectionBrokerRequestHandler.roundRobinBatch(List.<String>of(), 7, 1).isEmpty());
   }
 
-  /// reportServerCoverage records the uncovered-server count as a gauge: 2 when only one of three servers
-  /// is probed, 1 when a server has no table routing to it, 0 when the tables span every server.
+  /// reportServerCoverage records, at exit, the servers left cold given the tables actually probed: 1 when
+  /// only one of two servers' tables was probed (the other missed, e.g. budget expired first), 0 when every
+  /// server's table was probed. A cluster server no routable table routes to is excluded from the universe.
   @Test
   public void reportServerCoverageRecordsUncoveredGauge() {
     // s3 is in the cluster-wide server map but NO table routes to it -- another tenant's server. The
@@ -235,10 +238,11 @@ public class BrokerWarmupTest {
         Map.of("a_OFFLINE", Set.of("s1"), "b_OFFLINE", Set.of("s2")), Set.of("s1", "s2", "s3"));
     BrokerMetrics metrics = mock(BrokerMetrics.class);
 
+    // Only a_OFFLINE was probed (b_OFFLINE never reached -- budget expired) -> s2 left cold; s3 excluded.
     SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics, List.of("a_OFFLINE"));
-    // Only s2 uncovered; s3 (no routing) is not this broker's server and is excluded.
     verify(metrics).setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, 1L);
 
+    // Both tables probed -> every server warmed.
     SingleConnectionBrokerRequestHandler.reportServerCoverage(routing, metrics,
         List.of("a_OFFLINE", "b_OFFLINE"));
     verify(metrics).setValueOfGlobalGauge(BrokerGauge.STARTUP_WARMUP_UNCOVERED_SERVERS, 0L);
@@ -288,7 +292,8 @@ public class BrokerWarmupTest {
           () -> {
             throw new RuntimeException("probe blew up");   // threw: excluded, must not fail the round
           });
-      List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+      List<Long> latencies =
+          SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline, new boolean[1]);
       assertEquals(new HashSet<>(latencies), Set.of(10L, 20L));
       assertEquals(latencies.size(), 2);
     } finally {
@@ -315,7 +320,8 @@ public class BrokerWarmupTest {
       }
       long deadline = System.currentTimeMillis() + 300L;
       long start = System.currentTimeMillis();
-      List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+      List<Long> latencies =
+          SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline, new boolean[1]);
       long elapsed = System.currentTimeMillis() - start;
       assertTrue(elapsed < 3_000L, "round must return near the 300ms budget, took " + elapsed + "ms");
       assertTrue(latencies.isEmpty(), "no 5s probe can finish within a 300ms budget");
@@ -336,7 +342,7 @@ public class BrokerWarmupTest {
     try {
       List<Callable<Long>> tasks = List.of(() -> 1L, () -> 2L);
       List<Long> latencies = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool,
-          System.currentTimeMillis() - 1L);
+          System.currentTimeMillis() - 1L, new boolean[1]);
       assertTrue(latencies.isEmpty());
     } finally {
       pool.shutdownNow();
@@ -364,7 +370,7 @@ public class BrokerWarmupTest {
       AtomicReference<List<Long>> result = new AtomicReference<>();
       AtomicBoolean interruptPreserved = new AtomicBoolean(false);
       Thread runner = new Thread(() -> {
-        List<Long> r = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline);
+        List<Long> r = SingleConnectionBrokerRequestHandler.runConcurrentRound(tasks, pool, deadline, new boolean[1]);
         result.set(r);
         interruptPreserved.set(Thread.currentThread().isInterrupted());
       });
@@ -375,6 +381,38 @@ public class BrokerWarmupTest {
       assertFalse(runner.isAlive(), "interrupt must end the round promptly, not wait 10s for the probes");
       assertTrue(result.get().isEmpty());
       assertTrue(interruptPreserved.get(), "interrupt status must be re-set for the caller loop to observe");
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  /// The probe-pool drain must actually wait even when the caller's interrupt flag is set -- the state
+  /// shutdown leaves the warmup thread in. A busy task that ignores interrupts stands in for a probe
+  /// mid-flight: a naive `awaitTermination` would throw immediately on the interrupt flag and skip the
+  /// drain, leaving the pool un-terminated; the save-and-clear must let the wait complete and restore the
+  /// flag. This is the shutdown path #17 was about.
+  @Test
+  public void awaitPoolDrainWaitsForTasksEvenWhenCallerInterrupted() throws Exception {
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      CountDownLatch started = new CountDownLatch(1);
+      pool.submit(() -> {
+        started.countDown();
+        long end = System.currentTimeMillis() + 300L;
+        while (System.currentTimeMillis() < end) {
+          // Busy-wait that deliberately ignores interrupts, standing in for a probe mid-flight.
+        }
+      });
+      assertTrue(started.await(2, TimeUnit.SECONDS));
+      pool.shutdownNow();                   // interrupts the (interrupt-ignoring) task
+      Thread.currentThread().interrupt();   // as stopWarmup() leaves the warmup thread on shutdown
+
+      SingleConnectionBrokerRequestHandler.awaitPoolDrain(pool, 5_000L);
+
+      // Flag restored (and cleared here so it does not leak to other tests); and the drain actually waited
+      // for the task rather than returning 0ms on the interrupt flag.
+      assertTrue(Thread.interrupted(), "the interrupt flag must be restored");
+      assertTrue(pool.isTerminated(), "drain must wait for the task, not skip on the interrupt flag");
     } finally {
       pool.shutdownNow();
     }
