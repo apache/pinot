@@ -18,77 +18,44 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Publishes self-contained count summaries independently of recovery bitmaps. One daemon writes at most eight
-/// queued summaries, each capped at [#MAX_SEGMENTS] entries. No bitmap bytes or segment objects are retained.
-/// Submission never waits for disk I/O or queue capacity; overload loses diagnostic coverage, not ingestion progress.
+/// Synchronously persists compact partition context at the end of an existing startup snapshot attempt.
+/// Atomic file replacement allows concurrent readers. Diagnostic write failures leave recovery bitmaps untouched.
 public final class UpsertSnapshotMetadataStore {
   public static final String ENABLE_SNAPSHOT_METADATA = "enableSnapshotMetadata";
-  static final int MAX_SEGMENTS = 10_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertSnapshotMetadataStore.class);
-  private static final ThreadPoolExecutor WRITER = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
-      new ArrayBlockingQueue<>(8),
-      new ThreadFactoryBuilder().setDaemon(true).setNameFormat("upsert-snapshot-metadata-%d").build());
 
   private UpsertSnapshotMetadataStore() {
   }
 
-  static void submit(File tableIndexDir, UpsertSnapshotMetadata metadata) {
-    submit(tableIndexDir, metadata, WRITER);
-  }
-
-  @VisibleForTesting
-  static boolean submit(File tableIndexDir, UpsertSnapshotMetadata metadata, Executor executor) {
+  static void persist(File tableIndexDir, UpsertSnapshotMetadata metadata) {
     try {
-      executor.execute(() -> {
-        try {
-          persist(tableIndexDir, metadata);
-        } catch (Exception e) {
-          LOGGER.warn("Could not persist upsert snapshot metadata for table directory: {}, partition: {}",
-              tableIndexDir, metadata.partitionId(), e);
-        }
-      });
-      return true;
-    } catch (RejectedExecutionException e) {
-      LOGGER.warn("Skipping upsert snapshot metadata for table directory: {}, partition: {}: writer queue is full",
-          tableIndexDir, metadata.partitionId());
-      return false;
+      File target = getMetadataFile(tableIndexDir, metadata.partitionId());
+      // Do not create a table directory that may have been removed.
+      File temporary = File.createTempFile(target.getName(), ".tmp", tableIndexDir);
+      try {
+        Files.write(temporary.toPath(), JsonUtils.objectToBytes(metadata));
+        Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+      } finally {
+        Files.deleteIfExists(temporary.toPath());
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Could not persist upsert snapshot metadata for table directory: {}, partition: {}",
+          tableIndexDir, metadata.partitionId(), e);
     }
   }
 
-  @VisibleForTesting
-  static void persist(File tableIndexDir, UpsertSnapshotMetadata metadata)
-      throws IOException {
-    File target = getMetadataFile(tableIndexDir, metadata.partitionId());
-    // Do not create the table directory: the table may have been removed since capture.
-    File temporary = File.createTempFile(target.getName(), ".tmp", tableIndexDir);
-    try {
-      Files.write(temporary.toPath(), JsonUtils.objectToBytes(metadata));
-      Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE,
-          StandardCopyOption.REPLACE_EXISTING);
-    } finally {
-      Files.deleteIfExists(temporary.toPath());
-    }
-  }
-
-  /// Returns the last successfully published summary, which can predate newer bitmap snapshots or a restart.
-  /// Missing, malformed and unsupported summaries are unavailable, never evidence of agreement or divergence.
+  /// Returns the last successfully persisted context, which can predate newer bitmap snapshots or a restart.
+  /// Missing, malformed and unsupported metadata is unavailable, never evidence of agreement or divergence.
   @Nullable
   public static UpsertSnapshotMetadata read(File tableIndexDir, int partitionId) {
     File file = getMetadataFile(tableIndexDir, partitionId);

@@ -701,7 +701,7 @@ public class TablesResource {
   @Path("/tables/{tableNameWithType}/upsertSnapshotMetadata/{partitionId}")
   @Produces(MediaType.APPLICATION_JSON)
   @Authorize(targetType = TargetType.TABLE, action = Actions.Table.GET_METADATA)
-  @ApiOperation(value = "Returns the last published upsert snapshot count summary",
+  @ApiOperation(value = "Returns the last persisted upsert snapshot partition context",
       notes = "Reads diagnostic metadata only; never takes a snapshot. The startup offset is not a verified boundary.")
   public Map<String, Object> getUpsertSnapshotMetadata(
       @ApiParam(value = "Table name including type", required = true)

@@ -50,7 +50,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata;
-import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata.SegmentSnapshot;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -92,8 +91,7 @@ public class TablesResourceTest extends BaseResourceTest {
     String path = "/tables/" + REALTIME_TABLE_NAME + "/upsertSnapshotMetadata/0";
     JsonNode missing = JsonUtils.stringToJsonNode(_webTarget.path(path).request().get(String.class));
     assertEquals(missing.get("availability").asText(), "UNAVAILABLE");
-    UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 0, "table__0__2__100", "5000", 1000,
-        2, 1, 0, false, Map.of("segment", new SegmentSnapshot("123", 10, null)));
+    UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 0, "table__0__2__100", "5000", 1000);
     File file = new File(_tableDataManagerMap.get(REALTIME_TABLE_NAME).getTableDataDir(),
         "upsert.snapshot.metadata.partition.0.json");
     FileUtils.writeByteArrayToFile(file, JsonUtils.objectToBytes(metadata));
@@ -101,9 +99,8 @@ public class TablesResourceTest extends BaseResourceTest {
       JsonNode available = JsonUtils.stringToJsonNode(_webTarget.path(path).request().get(String.class));
       assertEquals(available.get("availability").asText(), "AVAILABLE");
       assertEquals(available.get("snapshot").get("boundaryStatus").asText(), "UNVERIFIED");
-      assertEquals(available.get("snapshot").get("segments").get("segment").get("validDocCount").asInt(), 10);
-      // This count comes from the sidecar even though no loaded segment named "segment" exists.
-      assertFalse(_realtimeIndexSegments.stream().anyMatch(segment -> segment.getSegmentName().equals("segment")));
+      assertEquals(available.get("snapshot").get("startOffset").asText(), "5000");
+      assertFalse(available.get("snapshot").has("segments"));
       try (Response response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/upsertSnapshotMetadata/-1")
           .request().get()) {
         assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());

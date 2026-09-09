@@ -83,7 +83,7 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testSnapshotMetadataKeepsCountsAndContextTogether()
+  public void testSnapshotMetadataStoresStartupContextSynchronously()
       throws Exception {
     UpsertContext context = mock(UpsertContext.class);
     when(context.isSnapshotEnabled()).thenReturn(true);
@@ -105,30 +105,39 @@ public class BasePartitionUpsertMetadataManagerTest {
       manager.trackSegment(segment);
       manager.trackSegmentForSnapshot(segment);
       manager.takeSnapshot("table__0__1__100", "10");
-      TestUtils.waitForCondition(aVoid -> UpsertSnapshotMetadataStore.read(TEMP_DIR, 0) != null, 5000L,
-          "Snapshot metadata was not published");
       UpsertSnapshotMetadata first = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
       assertEquals(first.startOffset(), "10");
-      assertEquals(first.segments().get("segment").validDocCount(), 3);
-      assertEquals(first.segments().get("segment").queryableDocCount(), Integer.valueOf(2));
+      assertEquals(first.consumingSegmentName(), "table__0__1__100");
       assertEquals(first.getBoundaryStatus(), "UNVERIFIED");
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(),
+          2);
 
       segment.getValidDocIds().remove(0);
-      assertEquals(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().get("segment").validDocCount(), 3);
       manager._updatedSegmentsSinceLastSnapshot.add(segment);
       when(segmentLock.tryLock()).thenReturn(false);
       manager.takeSnapshot("table__0__2__200", "20");
-      TestUtils.waitForCondition(aVoid -> {
-        UpsertSnapshotMetadata metadata = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
-        return metadata != null && metadata.startOffset().equals("20");
-      }, 5000L, "Skipped snapshot attempt was not published");
-      assertTrue(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().isEmpty());
+      UpsertSnapshotMetadata second = UpsertSnapshotMetadataStore.read(TEMP_DIR, 0);
+      assertEquals(second.startOffset(), "20");
+      // Partition context does not certify that each bitmap was captured in this attempt.
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
 
-      // A later manual snapshot must not reuse the startup context or publish misleading diagnostic counts.
+      // A later manual snapshot must not reuse the startup context.
       when(segmentLock.tryLock()).thenReturn(true);
       manager.takeSnapshot();
-      assertTrue(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0).segments().isEmpty());
+      assertEquals(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0), second);
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+
+      // Failing the extra metadata write must not prevent bitmap snapshot persistence.
+      File metadataFile = new File(TEMP_DIR, "upsert.snapshot.metadata.partition.0.json");
+      FileUtils.forceDelete(metadataFile);
+      FileUtils.forceMkdir(metadataFile);
+      FileUtils.touch(new File(metadataFile, "block-replacement"));
+      segment.getValidDocIds().remove(1);
+      manager._updatedSegmentsSinceLastSnapshot.add(segment);
+      manager.takeSnapshot("table__0__3__300", "30");
+      assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 1);
+      assertNull(UpsertSnapshotMetadataStore.read(TEMP_DIR, 0));
     } finally {
       manager.stop();
       manager.close();

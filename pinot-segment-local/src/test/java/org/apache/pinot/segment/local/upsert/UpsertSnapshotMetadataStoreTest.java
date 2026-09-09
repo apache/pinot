@@ -20,14 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata.SegmentSnapshot;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -39,26 +32,23 @@ import static org.testng.Assert.assertTrue;
 
 public class UpsertSnapshotMetadataStoreTest {
   @Test
-  public void testSelfContainedSummaryAndCompatibility()
+  public void testCompactContextIsImmediatelyAvailableAndCompatible()
       throws Exception {
     File directory = Files.createTempDirectory("upsert-snapshot-metadata").toFile();
     try {
       assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
-      Map<String, SegmentSnapshot> counts = new HashMap<>();
-      counts.put("segment", new SegmentSnapshot("123", 10, null));
-      UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 3, "table__3__2__100", "5000", 1000,
-          2, 1, 0, false, counts);
-      counts.clear();
+      UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 3, "table__3__2__100", "5000", 1000);
       UpsertSnapshotMetadataStore.persist(directory, metadata);
       assertEquals(UpsertSnapshotMetadataStore.read(directory, 3), metadata);
-      assertNull(UpsertSnapshotMetadataStore.read(directory, 3).segments().get("segment").queryableDocCount());
+      assertEquals(JsonUtils.objectToJsonNode(metadata).size(), 6);
+      assertFalse(JsonUtils.objectToJsonNode(metadata).has("segments"));
       assertEquals(JsonUtils.objectToJsonNode(metadata).get("boundaryStatus").asText(), "UNVERIFIED");
 
       // A future status must not turn a version-1 observation into a verified boundary.
       String json = JsonUtils.objectToString(metadata).replace("UNVERIFIED", "VERIFIED");
       assertEquals(JsonUtils.stringToObject(json, UpsertSnapshotMetadata.class).getBoundaryStatus(), "UNVERIFIED");
       UpsertSnapshotMetadataStore.persist(directory,
-          new UpsertSnapshotMetadata(2, 3, "table__3__2__100", "5000", 1000, 2, 1, 0, false, Map.of()));
+          new UpsertSnapshotMetadata(2, 3, "table__3__2__100", "5000", 1000));
       assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
       File file = new File(directory, "upsert.snapshot.metadata.partition.3.json");
       Files.writeString(file.toPath(), "{truncated");
@@ -68,36 +58,23 @@ public class UpsertSnapshotMetadataStoreTest {
     }
   }
 
-  @Test(timeOut = 10_000)
-  public void testFullQueueDropsDiagnosticWithoutWaitingForWriter()
+  @Test
+  public void testWriteFailureIsBestEffortAndCleansTemporaryFile()
       throws Exception {
-    File directory = Files.createTempDirectory("upsert-snapshot-queue").toFile();
-    CountDownLatch writerStarted = new CountDownLatch(1);
-    CountDownLatch releaseWriter = new CountDownLatch(1);
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1));
+    File directory = Files.createTempDirectory("upsert-snapshot-write-failure").toFile();
     try {
-      executor.execute(() -> {
-        writerStarted.countDown();
-        try {
-          releaseWriter.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-      });
-      assertTrue(writerStarted.await(5, TimeUnit.SECONDS));
-      UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 0, "segment", "10", 1000,
-          0, 0, 0, false, Map.of());
-      assertTrue(UpsertSnapshotMetadataStore.submit(directory, metadata, executor));
-      assertFalse(UpsertSnapshotMetadataStore.submit(directory, metadata, executor));
+      UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(1, 0, "segment", "10", 1000);
+      File target = new File(directory, "upsert.snapshot.metadata.partition.0.json");
+      assertTrue(target.mkdir());
+      Files.writeString(new File(target, "block-replacement").toPath(), "keep");
+      UpsertSnapshotMetadataStore.persist(directory, metadata);
+      assertTrue(target.isDirectory());
+      assertEquals(directory.list().length, 1);
       assertNull(UpsertSnapshotMetadataStore.read(directory, 0));
-      releaseWriter.countDown();
-      executor.shutdown();
-      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
-      assertEquals(UpsertSnapshotMetadataStore.read(directory, 0), metadata);
+      File missingDirectory = new File(directory, "removed-table");
+      UpsertSnapshotMetadataStore.persist(missingDirectory, metadata);
+      assertFalse(missingDirectory.exists());
     } finally {
-      releaseWriter.countDown();
-      executor.shutdownNow();
-      executor.awaitTermination(5, TimeUnit.SECONDS);
       FileUtils.deleteDirectory(directory);
     }
   }

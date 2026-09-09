@@ -19,33 +19,19 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.Map;
-import javax.annotation.Nullable;
 
 
-/// Immutable diagnostic counts from one existing startup snapshot attempt. Only segments successfully written in
-/// this attempt are included; unchanged, skipped and consuming segments are not assigned the new capture context.
-/// Counts belong to this summary and must never be combined with a newer bitmap file or live count.
+/// Immutable partition context for an existing startup snapshot attempt. Contains no segment information or counts.
+/// This context is not bound to individual bitmap files, which may be skipped, unchanged or subsequently overwritten.
 ///
 /// The startup offset is an observation, not a verified boundary: predecessor reconciliation and background
 /// mutations can overlap capture. Version 1 deliberately cannot certify replica divergence, even at equal offsets.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String consumingSegmentName,
-                                    String startOffset, long capturedAtMillis, int numTrackedSegments,
-                                    int numConsumingSegments, int numUnchangedSegments, boolean truncated,
-                                    Map<String, SegmentSnapshot> segments) {
+                                    String startOffset, long capturedAtMillis) {
   public static final int FORMAT_VERSION = 1;
-
-  public UpsertSnapshotMetadata {
-    segments = Map.copyOf(segments);
-  }
 
   public String getBoundaryStatus() {
     return "UNVERIFIED";
-  }
-
-  /// Counts and document-ID space of one persisted segment snapshot. A missing queryable count is not zero.
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public record SegmentSnapshot(String segmentCrc, int validDocCount, @Nullable Integer queryableDocCount) {
   }
 }

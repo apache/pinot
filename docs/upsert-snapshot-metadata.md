@@ -17,12 +17,16 @@
     under the License.
 -->
 
-# Upsert snapshot count metadata
+# Upsert snapshot partition context
 
-An optional server-local sidecar records the counts written during an existing startup snapshot attempt.
-It helps explain count differences between replicas by exposing the observed startup offset and which
-segments were captured. Version 1 always reports `boundaryStatus: UNVERIFIED`. Equal startup offsets do
-not prove comparable state: predecessor replacement, replay and background cleanup may still differ.
+An optional server-local sidecar records the partition context of an existing startup snapshot attempt.
+It contains the triggering consumer, its observed start offset, and the capture-attempt start time.
+There is no per-segment inventory, CRC, or document count. Payload size does not grow with the number
+of tracked or captured segments.
+
+Version 1 always reports `boundaryStatus: UNVERIFIED`. Equal startup offsets do not prove comparable
+state: predecessor replacement, replay and background cleanup may still differ. This partition context
+is not bound to individual bitmap files or separately fetched counts.
 
 Enable it through the table's existing upsert metadata-manager configuration:
 
@@ -39,21 +43,20 @@ Enable it through the table's existing upsert metadata-manager configuration:
 ```
 
 `enableSnapshotMetadata` defaults to false. Both the on-heap manager and managers extending the base
-partition implementation can use it. There is no new work in per-record ingestion, no additional bitmap
-serialization and no wait for predecessor reconciliation. Capture adds bounded per-segment count objects;
-a single background writer serializes JSON and atomically replaces one file per partition:
+partition implementation can use it. At the end of the existing startup snapshot attempt, the consuming
+thread synchronously serializes the compact context and atomically replaces one file per partition:
 
 ```text
 <table data directory>/upsert.snapshot.metadata.partition.<partitionId>.json
 ```
 
-The writer queue holds at most eight summaries; a summary contains at most 10,000 segment entries.
-Larger captures set `truncated: true`. A full queue drops the new diagnostic summary without waiting.
-Publication failure preserves any previous summary. CPU, allocation and disk overhead still need to be
-measured before enabling the feature for a production workload. Recovery bitmap files and their write
-ordering are unchanged. The sidecar is not uploaded to deep store.
+There is no background writer, queue, per-record work, additional bitmap serialization, or wait for
+predecessor reconciliation. The extra serialization and file I/O complete before the next consumer starts
+reading records. A failed metadata write is logged and leaves the bitmap snapshots intact. The API can
+continue to return a previous context if replacement fails. Recovery bitmap write ordering is unchanged.
+The sidecar is not uploaded to deep store. Manual or shutdown snapshots do not reuse a startup offset.
 
-Read the last successfully published summary through the server API:
+Read the last successfully persisted context through the server API:
 
 ```http
 GET /tables/orders_REALTIME/upsertSnapshotMetadata/3
@@ -70,19 +73,16 @@ The snapshot contains:
 | `formatVersion` | Serialization version; version 1 cannot certify a logical boundary. |
 | `partitionId`, `consumingSegmentName`, `startOffset` | Partition and triggering consumer's observed starting offset. The offset is opaque and is not proof that preceding effects are reconciled. |
 | `capturedAtMillis` | Capture-attempt start time for diagnosing age, not cross-replica alignment. |
-| `numTrackedSegments`, `numConsumingSegments`, `numUnchangedSegments` | Existing snapshot-loop counts explaining omitted coverage. |
-| `truncated` | Whether the diagnostic entry limit omitted successfully captured segments. |
-| `segments` | Segment name to content CRC, captured valid-doc count and optional queryable-doc count. |
 | `boundaryStatus` | Always `UNVERIFIED` in version 1. |
 
-Only successful writes from this attempt appear in `segments`. Skipped and unchanged snapshots are not
-relabeled with a newer offset. A missing queryable count is not zero. Counts in this summary are
-self-contained historical observations: never pair its context with today's bitmap or a live count.
-They can remain available after restart or after the original segment was removed. No bitmap-integrity
-hash or historical bitmap retention is required for this count-only diagnostic artifact.
+Individual bitmap files may have been skipped or unchanged during the recorded attempt, or overwritten
+later. Consumers must not label those files or their counts with this partition offset. SRT may display
+whether replicas report different partition startup contexts, but that does not establish the cause of
+a separately observed segment-count difference or make matching contexts comparable.
 
-This first version retains only the last published attempt per partition. It deliberately defers common
-boundary verification, lifecycle instrumentation, cleanup/configuration fingerprints, history, membership
-digests, and controller scheduling. Consumers must treat missing or unverified evidence as unavailable for
+This first version retains only the last persisted attempt per partition. It defers binding context to
+per-segment snapshots, common boundary verification, lifecycle instrumentation, cleanup/configuration
+fingerprints, history, membership digests, and controller scheduling. Consumers must treat missing or
+unverified evidence as unavailable for
 a definitive divergence verdict, not as agreement. A raw count-disagreement metric remains an operational
 observation and must not be presented as a verified divergence alarm.
