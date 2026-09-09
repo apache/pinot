@@ -3016,17 +3016,17 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         continue;
       }
 
-      // Non-pauseless consumers can retry independently. Waiting for every replica to fail leaves a single failed
-      // partition replica unavailable indefinitely. Preserve the pauseless policy above and reset only ERROR replicas:
-      // resetting healthy replicas alongside them can remove the last serving copy during recovery.
-      if (status != Status.IN_PROGRESS || !isPauselessTable
-          || segmentsInErrorStateInAllReplicas.contains(segmentName)) {
-        Map<String, String> idealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
-        for (Map.Entry<String, String> entry : segmentToInstanceCurrentStateMap.get(segmentName).entrySet()) {
-          if (SegmentStateModel.ERROR.equals(entry.getValue()) && idealStateMap.containsKey(entry.getKey())) {
-            _helixResourceManager.resetSegment(realtimeTableName, segmentName, entry.getKey());
-          }
-        }
+      // 2) For IN_PROGRESS segments where all replicas are in ERROR, issue a reset to allow ERROR->OFFLINE and retry
+      if (status == Status.IN_PROGRESS && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
+        LOGGER.info("Resetting IN_PROGRESS segment: {} in table: {} since all replicas are in ERROR state.",
+            segmentName, realtimeTableName);
+        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+        continue;
+      }
+
+      // 3) For all other non-IN_PROGRESS statuses with any ERROR replica, trigger a reset to download/refresh
+      if (status != Status.IN_PROGRESS) {
+        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
 

@@ -230,15 +230,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
-    } catch (RuntimeException e) {
-      // Acquisition can fail before executeInternal() installs its error handler. Return an error block so that all
-      // callers, including hybrid multi-stage queries, propagate the failure instead of serving a partial response.
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-      InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
-      instanceResponse.addException(QueryErrorCode.QUERY_EXECUTION,
-          "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
-      LOGGER.error("Exception acquiring segments for requestId: {}", requestId, e);
-      return instanceResponse;
     }
 
     if (LOGGER.isDebugEnabled()) {

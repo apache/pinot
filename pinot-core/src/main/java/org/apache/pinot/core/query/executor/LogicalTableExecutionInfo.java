@@ -52,19 +52,11 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
     List<TableSegmentsContext> tableSegmentsContexts = queryRequest.getTableSegmentsContexts();
     List<SingleTableExecutionInfo> tableExecutionInfos =
         new ArrayList<>(Objects.requireNonNull(tableSegmentsContexts).size());
-    try {
-      for (TableSegmentsContext tableSegmentsContext : tableSegmentsContexts) {
-        SingleTableExecutionInfo singleTableExecutionInfo =
-            SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
-                tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
-        tableExecutionInfos.add(singleTableExecutionInfo);
-      }
-    } catch (TableNotFoundException | RuntimeException | Error e) {
-      // A later table can reject acquisition (e.g. failed realtime metadata). Release earlier tables' query references.
-      for (SingleTableExecutionInfo tableExecutionInfo : tableExecutionInfos) {
-        tableExecutionInfo.releaseSegmentDataManagers();
-      }
-      throw e;
+    for (TableSegmentsContext tableSegmentsContext : tableSegmentsContexts) {
+      SingleTableExecutionInfo singleTableExecutionInfo =
+          SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
+              tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
+      tableExecutionInfos.add(singleTableExecutionInfo);
     }
 
     return new LogicalTableExecutionInfo(tableExecutionInfos);
