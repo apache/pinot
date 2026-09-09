@@ -41,7 +41,7 @@ public class UnionOperator extends SetOperator {
 
   private MseBlock _eosBlock = null;
   private int _currentOperatorIndex = 0;
-  private final Set<Record> _seenRecords = new ObjectOpenHashSet<>();
+  private Set<Record> _seenRecords = new ObjectOpenHashSet<>();
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> inputOperators, DataSchema dataSchema) {
@@ -60,11 +60,13 @@ public class UnionOperator extends SetOperator {
       MseBlock block = currentOperator.nextBlock();
       if (block.isError()) {
         _eosBlock = block;
+        releaseBuffers();
         return block;
       } else if (block.isSuccess()) {
         _currentOperatorIndex++;
         if (_currentOperatorIndex == _inputOperators.size()) {
           _eosBlock = block;
+          releaseBuffers();
           return block;
         }
       } else if (block.isData()) {
@@ -102,5 +104,19 @@ public class UnionOperator extends SetOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  /// Replaces `_seenRecords` with a fresh, empty set rather than clearing it: `ObjectOpenHashSet.clear()` nulls the
+  /// entries but deliberately keeps the key table at the capacity it grew to, and for a de-duplicating UNION that
+  /// table is sized by the full distinct cardinality of every input. Safe to swap because [#getNextBlock()] returns
+  /// the cached `_eosBlock` without touching the set once it is set, and it is set before every release.
+  @Override
+  protected void releaseBuffers() {
+    _seenRecords = new ObjectOpenHashSet<>();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_seenRecords.isEmpty();
   }
 }

@@ -34,14 +34,12 @@ public class ZstdCodecDefinitionTest {
 
   @Test
   public void testEmptyInputRoundTrip() throws Exception {
-    ByteBuffer encoded = CODEC.encode(OPTIONS, CONTEXT, ByteBuffer.allocateDirect(0));
+    ByteBuffer encoded = ByteBuffer.allocateDirect(CODEC.maxEncodedSize(OPTIONS, CONTEXT, 0));
+    CODEC.encode(OPTIONS, CONTEXT, ByteBuffer.allocateDirect(0), encoded);
     assertTrue(encoded.hasRemaining(), "An empty input should still produce a Zstd frame");
 
-    ByteBuffer decoded = CODEC.decode(OPTIONS, CONTEXT, encoded.duplicate());
-    assertEquals(decoded.remaining(), 0);
-
     ByteBuffer destination = ByteBuffer.allocateDirect(0);
-    CODEC.decodeInto(OPTIONS, CONTEXT, encoded.duplicate(), destination);
+    CODEC.decode(OPTIONS, CONTEXT, encoded.duplicate(), destination);
     assertEquals(destination.position(), 0);
     assertEquals(destination.limit(), 0);
     assertEquals(destination.remaining(), 0);

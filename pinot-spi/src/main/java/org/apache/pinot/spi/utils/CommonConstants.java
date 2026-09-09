@@ -434,6 +434,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+
+    // When enabled, once Helix converges at startup the broker opens a Netty channel to every (server,
+    // table type) it routes to -- including the TLS handshake when broker->server TLS is on -- so the
+    // first real query does not pay the blocking connect on its critical path. Runs on a background
+    // thread and is bounded by CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS; channels that do not make
+    // it fall back to the lazy path. On by default; set to false to restore the pure lazy-connect path,
+    // whose behaviour is then unchanged.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED =
+        "pinot.broker.startup.preconnect.enabled";
+    public static final boolean DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED = true;
+    // Upper bound on the whole pre-connect step so a slow or unreachable server cannot delay it
+    // indefinitely; channels not connected within the budget fall back to the lazy path.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS =
+        "pinot.broker.startup.preconnect.timeoutMs";
+    public static final long DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS = 30_000L;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     // Config for number of threads to use for Broker reduce-phase.
@@ -977,6 +992,9 @@ public class CommonConstants {
         // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
+        // NOTE: Aggregations are counted here no matter whether they are referenced in the SELECT list, the HAVING
+        //       clause or the ORDER-BY clause, so a query that projects no aggregation but orders by (or filters on)
+        //       a filtered one is also covered.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
 
         // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
@@ -2745,11 +2763,20 @@ public class CommonConstants {
 
     /// Max number of rows operators stored in the op stats cache.
     /// Although the cache stores stages, each entry has a weight equal to the number of operators in the stage.
+    ///
+    /// @deprecated No longer read. The op stats cache it sized was removed once its only reader disappeared;
+    /// the key is kept so existing configurations keep starting.
+    @Deprecated
     public static final String KEY_OF_OP_STATS_CACHE_SIZE = "pinot.server.query.op.stats.cache.size";
+    @Deprecated
     public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 10000;
 
     /// Max time to keep the op stats in the cache.
+    ///
+    /// @deprecated No longer read. See [#KEY_OF_OP_STATS_CACHE_SIZE].
+    @Deprecated
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
+    @Deprecated
     public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 600 * 1000;
 
     /// Max number of cancelled queries to keep in the cache.

@@ -34,7 +34,7 @@ import org.xerial.snappy.Snappy;
 /// The name {@value #NAME} is a frozen on-disk API contract stored verbatim in segment file
 /// headers. It must never be changed or reused for a different algorithm.
 ///
-/// Note: [#decodeInto()] requires a direct [ByteBuffer] for `dst` because the
+/// Note: [#decode()] requires a direct [ByteBuffer] for `dst` because the
 /// Snappy JNI `uncompress(ByteBuffer, ByteBuffer)` overload requires both buffers to be direct.
 /// Also, that JNI overload writes at `dst.position()` but does *not* advance it; the
 /// returned byte count is used to set `dst.limit()` explicitly.
@@ -87,58 +87,28 @@ final class SnappyCodecDefinition implements ChunkCodecHandler<SnappyCodecDefini
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+    if (!dst.isDirect()) {
+      throw new IllegalArgumentException("Snappy encode requires a direct destination buffer");
+    }
+    dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
     try {
       int maxSize = Snappy.maxCompressedLength(directSrc.remaining());
-      out = ByteBuffer.allocateDirect(maxSize);
-      int compressedSize = Snappy.compress(directSrc, out);
-      out.limit(compressedSize);
-      out.position(0);
-      succeeded = true;
-      return out;
+      if (maxSize > dst.capacity()) {
+        throw new IllegalArgumentException(
+            "Snappy: encoded size bound " + maxSize + " exceeds dst capacity " + dst.capacity());
+      }
+      int compressedSize = Snappy.compress(directSrc, dst);
+      dst.limit(compressedSize);
+      dst.position(0);
     } finally {
       CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
     }
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
-    // Snappy JNI requires direct buffers — convert before reading the size header so the heap
-    // fallback path actually works (Snappy.uncompressedLength does not accept heap input).
-    ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
-    try {
-      int decompressedSize = CodecBufferUtils.checkDeclaredDecompressedSize(
-          Snappy.uncompressedLength(directSrc.duplicate()), "Snappy", "varint length header");
-      out = ByteBuffer.allocateDirect(decompressedSize);
-      // Snappy JNI writes at dst.position() but does NOT advance it; use returned count to set limit
-      int written = Snappy.uncompress(directSrc, out);
-      if (written != decompressedSize) {
-        throw new IOException(
-            "Snappy decode size mismatch: expected " + decompressedSize + ", got " + written
-                + ". Segment may be corrupt.");
-      }
-      out.limit(written);
-      out.position(0);
-      succeeded = true;
-      return out;
-    } finally {
-      CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
-    }
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
     dst.clear();
     // Snappy JNI requires direct buffers — convert before reading the size header.
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
@@ -164,12 +134,12 @@ final class SnappyCodecDefinition implements ChunkCodecHandler<SnappyCodecDefini
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     return Snappy.maxCompressedLength(inputSize);
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return true;
   }
 }

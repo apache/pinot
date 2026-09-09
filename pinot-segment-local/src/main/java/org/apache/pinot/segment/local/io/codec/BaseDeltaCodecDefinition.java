@@ -67,13 +67,13 @@ abstract class BaseDeltaCodecDefinition<O extends CodecOptions> implements Chunk
   }
 
   @Override
-  public final int maxEncodedSize(O options, int inputSize) {
+  public final int maxEncodedSize(O options, CodecContext ctx, int inputSize) {
     // Passthrough: output is exactly the same size as the input (no header).
     return inputSize;
   }
 
   @Override
-  public final boolean requiresDirectDstBuffer() {
+  public final boolean requiresDirectDecodeDstBuffer() {
     return false;
   }
 
@@ -82,28 +82,29 @@ abstract class BaseDeltaCodecDefinition<O extends CodecOptions> implements Chunk
   public abstract O parseOptions(List<String> args);
 
   @Override
-  public final ByteBuffer encode(O options, CodecContext ctx, ByteBuffer src) {
+  public final void encode(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
+    dst.clear();
     int elementSize = elementSize(ctx, src.remaining());
     int count = src.remaining() / elementSize;
-    return elementSize == Long.BYTES ? encodeLong(src, count) : encodeInt(src, count);
-  }
-
-  @Override
-  public final ByteBuffer decode(O options, CodecContext ctx, ByteBuffer src) {
-    // The persisted transform layout is always big-endian, independent of the byte order on a
-    // caller-provided view. duplicate() also keeps the caller's position/limit untouched.
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
-    int elementSize = elementSize(ctx, src.remaining());
-    int count = src.remaining() / elementSize;
-    if (count == 0) {
-      return ByteBuffer.allocateDirect(0);
+    int encodedSize = count * elementSize;
+    if (encodedSize > dst.capacity()) {
+      throw new IllegalArgumentException(
+          name() + ": encoded size " + encodedSize + " exceeds dst capacity " + dst.capacity());
     }
-    return elementSize == Long.BYTES ? decodeLong(src, count) : decodeInt(src, count);
+    if (count > 0) {
+      if (elementSize == Long.BYTES) {
+        encodeLongInto(src, count, dst);
+      } else {
+        encodeIntInto(src, count, dst);
+      }
+    }
+    dst.flip();
   }
 
   @Override
-  public final void decodeInto(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
+  public final void decode(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     int elementSize = elementSize(ctx, src.remaining());
     int count = src.remaining() / elementSize;
@@ -144,13 +145,9 @@ abstract class BaseDeltaCodecDefinition<O extends CodecOptions> implements Chunk
   // All operate on a header-less, same-width array of `count` values.
   // -------------------------------------------------------------------------
 
-  protected abstract ByteBuffer encodeInt(ByteBuffer src, int count);
+  protected abstract void encodeIntInto(ByteBuffer src, int count, ByteBuffer dst);
 
-  protected abstract ByteBuffer encodeLong(ByteBuffer src, int count);
-
-  protected abstract ByteBuffer decodeInt(ByteBuffer src, int count);
-
-  protected abstract ByteBuffer decodeLong(ByteBuffer src, int count);
+  protected abstract void encodeLongInto(ByteBuffer src, int count, ByteBuffer dst);
 
   protected abstract void decodeIntInto(ByteBuffer src, int count, ByteBuffer dst);
 

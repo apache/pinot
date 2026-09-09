@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -31,12 +32,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class ImmutableOpenStructDataSourceTest {
@@ -62,8 +58,26 @@ public class ImmutableOpenStructDataSourceTest {
         null);
 
     assertSame(ds.getDataSource("clicks"), clicksDs);
-    // absent key with mock sparse (no real forward index) returns null
-    assertNull(ds.getDataSource("unknown"));
+    // Absent key with mock sparse (no real forward index) resolves to an all-null STRING source
+    DataSource unknownDs = ds.getDataSource("unknown");
+    assertTrue(unknownDs instanceof NullDataSource);
+    assertEquals(unknownDs.getDataSourceMetadata().getDataType(), DataType.STRING);
+  }
+
+  /// A key absent from the whole segment is described by its declared child field spec, including a custom default
+  /// null value.
+  @Test
+  public void testAbsentDeclaredKeyReadsDeclaredDefault() {
+    ComplexFieldSpec spec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true,
+        Map.of("score", new DimensionFieldSpec("score", DataType.STRING, true, "N/A")));
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(spec, Map.of(), null, 7, null);
+
+    DataSource scoreDs = ds.getDataSource("score");
+    assertTrue(scoreDs instanceof NullDataSource);
+    assertEquals(scoreDs.getDataSourceMetadata().getDataType(), DataType.STRING);
+    assertEquals(scoreDs.getDataSourceMetadata().getNumDocs(), 7);
+    assertEquals(scoreDs.getDictionary().get(0), "N/A");
+    assertEquals(scoreDs.getNullValueVector().getNullBitmap().getCardinality(), 7);
   }
 
   @Test
@@ -153,7 +167,7 @@ public class ImmutableOpenStructDataSourceTest {
         null);
 
     assertSame(ds.getDataSourceMetadata("clicks"), clicksMeta);
-    assertNull(ds.getDataSourceMetadata("absent"));
+    assertEquals(ds.getDataSourceMetadata("absent").getDataType(), DataType.STRING);
   }
 
   @Test
@@ -235,7 +249,7 @@ public class ImmutableOpenStructDataSourceTest {
     assertTrue(regionDs instanceof SparseKeyDataSource);
     assertEquals(regionDs.getForwardIndex().getString(0, null), "us");
     assertSame(ds.getDataSource("region"), regionDs);
-    assertNull(ds.getDataSource("nope"));
+    assertTrue(ds.getDataSource("nope") instanceof NullDataSource);
     assertFalse(ds.isMaterialized("region"));
     assertFalse(ds.isFullyMaterialized());
   }

@@ -1269,6 +1269,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _routableServerInstanceMap;
   }
 
+  @Override
+  public Set<String> getRoutableTables() {
+    return Set.copyOf(_routingEntryMap.keySet());
+  }
+
   /// Must be called under `_globalLock.writeLock()` when rebuilding `_routableServerInstanceMap` from a freshly
   /// computed set of routable server IDs.
   @GuardedBy("_globalLock.writeLock()")

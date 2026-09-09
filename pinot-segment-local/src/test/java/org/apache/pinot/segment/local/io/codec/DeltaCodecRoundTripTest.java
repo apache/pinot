@@ -133,13 +133,13 @@ public class DeltaCodecRoundTripTest {
     misaligned.put((byte) 1).put((byte) 2).put((byte) 3).flip();
 
     IllegalArgumentException encodeException = expectThrows(IllegalArgumentException.class,
-        () -> executor.encode(misaligned.duplicate()));
+        () -> CodecTestUtils.encode(executor, misaligned.duplicate()));
     assertTrue(encodeException.getMessage().contains("not a multiple of element size"),
         encodeException.getMessage());
 
     ByteBuffer dst = ByteBuffer.allocateDirect(Integer.BYTES);
     IllegalArgumentException decodeException = expectThrows(IllegalArgumentException.class,
-        () -> executor.decode(misaligned.duplicate(), dst, Integer.BYTES));
+        () -> CodecTestUtils.decode(executor, misaligned.duplicate(), dst, Integer.BYTES));
     assertTrue(decodeException.getMessage().contains("not a multiple of element size"),
         decodeException.getMessage());
   }
@@ -152,16 +152,11 @@ public class DeltaCodecRoundTripTest {
       src.putInt(value);
     }
     src.flip();
-    ByteBuffer encoded = executor.encode(src.duplicate());
-
-    // Allocating decode path.
-    int[] decoded = readInts(executor.decode(encoded.duplicate()), values.length);
-    assertTrue(Arrays.equals(decoded, values),
-        describeMismatch(spec, Arrays.toString(values), Arrays.toString(decoded)));
+    ByteBuffer encoded = CodecTestUtils.encode(executor, src.duplicate());
 
     // Bounded decode-into path (the segment-reader entry point).
     ByteBuffer dst = ByteBuffer.allocateDirect(decodedSize);
-    executor.decode(encoded.duplicate(), dst, decodedSize);
+    CodecTestUtils.decode(executor, encoded.duplicate(), dst, decodedSize);
     int[] decodedInto = readInts(dst, values.length);
     assertTrue(Arrays.equals(decodedInto, values),
         describeMismatch(spec, Arrays.toString(values), Arrays.toString(decodedInto)));
@@ -175,16 +170,11 @@ public class DeltaCodecRoundTripTest {
       src.putLong(value);
     }
     src.flip();
-    ByteBuffer encoded = executor.encode(src.duplicate());
-
-    // Allocating decode path.
-    long[] decoded = readLongs(executor.decode(encoded.duplicate()), values.length);
-    assertTrue(Arrays.equals(decoded, values),
-        describeMismatch(spec, Arrays.toString(values), Arrays.toString(decoded)));
+    ByteBuffer encoded = CodecTestUtils.encode(executor, src.duplicate());
 
     // Bounded decode-into path (the segment-reader entry point).
     ByteBuffer dst = ByteBuffer.allocateDirect(decodedSize);
-    executor.decode(encoded.duplicate(), dst, decodedSize);
+    CodecTestUtils.decode(executor, encoded.duplicate(), dst, decodedSize);
     long[] decodedInto = readLongs(dst, values.length);
     assertTrue(Arrays.equals(decodedInto, values),
         describeMismatch(spec, Arrays.toString(values), Arrays.toString(decodedInto)));
@@ -192,13 +182,8 @@ public class DeltaCodecRoundTripTest {
 
   private static void assertIntDecodeFixture(String spec, byte[] encoded, int[] expected) throws IOException {
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, INT_CTX, CodecRegistry.DEFAULT);
-    int[] decoded = readInts(
-        executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected.length);
-    assertTrue(Arrays.equals(decoded, expected),
-        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
-
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Integer.BYTES);
-    executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
+    CodecTestUtils.decode(executor, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
     int[] decodedInto = readInts(dst, expected.length);
     assertTrue(Arrays.equals(decodedInto, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));
@@ -206,13 +191,8 @@ public class DeltaCodecRoundTripTest {
 
   private static void assertLongDecodeFixture(String spec, byte[] encoded, long[] expected) throws IOException {
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, LONG_CTX, CodecRegistry.DEFAULT);
-    long[] decoded = readLongs(
-        executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected.length);
-    assertTrue(Arrays.equals(decoded, expected),
-        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
-
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Long.BYTES);
-    executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
+    CodecTestUtils.decode(executor, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
     long[] decodedInto = readLongs(dst, expected.length);
     assertTrue(Arrays.equals(decodedInto, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -225,7 +226,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     }
 
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
+    CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, null);
     return new GlobalPlanImplV0(
         new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
   }
@@ -395,7 +396,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     }
 
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamer);
+    CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, streamer);
     return new GlobalPlanImplV0(
         new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
   }
@@ -409,6 +410,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     } else {
       return makeSegmentPlanNode(segmentContext, queryContext);
     }
+  }
+
+  /// Returns the combine plan node placed above the segment plan nodes, for both the streaming and the
+  /// non-streaming instance plan. `streamer` is null for a non-streaming query.
+  ///
+  /// Which combine operator that node builds is decided inside [CombinePlanNode] itself, per query type, so an
+  /// implementation substituting one query type does not have to reproduce the dispatch for the others.
+  protected CombinePlanNode createCombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext,
+      ExecutorService executorService, @Nullable ResultsBlockStreamer streamer) {
+    return new CombinePlanNode(planNodes, queryContext, executorService, streamer);
   }
 
   /// In-place rewrite QueryContext based on the information from local IndexSegment.

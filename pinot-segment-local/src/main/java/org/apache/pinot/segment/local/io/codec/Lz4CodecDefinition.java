@@ -94,53 +94,29 @@ final class Lz4CodecDefinition implements ChunkCodecHandler<Lz4CodecDefinition.O
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
-    // LZ4 JNI requires both buffers be direct; mirror the Snappy/Zstd defensive copy.
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+    if (!dst.isDirect()) {
+      throw new IllegalArgumentException("LZ4 encode requires a direct destination buffer");
+    }
+    dst.clear();
+    // LZ4 JNI requires both buffers be direct. Production callers already supply direct input;
+    // copy heap input when necessary without taking ownership of the caller's source buffer.
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
     try {
       int maxSize = Native.COMPRESSOR.maxCompressedLength(directSrc.remaining());
-      out = ByteBuffer.allocateDirect(maxSize);
-      Native.COMPRESSOR.compress(directSrc, out);
-      out.flip();
-      succeeded = true;
-      return out;
+      if (maxSize > dst.capacity()) {
+        throw new IllegalArgumentException(
+            "LZ4: encoded size bound " + maxSize + " exceeds dst capacity " + dst.capacity());
+      }
+      Native.COMPRESSOR.compress(directSrc, dst);
+      dst.flip();
     } finally {
       CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
     }
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
-    ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
-    try {
-      int decompressedLength = CodecBufferUtils.checkDeclaredDecompressedSize(
-          LZ4DecompressorWithLength.getDecompressedLength(directSrc), "LZ4", "length prefix");
-      out = ByteBuffer.allocateDirect(decompressedLength);
-      Native.DECOMPRESSOR.decompress(directSrc, out);
-      if (out.position() != decompressedLength) {
-        throw new IOException("LZ4 decoded " + out.position() + " bytes but expected " + decompressedLength
-            + ". Segment may be corrupt.");
-      }
-      out.flip();
-      succeeded = true;
-      return out;
-    } finally {
-      CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
-    }
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
     dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
     try {
@@ -162,13 +138,13 @@ final class Lz4CodecDefinition implements ChunkCodecHandler<Lz4CodecDefinition.O
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     // LZ4CompressorWithLength adds a 4-byte length prefix before the compressed payload
     return Native.FACTORY.fastCompressor().maxCompressedLength(inputSize) + Integer.BYTES;
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return false;
   }
 }

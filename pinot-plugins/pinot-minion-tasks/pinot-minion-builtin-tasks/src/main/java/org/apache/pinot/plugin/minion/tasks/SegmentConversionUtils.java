@@ -126,6 +126,10 @@ public class SegmentConversionUtils {
         retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
     RetryPolicy retryPolicy =
         RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
+    String socketTimeoutMsConfig = configs.get(MinionConstants.SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS_KEY);
+    int socketTimeoutMs =
+        socketTimeoutMsConfig != null ? Integer.parseInt(socketTimeoutMsConfig)
+            : HttpClient.DEFAULT_SOCKET_TIMEOUT_MS;
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -143,7 +147,7 @@ public class SegmentConversionUtils {
         try {
           SimpleHttpResponse response =
               fileUploadDownloadClient.uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
-                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  socketTimeoutMs);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
@@ -178,6 +182,14 @@ public class SegmentConversionUtils {
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
       boolean forceCleanup)
       throws Exception {
+    return startSegmentReplace(tableNameWithType, uploadURL, startReplaceSegmentsRequest, authProvider, forceCleanup,
+        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static String startSegmentReplace(String tableNameWithType, String uploadURL,
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
+      boolean forceCleanup, int socketTimeoutMs)
+      throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -185,7 +197,8 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(),
           forceCleanup);
       SimpleHttpResponse response =
-          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider);
+          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider,
+              socketTimeoutMs);
       String responseString = response.getResponse();
       LOGGER.info(
           "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",

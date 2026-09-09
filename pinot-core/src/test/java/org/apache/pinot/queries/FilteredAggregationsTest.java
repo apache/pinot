@@ -478,4 +478,79 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     long nonFilterQueryDocsScanned = getBrokerResponse(nonFilterQuery).getNumDocsScanned();
     assertEquals(filterQueryDocsScanned, nonFilterQueryDocsScanned);
   }
+
+  @Test
+  public void testFilteredAggregationOnlyInHaving() {
+    // An aggregation with a FILTER clause that is referenced only in the HAVING clause (and not in the SELECT list)
+    // must still have its filter applied. With the main filter INT_COL < 8, each group holds a single distinct
+    // INT_COL value, so groups 0-4 hold only rows matching INT_COL < 5 and groups 5-7 only rows matching
+    // INT_COL >= 5. The HAVING clause therefore keeps groups 0-4.
+    String havingQuery =
+        "SELECT NO_INDEX_COL, COUNT(*) testCount FROM MyTable WHERE INT_COL < 8 GROUP BY NO_INDEX_COL "
+            + "HAVING COUNT(*) FILTER(WHERE INT_COL < 5) > 0 AND COUNT(*) FILTER(WHERE INT_COL >= 5) < 1 "
+            + "ORDER BY NO_INDEX_COL";
+    List<Object[]> rows = getBrokerResponse(havingQuery).getResultTable().getRows();
+    assertEquals(rows.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertEquals(rows.get(i)[0], i);
+      assertEquals(rows.get(i)[1], 4L);
+    }
+
+    // Projecting the same filtered aggregations in the SELECT list must not change the groups that are kept.
+    String selectQuery =
+        "SELECT NO_INDEX_COL, COUNT(*) testCount, COUNT(*) FILTER(WHERE INT_COL < 5) testLow, "
+            + "COUNT(*) FILTER(WHERE INT_COL >= 5) testHigh FROM MyTable WHERE INT_COL < 8 GROUP BY NO_INDEX_COL "
+            + "HAVING COUNT(*) FILTER(WHERE INT_COL < 5) > 0 AND COUNT(*) FILTER(WHERE INT_COL >= 5) < 1 "
+            + "ORDER BY NO_INDEX_COL";
+    List<Object[]> selectRows = getBrokerResponse(selectQuery).getResultTable().getRows();
+    assertEquals(selectRows.size(), rows.size());
+    for (int i = 0; i < selectRows.size(); i++) {
+      assertEquals(selectRows.get(i)[0], rows.get(i)[0]);
+      assertEquals(selectRows.get(i)[1], rows.get(i)[1]);
+      assertEquals(selectRows.get(i)[2], 4L);
+      assertEquals(selectRows.get(i)[3], 0L);
+    }
+  }
+
+  @Test
+  public void testFilteredAggregationOnlyInOrderBy() {
+    // Same as above for an aggregation that is referenced only in the ORDER-BY clause. Groups 5-7 hold only rows
+    // matching INT_COL >= 5, so they must sort before groups 0-4 on the filtered count.
+    String query = "SELECT NO_INDEX_COL FROM MyTable WHERE INT_COL < 8 GROUP BY NO_INDEX_COL "
+        + "ORDER BY COUNT(*) FILTER(WHERE INT_COL >= 5) DESC, NO_INDEX_COL ASC";
+    List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
+    assertEquals(rows.size(), 8);
+    int[] groups = new int[rows.size()];
+    for (int i = 0; i < rows.size(); i++) {
+      groups[i] = (int) rows.get(i)[0];
+    }
+    assertEquals(groups, new int[]{5, 6, 7, 0, 1, 2, 3, 4});
+  }
+
+  @Test
+  public void testFilteredAggregationOnlyInOrderBySkipEmptyGroups() {
+    // The query below has no non-filtered aggregation, so enabling the skip-empty-groups option drops the groups that
+    // match no aggregation filter. Groups 0-4 hold no row matching INT_COL >= 5 and are therefore not returned.
+    String query = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS
+        + "=true; SELECT NO_INDEX_COL FROM MyTable WHERE INT_COL < 8 GROUP BY NO_INDEX_COL "
+        + "ORDER BY COUNT(*) FILTER(WHERE INT_COL >= 5) DESC, NO_INDEX_COL ASC";
+    List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
+    int[] groups = new int[rows.size()];
+    for (int i = 0; i < rows.size(); i++) {
+      groups[i] = (int) rows.get(i)[0];
+    }
+    assertEquals(groups, new int[]{5, 6, 7});
+  }
+
+  @Test
+  public void testFilteredAggregationOnlyInHavingWithoutGroupBy() {
+    // Without a GROUP BY the query is planned by AggregationPlanNode, which switches to the filtered operator here
+    // too. The main filter matches INT_COL 0-7 across the 4 segments, and the HAVING condition holds either way, so
+    // the projected count must stay the same.
+    String query = "SELECT COUNT(*) testCount FROM MyTable WHERE INT_COL < 8 "
+        + "HAVING COUNT(*) FILTER(WHERE INT_COL < 5) > 0";
+    List<Object[]> rows = getBrokerResponse(query).getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 32L);
+  }
 }

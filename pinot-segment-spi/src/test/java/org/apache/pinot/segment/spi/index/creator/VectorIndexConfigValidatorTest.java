@@ -393,6 +393,52 @@ public class VectorIndexConfigValidatorTest {
   // Property value validation tests
   // ============================================================
 
+  @Test
+  public void testAcceptRefreshTuning() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("refreshMinIntervalMs", "0");
+    properties.put("refreshWaitTimeoutMs", "5000");
+
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*HNSW refreshMinIntervalMs must be >= 0.*")
+  public void testRejectNegativeRefreshMinIntervalMs() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("refreshMinIntervalMs", "-1");
+
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*HNSW refreshWaitTimeoutMs must be >= 1.*")
+  public void testRejectZeroRefreshWaitTimeoutMs() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("refreshWaitTimeoutMs", "0");
+
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+  }
+
+  /// The validator must be exactly as strict as MutableVectorIndex's own parse, including whitespace: a value it
+  /// accepts here but the server rejects would stop ingestion instead of failing the table config.
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*HNSW refreshMinIntervalMs must be a valid long.*")
+  public void testRejectNonNumericRefreshMinIntervalMs() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("refreshMinIntervalMs", " 100 ");
+
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*HNSW maxCon must be a positive integer.*")
   public void testRejectNegativeMaxCon() {

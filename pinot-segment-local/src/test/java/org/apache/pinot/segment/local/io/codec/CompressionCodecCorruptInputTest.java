@@ -51,22 +51,23 @@ public class CompressionCodecCorruptInputTest {
   public void testLz4DecodeRejectsGarbage() {
     // A 0xFF length-prefix decodes to a negative/huge length → out-of-range guard must fire.
     assertThrows(Exception.class,
-        () -> Lz4CodecDefinition.INSTANCE.decode(Lz4CodecDefinition.OPTIONS, CTX, garbage(64)));
+        () -> Lz4CodecDefinition.INSTANCE.decode(Lz4CodecDefinition.OPTIONS, CTX, garbage(64),
+            ByteBuffer.allocateDirect(64)));
   }
 
   @Test
   public void testZstdDecodeRejectsGarbage() {
     assertThrows(Exception.class,
         () -> ZstdCodecDefinition.INSTANCE.decode(ZstdCodecDefinition.INSTANCE.parseOptions(List.of()), CTX,
-            garbage(64)));
+            garbage(64), ByteBuffer.allocateDirect(64)));
   }
 
   @Test
-  public void testZstdDecodeIntoRejectsOversizedDeclaredSize() {
-    // decodeInto must apply the shared sanity cap before its later destination-capacity check.
+  public void testZstdDecodeRejectsOversizedDeclaredSize() {
+    // Apply the shared sanity cap before the later destination-capacity check.
     ByteBuffer dst = ByteBuffer.allocateDirect(16);
     IOException exception = expectThrows(IOException.class,
-        () -> ZstdCodecDefinition.INSTANCE.decodeInto(
+        () -> ZstdCodecDefinition.INSTANCE.decode(
             ZstdCodecDefinition.INSTANCE.parseOptions(List.of()), CTX, oversizedZstdFrame(), dst));
     assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
   }
@@ -84,26 +85,17 @@ public class CompressionCodecCorruptInputTest {
   @Test
   public void testSnappyDecodeRejectsGarbage() {
     assertThrows(Exception.class,
-        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, garbage(64)));
+        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, garbage(64),
+            ByteBuffer.allocateDirect(64)));
   }
 
   @Test
   public void testSnappyDecodeRejectsOversizedDeclaredSize() {
-    // The sanity cap must fire before any allocation driven by the untrusted header. The declared size is
+    // The sanity cap must fire before the destination-capacity guard. The declared size is
     // the smallest rejected value (cap + 1), pinning the inclusive boundary: exactly 1 GiB is accepted.
     IOException exception = expectThrows(IOException.class,
-        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, oversizedSnappyFrame()));
-    assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
-  }
-
-  @Test
-  public void testSnappyDecodeIntoRejectsOversizedDeclaredSize() {
-    // decodeInto is the path the bounded executor uses in production; it must reject with the size-cap
-    // IOException, not the later dst-capacity IllegalArgumentException.
-    ByteBuffer dst = ByteBuffer.allocateDirect(16);
-    IOException exception = expectThrows(IOException.class,
-        () -> SnappyCodecDefinition.INSTANCE.decodeInto(SnappyCodecDefinition.OPTIONS, CTX,
-            oversizedSnappyFrame(), dst));
+        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX,
+            oversizedSnappyFrame(), ByteBuffer.allocateDirect(16)));
     assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
   }
 
@@ -118,7 +110,8 @@ public class CompressionCodecCorruptInputTest {
   @Test
   public void testGzipDecodeRejectsGarbage() {
     IOException exception = expectThrows(IOException.class,
-        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, garbage(64)));
+        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, garbage(64),
+            ByteBuffer.allocate(64)));
     assertTrue(exception.getMessage().contains("invalid decompressed size"), exception.getMessage());
   }
 
@@ -126,7 +119,8 @@ public class CompressionCodecCorruptInputTest {
   public void testGzipDecodeRejectsTruncatedFooter() {
     // Fewer than 4 bytes cannot carry the uncompressed-size footer GZIP appends.
     IOException exception = expectThrows(IOException.class,
-        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, garbage(2)));
+        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, garbage(2),
+            ByteBuffer.allocate(0)));
     assertTrue(exception.getMessage().contains("too short"), exception.getMessage());
   }
 
@@ -135,7 +129,7 @@ public class CompressionCodecCorruptInputTest {
     ByteBuffer encoded = encodeGzip(new byte[256]);
     encoded.putInt(encoded.limit() - Integer.BYTES, 128);
     IOException exception = expectThrows(IOException.class,
-        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded));
+        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded, ByteBuffer.allocate(256)));
     assertTrue(exception.getMessage().contains("expands beyond footer-declared size"), exception.getMessage());
   }
 
@@ -144,7 +138,7 @@ public class CompressionCodecCorruptInputTest {
     ByteBuffer encoded = encodeGzip(new byte[256]);
     encoded.putInt(encoded.limit() - Integer.BYTES, 0);
     IOException exception = expectThrows(IOException.class,
-        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded));
+        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded, ByteBuffer.allocate(256)));
     assertTrue(exception.getMessage().contains("expands beyond footer-declared size"), exception.getMessage());
   }
 
@@ -154,7 +148,7 @@ public class CompressionCodecCorruptInputTest {
     int checksumByte = encoded.limit() - Integer.BYTES - 1;
     encoded.put(checksumByte, (byte) (encoded.get(checksumByte) ^ 0x01));
     IOException exception = expectThrows(IOException.class,
-        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded));
+        () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded, ByteBuffer.allocate(256)));
     assertTrue(exception.getMessage().contains("GZIP decompression failed"), exception.getMessage());
   }
 
@@ -165,8 +159,9 @@ public class CompressionCodecCorruptInputTest {
     Arrays.fill(values, (byte) 0x5A);
     ByteBuffer encoded = encodeGzip(values).order(ByteOrder.LITTLE_ENDIAN);
 
-    assertDecodedEquals(values,
-        GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded));
+    ByteBuffer destination = ByteBuffer.allocate(values.length);
+    GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded, destination);
+    assertDecodedEquals(values, destination);
   }
 
   @Test
@@ -181,21 +176,22 @@ public class CompressionCodecCorruptInputTest {
     framed.put(encoded.duplicate()).flip();
     framed.position(prefixLength);
 
-    assertDecodedEquals(values,
-        GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, framed));
+    ByteBuffer destination = ByteBuffer.allocate(values.length);
+    GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, framed, destination);
+    assertDecodedEquals(values, destination);
   }
 
   @Test
   public void testGzipMaxEncodedSizeRejectsOverflow() {
     assertThrows(IllegalArgumentException.class,
-        () -> GzipCodecDefinition.INSTANCE.maxEncodedSize(GzipCodecDefinition.OPTIONS, Integer.MAX_VALUE));
+        () -> GzipCodecDefinition.INSTANCE.maxEncodedSize(GzipCodecDefinition.OPTIONS, CTX, Integer.MAX_VALUE));
   }
 
   @Test
   public void testMultiStageDecodeBoundsInnerSnappyOutput() throws Exception {
     // A valid Snappy frame that expands to 1 MiB is far larger than the four-byte final INT
-    // chunk declared by the outer format. The executor must use Snappy.decodeInto() with a
-    // four-byte scratch bound instead of letting Snappy.decode() allocate from its inner header.
+    // chunk declared by the outer format. The executor must supply a four-byte scratch bound
+    // instead of sizing the destination from the inner frame header.
     byte[] compressed = Snappy.compress(new byte[1024 * 1024]);
     // Keep only a small prefix: it contains Snappy's claimed decoded length and stays below the
     // executor's outer encoded-size bound, so this specifically exercises the inner-frame guard.
@@ -206,7 +202,7 @@ public class CompressionCodecCorruptInputTest {
         "DELTA,SNAPPY", CTX, CodecRegistry.DEFAULT);
 
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-        () -> executor.decode(encoded, decoded, Integer.BYTES));
+        () -> CodecTestUtils.decode(executor, encoded, decoded, Integer.BYTES));
     assertTrue(exception.getMessage().contains("Snappy: decompressed size"), exception.getMessage());
   }
 
@@ -217,14 +213,15 @@ public class CompressionCodecCorruptInputTest {
     CodecPipelineExecutor executor = CodecPipelineExecutor.create("GZIP", CTX, CodecRegistry.DEFAULT);
 
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-        () -> executor.decode(encoded, decoded, Integer.BYTES, 128));
+        () -> CodecTestUtils.decode(executor, encoded, decoded, Integer.BYTES, 128));
     assertTrue(exception.getMessage().contains("Encoded input size"), exception.getMessage());
   }
 
   private static ByteBuffer encodeGzip(byte[] values) throws Exception {
-    ByteBuffer source = ByteBuffer.allocateDirect(values.length);
-    source.put(values).flip();
-    return GzipCodecDefinition.INSTANCE.encode(GzipCodecDefinition.OPTIONS, CTX, source);
+    ByteBuffer encoded = ByteBuffer.allocate(
+        GzipCodecDefinition.INSTANCE.maxEncodedSize(GzipCodecDefinition.OPTIONS, CTX, values.length));
+    GzipCodecDefinition.INSTANCE.encode(GzipCodecDefinition.OPTIONS, CTX, ByteBuffer.wrap(values), encoded);
+    return encoded;
   }
 
   private static void assertDecodedEquals(byte[] expected, ByteBuffer decoded) {

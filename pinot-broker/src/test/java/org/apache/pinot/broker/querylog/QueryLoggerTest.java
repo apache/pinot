@@ -43,10 +43,15 @@ import org.slf4j.Marker;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.broker.querylog.QueryLogger.SqlRedactionMode;
+import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("UnstableApiUsage")
@@ -254,6 +259,126 @@ public class QueryLoggerTest {
         Mockito.anyString(), Mockito.anyLong(), Mockito.anyString());
     // ...and the completion record, which shares this logger, does not
     Mockito.verify(_logger).info(Mockito.anyString());
+  }
+
+  @Test
+  public void shouldLogMultiLineQueryOnASingleLine() {
+    // Given: a client that submits pretty-printed SQL, as JDBC/BI tools routinely do
+    when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+    String prettyPrinted = "SELECT id, name\nFROM users\r\nWHERE id = 42\nLIMIT 10";
+
+    // When:
+    queryLogger.logQueryReceived(123L, prettyPrinted, null);
+
+    // Then: one record, on one physical line
+    assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    assertFalse(logged.contains("\n"), "logged query must not contain a line feed: " + logged);
+    assertFalse(logged.contains("\r"), "logged query must not contain a carriage return: " + logged);
+    // and the breaks are escaped, not discarded, so nothing is lost
+    assertTrue(logged.contains("SELECT id, name\\nFROM users\\r\\nWHERE id = 42\\nLIMIT 10"), logged);
+  }
+
+  @DataProvider(name = "lineComments")
+  public Object[][] lineComments() {
+    return new Object[][]{{"--"}, {"//"}};
+  }
+
+  @Test(dataProvider = "lineComments")
+  public void shouldNotBreakLineCommentsWhenLoggingOnASingleLine(String commentPrefix) {
+    // Given: a query whose line comment is terminated by the newline. Pinot's grammar accepts both
+    // "--" and "//" line comments (SINGLE_LINE_COMMENT in Parser.jj), so replacing the break with a
+    // space would pull "FROM t" into the comment and change what the logged query means.
+    when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    // When:
+    String query = "SELECT a " + commentPrefix + " note\nFROM t";
+    queryLogger.logQueryReceived(123L, query, null);
+
+    // Then:
+    assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    assertFalse(logged.contains("\n"), logged);
+    assertEquals(logged, "SQL query for request 123: SELECT a " + commentPrefix + " note\\nFROM t");
+    assertEquals(logged.substring("SQL query for request 123: ".length()).translateEscapes(), query);
+    assertFalse(logged.contains(commentPrefix + " note FROM t"),
+        "the comment must not swallow the rest of the statement: " + logged);
+  }
+
+  @Test
+  public void shouldLeaveASingleLineQueryUntouched() {
+    // Given:
+    when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    // When:
+    queryLogger.logQueryReceived(123L, "SELECT a FROM t WHERE s = 'x'", null);
+
+    // Then: no escaping applied to a query that was already on one line
+    assertEquals(_infoLog.size(), 1);
+    assertTrue(_infoLog.get(0).contains("SELECT a FROM t WHERE s = 'x'"), _infoLog.get(0));
+  }
+
+  @Test
+  public void shouldLogMultiLineQueryOnASingleLineOnCompletion() {
+    // Given: the completion record carries the query too, so it needs the same treatment
+    when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, false,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+    QueryLogger.QueryLogParams params =
+        generateParams(false, false, 0, 456, null, "SELECT id\nFROM users\nLIMIT 1");
+
+    // When:
+    queryLogger.logQueryCompleted(params, true);
+
+    // Then:
+    assertEquals(_infoLog.size(), 1);
+    String logged = _infoLog.get(0);
+    assertFalse(logged.contains("\n"), logged);
+    assertTrue(logged.contains("query=SELECT id\\nFROM users\\nLIMIT 1"), logged);
+  }
+
+  @DataProvider(name = "queriesWithEscapedCharacters")
+  public Object[][] queriesWithEscapedCharacters() {
+    return new Object[][]{
+        {"SELECT 'a\nb' FROM t", "SELECT 'a\\nb' FROM t"},
+        {"SELECT 'a\\nb' FROM t", "SELECT 'a\\\\nb' FROM t"},
+        {"SELECT 'a\rb' FROM t", "SELECT 'a\\rb' FROM t"},
+        {"SELECT 'a\\rb' FROM t", "SELECT 'a\\\\rb' FROM t"},
+        {"SELECT 'a\\\nb' FROM t", "SELECT 'a\\\\\\nb' FROM t"},
+        {"SELECT 'a\n\\b' FROM t", "SELECT 'a\\n\\\\b' FROM t"},
+        {"SELECT 'a\\\r\nb' FROM t", "SELECT 'a\\\\\\r\\nb' FROM t"},
+        {"SELECT 'a\\\\b' FROM t", "SELECT 'a\\\\\\\\b' FROM t"},
+        {"SELECT '\\d+\\s+\\w+' FROM t", "SELECT '\\\\d+\\\\s+\\\\w+' FROM t"},
+        {"SELECT '\\t\\b\\f\\141' FROM t", "SELECT '\\\\t\\\\b\\\\f\\\\141' FROM t"},
+        {"SELECT\t'a\tb' FROM t", "SELECT\t'a\tb' FROM t"}
+    };
+  }
+
+  @Test(dataProvider = "queriesWithEscapedCharacters")
+  public void shouldLogQueryWithReversibleEscaping(String query, String expected) {
+    when(_logRateLimiter.tryAcquire()).thenReturn(true);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 10_000, true, true,
+        SqlRedactionMode.NONE, _logger, _droppedRateLimiter);
+
+    queryLogger.logQueryReceived(123L, query, null);
+    queryLogger.logQueryCompleted(generateParams(false, false, 0, 456, null, query), true);
+
+    assertEquals(_infoLog.size(), 2);
+    String receivedQuery = _infoLog.get(0).substring("SQL query for request 123: ".length());
+    String completedLog = _infoLog.get(1);
+    String completedQuery = completedLog.substring(completedLog.indexOf(",query=") + ",query=".length());
+    for (String loggedQuery : List.of(receivedQuery, completedQuery)) {
+      assertEquals(loggedQuery, expected);
+      assertFalse(loggedQuery.contains("\n"));
+      assertFalse(loggedQuery.contains("\r"));
+      assertEquals(loggedQuery.translateEscapes(), query);
+    }
   }
 
   @Test
@@ -507,9 +632,15 @@ public class QueryLoggerTest {
 
   private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
       int numExceptions, long timeUsedMs, QueryFingerprint queryFingerprint) {
+    return generateParams(numGroupsLimitReached, numGroupsWarningLimitReached, numExceptions, timeUsedMs,
+        queryFingerprint, "SELECT * FROM foo");
+  }
+
+  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
+      int numExceptions, long timeUsedMs, QueryFingerprint queryFingerprint, String query) {
     RequestContext requestContext = new DefaultRequestContext();
     requestContext.setRequestId(123);
-    requestContext.setQuery("SELECT * FROM foo");
+    requestContext.setQuery(query);
     requestContext.setNumUnavailableSegments(21);
 
     if (queryFingerprint != null) {
