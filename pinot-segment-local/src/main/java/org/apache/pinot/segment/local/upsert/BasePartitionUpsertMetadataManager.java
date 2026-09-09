@@ -42,7 +42,6 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
-import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -720,11 +719,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           + "manual reconstruction and replay are required.";
       _logger.error(message, e);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
-      TableDataManager tableDataManager = _context.getTableDataManager();
-      if (tableDataManager != null) {
-        tableDataManager.addSegmentError(segmentName, new SegmentErrorInfo(System.currentTimeMillis(), message, e));
-      }
-      // TODO: Recover incomplete metadata revert before a later consumer uses the discarded segment's state.
+      // Preserve the existing propagation of failures that the backend did not handle.
       throw e;
     }
     if (getPrevKeyToRecordLocationSize() == 0) {
