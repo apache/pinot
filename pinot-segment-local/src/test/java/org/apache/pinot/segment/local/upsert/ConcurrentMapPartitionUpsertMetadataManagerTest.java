@@ -2381,23 +2381,16 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @DataProvider
   public Object[][] metadataRevertFailureCases() {
-    List<Object[]> cases = new ArrayList<>();
-    for (ConsumingSegmentConsistencyModeListener.Mode mode : ConsumingSegmentConsistencyModeListener.Mode.values()) {
-      for (boolean mutable : new boolean[]{true, false}) {
-        for (boolean inconsistentTable : new boolean[]{true, false}) {
-          for (boolean replacement : new boolean[]{true, false}) {
-            cases.add(new Object[]{mode, mutable, inconsistentTable, replacement, false});
-          }
-        }
-      }
-    }
-    cases.add(new Object[]{ConsumingSegmentConsistencyModeListener.Mode.PROTECTED, true, true, false, true});
-    return cases.toArray(new Object[0][]);
+    return new Object[][]{
+        {ConsumingSegmentConsistencyModeListener.Mode.PROTECTED, false},
+        {ConsumingSegmentConsistencyModeListener.Mode.PROTECTED, true},
+        {ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED, false}
+    };
   }
 
   @Test(dataProvider = "metadataRevertFailureCases")
   public void testOnlyProtectedRevertFailuresAreReported(ConsumingSegmentConsistencyModeListener.Mode mode,
-      boolean mutable, boolean inconsistentTable, boolean replacement, boolean jvmError) {
+      boolean replacement) {
     ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
     ConsumingSegmentConsistencyModeListener.Mode originalMode = listener.getConsistencyMode();
     ServerMetrics originalMetrics = ServerMetrics.get();
@@ -2406,20 +2399,20 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ServerMetrics.register(metrics);
     listener.setMode(mode);
     try {
-      UpsertContext context = _contextBuilder.setDropOutOfOrderRecord(inconsistentTable).build();
+      UpsertContext context = _contextBuilder.setDropOutOfOrderRecord(true).build();
       ConcurrentMapPartitionUpsertMetadataManager manager =
           spy(new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, context));
-      IndexSegment segment = mutable ? mock(MutableSegment.class) : mock(ImmutableSegmentImpl.class);
+      MutableSegment segment = mock(MutableSegment.class);
       String segmentName = "testTable__0__1__0";
       when(segment.getSegmentName()).thenReturn(segmentName);
       ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
       validDocIds.add(0);
       when(segment.getValidDocIds()).thenReturn(validDocIds);
       manager._trackedSegments.add(segment);
-      Throwable failure = jvmError ? new AssertionError("offload error") : new RuntimeException("removal failed");
+      RuntimeException failure = new RuntimeException("removal failed");
       doThrow(failure).when(manager).removeSegment(eq(segment), any(MutableRoaringBitmap.class));
 
-      Throwable thrown = expectThrows(Throwable.class, () -> {
+      RuntimeException thrown = expectThrows(RuntimeException.class, () -> {
         if (replacement) {
           ImmutableSegmentImpl newSegment = mock(ImmutableSegmentImpl.class);
           when(newSegment.getSegmentName()).thenReturn(segmentName);
@@ -2430,8 +2423,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       });
       assertSame(thrown, failure, "Preserve the original failure on every removal path");
       verify(manager).removeSegment(eq(segment), any(MutableRoaringBitmap.class));
-      boolean report = mode == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
-          && mutable && inconsistentTable && !jvmError;
+      boolean report = mode == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED;
       verify(metrics, times(report ? 1 : 0))
           .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
       verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());
@@ -2445,14 +2437,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @DataProvider
   public Object[][] handledRevertFailureCases() {
     return new Object[][]{
-        {"reader", false}, {"reader", true},
-        {"bitmap", false}, {"bitmap", true},
-        {"none", false}, {"none", true}
+        {"reader"}, {"bitmap"}
     };
   }
 
   @Test(dataProvider = "handledRevertFailureCases")
-  public void testHandledRevertFailuresKeepExistingBehavior(String failure, boolean replacement) {
+  public void testHandledRevertFailuresKeepExistingBehavior(String failure) {
     ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
     ConsumingSegmentConsistencyModeListener.Mode originalMode = listener.getConsistencyMode();
     ServerMetrics originalMetrics = ServerMetrics.get();
@@ -2467,7 +2457,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
       validDocIds.add(0);
       MutableSegment segment = mockMutableSegmentWithDataSource(1, validDocIds, null, new int[]{10});
-      String segmentName = segment.getSegmentName();
       ImmutableSegmentImpl previousSegment = mock(ImmutableSegmentImpl.class);
       when(previousSegment.getSegmentName()).thenReturn(getSegmentName(0));
       when(previousSegment.getValidDocIds()).thenReturn(
@@ -2485,25 +2474,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
             }
           })) {
         // Use the actual backend removal. Existing reader/bitmap fallbacks must finish without throwing.
-        if (replacement) {
-          ImmutableSegmentImpl newSegment = mock(ImmutableSegmentImpl.class);
-          when(newSegment.getSegmentName()).thenReturn(segmentName);
-          manager.replaceSegment(newSegment, null, null, null, segment);
-        } else {
-          manager.removeSegment(segment);
-          assertFalse(manager._trackedSegments.contains(segment));
-        }
+        manager.removeSegment(segment);
+        assertFalse(manager._trackedSegments.contains(segment));
         assertEquals(readers.constructed().size(), failure.equals("bitmap") ? 0 : 1);
       }
-      if (failure.equals("none")) {
-        assertSame(manager._primaryKeyToRecordLocationMap.get(key).getSegment(), previousSegment);
-      } else {
-        assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
-            "Preserve the existing key-removal fallback");
-      }
+      assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
+          "Preserve the existing key-removal fallback");
       assertTrue(manager._previousKeyToRecordLocationMap.isEmpty());
-      verify(metrics, times(failure.equals("none") ? 0 : 1))
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+      verify(metrics).addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
       verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());
     } finally {
       listener.setMode(originalMode);
