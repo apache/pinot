@@ -51,7 +51,6 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   // Try to schedule 10 segments for each thread, or evenly distribute them to all MAX_NUM_THREADS_PER_QUERY threads.
   // TODO: make this threshold configurable? threshold 10 is also used in CombinePlanNode, which accesses the
   //       dictionary data to do query planning and if segments are more than 10, planning is done in parallel.
-  private static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
 
   private FetchPlanner _fetchPlanner;
 

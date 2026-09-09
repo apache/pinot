@@ -19,10 +19,22 @@
 package org.apache.pinot.core.query.pruner;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -33,15 +45,19 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ColumnValueSegmentPrunerTest {
@@ -231,6 +247,142 @@ public class ColumnValueSegmentPrunerTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column = 3 OR (column NOT IN (1, 2) AND column BETWEEN 4 AND 5)");
     assertTrue(PRUNER.isApplicableTo(queryContext));
+  }
+
+  /// The pruner runs over every segment the server holds, so above a threshold it prunes across the query executor.
+  /// The parallel path must select exactly the same segments as the serial one.
+  @Test
+  public void testParallelPruningSelectsTheSameSegments() throws Exception {
+    int numSegments = 40;
+    Set<Thread> accessThreads = ConcurrentHashMap.newKeySet();
+    List<IndexSegment> segments = new ArrayList<>(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      // Alternate: half the segments hold values the predicate can match, half cannot and must be pruned.
+      segments.add(segmentWithRange(i % 2 == 0 ? 0 : 100, i % 2 == 0 ? 50 : 150,
+          () -> accessThreads.add(Thread.currentThread())));
+    }
+    QueryContext serialQuery = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 10");
+    serialQuery.setSchema(mock(Schema.class));
+    QueryContext parallelQuery = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 10");
+    parallelQuery.setSchema(mock(Schema.class));
+    parallelQuery.setEndTimeMs(System.currentTimeMillis() + 30_000);
+    parallelQuery.setMaxExecutionThreads(4);
+
+    List<IndexSegment> serial = PRUNER.prune(segments, serialQuery);
+    assertEquals(accessThreads, Set.of(Thread.currentThread()));
+    accessThreads.clear();
+    ExecutorService executor = Executors.newFixedThreadPool(4);
+    try {
+      List<IndexSegment> parallel = PRUNER.prune(segments, parallelQuery, executor);
+      assertEquals(new HashSet<>(parallel), new HashSet<>(serial));
+      assertEquals(parallel.size(), numSegments / 2);
+      assertFalse(accessThreads.isEmpty());
+      assertFalse(accessThreads.contains(Thread.currentThread()), "Pruning must run on the supplied executor");
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testParallelPruningFallsBackToCallingThread() {
+    Set<Thread> accessThreads = new HashSet<>();
+    IndexSegment segment = segmentWithRange(0, 50, () -> accessThreads.add(Thread.currentThread()));
+    QueryContext query = pruningQuery();
+    ExecutorService executor = mock(ExecutorService.class);
+
+    assertTrue(PRUNER.prune(List.of(), query, executor).isEmpty());
+    assertEquals(PRUNER.prune(Collections.nCopies(10, segment), query, executor).size(), 10);
+    verifyNoInteractions(executor);
+    assertEquals(PRUNER.prune(Collections.nCopies(40, segment), query, null).size(), 40);
+    assertEquals(accessThreads, Set.of(Thread.currentThread()));
+  }
+
+  @Test(timeOut = 10_000)
+  public void testParallelPruningRejectsExpiredDeadline() throws Exception {
+    CountDownLatch releaseWorker = new CountDownLatch(1);
+    IndexSegment segment = segmentWithRange(0, 50, () -> {
+      try {
+        releaseWorker.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new QueryCancelledException("Pruning worker interrupted", e);
+      }
+    });
+    QueryContext query = pruningQuery();
+    query.setEndTimeMs(0);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      RuntimeException failure = expectThrows(RuntimeException.class,
+          () -> PRUNER.prune(Collections.nCopies(40, segment), query, executor));
+      assertTrue(ExceptionUtils.indexOfType(failure, TimeoutException.class) >= 0);
+    } finally {
+      releaseWorker.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  /// A canceled worker must stop before it accesses another segment, even when metadata reads never block.
+  @Test(timeOut = 10_000)
+  public void testParallelPruningStopsInterruptedWorkerBetweenSegments() throws Exception {
+    AtomicInteger visits = new AtomicInteger();
+    IndexSegment segment = segmentWithRange(0, 50, () -> {
+      visits.incrementAndGet();
+      Thread.currentThread().interrupt();
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      RuntimeException failure = expectThrows(RuntimeException.class,
+          () -> PRUNER.prune(Collections.nCopies(40, segment), pruningQuery(), executor));
+      assertTrue(ExceptionUtils.indexOfType(failure, QueryCancelledException.class) >= 0);
+      assertEquals(visits.get(), 1, "An interrupted worker must not keep visiting segments");
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void testParallelPruningPropagatesWorkerFailure() throws Exception {
+    IllegalStateException workerFailure = new IllegalStateException("Cannot read segment metadata");
+    IndexSegment segment = segmentWithRange(0, 50, () -> {
+      throw workerFailure;
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      RuntimeException failure = expectThrows(RuntimeException.class,
+          () -> PRUNER.prune(Collections.nCopies(40, segment), pruningQuery(), executor));
+      assertTrue(ExceptionUtils.getThrowableList(failure).contains(workerFailure));
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  private QueryContext pruningQuery() {
+    QueryContext query = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE column = 10");
+    query.setSchema(mock(Schema.class));
+    query.setMaxExecutionThreads(1);
+    query.setEndTimeMs(System.currentTimeMillis() + 30_000);
+    return query;
+  }
+
+  private IndexSegment segmentWithRange(int minValue, int maxValue, Runnable onAccess) {
+    IndexSegment indexSegment = mockIndexSegment();
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenAnswer(invocation -> {
+      onAccess.run();
+      return dataSource;
+    });
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getDataType()).thenReturn(DataType.INT);
+    when(metadata.getMinValue()).thenReturn(minValue);
+    when(metadata.getMaxValue()).thenReturn(maxValue);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    return indexSegment;
   }
 
   private IndexSegment mockIndexSegment() {
