@@ -68,7 +68,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -148,10 +147,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private BooleanSupplier _isTableReadyToConsumeData;
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
-
-  // An unfinished offload still owns its table reference. Keep it out of the query map until removal can finish,
-  // and prevent use of only its partition. Serial consumption bounds this to one unfinished mutable per partition.
-  private final Map<Integer, RealtimeSegmentDataManager> _failedMetadataRemovals = new ConcurrentHashMap<>();
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -312,14 +307,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         _tableDedupMetadataManager.stop();
       }
       releaseAndRemoveAllSegments();
-      for (RealtimeSegmentDataManager segment : _failedMetadataRemovals.values()) {
-        synchronized (segment) {
-          int partitionId = new LLCSegmentName(segment.getSegmentName()).getPartitionGroupId();
-          if (_failedMetadataRemovals.remove(partitionId, segment)) {
-            releaseSegment(segment);
-          }
-        }
-      }
       try {
         if (_tableUpsertMetadataManager != null) {
           _tableUpsertMetadataManager.close();
@@ -480,7 +467,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected void doAddOnlineSegment(String segmentName)
       throws Exception {
-    checkMetadataHealthy(segmentName);
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     Preconditions.checkState(zkMetadata.getStatus() != Status.IN_PROGRESS,
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
@@ -514,7 +500,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addConsumingSegment(String segmentName)
       throws Exception {
-    checkMetadataHealthy(segmentName);
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -718,7 +703,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
-    checkMetadataHealthy(segmentName);
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
 
@@ -830,121 +814,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   ConsumerCoordinator getConsumerCoordinator(int partitionId) {
     return _partitionIdToConsumerCoordinatorMap.computeIfAbsent(partitionId,
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
-  }
-
-  void onSegmentMetadataRemovalFailure(RealtimeSegmentDataManager segment) {
-    int partitionId = new LLCSegmentName(segment.getSegmentName()).getPartitionGroupId();
-    RealtimeSegmentDataManager existing = _failedMetadataRemovals.putIfAbsent(partitionId, segment);
-    Preconditions.checkState(existing == null || existing == segment,
-        "Multiple failed metadata removals in partition: %s of table: %s", partitionId, _tableNameWithType);
-  }
-
-  void checkMetadataHealthy(int partitionId) {
-    RealtimeSegmentDataManager failedSegment = _failedMetadataRemovals.get(partitionId);
-    if (failedSegment != null) {
-      throw new IllegalStateException(
-          "Metadata removal failed for segment: " + failedSegment.getSegmentName() + " in partition: " + partitionId
-              + " of table: " + _tableNameWithType + ". Finish metadata removal before resuming this partition");
-    }
-  }
-
-  private void checkMetadataHealthy(String segmentName) {
-    if (!_failedMetadataRemovals.isEmpty()) {
-      checkMetadataHealthy(getMetadataPartitionId(segmentName));
-    }
-  }
-
-  private int getMetadataPartitionId(String segmentName) {
-    Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    Preconditions.checkState(partitionId != null,
-        "Cannot determine partition for segment: %s while metadata recovery is pending", segmentName);
-    return partitionId;
-  }
-
-  /// Called by the existing ERROR reset before the replica can return to service. A retry is allowed only when the
-  /// metadata implementation preserved unfinished work. An ordinary registration or a no-op offload cannot clear it.
-  public void retryFailedMetadataRemoval(String segmentName) {
-    if (_failedMetadataRemovals.isEmpty()) {
-      return;
-    }
-    Preconditions.checkState(!_shutDown, "Cannot recover metadata while shutting down table: %s", _tableNameWithType);
-    int partitionId = getMetadataPartitionId(segmentName);
-    RealtimeSegmentDataManager failedSegment = _failedMetadataRemovals.get(partitionId);
-    if (failedSegment == null) {
-      return;
-    }
-    synchronized (failedSegment) {
-      if (_failedMetadataRemovals.get(partitionId) != failedSegment) {
-        return;
-      }
-      Preconditions.checkState(!_shutDown, "Cannot recover metadata while shutting down table: %s", _tableNameWithType);
-      failedSegment.retryMetadataRemoval();
-      releaseSegment(failedSegment);
-      _failedMetadataRemovals.remove(partitionId, failedSegment);
-      _logger.info("Completed failed metadata removal for segment: {}, partition: {}", failedSegment.getSegmentName(),
-          partitionId);
-    }
-  }
-
-  @Override
-  protected void doOffloadSegment(String segmentName) {
-    retryFailedMetadataRemoval(segmentName);
-    super.doOffloadSegment(segmentName);
-  }
-
-  /// Newly discovered segments from a failed partition must not be added to a request routed here for healthy
-  /// partitions. Segments explicitly requested by the broker are still checked by acquireSegments and fail the query.
-  public Set<String> getHealthyNewlyAddedSegments(Set<String> newlyAddedSegments) {
-    if (_failedMetadataRemovals.isEmpty()) {
-      return newlyAddedSegments;
-    }
-    Set<String> healthySegments = new HashSet<>();
-    for (String segmentName : newlyAddedSegments) {
-      if (!_failedMetadataRemovals.containsKey(getQueryPartitionId(segmentName))) {
-        healthySegments.add(segmentName);
-      }
-    }
-    return healthySegments;
-  }
-
-  private int getQueryPartitionId(String segmentName) {
-    Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-    if (partitionId == null) {
-      // Resolve legacy uploaded names from already loaded metadata. Recovery must not put ZK reads on the query path.
-      SegmentDataManager segment = _segmentDataManagerMap.get(segmentName);
-      if (segment != null) {
-        for (ColumnMetadata column : segment.getSegment().getSegmentMetadata().getColumnMetadataMap().values()) {
-          Set<Integer> partitions = column.getPartitions();
-          if (partitions != null && !partitions.isEmpty()) {
-            Preconditions.checkState(
-                partitions.size() == 1 && (partitionId == null || partitions.contains(partitionId)),
-                "Ambiguous partition metadata for segment: %s while recovery is pending", segmentName);
-            partitionId = partitions.iterator().next();
-          }
-        }
-      }
-    }
-    Preconditions.checkState(partitionId != null,
-        "Cannot determine partition for segment: %s while metadata recovery is pending", segmentName);
-    return partitionId;
-  }
-
-  @Override
-  public List<SegmentDataManager> acquireSegments(List<String> segmentNames,
-      @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
-    // Only requests touching the failed partition are rejected. Check optional upsert-view segments too, before any
-    // references are acquired, so newly added segments cannot bypass the boundary or yield a partial result.
-    if (!_failedMetadataRemovals.isEmpty()) {
-      for (String segmentName : segmentNames) {
-        checkMetadataHealthy(getQueryPartitionId(segmentName));
-      }
-      if (optionalSegmentNames != null) {
-        for (String segmentName : optionalSegmentNames) {
-          checkMetadataHealthy(getQueryPartitionId(segmentName));
-        }
-      }
-    }
-    return super.acquireSegments(segmentNames, optionalSegmentNames, missingSegments);
   }
 
   public boolean isEnforceConsumptionInOrderEnabled() {

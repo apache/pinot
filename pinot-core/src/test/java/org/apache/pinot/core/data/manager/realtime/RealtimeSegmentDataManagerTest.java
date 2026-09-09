@@ -29,10 +29,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,7 +56,6 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.upsert.RetryableMetadataRemovalException;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -80,14 +75,12 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
@@ -98,7 +91,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -736,21 +728,9 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      ConsumerCoordinator coordinator = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID);
-      Semaphore semaphore = coordinator.getSemaphore();
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
       Assert.assertTrue(semaphore.tryAcquire());
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
-
-      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
-      RealtimeTableDataManager metadataState = new RealtimeTableDataManager(null);
-      doAnswer(invocation -> {
-        metadataState.onSegmentMetadataRemovalFailure(invocation.getArgument(0));
-        return null;
-      }).when(tableDataManager).onSegmentMetadataRemovalFailure(any(RealtimeSegmentDataManager.class));
-      doAnswer(invocation -> {
-        metadataState.checkMetadataHealthy(invocation.getArgument(0));
-        return null;
-      }).when(tableDataManager).checkMetadataHealthy(anyInt());
 
       MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
       doThrow(new RuntimeException("metadata removal failed")).when(realtimeSegment).offload();
@@ -762,106 +742,12 @@ public class RealtimeSegmentDataManagerTest {
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "metadata removal failed");
       }
-      // Resource cleanup must not leak the semaphore, but it cannot authorize consuming against failed metadata.
+      verify(segmentDataManager.getTableDataManager()).addSegmentError(eq(SEGMENT_NAME_STR),
+          argThat(error -> error.getErrorMessage().contains("REALTIME_METADATA_REMOVAL_FAILED")
+              && error.getErrorMessage().contains("METADATA_RECOVERY.md")));
+      // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released even when metadata removal fails");
-      LLCSegmentName successor = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID + 1, SEG_TIME_MS);
-      IllegalStateException failure =
-          Assert.expectThrows(IllegalStateException.class, () -> coordinator.acquire(successor));
-      Assert.assertTrue(failure.getMessage().contains(SEGMENT_NAME_STR));
-      Assert.assertEquals(semaphore.availablePermits(), 1);
-
-      // SegmentDataManager's offload latch makes a repeated offload a no-op. That must not clear the table failure.
-      segmentDataManager.offload();
-      Assert.expectThrows(IllegalStateException.class, () -> coordinator.acquire(successor));
-      verify(realtimeSegment).offload();
-    }
-  }
-
-  @Test
-  public void testMetadataRemovalCannotResumeAfterConsumptionPermitWasReleased()
-      throws Exception {
-    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
-      doThrow(new RetryableMetadataRemovalException("storage unavailable", new IllegalStateException()))
-          .when(realtimeSegment).offload();
-      segmentDataManager.setRealtimeSegment(realtimeSegment);
-      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
-      Assert.expectThrows(RetryableMetadataRemovalException.class, segmentDataManager::offload);
-      Assert.expectThrows(IllegalStateException.class, segmentDataManager::retryMetadataRemoval);
-      verify(realtimeSegment).offload();
-    }
-  }
-
-  @Test
-  public void testConcurrentMetadataRecoveryPreservesQueryReferenceAndConsumerPermit()
-      throws Exception {
-    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
-    CountDownLatch repairStarted = new CountDownLatch(1);
-    CountDownLatch finishRepair = new CountDownLatch(1);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      RealtimeTableDataManager metadataState = new RealtimeTableDataManager(null) {
-        {
-          _tableNameWithType = REALTIME_TABLE_NAME;
-          _logger = LoggerFactory.getLogger(RealtimeSegmentDataManagerTest.class);
-        }
-
-        @Override
-        protected void closeSegment(SegmentDataManager segment) {
-          segment.destroy();
-        }
-      };
-      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
-      doAnswer(invocation -> {
-        metadataState.onSegmentMetadataRemovalFailure(invocation.getArgument(0));
-        Assert.expectThrows(IllegalStateException.class, segmentDataManager::retryMetadataRemoval);
-        return null;
-      }).when(tableDataManager).onSegmentMetadataRemovalFailure(any(RealtimeSegmentDataManager.class));
-      doAnswer(invocation -> {
-        metadataState.checkMetadataHealthy(invocation.getArgument(0));
-        return null;
-      }).when(tableDataManager).checkMetadataHealthy(anyInt());
-      ConsumerCoordinator coordinator = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID);
-      Assert.assertTrue(coordinator.getSemaphore().tryAcquire());
-      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
-      Assert.assertTrue(segmentDataManager.increaseReferenceCount());
-      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
-      AtomicBoolean fail = new AtomicBoolean(true);
-      doAnswer(invocation -> {
-        if (fail.get()) {
-          throw new RetryableMetadataRemovalException("storage unavailable", new IllegalStateException());
-        }
-        repairStarted.countDown();
-        Assert.assertTrue(finishRepair.await(10, TimeUnit.SECONDS));
-        return invocation.callRealMethod();
-      }).when(realtimeSegment).offload();
-      segmentDataManager.setRealtimeSegment(realtimeSegment);
-      Assert.expectThrows(RetryableMetadataRemovalException.class, segmentDataManager::offload);
-      Assert.assertEquals(coordinator.getSemaphore().availablePermits(), 1);
-      Assert.assertEquals(segmentDataManager.getReferenceCount(), 2);
-      fail.set(false);
-      Future<?> first = executor.submit(() -> metadataState.retryFailedMetadataRemoval(SEGMENT_NAME_STR));
-      Assert.assertTrue(repairStarted.await(10, TimeUnit.SECONDS));
-      Future<?> second = executor.submit(() -> metadataState.retryFailedMetadataRemoval(SEGMENT_NAME_STR));
-      Assert.expectThrows(IllegalStateException.class, () -> metadataState.checkMetadataHealthy(PARTITION_GROUP_ID));
-      finishRepair.countDown();
-      first.get(10, TimeUnit.SECONDS);
-      second.get(10, TimeUnit.SECONDS);
-      metadataState.checkMetadataHealthy(PARTITION_GROUP_ID);
-      Assert.assertEquals(segmentDataManager.getReferenceCount(), 1);
-      verify(realtimeSegment, never()).destroy();
-      verify(realtimeSegment, times(2)).offload();
-      coordinator.acquire(new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID + 1, SEG_TIME_MS));
-      Assert.assertEquals(coordinator.getSemaphore().availablePermits(), 0);
-      coordinator.release();
-      metadataState.releaseSegment(segmentDataManager);
-      Assert.assertEquals(segmentDataManager.getReferenceCount(), 0);
-      verify(realtimeSegment).destroy();
-    } finally {
-      finishRepair.countDown();
-      executor.shutdownNow();
     }
   }
 

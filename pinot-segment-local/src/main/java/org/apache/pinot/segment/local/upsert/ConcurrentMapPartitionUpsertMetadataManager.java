@@ -250,14 +250,22 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       prevDocId, recordInfo);
                   return prevLocation;
                 } catch (Exception e) {
-                  _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                      e);
+                  // TODO: Restore the previous row on reader failure. This fallback loses its key location;
+                  // alert on the meter/log and follow pinot-core/METADATA_RECOVERY.md to replay the affected suffix.
+                  _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                      ServerMeter.REALTIME_METADATA_REMOVAL_FAILURES, 1);
+                  _logger.error("REALTIME_METADATA_REMOVAL_FAILED: source segment: {}, previous segment: {}, "
+                          + "removing key after reader failure; follow pinot-core/METADATA_RECOVERY.md",
+                      segment.getSegmentName(), prevSegment.getSegmentName(), e);
                   return null;
                 }
               } else {
                 // Should not happen
-                _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
-                    prevSegment.getSegmentName());
+                _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                    ServerMeter.REALTIME_METADATA_REMOVAL_FAILURES, 1);
+                _logger.error("REALTIME_METADATA_REMOVAL_FAILED: source segment: {}, previous segment: {}, "
+                        + "removing key because valid doc ids are missing; follow pinot-core/METADATA_RECOVERY.md",
+                    segment.getSegmentName(), prevSegment.getSegmentName());
                 return null;
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {

@@ -49,6 +49,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CLP_TOO_MANY_ENCODED_VARS("rows", false),
   REALTIME_CLP_UNENCODABLE("rows", false),
   REALTIME_CLP_ENCODED_NON_STRINGS("rows", false),
+  REALTIME_METADATA_REMOVAL_FAILURES("exceptions", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE("bytes", false),
   REALTIME_OFFSET_COMMITS("commits", true),
