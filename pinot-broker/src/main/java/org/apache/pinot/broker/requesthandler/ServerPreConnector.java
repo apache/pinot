@@ -77,14 +77,26 @@ public class ServerPreConnector {
 
   /// Floor for the straggler window: the minimum quiet time, once at least one channel is up, to wait for
   /// the next one before concluding the rest are stuck. The effective window scales up off the first
-  /// observed connect latency (to twice it) so that when there are more channels than worker threads, the
-  /// gap between completion waves is not misread as a straggler. A quiet window this long means what is
-  /// left is stuck rather than merely slow, so the caller is released and the stragglers finish -- or time
-  /// out -- on their own daemon threads. Until the first *successful* connect the whole budget is
-  /// available: with nothing up yet there is no way to tell "every server is slow" from "a few are stuck",
-  /// and a fast failure must not start the clock.
+  /// observed connect latency (to twice it, capped at [#STRAGGLER_GRACE_CAP_MS]) so that when there are more
+  /// channels than worker threads, the gap between completion waves is not misread as a straggler. A quiet
+  /// window this long means what is left is stuck rather than merely slow, so the caller is released and the
+  /// stragglers finish -- or time out -- on their own daemon threads. Until the first *successful* connect
+  /// the whole budget is available: with nothing up yet there is no way to tell "every server is slow" from
+  /// "a few are stuck", and a fast failure must not start the clock.
   @VisibleForTesting
   static final long STRAGGLER_GRACE_MS = 2_000L;
+
+  /// Ceiling for the straggler window. The window scales to twice the first observed connect latency (see
+  /// [#stragglerGraceMs]); without a ceiling a very slow *healthy* connect would stretch it arbitrarily -- a
+  /// 12 s connect would make the window 24 s, so a genuinely dead server would then hold the readiness gate
+  /// for almost the whole budget, defeating the protection the window exists for. Capping the window bounds
+  /// the dead-server delay to roughly one connect plus this ceiling, however slow the healthy connects are.
+  /// 10 s (5x the floor) covers realistic healthy connect latencies -- typical TLS connects are well under a
+  /// second and even a loaded server rarely takes this long -- while keeping the dead-server delay well under
+  /// the budget. A cluster whose connects are slower than this is under-counted, which is benign: those
+  /// channels still finish on the daemon threads and are published for the first query to reuse.
+  @VisibleForTesting
+  static final long STRAGGLER_GRACE_CAP_MS = 10_000L;
 
   /// Opens one broker-to-server channel. Implementations must bound their own wait by `timeoutMs` and
   /// must not throw; the return value reports whether the channel is connected.
@@ -175,8 +187,8 @@ public class ServerPreConnector {
               // All tasks started together, so the first success approximates one connect's latency. With
               // more channels than workers the surplus completes in waves one latency apart, so a window
               // narrower than that latency would abandon healthy channels still queued behind the pool.
-              // Scale to twice the first latency, never below the floor.
-              graceMs = Math.max(STRAGGLER_GRACE_MS, 2 * (System.currentTimeMillis() - startMs));
+              // Scale to twice the first latency, clamped to the floor and ceiling (see stragglerGraceMs).
+              graceMs = stragglerGraceMs(System.currentTimeMillis() - startMs);
             }
             connected++;
           }
@@ -206,5 +218,15 @@ public class ServerPreConnector {
       LOGGER.info("Broker pre-connected {}/{} channel(s) in {} ms", connected, channelCount, elapsedMs);
     }
     return connected;
+  }
+
+  /// The straggler window for a run whose first channel came up after `observedConnectLatencyMs`. Scaled to
+  /// twice that latency so completion waves (more channels than workers) are not misread as stragglers, then
+  /// clamped to [[#STRAGGLER_GRACE_MS], [#STRAGGLER_GRACE_CAP_MS]]. The floor keeps a fast cluster's window
+  /// from collapsing below the base grace; the ceiling keeps a very slow *healthy* connect from stretching
+  /// the window so far that a genuinely dead server would hold the gate for most of the budget.
+  @VisibleForTesting
+  static long stragglerGraceMs(long observedConnectLatencyMs) {
+    return Math.max(STRAGGLER_GRACE_MS, Math.min(STRAGGLER_GRACE_CAP_MS, 2 * observedConnectLatencyMs));
   }
 }

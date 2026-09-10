@@ -302,6 +302,52 @@ public class ServerPreConnectorTest {
         "all healthy channels must connect even when they complete in waves slower than the grace floor");
   }
 
+  /// The grace window scales to twice the first connect latency, clamped to the floor and the ceiling: a
+  /// fast connect pins it at the floor, a mid connect scales linearly, and a very slow connect is capped so
+  /// a dead server cannot hold the gate for most of the budget.
+  @Test
+  public void stragglerGraceScalesBetweenFloorAndCeiling() {
+    // Fast connect: 2 * 50 = 100 ms is below the floor, so the floor wins.
+    assertEquals(ServerPreConnector.stragglerGraceMs(50L), ServerPreConnector.STRAGGLER_GRACE_MS);
+    // Mid connect: 2 * 2000 = 4000 ms sits between floor and ceiling and is used as-is.
+    assertEquals(ServerPreConnector.stragglerGraceMs(2_000L), 4_000L);
+    // Very slow connect: 2 * 8000 = 16000 ms exceeds the ceiling, so the ceiling caps it.
+    assertEquals(ServerPreConnector.stragglerGraceMs(8_000L), ServerPreConnector.STRAGGLER_GRACE_CAP_MS);
+  }
+
+  /// Mixed connect latencies -- one fast server, the rest slower than the grace floor -- under-count, and no
+  /// window size fixes it. The window is sized off the *first* (fastest) connect, so a fast one pins it at
+  /// the floor; the slower-but-healthy channels then arrive after the floor has elapsed and are released
+  /// before being counted. This is an inherent limit of a reactive grace window (the release decision fires
+  /// before the slow channels return) -- not something the ceiling changes -- and it is benign: the uncounted
+  /// channels still finish on the daemon threads and are published for the first query. Documents the
+  /// behavior so a later change does not "fix" it by inflating the window for every cluster.
+  @Test
+  public void mixedLatencyUnderCountsAndIsNotFixedByTheCeiling() {
+    List<ServerInstance> servers = mockServers(8);   // 8 channels, all start at once on the 16-worker pool
+    long slowMs = ServerPreConnector.STRAGGLER_GRACE_MS + 1000L;   // 3000 ms, slower than the 2000 ms floor
+    long budgetMs = 30_000L;
+    AtomicInteger n = new AtomicInteger();
+
+    int connected = new ServerPreConnector(() -> targets(servers, TableType.OFFLINE),
+        (server, tableType, timeoutMs) -> {
+          if (n.getAndIncrement() == 0) {
+            return true;   // one fast connect completes first and pins the window at the floor
+          }
+          try {
+            Thread.sleep(slowMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+          }
+          return true;
+        }).preConnect(System.currentTimeMillis() + budgetMs);
+
+    assertEquals(connected, 1,
+        "mixed latency under-counts: the fast connect pins the window at the floor, so the slower healthy "
+            + "channels are released before they are counted -- benign, and not fixable by the ceiling");
+  }
+
   /// The thread pool is a throughput cap, not a safety bound, so each connect has to carry its own
   /// deadline-derived timeout. Without it a channel queued behind a stuck worker could outlive the
   /// budget entirely.
