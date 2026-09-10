@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,10 +74,13 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
   // ignored key of every consumed row.
   private volatile long _ignoredKeyDropCount;
-  // Batched for the same reason as _ignoredKeyDropCount: keep a metered-value call, which rebuilds
-  // the metric name and hits the registry, off the per-row consuming path. Flushed in close().
-  private volatile long _typeCoercionFailureCount;
-  private volatile long _typeInferenceFailureCount;
+  // Single-writer (see #index): the consuming thread caches and reuses the PinotMeter, which skips
+  // the per-value metric-name rebuild and registry lookup addMeteredTableValue would otherwise do,
+  // while still marking the meter live instead of batching the count to close().
+  @Nullable
+  private PinotMeter _typeCoercionFailureMeter;
+  @Nullable
+  private PinotMeter _typeInferenceFailureMeter;
 
   public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
@@ -169,7 +173,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
                 + " Falling back to STRING.",
             _openStructColumn, key, rawValue.getClass().getName());
       }
-      _typeInferenceFailureCount++;
+      _typeInferenceFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES,
+          _typeInferenceFailureMeter);
       return DataType.STRING;
     }
     return establishedType != null ? establishedType : inferred;
@@ -180,7 +185,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// own stored type, so the return value is unused and only the side effect matters.
   private void meterIfUninferable(Object rawValue) {
     if (OpenStructTypeInference.inferDataType(rawValue) == null) {
-      _typeInferenceFailureCount++;
+      _typeInferenceFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES,
+          _typeInferenceFailureMeter);
     }
   }
 
@@ -195,9 +201,21 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
-      _typeCoercionFailureCount++;
+      _typeCoercionFailureMeter = meterFailure(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES,
+          _typeCoercionFailureMeter);
       return null;
     }
+  }
+
+  /// Marks one occurrence on `meter`, reusing `reusedMeter` when present to skip the metric-name
+  /// rebuild and registry lookup a fresh [ServerMetrics#addMeteredTableValue] call would do. Returns
+  /// the meter to reuse on the next call (unchanged when no [ServerMetrics] is registered).
+  private PinotMeter meterFailure(ServerMeter meter, @Nullable PinotMeter reusedMeter) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null) {
+      return reusedMeter;
+    }
+    return serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn, meter, 1, reusedMeter);
   }
 
   /// Allocates a new MutableKeyColumn for `key` with the resolved `storedType` and
@@ -299,30 +317,26 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Override
   public void close()
       throws IOException {
-    flushMeters();
-    for (MutableKeyColumn keyCol : _keyColumns.values()) {
-      keyCol.close();
+    try {
+      flushMeters();
+    } finally {
+      for (MutableKeyColumn keyCol : _keyColumns.values()) {
+        keyCol.close();
+      }
     }
   }
 
-  /// Emits the batched ingestion counters. Counters accumulate per row on the consuming path and
-  /// are flushed once here, mirroring what [OpenStructColumnSplitter] does at seal time.
+  /// Emits the batched ignored-key-drop counter. It accumulates per row on the consuming path and
+  /// is flushed once here, mirroring what [OpenStructColumnSplitter] does at seal time. Zeroed after
+  /// emitting so a second close() (e.g. destroy() after commit()) does not double-count.
   private void flushMeters() {
-    ServerMetrics serverMetrics = ServerMetrics.get();
-    if (serverMetrics == null) {
-      return;
-    }
     if (_ignoredKeyDropCount > 0) {
-      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
-    }
-    if (_typeCoercionFailureCount > 0) {
-      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _typeCoercionFailureCount);
-    }
-    if (_typeInferenceFailureCount > 0) {
-      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, _typeInferenceFailureCount);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+      }
+      _ignoredKeyDropCount = 0;
     }
   }
 }
