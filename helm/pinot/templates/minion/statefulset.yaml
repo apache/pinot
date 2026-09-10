@@ -25,6 +25,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.minionLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.minion.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -66,7 +67,7 @@ spec:
       - name: minion
         securityContext:
           {{- toYaml .Values.minion.securityContext | nindent 10 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.minionImage.repository | default .Values.image.repository }}:{{ .Values.minionImage.tag | default .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
           "{{ .Values.minion.startCommand }}",
