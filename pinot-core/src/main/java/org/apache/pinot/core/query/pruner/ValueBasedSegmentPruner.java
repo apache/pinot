@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -49,7 +50,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
-  protected static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
+  private static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
   protected int _inPredicateThreshold;
 
   @Override
@@ -113,16 +114,37 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
 
   abstract boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions);
 
-  /// Prunes across the query executor when there are enough segments to be worth it.
-  ///
-  /// Each task owns its value and data-source caches. Parsed values are reused across its segments, while the
-  /// data-source cache is cleared for each segment. The result order can differ from the input order, as in
-  /// [BloomFilterSegmentPruner].
+  @Override
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+    return prune(segments, query, null, null);
+  }
+
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
       @Nullable ExecutorService executorService) {
+    return prune(segments, query, executorService, null);
+  }
+
+  /// Each worker owns its caches. Parallel pruning may return segments in a different order.
+  protected List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
+      @Nullable ExecutorService executorService, @Nullable FetchContext[] fetchContexts) {
+    if (segments.isEmpty()) {
+      return segments;
+    }
     if (executorService == null || segments.size() <= TARGET_NUM_SEGMENTS_PER_THREAD) {
-      return prune(segments, query);
+      FilterContext filter = Objects.requireNonNull(query.getFilter());
+      ValueCache cachedValues = new ValueCache();
+      Map<String, DataSource> dataSourceCache = new HashMap<>();
+      List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
+      int i = 0;
+      for (IndexSegment segment : segments) {
+        dataSourceCache.clear();
+        FetchContext fetchContext = fetchContexts != null ? fetchContexts[i++] : null;
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, query)) {
+          selectedSegments.add(segment);
+        }
+      }
+      return selectedSegments;
     }
     int numSegments = segments.size();
     int numTasks = QueryMultiThreadingUtils.getNumTasks(numSegments, TARGET_NUM_SEGMENTS_PER_THREAD,
@@ -134,13 +156,13 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       Map<String, DataSource> dataSourceCache = new HashMap<>();
       List<IndexSegment> selectedSegments = new ArrayList<>();
       for (int i = index; i < numSegments; i += numTasks) {
-        // The deadline helper interrupts cancelled tasks and waits for them before releasing the segments.
         if (Thread.currentThread().isInterrupted()) {
           throw new QueryCancelledException("Cancelled while running " + getClass().getSimpleName());
         }
         dataSourceCache.clear();
         IndexSegment segment = segments.get(i);
-        if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, query)) {
+        FetchContext fetchContext = fetchContexts != null ? fetchContexts[i] : null;
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, query)) {
           selectedSegments.add(segment);
         }
       }
@@ -158,22 +180,17 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     return allSelectedSegments;
   }
 
-  @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    if (segments.isEmpty()) {
-      return segments;
+  private boolean pruneSegmentWithFetchContext(IndexSegment segment, @Nullable FetchContext fetchContext,
+      FilterContext filter, Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext query) {
+    if (fetchContext == null) {
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
     }
-    FilterContext filter = Objects.requireNonNull(query.getFilter());
-    ValueCache cachedValues = new ValueCache();
-    Map<String, DataSource> dataSourceCache = new HashMap<>();
-    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
-    for (IndexSegment segment : segments) {
-      dataSourceCache.clear();
-      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, query)) {
-        selectedSegments.add(segment);
-      }
+    segment.acquire(fetchContext);
+    try {
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
+    } finally {
+      segment.release(fetchContext);
     }
-    return selectedSegments;
   }
 
   protected boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
