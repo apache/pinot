@@ -52,11 +52,13 @@ import org.slf4j.LoggerFactory;
 /// no-op, so this is safe to call more than once.
 ///
 /// Bounded so it can never stall startup: a capped thread pool, a per-channel connect bound derived from
-/// the remaining budget, a per-channel wait clamped to the caller's deadline, and a straggler grace window
-/// ([#STRAGGLER_GRACE_MS]) that, once at least one channel is up, releases the caller when the rest stop
-/// arriving rather than waiting out the whole budget on one stuck server. A server that is unreachable or
-/// itself restarting is logged and skipped -- the existing lazy-connect path still serves it. This class
-/// is stateless and thread-safe.
+/// the remaining budget, and the caller's `deadlineMs` as the single release bound. There is no early
+/// release: [#preConnect] waits for each channel to resolve (connect or fail) up to the deadline, then
+/// returns. That keeps readiness honest -- the broker is released once its channels are actually warm, or
+/// the budget is spent -- rather than guessing from a quiet period that the rest are stuck, which cannot
+/// tell a slow-but-healthy connect from a dead one and so can release with healthy channels still cold. A
+/// failed or unreachable connect is logged and skipped and never stops the others from being waited for;
+/// the deadline is the only thing that ends the wait early. This class is stateless and thread-safe.
 ///
 /// It takes its dependencies as functions rather than concrete `RoutingManager`/`QueryRouter` types so
 /// the parallelism, budget and failure handling can be unit-tested without a live broker.
@@ -70,33 +72,10 @@ public class ServerPreConnector {
   /// query load, so the threads are almost entirely parked rather than contending for CPU.
   ///
   /// It is a throughput cap, not a safety bound: with more channels than threads the surplus queues
-  /// behind the workers, so the budget alone must not be what stops a stuck connect. That is why
+  /// behind the workers, so the deadline alone must not be what stops a stuck connect. That is why
   /// [ChannelConnector] takes a per-channel timeout.
   @VisibleForTesting
   static final int MAX_CONNECT_THREADS = 16;
-
-  /// Floor for the straggler window: the minimum quiet time, once at least one channel is up, to wait for
-  /// the next one before concluding the rest are stuck. The effective window scales up off the first
-  /// observed connect latency (to twice it, capped at [#STRAGGLER_GRACE_CAP_MS]) so that when there are more
-  /// channels than worker threads, the gap between completion waves is not misread as a straggler. A quiet
-  /// window this long means what is left is stuck rather than merely slow, so the caller is released and the
-  /// stragglers finish -- or time out -- on their own daemon threads. Until the first *successful* connect
-  /// the whole budget is available: with nothing up yet there is no way to tell "every server is slow" from
-  /// "a few are stuck", and a fast failure must not start the clock.
-  @VisibleForTesting
-  static final long STRAGGLER_GRACE_MS = 2_000L;
-
-  /// Ceiling for the straggler window. The window scales to twice the first observed connect latency (see
-  /// [#stragglerGraceMs]); without a ceiling a very slow *healthy* connect would stretch it arbitrarily -- a
-  /// 12 s connect would make the window 24 s, so a genuinely dead server would then hold the readiness gate
-  /// for almost the whole budget, defeating the protection the window exists for. Capping the window bounds
-  /// the dead-server delay to roughly one connect plus this ceiling, however slow the healthy connects are.
-  /// 10 s (5x the floor) covers realistic healthy connect latencies -- typical TLS connects are well under a
-  /// second and even a loaded server rarely takes this long -- while keeping the dead-server delay well under
-  /// the budget. A cluster whose connects are slower than this is under-counted, which is benign: those
-  /// channels still finish on the daemon threads and are published for the first query to reuse.
-  @VisibleForTesting
-  static final long STRAGGLER_GRACE_CAP_MS = 10_000L;
 
   /// Opens one broker-to-server channel. Implementations must bound their own wait by `timeoutMs` and
   /// must not throw; the return value reports whether the channel is connected.
@@ -125,10 +104,10 @@ public class ServerPreConnector {
   }
 
   /// Opens the supplied (server, table type) channels in parallel, bounded by `deadlineMs` (an absolute
-  /// [System#currentTimeMillis] value). Returns the number of channels connected **before the caller was
-  /// released** -- so a straggler that connects after the grace window (see [#STRAGGLER_GRACE_MS]) is not
-  /// counted, even though its channel is still published for the first query to reuse. Never throws: a
-  /// channel that fails or times out is logged and skipped.
+  /// [System#currentTimeMillis] value). Returns the number of channels connected by the deadline. A channel
+  /// still connecting when the deadline passes keeps warming on its daemon thread and is published for the
+  /// first query to reuse; it is simply not counted. Never throws: a channel that fails or times out is
+  /// logged and skipped, and never stops the others from being waited for.
   public int preConnect(long deadlineMs) {
     // Snapshot the target view once. The supplier may derive from a live routing view that another thread
     // updates during startup; snapshotting keeps the channel count consistent with the tasks actually
@@ -147,9 +126,6 @@ public class ServerPreConnector {
     // still queues for a worker, which is what the per-channel timeout bounds.
     CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executor);
     int connected = 0;
-    boolean releasedEarly = false;
-    // The straggler window, scaled up off the first observed connect latency (see where it is set below).
-    long graceMs = STRAGGLER_GRACE_MS;
     try {
       for (ChannelTarget target : targets) {
         completionService.submit(() -> _connector.connect(target.serverInstance(), target.tableType(),
@@ -160,36 +136,19 @@ public class ServerPreConnector {
         if (remainingMs <= 0) {
           break;
         }
-        // Keep the whole budget available until the first *successful* connect: a quiet window only means
-        // "the rest are stuck" once at least one channel has actually come up. Keying the exemption on the
-        // first completion instead would let a single fast event -- an instantly refused connect, or one
-        // nearby server -- start the grace clock before the healthy-but-slower channels return, abandoning
-        // them. Once one channel is up, a quiet grace window is the signal that what is left is stuck rather
-        // than slow, and the caller is released -- one unreachable server otherwise holds the gate for the
-        // entire budget. (A cluster where no server ever connects still exits promptly when connects fail
-        // fast, and waits the budget only when every connect black-holes, which is the correct thing to do
-        // for a broker that can reach nothing.)
-        // `graceMs` is scaled off the first connect's latency (set below), so with more channels than
-        // workers the gap between completion waves is not misread as a straggler.
-        long waitMs = connected == 0 ? remainingMs : Math.min(remainingMs, graceMs);
         try {
-          Future<Boolean> future = completionService.poll(waitMs, TimeUnit.MILLISECONDS);
+          // Wait up to the whole remaining budget for the next channel. A completed channel returns
+          // immediately, so a fully healthy cluster is released as soon as its last channel is up -- not at
+          // the deadline. The only thing this actually blocks on is a channel that never completes (an
+          // unreachable server that black-holes to its own connect timeout); the deadline is the single
+          // bound on that, and one such server costs at most the budget, never the others' warm-up.
+          Future<Boolean> future = completionService.poll(remainingMs, TimeUnit.MILLISECONDS);
           if (future == null) {
-            // The grace cap was binding (we could have waited longer but chose not to) only when waitMs was
-            // clamped below the remaining budget; otherwise this is plain budget exhaustion.
-            releasedEarly = waitMs < remainingMs;
-            LOGGER.info("No pre-connect channel completed in {} ms with {}/{} still outstanding; releasing startup "
-                + "and leaving them to the lazy connect path", waitMs, channelCount - i, channelCount);
+            LOGGER.info("Pre-connect budget elapsed with {}/{} channel(s) still outstanding; releasing startup "
+                + "and leaving them to the lazy connect path", channelCount - i, channelCount);
             break;
           }
           if (Boolean.TRUE.equals(future.get())) {
-            if (connected == 0) {
-              // All tasks started together, so the first success approximates one connect's latency. With
-              // more channels than workers the surplus completes in waves one latency apart, so a window
-              // narrower than that latency would abandon healthy channels still queued behind the pool.
-              // Scale to twice the first latency, clamped to the floor and ceiling (see stragglerGraceMs).
-              graceMs = stragglerGraceMs(System.currentTimeMillis() - startMs);
-            }
             connected++;
           }
         } catch (InterruptedException e) {
@@ -197,36 +156,25 @@ public class ServerPreConnector {
           Thread.currentThread().interrupt();
           break;
         } catch (ExecutionException e) {
-          // A server that is unreachable or itself restarting must not block startup.
+          // A server that is unreachable or itself restarting must not stop us waiting for the others.
           LOGGER.debug("Pre-connect did not complete for one channel", e);
         }
       }
     } finally {
-      // shutdown(), not shutdownNow(): a channel we stopped waiting on is still connecting on a daemon
-      // thread. Interrupting a worker parked in connect().sync() abandons a ChannelFuture that can still
-      // complete, leaking a socket nobody references or closes. Letting the workers run means a late
-      // channel is still published for the first query to reuse, and each task is already bounded by its
-      // own deadline-derived timeout, so none outlives the budget.
+      // shutdown(), not shutdownNow(): a channel still connecting past the deadline is on a daemon thread.
+      // Interrupting a worker parked in connect().sync() abandons a ChannelFuture that can still complete,
+      // leaking a socket nobody references or closes. Letting the workers run means a late channel still
+      // warms in the background and is published for the first query to reuse, and each task is already
+      // bounded by its own deadline-derived timeout, so none outlives the budget.
       executor.shutdown();
     }
     long elapsedMs = System.currentTimeMillis() - startMs;
     if (connected < channelCount) {
-      LOGGER.warn("Broker pre-connected {}/{} channel(s) in {} ms ({}); the rest fall back to the lazy connect "
-          + "path", connected, channelCount, elapsedMs, releasedEarly ? "released early on a straggler grace window"
-          : "budget elapsed");
+      LOGGER.warn("Broker pre-connected {}/{} channel(s) in {} ms; the rest fall back to the lazy connect path",
+          connected, channelCount, elapsedMs);
     } else {
       LOGGER.info("Broker pre-connected {}/{} channel(s) in {} ms", connected, channelCount, elapsedMs);
     }
     return connected;
-  }
-
-  /// The straggler window for a run whose first channel came up after `observedConnectLatencyMs`. Scaled to
-  /// twice that latency so completion waves (more channels than workers) are not misread as stragglers, then
-  /// clamped to [[#STRAGGLER_GRACE_MS], [#STRAGGLER_GRACE_CAP_MS]]. The floor keeps a fast cluster's window
-  /// from collapsing below the base grace; the ceiling keeps a very slow *healthy* connect from stretching
-  /// the window so far that a genuinely dead server would hold the gate for most of the budget.
-  @VisibleForTesting
-  static long stragglerGraceMs(long observedConnectLatencyMs) {
-    return Math.max(STRAGGLER_GRACE_MS, Math.min(STRAGGLER_GRACE_CAP_MS, 2 * observedConnectLatencyMs));
   }
 }
