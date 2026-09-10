@@ -2122,19 +2122,22 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     // Pre-processing would repair the segment, so it has to be off for the loader to ever see the stale star-tree.
-    // 'skipSegmentPreprocess' is the knob that turns it off, and it takes effect through
-    // ImmutableSegmentLoader#needPreprocess, not SegmentPreProcessor#needProcess. It resolves live through the
-    // table config, so both assertions below use the same IndexLoadingConfig.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
       assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
-      indexingConfig.setSkipSegmentPreprocess(true);
-      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
     }
 
-    // Load without pre-processing, as a caller does once needPreprocess() answers false. Note the flag alone is not
-    // enough: ImmutableSegmentLoader#preprocess does not re-check it, so a caller that asks for pre-processing
-    // unconditionally still repairs the segment.
-    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    // 'skipSegmentPreprocess' is the knob that turns it off, and it takes effect through
+    // ImmutableSegmentLoader#needPreprocess, not SegmentPreProcessor#needProcess. IndexLoadingConfig snapshots it,
+    // so it needs a fresh config rather than an in-place edit of the table config.
+    indexingConfig.setSkipSegmentPreprocess(true);
+    IndexLoadingConfig skipPreprocessLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, skipPreprocessLoadingConfig));
+    }
+
+    // Ask the loader to pre-process, as the server does: it gates on needPreprocess() itself, so the flag keeps the
+    // stale star-tree in place and the star-tree loader has to cope with it rather than fail the load.
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, skipPreprocessLoadingConfig, true);
     try {
       assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
       // The stale star-tree is still on disk; it is skipped at load time, not removed
