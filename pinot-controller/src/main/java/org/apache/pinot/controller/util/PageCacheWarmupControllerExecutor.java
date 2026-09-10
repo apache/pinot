@@ -21,12 +21,13 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.BiMap;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -43,7 +44,6 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -148,26 +149,23 @@ public class PageCacheWarmupControllerExecutor {
           _maxPageCacheWarmupDurationMs);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
 
-      PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_pageCacheWarmupQueriesDataDir).getScheme());
-      File tableDir = new File(_pageCacheWarmupQueriesDataDir, tableNameWithType);
-      File[] files = tableDir.listFiles(File::isFile);
-      if (files == null || files.length == 0) {
+      URI tableDirUri = getTableDirectoryUri(_pageCacheWarmupQueriesDataDir, tableNameWithType);
+      PinotFS pinotFS = PinotFSFactory.create(tableDirUri.getScheme());
+      URI queryFileUri = getMostRecentlyModifiedFileUri(pinotFS, tableDirUri);
+      if (queryFileUri == null) {
         LOGGER.warn("No warm‑up query files found for table: {}", tableNameWithType);
         return;
       }
-      // If there are multiple files, use the most recently modified one.
-      Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
-      File queryFile = files[0];
-      LOGGER.info("Using warm‑up query file: {}", queryFile.getName());
+      LOGGER.info("Using warm‑up query file: {}", queryFileUri);
 
       List<String> queries;
-      try (InputStream inputStream = pinotFS.open(queryFile.toURI())) {
+      try (InputStream inputStream = pinotFS.open(queryFileUri)) {
         String json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         queries = JsonUtils.stringToObject(json, new TypeReference<>() {
         });
       }
       if (queries == null || queries.isEmpty()) {
-        LOGGER.warn("No queries found in warm‑up query file: {} for table: {}", queryFile.getName(), tableNameWithType);
+        LOGGER.warn("No queries found in warm‑up query file: {} for table: {}", queryFileUri, tableNameWithType);
         return;
       }
 
@@ -211,6 +209,149 @@ public class PageCacheWarmupControllerExecutor {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Failed to serve queries for table: {}", tableNameWithType, e);
     }
+  }
+
+  @Nullable
+  private static URI getMostRecentlyModifiedFileUri(PinotFS pinotFS, URI directoryUri)
+      throws IOException, URISyntaxException {
+    List<FileMetadata> fileMetadataList;
+    try {
+      fileMetadataList = pinotFS.listFilesWithMetadata(directoryUri, false);
+    } catch (UnsupportedOperationException e) {
+      return getMostRecentlyModifiedFileUriFromPaths(pinotFS, directoryUri);
+    } catch (IOException | IllegalArgumentException e) {
+      try {
+        if (!pinotFS.exists(directoryUri)) {
+          return null;
+        }
+      } catch (IOException | RuntimeException existsException) {
+        e.addSuppressed(existsException);
+      }
+      throw e;
+    }
+
+    URI mostRecentlyModifiedFileUri = null;
+    long mostRecentModificationTime = Long.MIN_VALUE;
+    for (FileMetadata fileMetadata : fileMetadataList) {
+      if (!fileMetadata.isDirectory()) {
+        URI fileUri = getListedFileUri(fileMetadata.getFilePath(), directoryUri);
+        long modificationTime = fileMetadata.getLastModifiedTime();
+        if (modificationTime <= 0) {
+          modificationTime = pinotFS.lastModified(fileUri);
+        }
+        if (mostRecentlyModifiedFileUri == null || modificationTime > mostRecentModificationTime) {
+          mostRecentlyModifiedFileUri = fileUri;
+          mostRecentModificationTime = modificationTime;
+        }
+      }
+    }
+    return mostRecentlyModifiedFileUri;
+  }
+
+  @Nullable
+  private static URI getMostRecentlyModifiedFileUriFromPaths(PinotFS pinotFS, URI directoryUri)
+      throws IOException, URISyntaxException {
+    String[] filePaths;
+    try {
+      filePaths = pinotFS.listFiles(directoryUri, false);
+    } catch (IOException | IllegalArgumentException e) {
+      try {
+        if (!pinotFS.exists(directoryUri)) {
+          return null;
+        }
+      } catch (IOException | RuntimeException existsException) {
+        e.addSuppressed(existsException);
+      }
+      throw e;
+    }
+
+    URI mostRecentlyModifiedFileUri = null;
+    long mostRecentModificationTime = Long.MIN_VALUE;
+    for (String filePath : filePaths) {
+      URI fileUri = getListedFileUri(filePath, directoryUri);
+      if (!pinotFS.isDirectory(fileUri)) {
+        long modificationTime = pinotFS.lastModified(fileUri);
+        if (mostRecentlyModifiedFileUri == null || modificationTime > mostRecentModificationTime) {
+          mostRecentlyModifiedFileUri = fileUri;
+          mostRecentModificationTime = modificationTime;
+        }
+      }
+    }
+    return mostRecentlyModifiedFileUri;
+  }
+
+  private static URI getTableDirectoryUri(String dataDir, String tableNameWithType) {
+    try {
+      URI dataDirUri = new URI(dataDir);
+      if (dataDirUri.getScheme() != null) {
+        String encodedTableName = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8).replace("+", "%20");
+        return new URI(dataDir + (dataDir.endsWith("/") ? "" : "/") + encodedTableName);
+      }
+    } catch (URISyntaxException e) {
+      if (dataDir.matches("^[A-Za-z][A-Za-z0-9+.-]*://.*")) {
+        throw new IllegalArgumentException("Invalid page cache warmup query data directory: " + dataDir, e);
+      }
+      // Preserve the existing File semantics for local paths that are not valid URI strings.
+    }
+    return new File(dataDir, tableNameWithType).toURI();
+  }
+
+  private static URI getListedFileUri(String filePath, URI directoryUri)
+      throws URISyntaxException {
+    if ("file".equalsIgnoreCase(directoryUri.getScheme())
+        && !filePath.regionMatches(true, 0, "file:", 0, "file:".length())) {
+      return new File(filePath).toURI();
+    }
+
+    try {
+      URI fileUri = new URI(filePath);
+      if (fileUri.getScheme() != null && fileUri.getRawQuery() == null && fileUri.getRawFragment() == null
+          && !usesRawQualifiedListingPaths(fileUri.getScheme())) {
+        return fileUri;
+      }
+    } catch (URISyntaxException e) {
+      // Rebuild raw filesystem paths below so reserved filename characters are encoded as path components.
+    }
+
+    String scheme = directoryUri.getScheme();
+    String authority = directoryUri.getAuthority();
+    String path = filePath;
+    int schemeSeparatorIndex = getSchemeSeparatorIndex(filePath);
+    if (schemeSeparatorIndex >= 0) {
+      scheme = filePath.substring(0, schemeSeparatorIndex);
+      path = filePath.substring(schemeSeparatorIndex + 1);
+      if (path.startsWith("//")) {
+        int pathStartIndex = path.indexOf('/', 2);
+        if (pathStartIndex < 0) {
+          authority = path.substring(2);
+          path = "";
+        } else {
+          authority = path.substring(2, pathStartIndex);
+          path = path.substring(pathStartIndex);
+        }
+      } else if (!scheme.equalsIgnoreCase(directoryUri.getScheme())) {
+        authority = null;
+      }
+    }
+    return new URI(scheme, authority, path, null, null);
+  }
+
+  private static boolean usesRawQualifiedListingPaths(String scheme) {
+    return "s3".equalsIgnoreCase(scheme) || "s3a".equalsIgnoreCase(scheme);
+  }
+
+  private static int getSchemeSeparatorIndex(String uri) {
+    int separatorIndex = uri.indexOf(':');
+    if (separatorIndex <= 0 || !Character.isLetter(uri.charAt(0))) {
+      return -1;
+    }
+    for (int i = 1; i < separatorIndex; i++) {
+      char character = uri.charAt(i);
+      if (!Character.isLetterOrDigit(character) && character != '+' && character != '-' && character != '.') {
+        return -1;
+      }
+    }
+    return separatorIndex;
   }
 
   /// Sends a single warm‑up HTTP request with retries and logs the outcome.
