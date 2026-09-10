@@ -223,14 +223,16 @@ public class OpenStructColumnSplitterTest {
     PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(sparseCol);
     assertNotNull(props);
 
-    // Regression: the sparse column's metadata used to omit several properties ColumnMetadataImpl.
-    // fromPropertiesConfiguration() reads via config.getInt() with no default (e.g. CARDINALITY). This branch's
-    // reader still tolerates a missing bitsPerElement/lengthOfEachEntry/maxNumberOfMultiValues via UNAVAILABLE
-    // defaults, but the sibling early-release branch's stricter reader throws NoSuchElementException on the same
-    // gap, so keep this column on the standard addColumnMetadataInfo() path and verify it round-trips cleanly.
+    // Regression: the hand-rolled metadata this replaced never wrote FieldConfig.EncodingType or
+    // LENGTH_OF_LONGEST_ELEMENT, and approximated CARDINALITY as the non-null doc count (1 here) rather than the
+    // real distinct-value count (2: the one non-empty json blob, plus the "" default shared by the 9 absent docs).
+    // Assert the values that only the real addColumnMetadataInfo()/statsCollector path can produce.
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(props, 10, sparseCol);
     assertEquals(metadata.getFieldSpec().getDataType(), DataType.STRING);
     assertFalse(metadata.hasDictionary());
+    assertEquals(metadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+    assertEquals(metadata.getCardinality(), 2);
+    assertTrue(metadata.getLengthOfLongestElement() > 0);
   }
 
   @Test
