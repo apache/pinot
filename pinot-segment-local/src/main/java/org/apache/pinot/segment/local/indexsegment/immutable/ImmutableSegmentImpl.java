@@ -44,7 +44,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.segment.local.upsert.UpsertSnapshotFingerprint;
 import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -98,8 +97,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
-  @Nullable
-  private volatile UpsertSnapshotFingerprint.Cache _snapshotFingerprintCache;
 
   public ImmutableSegmentImpl(
       SegmentDirectory segmentDirectory,
@@ -183,35 +180,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Nullable
   public MutableRoaringBitmap loadDocIdsFromSnapshot(String fileName) {
-    SavedDocIdsSnapshot snapshot = loadSavedDocIdsSnapshot(fileName, false);
-    return snapshot != null ? snapshot.bitmap() : null;
-  }
-
-  /// Reads the existing file once. The optional fingerprint binds the returned membership to these exact raw bytes,
-  /// rather than to a later read or the reserialized bitmap in an API response.
-  @Nullable
-  public SavedDocIdsSnapshot loadSavedDocIdsSnapshot(String fileName, boolean includeFingerprint) {
-    UpsertSnapshotFingerprint.Cache cache = _snapshotFingerprintCache;
-    UpsertSnapshotFingerprint.State before = cache != null ? cache.read() : null;
     File docIdsSnapshotFile = getSnapshotFile(fileName);
     if (docIdsSnapshotFile.exists()) {
       try {
         byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
         MutableRoaringBitmap docIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
-        String fingerprint = null;
-        if (includeFingerprint || cache != null) {
-          try {
-            fingerprint = UpsertSnapshotFingerprint.hash(bytes);
-            if (cache != null) {
-              cache.seedRead(before, fileName, fingerprint);
-            }
-          } catch (RuntimeException e) {
-            LOGGER.warn("Could not fingerprint snapshot file: {}", docIdsSnapshotFile, e);
-          }
-        }
         LOGGER.info("Loaded docIds from snapshot for segment: {} with: {} docs", getSegmentName(),
             docIds.getCardinality());
-        return new SavedDocIdsSnapshot(docIds, fingerprint);
+        return docIds;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while loading docIds from snapshot file: {}, ignoring the snapshot",
             docIdsSnapshotFile);
@@ -222,29 +198,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   /// Persists the doc ids bitmap snapshot into the given file.
   public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
-      throws IOException {
-    UpsertSnapshotFingerprint.Cache cache = _snapshotFingerprintCache;
-    UpsertSnapshotFingerprint.State started = cache != null ? cache.beginChange(fileName) : null;
-    String fingerprint = null;
-    try {
-      persistDocIdsSnapshotFile(fileName, docIdsSnapshot);
-      if (cache != null) {
-        // Serialization released the bitmap monitor before reaching here. Diagnostic hashing must not fail the write.
-        try {
-          fingerprint = UpsertSnapshotFingerprint.hash(docIdsSnapshot.getBytes());
-        } catch (RuntimeException e) {
-          LOGGER.warn("Could not fingerprint snapshot for segment: {}, file: {}", getSegmentName(), fileName, e);
-        }
-      }
-    } finally {
-      if (cache != null) {
-        cache.endChange(started, fileName, fingerprint);
-      }
-    }
-  }
-
-  private void persistDocIdsSnapshotFile(String fileName,
-      ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
       throws IOException {
     File tmpFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
@@ -263,18 +216,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   public void deleteSnapshotFile(String fileName) {
-    UpsertSnapshotFingerprint.Cache cache = _snapshotFingerprintCache;
-    UpsertSnapshotFingerprint.State started = cache != null ? cache.beginChange(fileName) : null;
-    try {
-      deleteSnapshotFileInternal(fileName);
-    } finally {
-      if (cache != null) {
-        cache.endChange(started, fileName, null);
-      }
-    }
-  }
-
-  private void deleteSnapshotFileInternal(String fileName) {
     File snapshotFile = getSnapshotFile(fileName);
     if (snapshotFile.exists()) {
       try {
@@ -295,31 +236,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   public boolean hasSnapshotFile(String fileName) {
     return getSnapshotFile(fileName).exists();
-  }
-
-  /// Called at segment admission/capture, never on the record path. Concurrent first enablement can only discard
-  /// diagnostic coverage; it cannot invent a known fingerprint. The segment lock serializes normal admission.
-  public void enableSnapshotFingerprints() {
-    if (_snapshotFingerprintCache == null) {
-      _snapshotFingerprintCache = new UpsertSnapshotFingerprint.Cache();
-    }
-  }
-
-  @Nullable
-  public UpsertSnapshotFingerprint.State getSnapshotFingerprints() {
-    UpsertSnapshotFingerprint.Cache cache = _snapshotFingerprintCache;
-    return cache != null ? cache.read() : null;
-  }
-
-  public void invalidateSnapshotFingerprints() {
-    UpsertSnapshotFingerprint.Cache cache = _snapshotFingerprintCache;
-    if (cache != null) {
-      cache.invalidate();
-    }
-  }
-
-  /// A decoded saved bitmap with the optional hash of the raw file bytes from the same read.
-  public record SavedDocIdsSnapshot(MutableRoaringBitmap bitmap, @Nullable String fileFingerprint) {
   }
 
   /// if re processing or reload is needed on a segment then return true
@@ -437,7 +353,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public void destroy() {
-    invalidateSnapshotFingerprints();
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
     if (_partitionUpsertMetadataManager != null) {

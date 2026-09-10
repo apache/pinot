@@ -84,14 +84,8 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// before a new consuming segment starts consuming.
   void takeSnapshot();
 
-  /// Reads current-runtime diagnostic state without snapshotting, scanning or creating a partition manager.
-  @Nullable
-  default UpsertSnapshotMetadata.Status getSnapshotMetadataStatus() {
-    return null;
-  }
-
-  /// Takes the existing snapshot with diagnostic startup context. The offset is not a verified logical boundary.
-  /// Implementations without snapshot metadata support retain their existing behavior.
+  /// Takes the existing snapshot with startup context. The offset is not a verified logical boundary.
+  /// Implementations that do not observe snapshots retain their existing behavior.
   default void takeSnapshot(String consumingSegmentName, String startOffset) {
     takeSnapshot();
   }

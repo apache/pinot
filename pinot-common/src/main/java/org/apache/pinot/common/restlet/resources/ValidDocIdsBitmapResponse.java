@@ -37,21 +37,13 @@ public class ValidDocIdsBitmapResponse {
   private final byte[] _bitmap;
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
-  @Nullable
-  private final String _snapshotFileFingerprint;
-
-  public ValidDocIdsBitmapResponse(String segmentName, String crc, @Nullable String segmentDataCrc,
-      ValidDocIdsType validDocIdsType, byte[] bitmap, String instanceId, ServiceStatus.Status serverStatus) {
-    this(segmentName, crc, segmentDataCrc, validDocIdsType, bitmap, instanceId, serverStatus, null);
-  }
 
   @JsonCreator
   public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("segmentCrc") String crc, @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType, @JsonProperty("bitmap") byte[] bitmap,
       @JsonProperty("instanceId") String instanceId,
-      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus,
-      @JsonProperty("snapshotFileFingerprint") @Nullable String snapshotFileFingerprint) {
+      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _segmentCrc = crc;
     _segmentDataCrc = segmentDataCrc;
@@ -59,7 +51,6 @@ public class ValidDocIdsBitmapResponse {
     _bitmap = bitmap;
     _instanceId = instanceId;
     _serverStatus = serverStatus;
-    _snapshotFileFingerprint = snapshotFileFingerprint;
   }
 
   public String getSegmentName() {
@@ -91,13 +82,5 @@ public class ValidDocIdsBitmapResponse {
 
   public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
-  }
-
-  /// SHA-256 of the exact saved file bytes read for this response, when explicitly requested. The response bitmap
-  /// may have been reserialized; its bytes must not be substituted when confirming a saved-file fingerprint.
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  @Nullable
-  public String getSnapshotFileFingerprint() {
-    return _snapshotFileFingerprint;
   }
 }

@@ -49,9 +49,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.segment.local.upsert.UpsertSnapshotFingerprint;
-import org.apache.pinot.segment.local.upsert.UpsertSnapshotMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -80,69 +77,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
 
 
 public class TablesResourceTest extends BaseResourceTest {
-
-  @Test
-  public void testUpsertSnapshotMetadataApi()
-      throws Exception {
-    String path = "/tables/" + REALTIME_TABLE_NAME + "/upsertSnapshotMetadata/0";
-    JsonNode missing = JsonUtils.stringToJsonNode(_webTarget.path(path).request().get(String.class));
-    assertEquals(missing.get("availability").asText(), "UNAVAILABLE");
-    UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, 0,
-        "table__0__2__100", "5000", 1000, 1001, "runtime", 1,
-        new UpsertSnapshotMetadata.Attempt(1, 0, 1, 0, 0, false), new UpsertSnapshotMetadata.Counters(1, 1, 0),
-        UpsertSnapshotMetadata.Content.unavailable(1), UpsertSnapshotMetadata.CleanupProgress.disabled(),
-        UpsertSnapshotMetadata.CleanupProgress.disabled(), false);
-    File file = new File(_tableDataManagerMap.get(REALTIME_TABLE_NAME).getTableDataDir(),
-        "upsert.snapshot.metadata.partition.0.json");
-    FileUtils.writeByteArrayToFile(file, JsonUtils.objectToBytes(metadata));
-    try {
-      JsonNode available = JsonUtils.stringToJsonNode(_webTarget.path(path).request().get(String.class));
-      assertEquals(available.get("availability").asText(), "AVAILABLE");
-      assertEquals(available.get("source").asText(), "HISTORICAL_FILE");
-      assertEquals(available.get("snapshot").get("boundaryStatus").asText(), "UNVERIFIED");
-      assertEquals(available.get("snapshot").get("startOffset").asText(), "5000");
-      assertFalse(available.get("snapshot").has("segments"));
-      TableDataManager originalTable = _tableDataManagerMap.get(REALTIME_TABLE_NAME);
-      TableDataManager liveTable = spy(originalTable);
-      TableUpsertMetadataManager tableManager = mock(TableUpsertMetadataManager.class);
-      PartitionUpsertMetadataManager partitionManager = mock(PartitionUpsertMetadataManager.class);
-      when(liveTable.getTableUpsertMetadataManager()).thenReturn(tableManager);
-      when(tableManager.getPartitionManager(0)).thenReturn(partitionManager);
-      when(partitionManager.getSnapshotMetadataStatus()).thenReturn(new UpsertSnapshotMetadata.Status(metadata,
-          "FAILED", 1, new UpsertSnapshotMetadata.CleanupProgress(2, "FAILED_POSSIBLY_PARTIAL", null, 100D, true, 1)));
-      _tableDataManagerMap.put(REALTIME_TABLE_NAME, liveTable);
-      try {
-        JsonNode live = JsonUtils.stringToJsonNode(_webTarget.path(path).request().get(String.class));
-        assertEquals(live.get("source").asText(), "LIVE");
-        assertEquals(live.get("persistenceStatus").asText(), "FAILED");
-        assertEquals(live.get("publicationFailures").asInt(), 1);
-        assertEquals(live.get("cleanupNow").get("phase").asText(), "FAILED_POSSIBLY_PARTIAL");
-        assertEquals(live.get("snapshot").get("cleanupAfter").get("phase").asText(), "DISABLED");
-        verify(tableManager, never()).getOrCreatePartitionManager(0);
-      } finally {
-        _tableDataManagerMap.put(REALTIME_TABLE_NAME, originalTable);
-      }
-      try (Response response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/upsertSnapshotMetadata/-1")
-          .request().get()) {
-        assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
-      }
-      try (Response response = _webTarget.path("/tables/missing_REALTIME/upsertSnapshotMetadata/0").request().get()) {
-        assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-      }
-    } finally {
-      FileUtils.deleteQuietly(file);
-    }
-  }
 
   @Test
   public void getTables()
@@ -588,14 +526,6 @@ public class TablesResourceTest extends BaseResourceTest {
     byte[] validDocIdsSnapshotBitmap = response.getBitmap();
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
-
-    assertNull(response.getSnapshotFileFingerprint());
-    response = _webTarget.path(snapshotPath).queryParam("includeSnapshotFingerprint", true)
-        .request().get(ValidDocIdsBitmapResponse.class);
-    assertEquals(response.getSnapshotFileFingerprint(),
-        UpsertSnapshotFingerprint.hash(FileUtils.readFileToByteArray(validDocIdsSnapshotFile)));
-    assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(response.getBitmap())).toMutableRoaringBitmap(),
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check snapshot type

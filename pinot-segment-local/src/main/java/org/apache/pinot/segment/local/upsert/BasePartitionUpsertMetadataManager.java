@@ -91,8 +91,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
-  @Nullable
-  private final UpsertSnapshotDiagnostics _snapshotDiagnostics;
   // Scoped to the startup call so manual/shutdown snapshots cannot inherit an old startup offset. Keeping the
   // context on the calling thread also preserves overrides of the existing takeSnapshot()/doTakeSnapshot() hooks.
   private final ThreadLocal<SnapshotContext> _snapshotContext = new ThreadLocal<>();
@@ -166,10 +164,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = context.getPartialUpsertHandlerSupplier();
     _partialUpsertHandler = partialUpsertHandlerSupplier != null ? partialUpsertHandlerSupplier.get() : null;
     _enableSnapshot = context.isSnapshotEnabled();
-    Map<String, String> metadataManagerConfigs = context.getMetadataManagerConfigs();
-    boolean enableSnapshotMetadata = _enableSnapshot && metadataManagerConfigs != null && Boolean.parseBoolean(
-        metadataManagerConfigs.get(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA));
-    _snapshotDiagnostics = enableSnapshotMetadata ? new UpsertSnapshotDiagnostics(partitionId, context) : null;
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
@@ -312,7 +306,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-    enableSnapshotFingerprints(immutableSegment);
     try {
       doAddSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
@@ -427,7 +420,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-    enableSnapshotFingerprints(immutableSegment);
     try {
       doPreloadSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
@@ -579,7 +571,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip replacing segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
-    enableSnapshotFingerprints(segment instanceof ImmutableSegmentImpl immutableSegment ? immutableSegment : null);
     try {
       doReplaceSegment(segment, oldSegment);
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
@@ -770,7 +761,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
@@ -885,15 +875,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void takeSnapshot(String consumingSegmentName, String startOffset) {
-    if (_snapshotDiagnostics == null) {
-      takeSnapshot();
-      return;
-    }
+    SnapshotContext previous = _snapshotContext.get();
     _snapshotContext.set(new SnapshotContext(consumingSegmentName, startOffset));
     try {
       takeSnapshot();
     } finally {
-      _snapshotContext.remove();
+      if (previous == null) {
+        _snapshotContext.remove();
+      } else {
+        _snapshotContext.set(previous);
+      }
     }
   }
 
@@ -928,33 +919,57 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /// Creates an optional observer for one attempt. Context is absent for manual/shutdown snapshots.
+  /// Observations do not establish a shared source boundary between replicas.
+  @Nullable
+  protected UpsertSnapshotObserver createSnapshotObserver(@Nullable String consumingSegmentName,
+      @Nullable String startOffset) {
+    return null;
+  }
+
   protected void doTakeSnapshot() {
-    UpsertSnapshotDiagnostics.Capture capture = null;
-    if (_snapshotDiagnostics != null) {
-      SnapshotContext context = _snapshotContext.get();
-      try {
-        capture = _snapshotDiagnostics.begin(context != null ? context.consumingSegmentName() : null,
-            context != null ? context.startOffset() : null, getSnapshotCleanupProgress());
-      } catch (RuntimeException e) {
-        _logger.warn("Could not start diagnostic snapshot observation", e);
-      }
+    UpsertSnapshotObserver observer = null;
+    SnapshotContext context = _snapshotContext.get();
+    try {
+      observer = createSnapshotObserver(context != null ? context.consumingSegmentName() : null,
+          context != null ? context.startOffset() : null);
+    } catch (RuntimeException e) {
+      _logger.warn("Could not create snapshot observer", e);
     }
     boolean completed = false;
     try {
-      doTakeSnapshot(capture);
+      doTakeSnapshot(observer);
       completed = true;
     } finally {
-      if (capture != null) {
+      if (observer != null) {
         try {
-          _snapshotDiagnostics.finish(capture, !completed, getSnapshotCleanupProgress());
+          observer.onComplete(!completed);
         } catch (RuntimeException e) {
-          _logger.warn("Could not publish diagnostic snapshot observation", e);
+          _logger.warn("Snapshot completion observer failed", e);
         }
       }
     }
   }
 
-  private void doTakeSnapshot(@Nullable UpsertSnapshotDiagnostics.Capture capture) {
+  private void observeSnapshotSegment(@Nullable UpsertSnapshotObserver observer, ImmutableSegmentImpl segment,
+      UpsertSnapshotObserver.Outcome outcome) {
+    if (observer != null) {
+      try {
+        observer.onSegment(segment, outcome);
+      } catch (RuntimeException e) {
+        _logger.warn("Snapshot segment observer failed for segment: {}", segment.getSegmentName(), e);
+      }
+    }
+  }
+
+  /// Extension point around the existing write. Implementations must preserve its persistence/exception semantics
+  /// and must not mutate the already serialized bytes. No extra serialization or file read is required.
+  protected void persistSnapshot(ImmutableSegmentImpl segment, String fileName,
+      ThreadSafeMutableRoaringBitmap.CardinalityAndBytes snapshot) throws IOException {
+    segment.persistDocIdsSnapshot(fileName, snapshot);
+  }
+
+  private void doTakeSnapshot(@Nullable UpsertSnapshotObserver observer) {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
     long numQueryableDocIdsInSnapshot = 0L;
@@ -974,18 +989,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     List<ImmutableSegmentImpl> segmentsWithSnapshot = new ArrayList<>();
     List<ImmutableSegmentImpl> segmentsWithoutSnapshot = new ArrayList<>();
     for (IndexSegment segment : _trackedSegments) {
-      if (capture != null) {
-        capture.track(segment);
-      }
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
         if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
           // if no updates since last snapshot then skip
           numUnchangedSegments++;
+          observeSnapshotSegment(observer, immutableSegment, UpsertSnapshotObserver.Outcome.UNCHANGED);
           continue;
         }
-        if (capture != null) {
-          capture._selected++;
-        }
+        observeSnapshotSegment(observer, immutableSegment, UpsertSnapshotObserver.Outcome.SELECTED);
         if (_segmentsWithSnapshot.contains(segment)) {
           segmentsWithSnapshot.add(immutableSegment);
         } else {
@@ -1010,9 +1021,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
       boolean locked = segmentLock.tryLock();
       if (!locked) {
-        if (capture != null) {
-          capture._lockSkipped++;
-        }
+        observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.LOCK_SKIPPED);
         // The snapshot kept on disk might have become stale, so skip creating new snapshot files in the next loop to
         // keep all the snapshots on disk disjoint with each other.
         _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
@@ -1026,9 +1035,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // the next snapshot round. The snapshot kept on disk for the segment might be stale though, so also skip
         // creating new snapshot files in the next loop.
         if (!_trackedSegments.contains(segment)) {
-          if (capture != null) {
-            capture._otherSkipped++;
-          }
+          observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.SKIPPED);
           _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
           isSegmentSkipped = true;
           continue;
@@ -1038,7 +1045,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
-          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+          persistSnapshot(segment, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
         }
         if (_deleteRecordColumn != null) {
@@ -1047,23 +1054,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                 queryableDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
+            persistSnapshot(segment, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
           }
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
-        if (capture != null) {
-          if (requiredBitmapsPresent) {
-            capture._written++;
-          } else {
-            capture._otherSkipped++;
-          }
-        }
+        observeSnapshotSegment(observer, segment, requiredBitmapsPresent ? UpsertSnapshotObserver.Outcome.WRITTEN
+            : UpsertSnapshotObserver.Outcome.SKIPPED);
       } catch (Exception e) {
-        if (capture != null) {
-          capture._failed++;
-        }
+        observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.FAILED);
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         isSegmentSkipped = true;
       } finally {
@@ -1083,9 +1083,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // segmentLock can still be held by the thread replacing it with the immutable one.
         boolean locked = segmentLock.tryLock();
         if (!locked) {
-          if (capture != null) {
-            capture._lockSkipped++;
-          }
+          observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.LOCK_SKIPPED);
           _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
               segmentName);
           continue;
@@ -1094,9 +1092,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           // The segment can be replaced or removed by another thread after it was classified without snapshot.
           // The replaced segment object no longer owns the segment directory, so skip persisting its bitmaps.
           if (!_trackedSegments.contains(segment)) {
-            if (capture != null) {
-              capture._otherSkipped++;
-            }
+            observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.SKIPPED);
             _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
             continue;
           }
@@ -1106,7 +1102,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
                 validDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+            persistSnapshot(segment, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
             _segmentsWithSnapshot.add(segment);
@@ -1118,30 +1114,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             if (queryableDocIds != null) {
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                   queryableDocIds.getBytesAndCardinality();
-              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
+              persistSnapshot(segment, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
               numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
             }
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
           numImmutableSegments++;
-          if (capture != null) {
-            if (requiredBitmapsPresent) {
-              capture._written++;
-            } else {
-              capture._otherSkipped++;
-            }
-          }
+          observeSnapshotSegment(observer, segment, requiredBitmapsPresent ? UpsertSnapshotObserver.Outcome.WRITTEN
+              : UpsertSnapshotObserver.Outcome.SKIPPED);
         } catch (Exception e) {
-          if (capture != null) {
-            capture._failed++;
-          }
+          observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.FAILED);
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
           segmentLock.unlock();
         }
       }
-    } else if (capture != null) {
-      capture._otherSkipped += segmentsWithoutSnapshot.size();
+    } else if (observer != null) {
+      for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+        observeSnapshotSegment(observer, segment, UpsertSnapshotObserver.Outcome.SKIPPED);
+      }
     }
     _updatedSegmentsSinceLastSnapshot.retainAll(_trackedSegments);
     _segmentsWithSnapshot.retainAll(_trackedSegments);
@@ -1192,28 +1183,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /// Override only with observations from the actual cleanup pass. A target/preload watermark is not completed work.
-  protected UpsertSnapshotMetadata.CleanupProgress getSnapshotCleanupProgress() {
-    return isTTLEnabled() ? UpsertSnapshotMetadata.CleanupProgress.unknown()
-        : UpsertSnapshotMetadata.CleanupProgress.disabled();
-  }
-
-  @Override
-  @Nullable
-  public UpsertSnapshotMetadata.Status getSnapshotMetadataStatus() {
-    return _snapshotDiagnostics != null ? _snapshotDiagnostics.status(getSnapshotCleanupProgress()) : null;
-  }
-
-  protected final boolean isSnapshotMetadataEnabled() {
-    return _snapshotDiagnostics != null;
-  }
-
-  private void enableSnapshotFingerprints(@Nullable ImmutableSegmentImpl segment) {
-    if (_snapshotDiagnostics != null && segment != null) {
-      segment.enableSnapshotFingerprints();
-    }
-  }
-
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
@@ -1237,7 +1206,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing expired primary keys because metadata manager is already stopped");
       return;
     }
-
     try {
       long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
@@ -1384,9 +1352,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// Removes the segment from all the tracking sets. The segment is removed eagerly instead of waiting for the next
   /// snapshot round to clean it up, to not keep stale segment object references around.
   protected void untrackSegment(IndexSegment segment) {
-    if (_snapshotDiagnostics != null && segment instanceof ImmutableSegmentImpl immutableSegment) {
-      immutableSegment.invalidateSnapshotFingerprints();
-    }
     _trackedSegments.remove(segment);
     _updatedSegmentsSinceLastSnapshot.remove(segment);
     _segmentsWithSnapshot.remove(segment);
