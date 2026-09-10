@@ -19,124 +19,107 @@
 
 # Upsert snapshot diagnostics
 
-The opt-in producer records two kinds of evidence: work skipped during an existing snapshot attempt,
-and fingerprints of the saved bitmap population. The partition payload has no per-segment list and its
-size does not grow with segment count. This is diagnostic evidence, not a recovery manifest.
-
-Enable it through the existing table configuration:
+This opt-in feature records why a snapshot attempt missed work and fingerprints the saved bitmap
+population for later comparison. Each partition retains one compact report, with no per-segment list.
 
 ```json
-{
-  "upsertConfig": {
-    "mode": "FULL",
-    "snapshot": "ENABLE",
-    "metadataManagerConfigs": {"enableSnapshotMetadata": "true"}
-  }
-}
+{"upsertConfig": {"mode": "FULL", "snapshot": "ENABLE",
+  "metadataManagerConfigs": {"enableSnapshotMetadata": "true"}}}
 ```
 
-The default is false. The base partition manager supplies snapshot accounting and fingerprints to the
-on-heap manager and its subclasses. Engines with asynchronous cleanup must override the cleanup
-observation hook at the actual cleanup pass; a no-op startup TTL hook cannot establish completed cleanup.
+The default is false. On-heap and RocksDB managers share snapshot accounting and file fingerprints.
+RocksDB additionally observes its actual asynchronous cleanup pass.
+
+## Code flow
+
+1. `BasePartitionUpsertMetadataManager` counts outcomes in its existing snapshot loops.
+2. `ImmutableSegmentImpl` caches hashes while existing operations write or load saved bitmap bytes.
+3. `UpsertSnapshotDiagnostics` collects those cached contributions, builds the report, and publishes it.
+4. `UpsertSnapshotMetadataStore` persists/reads the sidecar; the server API prefers the live report.
+
+The report is plain immutable data. Cleanup publishes immutable before/after values under the existing
+RocksDB lifecycle lock. Snapshot readers do not acquire that lock. Concurrent captures use a local
+sequence and active count; there is no general lifecycle observer or configuration-comparison engine.
 
 ## Snapshot outcomes
 
-Version 2 records selected, successfully written, directly lock-skipped, otherwise skipped, and failed
-segment counts, plus an aborted flag. A segment whose valid bitmap was written but whose queryable
-bitmap failed counts as failed. Segments deferred because an earlier existing-file write/lock failed
-count as otherwise skipped, not as direct lock failures. Retained unchanged segments are included in
-content coverage but are not selected for a new write.
+`attempt` contains selected, written, directly lock-skipped, otherwise skipped, and failed segment
+counts, plus an aborted flag. A partial valid/queryable write counts as failed. New-file work deferred
+because an earlier existing-file write or lock failed counts as otherwise skipped. Unchanged segments
+contribute to content coverage but are not selected for another write.
 
 `runtimeEpoch` identifies one manager lifetime. Cumulative attempt, lock-affected attempt, and failed
-attempt counters let a poller observe failures between polls. Compare counters only within that epoch.
-`captureId` and timestamps identify local attempts; neither aligns replicas. Startup calls carry their
-consumer name and opaque start offset. Manual/shutdown captures have no startup context. Early exits
-before an attempt starts (snapshots disabled, initial full-upsert startup, or stopped manager) produce
-no new attempt.
+attempt counters reveal failures between polls; compare them only within that epoch. `captureId` and
+timestamps identify local attempts. Startup captures also carry the consumer name and opaque start
+offset; manual/shutdown captures do not. None of these fields aligns replicas. Exits before an attempt
+starts, such as disabled snapshots or a stopped manager, produce no new report.
 
-## Saved content and coverage
+## Saved content
 
-`content.populationFingerprint` covers the sorted segment names, data CRCs, and bitmap types of all
-tracked immutable segments. `content.savedFilesFingerprint` additionally covers their raw saved file
-hashes. Types are `VALID` and, for tables with a delete column, `QUERYABLE`. Length-prefixed UTF-8
-fields and explicit domain separators avoid ambiguous concatenation. `algorithm` versions this encoding.
-`expectedFiles` and `knownFiles` expose coverage. Missing CRCs, duplicate identities, or unknown file
-contributions prevent a complete aggregate hash. The declared population does not certify that all
-expected source segments are loaded.
+`content.populationFingerprint` covers sorted segment names, data CRCs, and bitmap types for all
+tracked immutable segments. `savedFilesFingerprint` additionally covers their raw saved-file hashes.
+Types are `VALID` and, with a delete column, `QUERYABLE`. The versioned encoding uses length-prefixed
+UTF-8 fields and domain separators. `expectedFiles` and `knownFiles` expose coverage; unknown CRCs,
+duplicate identities, or missing contributions prevent a complete aggregate hash.
 
-Each immutable segment optionally caches two SHA-256 fingerprints. Existing snapshot writes hash the
-already serialized bytes after successful persistence. Existing loads can seed an unchanged cache from
-the bytes they already read. In-place snapshot deletion/write, untracking, and destruction invalidate
-contributions; overlapping file changes remain unknown. No producer file reread is added to fill gaps.
-Retained files contribute their cached hashes even when a later attempt writes no dirty segments.
+Each immutable segment optionally caches two hashes. Writes hash already serialized bytes after
+successful persistence; normal loads can seed an unchanged cache from bytes already read. File
+changes, deletion, untracking, and destruction invalidate contributions. Overlapping changes remain
+unknown. Retained files participate even when an attempt writes no dirty segments. There is no extra
+producer file read to fill gaps, and the declared population does not certify all source segments loaded.
 
-Raw Roaring bytes are not canonical membership. Equivalent sets can serialize differently after
-`runOptimize()`. A differing aggregate is a candidate requiring exact logical bitmap comparison.
-For confirmation, use the existing saved-bitmap endpoint with its optional hash:
+Raw Roaring bytes are not canonical membership: equal sets can serialize differently after
+`runOptimize()`. A fingerprint mismatch needs logical bitmap comparison. The existing saved-bitmap
+endpoint can return the hash of the exact raw bytes it read:
 
 ```http
 GET /segments/orders_REALTIME/<segment>/validDocIdsBitmap?validDocIdsType=SNAPSHOT&includeSnapshotFingerprint=true
 ```
 
-Use `SNAPSHOT_WITH_DELETE` for the queryable bitmap. `snapshotFileFingerprint` hashes the exact raw file
-bytes read for that response. The response bitmap is reserialized and must not be hashed as a substitute.
-A future checker must fetch every declared file with bounded concurrency, reproduce both aggregate
-fingerprints using response identities/raw-file hashes, and require an exact match to its target report
-before comparing logical bitmap memberships. Overwritten files, unknown hashes, changed CRCs or
-population mismatch make the target unavailable; do not pair old metadata with today's bitmaps.
-Equal cardinalities do not imply equal membership. No primary-key duplicate scan is performed.
+Use `SNAPSHOT_WITH_DELETE` for queryable bitmaps. A future checker must fetch every declared file with
+bounded concurrency, reproduce the target report's population and saved-file fingerprints from the
+response identities and `snapshotFileFingerprint`, then compare logical bitmap memberships. The
+response bitmap is reserialized: hashing those bytes cannot replace the raw-file hash. If files were
+overwritten or identities/coverage changed, the target is unavailable. Do not mix old reports with new
+files. Equal cardinalities alone do not establish equal membership; no primary-key scan is added.
 
-## Boundary and cleanup limitations
+## Cleanup and boundary
 
-`boundaryStatus` is always `UNVERIFIED` in version 2. `comparisonIssues` exposes incomplete outcomes,
-unknown content/configuration, concurrent captures, consuming segments, observed lifecycle overlap,
-and cleanup overlap/failure. Manager-local epochs cannot observe every outer reload/directory change,
-attest stream identity across configuration changes, or establish settled predecessor processing in
-pauseless ingestion. `SOURCE_BOUNDARY_UNVERIFIED` therefore remains present even in otherwise quiet
-captures. Matching offsets, config hashes and files cannot promote this to a verified source boundary.
+`cleanupBefore` and `cleanupAfter` are frozen observations; `cleanupNow` is current process state.
+Cleanup exposes its phase, observation version, target and last-completed watermarks, whether the pass
+may affect valid doc IDs, and cumulative failures. Only a successful actual pass advances the completed
+watermark. `FAILED_POSSIBLY_PARTIAL` retains the previous completed watermark. Version changes or a
+running phase identify possible overlap without making snapshot readers wait. Engines without actual
+cleanup instrumentation report unknown cleanup when TTL is enabled.
 
-Cleanup observations distinguish disabled, not yet run, running, completed, and possibly partial failed
-passes. A target watermark becomes completed only after an actual pass and its bookkeeping succeed.
-Failure retains the previous completed watermark. Historical before/after observations are immutable;
-the API exposes current cleanup separately. Manager lifecycle failure totals remain visible for the
-manager lifetime. These observations do not synchronize or delay cleanup.
-
-A checker can confirm that saved contents differ when it binds the fetched files successfully. Calling
-that difference replica divergence at the same source boundary additionally requires producer boundary
-attestation, which is not implemented here. Missing/unverified evidence is not agreement. Controller
-scheduling, logical comparison/alerts, and SRT integration are separate work.
+`concurrentSnapshots` identifies overlapping attempts. `boundaryStatus` remains `UNVERIFIED`:
+matching offsets or saved files cannot establish a shared logical source boundary. Confirming different
+saved memberships is possible after file binding; calling that replica divergence at the same source
+boundary requires additional attestation. Controller scheduling, logical comparison, and alerts remain
+separate work. Version 3 removes provisional lifecycle/configuration fields from the earlier draft;
+older sidecars are treated as unavailable.
 
 ## Publication and cost
 
-At the end of each actual attempt, the producer publishes its immutable report in memory and
-synchronously atomically replaces this server-local file:
+The producer publishes the immutable report in memory and atomically replaces a server-local sidecar:
 
 ```text
 <table data directory>/upsert.snapshot.metadata.partition.<partitionId>.json
 ```
 
-The sidecar is not uploaded to deep store. A metadata write failure leaves recovery bitmaps intact and
-keeps the current in-memory report readable with its failure status. Only one report is retained; a
-historical file can lag live state and concurrent completions can persist in a different order.
-
 ```http
 GET /tables/orders_REALTIME/upsertSnapshotMetadata/3
 ```
 
-The response reports `availability`, `partitionId`, `snapshot`, and `source: LIVE` or `HISTORICAL_FILE`.
-Live responses also include `persistenceStatus`, cumulative `publicationFailures`, and `cleanupNow`.
-Missing, malformed, unsupported-version or wrong-partition sidecars are unavailable. The metadata API
-uses access control and database translation and never takes snapshots, reads bitmaps or scans keys.
+The API reports `availability`, `partitionId`, `snapshot`, and `source` (`LIVE` or `HISTORICAL_FILE`).
+Live responses include `persistenceStatus`, cumulative `publicationFailures`, and `cleanupNow`. A failed
+sidecar write leaves the live report readable. Historical files can lag live state; concurrent attempts
+can persist in completion order different from the live report. Missing, malformed, unsupported-version,
+or wrong-partition files are unavailable. The API checks access/database translation and does no scan.
 
 There are no new per-record hooks, database scans, bitmap serializations, blocking locks, retries, or
-waits for predecessor readiness. Enabled captures do add hashing proportional to serialized bytes,
-transient aggregation/sorting proportional to the tracked immutable population, two optional hash
-strings per live immutable segment, and synchronous compact JSON/file publication. Existing bitmap
-monitors are released before hashing, but the segment lock and startup call still include that work.
-This is not a zero-latency guarantee; measure rollover latency with representative snapshot sizes before
-enabling broadly. Unknown coverage is retained instead of adding work to make a capture comparable.
-
-A local Java 25.0.3/aarch64 smoke measurement (100 warmed samples, no production traffic) observed
-SHA-256 medians of 0.42 ms for 1 MiB and 6.79 ms for 16 MiB, and aggregate medians of 0.28 ms for
-1,000 files and 3.67 ms for 10,000 files. These isolate hashing/aggregation and exclude serialization,
-file I/O, lock contention and end-to-end startup latency. They are not a benchmark guarantee.
+predecessor waits. Enabled captures add hashing proportional to saved bytes, temporary sorting and
+aggregation proportional to the immutable population, two cached hashes per immutable segment, and
+synchronous compact JSON/file publication. Existing bitmap monitors are released before hashing, but
+segment locks and startup calls still include that work. Measure representative rollover latency before
+broad enablement; unknown coverage is preferable to extra work to complete a report.

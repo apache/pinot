@@ -101,8 +101,7 @@ public class TablesResourceTest extends BaseResourceTest {
         "table__0__2__100", "5000", 1000, 1001, "runtime", 1,
         new UpsertSnapshotMetadata.Attempt(1, 0, 1, 0, 0, false), new UpsertSnapshotMetadata.Counters(1, 1, 0),
         UpsertSnapshotMetadata.Content.unavailable(1), UpsertSnapshotMetadata.CleanupProgress.disabled(),
-        UpsertSnapshotMetadata.CleanupProgress.disabled(), new UpsertSnapshotMetadata.Activity(0, 0, 0),
-        new UpsertSnapshotMetadata.Activity(0, 0, 0), null, List.of("SOURCE_BOUNDARY_UNVERIFIED"));
+        UpsertSnapshotMetadata.CleanupProgress.disabled(), false);
     File file = new File(_tableDataManagerMap.get(REALTIME_TABLE_NAME).getTableDataDir(),
         "upsert.snapshot.metadata.partition.0.json");
     FileUtils.writeByteArrayToFile(file, JsonUtils.objectToBytes(metadata));

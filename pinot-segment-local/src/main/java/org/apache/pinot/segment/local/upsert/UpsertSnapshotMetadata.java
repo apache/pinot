@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.List;
 import javax.annotation.Nullable;
 
 
@@ -31,13 +30,8 @@ public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String 
                                     String startOffset, long capturedAtMillis, long finishedAtMillis,
                                     String runtimeEpoch, long captureId, Attempt attempt, Counters counters,
                                     Content content, CleanupProgress cleanupBefore, CleanupProgress cleanupAfter,
-                                    Activity lifecycleBefore, Activity lifecycleAfter,
-                                    @Nullable String configurationFingerprint, List<String> comparisonIssues) {
-  public static final int FORMAT_VERSION = 2;
-
-  public UpsertSnapshotMetadata {
-    comparisonIssues = List.copyOf(comparisonIssues);
-  }
+                                    boolean concurrentSnapshots) {
+  public static final int FORMAT_VERSION = 3;
 
   public String getBoundaryStatus() {
     return "UNVERIFIED";
@@ -64,10 +58,6 @@ public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String 
     }
   }
 
-  /// A coherent local lifecycle observation. Failures remain visible even after the operation has stopped.
-  public record Activity(long version, int activeOperations, long failedOperations) {
-  }
-
   /// Historical observations must not be replaced by the producer's current cleanup state when serving the API.
   /// A completed watermark is absent until an actual successful pass has established it.
   public record CleanupProgress(long version, String phase, @Nullable Double lastCompletedWatermark,
@@ -78,6 +68,23 @@ public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String 
 
     public static CleanupProgress disabled() {
       return new CleanupProgress(0, "DISABLED", null, null, false, 0);
+    }
+
+    public static CleanupProgress notRun() {
+      return new CleanupProgress(0, "NOT_RUN", null, null, true, 0);
+    }
+
+    /// Returns the observation for an actual pass. The cleanup implementation supplies single-writer ownership.
+    public CleanupProgress started(@Nullable Double watermark, boolean affectsValidDocIds) {
+      Double target = watermark != null && Double.isFinite(watermark) ? watermark : null;
+      return new CleanupProgress(version + 1, "RUNNING", lastCompletedWatermark, target, affectsValidDocIds,
+          failedPasses);
+    }
+
+    public CleanupProgress finished(boolean succeeded) {
+      Double completed = succeeded && targetWatermark != null ? targetWatermark : lastCompletedWatermark;
+      return new CleanupProgress(version + 1, succeeded ? "COMPLETED" : "FAILED_POSSIBLY_PARTIAL", completed,
+          targetWatermark, mayAffectValidDocIds, failedPasses + (succeeded ? 0 : 1));
     }
   }
 

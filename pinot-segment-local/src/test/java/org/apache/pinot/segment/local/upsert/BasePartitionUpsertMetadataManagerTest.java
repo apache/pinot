@@ -259,24 +259,28 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testSnapshotMetadataObservesLifecycleBetweenCaptureEnds()
+  public void testSnapshotMetadataDetectsConcurrentAttempts()
       throws Exception {
     DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager(null);
     try {
       snapshotMetadataSegment(manager, "segment", 1);
       Lock available = mock(Lock.class);
       when(available.tryLock()).thenReturn(true);
+      AtomicBoolean nestedSnapshot = new AtomicBoolean();
       when(manager.getContext().getTableDataManager().getSegmentLock("segment")).thenAnswer(invocation -> {
-        manager.beginSnapshotMetadataMutation(null);
-        manager.endSnapshotMetadataMutation(true);
+        if (nestedSnapshot.compareAndSet(false, true)) {
+          manager.takeSnapshot("table__0__3__300", "30");
+        }
         return available;
       });
       manager.takeSnapshot("table__0__2__200", "20");
       UpsertSnapshotMetadata metadata = manager.getSnapshotMetadataStatus().snapshot();
       assertEquals(metadata.attempt().writtenSegments(), 1);
-      assertEquals(metadata.lifecycleAfter().activeOperations(), 0);
-      assertTrue(metadata.comparisonIssues().contains("LIFECYCLE_OVERLAP"));
+      assertEquals(metadata.counters().attemptsTotal(), 2);
+      assertTrue(metadata.concurrentSnapshots());
       assertEquals(metadata.getBoundaryStatus(), "UNVERIFIED");
+      manager.takeSnapshot("table__0__4__400", "40");
+      assertFalse(manager.getSnapshotMetadataStatus().snapshot().concurrentSnapshots());
     } finally {
       manager.stop();
       manager.close();

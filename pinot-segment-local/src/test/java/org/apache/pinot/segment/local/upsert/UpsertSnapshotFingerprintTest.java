@@ -108,39 +108,25 @@ public class UpsertSnapshotFingerprintTest {
   }
 
   @Test
-  public void testCoarseActivitySeesAnEntireOperationBetweenReads() {
-    UpsertSnapshotActivity activity = new UpsertSnapshotActivity();
-    UpsertSnapshotMetadata.Activity before = activity.read();
-    activity.begin();
-    activity.end(false);
-    assertEquals(activity.read().activeOperations(), 0);
-    assertNotEquals(activity.read().version(), before.version());
-    assertEquals(activity.read().failedOperations(), 1);
-  }
-
-  @Test
   public void testCleanupOverlapAndFailurePreserveCompletedWatermark() {
-    UpsertSnapshotCleanup cleanup = new UpsertSnapshotCleanup(true);
-    UpsertSnapshotMetadata.CleanupProgress first = cleanup.begin(100D, true);
-    cleanup.end(first, true);
-    UpsertSnapshotMetadata.CleanupProgress before = cleanup.read();
-    assertEquals(before.lastCompletedWatermark(), 100D);
-    UpsertSnapshotMetadata.CleanupProgress running = cleanup.begin(200D, true);
+    UpsertSnapshotMetadata.CleanupProgress cleanup = UpsertSnapshotMetadata.CleanupProgress.notRun();
+    cleanup = cleanup.started(100D, true).finished(true);
+    assertEquals(cleanup.lastCompletedWatermark(), 100D);
+    UpsertSnapshotMetadata.CleanupProgress before = cleanup;
+    UpsertSnapshotMetadata.CleanupProgress running = cleanup.started(200D, true);
     assertEquals(running.lastCompletedWatermark(), 100D);
-    assertEquals(UpsertSnapshotDiagnostics.cleanupOverlaps(running, running), true);
-    cleanup.end(running, false);
-    assertEquals(cleanup.read().phase(), "FAILED_POSSIBLY_PARTIAL");
-    assertEquals(cleanup.read().lastCompletedWatermark(), 100D);
-    assertEquals(cleanup.read().failedPasses(), 1);
-    assertEquals(UpsertSnapshotDiagnostics.cleanupOverlaps(before, cleanup.read()), true);
-    running = cleanup.begin(null, false);
-    cleanup.end(running, true);
-    assertEquals(cleanup.read().lastCompletedWatermark(), 100D);
-    assertEquals(cleanup.read().failedPasses(), 1);
-    before = cleanup.read();
-    running = cleanup.begin(200D, true);
-    cleanup.end(running, true);
-    assertEquals(UpsertSnapshotDiagnostics.cleanupOverlaps(before, cleanup.read()), true);
+    assertEquals(running.phase(), "RUNNING");
+    cleanup = running.finished(false);
+    assertEquals(cleanup.phase(), "FAILED_POSSIBLY_PARTIAL");
+    assertEquals(cleanup.lastCompletedWatermark(), 100D);
+    assertEquals(cleanup.failedPasses(), 1);
+    assertNotEquals(before.version(), cleanup.version());
+    cleanup = cleanup.started(null, false).finished(true);
+    assertEquals(cleanup.lastCompletedWatermark(), 100D);
+    assertEquals(cleanup.failedPasses(), 1);
+    before = cleanup;
+    cleanup = cleanup.started(200D, true).finished(true);
+    assertNotEquals(before.version(), cleanup.version());
   }
 
   private static UpsertSnapshotFingerprint.File file(String name, String crc, String hash) {

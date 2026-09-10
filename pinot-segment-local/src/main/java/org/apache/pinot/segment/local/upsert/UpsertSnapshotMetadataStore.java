@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Synchronously persists compact partition context at the end of an existing startup snapshot attempt.
+/// Synchronously persists compact partition context at the end of an existing snapshot attempt.
 /// Atomic file replacement allows concurrent readers. Diagnostic write failures leave recovery bitmaps untouched.
 public final class UpsertSnapshotMetadataStore {
   public static final String ENABLE_SNAPSHOT_METADATA = "enableSnapshotMetadata";

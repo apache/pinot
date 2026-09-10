@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -42,15 +41,21 @@ public class UpsertSnapshotMetadataStoreTest {
       assertTrue(UpsertSnapshotMetadataStore.persist(directory, metadata));
       assertEquals(UpsertSnapshotMetadataStore.read(directory, 3), metadata);
       assertFalse(JsonUtils.objectToJsonNode(metadata).has("segments"));
+      assertFalse(JsonUtils.objectToJsonNode(metadata).has("lifecycleBefore"));
+      assertFalse(JsonUtils.objectToJsonNode(metadata).has("configurationFingerprint"));
+      assertFalse(JsonUtils.objectToJsonNode(metadata).has("comparisonIssues"));
+      assertTrue(JsonUtils.objectToJsonNode(metadata).has("concurrentSnapshots"));
       assertEquals(JsonUtils.objectToJsonNode(metadata).get("boundaryStatus").asText(), "UNVERIFIED");
 
       // A forged status must not turn an observed capture into a verified boundary.
       String json = JsonUtils.objectToString(metadata).replace("UNVERIFIED", "VERIFIED");
       assertEquals(JsonUtils.stringToObject(json, UpsertSnapshotMetadata.class).getBoundaryStatus(), "UNVERIFIED");
       File file = new File(directory, "upsert.snapshot.metadata.partition.3.json");
-      Files.writeString(file.toPath(), JsonUtils.objectToString(metadata).replace("\"formatVersion\":2",
-          "\"formatVersion\":3"));
-      assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
+      for (int unsupportedVersion : new int[]{2, 99}) {
+        Files.writeString(file.toPath(), JsonUtils.objectToString(metadata).replace(
+            "\"formatVersion\":" + UpsertSnapshotMetadata.FORMAT_VERSION, "\"formatVersion\":" + unsupportedVersion));
+        assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
+      }
       Files.writeString(file.toPath(), "{truncated");
       assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
     } finally {
@@ -84,7 +89,6 @@ public class UpsertSnapshotMetadataStoreTest {
         1000, 1001, "runtime", 1, new UpsertSnapshotMetadata.Attempt(0, 0, 0, 0, 0, false),
         new UpsertSnapshotMetadata.Counters(1, 0, 0), UpsertSnapshotMetadata.Content.unavailable(0),
         UpsertSnapshotMetadata.CleanupProgress.disabled(), UpsertSnapshotMetadata.CleanupProgress.disabled(),
-        new UpsertSnapshotMetadata.Activity(0, 0, 0), new UpsertSnapshotMetadata.Activity(0, 0, 0), null,
-        List.of("SOURCE_BOUNDARY_UNVERIFIED"));
+        false);
   }
 }

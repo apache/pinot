@@ -115,49 +115,52 @@ public final class UpsertSnapshotFingerprint {
   /// Per immutable-segment cache. Coarse file changes invalidate before I/O; reads can seed only an unchanged
   /// generation. Overlapping changes are conservatively unknown, including a failed/partial file replacement.
   public static final class Cache {
-    private final AtomicReference<State> _state = new AtomicReference<>(new State(0, 0, null, null, false));
+    private final AtomicReference<State> _state = new AtomicReference<>(new State(0, null, null, false));
 
     public State read() {
       return _state.get();
     }
 
     public State beginChange(String fileName) {
-      return _state.updateAndGet(state -> new State(state.version() + 1, state.activeChanges() + 1,
-          isValid(fileName) ? null : state.valid(), isValid(fileName) ? state.queryable() : null, state.invalidated()));
+      return _state.updateAndGet(state -> state.updateFile(state.activeChanges() + 1, fileName, null));
     }
 
     public void endChange(State started, String fileName, @Nullable String fingerprint) {
       _state.updateAndGet(state -> {
         String known = state == started && state.activeChanges() == 1 && !state.invalidated() ? fingerprint : null;
-        return new State(state.version() + 1, state.activeChanges() - 1,
-            isValid(fileName) ? known : state.valid(), isValid(fileName) ? state.queryable() : known,
-            state.invalidated());
+        return state.updateFile(state.activeChanges() - 1, fileName, known);
       });
     }
 
     public void seedRead(State before, String fileName, String fingerprint) {
       if (before.activeChanges() == 0 && !before.invalidated()) {
-        _state.compareAndSet(before, new State(before.version(), 0,
-            isValid(fileName) ? fingerprint : before.valid(), isValid(fileName) ? before.queryable() : fingerprint,
-            false));
+        _state.compareAndSet(before, before.updateFile(0, fileName, fingerprint));
       }
     }
 
     public void invalidate() {
-      _state.updateAndGet(state -> new State(state.version() + 1, state.activeChanges(), null, null, true));
-    }
-
-    private static boolean isValid(String fileName) {
-      return fileName.equals(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      _state.updateAndGet(state -> new State(state.activeChanges(), null, null, true));
     }
   }
 
-  /// One coherent observation of both cached contributions. Active/invalidated states are not usable coverage.
-  public record State(long version, int activeChanges, @Nullable String valid, @Nullable String queryable,
+  /// One coherent observation of both cached contributions. Object identity is the generation token: every change
+  /// creates a new state, so a stale reader/writer cannot publish over a newer one.
+  /// Active/invalidated states are unknown.
+  public record State(int activeChanges, @Nullable String valid, @Nullable String queryable,
                       boolean invalidated) {
     @Nullable
     public String fingerprint(boolean queryableBitmap) {
-      return activeChanges == 0 && !invalidated ? queryableBitmap ? queryable : valid : null;
+      if (activeChanges != 0 || invalidated) {
+        return null;
+      }
+      return queryableBitmap ? queryable : valid;
+    }
+
+    private State updateFile(int writers, String fileName, @Nullable String fingerprint) {
+      if (fileName.equals(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)) {
+        return new State(writers, fingerprint, queryable, invalidated);
+      }
+      return new State(writers, valid, fingerprint, invalidated);
     }
   }
 }
