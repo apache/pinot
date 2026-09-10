@@ -143,11 +143,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       Schema schema = segmentMetadata.getSchema();
       for (String parent : openStructParents) {
         FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(parent) : null;
+        if (schema == null) {
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': no schema available. "
+              + "Dense/sparse child data on disk will not be queryable.", segmentMetadata.getName(), parent);
+          continue;
+        }
         if (!(fieldSpec instanceof ComplexFieldSpec)) {
-          LOGGER.warn("Skipping OPEN_STRUCT parent column '{}': schema is {} or fieldSpec is {} "
+          LOGGER.warn("Segment '{}': skipping OPEN_STRUCT parent column '{}': fieldSpec is {} "
                   + "(expected ComplexFieldSpec). Dense/sparse child data on disk will not be queryable.",
-              parent, schema != null ? "present" : "null",
-              fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
+              segmentMetadata.getName(), parent, fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
           continue;
         }
         ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
