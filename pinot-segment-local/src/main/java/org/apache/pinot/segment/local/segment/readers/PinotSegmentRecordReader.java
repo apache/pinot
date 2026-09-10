@@ -29,10 +29,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -58,6 +60,9 @@ public class PinotSegmentRecordReader implements RecordReader {
   // OPEN_STRUCT parent columns have no forward index of their own (they expose per-key sub-columns),
   // so they cannot be read via PinotSegmentColumnReader. Their per-doc value is reconstructed as a map.
   private Map<String, OpenStructDataSource> _openStructDataSources;
+  // Scan-scoped readers opened once per column (see OpenStructDataSource#openMapValueReader), reused
+  // across every getRecord() call instead of reconstructing per-key forward-index readers per doc.
+  private Map<String, OpenStructDataSource.MapValueReader> _openStructMapValueReaders;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
 
@@ -171,6 +176,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       _columnReaders = new ArrayList<>();
       _columnNames = new ArrayList<>();
       _openStructDataSources = new HashMap<>();
+      _openStructMapValueReaders = new HashMap<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {
@@ -206,13 +212,30 @@ public class PinotSegmentRecordReader implements RecordReader {
   private void addColumnReader(String column) {
     DataSource dataSource = _indexSegment.getDataSourceNullable(column);
     if (dataSource instanceof OpenStructDataSource) {
-      _openStructDataSources.put(column, (OpenStructDataSource) dataSource);
+      OpenStructDataSource openStructDataSource = (OpenStructDataSource) dataSource;
+      _openStructDataSources.put(column, openStructDataSource);
+      _openStructMapValueReaders.put(column, openStructDataSource.openMapValueReader());
+      return;
+    }
+    if (isMaterializedOpenStructChild(column)) {
+      // A materialized OPEN_STRUCT/MAP child (e.g. "event$clicks") is a physical column on disk but
+      // not independently queryable -- it has no DataSource of its own (see
+      // ImmutableSegmentImpl#_dataSources), only its parent does, and the parent's OpenStructDataSource
+      // registered above already covers its value. This is reachable whenever the segment is loaded
+      // without an explicit table schema (e.g. the File-based constructors of this class), since
+      // SegmentMetadataImpl then self-derives a schema from every physical column on disk, children
+      // included.
       return;
     }
     PinotSegmentColumnReader reader = new PinotSegmentColumnReader(_indexSegment, column);
     _columnReaderMap.put(column, reader);
     _columnNames.add(column);
     _columnReaders.add(reader);
+  }
+
+  private boolean isMaterializedOpenStructChild(String column) {
+    ColumnMetadata columnMetadata = _indexSegment.getSegmentMetadata().getColumnMetadataFor(column);
+    return columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild();
   }
 
   /// Returns the sorted document ids.
@@ -251,7 +274,7 @@ public class PinotSegmentRecordReader implements RecordReader {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
-    for (Map.Entry<String, OpenStructDataSource> entry : _openStructDataSources.entrySet()) {
+    for (Map.Entry<String, OpenStructDataSource.MapValueReader> entry : _openStructMapValueReaders.entrySet()) {
       Map<String, Object> value = entry.getValue().getMapValue(docId);
       // A null map means no key is present at this doc; leave the column unset so the OPEN_STRUCT
       // build treats it as an absent/empty struct.
@@ -310,6 +333,11 @@ public class PinotSegmentRecordReader implements RecordReader {
     if (_columnReaderMap != null) {
       for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
         columnReader.close();
+      }
+    }
+    if (_openStructMapValueReaders != null) {
+      for (OpenStructDataSource.MapValueReader reader : _openStructMapValueReaders.values()) {
+        reader.close();
       }
     }
     if (_destroySegmentOnClose && _indexSegment != null) {

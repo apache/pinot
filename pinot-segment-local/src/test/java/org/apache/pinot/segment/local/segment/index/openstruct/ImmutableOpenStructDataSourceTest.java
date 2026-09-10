@@ -18,11 +18,22 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.File;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -31,9 +42,19 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -519,5 +540,79 @@ public class ImmutableOpenStructDataSourceTest {
         openStructSpec("event"), Map.of(), null, 0, null);
 
     assertNull(ds.getMapValue(0));
+  }
+
+  /// Builds and seals a real OPEN_STRUCT segment (one dense key, one sparse key) and reads it back
+  /// with [PinotSegmentRecordReader], which drives [ImmutableOpenStructDataSource#getMapValue]
+  /// through [org.apache.pinot.segment.spi.IndexSegment#getPhysicalColumnNames], the schema-derived
+  /// column set every real caller uses — never the materialized child columns
+  /// (`event$clicks`/`event$__sparse__`) by name. Every other test in this class drives
+  /// `getMapValue`/`openMapValueReader` against mocked [DataSource]s; this is the one real
+  /// sealed-segment round trip, so a regression in how `ImmutableSegmentImpl` wires the parent
+  /// [DataSource] or in the [ImmutableOpenStructDataSource.CachingMapValueReader] reader cache can't
+  /// hide behind a mock that always answers the way the test expects (e.g. in the per-key reader
+  /// cache `openMapValueReader()` builds for a sequential scan).
+  @Test
+  public void testSealedSegmentRoundTripThroughRecordReader()
+      throws Exception {
+    File tempDir = Files.createTempDirectory("ImmutableOpenStructDataSourceTest").toFile();
+    try {
+      Map<String, FieldSpec> children = new HashMap<>();
+      children.put("clicks", new DimensionFieldSpec("clicks", DataType.LONG, true));
+      ComplexFieldSpec fieldSpec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, children);
+      Schema schema = new Schema.SchemaBuilder().setSchemaName("testRoundTrip").addField(fieldSpec).build();
+
+      // "clicks" present on 9/10 docs -> dense; "region" present on 1/10 -> sparse.
+      OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+      FieldConfig eventFieldConfig = new FieldConfig.Builder("event").withIndexes(indexes).build();
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+          .setTableName("testRoundTrip")
+          .setFieldConfigList(List.of(eventFieldConfig))
+          .setNullHandlingEnabled(true)
+          .build();
+
+      int numDocs = 10;
+      List<GenericRow> rows = new ArrayList<>(numDocs);
+      List<Map<String, Object>> expected = new ArrayList<>(numDocs);
+      for (int docId = 0; docId < numDocs; docId++) {
+        Map<String, Object> value = new HashMap<>();
+        if (docId != 9) {
+          value.put("clicks", (long) docId);
+        }
+        if (docId == 3) {
+          value.put("region", "us");
+        }
+        GenericRow row = new GenericRow();
+        row.putValue("event", value);
+        rows.add(row);
+        expected.add(value.isEmpty() ? null : value);
+      }
+
+      SegmentGeneratorConfig segmentConfig = new SegmentGeneratorConfig(tableConfig, schema);
+      segmentConfig.setOutDir(tempDir.getAbsolutePath());
+      segmentConfig.setSegmentName("testRoundTripSegment");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(segmentConfig, new GenericRowRecordReader(rows));
+      driver.build();
+
+      ImmutableSegment segment = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+      try {
+        assertTrue(segment.getDataSource("event") instanceof ImmutableOpenStructDataSource);
+        try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+          recordReader.init(segment);
+          for (int docId = 0; docId < numDocs; docId++) {
+            GenericRow row = new GenericRow();
+            recordReader.next(row);
+            assertEquals(row.getValue("event"), expected.get(docId), "docId=" + docId);
+          }
+        }
+      } finally {
+        segment.destroy();
+      }
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 }

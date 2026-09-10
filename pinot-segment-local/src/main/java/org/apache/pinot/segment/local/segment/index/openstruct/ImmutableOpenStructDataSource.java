@@ -200,6 +200,85 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     }
   }
 
+  @Override
+  public MapValueReader openMapValueReader() {
+    return new CachingMapValueReader();
+  }
+
+  /// Caches one [PinotSegmentColumnReader] per key for the life of the reader, instead of the
+  /// per-call construct-and-close [#readValue]/[#getMapValue] does. For a raw, chunk-compressed
+  /// column (e.g. the sparse blob), a fresh reader per doc means a fresh decompression buffer and,
+  /// depending on access order, redundant re-decompression of the same chunk; reusing the reader
+  /// across a sequential scan lets it carry its decoded-chunk state forward. Not thread-safe — for
+  /// one single-threaded scan only, per [OpenStructDataSource#openMapValueReader()].
+  private final class CachingMapValueReader implements MapValueReader {
+    private final Map<String, PinotSegmentColumnReader> _readers = new HashMap<>();
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public Map<String, Object> getMapValue(int docId) {
+      Map<String, Object> result = null;
+
+      for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
+        Object value = readValue(entry.getKey(), entry.getValue(), docId);
+        if (value != null) {
+          if (result == null) {
+            result = new HashMap<>();
+          }
+          result.put(entry.getKey(), value);
+        }
+      }
+
+      if (_sparseDataSource != null) {
+        Object sparseValue = readValue(_fieldSpec.getName(), _sparseDataSource, docId);
+        if (sparseValue instanceof String) {
+          String json = (String) sparseValue;
+          if (!json.isEmpty()) {
+            try {
+              Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+              if (result == null) {
+                result = new HashMap<>();
+              }
+              result.putAll(sparseMap);
+            } catch (IOException e) {
+              throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+            }
+          }
+        }
+      }
+
+      return result;
+    }
+
+    @Nullable
+    private Object readValue(String key, DataSource dataSource, int docId) {
+      PinotSegmentColumnReader reader = _readers.computeIfAbsent(key, k -> createReader(k, dataSource));
+      if (reader == null) {
+        return null;
+      }
+      return reader.isNull(docId) ? null : reader.getValue(docId);
+    }
+
+    @Nullable
+    private PinotSegmentColumnReader createReader(String key, DataSource dataSource) {
+      ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
+      if (fwdReader == null) {
+        return null;
+      }
+      return new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
+          dataSource.getNullValueVector(), 0);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (PinotSegmentColumnReader reader : _readers.values()) {
+        reader.close();
+      }
+    }
+  }
+
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {
     private final FieldSpec _fieldSpec;
     private final int _numDocs;
