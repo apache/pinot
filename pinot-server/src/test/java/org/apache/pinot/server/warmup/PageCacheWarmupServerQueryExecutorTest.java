@@ -26,6 +26,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -124,7 +126,6 @@ public class PageCacheWarmupServerQueryExecutorTest {
     when(_queryScheduler.submit(any())).thenAnswer(inv ->
         com.google.common.util.concurrent.Futures.immediateFuture(new byte[0]));
 
-    // Dummy warm‑up spec: 2‑second budget
     PageCacheWarmupConfig.Spec warmSpec = new PageCacheWarmupConfig.Spec(true, 2, null, null);
 
     // Wire the table manager and a single segment so warmupTable() finds data
@@ -142,6 +143,12 @@ public class PageCacheWarmupServerQueryExecutorTest {
         "SELECT * FROM testTable LIMIT 1",
         "SELECT COUNT(*) FROM testTable"
     );
+
+    // Keep one-time SQL parser and compiler initialization outside the table-level warmup budget.
+    for (String query : queries) {
+      QueryContextConverterUtils.getQueryContext(query);
+      CalciteSqlCompiler.compileToBrokerRequest(query);
+    }
 
     double warmupQps = 20.0;  // plenty of headroom (2 queries << 20 QPS)
 
