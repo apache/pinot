@@ -54,16 +54,38 @@ public class SegmentZKMetadataCustomMapModifier {
   public SegmentZKMetadataCustomMapModifier(String jsonString)
       throws IOException {
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());
+    if (!jsonNode.isObject()) {
+      throw new IOException("Segment ZK metadata custom map modifier must be a JSON object");
+    }
+    JsonNode modifyMode = jsonNode.get(MAP_MODIFY_MODE_KEY);
+    if (modifyMode == null || !modifyMode.isTextual()) {
+      throw new IOException("Segment ZK metadata custom map modifier mode must be a string");
+    }
+    try {
+      _modifyMode = ModifyMode.valueOf(modifyMode.textValue());
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Invalid segment ZK metadata custom map modifier mode: " + modifyMode.textValue(), e);
+    }
     JsonNode jsonMap = jsonNode.get(MAP_KEY);
-    if (jsonMap == null || jsonMap.isEmpty()) {
+    if (jsonMap == null || jsonMap.isNull()) {
       _map = null;
     } else {
-      _map = new HashMap<>();
-      Iterator<String> keys = jsonMap.fieldNames();
-      while (keys.hasNext()) {
-        String key = keys.next();
-        _map.put(key, jsonMap.get(key).asText());
+      if (!jsonMap.isObject()) {
+        throw new IOException("Segment ZK metadata custom map must be an object or null");
+      }
+      if (jsonMap.isEmpty()) {
+        _map = null;
+      } else {
+        _map = new HashMap<>();
+        Iterator<String> keys = jsonMap.fieldNames();
+        while (keys.hasNext()) {
+          String key = keys.next();
+          JsonNode value = jsonMap.get(key);
+          if (!value.isTextual()) {
+            throw new IOException("Segment ZK metadata custom map value must be a string for key: " + key);
+          }
+          _map.put(key, value.textValue());
+        }
       }
     }
   }
