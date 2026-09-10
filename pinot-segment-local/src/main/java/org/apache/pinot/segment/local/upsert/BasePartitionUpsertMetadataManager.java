@@ -685,11 +685,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
       }
-      List<PrimaryKey> sampledKeysNotReplaced = new ArrayList<>(NUM_SAMPLED_KEYS_NOT_REPLACED);
       int numKeysStillNotReplaced =
-          removeSegmentAndGetNumKeysRemoved(oldSegment, validDocIdsForOldSegment, sampledKeysNotReplaced);
+          removeSegmentAndGetNumKeysRemoved(oldSegment, validDocIdsForOldSegment);
       if (numKeysStillNotReplaced > 0) {
-        logKeysNotReplaced(segmentName, numKeysStillNotReplaced, sampledKeysNotReplaced);
+        _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
         updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
       }
     }
@@ -743,30 +742,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
-  /// How many of the unreplaced primary keys to name in the log. Bounded because the count itself can be large,
-  /// and because a primary key is customer data.
-  protected static final int NUM_SAMPLED_KEYS_NOT_REPLACED = 8;
-
-  /// Removes candidate keys and returns how many were still owned by the segment at removal time, appending up to
-  /// [#NUM_SAMPLED_KEYS_NOT_REPLACED] of them to `sampledKeysRemoved` when it is given. Implementations backed by
-  /// concurrent metadata should override this and count only removals that pass their authoritative ownership check.
-  /// The default preserves compatibility with existing metadata-manager implementations and names no keys, since it
-  /// cannot tell which of the candidates were actually removed.
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds,
-      @Nullable List<PrimaryKey> sampledKeysRemoved) {
+  /// Removes candidate keys and returns how many were still owned by the segment at removal time. Implementations
+  /// backed by concurrent metadata should override this method and count only removals that pass their authoritative
+  /// ownership check. The default preserves compatibility with existing metadata-manager implementations.
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     removeSegment(segment, validDocIds);
     return validDocIds.getCardinality();
-  }
-
-  /// Logs the unreplaced-key count, naming a few of the keys when the implementation could identify them.
-  protected void logKeysNotReplaced(String segmentName, int numKeysStillNotReplaced,
-      List<PrimaryKey> sampledKeysNotReplaced) {
-    if (sampledKeysNotReplaced.isEmpty()) {
-      _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
-    } else {
-      _logger.warn("Found {} primary keys not replaced for segment: {}, first {}: {}", numKeysStillNotReplaced,
-          segmentName, sampledKeysNotReplaced.size(), sampledKeysNotReplaced);
-    }
   }
 
   protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);

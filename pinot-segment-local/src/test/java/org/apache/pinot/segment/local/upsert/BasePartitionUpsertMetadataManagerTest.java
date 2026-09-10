@@ -1210,8 +1210,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
-    protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds,
-        @Nullable List<PrimaryKey> sampledKeysRemoved) {
+    protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
       _candidateValidDocIds = validDocIds.clone();
       return _numKeysRemovedAtActionBoundary;
     }

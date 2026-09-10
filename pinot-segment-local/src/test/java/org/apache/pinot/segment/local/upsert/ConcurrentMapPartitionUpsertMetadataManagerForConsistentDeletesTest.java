@@ -1368,13 +1368,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     upsertMetadataManager._primaryKeyToRecordLocationMap.put(newerSegmentMapKey,
         new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(newerSegment, 1, 200, 2));
 
-    List<PrimaryKey> sampledKeysRemoved = new ArrayList<>();
     int numKeysRemoved = upsertMetadataManager.removeSegmentAndGetNumKeysRemoved(oldSegment,
-        List.of(oldSegmentKey, newerSegmentKey).iterator(), sampledKeysRemoved);
+        List.of(oldSegmentKey, newerSegmentKey).iterator());
 
     assertEquals(numKeysRemoved, 1);
-    // Only the key still owned by the old segment is named, not the one ingestion already moved.
-    assertEquals(sampledKeysRemoved, List.of(oldSegmentKey));
     assertFalse(upsertMetadataManager._primaryKeyToRecordLocationMap.containsKey(oldSegmentMapKey));
     ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation newerLocation =
         upsertMetadataManager._primaryKeyToRecordLocationMap.get(newerSegmentMapKey);

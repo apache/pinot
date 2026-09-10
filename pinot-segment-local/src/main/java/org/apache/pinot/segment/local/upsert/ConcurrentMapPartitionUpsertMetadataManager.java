@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -210,11 +209,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator, null);
+    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator);
   }
 
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator,
-      @Nullable List<PrimaryKey> sampledKeysRemoved) {
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
     AtomicInteger numKeysRemoved = new AtomicInteger();
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey primaryKey = primaryKeyIterator.next();
@@ -222,9 +220,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
               numKeysRemoved.getAndIncrement();
-              if (sampledKeysRemoved != null && sampledKeysRemoved.size() < NUM_SAMPLED_KEYS_NOT_REPLACED) {
-                sampledKeysRemoved.add(primaryKey);
-              }
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
@@ -304,11 +299,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds,
-      @Nullable List<PrimaryKey> sampledKeysRemoved) {
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       return removeSegmentAndGetNumKeysRemoved(segment,
-          UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds), sampledKeysRemoved);
+          UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),

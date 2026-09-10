@@ -20,11 +20,9 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -240,11 +238,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void doRemoveSegment(IndexSegment segment) {
-    doRemoveSegmentAndGetNumKeysRemoved(segment, null);
+    doRemoveSegmentAndGetNumKeysRemoved(segment);
   }
 
-  protected int doRemoveSegmentAndGetNumKeysRemoved(IndexSegment segment,
-      @Nullable List<PrimaryKey> sampledKeysRemoved) {
+  protected int doRemoveSegmentAndGetNumKeysRemoved(IndexSegment segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Removing {} segment: {}, current primary key count: {}",
         segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
@@ -258,8 +255,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             UpsertUtils.getRecordIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
       } else {
         numKeysRemoved = removeSegmentAndGetNumKeysRemoved(segment,
-            UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()),
-            sampledKeysRemoved);
+            UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -319,10 +315,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
       // distinctSegmentCount by 1
-      List<PrimaryKey> sampledKeysNotReplaced = new ArrayList<>(NUM_SAMPLED_KEYS_NOT_REPLACED);
-      int numKeysStillNotReplaced = doRemoveSegmentAndGetNumKeysRemoved(oldSegment, sampledKeysNotReplaced);
+      int numKeysStillNotReplaced = doRemoveSegmentAndGetNumKeysRemoved(oldSegment);
       if (numKeysStillNotReplaced > 0) {
-        logKeysNotReplaced(segmentName, numKeysStillNotReplaced, sampledKeysNotReplaced);
+        _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
         updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
       }
     } finally {
@@ -332,11 +327,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator, null);
+    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator);
   }
 
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator,
-      @Nullable List<PrimaryKey> sampledKeysRemoved) {
+  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
     AtomicInteger numKeysRemoved = new AtomicInteger();
     // We need to decrease the distinctSegmentCount for each unique primary key in this deleting segment by 1
     // as the occurrence of the key in this segment is being removed. We are taking a set of unique primary keys
@@ -348,9 +342,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
               numKeysRemoved.getAndIncrement();
-              if (sampledKeysRemoved != null && sampledKeysRemoved.size() < NUM_SAMPLED_KEYS_NOT_REPLACED) {
-                sampledKeysRemoved.add(primaryKey);
-              }
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
