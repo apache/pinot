@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.physical;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -106,14 +108,69 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     assertEquals(singleMailbox(receiverMailboxes, 1, SENDER_STAGE).getHostname(), "host_B");
   }
 
-  /// An unequal-but-non-multiple worker count (2 senders, 3 receivers) must be rejected rather than rounding the
-  /// parallelism down to 1 and silently dropping the extra receiver.
-  @Test(expectedExceptions = IllegalStateException.class,
-      expectedExceptionsMessageRegExp = ".*multiple of number of senders.*")
-  public void testSingletonRejectsNonMultipleReceiverCount() {
+  /// A KEYED local exchange (a UNION ALL input carries the projected columns) whose worker counts do not divide
+  /// evenly is promoted to a real hash shuffle: HashExchange routes every key consistently across the receivers, so
+  /// this is correct for a concatenation and for a keyed join alike.
+  @Test
+  public void testKeyedSingletonWithUnequalWorkersShuffles() {
     DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
     DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
-    process(singletonSendNode(List.of(0)), sender, receiver);
+    MailboxSendNode sendNode = singletonSendNode(List.of(0));
+    process(sendNode, sender, receiver);
+
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    // Shuffled: every receiver worker reads from every sender worker.
+    for (int workerId = 0; workerId < 3; workerId++) {
+      assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), workerId, SENDER_STAGE), List.of(0, 1));
+    }
+  }
+
+  /// The parallelism path addresses a whole receiver range at the range's FIRST host, which is only valid when the
+  /// receiver map was derived from the sender. Here the single sender's two receivers sit on DIFFERENT servers, so
+  /// that assumption does not hold: posting both to host_A would strand the receiver on host_B until the deadline.
+  /// Co-residency is verified rather than assumed, and the exchange falls back to a full shuffle.
+  @Test
+  public void testSingletonWithParallelismAcrossHostsShuffles() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    MailboxSendNode sendNode = singletonSendNode(List.of(0));
+    process(sendNode, sender, receiver);
+
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    Set<String> hosts = new HashSet<>();
+    for (MailboxInfo mailboxInfo : sender.getWorkerIdToMailboxesMap().get(0).get(RECEIVER_STAGE).getMailboxInfos()) {
+      hosts.add(mailboxInfo.getHostname());
+    }
+    assertEquals(hosts, Set.of("host_A", "host_B"), "Each receiver must be addressed at its own host");
+  }
+
+  /// A KEYLESS local exchange must still fail loudly when the workers do not line up. This is the colocated
+  /// dynamic-broadcast semi-join build side: every receiver needs the WHOLE build side to build its filter
+  /// (the non-colocated variant broadcasts for exactly that reason), so redistributing it would silently
+  /// drop matches. A UNION ALL input never reaches here because it carries the projected columns as keys.
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = ".*requires keys.*")
+  public void testKeylessSingletonWithUnequalWorkersStillFails() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
+    process(singletonSendNode(List.of()), sender, receiver);
+  }
+
+  /// A local exchange whose sender stage has no worker at all (a fully pruned leaf) has nothing to wire 1-to-1, and
+  /// computing the parallelism would divide by zero. Every live receiver must still get an entry, holding an empty
+  /// mailbox list, or its WorkerMetadata carries a null mailbox map and fails during dispatch serialization.
+  @Test
+  public void testSingletonWithZeroSendersDoesNotDivideByZero() {
+    DispatchablePlanMetadata sender = metadata(Map.of());
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    process(singletonSendNode(List.of()), sender, receiver);
+
+    assertTrue(sender.getWorkerIdToMailboxesMap().isEmpty());
+    for (int workerId = 0; workerId < 2; workerId++) {
+      MailboxInfos mailboxInfos = receiver.getWorkerIdToMailboxesMap().get(workerId).get(SENDER_STAGE);
+      assertNotNull(mailboxInfos, "Missing entry for worker: " + workerId);
+      assertTrue(mailboxInfos.getMailboxInfos().isEmpty());
+    }
   }
 
   /// A SINGLETON local exchange with parallelism (more receivers than senders) does not assert co-location either: it
@@ -190,6 +247,21 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
       assertTrue(mailboxInfos.getMailboxInfos().isEmpty(), String.valueOf(mailboxInfos.getMailboxInfos()));
     }
     // Nothing to receive on: the receiver has no worker to hold an entry.
+    assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
+  }
+
+  /// A pre-partitioned hash exchange whose sender stage has zero workers (all its leaf segments were pruned) must not
+  /// be wired as a direct exchange: with the receiver stage also empty (as when every branch of a UNION ALL is fully
+  /// pruned), the sender and receiver counts trivially "match" and computing the fan-out parallelism would divide by
+  /// zero. It must fall back to the regular wiring, which is a no-op for empty stages.
+  @Test
+  public void testPrePartitionedExchangeWithZeroWorkersFallsBackToShuffle() {
+    DispatchablePlanMetadata sender = metadata(Map.of());
+    sender.setPrePartitioned(true);
+    DispatchablePlanMetadata receiver = metadata(Map.of());
+    process(hashSendNode(), sender, receiver);
+
+    assertTrue(sender.getWorkerIdToMailboxesMap().isEmpty());
     assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
   }
 

@@ -49,7 +49,7 @@ import org.roaringbitmap.IntIterator;
 /// - dataType: the data type of data column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
-    extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {
+    extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
   private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 

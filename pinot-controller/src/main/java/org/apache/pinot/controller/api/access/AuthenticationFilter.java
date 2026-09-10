@@ -30,13 +30,16 @@ import javax.inject.Provider;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Authorize;
@@ -103,8 +106,15 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     // authorization. If table name is not available, it means the endpoint is not a table-level endpoint.
     String tableName = extractTableName(endpointMethod, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     if (tableName != null) {
+      if (StringUtils.isBlank(tableName)) {
+        throw new WebApplicationException("Table name must not be blank", Response.Status.BAD_REQUEST);
+      }
       // If table name is present, translate it to the fully qualified name based on database header.
-      tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
+      try {
+        tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
+      } catch (RuntimeException e) {
+        throw new WebApplicationException("Invalid table name: " + e.getMessage(), e, Response.Status.BAD_REQUEST);
+      }
     }
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);

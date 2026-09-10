@@ -34,7 +34,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class PercentileAggregationFunction extends NullableSingleInputAggregationFunction<DoubleArrayList, Double> {
+public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   //version 0 functions specified in the of form PERCENTILE<2-digits>(column)

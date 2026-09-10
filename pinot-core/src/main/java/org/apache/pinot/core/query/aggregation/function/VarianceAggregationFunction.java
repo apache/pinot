@@ -40,7 +40,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// The algorithm to compute variance is based on "Updating Formulae and a Pairwise Algorithm for Computing
 /// Sample Variances" by Chan et al. Please refer to the "Parallel Algorithm" section from
 /// - [this wiki](https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm)
-public class VarianceAggregationFunction extends NullableSingleInputAggregationFunction<VarianceTuple, Double> {
+public class VarianceAggregationFunction extends BaseSingleInputAggregationFunction<VarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final boolean _isSample;
   protected final boolean _isStdDev;

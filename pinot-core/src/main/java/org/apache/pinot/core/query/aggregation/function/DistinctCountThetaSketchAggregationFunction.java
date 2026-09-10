@@ -80,7 +80,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 /// E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountThetaSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<List<ThetaSketchAccumulator>, Comparable> {
+    extends BaseSingleInputAggregationFunction<List<ThetaSketchAccumulator>, Comparable> {
   private static final String SET_UNION = "setunion";
   private static final String SET_INTERSECT = "setintersect";
   private static final String SET_DIFF = "setdiff";

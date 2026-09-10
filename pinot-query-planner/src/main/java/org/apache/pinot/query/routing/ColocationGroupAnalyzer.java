@@ -150,7 +150,7 @@ class ColocationGroupAnalyzer {
     if (members.size() < 2) {
       return null;
     }
-    List<Integer> partitionedLeafFragmentIds = new ArrayList<>();
+    List<PlanFragment> partitionedLeafFragments = new ArrayList<>();
     int partitionSize = -1;
     int partitionParallelism = -1;
     String partitionFunction = null;
@@ -186,7 +186,7 @@ class ColocationGroupAnalyzer {
         return null;
       }
       String leafPartitionFunction = hints.getHintedPartitionFunction();
-      if (partitionedLeafFragmentIds.isEmpty()) {
+      if (partitionedLeafFragments.isEmpty()) {
         partitionSize = hints.getPartitionSize();
         partitionParallelism = hints.getPartitionParallelism();
         partitionFunction = leafPartitionFunction;
@@ -195,12 +195,12 @@ class ColocationGroupAnalyzer {
           || !isSamePartitionFunction(partitionFunction, leafPartitionFunction)) {
         return null;
       }
-      partitionedLeafFragmentIds.add(fragmentId);
+      partitionedLeafFragments.add(fragment);
     }
-    if (partitionedLeafFragmentIds.isEmpty()) {
+    if (partitionedLeafFragments.isEmpty()) {
       return null;
     }
-    return new ColocationGroup(partitionSize, partitionedLeafFragmentIds);
+    return new ColocationGroup(partitionSize, partitionedLeafFragments);
   }
 
   /// Compares two `partition_function` hints the way the rest of the engine compares partition function names:
@@ -242,12 +242,13 @@ class ColocationGroupAnalyzer {
   static class ColocationGroup {
     /// The number of partition classes, and of workers before reduction, i.e. the hinted `partition_size`.
     final int _partitionSize;
-    /// The members whose data decides which classes survive.
-    final List<Integer> _partitionedLeafFragmentIds;
+    /// The members whose data decides which classes survive. The whole fragment rather than its id because deciding
+    /// survival reads each member's own filter off its leaf stage tree, see `WorkerManager#assignPartitionClasses`.
+    final List<PlanFragment> _partitionedLeafFragments;
 
-    ColocationGroup(int partitionSize, List<Integer> partitionedLeafFragmentIds) {
+    ColocationGroup(int partitionSize, List<PlanFragment> partitionedLeafFragments) {
       _partitionSize = partitionSize;
-      _partitionedLeafFragmentIds = partitionedLeafFragmentIds;
+      _partitionedLeafFragments = partitionedLeafFragments;
     }
   }
 }

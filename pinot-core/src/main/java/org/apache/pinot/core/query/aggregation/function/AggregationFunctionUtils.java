@@ -72,7 +72,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -671,9 +671,9 @@ public class AggregationFunctionUtils {
   }
 
   private static Long getMinValueLong(DataSource dataSource) {
-    FieldSpec.DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
     Preconditions.checkArgument(
-        dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.INT,
+        dataType == DataType.LONG || dataType == DataType.INT,
         "MINLONG aggregation function can only be applied to columns of integer types");
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
@@ -691,9 +691,9 @@ public class AggregationFunctionUtils {
   }
 
   private static Long getMaxValueLong(DataSource dataSource) {
-    FieldSpec.DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
     Preconditions.checkArgument(
-        dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.INT,
+        dataType == DataType.LONG || dataType == DataType.INT,
         "MAXLONG aggregation function can only be applied to columns of integer types");
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
@@ -805,7 +805,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = dataSource.getDictionary();
     assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
-    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+    if (metadata.getDataType() == DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized HyperLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -829,7 +829,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = dataSource.getDictionary();
     assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
-    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+    if (metadata.getDataType() == DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized HyperLogLogPlus objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -873,7 +873,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = dataSource.getDictionary();
     assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
-    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+    if (metadata.getDataType() == DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);

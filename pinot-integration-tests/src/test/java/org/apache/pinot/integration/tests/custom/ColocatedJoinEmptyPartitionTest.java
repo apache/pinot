@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -34,6 +36,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -66,6 +69,11 @@ import static org.testng.Assert.assertTrue;
 /// end-to-end run can show is that a real server accepts and answers a leaf-stage request whose segment list is empty
 /// for a genuinely partitioned table scan.
 ///
+/// The same fixture covers the class reduction a filter buys. The tables configure the `partition` segment pruner, so
+/// a restriction on the join key lets the broker eliminate segments before planning, and a class every member
+/// eliminates leaves the group: `partitionKey IN (1, 2)` keeps only classes 1 and 2, halving the leaf worker count.
+/// A restriction matching nothing anywhere falls back to the populated classes and returns an empty result.
+///
 /// The partition layout is supplied with explicit `tableOptions` hints rather than inferred, because hint inference is
 /// off by default (`pinot.broker.multistage.infer.partition.hint`); the hints carry exactly what it would have
 /// produced. The `is_colocated_by_join_keys` hint is spelled out for readability -- the exchange would be
@@ -90,6 +98,12 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
   /// The partition classes kept by a colocated join of the two tables, i.e. the union of the populated ones.
   private static final int NUM_KEPT_CLASSES_FOR_JOIN = 4;
   private static final int NUM_ROWS_PER_PARTITION = 2;
+
+  /// The partition keys the pruning tests filter on. They land in partitions 1 and 2, the only ones both tables
+  /// populate, so classes 0 (left only) and 3 (right only) are eliminated on every member of the colocated group.
+  private static final List<Integer> FILTERED_KEYS = List.of(1, 2);
+  /// A key in a partition neither table populates, so the filter matches nothing anywhere.
+  private static final List<Integer> UNMATCHED_KEYS = List.of(5);
 
   private static final int LEFT_METRIC_MULTIPLIER = 10;
   private static final int RIGHT_METRIC_MULTIPLIER = 100;
@@ -235,31 +249,143 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
 
     assertEquals(colocatedResponse.get("resultTable").get("rows"), shuffledResponse.get("resultTable").get("rows"),
         "Colocated and shuffled plans must return the same rows");
+    assertShuffledLeafStages(shuffledResponse, 2);
+  }
 
-    JsonNode shuffledStageStats = shuffledResponse.get("stageStats");
-    assertNotNull(shuffledStageStats, "Missing stage stats in shuffled response: " + shuffledResponse);
-    List<JsonNode> shuffledLeafStageSends = new ArrayList<>();
-    collectLeafStageSends(shuffledStageStats, shuffledLeafStageSends);
-    assertEquals(shuffledLeafStageSends.size(), 2,
-        "Unexpected number of leaf stages in stage stats: " + shuffledStageStats.toPrettyString());
-    for (JsonNode leafStageSend : shuffledLeafStageSends) {
-      assertTrue(leafStageSend.path("fanOut").asInt(-1) > 1,
-          "A shuffled leaf send must write more than one receive mailbox, otherwise the fanOut of 1 asserted for the "
-              + "colocated plan proves nothing. Stage stats: " + shuffledStageStats.toPrettyString());
-    }
+  /// The class reduction broker pruning buys: a filter that every member of the colocated group can prune with drops
+  /// the classes all of them eliminate, so the leaves run fewer workers and scan fewer segments than the union of the
+  /// populated classes. What the reduced width must not cost is the 1-to-1 wiring, which is what the two exchange
+  /// assertions are for.
+  @Test
+  public void testColocatedJoinPrunesClassesEveryMemberFilters()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = colocatedJoinQuery(LEFT_TABLE_NAME, RIGHT_TABLE_NAME, bothSidesFilter(FILTERED_KEYS));
+
+    JsonNode response = queryBrokerHttpEndpoint(query);
+    assertNoExceptions(response);
+    assertRows(response, expectedFilteredRows(FILTERED_KEYS));
+
+    // Classes 0 and 3 go: the left table's only class-0 segment is pruned by its own filter and the right table never
+    // populated that class, and symmetrically for class 3. Both tables populate every surviving class with exactly one
+    // segment, so both leaves scan one segment per kept class.
+    List<Integer> keptClasses = keptClassesFor(FILTERED_KEYS);
+    assertLeafStages(response, 2, keptClasses.size(), keptClasses.size());
+    assertDirectExchanges(query, 2, keptClasses.size());
+
+    // One segment per class that a table populated but the filter did not keep: the left table's class-0 segment and
+    // the right table's class-3 one.
+    long expectedNumPrunedSegments =
+        Stream.concat(LEFT_POPULATED_PARTITIONS.stream(), RIGHT_POPULATED_PARTITIONS.stream())
+            .filter(partition -> !keptClasses.contains(partition))
+            .count();
+    assertEquals(response.path("numSegmentsPrunedByBroker").asLong(-1), expectedNumPrunedSegments,
+        "Unexpected number of broker-pruned segments in response: " + response);
+  }
+
+  /// The same differential check as [#testColocatedJoinMatchesShuffledJoin], at the reduced width. A plan that quietly
+  /// fell back to a shuffle would return the right rows too, so this pairs with the `fanOut` and `[PARTITIONED]`
+  /// assertions rather than replacing them; what it rules out is a reduction that pairs the wrong classes and drops or
+  /// duplicates rows with no error. The shuffled plan reaches its answer by an independent route: with no table hints
+  /// its leaves are assigned per server and pruned per segment, not per partition class.
+  @Test
+  public void testFilteredColocatedJoinMatchesFilteredShuffledJoin()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String whereClause = bothSidesFilter(FILTERED_KEYS);
+    JsonNode colocatedResponse = queryBrokerHttpEndpoint(
+        colocatedJoinQuery(LEFT_TABLE_NAME, RIGHT_TABLE_NAME, whereClause));
+    assertNoExceptions(colocatedResponse);
+    // Pin the rows rather than only comparing the two plans: were the filter to stop matching anything, both sides
+    // would return nothing and the comparison below would still pass while proving nothing at all.
+    assertRows(colocatedResponse, expectedFilteredRows(FILTERED_KEYS));
+    JsonNode shuffledResponse = queryBrokerHttpEndpoint(
+        shuffledJoinQuery(LEFT_TABLE_NAME, RIGHT_TABLE_NAME, whereClause));
+    assertNoExceptions(shuffledResponse);
+
+    assertEquals(colocatedResponse.get("resultTable").get("rows"), shuffledResponse.get("resultTable").get("rows"),
+        "Class-reduced colocated and shuffled plans must return the same rows");
+    assertShuffledLeafStages(shuffledResponse, 2);
+  }
+
+  /// A filter every member prunes every segment with: the group is left with no surviving class at all. It must fall
+  /// back to its populated classes and let the servers return the empty result, because a zero-worker leaf has no
+  /// handling on a 1-to-1 exchange -- an empty answer, not an error.
+  @Test
+  public void testColocatedJoinWithFilterMatchingNothing()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    assertTrue(keptClassesFor(UNMATCHED_KEYS).isEmpty(),
+        "The filter must match no partition either table populates, otherwise this is not the all-pruned fallback");
+    String query = colocatedJoinQuery(LEFT_TABLE_NAME, RIGHT_TABLE_NAME, bothSidesFilter(UNMATCHED_KEYS));
+
+    JsonNode response = queryBrokerHttpEndpoint(query);
+    assertNoExceptions(response);
+    assertRows(response, List.of());
+
+    // Planned exactly as if there were no filter, and nothing is reported as pruned: the fallback dropped no class the
+    // group would otherwise have kept.
+    assertLeafStages(response, 2, NUM_KEPT_CLASSES_FOR_JOIN, LEFT_POPULATED_PARTITIONS.size());
+    assertDirectExchanges(query, 2, NUM_KEPT_CLASSES_FOR_JOIN);
+    assertEquals(response.path("numSegmentsPrunedByBroker").asLong(-1), 0L,
+        "Unexpected number of broker-pruned segments in response: " + response);
   }
 
   private static String colocatedJoinQuery(String leftTableName, String rightTableName) {
+    return colocatedJoinQuery(leftTableName, rightTableName, "");
+  }
+
+  private static String colocatedJoinQuery(String leftTableName, String rightTableName, String whereClause) {
     return String.format(
-        "SELECT %s l.%s, l.%s, r.%s FROM %s %s AS l JOIN %s %s AS r ON l.%s = r.%s ORDER BY l.%s",
+        "SELECT %s l.%s, l.%s, r.%s FROM %s %s AS l JOIN %s %s AS r ON l.%s = r.%s %s ORDER BY l.%s",
         COLOCATED_JOIN_HINT, PARTITION_KEY_COLUMN, METRIC_COLUMN, METRIC_COLUMN, leftTableName, TABLE_HINT,
-        rightTableName, TABLE_HINT, PARTITION_KEY_COLUMN, PARTITION_KEY_COLUMN, PARTITION_KEY_COLUMN);
+        rightTableName, TABLE_HINT, PARTITION_KEY_COLUMN, PARTITION_KEY_COLUMN, whereClause, PARTITION_KEY_COLUMN);
   }
 
   private static String shuffledJoinQuery(String leftTableName, String rightTableName) {
-    return String.format("SELECT l.%s, l.%s, r.%s FROM %s AS l JOIN %s AS r ON l.%s = r.%s ORDER BY l.%s",
+    return shuffledJoinQuery(leftTableName, rightTableName, "");
+  }
+
+  private static String shuffledJoinQuery(String leftTableName, String rightTableName, String whereClause) {
+    return String.format("SELECT l.%s, l.%s, r.%s FROM %s AS l JOIN %s AS r ON l.%s = r.%s %s ORDER BY l.%s",
         PARTITION_KEY_COLUMN, METRIC_COLUMN, METRIC_COLUMN, leftTableName, rightTableName, PARTITION_KEY_COLUMN,
-        PARTITION_KEY_COLUMN, PARTITION_KEY_COLUMN);
+        PARTITION_KEY_COLUMN, whereClause, PARTITION_KEY_COLUMN);
+  }
+
+  /// A partition-key restriction spelled out on both sides of the join rather than on one and left to Calcite's
+  /// transitive inference, so that the leaf of each member carries it whatever the planner decides to push down.
+  private static String bothSidesFilter(List<Integer> keys) {
+    String keyList = keys.stream().map(String::valueOf).collect(Collectors.joining(", "));
+    return String.format("WHERE l.%s IN (%s) AND r.%s IN (%s)", PARTITION_KEY_COLUMN, keyList, PARTITION_KEY_COLUMN,
+        keyList);
+  }
+
+  /// The partition classes a colocated join of the two tables keeps under the given partition-key restriction. A class
+  /// survives when at least one member still holds a segment its own filter leaves, i.e. when some restricted key
+  /// hashes into a partition that member populates. One partition per class here, since the declared partition count
+  /// is the hinted partition size.
+  private static List<Integer> keptClassesFor(List<Integer> keys) {
+    return keys.stream()
+        .map(key -> key % NUM_DECLARED_PARTITIONS)
+        .filter(partition -> LEFT_POPULATED_PARTITIONS.contains(partition)
+            || RIGHT_POPULATED_PARTITIONS.contains(partition))
+        .distinct()
+        .sorted()
+        .collect(Collectors.toList());
+  }
+
+  /// The rows the given partition-key restriction leaves in an inner join of the two tables: a key survives when both
+  /// tables populate the partition it hashes into, and every populated partition holds every one of its keys.
+  private static List<List<Long>> expectedFilteredRows(List<Integer> keys) {
+    List<List<Long>> expectedRows = new ArrayList<>();
+    for (int key : keys) {
+      int partition = key % NUM_DECLARED_PARTITIONS;
+      if (LEFT_POPULATED_PARTITIONS.contains(partition) && RIGHT_POPULATED_PARTITIONS.contains(partition)) {
+        expectedRows.add(
+            List.of((long) key, (long) key * LEFT_METRIC_MULTIPLIER, (long) key * RIGHT_METRIC_MULTIPLIER));
+      }
+    }
+    return expectedRows;
   }
 
   private static void assertNoExceptions(JsonNode response) {
@@ -312,6 +438,22 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
       JsonNode leaf = leafStageSend.get("children").get(0);
       assertEquals(leaf.path("numSegmentsQueried").asInt(-1), expectedNumSegments,
           "Unexpected number of segments queried by the leaf stage. Stage stats: " + stageStats.toPrettyString());
+    }
+  }
+
+  /// Asserts that every leaf stage of a shuffled plan writes more than one receive mailbox. This is the control that
+  /// gives the `fanOut` of 1 asserted for a colocated plan its meaning.
+  private static void assertShuffledLeafStages(JsonNode response, int expectedNumLeafStages) {
+    JsonNode stageStats = response.get("stageStats");
+    assertNotNull(stageStats, "Missing stage stats in shuffled response: " + response);
+    List<JsonNode> leafStageSends = new ArrayList<>();
+    collectLeafStageSends(stageStats, leafStageSends);
+    assertEquals(leafStageSends.size(), expectedNumLeafStages,
+        "Unexpected number of leaf stages in stage stats: " + stageStats.toPrettyString());
+    for (JsonNode leafStageSend : leafStageSends) {
+      assertTrue(leafStageSend.path("fanOut").asInt(-1) > 1,
+          "A shuffled leaf send must write more than one receive mailbox, otherwise the fanOut of 1 asserted for the "
+              + "colocated plan proves nothing. Stage stats: " + stageStats.toPrettyString());
     }
   }
 
@@ -406,6 +548,10 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
         .setNumReplicas(2)
         .setSegmentPartitionConfig(new SegmentPartitionConfig(
             Map.of(PARTITION_KEY_COLUMN, new ColumnPartitionConfig(PARTITION_FUNCTION, NUM_DECLARED_PARTITIONS))))
+        // Without this the broker builds no partition pruner at all (SegmentPrunerFactory only reads the routing
+        // config), a filter on the partition key would prune nothing, and the filtered tests below would assert the
+        // unfiltered worker count. The unfiltered tests are unaffected: with no filter there is nothing to prune.
+        .setRoutingConfig(new RoutingConfig(null, List.of(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, null))
         .build();
   }
 

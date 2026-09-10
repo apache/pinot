@@ -184,13 +184,12 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
         return PinotMetricUtils.getPinotMetricsFactoryClasses().stream()
             .map(clazz -> {
-                  try {
-                    return (PinotMetricsFactory) clazz.getDeclaredConstructor().newInstance();
-                  } catch (Exception ex) {
-                    throw new IllegalArgumentException("Cannot instantiate class " + clazz, ex);
-                  }
-                }
-            );
+              try {
+                return (PinotMetricsFactory) clazz.getDeclaredConstructor().newInstance();
+              } catch (Exception ex) {
+                throw new IllegalArgumentException("Cannot instantiate class " + clazz, ex);
+              }
+            });
       }
     },
     /// An algorithm returns all the factories listed in the config under the [#LIST_KEY].
@@ -199,15 +198,14 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
         return metricsConfiguration.getProperty(LIST_KEY, List.of()).stream()
             .map(className -> {
-                  try {
-                    return PluginManager.get().createInstance(className);
-                  } catch (ClassNotFoundException ex) {
-                    throw new IllegalArgumentException("Cannot find metric factory named " + className, ex);
-                  } catch (Exception ex) {
-                    throw new IllegalArgumentException("Cannot instantiate class " + className, ex);
-                  }
-                }
-            );
+              try {
+                return PluginManager.get().createInstance(className);
+              } catch (ClassNotFoundException ex) {
+                throw new IllegalArgumentException("Cannot find metric factory named " + className, ex);
+              } catch (Exception ex) {
+                throw new IllegalArgumentException("Cannot instantiate class " + className, ex);
+              }
+            });
       }
     };
 

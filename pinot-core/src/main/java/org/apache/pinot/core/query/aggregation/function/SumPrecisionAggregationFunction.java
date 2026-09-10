@@ -47,7 +47,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 /// - Expression: expression that contains the values to be summed up, can be serialized BigDecimal objects
 /// - Precision (optional): precision to be set to the final result
 /// - Scale (optional): scale to be set to the final result
-public class SumPrecisionAggregationFunction extends NullableSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   private final Integer _precision;
   private final Integer _scale;
 

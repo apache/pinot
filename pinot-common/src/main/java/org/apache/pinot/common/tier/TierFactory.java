@@ -51,7 +51,9 @@ public final class TierFactory {
       LOGGER.debug("Provided segments: {} for tier: {}", providedSegmentsForTier, tierConfig.getName());
       segmentSelector = new FixedTierSegmentSelector(providedSegmentsForTier);
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new TimeBasedTierSegmentSelector(tierConfig.getSegmentAge());
+      TimeBasedTierSegmentSelector.AgeField ageField =
+          TimeBasedTierSegmentSelector.AgeField.fromConfig(tierConfig.getSegmentAgeField());
+      segmentSelector = new TimeBasedTierSegmentSelector(tierConfig.getSegmentAge(), ageField);
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
       List<String> segments = tierConfig.getSegmentList();
       segmentSelector =

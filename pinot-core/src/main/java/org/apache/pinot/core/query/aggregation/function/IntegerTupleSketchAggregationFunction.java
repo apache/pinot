@@ -59,16 +59,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Usage examples:
 ///
 /// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
-///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+///   argument. The second argument is the nominal entries, and defaults to 16384.
 ///   The "raw" equivalents return serialised sketches in base64-encoded strings.
 ///
 ///   DISTINCT_COUNT_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_TUPLE_SKETCH(col, 16384)
 ///
 ///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 16384)
 /// - Extracting a cardinality estimate from a CPC sketch:
 ///
 ///   GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)
@@ -96,7 +96,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+    extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
@@ -162,9 +162,6 @@ public class IntegerTupleSketchAggregationFunction
     forEachNotNull(length, blockValSet, (from, to) -> {
       // An empty range still reaches here, for a zero-length block. Creating the accumulator for it would mark
       // the holder as aggregated and lose the signal this whole arrangement exists to carry.
-      if (to == from) {
-        return;
-      }
       TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
       for (int i = from; i < to; i++) {
         tupleIntSketchAccumulator.apply(deserializeSketch(bytesValues[i]));

@@ -226,7 +226,7 @@ public class StoredTypeDispatchTest {
         ExpressionContext.forLiteral(Literal.intValue(2)),
         ExpressionContext.forLiteral(Literal.stringValue("")));
 
-    TimeSeriesAggregationFunction function = new TimeSeriesAggregationFunction(arguments);
+    TimeSeriesAggregationFunction function = new TimeSeriesAggregationFunction(arguments, false);
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(NUM_DOCS, holder, timeSeriesBlocks(valueBlock));
     return function.extractAggregationResult(holder);
@@ -242,7 +242,7 @@ public class StoredTypeDispatchTest {
         ExpressionContext.forLiteral(Literal.longValue(100)),
         ExpressionContext.forLiteral(Literal.longValue(10)),
         ExpressionContext.forLiteral(Literal.intValue(2)),
-        ExpressionContext.forLiteral(Literal.stringValue(""))));
+        ExpressionContext.forLiteral(Literal.stringValue(""))), false);
   }
 
   private static Map<ExpressionContext, BlockValSet> timeSeriesBlocks(BlockValSet valueBlock) {

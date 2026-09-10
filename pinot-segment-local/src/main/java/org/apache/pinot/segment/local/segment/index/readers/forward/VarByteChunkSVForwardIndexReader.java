@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -133,6 +134,18 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
   @Override
   public String getMapAsJsonString(int docId, ChunkReaderContext context) {
     return MapUtils.frameToJsonString(getBytes(docId, context));
+  }
+
+  @Nullable
+  @Override
+  public Object getMapEntryValue(int docId, ChunkReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValue(getBytes(docId, context), key);
+  }
+
+  @Nullable
+  @Override
+  public String getMapEntryValueAsString(int docId, ChunkReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(getBytes(docId, context)), key);
   }
 
   /// Helper method to read BYTES value from the compressed index.

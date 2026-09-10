@@ -26,16 +26,19 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.NullSkippingUtils;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxMeasuringValSetWrapper;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjectionValSetWrapper;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class ParentExprMinMaxAggregationFunction extends ParentAggregationFunction<ExprMinMaxObject, ExprMinMaxObject> {
@@ -68,9 +71,10 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   // If the schemas are initialized
   private final ThreadLocal<Boolean> _schemaInitialized = ThreadLocal.withInitial(() -> false);
 
-  public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax) {
+  public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax,
+      boolean nullHandlingEnabled) {
 
-    super(arguments);
+    super(arguments, nullHandlingEnabled);
     _isMax = isMax;
     _functionIdContext = arguments.get(0);
 
@@ -110,33 +114,83 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    initializeWithNewDataBlocks(blockValSetMap);
 
-    ExprMinMaxObject exprMinMaxObject = aggregationResultHolder.getResult();
-
-    if (exprMinMaxObject == null) {
-      initializeWithNewDataBlocks(blockValSetMap);
-      exprMinMaxObject = new ExprMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
+    ExprMinMaxObject result = aggregationResultHolder.getResult();
+    if (result == null) {
+      result = new ExprMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
+      aggregationResultHolder.setValue(result);
     }
 
+    ExprMinMaxObject exprMinMaxObject = result;
     List<Integer> rowIds = new ArrayList<>();
-    for (int i = 0; i < length; i++) {
-      int compareResult = exprMinMaxObject.compareAndSetKey(_exprMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
-      if (compareResult == 0) {
-        // same key, add the rowId to the list
-        rowIds.add(i);
-      } else if (compareResult > 0) {
-        // new key is set, clear the list and add the new rowId
-        rowIds.clear();
-        rowIds.add(i);
+    // Whether this block replaced the extremum key.
+    boolean[] keyReplaced = {false};
+    forEachNotNullMeasuring(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int compareResult = exprMinMaxObject.compareAndSetKey(_exprMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
+        if (compareResult == 0) {
+          // same key, add the rowId to the list
+          rowIds.add(i);
+        } else if (compareResult > 0) {
+          // new key is set, clear the list and add the new rowId
+          rowIds.clear();
+          rowIds.add(i);
+          keyReplaced[0] = true;
+        }
+      }
+    });
+
+    // For all the rows that are associated with the extremum key, add the projection columns. The projection values
+    // are collected once here rather than per winning row, so that a row later beaten within this block never reads
+    // the projection columns at all.
+    //
+    // Only matters across blocks. rowIds is local, so within one block clearing it is enough and the object's value
+    // list is still empty; but the object outlives the call, and a block that replaces the key has to discard what an
+    // earlier block published under the old one. rowIds.clear() cannot reach those. Only setToNewVal clears them, so
+    // the first surviving row goes through it and the rows tying it are appended.
+    List<ExprMinMaxProjectionValSetWrapper> projectionColumnSets = _exprMinMaxWrapperProjectionColumnSets.get();
+    int firstToAppend = 0;
+    if (keyReplaced[0]) {
+      exprMinMaxObject.setToNewVal(projectionColumnSets, rowIds.get(0));
+      firstToAppend = 1;
+    }
+    for (int i = firstToAppend; i < rowIds.size(); i++) {
+      exprMinMaxObject.addVal(projectionColumnSets, rowIds.get(i));
+    }
+  }
+
+  /// Runs `consumer` over the row ranges where every measuring column is non-null.
+  ///
+  /// The measuring columns form a single composite key, so a null in any one of them leaves the key undefined and the
+  /// row cannot take part in the comparison at all. The projection columns are only payload carried out of the winning
+  /// row, so a null there does not disqualify it. With the option disabled the whole block is one range, which is what
+  /// this function did unconditionally before.
+  private void forEachNotNullMeasuring(int length, Map<ExpressionContext, BlockValSet> blockValSetMap,
+      BatchConsumer consumer) {
+    NullSkippingUtils.forEachNotNull(_nullHandlingEnabled, length, measuringNullBitmap(blockValSetMap), consumer);
+  }
+
+  /// Returns the union of the measuring columns' null bitmaps, or `null` when no row is null.
+  @Nullable
+  private RoaringBitmap measuringNullBitmap(Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    if (!_nullHandlingEnabled) {
+      return null;
+    }
+    RoaringBitmap merged = null;
+    for (ExpressionContext measuringColumn : _measuringColumns) {
+      RoaringBitmap nullBitmap = blockValSetMap.get(measuringColumn).getNullBitmap();
+      if (nullBitmap == null) {
+        continue;
+      }
+      // Copied before merging: the bitmap belongs to the block and must not be mutated
+      if (merged == null) {
+        merged = nullBitmap.clone();
+      } else {
+        merged.or(nullBitmap);
       }
     }
-
-    // for all the rows that are associated with the extremum key, add the projection columns
-    for (Integer rowId : rowIds) {
-      exprMinMaxObject.addVal(_exprMinMaxWrapperProjectionColumnSets.get(), rowId);
-    }
-
-    aggregationResultHolder.setValue(exprMinMaxObject);
+    return merged;
   }
 
   // this method is called to initialize the schemas if they are not initialized
@@ -225,10 +279,12 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     initializeWithNewDataBlocks(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      updateGroupByResult(groupByResultHolder, i, groupKey);
-    }
+    forEachNotNullMeasuring(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        updateGroupByResult(groupByResultHolder, i, groupKey);
+      }
+    });
   }
 
   private void updateGroupByResult(GroupByResultHolder groupByResultHolder, int i, int groupKey) {
@@ -249,11 +305,13 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     initializeWithNewDataBlocks(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        updateGroupByResult(groupByResultHolder, i, groupKey);
+    forEachNotNullMeasuring(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          updateGroupByResult(groupByResultHolder, i, groupKey);
+        }
       }
-    }
+    });
   }
 
   @Override
