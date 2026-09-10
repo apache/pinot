@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.util.stream.IntStream;
 import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.cpc.CpcUnion;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -77,6 +78,37 @@ public class CpcSketchAccumulatorTest {
     accumulator.apply(sketch2);
 
     Assert.assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate(), _epsilon);
+  }
+
+  @Test
+  public void testInputsSurviveRepeatedFlushes() {
+    for (int threshold = 1; threshold <= 4; threshold++) {
+      CpcSketchAccumulator accumulator = new CpcSketchAccumulator(_lgNominalEntries, threshold);
+      CpcUnion expected = new CpcUnion(_lgNominalEntries);
+      for (int i = 0; i < 7; i++) {
+        CpcSketch sketch = new CpcSketch(_lgNominalEntries);
+        int base = i * 1000;
+        IntStream.range(base, base + 1000).forEach(sketch::update);
+        accumulator.apply(sketch);
+        expected.update(sketch);
+      }
+      Assert.assertEquals(accumulator.getResult().getEstimate(), expected.getResult().getEstimate(), _epsilon,
+          "threshold " + threshold);
+    }
+  }
+
+  @Test
+  public void testRepeatedGetResultIsStable() {
+    CpcSketchAccumulator accumulator = new CpcSketchAccumulator(_lgNominalEntries, 2);
+    for (int i = 0; i < 5; i++) {
+      CpcSketch sketch = new CpcSketch(_lgNominalEntries);
+      int base = i * 1000;
+      IntStream.range(base, base + 1000).forEach(sketch::update);
+      accumulator.apply(sketch);
+    }
+    double first = accumulator.getResult().getEstimate();
+    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
+    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
   }
 
   @Test
