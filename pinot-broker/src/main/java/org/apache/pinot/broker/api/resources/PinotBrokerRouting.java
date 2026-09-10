@@ -30,13 +30,16 @@ import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
+import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -45,6 +48,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -67,6 +71,25 @@ public class PinotBrokerRouting {
 
   @Inject
   private HelixManager _helixManager;
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("/routing/server/{instanceId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Check whether a server is enabled for broker routing")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is enabled for routing"),
+      @ApiResponse(code = 503, message = "Server is not enabled for routing")
+  })
+  public String getServerRoutingStatus(
+      @ApiParam(value = "Server instance id") @PathParam("instanceId") String instanceId) {
+    if (_routingManager.isServerEnabled(instanceId)) {
+      return CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE;
+    }
+    String errorMessage = String.format("Server %s is not enabled for routing", instanceId);
+    throw new WebApplicationException(errorMessage,
+        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errorMessage).build());
+  }
 
   @PUT
   @Produces(MediaType.TEXT_PLAIN)

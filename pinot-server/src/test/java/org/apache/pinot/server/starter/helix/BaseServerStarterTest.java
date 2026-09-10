@@ -18,17 +18,59 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Map;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 public class BaseServerStarterTest {
+  @Test
+  public void testBrokerRoutingReadinessAuthConfiguration() {
+    HelixServerStarter serverStarter = new HelixServerStarter();
+    serverStarter._serverConf = new PinotConfiguration(Map.of(
+        Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX + ".prefix", "Bearer",
+        Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX + ".token", "test-token"));
+    serverStarter._helixManager = mock(HelixManager.class);
+    serverStarter._instanceId = "Server_localhost_8098";
+    when(serverStarter._helixManager.getInstanceName()).thenReturn(serverStarter._instanceId);
+
+    try (BrokerRoutingReadyChecker checker = serverStarter.createBrokerRoutingReadyChecker()) {
+      assertEquals(checker.getAuthProvider().getRequestHeaders(), Map.of("Authorization", "Bearer test-token"));
+    }
+  }
+
+  @Test
+  public void testBrokerRoutingReadinessRollout() {
+    assertFalse(Server.DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK);
+    assertFalse(Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
+
+    HelixServerStarter serverStarter = new HelixServerStarter();
+    assertFalse(serverStarter.isServerReadyForHealthCheck());
+
+    serverStarter._isServerReadyToServeQueries = true;
+    assertTrue(serverStarter.isServerReadyForHealthCheck());
+
+    BrokerRoutingReadyChecker brokerRoutingReadyChecker = mock(BrokerRoutingReadyChecker.class);
+    serverStarter._brokerRoutingReadyChecker = brokerRoutingReadyChecker;
+    when(brokerRoutingReadyChecker.isReady()).thenReturn(false);
+    assertFalse(serverStarter.isServerReadyForHealthCheck());
+
+    when(brokerRoutingReadyChecker.isReady()).thenReturn(true);
+    assertTrue(serverStarter.isServerReadyForHealthCheck());
+  }
+
   @Test
   public void testConfiguredServerHostDoesNotResolveDefaultHost()
       throws Exception {

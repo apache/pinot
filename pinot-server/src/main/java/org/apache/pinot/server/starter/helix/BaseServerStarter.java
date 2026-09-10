@@ -59,6 +59,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -121,6 +122,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -182,6 +184,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected QueryKillingManager _queryKillingManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
+  protected BrokerRoutingReadyChecker _brokerRoutingReadyChecker;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
@@ -911,6 +914,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverInstance.startQueryServer();
     _helixAdmin.setConfig(_instanceConfigScope,
         Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+    if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_BROKER_ROUTING_CHECK,
+        Server.DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK)) {
+      _brokerRoutingReadyChecker = createBrokerRoutingReadyChecker();
+    }
+    // Publish query readiness only after the optional routing checker is installed. Otherwise a concurrent health
+    // request could observe a transient ready state while the checker is still null.
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
@@ -966,6 +975,21 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected boolean isServerReadyToServeQueries() {
     return _isServerReadyToServeQueries;
+  }
+
+  protected boolean isServerReadyForHealthCheck() {
+    return isServerReadyToServeQueries()
+        && (_brokerRoutingReadyChecker == null || _brokerRoutingReadyChecker.isReady());
+  }
+
+  protected BrokerRoutingReadyChecker createBrokerRoutingReadyChecker() {
+    long timeoutMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS,
+        Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS);
+    boolean failOpen = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN,
+        Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
+    AuthProvider authProvider = AuthProviderUtils.extractAuthProvider(_serverConf,
+        Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX);
+    return new BrokerRoutingReadyChecker(_helixManager, timeoutMs, failOpen, authProvider);
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
@@ -1035,6 +1059,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
+    if (_brokerRoutingReadyChecker != null) {
+      _brokerRoutingReadyChecker.close();
+    }
     if (_transitionThreadPoolManager != null) {
       _transitionThreadPoolManager.shutdown();
     }
@@ -1259,7 +1286,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected AdminApiApplication createServerAdminApp() {
-    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf,
+        this::isServerReadyForHealthCheck);
   }
 
   /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.

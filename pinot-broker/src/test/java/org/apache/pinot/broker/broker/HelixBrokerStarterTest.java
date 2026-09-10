@@ -21,6 +21,10 @@ package org.apache.pinot.broker.broker;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
@@ -146,6 +150,29 @@ public class HelixBrokerStarterTest extends ControllerTest {
     // NOTE: It is disabled in cluster config, but enabled in instance config. Instance config should take precedence.
     assertTrue(config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false));
     assertEquals(config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT, 1), 1000);
+  }
+
+  @Test
+  public void testServerRoutingStatus() {
+    BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
+    TestUtils.waitForCondition(aVoid -> !routingManager.getEnabledServerInstanceMap().isEmpty(), 30_000L,
+        "Failed to find an enabled server");
+    String serverInstance = routingManager.getEnabledServerInstanceMap().keySet().iterator().next();
+    assertTrue(routingManager.isServerEnabled(serverInstance));
+
+    Client client = ClientBuilder.newClient();
+    try {
+      WebTarget routingTarget = client.target("http://localhost:18099/routing/server");
+      try (Response response = routingTarget.path(serverInstance).request().get()) {
+        assertEquals(response.getStatus(), 200);
+        assertEquals(response.readEntity(String.class), CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
+      }
+      try (Response response = routingTarget.path("Server_unknown_8098").request().get()) {
+        assertEquals(response.getStatus(), 503);
+      }
+    } finally {
+      client.close();
+    }
   }
 
   @Test
