@@ -234,7 +234,13 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   private boolean isMaterializedOpenStructChild(String column) {
-    ColumnMetadata columnMetadata = _indexSegment.getSegmentMetadata().getColumnMetadataFor(column);
+    // Mutable/consuming segments have no column metadata map (never materialize OPEN_STRUCT children
+    // on disk), so getColumnMetadataFor() would NPE on its unconditional map lookup.
+    Map<String, ColumnMetadata> columnMetadataMap = _indexSegment.getSegmentMetadata().getColumnMetadataMap();
+    if (columnMetadataMap == null) {
+      return false;
+    }
+    ColumnMetadata columnMetadata = columnMetadataMap.get(column);
     return columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild();
   }
 
