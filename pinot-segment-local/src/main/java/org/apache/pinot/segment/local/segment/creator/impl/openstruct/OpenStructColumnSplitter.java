@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByt
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructSupportedIndexes;
@@ -588,7 +589,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // the write loop rather than in a pass of its own: it needs the exact same per-doc branch.
     DimensionFieldSpec sparseFieldSpec = new DimensionFieldSpec(sparseCol, DataType.STRING, true);
     String defaultValue = "";
-    AbstractColumnStatisticsCollector statsCollector = StatsCollectorUtil.createStatsCollector(sparseFieldSpec, null);
+    sparseFieldSpec.setDefaultNullValue(defaultValue);
+    // This column is always raw (no dictionary), so it never needs the sorted unique-values array
+    // StringColumnPreIndexStatsCollector builds for dictionary creation -- the O(n log n) sort at
+    // seal() would be pure overhead here, close to one entry per doc. NoDictColumnStatisticsCollector
+    // gives the same cardinality/min/max/length stats without it (exact cardinality up to its
+    // tracking threshold, HyperLogLog beyond that).
+    AbstractColumnStatisticsCollector statsCollector = new NoDictColumnStatisticsCollector(sparseFieldSpec, null, null);
 
     SingleValueVarByteRawIndexCreator fwdCreator = new SingleValueVarByteRawIndexCreator(
         _indexDir, ChunkCompressionType.LZ4, sparseCol, _numDocs, DataType.STRING, maxLen);
