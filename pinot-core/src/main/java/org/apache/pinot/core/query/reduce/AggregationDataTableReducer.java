@@ -63,7 +63,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
     if (dataTableMap.isEmpty()) {
       DataSchema resultTableSchema =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema)).getResultDataSchema();
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, List.of()));
+      RewriterResult result = ResultRewriteUtils.rewriteResult(resultTableSchema, List.of());
+      brokerResponseNative.setResultTable(new ResultTable(result.getDataSchema(), result.getRows()));
       return;
     }
 
@@ -242,7 +243,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numColumns = columnDataTypes.length;
     for (Object[] rewrittenRow : rows) {
       for (int j = 0; j < numColumns; j++) {
-        rewrittenRow[j] = columnDataTypes[j].format(rewrittenRow[j]);
+        if (rewrittenRow[j] != null) {
+          rewrittenRow[j] = columnDataTypes[j].format(rewrittenRow[j]);
+        }
       }
     }
 

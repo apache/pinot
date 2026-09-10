@@ -1,0 +1,371 @@
+{
+  "polymorphic_aggregate_extensions": {
+    "comments": "Inferred ARRAY_AGG and ANY_VALUE retain logical schemas across distributed and direct aggregation. Values are identical within each group so unordered collection and ANY_VALUE outputs are deterministic.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "items": {
+        "schema": [
+          {
+            "name": "group_id",
+            "type": "STRING"
+          },
+          {
+            "name": "numericValue",
+            "type": "INT"
+          },
+          {
+            "name": "textValue",
+            "type": "STRING"
+          },
+          {
+            "name": "moment",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "flag",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "bigValue",
+            "type": "LONG"
+          },
+          {
+            "name": "intValues",
+            "type": "INT",
+            "isSingleValue": false
+          }
+        ],
+        "inputs": [
+          [
+            "a",
+            2,
+            "alpha",
+            "2026-09-03 08:00:00.001",
+            true,
+            9007199254740993,
+            [
+              1,
+              1
+            ]
+          ],
+          [
+            "a",
+            2,
+            "alpha",
+            "2026-09-03 08:00:00.001",
+            true,
+            9007199254740993,
+            [
+              1,
+              1
+            ]
+          ],
+          [
+            "a",
+            2,
+            "alpha",
+            "2026-09-03 08:00:00.001",
+            true,
+            9007199254740993,
+            [
+              1,
+              1
+            ]
+          ],
+          [
+            "a",
+            2,
+            "alpha",
+            "2026-09-03 08:00:00.001",
+            true,
+            9007199254740993,
+            [
+              1,
+              1
+            ]
+          ],
+          [
+            "b",
+            -1,
+            "beta",
+            "1969-12-31 23:59:59.999",
+            false,
+            -9007199254740993,
+            [
+              3
+            ]
+          ],
+          [
+            "b",
+            -1,
+            "beta",
+            "1969-12-31 23:59:59.999",
+            false,
+            -9007199254740993,
+            [
+              3
+            ]
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            null,
+            null,
+            []
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            null,
+            null,
+            []
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Inferred numeric, string, boolean, timestamp and exact long arrays retain their element types",
+        "sql": "SELECT group_id, ARRAY_AGG(numericValue), ARRAY_AGG(textValue), ARRAY_AGG(flag), ARRAY_AGG(moment), ARRAY_AGG(bigValue) FROM {items} WHERE group_id <> 'nulls' GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            [
+              2,
+              2,
+              2,
+              2
+            ],
+            [
+              "alpha",
+              "alpha",
+              "alpha",
+              "alpha"
+            ],
+            [
+              true,
+              true,
+              true,
+              true
+            ],
+            [
+              "2026-09-03 08:00:00.001",
+              "2026-09-03 08:00:00.001",
+              "2026-09-03 08:00:00.001",
+              "2026-09-03 08:00:00.001"
+            ],
+            [
+              9007199254740993,
+              9007199254740993,
+              9007199254740993,
+              9007199254740993
+            ]
+          ],
+          [
+            "b",
+            [
+              -1,
+              -1
+            ],
+            [
+              "beta",
+              "beta"
+            ],
+            [
+              false,
+              false
+            ],
+            [
+              "1969-12-31 23:59:59.999",
+              "1969-12-31 23:59:59.999"
+            ],
+            [
+              -9007199254740993,
+              -9007199254740993
+            ]
+          ]
+        ]
+      },
+      {
+        "description": "Boolean distinct option selects existing set accumulators for logical arrays",
+        "sql": "SELECT group_id, ARRAY_AGG(numericValue, true), ARRAY_AGG(textValue, true), ARRAY_AGG(flag, true), ARRAY_AGG(moment, true) FROM {items} WHERE group_id <> 'nulls' GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            [
+              2
+            ],
+            [
+              "alpha"
+            ],
+            [
+              true
+            ],
+            [
+              "2026-09-03 08:00:00.001"
+            ]
+          ],
+          [
+            "b",
+            [
+              -1
+            ],
+            [
+              "beta"
+            ],
+            [
+              false
+            ],
+            [
+              "1969-12-31 23:59:59.999"
+            ]
+          ]
+        ]
+      },
+      {
+        "description": "MV input flattens to one array dimension, with and without deduplication",
+        "sql": "SELECT group_id, ARRAY_AGG(intValues), ARRAY_AGG(intValues, true) FROM {items} WHERE group_id <> 'nulls' GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1
+            ]
+          ],
+          [
+            "b",
+            [
+              3,
+              3
+            ],
+            [
+              3
+            ]
+          ]
+        ]
+      },
+      {
+        "description": "Empty global aggregation preserves the declared logical array types",
+        "sql": "SELECT ARRAY_AGG(numericValue), ARRAY_AGG(textValue), ARRAY_AGG(flag), ARRAY_AGG(moment), ARRAY_AGG(bigValue) FROM {items} WHERE group_id = 'missing'",
+        "outputs": [
+          [
+            [],
+            [],
+            [],
+            [],
+            []
+          ]
+        ]
+      },
+      {
+        "description": "All-null scalar input produces empty arrays without changing result types",
+        "sql": "SELECT ARRAY_AGG(numericValue), ARRAY_AGG(textValue), ARRAY_AGG(flag), ARRAY_AGG(moment) FROM {items} WHERE group_id = 'nulls'",
+        "outputs": [
+          [
+            [],
+            [],
+            [],
+            []
+          ]
+        ]
+      },
+      {
+        "description": "Direct aggregation retains array and scalar logical types without a leaf accumulator",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ group_id, ARRAY_AGG(flag, true), ARRAY_AGG(moment, true), ANY_VALUE(textValue) FROM {items} WHERE group_id <> 'nulls' GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            [
+              true
+            ],
+            [
+              "2026-09-03 08:00:00.001"
+            ],
+            "alpha"
+          ],
+          [
+            "b",
+            [
+              false
+            ],
+            [
+              "1969-12-31 23:59:59.999"
+            ],
+            "beta"
+          ]
+        ]
+      },
+      {
+        "description": "ANY_VALUE retains exact LONG, STRING, BOOLEAN and TIMESTAMP values across stages",
+        "sql": "SELECT group_id, ANY_VALUE(textValue), ANY_VALUE(bigValue), ANY_VALUE(moment), ANY_VALUE(flag) FROM {items} GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            "alpha",
+            9007199254740993,
+            "2026-09-03 08:00:00.001",
+            true
+          ],
+          [
+            "b",
+            "beta",
+            -9007199254740993,
+            "1969-12-31 23:59:59.999",
+            false
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            null
+          ]
+        ]
+      },
+      {
+        "description": "Scalar post-aggregation resolves from ANY_VALUE logical return types",
+        "sql": "SELECT UPPER(ANY_VALUE(textValue)), fromTimestamp(ANY_VALUE(moment)) = ANY_VALUE(fromTimestamp(moment)), ANY_VALUE(bigValue) FROM {items} WHERE group_id = 'a'",
+        "outputs": [
+          [
+            "ALPHA",
+            true,
+            9007199254740993
+          ]
+        ]
+      },
+      {
+        "description": "Empty ANY_VALUE global aggregates retain schema and return null",
+        "sql": "SELECT ANY_VALUE(textValue), ANY_VALUE(bigValue), ANY_VALUE(moment), ANY_VALUE(flag) FROM {items} WHERE group_id = 'missing'",
+        "outputs": [
+          [
+            null,
+            null,
+            null,
+            null
+          ]
+        ]
+      },
+      {
+        "description": "Empty grouped ANY_VALUE produces no groups",
+        "sql": "SELECT group_id, ANY_VALUE(bigValue) FROM {items} WHERE group_id = 'missing' GROUP BY group_id",
+        "outputs": []
+      }
+    ]
+  }
+}

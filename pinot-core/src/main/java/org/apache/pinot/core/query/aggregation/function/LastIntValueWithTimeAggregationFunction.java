@@ -46,7 +46,12 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
 
   public LastIntValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled, boolean isBoolean) {
-    super(dataCol, timeCol, ObjectSerDeUtils.INT_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    this(dataCol, timeCol, nullHandlingEnabled, isBoolean, false);
+  }
+
+  public LastIntValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, boolean isBoolean, boolean typeInferred) {
+    super(dataCol, timeCol, ObjectSerDeUtils.INT_LONG_PAIR_SER_DE, nullHandlingEnabled, typeInferred);
     _isBoolean = isBoolean;
   }
 
@@ -95,15 +100,6 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
         }
       }
     });
-  }
-
-  @Override
-  public String getResultColumnName() {
-    if (_isBoolean) {
-      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'BOOLEAN')";
-    } else {
-      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'INT')";
-    }
   }
 
   @Override

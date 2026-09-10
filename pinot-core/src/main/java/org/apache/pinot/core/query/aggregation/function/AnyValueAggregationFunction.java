@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +27,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -36,6 +39,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /// AnyValue aggregation function returns any arbitrary NON-NULL value from the column for each group.
@@ -44,6 +48,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// GROUP BY columns, avoiding the need to add it to GROUP BY clause. The implementation is null-aware and will scan
 /// only until it finds the first non-null value in the current batch for each group/key. This makes it O(n) over the
 /// input once per group until the first value is set, with early-exit fast paths when there are no nulls.
+/// Bound instances have an immutable logical result type and can be shared across segment threads. The unbound
+/// constructor retains historical stored-type inference for callers that do not supply query bindings.
 ///
 /// **Example:**
 ///
@@ -56,12 +62,36 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// ```
 public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunction<Object, Comparable<?>> {
   private static final DataType[] DATA_TYPE_VALUES = DataType.values();
-  // Result type is determined at runtime based on input expression type
-  private ColumnDataType _resultType;
+  @Nullable
+  private final ColumnDataType _resultType;
+  @Nullable
+  private ColumnDataType _legacyResultType;
 
   public AnyValueAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "ANY_VALUE"), nullHandlingEnabled);
     _resultType = null;
+  }
+
+  public AnyValueAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled,
+      AggregateCallBinding binding) {
+    super(verifySingleArgument(arguments, "ANY_VALUE"), nullHandlingEnabled);
+    _resultType = binding.getResultType();
+    Preconditions.checkArgument(binding.getArgumentTypes().size() == 1
+            && (binding.getArgumentTypes().get(0) == _resultType
+            || binding.getArgumentTypes().get(0) == ColumnDataType.JSON && _resultType == ColumnDataType.STRING),
+        "ANY_VALUE result type must match its single input type");
+    switch (_resultType.getStoredType()) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+      case BIG_DECIMAL:
+      case BYTES:
+        break;
+      default:
+        throw new IllegalArgumentException("ANY_VALUE unsupported type: " + _resultType);
+    }
   }
 
   @Override
@@ -81,14 +111,12 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    // Default to STRING if result type is not yet determined
-    // TODO: See if UNKNOWN can be used instead
-    return _resultType != null ? _resultType : ColumnDataType.STRING;
+    return getFinalResultColumnType().getStoredType();
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return _resultType != null ? _resultType : ColumnDataType.STRING;
+    return _resultType != null ? _resultType : _legacyResultType != null ? _legacyResultType : ColumnDataType.STRING;
   }
 
   @Nullable
@@ -103,6 +131,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
     return groupByResultHolder.getResult(groupKey);
   }
 
+  @Nullable
   @Override
   public Comparable<?> extractFinalResult(@Nullable Object intermediateResult) {
     return (Comparable<?>) intermediateResult;
@@ -121,9 +150,9 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       return;
     }
     BlockValSet bvs = blockValSetMap.get(_expression);
-    ensureResultType(bvs);
+    ensureLegacyResultType(bvs);
     aggregateHelper(length, bvs, (i, value) -> {
-      holder.setValue(value);
+      holder.setValue(toIntermediateValue(value));
       return true; // Stop after first value found
     });
   }
@@ -132,11 +161,11 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder holder,
                                  Map<ExpressionContext, BlockValSet> map) {
     BlockValSet bvs = map.get(_expression);
-    ensureResultType(bvs);
+    ensureLegacyResultType(bvs);
     aggregateHelper(length, bvs, (i, value) -> {
       int g = groupKeys[i];
       if (holder.getResult(g) == null) {
-        holder.setValueForKey(g, value);
+        holder.setValueForKey(g, toIntermediateValue(value));
       }
       return false; // Continue processing for other groups
     });
@@ -146,11 +175,12 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder holder,
                                  Map<ExpressionContext, BlockValSet> map) {
     BlockValSet bvs = map.get(_expression);
-    ensureResultType(bvs);
+    ensureLegacyResultType(bvs);
     aggregateHelper(length, bvs, (i, value) -> {
       int[] keys = groupKeysArray[i];
       for (int g : keys) {
         if (holder.getResult(g) == null) {
+          value = toIntermediateValue(value);
           holder.setValueForKey(g, value);
         }
       }
@@ -180,15 +210,25 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
     boolean process(int index, T value); // Returns true to stop processing, false to continue
   }
 
+  /// Wrap bytes only when retaining a value, sharing the wrapper across accepting MV groups.
+  private static Object toIntermediateValue(Object value) {
+    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
+  }
+
   /// Generic helper for processing values with dictionary optimization for all supported data types
   private void aggregateHelper(int length, BlockValSet bvs, ValueProcessor<Object> processor) {
+    // A segment can retain an older physical type after schema evolution. Read through the bound type's conversion
+    // getter so values have the representation promised by the intermediate schema before merging or serialization.
+    DataType storedType = _resultType != null
+        ? _resultType.getStoredType().toDataType()
+        : bvs.getValueType().getStoredType();
     // Use dictionary-based access for efficiency when available
     if (bvs.isDictionaryEncoded()) {
       final int[] dictIds = bvs.getDictionaryIdsSV();
       final Dictionary dict = bvs.getDictionary();
       forEachNotNull(length, bvs, (from, to) -> {
         for (int i = from; i < to; i++) {
-          Object value = getDictionaryValue(dict, dictIds[i], bvs.getValueType().getStoredType());
+          Object value = getDictionaryValue(dict, dictIds[i], storedType);
           if (processor.process(i, value)) {
             break;
           }
@@ -198,7 +238,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       // Fall back to direct value access based on type
       forEachNotNull(length, bvs, (from, to) -> {
         for (int i = from; i < to; i++) {
-          Object value = getDirectValue(bvs, i);
+          Object value = getDirectValue(bvs, i, storedType);
           if (value != null && processor.process(i, value)) {
             break;
           }
@@ -230,8 +270,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   /// Get value directly from BlockValSet based on data type
-  private Object getDirectValue(BlockValSet bvs, int index) {
-    switch (bvs.getValueType().getStoredType()) {
+  private Object getDirectValue(BlockValSet bvs, int index, DataType storedType) {
+    switch (storedType) {
       case INT:
         return bvs.getIntValuesSV()[index];
       case LONG:
@@ -247,7 +287,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BYTES:
         return bvs.getBytesValuesSV()[index];
       default:
-        throw new IllegalStateException("Unsupported direct access type: " + bvs.getValueType().getStoredType());
+        throw new IllegalStateException("Unsupported direct access type: " + storedType);
     }
   }
 
@@ -266,6 +306,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       return serializeVariableValue(DataType.STRING, ((String) value).getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof BigDecimal) {
       return serializeVariableValue(DataType.BIG_DECIMAL, value.toString().getBytes(StandardCharsets.UTF_8));
+    } else if (value instanceof ByteArray) {
+      return serializeVariableValue(DataType.BYTES, ((ByteArray) value).getBytes());
     } else if (value instanceof byte[]) {
       return serializeVariableValue(DataType.BYTES, (byte[]) value);
     } else {
@@ -309,7 +351,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BIG_DECIMAL:
         return new BigDecimal(new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8));
       case BYTES:
-        return deserializeVariableBytes(buffer);
+        return new ByteArray(deserializeVariableBytes(buffer));
       default:
         throw new IllegalStateException("Unsupported data type for deserialization: " + dataType);
     }
@@ -323,34 +365,25 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
     return bytes;
   }
 
-  private void ensureResultType(BlockValSet bvs) {
-    if (_resultType != null) {
-      return;
+  private void ensureLegacyResultType(BlockValSet block) {
+    if (_resultType == null && _legacyResultType == null) {
+      _legacyResultType = ColumnDataType.fromDataType(block.getValueType().getStoredType(), true);
     }
-    switch (bvs.getValueType().getStoredType()) {
-      case INT:
-        _resultType = ColumnDataType.INT;
-        return;
-      case LONG:
-        _resultType = ColumnDataType.LONG;
-        return;
-      case FLOAT:
-        _resultType = ColumnDataType.FLOAT;
-        return;
-      case DOUBLE:
-        _resultType = ColumnDataType.DOUBLE;
-        return;
-      case STRING:
-        _resultType = ColumnDataType.STRING;
-        return;
-      case BIG_DECIMAL:
-        _resultType = ColumnDataType.BIG_DECIMAL;
-        return;
-      case BYTES:
-        _resultType = ColumnDataType.BYTES;
-        return;
-      default:
-        throw new IllegalStateException("ANY_VALUE unsupported type: " + bvs.getValueType());
+  }
+
+  /// Creates schema-bound ANY_VALUE implementations while retaining the historical constructor for unbound callers.
+  public static class Provider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.ANYVALUE;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      AggregateCallBinding binding = function.getAggregationBinding();
+      return binding != null
+          ? new AnyValueAggregationFunction(function.getArguments(), nullHandlingEnabled, binding)
+          : new AnyValueAggregationFunction(function.getArguments(), nullHandlingEnabled);
     }
   }
 }
