@@ -20,13 +20,20 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import java.io.File;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -34,7 +41,9 @@ import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -53,8 +62,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/// Tests the [BaseSingleSegmentConversionExecutor#executeTask] upload-failure handling: a segment-upload failure
-/// must propagate so the task is marked failed (and retried) rather than being silently reported as successful.
+/// Tests executeTask: upload failures propagate, the default METADATA push is unchanged, and the opt-in controller-copy
+/// METADATA push is safe for a same-name segment refresh.
 public class BaseSingleSegmentConversionExecutorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "BaseSingleSegmentConversionExecutorTest");
@@ -67,10 +76,13 @@ public class BaseSingleSegmentConversionExecutorTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String TASK_TYPE = "TestSingleSegmentConversionTask";
   private static final String TASK_ID = "Task_" + TASK_TYPE + "_0";
-  private static final long SEGMENT_CRC = 100L;
+  private static final String DOWNLOAD_URL = "http://unused/download";
+  // A CRC that never matches the built segment, so the converted segment always counts as changed.
+  private static final long STALE_SEGMENT_CRC = 100L;
   private static final String D1 = "d1";
 
   private File _segmentIndexDir;
+  private long _segmentCrc;
 
   @BeforeClass
   public void setUp()
@@ -95,6 +107,7 @@ public class BaseSingleSegmentConversionExecutorTest {
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     _segmentIndexDir = new File(SEGMENT_DIR, SEGMENT_NAME);
+    _segmentCrc = Long.parseLong(new SegmentMetadataImpl(_segmentIndexDir).getCrc());
 
     Assert.assertTrue(DATA_DIR.mkdirs());
     MinionContext.getInstance().setDataDir(DATA_DIR);
@@ -110,9 +123,9 @@ public class BaseSingleSegmentConversionExecutorTest {
               Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)))
           .thenThrow(new RuntimeException("simulated upload failure"));
 
-      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor();
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC);
       try {
-        executor.executeTask(createTaskConfig());
+        executor.executeTask(createTaskConfig(STALE_SEGMENT_CRC));
         Assert.fail("executeTask must rethrow when segment upload fails, not report success");
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "simulated upload failure");
@@ -125,24 +138,13 @@ public class BaseSingleSegmentConversionExecutorTest {
       throws Exception {
     try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
       // uploadSegment is a no-op by default for the mocked static, simulating a successful upload.
-      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor();
-      SegmentConversionResult result = executor.executeTask(createTaskConfig());
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC);
+      SegmentConversionResult result = executor.executeTask(createTaskConfig(STALE_SEGMENT_CRC));
       Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
       Assert.assertEquals(result.getTableNameWithType(), TABLE_NAME_WITH_TYPE);
       mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
           Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)));
     }
-  }
-
-  private PinotTaskConfig createTaskConfig() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_TYPE);
-    configs.put(MinionConstants.SEGMENT_NAME_KEY, SEGMENT_NAME);
-    configs.put(MinionConstants.DOWNLOAD_URL_KEY, "http://unused/download");
-    configs.put(MinionConstants.UPLOAD_URL_KEY, "http://unused/upload");
-    configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, Long.toString(SEGMENT_CRC));
-    configs.put("TASK_ID", TASK_ID);
-    return new PinotTaskConfig(TASK_TYPE, configs);
   }
 
   /// Verifies that when a METADATA-mode push fails after the converted tar was already staged to the output PinotFS,
@@ -163,13 +165,13 @@ public class BaseSingleSegmentConversionExecutorTest {
             Mockito.mockStatic(SegmentPushUtils.class, Mockito.CALLS_REAL_METHODS)) {
       minionTaskUtils.when(() -> MinionTaskUtils.getOutputPinotFS(Mockito.any(), Mockito.any()))
           .thenReturn(mockOutputFS);
-      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.anyList(), Mockito.anyList()))
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.anyMap(),
+              Mockito.anyList(), Mockito.anyList()))
           .thenThrow(new RuntimeException("simulated metadata push failure"));
 
-      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor();
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC);
       try {
-        executor.executeTask(createMetadataPushTaskConfig(outputDir));
+        executor.executeTask(createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
         Assert.fail("executeTask must rethrow when metadata push fails");
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "simulated metadata push failure");
@@ -179,17 +181,238 @@ public class BaseSingleSegmentConversionExecutorTest {
     }
   }
 
-  private PinotTaskConfig createMetadataPushTaskConfig(File outputDir) {
+
+  /// The default METADATA push still registers the staged tar's URI, with a metadata tar built from the local
+  /// segment instead of the staged tar being downloaded back, and never takes the controller-copy path.
+  @Test
+  public void testDefaultMetadataPushRegistersStagedUri()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-default");
+    FileUtils.forceMkdir(outputDir);
+    File capturedMetadataTar = new File(TEMP_DIR, "captured-default-metadata.tar.gz");
+    List<String> capturedUris = new ArrayList<>();
+    try (MockedStatic<SegmentPushUtils> segmentPushUtils = Mockito.mockStatic(SegmentPushUtils.class,
+            Mockito.CALLS_REAL_METHODS);
+        MockedStatic<SegmentConversionUtils> conversionUtils = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.anyMap(),
+          Mockito.anyList(), Mockito.anyList())).thenAnswer(invocation -> {
+            Map<String, File> uriToMetadataFile = invocation.getArgument(1);
+            capturedUris.addAll(uriToMetadataFile.keySet());
+            FileUtils.copyFile(uriToMetadataFile.values().iterator().next(), capturedMetadataTar);
+            return null;
+          });
+
+      new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC).executeTask(
+          createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
+
+      // No PinotFS-based push, which is the variant that downloads the staged tar back.
+      segmentPushUtils.verify(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(),
+          Mockito.any(PinotFS.class), Mockito.anyMap(), Mockito.anyList(), Mockito.anyList()), Mockito.never());
+      conversionUtils.verifyNoInteractions();
+    }
+    File stagedTar = new File(outputDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    Assert.assertEquals(capturedUris.size(), 1);
+    Assert.assertEquals(new File(URI.create(capturedUris.get(0))), stagedTar);
+    assertMetadataTarDescribesSegment(capturedMetadataTar, new File(TEMP_DIR, "untar-default-metadata"));
+    // The staged tar is the segment's download URL in this mode, so it stays.
+    Assert.assertTrue(stagedTar.isFile());
+  }
+
+  /// Controller-copy push of a changed segment: task-unique staging name, TAR guards plus copy flag, a metadata-only
+  /// tar built locally, and the staged tar deleted once the push is done.
+  @Test
+  public void testMetadataPushStagesTarAndRegistersMetadata()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-changed");
+    FileUtils.forceMkdir(outputDir);
+    File stagedTar = new File(outputDir, SEGMENT_NAME + "." + TASK_ID + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File capturedMetadataTar = new File(TEMP_DIR, "captured-metadata.tar.gz");
+    List<Header> capturedHeaders = new ArrayList<>();
+
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      stubUploadSegmentMetadata(mocked, invocation -> {
+        // The controller copies from the staged tar while handling the request, so it must exist at this point.
+        Assert.assertTrue(stagedTar.isFile(), "staged tar must exist while the metadata push is in flight");
+        assertTarHoldsSegment(stagedTar, new File(TEMP_DIR, "untar-staged"));
+        capturedHeaders.addAll(invocation.getArgument(1));
+        FileUtils.copyFile(invocation.getArgument(6), capturedMetadataTar);
+      });
+
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC, true);
+      SegmentConversionResult result =
+          executor.executeTask(createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
+      Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
+      mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
+          Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)), Mockito.never());
+    }
+
+    // Nothing references the staged tar after the controller copied it, so it must be gone.
+    Assert.assertEquals(outputDir.list().length, 0, "staged tar must be deleted after the push");
+
+    Assert.assertEquals(headerValue(capturedHeaders, HttpHeaders.IF_MATCH), String.valueOf(STALE_SEGMENT_CRC));
+    Assert.assertEquals(headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY), "true");
+    Assert.assertNotNull(
+        headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER));
+    Assert.assertEquals(headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE),
+        FileUploadDownloadClient.FileUploadType.METADATA.toString());
+    Assert.assertEquals(
+        headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE), "true");
+    String downloadUri = headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+    Assert.assertEquals(new File(URI.create(downloadUri)), stagedTar);
+
+    assertMetadataTarDescribesSegment(capturedMetadataTar, new File(TEMP_DIR, "untar-metadata"));
+  }
+
+  /// The metadata tar carries only the two files the controller reads, and they describe the converted segment.
+  private void assertMetadataTarDescribesSegment(File metadataTar, File untarDir)
+      throws Exception {
+    File untarredMetadataDir = TarCompressionUtils.untar(metadataTar, untarDir).get(0);
+    Set<String> fileNames =
+        java.util.Arrays.stream(untarredMetadataDir.listFiles()).map(File::getName).collect(Collectors.toSet());
+    Assert.assertEquals(fileNames,
+        Set.of(V1Constants.MetadataKeys.METADATA_FILE_NAME, V1Constants.SEGMENT_CREATION_META));
+    SegmentMetadataImpl pushedMetadata = new SegmentMetadataImpl(untarredMetadataDir);
+    Assert.assertEquals(pushedMetadata.getName(), SEGMENT_NAME);
+    Assert.assertEquals(Long.parseLong(pushedMetadata.getCrc()), _segmentCrc);
+  }
+
+  /// A plain-path output dir (local deep store) must reach the controller as a file URI.
+  @Test
+  public void testMetadataPushQualifiesSchemelessOutputDir()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-schemeless");
+    FileUtils.forceMkdir(outputDir);
+    File stagedTar = new File(outputDir, SEGMENT_NAME + "." + TASK_ID + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    List<Header> capturedHeaders = new ArrayList<>();
+
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      stubUploadSegmentMetadata(mocked, invocation -> {
+        Assert.assertTrue(stagedTar.isFile());
+        capturedHeaders.addAll(invocation.getArgument(1));
+      });
+      PinotTaskConfig taskConfig = createTaskConfig(STALE_SEGMENT_CRC);
+      Map<String, String> configs = taskConfig.getConfigs();
+      configs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
+      configs.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDir.getAbsolutePath());
+      new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC, true).executeTask(taskConfig);
+    }
+
+    URI downloadUri = URI.create(headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI));
+    Assert.assertEquals(downloadUri.getScheme(), "file");
+    Assert.assertEquals(new File(downloadUri), stagedTar);
+    Assert.assertEquals(outputDir.list().length, 0, "staged tar must be deleted after the push");
+  }
+
+  /// A failed push propagates and leaves no staged tar behind.
+  @Test
+  public void testMetadataPushDeletesStagedTarWhenPushFails()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-failed");
+    FileUtils.forceMkdir(outputDir);
+
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      mocked.when(() -> SegmentConversionUtils.uploadSegmentMetadata(Mockito.any(), Mockito.anyList(),
+              Mockito.anyList(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+              Mockito.any(File.class)))
+          .thenThrow(new RuntimeException("simulated metadata push failure"));
+
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC, true);
+      try {
+        executor.executeTask(createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
+        Assert.fail("executeTask must rethrow when metadata push fails");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "simulated metadata push failure");
+      }
+    }
+    Assert.assertEquals(outputDir.list().length, 0, "staged tar must be deleted after a failed push");
+  }
+
+  /// A retry reuses the staging name and overwrites an interrupted attempt's leftover instead of failing.
+  @Test
+  public void testMetadataPushOverwritesStagedTarLeftByPreviousAttempt()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-leftover");
+    FileUtils.forceMkdir(outputDir);
+    File stagedTar = new File(outputDir, SEGMENT_NAME + "." + TASK_ID + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    FileUtils.writeStringToFile(stagedTar, "leftover from an interrupted attempt", StandardCharsets.UTF_8);
+
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      stubUploadSegmentMetadata(mocked,
+          invocation -> assertTarHoldsSegment(stagedTar, new File(TEMP_DIR, "untar-leftover")));
+      new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC, true).executeTask(
+          createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
+    }
+    Assert.assertEquals(outputDir.list().length, 0, "staged tar must be deleted after the push");
+  }
+
+  /// An unchanged segment (same CRC) is re-registered against its download URL without staging or copying.
+  @Test
+  public void testMetadataPushRegistersMetadataOnlyWhenSegmentUnchanged()
+      throws Exception {
+    File outputDir = new File(TEMP_DIR, "output-unchanged");
+    FileUtils.forceMkdir(outputDir);
+    List<Header> capturedHeaders = new ArrayList<>();
+
+    try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
+      stubUploadSegmentMetadata(mocked, invocation -> {
+        Assert.assertEquals(outputDir.list().length, 0, "an unchanged segment must not be staged");
+        capturedHeaders.addAll(invocation.getArgument(1));
+      });
+      new TestSingleSegmentConversionExecutor(_segmentCrc, true).executeTask(
+          createMetadataPushTaskConfig(_segmentCrc, outputDir));
+    }
+
+    Assert.assertEquals(headerValue(capturedHeaders, HttpHeaders.IF_MATCH), String.valueOf(_segmentCrc));
+    Assert.assertEquals(headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY), "true");
+    Assert.assertEquals(headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI),
+        DOWNLOAD_URL);
+    Assert.assertEquals(
+        headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE), "false");
+    Assert.assertEquals(outputDir.list().length, 0);
+  }
+
+  private interface MetadataPushCheck {
+    void check(org.mockito.invocation.InvocationOnMock invocation)
+        throws Exception;
+  }
+
+  private static void stubUploadSegmentMetadata(MockedStatic<SegmentConversionUtils> mocked, MetadataPushCheck check) {
+    mocked.when(() -> SegmentConversionUtils.uploadSegmentMetadata(Mockito.any(), Mockito.anyList(), Mockito.anyList(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)))
+        .thenAnswer(invocation -> {
+          check.check(invocation);
+          return null;
+        });
+  }
+
+  private void assertTarHoldsSegment(File tarFile, File untarDir)
+      throws Exception {
+    FileUtils.deleteDirectory(untarDir);
+    File untarredSegmentDir = TarCompressionUtils.untar(tarFile, untarDir).get(0);
+    Assert.assertEquals(new SegmentMetadataImpl(untarredSegmentDir).getName(), SEGMENT_NAME);
+  }
+
+  private static String headerValue(List<Header> headers, String name) {
+    return headers.stream().filter(header -> header.getName().equals(name)).map(Header::getValue).findFirst()
+        .orElse(null);
+  }
+
+  private PinotTaskConfig createTaskConfig(long originalSegmentCrc) {
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_TYPE);
     configs.put(MinionConstants.SEGMENT_NAME_KEY, SEGMENT_NAME);
-    configs.put(MinionConstants.DOWNLOAD_URL_KEY, "http://unused/download");
+    configs.put(MinionConstants.DOWNLOAD_URL_KEY, DOWNLOAD_URL);
     configs.put(MinionConstants.UPLOAD_URL_KEY, "http://unused/upload");
-    configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, Long.toString(SEGMENT_CRC));
+    configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, Long.toString(originalSegmentCrc));
     configs.put("TASK_ID", TASK_ID);
-    configs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
-    configs.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDir.toURI().toString());
     return new PinotTaskConfig(TASK_TYPE, configs);
+  }
+
+  private PinotTaskConfig createMetadataPushTaskConfig(long originalSegmentCrc, File outputDir) {
+    PinotTaskConfig taskConfig = createTaskConfig(originalSegmentCrc);
+    taskConfig.getConfigs().put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
+    taskConfig.getConfigs().put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDir.toURI().toString());
+    return taskConfig;
   }
 
   @AfterClass
@@ -201,9 +424,25 @@ public class BaseSingleSegmentConversionExecutorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /// Minimal concrete executor that stubs out the infrastructure-dependent hooks (download, CRC check, conversion, ZK
-  /// metadata modifier) so `executeTask` runs to the upload step without a server, controller, or deep store.
+  /// Stubs download, CRC check, conversion (a copy, so the CRC is unchanged) and the ZK modifier.
   private class TestSingleSegmentConversionExecutor extends BaseSingleSegmentConversionExecutor {
+    private final long _zkSegmentCrc;
+    private final boolean _copyToDeepStore;
+
+    TestSingleSegmentConversionExecutor(long zkSegmentCrc) {
+      this(zkSegmentCrc, false);
+    }
+
+    TestSingleSegmentConversionExecutor(long zkSegmentCrc, boolean copyToDeepStore) {
+      _zkSegmentCrc = zkSegmentCrc;
+      _copyToDeepStore = copyToDeepStore;
+    }
+
+    @Override
+    protected boolean isCopyToDeepStoreForMetadataPush() {
+      return _copyToDeepStore;
+    }
+
     @Override
     protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,
         String taskType, File tempDataDir, String suffix)
@@ -215,7 +454,7 @@ public class BaseSingleSegmentConversionExecutorTest {
 
     @Override
     protected long getSegmentCrc(String tableNameWithType, String segmentName) {
-      return SEGMENT_CRC;
+      return _zkSegmentCrc;
     }
 
     @Override
