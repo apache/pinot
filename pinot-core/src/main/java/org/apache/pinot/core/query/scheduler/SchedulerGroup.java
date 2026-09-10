@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
+import java.util.List;
+
+
 /// Scheduler group is a sub-queue in multi-level scheduling queues.
 /// This class maintains context information for each of the scheduling
 /// queues. Each SchedulerGroup is a queue of requests and related accounting.
@@ -41,7 +44,8 @@ public interface SchedulerGroup extends SchedulerGroupAccountant {
   SchedulerQueryContext removeFirst();
 
   /// Remove all the pending queries with arrival time earlier than the deadline
-  void trimExpired(long deadlineMillis);
+  /// @return the removed queries, so the caller can complete their result futures. Never null.
+  List<SchedulerQueryContext> trimExpired(long deadlineMillis);
 
   /// @return true if there are no pending queries for this group
   boolean isEmpty();
