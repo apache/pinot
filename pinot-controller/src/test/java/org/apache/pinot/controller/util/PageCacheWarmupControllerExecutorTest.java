@@ -88,7 +88,6 @@ public class PageCacheWarmupControllerExecutorTest {
       executor.triggerPageCacheWarmup(TABLE_NAME_WITH_TYPE, List.of("segment"));
 
       verify(pinotFS).listFilesWithMetadata(tableDirUri, false);
-      verify(pinotFS, never()).listFiles(tableDirUri, false);
       verify(pinotFS, never()).exists(tableDirUri);
       verify(pinotFS).open(latestQueryFileUri);
       verify(pinotFS, never()).lastModified(directoryUri);
@@ -104,7 +103,7 @@ public class PageCacheWarmupControllerExecutorTest {
   }
 
   @Test
-  public void testFallbackSelectsLatestPathOnlyFile()
+  public void testLoadsPathOnlyHdfsMetadata()
       throws Exception {
     String dataDir = "hdfs://nameservice/page-cache-warmup";
     URI tableDirUri = URI.create(dataDir + "/" + TABLE_NAME_WITH_TYPE);
@@ -117,12 +116,10 @@ public class PageCacheWarmupControllerExecutorTest {
     URI latestQueryFileUri = new URI("hdfs", "nameservice", latestQueryFilePath, null, null);
 
     PinotFS pinotFS = mock(PinotFS.class);
-    when(pinotFS.listFilesWithMetadata(tableDirUri, false)).thenThrow(UnsupportedOperationException.class);
-    when(pinotFS.listFiles(tableDirUri, false)).thenReturn(
-        new String[]{oldQueryFilePath, directoryPath, latestQueryFilePath});
-    when(pinotFS.isDirectory(directoryUri)).thenReturn(true);
-    when(pinotFS.lastModified(oldQueryFileUri)).thenReturn(100L);
-    when(pinotFS.lastModified(latestQueryFileUri)).thenReturn(200L);
+    when(pinotFS.listFilesWithMetadata(tableDirUri, false)).thenReturn(List.of(
+        fileMetadata(oldQueryFilePath, 100L, false),
+        fileMetadata(directoryPath, 300L, true),
+        fileMetadata(latestQueryFilePath, 200L, false)));
     when(pinotFS.open(latestQueryFileUri)).thenReturn(new ByteArrayInputStream(QUERIES_JSON));
 
     PageCacheWarmupControllerExecutor executor = createExecutor(createResourceManager(), dataDir);
@@ -132,7 +129,6 @@ public class PageCacheWarmupControllerExecutorTest {
       executor.triggerPageCacheWarmup(TABLE_NAME_WITH_TYPE, List.of("segment"));
 
       verify(pinotFS).open(latestQueryFileUri);
-      verify(pinotFS, never()).exists(tableDirUri);
       verify(pinotFS, never()).lastModified(directoryUri);
       verify(pinotFS, never()).open(oldQueryFileUri);
     } finally {
@@ -206,7 +202,6 @@ public class PageCacheWarmupControllerExecutorTest {
       try {
         executor.triggerPageCacheWarmup(TABLE_NAME_WITH_TYPE, List.of("segment"));
 
-        verify(pinotFS, never()).listFiles(tableDirUri, false);
         verify(pinotFS, never()).open(any());
         verify(resourceManager, never()).getServerInstancesForTable(RAW_TABLE_NAME, TableType.OFFLINE);
         verify(controllerMetrics).addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1L);

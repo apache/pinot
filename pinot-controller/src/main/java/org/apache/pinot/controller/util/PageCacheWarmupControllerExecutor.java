@@ -217,8 +217,6 @@ public class PageCacheWarmupControllerExecutor {
     List<FileMetadata> fileMetadataList;
     try {
       fileMetadataList = pinotFS.listFilesWithMetadata(directoryUri, false);
-    } catch (UnsupportedOperationException e) {
-      return getMostRecentlyModifiedFileUriFromPaths(pinotFS, directoryUri);
     } catch (IOException | IllegalArgumentException e) {
       try {
         if (!pinotFS.exists(directoryUri)) {
@@ -239,38 +237,6 @@ public class PageCacheWarmupControllerExecutor {
         if (modificationTime <= 0) {
           modificationTime = pinotFS.lastModified(fileUri);
         }
-        if (mostRecentlyModifiedFileUri == null || modificationTime > mostRecentModificationTime) {
-          mostRecentlyModifiedFileUri = fileUri;
-          mostRecentModificationTime = modificationTime;
-        }
-      }
-    }
-    return mostRecentlyModifiedFileUri;
-  }
-
-  @Nullable
-  private static URI getMostRecentlyModifiedFileUriFromPaths(PinotFS pinotFS, URI directoryUri)
-      throws IOException, URISyntaxException {
-    String[] filePaths;
-    try {
-      filePaths = pinotFS.listFiles(directoryUri, false);
-    } catch (IOException | IllegalArgumentException e) {
-      try {
-        if (!pinotFS.exists(directoryUri)) {
-          return null;
-        }
-      } catch (IOException | RuntimeException existsException) {
-        e.addSuppressed(existsException);
-      }
-      throw e;
-    }
-
-    URI mostRecentlyModifiedFileUri = null;
-    long mostRecentModificationTime = Long.MIN_VALUE;
-    for (String filePath : filePaths) {
-      URI fileUri = getListedFileUri(filePath, directoryUri);
-      if (!pinotFS.isDirectory(fileUri)) {
-        long modificationTime = pinotFS.lastModified(fileUri);
         if (mostRecentlyModifiedFileUri == null || modificationTime > mostRecentModificationTime) {
           mostRecentlyModifiedFileUri = fileUri;
           mostRecentModificationTime = modificationTime;
