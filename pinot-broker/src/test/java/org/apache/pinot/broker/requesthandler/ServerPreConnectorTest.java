@@ -169,14 +169,14 @@ public class ServerPreConnectorTest {
     assertTrue(elapsedMs < 3_000L, "preConnect took " + elapsedMs + " ms, expected it to honor the budget");
   }
 
-  /// One unreachable server must not hold startup for the whole budget: once the healthy channels are back
-  /// and nothing more arrives for the grace window, preConnect returns and leaves the straggler to finish
-  /// (or time out) on its own daemon thread. Without the grace window the final poll would block for the
-  /// rest of the budget.
+  /// An unreachable server that black-holes (never completes) holds pre-connect only until the deadline,
+  /// and the healthy channels are still counted. There is no early release: the deadline is the single
+  /// bound, so a broker with one dead server pays at most the budget on startup, and that cost is tuned
+  /// through the budget rather than a heuristic.
   @Test
-  public void oneStuckChannelDoesNotHoldStartupForTheWholeBudget() {
+  public void blackHoledChannelIsBoundedByTheDeadlineAndHealthyChannelsAreCounted() {
     List<ServerInstance> servers = mockServers(4);   // 4 x 2 table types = 8 channels
-    long budgetMs = 30_000L;
+    long budgetMs = 800L;
     AtomicInteger n = new AtomicInteger();
     long startMs = System.currentTimeMillis();
 
@@ -184,7 +184,7 @@ public class ServerPreConnectorTest {
         (server, tableType, timeoutMs) -> {
           if (n.getAndIncrement() == 0) {
             try {
-              Thread.sleep(timeoutMs);
+              Thread.sleep(5_000L);   // black-hole well past the budget; never connects in time
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
@@ -195,18 +195,18 @@ public class ServerPreConnectorTest {
     long elapsedMs = System.currentTimeMillis() - startMs;
 
     assertEquals(connected, 7, "the seven healthy channels must still be counted");
-    assertTrue(elapsedMs < 5 * ServerPreConnector.STRAGGLER_GRACE_MS,
-        "one stuck channel held startup for " + elapsedMs + " ms of a " + budgetMs + " ms budget");
+    // Bounded by the deadline: the one black-holed channel holds only until the budget, never longer.
+    assertTrue(elapsedMs < 3 * budgetMs,
+        "one black-holed channel held startup for " + elapsedMs + " ms of an " + budgetMs + " ms budget");
   }
 
-  /// The whole budget is available until the first successful connect: a cluster whose channels are all
-  /// slower than the grace window (but faster than the budget) must still connect every one, not bail at
-  /// the grace window having connected nothing. If the exemption were missing, the first poll would time
-  /// out at the grace window before any channel returned, and connected would be 0.
+  /// Slow-but-healthy channels are all counted: with the deadline as the only bound, a cluster whose every
+  /// channel is slow (but faster than the budget) still connects every one and is released once they are
+  /// all up -- not at the deadline, and never with any of them abandoned.
   @Test
-  public void slowFirstChannelIsStillCountedAndNotAbandonedByGraceWindow() {
+  public void slowHealthyChannelsAreAllCounted() {
     List<ServerInstance> servers = mockServers(3);      // 3 x 2 = 6 channels
-    long slowMs = ServerPreConnector.STRAGGLER_GRACE_MS + 500L;   // slower than grace, faster than budget
+    long slowMs = 2_500L;                               // slow, but faster than the budget
     long budgetMs = 30_000L;
     long startMs = System.currentTimeMillis();
 
@@ -222,27 +222,26 @@ public class ServerPreConnectorTest {
         }).preConnect(startMs + budgetMs);
     long elapsedMs = System.currentTimeMillis() - startMs;
 
-    assertEquals(connected, 6, "every channel must be counted even though all are slower than the grace window");
-    assertTrue(elapsedMs >= slowMs, "the first channel must be waited for past the grace window, not abandoned");
-    assertTrue(elapsedMs < budgetMs, "must not wait the whole budget once the channels are back");
+    assertEquals(connected, 6, "every channel must be counted even though all are slow");
+    assertTrue(elapsedMs >= slowMs, "the slow channels must be waited for, not abandoned");
+    assertTrue(elapsedMs < budgetMs, "must be released once the channels are back, not held to the deadline");
   }
 
-  /// A fast failure (an instantly refused connect) that completes before the healthy channels must NOT
-  /// consume the whole-budget exemption and cause the grace window to abandon the healthy-but-slower
-  /// channels. Since the exemption keys on the first *successful* connect, the fast failure does not start
-  /// the grace clock, and the five healthy channels are all waited for and counted. Regression test for a
-  /// grace-window bug where keying on the first *completion* undercounted to 0 here.
+  /// The core invariant: a failed connect must not stop us waiting for the others. One connect fails
+  /// instantly and completes first; the five healthy-but-slower channels must still all be waited for and
+  /// counted. (Under the old grace window, keying the release on the first *completion* undercounted this
+  /// to 0; waiting to the deadline makes it unconditional.)
   @Test
-  public void healthyButSlowChannelsNotAbandonedAfterFastFailure() {
+  public void aFastFailureDoesNotStopWaitingForTheOtherChannels() {
     List<ServerInstance> servers = mockServers(3);      // 3 x 2 = 6 channels
-    long slowMs = ServerPreConnector.STRAGGLER_GRACE_MS + 500L;   // slower than grace, faster than budget
+    long slowMs = 2_500L;                               // slow, but faster than the budget
     long budgetMs = 30_000L;
     AtomicInteger n = new AtomicInteger();
 
     int connected = new ServerPreConnector(() -> targets(servers, TableType.OFFLINE, TableType.REALTIME),
         (server, tableType, timeoutMs) -> {
           if (n.getAndIncrement() == 0) {
-            return false;   // one instant failure, completes first, must not start the grace clock
+            return false;   // one instant failure, completes first, must not end the wait
           }
           try {
             Thread.sleep(slowMs);
@@ -254,7 +253,7 @@ public class ServerPreConnectorTest {
         }).preConnect(System.currentTimeMillis() + budgetMs);
 
     assertEquals(connected, 5,
-        "the five healthy channels must be counted; a fast failure must not trigger the grace window");
+        "the five healthy channels must be counted; a fast failure must not stop us waiting for them");
   }
 
   /// More channels than worker threads: the surplus queues behind the pool and still all connect. Exercises
@@ -274,6 +273,59 @@ public class ServerPreConnectorTest {
 
     assertEquals(connected, count * 2, "every queued channel must eventually connect");
     assertEquals(calls.get(), count * 2, "every channel must be attempted");
+  }
+
+  /// More channels than worker threads, every one HEALTHY but slow. The surplus completes in waves one
+  /// connect-latency apart; because pre-connect waits to the deadline rather than releasing on a quiet
+  /// window, every wave is waited for and all connect. (The grace window this replaces under-counted this
+  /// to ~one wave when the inter-wave gap exceeded the window.)
+  @Test
+  public void manyHealthyChannelsInWavesAllConnect() {
+    int count = ServerPreConnector.MAX_CONNECT_THREADS * 3;   // 48 channels, pool caps at 16 -> 3 waves
+    List<ServerInstance> servers = mockServers(count);
+    long slowMs = 3_000L;
+
+    int connected = new ServerPreConnector(() -> targets(servers, TableType.OFFLINE),
+        (server, tableType, timeoutMs) -> {
+          try {
+            Thread.sleep(slowMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+          }
+          return true;
+        }).preConnect(System.currentTimeMillis() + 60_000L);
+
+    assertEquals(connected, count, "all healthy channels must connect even when they complete in waves");
+  }
+
+  /// Mixed connect latencies -- one fast server, the rest slower -- now connect **all** channels. The old
+  /// grace window sized itself off the first (fastest) connect and released before the slower healthy
+  /// channels returned, counting only 1; waiting to the deadline waits for every one. Regression test for
+  /// that mixed-latency under-count.
+  @Test
+  public void mixedLatencyAllChannelsConnect() {
+    List<ServerInstance> servers = mockServers(8);   // 8 channels, all start at once on the 16-worker pool
+    long slowMs = 3_000L;
+    long budgetMs = 30_000L;
+    AtomicInteger n = new AtomicInteger();
+
+    int connected = new ServerPreConnector(() -> targets(servers, TableType.OFFLINE),
+        (server, tableType, timeoutMs) -> {
+          if (n.getAndIncrement() == 0) {
+            return true;   // one fast connect; must not curtail waiting for the slower healthy ones
+          }
+          try {
+            Thread.sleep(slowMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+          }
+          return true;
+        }).preConnect(System.currentTimeMillis() + budgetMs);
+
+    assertEquals(connected, 8,
+        "with the deadline as the only bound, a fast connect no longer abandons the slower healthy channels");
   }
 
   /// The thread pool is a throughput cap, not a safety bound, so each connect has to carry its own
