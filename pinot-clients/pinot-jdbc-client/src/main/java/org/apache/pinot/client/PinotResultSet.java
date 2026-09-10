@@ -152,6 +152,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _totalRows = 0;
     _currentRow = -1;
     _columns.clear();
+    _columnDataTypes.clear();
+    _totalColumns = 0;
     _closed = true;
   }
 
