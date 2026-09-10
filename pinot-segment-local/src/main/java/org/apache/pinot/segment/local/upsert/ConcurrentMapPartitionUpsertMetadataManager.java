@@ -94,7 +94,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (currentSegment == segment) {
                 if (comparisonResult >= 0) {
                   replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                  return new RecordLocation(segment, newDocId, newComparisonValue);
+                  digestUpdate(primaryKey, currentRecordLocation, recordInfo);
+                  return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                 } else {
                   return currentRecordLocation;
                 }
@@ -121,13 +122,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
-                  return new RecordLocation(segment, newDocId, newComparisonValue);
+                  digestUpdate(primaryKey, currentRecordLocation, recordInfo);
+                  return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
                   if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                       && (prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
-                    RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                    RecordLocation newRecordLocation =
+                        new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                   }
                   return currentRecordLocation;
@@ -144,13 +147,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
-                  return new RecordLocation(segment, newDocId, newComparisonValue);
+                  digestUpdate(primaryKey, currentRecordLocation, recordInfo);
+                  return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
                   if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                       && (prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
-                    RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                    RecordLocation newRecordLocation =
+                        new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                   }
                   return currentRecordLocation;
@@ -168,13 +173,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
-                return new RecordLocation(segment, newDocId, newComparisonValue);
+                digestUpdate(primaryKey, currentRecordLocation, recordInfo);
+                return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
               } else {
                 RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
                 if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                     && (prevRecordLocation == null
                     || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
-                  RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+                  RecordLocation newRecordLocation =
+                      new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
                   _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                 }
                 return currentRecordLocation;
@@ -182,7 +189,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             } else {
               // New primary key
               addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-              return new RecordLocation(segment, newDocId, newComparisonValue);
+              digestAdd(primaryKey, recordInfo);
+              return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
             }
           });
     }
@@ -202,8 +210,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       int newDocId = recordInfo.getDocId();
       Comparable newComparisonValue = recordInfo.getComparisonValue();
       addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-      _primaryKeyToRecordLocationMap.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
-          new RecordLocation(segment, newDocId, newComparisonValue));
+      Object primaryKey = HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction);
+      _primaryKeyToRecordLocationMap.put(primaryKey,
+          new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord()));
+      digestAdd(primaryKey, recordInfo);
     }
   }
 
@@ -217,6 +227,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
+              digestRemove(pk, recordLocation);
               return null;
             }
             return recordLocation;
@@ -236,6 +247,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             if (recordLocation.getSegment() == segment) {
               RecordLocation prevLocation = _previousKeyToRecordLocationMap.remove(pk);
               if (prevLocation == null) {
+                digestRemove(pk, recordLocation);
                 return null;
               }
               // Revert to previous segment location
@@ -248,16 +260,19 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
                   replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
                       prevDocId, recordInfo);
+                  digestRevert(pk, recordLocation, prevLocation);
                   return prevLocation;
                 } catch (Exception e) {
                   _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
                       e);
+                  digestRemove(pk, recordLocation);
                   return null;
                 }
               } else {
                 // Should not happen
                 _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
                     prevSegment.getSegmentName());
+                digestRemove(pk, recordLocation);
                 return null;
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
@@ -305,7 +320,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
-        _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+        if (_primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation)) {
+          digestRemove(primaryKey, recordLocation);
+        }
         numMetadataTTLKeysRemoved.getAndIncrement();
       } else if (_deletedKeysTTL > 0) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
@@ -317,7 +334,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             numDeletedKeysWithinTTLWindow.getAndIncrement();
           } else {
             // delete key from primary hashmap
-            _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+            if (_primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation)) {
+              digestRemove(primaryKey, recordLocation);
+            }
             removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
             numDeletedTTLKeysRemoved.getAndIncrement();
           }
@@ -383,7 +402,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             // Update the record location when there is a tie to keep the newer record.
             if (newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               int currentDocId = currentRecordLocation.getDocId();
-              RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
+              digestUpdate(primaryKey, currentRecordLocation, recordInfo);
+              RecordLocation newRecordLocation =
+                  new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
               } else {
@@ -406,7 +427,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           } else {
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-            return new RecordLocation(segment, newDocId, newComparisonValue);
+            digestAdd(primaryKey, recordInfo);
+            return new RecordLocation(segment, newDocId, newComparisonValue, recordInfo.isDeleteRecord());
           }
         });
 
@@ -443,15 +465,47 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     return record;
   }
 
+  private void digestAdd(Object primaryKey, RecordInfo recordInfo) {
+    if (_keyDigest != null) {
+      _keyDigest.add(primaryKey, recordInfo.getComparisonValue(), recordInfo.isDeleteRecord());
+    }
+  }
+
+  private void digestUpdate(Object primaryKey, RecordLocation current, RecordInfo recordInfo) {
+    if (_keyDigest != null) {
+      _keyDigest.update(primaryKey, current.getComparisonValue(), current.isDeleteRecord(),
+          recordInfo.getComparisonValue(), recordInfo.isDeleteRecord());
+    }
+  }
+
+  private void digestRevert(Object primaryKey, RecordLocation current, RecordLocation previous) {
+    if (_keyDigest != null) {
+      _keyDigest.update(primaryKey, current.getComparisonValue(), current.isDeleteRecord(),
+          previous.getComparisonValue(), previous.isDeleteRecord());
+    }
+  }
+
+  private void digestRemove(Object primaryKey, RecordLocation current) {
+    if (_keyDigest != null) {
+      _keyDigest.remove(primaryKey, current.getComparisonValue(), current.isDeleteRecord());
+    }
+  }
+
   @VisibleForTesting
   static class RecordLocation {
+    // DocIds are non-negative, so the sign bit carries the tombstone flag without growing the object.
+    private static final int DELETE_RECORD_FLAG = 0x80000000;
     private final IndexSegment _segment;
-    private final int _docId;
+    private final int _docIdAndFlag;
     private final Comparable _comparisonValue;
 
     public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
+      this(indexSegment, docId, comparisonValue, false);
+    }
+
+    public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue, boolean deleteRecord) {
       _segment = indexSegment;
-      _docId = docId;
+      _docIdAndFlag = deleteRecord ? docId | DELETE_RECORD_FLAG : docId;
       _comparisonValue = comparisonValue;
     }
 
@@ -460,11 +514,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     }
 
     public int getDocId() {
-      return _docId;
+      return _docIdAndFlag & ~DELETE_RECORD_FLAG;
     }
 
     public Comparable getComparisonValue() {
       return _comparisonValue;
+    }
+
+    public boolean isDeleteRecord() {
+      return _docIdAndFlag < 0;
     }
   }
 }

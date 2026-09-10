@@ -46,24 +46,31 @@ final class UpsertSnapshotDiagnostics {
   private final File _tableIndexDir;
   private final int _partitionId;
   private final boolean _hasQueryableBitmap;
+  @Nullable
+  private final UpsertKeyDigest _keyDigest;
 
-  UpsertSnapshotDiagnostics(int partitionId, UpsertContext context) {
+  UpsertSnapshotDiagnostics(int partitionId, UpsertContext context, @Nullable UpsertKeyDigest keyDigest) {
     _partitionId = partitionId;
     _tableIndexDir = context.getTableIndexDir();
     _hasQueryableBitmap = context.getDeleteRecordColumn() != null;
+    _keyDigest = keyDigest;
   }
 
   Capture begin(@Nullable String consumingSegmentName, @Nullable String startOffset,
       UpsertSnapshotMetadata.CleanupProgress cleanup) {
     // Register activity before assigning the sequence, so a delayed starter cannot escape overlap detection.
     boolean concurrent = _activeSnapshots.incrementAndGet() > 1;
-    return new Capture(_nextCaptureId.incrementAndGet(), consumingSegmentName, startOffset, cleanup, concurrent);
+    UpsertKeyDigest.Mark digestStart = _keyDigest != null ? _keyDigest.freeze() : null;
+    return new Capture(_nextCaptureId.incrementAndGet(), consumingSegmentName, startOffset, cleanup, concurrent,
+        digestStart);
   }
 
   void finish(Capture capture, boolean aborted, UpsertSnapshotMetadata.CleanupProgress cleanupAfter) {
     UpsertSnapshotMetadata.Attempt attempt = new UpsertSnapshotMetadata.Attempt(capture._selected,
         capture._written, capture._lockSkipped, capture._otherSkipped, capture._failed, aborted);
     UpsertSnapshotMetadata.Content content = collectSavedContent(capture);
+    UpsertSnapshotMetadata.KeyDigest keyDigest = capture._digestStart != null && _keyDigest != null
+        ? UpsertSnapshotMetadata.KeyDigest.from(capture._digestStart, _keyDigest.freeze()) : null;
     int remaining = _activeSnapshots.decrementAndGet();
     boolean concurrent = capture._concurrentAtStart || remaining > 0 || _nextCaptureId.get() != capture._id;
     UpsertSnapshotMetadata.Counters counters = _counters.updateAndGet(previous -> new UpsertSnapshotMetadata.Counters(
@@ -71,7 +78,8 @@ final class UpsertSnapshotDiagnostics {
         previous.failedAttemptsTotal() + (aborted || capture._failed > 0 ? 1 : 0)));
     UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, _partitionId,
         capture._consumingSegmentName, capture._startOffset, capture._startedAtMillis, System.currentTimeMillis(),
-        _runtimeEpoch, capture._id, attempt, counters, content, capture._cleanup, cleanupAfter, concurrent);
+        _runtimeEpoch, capture._id, attempt, counters, content, keyDigest, capture._cleanup, cleanupAfter,
+        concurrent);
     publish(metadata);
   }
 
@@ -130,6 +138,8 @@ final class UpsertSnapshotDiagnostics {
     private final long _startedAtMillis = System.currentTimeMillis();
     private final UpsertSnapshotMetadata.CleanupProgress _cleanup;
     private final boolean _concurrentAtStart;
+    @Nullable
+    private final UpsertKeyDigest.Mark _digestStart;
     private final List<ImmutableSegmentImpl> _segments = new ArrayList<>();
     int _selected;
     int _written;
@@ -138,12 +148,14 @@ final class UpsertSnapshotDiagnostics {
     int _failed;
 
     private Capture(long id, String consumingSegmentName, String startOffset,
-        UpsertSnapshotMetadata.CleanupProgress cleanup, boolean concurrentAtStart) {
+        UpsertSnapshotMetadata.CleanupProgress cleanup, boolean concurrentAtStart,
+        @Nullable UpsertKeyDigest.Mark digestStart) {
       _id = id;
       _consumingSegmentName = consumingSegmentName;
       _startOffset = startOffset;
       _cleanup = cleanup;
       _concurrentAtStart = concurrentAtStart;
+      _digestStart = digestStart;
     }
 
     void track(IndexSegment segment) {

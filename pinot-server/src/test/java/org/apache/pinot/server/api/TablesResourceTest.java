@@ -100,7 +100,7 @@ public class TablesResourceTest extends BaseResourceTest {
     UpsertSnapshotMetadata metadata = new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, 0,
         "table__0__2__100", "5000", 1000, 1001, "runtime", 1,
         new UpsertSnapshotMetadata.Attempt(1, 0, 1, 0, 0, false), new UpsertSnapshotMetadata.Counters(1, 1, 0),
-        UpsertSnapshotMetadata.Content.unavailable(1), UpsertSnapshotMetadata.CleanupProgress.disabled(),
+        UpsertSnapshotMetadata.Content.unavailable(1), null, UpsertSnapshotMetadata.CleanupProgress.disabled(),
         UpsertSnapshotMetadata.CleanupProgress.disabled(), false);
     File file = new File(_tableDataManagerMap.get(REALTIME_TABLE_NAME).getTableDataDir(),
         "upsert.snapshot.metadata.partition.0.json");

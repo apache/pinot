@@ -123,3 +123,27 @@ aggregation proportional to the immutable population, two cached hashes per immu
 synchronous compact JSON/file publication. Existing bitmap monitors are released before hashing, but
 segment locks and startup calls still include that work. Measure representative rollover latency before
 broad enablement; unknown coverage is preferable to extra work to complete a report.
+
+## Key digest
+
+`keyDigest` is a running XOR over the live primary-key map. Each entry that is not a tombstone contributes
+`hash64(storedKey, comparisonValue)` to one of 256 buckets chosen by the top byte of the key hash. Segment and
+docId are not hashed, so a commit swap, reload or refresh that lands the same rows changes nothing. Applying a
+delete removes the old contribution and adds none, so the deletedKeysTTL sweep is invisible too. Cost is one hash
+and two XORs per map write, and 2 KB of state per partition.
+
+```json
+{"keyDigest": {"algorithm": "XXH64-KEY-CV-XOR-256-V1", "total": "9f1c...", "buckets": "<base64 of 256 longs>",
+  "entries": 1834211, "stable": true}}
+```
+
+The digest is frozen at capture start and again at the end. It publishes only when no segment add, preload,
+replace or removal was in flight at either read and nothing changed in between; otherwise `stable` is false and
+`total` and `buckets` are null. Compare two replicas only when both reports are stable, carry the same
+`consumingSegmentName` and `startOffset`, and have equal `populationFingerprint`. A differing `total` then names
+a real difference in keys or comparison values; a differing bucket names 1/256th of the key space.
+
+The on-heap manager applies every live-map removal to the digest, including the metadataTTL sweep, because that
+sweep runs at the commit boundary on every replica and the map is rebuilt from segments on restart. One capture
+after a restart on a metadataTTL table can differ until the first sweep runs. A manager whose sweep runs on a
+timer must keep the sweep off the digest and persist the buckets instead.

@@ -1986,6 +1986,149 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   /// Use a wrapper class to ensure different value has different reference.
+  @Test
+  public void testKeyDigestTracksLiveEntriesAcrossReplicas()
+      throws IOException {
+    verifyKeyDigestAcrossReplicas(HashFunction.NONE);
+    verifyKeyDigestAcrossReplicas(HashFunction.MURMUR3);
+  }
+
+  private void verifyKeyDigestAcrossReplicas(HashFunction hashFunction)
+      throws IOException {
+    ConcurrentMapPartitionUpsertMetadataManager replicaA = digestEnabledManager(hashFunction, DELETE_RECORD_COLUMN);
+    ConcurrentMapPartitionUpsertMetadataManager replicaB = digestEnabledManager(hashFunction, DELETE_RECORD_COLUMN);
+    UpsertKeyDigest digestA = replicaA.getKeyDigest();
+    UpsertKeyDigest digestB = replicaB.getKeyDigest();
+    assertNotNull(digestA);
+    assertNotNull(digestB);
+    assertEquals(digestA.freeze().total(), 0);
+
+    // Both replicas load the same sealed segment: 0 -> 100, 1 -> 100, 2 -> 100, 3 -> 100
+    int numRecords = 4;
+    int[] primaryKeys = new int[]{0, 1, 2, 3};
+    int[] timestamps = new int[]{100, 100, 100, 100};
+    List<PrimaryKey> primaryKeyList = getPrimaryKeyList(numRecords, primaryKeys);
+    ThreadSafeMutableRoaringBitmap validA1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableA1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segmentA1 = mockImmutableSegment(1, validA1, queryableA1, primaryKeyList);
+    replicaA.addSegment(segmentA1, validA1, queryableA1,
+        getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator());
+    ThreadSafeMutableRoaringBitmap validB1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableB1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segmentB1 = mockImmutableSegment(1, validB1, queryableB1, primaryKeyList);
+    replicaB.addSegment(segmentB1, validB1, queryableB1,
+        getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator());
+    UpsertKeyDigest.Mark loaded = digestA.freeze();
+    assertEquals(loaded.entries(), 4);
+    assertNotEquals(loaded.total(), 0);
+    assertTrue(loaded.sameEntries(digestB.freeze()));
+
+    // Consume the same records on both replicas. An out-of-order record changes nothing.
+    ThreadSafeMutableRoaringBitmap validA2 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableA2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment consumingA = mockMutableSegment(2, validA2, queryableA2);
+    ThreadSafeMutableRoaringBitmap validB2 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableB2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment consumingB = mockMutableSegment(2, validB2, queryableB2);
+    replicaA.addRecord(consumingA, new RecordInfo(makePrimaryKey(1), 0, 120, false));
+    replicaB.addRecord(consumingB, new RecordInfo(makePrimaryKey(1), 0, 120, false));
+    assertFalse(loaded.sameEntries(digestA.freeze()));
+    assertTrue(digestA.freeze().sameEntries(digestB.freeze()));
+    UpsertKeyDigest.Mark beforeOutOfOrder = digestA.freeze();
+    replicaA.addRecord(consumingA, new RecordInfo(makePrimaryKey(0), 1, 50, false));
+    assertTrue(beforeOutOfOrder.sameEntries(digestA.freeze()));
+
+    // Replica B misses an update: the digests differ until it applies the same record.
+    replicaA.addRecord(consumingA, new RecordInfo(makePrimaryKey(2), 2, 130, false));
+    assertFalse(digestA.freeze().sameEntries(digestB.freeze()));
+    replicaB.addRecord(consumingB, new RecordInfo(makePrimaryKey(2), 1, 130, false));
+    assertTrue(digestA.freeze().sameEntries(digestB.freeze()));
+
+    // Replica B swallows a delete: the tombstone removed key 3 from replica A's digest only.
+    replicaA.addRecord(consumingA, new RecordInfo(makePrimaryKey(3), 3, 140, true));
+    assertEquals(digestA.freeze().entries(), 3);
+    assertFalse(digestA.freeze().sameEntries(digestB.freeze()));
+    replicaB.addRecord(consumingB, new RecordInfo(makePrimaryKey(3), 2, 140, true));
+    assertTrue(digestA.freeze().sameEntries(digestB.freeze()));
+
+    // Replacing (reloading) the first segment with the same rows moves locations, not contributions.
+    UpsertKeyDigest.Mark beforeReplace = digestA.freeze();
+    ThreadSafeMutableRoaringBitmap newValidA1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap newQueryableA1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newSegmentA1 = mockImmutableSegment(1, newValidA1, newQueryableA1, primaryKeyList);
+    replicaA.replaceSegment(newSegmentA1, newValidA1, newQueryableA1,
+        getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator(), segmentA1);
+    assertTrue(beforeReplace.sameEntries(digestA.freeze()));
+    assertEquals(newValidA1.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // Removing the segment that still owns key 0 removes that key on both replicas.
+    replicaA._trackedSegments.add(newSegmentA1);
+    replicaA.removeSegment(newSegmentA1);
+    assertFalse(beforeReplace.sameEntries(digestA.freeze()));
+    replicaB._trackedSegments.add(segmentB1);
+    replicaB.removeSegment(segmentB1);
+    UpsertKeyDigest.Mark removed = digestA.freeze();
+    assertEquals(removed.entries(), 2);
+    assertTrue(removed.sameEntries(digestB.freeze()));
+
+    // The digest is a function of the live entries, not of the path that produced them.
+    ConcurrentMapPartitionUpsertMetadataManager fresh = digestEnabledManager(hashFunction, DELETE_RECORD_COLUMN);
+    ThreadSafeMutableRoaringBitmap validFresh = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableFresh = new ThreadSafeMutableRoaringBitmap();
+    int[] freshKeys = new int[]{1, 2, 3};
+    ImmutableSegmentImpl freshSegment =
+        mockImmutableSegment(2, validFresh, queryableFresh, getPrimaryKeyList(3, freshKeys));
+    fresh.addSegment(freshSegment, validFresh, queryableFresh,
+        getRecordInfoListWithIntegerComparison(3, freshKeys, new int[]{120, 130, 140},
+            new boolean[]{false, false, true}).iterator());
+    assertTrue(removed.sameEntries(fresh.getKeyDigest().freeze()));
+
+    replicaA.stop();
+    replicaA.close();
+    replicaB.stop();
+    replicaB.close();
+    fresh.stop();
+    fresh.close();
+  }
+
+  @Test
+  public void testKeyDigestFollowsMetadataTTLSweep()
+      throws IOException {
+    _contextBuilder.setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager manager = digestEnabledManager(HashFunction.NONE, null);
+    UpsertKeyDigest digest = manager.getKeyDigest();
+    assertNotNull(digest);
+    MutableSegment segment = mockMutableSegment(1, new ThreadSafeMutableRoaringBitmap(), null);
+    manager.addRecord(segment, new RecordInfo(makePrimaryKey(0), 0, 100, false));
+    manager.addRecord(segment, new RecordInfo(makePrimaryKey(1), 1, 120, false));
+    manager.addRecord(segment, new RecordInfo(makePrimaryKey(2), 2, 200, false));
+    assertEquals(digest.freeze().entries(), 3);
+
+    // The sweep runs at the commit boundary on every replica, so the swept keys leave the digest too.
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager._primaryKeyToRecordLocationMap.size(), 1);
+    UpsertKeyDigest.Mark swept = digest.freeze();
+    assertEquals(swept.entries(), 1);
+
+    ConcurrentMapPartitionUpsertMetadataManager fresh = digestEnabledManager(HashFunction.NONE, null);
+    fresh.addRecord(mockMutableSegment(1, new ThreadSafeMutableRoaringBitmap(), null),
+        new RecordInfo(makePrimaryKey(2), 0, 200, false));
+    assertTrue(swept.sameEntries(fresh.getKeyDigest().freeze()));
+
+    manager.stop();
+    manager.close();
+    fresh.stop();
+    fresh.close();
+  }
+
+  private ConcurrentMapPartitionUpsertMetadataManager digestEnabledManager(HashFunction hashFunction,
+      @Nullable String deleteRecordColumn) {
+    return new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+        _contextBuilder.setHashFunction(hashFunction).setDeleteRecordColumn(deleteRecordColumn).setEnableSnapshot(true)
+            .setTableIndexDir(INDEX_DIR)
+            .setMetadataManagerConfigs(Map.of(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA, "true")).build());
+  }
+
   private static class IntWrapper implements Comparable<IntWrapper> {
     final int _value;
 

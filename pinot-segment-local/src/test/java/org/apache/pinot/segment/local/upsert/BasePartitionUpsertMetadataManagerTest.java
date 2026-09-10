@@ -109,6 +109,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertEquals(first.startOffset(), "10");
       assertEquals(first.consumingSegmentName(), "table__0__1__100");
       assertEquals(first.getBoundaryStatus(), "UNVERIFIED");
+      assertTrue(first.keyDigest().stable());
+      assertEquals(first.keyDigest().total(), UpsertKeyDigest.ZERO_TOTAL);
+      assertEquals(first.keyDigest().entries(), 0);
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
       assertEquals(segment.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(),
           2);
@@ -281,6 +284,35 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertEquals(metadata.getBoundaryStatus(), "UNVERIFIED");
       manager.takeSnapshot("table__0__4__400", "40");
       assertFalse(manager.getSnapshotMetadataStatus().snapshot().concurrentSnapshots());
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
+  public void testSnapshotMetadataKeyDigestIsUnstableDuringSegmentOperations()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager manager = snapshotMetadataManager(null);
+    try {
+      snapshotMetadataSegment(manager, "digest", 0, 1);
+      manager.takeSnapshot("table__0__1__100", "10");
+      UpsertSnapshotMetadata.KeyDigest stable = manager.getSnapshotMetadataStatus().snapshot().keyDigest();
+      assertTrue(stable.stable());
+      assertEquals(stable.algorithm(), UpsertKeyDigest.ALGORITHM);
+      assertEquals(stable.total(), UpsertKeyDigest.ZERO_TOTAL);
+      assertEquals(UpsertKeyDigest.decodeBuckets(stable.buckets()).length, UpsertKeyDigest.BUCKETS);
+
+      // A segment-level operation in flight on another thread makes the mark unpublishable, not wrong.
+      manager.getKeyDigest().beginUnstable();
+      manager.takeSnapshot("table__0__2__200", "20");
+      UpsertSnapshotMetadata.KeyDigest unstable = manager.getSnapshotMetadataStatus().snapshot().keyDigest();
+      assertFalse(unstable.stable());
+      assertNull(unstable.total());
+      assertNull(unstable.buckets());
+      manager.getKeyDigest().endUnstable();
+      manager.takeSnapshot("table__0__3__300", "30");
+      assertTrue(manager.getSnapshotMetadataStatus().snapshot().keyDigest().stable());
     } finally {
       manager.stop();
       manager.close();

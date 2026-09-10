@@ -45,13 +45,15 @@ public class UpsertSnapshotMetadataStoreTest {
       assertFalse(JsonUtils.objectToJsonNode(metadata).has("configurationFingerprint"));
       assertFalse(JsonUtils.objectToJsonNode(metadata).has("comparisonIssues"));
       assertTrue(JsonUtils.objectToJsonNode(metadata).has("concurrentSnapshots"));
+      assertEquals(JsonUtils.objectToJsonNode(metadata).get("keyDigest").get("total").asText(),
+          UpsertKeyDigest.ZERO_TOTAL);
       assertEquals(JsonUtils.objectToJsonNode(metadata).get("boundaryStatus").asText(), "UNVERIFIED");
 
       // A forged status must not turn an observed capture into a verified boundary.
       String json = JsonUtils.objectToString(metadata).replace("UNVERIFIED", "VERIFIED");
       assertEquals(JsonUtils.stringToObject(json, UpsertSnapshotMetadata.class).getBoundaryStatus(), "UNVERIFIED");
       File file = new File(directory, "upsert.snapshot.metadata.partition.3.json");
-      for (int unsupportedVersion : new int[]{2, 99}) {
+      for (int unsupportedVersion : new int[]{2, 3, 99}) {
         Files.writeString(file.toPath(), JsonUtils.objectToString(metadata).replace(
             "\"formatVersion\":" + UpsertSnapshotMetadata.FORMAT_VERSION, "\"formatVersion\":" + unsupportedVersion));
         assertNull(UpsertSnapshotMetadataStore.read(directory, 3));
@@ -88,6 +90,8 @@ public class UpsertSnapshotMetadataStoreTest {
     return new UpsertSnapshotMetadata(UpsertSnapshotMetadata.FORMAT_VERSION, partitionId, "table__3__2__100", "5000",
         1000, 1001, "runtime", 1, new UpsertSnapshotMetadata.Attempt(0, 0, 0, 0, 0, false),
         new UpsertSnapshotMetadata.Counters(1, 0, 0), UpsertSnapshotMetadata.Content.unavailable(0),
+        new UpsertSnapshotMetadata.KeyDigest(UpsertKeyDigest.ALGORITHM, UpsertKeyDigest.ZERO_TOTAL,
+            UpsertKeyDigest.encodeBuckets(new long[UpsertKeyDigest.BUCKETS]), 0, true),
         UpsertSnapshotMetadata.CleanupProgress.disabled(), UpsertSnapshotMetadata.CleanupProgress.disabled(),
         false);
   }

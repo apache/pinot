@@ -29,9 +29,9 @@ import javax.annotation.Nullable;
 public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String consumingSegmentName,
                                     String startOffset, long capturedAtMillis, long finishedAtMillis,
                                     String runtimeEpoch, long captureId, Attempt attempt, Counters counters,
-                                    Content content, CleanupProgress cleanupBefore, CleanupProgress cleanupAfter,
-                                    boolean concurrentSnapshots) {
-  public static final int FORMAT_VERSION = 3;
+                                    Content content, @Nullable KeyDigest keyDigest, CleanupProgress cleanupBefore,
+                                    CleanupProgress cleanupAfter, boolean concurrentSnapshots) {
+  public static final int FORMAT_VERSION = 4;
 
   public String getBoundaryStatus() {
     return "UNVERIFIED";
@@ -55,6 +55,18 @@ public record UpsertSnapshotMetadata(int formatVersion, int partitionId, String 
 
     public static Content unavailable(int expectedFiles) {
       return new Content(ALGORITHM, SCOPE, null, null, expectedFiles, 0);
+    }
+  }
+
+  /// XOR digest of the live key map, frozen at capture start. Comparable across replicas only when stable and only
+  /// between reports with equal population fingerprints and equal startup context.
+  public record KeyDigest(String algorithm, @Nullable String total, @Nullable String buckets, long entries,
+                          boolean stable) {
+    /// Publishes the start mark only if both marks are stable and nothing changed during the attempt.
+    public static KeyDigest from(UpsertKeyDigest.Mark start, UpsertKeyDigest.Mark end) {
+      boolean stable = start.stable() && end.stable() && start.sameEntries(end);
+      return new KeyDigest(UpsertKeyDigest.ALGORITHM, stable ? UpsertKeyDigest.toHex(start.total()) : null,
+          stable ? UpsertKeyDigest.encodeBuckets(start.buckets()) : null, start.entries(), stable);
     }
   }
 

@@ -93,6 +93,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final boolean _enableSnapshot;
   @Nullable
   private final UpsertSnapshotDiagnostics _snapshotDiagnostics;
+  @Nullable
+  protected final UpsertKeyDigest _keyDigest;
   // Scoped to the startup call so manual/shutdown snapshots cannot inherit an old startup offset. Keeping the
   // context on the calling thread also preserves overrides of the existing takeSnapshot()/doTakeSnapshot() hooks.
   private final ThreadLocal<SnapshotContext> _snapshotContext = new ThreadLocal<>();
@@ -169,7 +171,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Map<String, String> metadataManagerConfigs = context.getMetadataManagerConfigs();
     boolean enableSnapshotMetadata = _enableSnapshot && metadataManagerConfigs != null && Boolean.parseBoolean(
         metadataManagerConfigs.get(UpsertSnapshotMetadataStore.ENABLE_SNAPSHOT_METADATA));
-    _snapshotDiagnostics = enableSnapshotMetadata ? new UpsertSnapshotDiagnostics(partitionId, context) : null;
+    _keyDigest = enableSnapshotMetadata ? new UpsertKeyDigest() : null;
+    _snapshotDiagnostics =
+        enableSnapshotMetadata ? new UpsertSnapshotDiagnostics(partitionId, context, _keyDigest) : null;
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
@@ -313,11 +317,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
     enableSnapshotFingerprints(immutableSegment);
+    beginDigestUnstable();
     try {
       doAddSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
     } finally {
+      endDigestUnstable();
       finishOperation();
     }
   }
@@ -428,11 +434,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
     enableSnapshotFingerprints(immutableSegment);
+    beginDigestUnstable();
     try {
       doPreloadSegment(immutableSegment);
       _trackedSegments.add(immutableSegment);
       trackSegmentForSnapshot(immutableSegment);
     } finally {
+      endDigestUnstable();
       finishOperation();
     }
   }
@@ -580,6 +588,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     enableSnapshotFingerprints(segment instanceof ImmutableSegmentImpl immutableSegment ? immutableSegment : null);
+    beginDigestUnstable();
     try {
       doReplaceSegment(segment, oldSegment);
       if (segment instanceof ImmutableSegmentImpl immutableSegment) {
@@ -590,6 +599,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       untrackSegment(oldSegment);
     } finally {
+      endDigestUnstable();
       finishOperation();
     }
   }
@@ -770,7 +780,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-
+    beginDigestUnstable();
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
@@ -781,6 +791,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       untrackSegment(segment);
     } finally {
+      endDigestUnstable();
       finishOperation();
     }
   }
@@ -1211,6 +1222,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private void enableSnapshotFingerprints(@Nullable ImmutableSegmentImpl segment) {
     if (_snapshotDiagnostics != null && segment != null) {
       segment.enableSnapshotFingerprints();
+    }
+  }
+
+  @VisibleForTesting
+  @Nullable
+  UpsertKeyDigest getKeyDigest() {
+    return _keyDigest;
+  }
+
+  private void beginDigestUnstable() {
+    if (_keyDigest != null) {
+      _keyDigest.beginUnstable();
+    }
+  }
+
+  private void endDigestUnstable() {
+    if (_keyDigest != null) {
+      _keyDigest.endUnstable();
     }
   }
 
