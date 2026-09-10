@@ -24,6 +24,7 @@ import { PinotTableDetails, TableData } from 'Models';
 import { getQueryTables, getTenantTable } from '../requests';
 import Utils from '../utils/Utils';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import { runWithConcurrencyLimit } from '../utils/requestLimiter';
 
 type BaseProps = {
   title: string;
@@ -50,6 +51,8 @@ const TableTooltipData = [
   null,
   'GOOD if all replicas of all segments are up',
 ];
+
+const TABLE_DETAILS_CONCURRENCY = 8;
 
 export const AsyncPinotTables = ({
   title,
@@ -155,8 +158,8 @@ export const AsyncPinotTables = ({
   };
 
   const fetchAllTableDetails = async (tables: string[]) => {
-    return tables.forEach((tableName) => {
-      PinotMethodUtils.getSegmentCountAndStatus(tableName).then(
+    const tasks = tables.map((tableName) => async () => {
+      const segmentDetails = PinotMethodUtils.getSegmentCountAndStatus(tableName).then(
         ({ segment_count, segment_status }) => {
           setTableData((prevState) => {
             const newRecords = [...prevState.records];
@@ -173,7 +176,7 @@ export const AsyncPinotTables = ({
         }
       );
 
-      PinotMethodUtils.getTableSizes(tableName).then(
+      const tableSizes = PinotMethodUtils.getTableSizes(tableName).then(
         ({ reported_size, estimated_size }) => {
           setTableData((prevState) => {
             const newRecords = [...prevState.records];
@@ -189,7 +192,10 @@ export const AsyncPinotTables = ({
           });
         }
       );
+
+      await Promise.all([segmentDetails, tableSizes]);
     });
+    return runWithConcurrencyLimit(tasks, TABLE_DETAILS_CONCURRENCY);
   };
 
   useEffect(() => {
