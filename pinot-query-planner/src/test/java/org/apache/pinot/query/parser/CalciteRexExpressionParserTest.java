@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.query.parser;
 
+import java.util.List;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -33,6 +36,20 @@ import static org.testng.Assert.assertTrue;
 /// Tests UUID literal conversion from multi-stage Rex expressions to single-stage request expressions.
 public class CalciteRexExpressionParserTest {
   private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+
+  @Test
+  public void testBoundAggregationSurvivesLeafConversion() {
+    AggregateCallBinding binding = new AggregateCallBinding(
+        List.of(ColumnDataType.TIMESTAMP, ColumnDataType.LONG), ColumnDataType.TIMESTAMP);
+    RexExpression.FunctionCall call = new RexExpression.FunctionCall(ColumnDataType.OBJECT, "FIRSTWITHTIME",
+        List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)), false, false, binding);
+    List<Expression> selectList = List.of(RequestUtils.getIdentifierExpression("value"),
+        RequestUtils.getIdentifierExpression("time"));
+    Expression expression = CalciteRexExpressionParser.convertAggregateList(List.of(), List.of(call), List.of(-1),
+        selectList).get(0);
+    assertEquals(expression.getFunctionCall().getOperands(), selectList);
+    assertEquals(expression.getFunctionCall().getAggregationBinding(), binding.toThrift());
+  }
 
   @Test
   public void testUuidLiteralUsesBinaryValue() {

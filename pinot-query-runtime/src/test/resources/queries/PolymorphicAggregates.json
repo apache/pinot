@@ -1,0 +1,289 @@
+{
+  "polymorphic_aggregation_distributed": {
+    "comments": "Schema bindings survive SSE leaves, MSE exchanges and reducers across four partitions on two servers.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "items": {
+        "schema": [
+          {
+            "name": "group_id",
+            "type": "STRING"
+          },
+          {
+            "name": "value",
+            "type": "STRING"
+          },
+          {
+            "name": "moment",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "flag",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "event_order",
+            "type": "LONG"
+          }
+        ],
+        "inputs": [
+          [
+            "a",
+            "p2",
+            "2026-09-03 08:00:00.001",
+            false,
+            1
+          ],
+          [
+            "a",
+            "p2",
+            "2026-09-03 08:00:00.001",
+            false,
+            2
+          ],
+          [
+            "a",
+            "p2",
+            "2026-09-03 09:00:00.123",
+            true,
+            3
+          ],
+          [
+            "a",
+            "p1",
+            "2026-09-03 09:00:00.123",
+            true,
+            4
+          ],
+          [
+            "a",
+            "p1",
+            "2026-09-03 09:00:00.123",
+            true,
+            5
+          ],
+          [
+            "a",
+            "p3",
+            "2026-09-03 10:00:00.999",
+            true,
+            6
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            7
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            8
+          ],
+          [
+            "ties",
+            "z",
+            "1970-01-01 00:00:00.001",
+            true,
+            9
+          ],
+          [
+            "ties",
+            "a",
+            "1969-12-31 23:59:59.999",
+            false,
+            10
+          ],
+          [
+            "ties",
+            "z",
+            "1970-01-01 00:00:00.001",
+            true,
+            11
+          ],
+          [
+            "ties",
+            "a",
+            "1969-12-31 23:59:59.999",
+            false,
+            12
+          ],
+          [
+            "empty",
+            "",
+            "2026-09-03 00:00:00.001",
+            null,
+            13
+          ],
+          [
+            "empty",
+            "z",
+            null,
+            false,
+            14
+          ],
+          [
+            "empty",
+            "",
+            null,
+            null,
+            15
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Distributed MODE retains STRING, TIMESTAMP and BOOLEAN, skipping nulls and preserving empty strings",
+        "sql": "SELECT group_id, MODE(value), MODE(moment), MODE(flag) FROM {items} GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            "p2",
+            "2026-09-03 09:00:00.123",
+            true
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null
+          ],
+          [
+            "ties",
+            "a",
+            "1969-12-31 23:59:59.999",
+            false
+          ],
+          [
+            "empty",
+            "",
+            "2026-09-03 00:00:00.001",
+            false
+          ]
+        ]
+      },
+      {
+        "description": "Typed MAX tie reducers retain logical types",
+        "sql": "SELECT MODE(value, 'MAX'), MODE(moment, 'MAX'), MODE(flag, 'MAX') FROM {items} WHERE group_id = 'ties'",
+        "outputs": [
+          [
+            "z",
+            "1970-01-01 00:00:00.001",
+            true
+          ]
+        ]
+      },
+      {
+        "description": "Two-argument FIRST and LAST preserve value types through distributed intermediate states",
+        "sql": "SELECT group_id, FIRST_WITH_TIME(value, event_order), LAST_WITH_TIME(value, event_order), FIRST_WITH_TIME(moment, event_order), LAST_WITH_TIME(moment, event_order), FIRST_WITH_TIME(flag, event_order), LAST_WITH_TIME(flag, event_order) FROM {items} GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            "p2",
+            "p3",
+            "2026-09-03 08:00:00.001",
+            "2026-09-03 10:00:00.999",
+            false,
+            true
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            "ties",
+            "z",
+            "a",
+            "1970-01-01 00:00:00.001",
+            "1969-12-31 23:59:59.999",
+            true,
+            false
+          ],
+          [
+            "empty",
+            "",
+            "",
+            "2026-09-03 00:00:00.001",
+            "2026-09-03 00:00:00.001",
+            false,
+            false
+          ]
+        ]
+      },
+      {
+        "description": "Empty global aggregates retain schema and return null",
+        "sql": "SELECT MODE(value), MODE(moment), MODE(flag), FIRST_WITH_TIME(moment, event_order), LAST_WITH_TIME(flag, event_order) FROM {items} WHERE group_id = 'missing'",
+        "outputs": [
+          [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        ]
+      },
+      {
+        "description": "Direct aggregation receives schema binding without a leaf accumulator",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ group_id, MODE(value), FIRST_WITH_TIME(moment, event_order), LAST_WITH_TIME(flag, event_order) FROM {items} GROUP BY group_id",
+        "outputs": [
+          [
+            "a",
+            "p2",
+            "2026-09-03 08:00:00.001",
+            true
+          ],
+          [
+            "nulls",
+            null,
+            null,
+            null
+          ],
+          [
+            "ties",
+            "a",
+            "1970-01-01 00:00:00.001",
+            false
+          ],
+          [
+            "empty",
+            "",
+            "2026-09-03 00:00:00.001",
+            false
+          ]
+        ]
+      },
+      {
+        "description": "Native transform expressions are bound from their inferred result type",
+        "sql": "SELECT MODE(NULLIF(value, '')), FIRST_WITH_TIME(CAST(moment AS TIMESTAMP), event_order), LAST_WITH_TIME(NOT flag, event_order) FROM {items} WHERE group_id = 'a'",
+        "outputs": [
+          [
+            "p2",
+            "2026-09-03 08:00:00.001",
+            false
+          ]
+        ]
+      },
+      {
+        "description": "Numeric MODE AVG keeps the legacy DOUBLE result and fractional ties",
+        "sql": "SELECT MODE(event_order, 'AVG') FROM {items} WHERE group_id = 'ties'",
+        "outputs": [
+          [
+            10.5
+          ]
+        ]
+      }
+    ]
+  }
+}

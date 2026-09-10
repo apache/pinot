@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /// The {@code FunctionContext} class represents the function in the expression.
@@ -34,12 +35,19 @@ public class FunctionContext {
   private final Type _type;
   private String _functionName;
   private final List<ExpressionContext> _arguments;
+  private final AggregateCallBinding _aggregationBinding;
 
   public FunctionContext(Type type, String functionName, List<ExpressionContext> arguments) {
+    this(type, functionName, arguments, null);
+  }
+
+  public FunctionContext(Type type, String functionName, List<ExpressionContext> arguments,
+      @Nullable AggregateCallBinding aggregationBinding) {
     _type = type;
     // NOTE: Standardize the function name to lower case
     _functionName = functionName.toLowerCase();
     _arguments = arguments;
+    _aggregationBinding = aggregationBinding;
   }
 
   public Type getType() {
@@ -57,6 +65,12 @@ public class FunctionContext {
 
   public List<ExpressionContext> getArguments() {
     return _arguments;
+  }
+
+  /// Execution metadata is deliberately excluded from expression identity and SQL rendering.
+  @Nullable
+  public AggregateCallBinding getAggregationBinding() {
+    return _aggregationBinding;
   }
 
   /// Adds the columns (IDENTIFIER expressions) in the function to the given set.

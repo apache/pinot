@@ -18,13 +18,23 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.sql.Timestamp;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,6 +44,82 @@ import static org.testng.Assert.assertTrue;
 
 
 public class EmptyResponseUtilsTest {
+
+  @Test
+  public void testBoundAggregationSchemaWithoutServers() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("name", DataType.STRING)
+        .addSingleValueDimension("ts", DataType.TIMESTAMP).addSingleValueDimension("flag", DataType.BOOLEAN)
+        .addSingleValueDimension("id", DataType.LONG).build();
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SET enableNullHandling=true; "
+        + "SELECT mode(ts) AS eventTime, firstWithTime(name,ts) AS firstName, "
+        + "lastWithTime(flag,ts) AS lastFlag, anyValue(flag) AS anyFlag, anyValue(ts) AS anyTime, "
+        + "anyValue(id) AS anyId, arrayAgg(ts) AS eventTimes, arrayAgg(flag) AS flags "
+        + "FROM testTable WHERE 1=0");
+    AggregationFunctionBinder.bind(query, schema);
+    ResultTable result = EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(query));
+    assertEquals(result.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.STRING, ColumnDataType.BOOLEAN,
+            ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG,
+            ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.BOOLEAN_ARRAY});
+    assertEquals(result.getDataSchema().getColumnNames(),
+        new String[]{"eventTime", "firstName", "lastFlag", "anyFlag", "anyTime", "anyId", "eventTimes", "flags"});
+    assertEquals(result.getRows().size(), 1);
+    assertEquals(result.getRows().get(0), new Object[]{null, null, null, null, null, null,
+        new String[0], new boolean[0]});
+
+    PinotQuery grouped = CalciteSqlParser.compileToPinotQuery(
+        "SELECT mode(ts), firstWithTime(name,ts), anyValue(ts), anyValue(flag), anyValue(id), "
+            + "arrayAgg(ts), arrayAgg(flag) FROM testTable WHERE 1=0 GROUP BY flag");
+    AggregationFunctionBinder.bind(grouped, schema);
+    ResultTable groupedResult =
+        EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(grouped));
+    assertTrue(groupedResult.getRows().isEmpty());
+    assertEquals(groupedResult.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.STRING, ColumnDataType.TIMESTAMP,
+            ColumnDataType.BOOLEAN, ColumnDataType.LONG, ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.BOOLEAN_ARRAY});
+  }
+
+  @Test
+  public void testBoundExprMinMaxSchemaWithoutServers() {
+    String previousRewriters = ResultRewriterFactory.getResultRewriter().stream()
+        .map(rewriter -> rewriter.getClass().getName()).collect(Collectors.joining(","));
+    ResultRewriterFactory.init(ParentAggregationResultRewriter.class.getName());
+    try {
+      Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("id", DataType.LONG)
+          .addSingleValueDimension("ts", DataType.TIMESTAMP).addSingleValueDimension("flag", DataType.BOOLEAN)
+          .addSingleValueDimension("payload", DataType.JSON).build();
+      for (String suffix : List.of("", " GROUP BY id", " LIMIT 0")) {
+        PinotQuery query = CalciteSqlParser.compileToPinotQuery("SET enableNullHandling=true; "
+            + "SELECT exprMin(flag,id), exprMax(ts,id), exprMin(payload,id) FROM testTable WHERE 1=0" + suffix);
+        new ExprMinMaxRewriter().rewrite(query);
+        AggregationFunctionBinder.bind(query, schema);
+        ResultTable result =
+            EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(query));
+        assertEquals(result.getDataSchema().getColumnNames(),
+            new String[]{"exprmin(flag,id)", "exprmax(ts,id)", "exprmin(payload,id)"});
+        assertEquals(result.getDataSchema().getColumnDataTypes(),
+            new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING});
+        if (suffix.isEmpty()) {
+          assertEquals(result.getRows().size(), 1);
+          assertEquals(result.getRows().get(0), new Object[]{null, null, null});
+        } else {
+          assertTrue(result.getRows().isEmpty());
+        }
+      }
+    } finally {
+      ResultRewriterFactory.init(previousRewriters.isEmpty() ? null : previousRewriters);
+    }
+  }
+
+  @Test
+  public void testEmptyPostAggregationFormattingWithAlias() {
+    QueryContext query = QueryContextConverterUtils.getQueryContext(
+        "SELECT toTimestamp(COUNT(*)) AS epoch FROM testTable WHERE 1=0");
+    ResultTable result = EmptyResponseUtils.buildEmptyResultTable(query);
+    assertEquals(result.getDataSchema().getColumnNames(), new String[]{"epoch"});
+    assertEquals(result.getDataSchema().getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.TIMESTAMP});
+    assertEquals(result.getRows().get(0), new Object[]{new Timestamp(0).toString()});
+  }
 
   /// An aggregation whose answer over no input is `NULL` has to survive the whole empty-response path.
   ///

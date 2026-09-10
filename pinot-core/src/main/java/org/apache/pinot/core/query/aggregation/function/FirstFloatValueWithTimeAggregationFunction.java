@@ -42,7 +42,12 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
 
   public FirstFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    this(dataCol, timeCol, nullHandlingEnabled, false);
+  }
+
+  public FirstFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, boolean typeInferred) {
+    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE, nullHandlingEnabled, typeInferred);
   }
 
   @Override
@@ -90,11 +95,6 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
         }
       }
     });
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'FLOAT')";
   }
 
   @Override

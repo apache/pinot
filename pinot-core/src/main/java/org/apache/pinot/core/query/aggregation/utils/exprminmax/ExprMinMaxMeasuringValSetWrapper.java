@@ -29,7 +29,14 @@ import org.apache.pinot.core.common.BlockValSet;
 public class ExprMinMaxMeasuringValSetWrapper extends ExprMinMaxWrapperValSet {
 
   public ExprMinMaxMeasuringValSetWrapper(BlockValSet blockValSet) {
-    super(resolveStoredType(blockValSet));
+    this(blockValSet, resolveStoredType(blockValSet));
+  }
+
+  /// Reads values in the schema-bound type, including widening older segments' physical numeric values.
+  public ExprMinMaxMeasuringValSetWrapper(BlockValSet blockValSet, ColumnDataType type) {
+    super(type.getStoredType());
+    Preconditions.checkState(blockValSet.isSingleValue() && !type.isArray(),
+        "ExprMinMax only supports single-valued measuring columns");
     setNewBlock(blockValSet);
   }
 

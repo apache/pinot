@@ -85,8 +85,9 @@ public class GapfillUtils {
       case FLOAT:
       case DOUBLE:
       case BOOLEAN:
-      case TIMESTAMP:
         return dataType.convertAndFormat(0);
+      case TIMESTAMP:
+        return dataType.convertAndFormat(0L);
       case STRING:
       case JSON:
       case BYTES:

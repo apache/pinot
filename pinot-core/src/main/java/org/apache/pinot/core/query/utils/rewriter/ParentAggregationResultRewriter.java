@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -118,15 +119,19 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
         String[] s = childAggregationFunctionNameWithKey
             .split(CommonConstants.RewriterConstants.CHILD_AGGREGATION_SEPERATOR);
         newColumnNames[j] = s[0];
+        ColumnDataType childType = dataSchema.getColumnDataType(i);
 
         if (childFunctionMapping == null) {
-          newColumnDataTypes[j] = DataSchema.ColumnDataType.STRING;
+          newColumnDataTypes[j] = childType != ColumnDataType.UNKNOWN ? childType : ColumnDataType.STRING;
           j++;
           continue;
         }
         ChildFunctionMapping childFunction = childFunctionMapping.get(s[1]);
-        newColumnDataTypes[j] = childFunction.getParent().getSchema()
-            .getColumnDataType(childFunction.getNestedOffset());
+        // The child's bound SQL result type is authoritative. The parent stores the original operand type,
+        // which can differ (for example a JSON operand projects as SQL STRING).
+        newColumnDataTypes[j] = childType != ColumnDataType.UNKNOWN
+            ? childType
+            : childFunction.getParent().getSchema().getColumnDataType(childFunction.getNestedOffset());
 
         childAggregationFunctionNestedIndexMapping.put(j, childFunction.getNestedOffset());
         childAggregationFunctionIndices.add(j);
