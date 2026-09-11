@@ -79,7 +79,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     Preconditions.checkArgument(isV2Parts(parts), "Invalid LLC segment name: %s", segmentName);
     _formatVersion = FORMAT_VERSION_V2;
     _tableName = parts[0];
-    _partitionGroupId = 0;
+    _partitionGroupId = Integer.MIN_VALUE;
     _topicId = parseNonNegativeInt(parts[2], "topicId", segmentName);
     _partitionId = parseNonNegativeInt(parts[3], "partitionId", segmentName);
     _sequenceNumber = Integer.parseInt(parts[4]);
@@ -100,11 +100,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
-  /// Formats a V2 LLC name. Do not call this from production writers until the reader-first
-  /// gate is on. Topic and partition must be non-negative; `partitionId` may be
-  /// `0..Integer.MAX_VALUE`.
-  public static String formatV2(String tableName, int topicId, int partitionId, int sequenceNumber,
-      long msSinceEpoch) {
+  /// Formats a V2 LLC name for tests. Production writers must not emit V2 names.
+  static String formatV2(String tableName, int topicId, int partitionId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     Preconditions.checkArgument(topicId >= 0, "V2 topicId must be non-negative: %s", topicId);
     Preconditions.checkArgument(partitionId >= 0, "V2 partitionId must be non-negative: %s", partitionId);

@@ -141,6 +141,10 @@ public class LLCSegmentNameTest {
     assertNotEquals(topic0Large.getStreamPartitionIdentity(), topic1Zero.getStreamPartitionIdentity());
     assertNotEquals(topic0Large, topic1Zero);
     assertTrue(topic0Large.compareTo(topic1Zero) < 0);
+
+    LLCSegmentName v1Packed = new LLCSegmentName("t", 10000, 0, msSinceEpoch);
+    assertTrue(v1Packed.compareTo(topic0Large) < 0);
+    assertTrue(v1Packed.compareTo(topic1Zero) < 0);
   }
 
   @Test
@@ -177,6 +181,7 @@ public class LLCSegmentNameTest {
     assertFalse(LLCSegmentName.isLLCSegment("orders__V2__1__0__17__20160609T2142Z"));
     assertNull(LLCSegmentName.of("orders__v2__1__0__17"));
     assertNull(LLCSegmentName.of("orders__v2__1__0__17__20160609T2142Z__extra"));
+    assertTrue(LLCSegmentName.isLLCSegment("orders__v2__x__0__17__20160609T2142Z"));
     assertNull(LLCSegmentName.of("orders__v2__x__0__17__20160609T2142Z"));
     assertNull(LLCSegmentName.of("orders__v2__-1__0__17__20160609T2142Z"));
     assertNull(LLCSegmentName.of("orders__v2__1__-1__17__20160609T2142Z"));

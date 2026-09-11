@@ -49,8 +49,8 @@ public final class StreamPartitionIdentity implements Comparable<StreamPartition
   /// `partitionGroupId % 10000`.
   public static final int UNKNOWN_TOPIC_ID = -1;
 
-  /// Sentinel raw partition id on V1 names. The persisted value lives in [getPartitionId] as the
-  /// V1 partition-group integer.
+  /// Unused field sentinel on V1 LLC names. V1 identities store the partition-group int
+  /// internally and expose it via [getPartitionGroupId].
   public static final int UNKNOWN_PARTITION_ID = -1;
 
   private final int _formatVersion;
@@ -83,13 +83,21 @@ public final class StreamPartitionIdentity implements Comparable<StreamPartition
     return _formatVersion == FORMAT_VERSION_V2;
   }
 
-  /// Topic id for V2, or [UNKNOWN_TOPIC_ID] for V1.
+  /// Registry topic id from a V2 identity.
   public int getTopicId() {
+    Preconditions.checkState(isV2(), "V1 stream partition identity has no topic id: %s", this);
     return _topicId;
   }
 
-  /// Raw stream partition for V2, or the persisted V1 partition-group int.
+  /// Raw stream partition id from a V2 identity.
   public int getPartitionId() {
+    Preconditions.checkState(isV2(), "V1 stream partition identity has no raw partition id: %s", this);
+    return _partitionId;
+  }
+
+  /// Persisted V1 partition-group int. V2 identities have no packed id.
+  public int getPartitionGroupId() {
+    Preconditions.checkState(!isV2(), "V2 stream partition identity has no packed partition group id: %s", this);
     return _partitionId;
   }
 

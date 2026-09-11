@@ -35,8 +35,9 @@ public class StreamPartitionIdentityTest {
     StreamPartitionIdentity identity = StreamPartitionIdentity.v1(10000);
     assertEquals(identity.getFormatVersion(), StreamPartitionIdentity.FORMAT_VERSION_V1);
     assertFalse(identity.isV2());
-    assertEquals(identity.getTopicId(), StreamPartitionIdentity.UNKNOWN_TOPIC_ID);
-    assertEquals(identity.getPartitionId(), 10000);
+    assertEquals(identity.getPartitionGroupId(), 10000);
+    assertThrows(IllegalStateException.class, identity::getTopicId);
+    assertThrows(IllegalStateException.class, identity::getPartitionId);
     assertEquals(identity.toString(), "v1:partitionGroupId=10000");
     assertEquals(identity, StreamPartitionIdentity.v1(10000));
     assertEquals(identity.hashCode(), StreamPartitionIdentity.v1(10000).hashCode());
@@ -49,6 +50,7 @@ public class StreamPartitionIdentityTest {
     assertTrue(identity.isV2());
     assertEquals(identity.getTopicId(), 1);
     assertEquals(identity.getPartitionId(), 0);
+    assertThrows(IllegalStateException.class, identity::getPartitionGroupId);
     assertEquals(identity.toString(), "v2:topicId=1,partitionId=0");
     assertEquals(identity, StreamPartitionIdentity.v2(1, 0));
     assertEquals(identity.hashCode(), StreamPartitionIdentity.v2(1, 0).hashCode());
