@@ -1,0 +1,75 @@
+{
+  "schemaName" : "schemaName",
+  "dimensionFieldSpecs" : [ {
+    "name" : "stringDim",
+    "dataType" : "STRING"
+  }, {
+    "name" : "intDim",
+    "dataType" : "INT"
+  }, {
+    "name" : "floatDim",
+    "dataType" : "FLOAT",
+    "defaultNullValue" : 0.0
+  }, {
+    "name" : "doubleDim",
+    "dataType" : "DOUBLE"
+  }, {
+    "name" : "longDim",
+    "dataType" : "LONG"
+  }, {
+    "name": "boolDim",
+    "dataType": "BOOLEAN"
+  }, {
+    "name" : "stringArrayDim",
+    "dataType" : "STRING",
+    "singleValueField" : false
+  }, {
+    "name" : "floatArrayDim",
+    "dataType" : "FLOAT",
+    "singleValueField" : false
+  }, {
+    "name": "boolArrayDim",
+    "dataType": "BOOLEAN",
+    "singleValueField": false
+  } ],
+  "metricFieldSpecs" : [ {
+    "name" : "floatMetric",
+    "dataType" : "FLOAT"
+  }, {
+    "name" : "doubleMetric",
+    "dataType" : "DOUBLE"
+  }, {
+    "name" : "longMetric",
+    "dataType" : "LONG"
+  }, {
+    "name" : "intMetric",
+    "dataType" : "INT",
+    "defaultNullValue" : 10
+  }, {
+    "name" : "stringMetric",
+    "dataType" : "STRING"
+  }, {
+    "name" : "byteDim",
+    "dataType" : "BYTES"
+  } ],
+  "timeFieldSpec" : {
+    "incomingGranularitySpec" : {
+      "name" : "incomingTimeField",
+      "dataType" : "LONG",
+      "timeType" : "SECONDS"
+    },
+    "outgoingGranularitySpec" : {
+      "name" : "outgoingTimeField",
+      "dataType" : "INT",
+      "timeType" : "DAYS"
+    }
+  },
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestampField",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:SECONDS"
+    }
+  ]
+}

@@ -46,6 +46,13 @@ import java.util.regex.Pattern
  *
  *  Segment name generation is also executed here in order to make it possible for segment names which derive some
  *  parts from actual data (records), such as minTimestamp, maxTimestamp, etc.
+ *
+ *  Thread safety: NOT thread-safe. Per the Spark DataWriter contract, each instance is owned by
+ *  a single Spark task and the framework invokes write/commit/abort/close sequentially from the
+ *  task thread. Mutable state (`segmentOutputDir`, `bufferedRecordReader`, `startTime`,
+ *  `endTime`) therefore needs no synchronization. `commit()` and `abort()` are mutually
+ *  exclusive (Spark calls one or the other, not both); `close()` may be called after either
+ *  and is idempotent w.r.t. temp-dir cleanup and reader close.
  */
 class PinotDataWriter[InternalRow](
                                     partitionId: Int,
@@ -65,6 +72,17 @@ class PinotDataWriter[InternalRow](
   private val timeColumnName = writeOptions.timeColumnName
   private val timeColumnIndex = if (timeColumnName != null) writeSchema.fieldIndex(timeColumnName) else -1
 
+  // Holds the per-partition temp directory that `generateSegment` creates so that `commit()`
+  // and `abort()` can delete it. Without this, long-running executors accumulate uncompressed
+  // segment build artifacts under the JVM tmpdir and can fill the disk.
+  private var segmentOutputDir: File = _
+
+  // Tracks whether the writer's close-once resources (buffered reader, temp dir tracker) have
+  // already been released, so close() after abort() is a no-op rather than relying on
+  // PinotBufferedRecordReader.close() being idempotent. See the class-level Javadoc for the
+  // commit/abort/close ordering contract.
+  private var closed = false
+
   private var isTimeColumnNumeric = false
   if (timeColumnIndex > -1) {
     isTimeColumnNumeric = writeSchema.fields(timeColumnIndex).dataType match {
@@ -79,9 +97,23 @@ class PinotDataWriter[InternalRow](
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
 
-    // Tracking startTime and endTime for segment name generation purposes
-    if (timeColumnIndex > -1 && isTimeColumnNumeric) {
-      val time = record.getLong(timeColumnIndex)
+    // Track startTime / endTime for segment name generation. Honor `isNullAt` first:
+    // Spark's primitive accessors return 0 for null cells, which would silently collapse
+    // startTime to 0 and corrupt the `{startTime}` / `{endTime}` segmentNameFormat
+    // placeholders. Also dispatch on the column's actual Spark type — `getLong` on an
+    // IntegerType column reads 8 bytes from a 4-byte slot in UnsafeRow and returns
+    // garbage from the next field.
+    if (timeColumnIndex > -1 && isTimeColumnNumeric && !record.isNullAt(timeColumnIndex)) {
+      val time = writeSchema.fields(timeColumnIndex).dataType match {
+        case org.apache.spark.sql.types.IntegerType => record.getInt(timeColumnIndex).toLong
+        case org.apache.spark.sql.types.LongType => record.getLong(timeColumnIndex)
+        // The match is total under the current `isTimeColumnNumeric` predicate (Int|Long).
+        // If a future contributor extends `isTimeColumnNumeric` to ShortType / ByteType /
+        // TimestampType without updating this branch, surface it as a clear failure rather
+        // than a mysterious MatchError mid-task.
+        case other => throw new IllegalStateException(
+          s"Unhandled numeric time-column type: $other; update PinotDataWriter.write to match.")
+      }
       startTime = Math.min(startTime, time)
       endTime = Math.max(endTime, time)
     }
@@ -90,9 +122,16 @@ class PinotDataWriter[InternalRow](
   override def commit(): WriterCommitMessage = {
     val segmentName = getSegmentName
     val segmentDir = generateSegment(segmentName)
-    val segmentTarFile = tarSegmentDir(segmentName, segmentDir)
-    pushSegmentTarFile(segmentTarFile)
-    new SuccessWriterCommitMessage(segmentName)
+    try {
+      val segmentTarFile = tarSegmentDir(segmentName, segmentDir)
+      pushSegmentTarFile(segmentTarFile)
+      new SuccessWriterCommitMessage(segmentName)
+    } finally {
+      // Always clear the temp build dir — both the uncompressed segment tree and the tar file
+      // live inside it, and once the tar is copied to savePath the local copies are disposable.
+      FileUtils.deleteQuietly(segmentDir)
+      segmentOutputDir = null
+    }
   }
 
   /** This method is used to generate the segment name based on the format
@@ -130,11 +169,30 @@ class PinotDataWriter[InternalRow](
     while (matcher.find()) {
       val variableName = matcher.group(1)
       val formatSpecifier = matcher.group(2)
-      val value = variables(variableName)
+      // Use Map#get so an unknown placeholder produces a clear job-submission-time error
+      // listing the supported names, rather than a `NoSuchElementException: key not found`
+      // surfacing only at commit() time after the segment was already built.
+      val value = variables.getOrElse(variableName,
+        throw new IllegalArgumentException(
+          s"Unknown segmentNameFormat placeholder '{$variableName}'; supported: " +
+            s"${variables.keys.toSeq.sorted.mkString(", ")}"))
 
       val formattedValue = formatSpecifier match {
         case null => value.toString
-        case spec => String.format(s"%${spec}d", value.asInstanceOf[Number])
+        // Width spec is only well-defined on numeric variables (`partitionId`, `startTime`,
+        // `endTime`) where it zero-pads the digit count. On a non-numeric variable like
+        // `{table}`, %Ns would emit leading whitespace inside the segment name (path-hostile
+        // for Hadoop FS, controller URLs, listings) and %-Ns would emit trailing whitespace —
+        // neither matches the documented analogue `{partitionId:05}`. Reject early with a
+        // clear message so the user sees the issue at job submission rather than at commit.
+        case spec => value match {
+          case n: Number => String.format(s"%${spec}d", n)
+          case _ =>
+            throw new IllegalArgumentException(
+              s"segmentNameFormat width spec ':$spec' is only supported on numeric variables " +
+                s"(partitionId, startTime, endTime); '$variableName' is not numeric. " +
+                s"Use '{$variableName}' without a width spec.")
+        }
       }
 
       matcher.appendReplacement(buffer, formattedValue)
@@ -146,6 +204,9 @@ class PinotDataWriter[InternalRow](
 
   private[pinot] def generateSegment(segmentName: String): File = {
     val outputDir = Files.createTempDirectory(classOf[PinotDataWriter[InternalRow]].getName).toFile
+    // Record for cleanup in abort(); commit()'s finally block overrides this to null after
+    // cleaning up itself.
+    segmentOutputDir = outputDir
     val indexingConfig = getIndexConfig
     val segmentGeneratorConfig = getSegmentGenerationConfig(segmentName, indexingConfig, outputDir)
 
@@ -207,7 +268,15 @@ class PinotDataWriter[InternalRow](
     val gr = new GenericRow()
 
     writeSchema.fields.zipWithIndex foreach { case(field, idx) =>
-      field.dataType match {
+      // Honor `record.isNullAt(idx)` before calling any typed accessor: Spark's primitive
+      // accessors (`getInt`, `getLong`, etc.) silently return zero values for null cells,
+      // which would corrupt the segment with synthetic zeros; `getString`/`getDecimal`
+      // would NPE. Mark the field null on the GenericRow so the segment driver can apply
+      // the column's defaultNullValue per Pinot's null-handling contract.
+      if (record.isNullAt(idx)) {
+        gr.putValue(field.name, null)
+        gr.addNullValueField(field.name)
+      } else field.dataType match {
         case org.apache.spark.sql.types.StringType =>
           gr.putValue(field.name, record.getString(idx))
         case org.apache.spark.sql.types.IntegerType =>
@@ -226,28 +295,43 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getBinary(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
+        case dt: org.apache.spark.sql.types.DecimalType =>
+          gr.putValue(field.name, record.getDecimal(idx, dt.precision, dt.scale).toJavaBigDecimal)
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
+          // Use ArrayData's type-specific accessors instead of `.array`, which only works on
+          // GenericArrayData (test scaffolding) and throws on the UnsafeArrayData that Spark
+          // uses in real workloads. The previous `.array.map(_.asInstanceOf[T])` would
+          // ClassCastException on real workloads, with a particularly bad failure for
+          // StringType (UTF8String → String cast).
+          val arrayData = record.getArray(idx)
           elementType match {
             case org.apache.spark.sql.types.StringType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[String]))
+              // ArrayData stores StringType elements as UTF8String, not Java String.
+              val n = arrayData.numElements()
+              val out = new Array[String](n)
+              var i = 0
+              while (i < n) {
+                val s = arrayData.getUTF8String(i)
+                out(i) = if (s == null) null else s.toString
+                i += 1
+              }
+              gr.putValue(field.name, out)
             case org.apache.spark.sql.types.IntegerType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Int]))
+              gr.putValue(field.name, arrayData.toIntArray())
             case org.apache.spark.sql.types.LongType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Long]))
+              gr.putValue(field.name, arrayData.toLongArray())
             case org.apache.spark.sql.types.FloatType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Float]))
+              gr.putValue(field.name, arrayData.toFloatArray())
             case org.apache.spark.sql.types.DoubleType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Double]))
+              gr.putValue(field.name, arrayData.toDoubleArray())
             case org.apache.spark.sql.types.BooleanType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
+              gr.putValue(field.name, arrayData.toBooleanArray())
             case org.apache.spark.sql.types.ByteType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
-            case org.apache.spark.sql.types.BinaryType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Array[Byte]]))
+              gr.putValue(field.name, arrayData.toByteArray())
             case org.apache.spark.sql.types.ShortType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
+              gr.putValue(field.name, arrayData.toShortArray())
             case _ =>
-              throw new UnsupportedOperationException(s"Unsupported data type: Array[${elementType}]")
+              throw new UnsupportedOperationException(s"Unsupported array element type: $elementType")
           }
         case _ =>
           throw new UnsupportedOperationException("Unsupported data type: " + field.dataType)
@@ -274,16 +358,35 @@ class PinotDataWriter[InternalRow](
 
   override def abort(): Unit = {
     logger.info("Aborting writer")
-    bufferedRecordReader.close()
+    closeOnce()
   }
 
   override def close(): Unit = {
     logger.info("Closing writer")
-    bufferedRecordReader.close()
+    closeOnce()
+  }
+
+  // Spark calls abort() and then close() on some error paths. Use a closed flag instead of
+  // relying on PinotBufferedRecordReader.close() being idempotent (it currently is, but the
+  // contract is not declared; pinning it here avoids future-binding the invariant).
+  // Wrap the reader close in try/finally so the temp-dir cleanup still runs if a future
+  // PinotBufferedRecordReader.close() implementation throws — otherwise the closed flag
+  // would already be set and the segmentOutputDir would leak on disk.
+  private def closeOnce(): Unit = {
+    if (closed) return
+    closed = true
+    try {
+      bufferedRecordReader.close()
+    } finally {
+      if (segmentOutputDir != null) {
+        FileUtils.deleteQuietly(segmentOutputDir)
+        segmentOutputDir = null
+      }
+    }
   }
 }
 
-class SuccessWriterCommitMessage(segmentName: String) extends WriterCommitMessage {
+class SuccessWriterCommitMessage(val segmentName: String) extends WriterCommitMessage {
   override def toString: String = {
     "SuccessWriterCommitMessage{" +
       "segmentName='" + segmentName + '\'' +

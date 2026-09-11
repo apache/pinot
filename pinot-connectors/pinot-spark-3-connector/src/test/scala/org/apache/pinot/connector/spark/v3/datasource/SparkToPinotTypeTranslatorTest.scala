@@ -34,9 +34,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       (DoubleType, FieldSpec.DataType.DOUBLE),
       (DecimalType(38, 18), FieldSpec.DataType.BIG_DECIMAL),
       (BooleanType, FieldSpec.DataType.BOOLEAN),
-      (BinaryType, FieldSpec.DataType.BYTES),
-      (TimestampType, FieldSpec.DataType.LONG),
-      (DateType, FieldSpec.DataType.INT)
+      (BinaryType, FieldSpec.DataType.BYTES)
     )
 
     for ((sparkType, expectedPinotType) <- typeMappings) {
@@ -68,11 +66,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       (ArrayType(LongType), FieldSpec.DataType.LONG),
       (ArrayType(FloatType), FieldSpec.DataType.FLOAT),
       (ArrayType(DoubleType), FieldSpec.DataType.DOUBLE),
-      (ArrayType(DecimalType(38, 18)), FieldSpec.DataType.BIG_DECIMAL),
-      (ArrayType(BooleanType), FieldSpec.DataType.BOOLEAN),
-      (ArrayType(BinaryType), FieldSpec.DataType.BYTES),
-      (ArrayType(TimestampType), FieldSpec.DataType.LONG),
-      (ArrayType(DateType), FieldSpec.DataType.INT)
+      (ArrayType(BooleanType), FieldSpec.DataType.BOOLEAN)
     )
 
     for ((sparkArrayType, expectedPinotType) <- arrayTypeMappings) {
@@ -82,6 +76,61 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
         null, null, null)
       assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
       assert(!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField)
+    }
+  }
+
+  test("Reject ArrayType(BinaryType) and ArrayType(DecimalType) — Pinot has no MV support") {
+    // Pinot rejects multi-value BYTES and multi-value BIG_DECIMAL columns on the segment
+    // build path, so the translator must reject up-front rather than letting a failure
+    // surface on the executor.
+    val rejected = List(
+      ArrayType(BinaryType),
+      ArrayType(DecimalType(38, 18))
+    )
+    for (sparkArrayType <- rejected) {
+      val sparkSchema = StructType(Array(StructField("field", sparkArrayType)))
+      val ex = intercept[UnsupportedOperationException] {
+        SparkToPinotTypeTranslator.translate(sparkSchema, "table", null, null, null)
+      }
+      assert(ex.getMessage.contains("not supported"))
+    }
+  }
+
+  test("Reject TimestampType and DateType — unit semantics do not round-trip") {
+    // Spark's TimestampType (microseconds-since-epoch) and DateType (days-since-epoch)
+    // do not match Pinot's millis-since-epoch convention, so naively mapping to LONG/INT
+    // would silently produce wrong-by-1000 timestamps. Reject so the user is forced to
+    // cast to LongType (millis) or StringType upstream.
+    val timestampSchema = StructType(Array(StructField("ts", TimestampType)))
+    val tsEx = intercept[UnsupportedOperationException] {
+      SparkToPinotTypeTranslator.translate(timestampSchema, "table", null, null, null)
+    }
+    assert(tsEx.getMessage.contains("TimestampType"))
+    assert(tsEx.getMessage.contains("Cast to LongType"))
+
+    val dateSchema = StructType(Array(StructField("d", DateType)))
+    val dEx = intercept[UnsupportedOperationException] {
+      SparkToPinotTypeTranslator.translate(dateSchema, "table", null, null, null)
+    }
+    assert(dEx.getMessage.contains("DateType"))
+    assert(dEx.getMessage.contains("Cast to StringType") || dEx.getMessage.contains("LongType"))
+  }
+
+  test("Reject unknown Spark types with a clear error at translation time") {
+    // Map/Struct/Null/CalendarInterval and similar types are not part of Pinot's data
+    // model. Translator must throw immediately rather than returning null and letting
+    // some downstream caller silently skip the field.
+    val rejected: List[DataType] = List(
+      MapType(StringType, IntegerType),
+      StructType(Seq(StructField("inner", IntegerType))),
+      NullType
+    )
+    for (sparkType <- rejected) {
+      val sparkSchema = StructType(Array(StructField("field", sparkType)))
+      val ex = intercept[UnsupportedOperationException] {
+        SparkToPinotTypeTranslator.translate(sparkSchema, "table", null, null, null)
+      }
+      assert(ex.getMessage.contains("Unsupported Spark data type"))
     }
   }
 }

@@ -36,7 +36,11 @@
 
   <modules>
     <module>pinot-spark-common</module>
+    <!-- pinot-spark-3-connector is deprecated and slated for removal in the next minor
+         release; see its README for the migration path to pinot-spark-4-connector. Both
+         build by default since Pinot's root pom enforces JDK 21+. -->
     <module>pinot-spark-3-connector</module>
+    <module>pinot-spark-4-connector</module>
     <module>pinot-flink-connector</module>
   </modules>
 </project>
