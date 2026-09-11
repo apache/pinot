@@ -741,6 +741,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
               _segmentLogger.error(errorMessage, e);
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+              // index() may publish-then-throw when continueOnError is false; refresh capacity from the segment.
+              canTakeMore = _realtimeSegment.canAddMore();
             }
           }
         }
@@ -1960,7 +1962,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setContinueOnError(ingestionConfig != null && ingestionConfig.isContinueOnError());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

@@ -162,6 +162,13 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _dropRecordOnPartitionMismatch;
   private final boolean _defaultNullHandlingEnabled;
+  /// Honors `IngestionConfig.continueOnError`. When false, exceptions from dictionary / row / index writes
+  /// propagate instead of being fail-soft substituted.
+  private final boolean _continueOnError;
+  /// First addNewRow indexing exception stashed so the row can be published before a strict rethrow.
+  /// Only accessed on the consuming thread that calls [#index].
+  @Nullable
+  private Exception _pendingRowIndexingException;
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -259,6 +266,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _dropRecordOnPartitionMismatch = config.isDropRecordOnPartitionMismatch();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
+    _continueOnError = config.isContinueOnError();
     _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -628,6 +636,7 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException {
+    _pendingRowIndexingException = null;
     IndexContainer mismatchedPartitionIndexContainer = null;
     String mismatchedPartitionValue = null;
     int mismatchedPartition = -1;
@@ -670,8 +679,8 @@ public class MutableSegmentImpl implements MutableSegment {
       // consistent upsert view, otherwise the latest doc can be missed by query due to 'docId < _numDocs' check
       // in query filter operators. Here the record becomes queryable before validDocIds bitmaps are updated.
       if (_upsertConsistencyMode != UpsertConfig.ConsistencyMode.NONE) {
-        updateDictionary(updatedRow);
-        addNewRow(numDocsIndexed, updatedRow);
+        // Fail-soft physical index (issue #16316): complete the row before advancing doc count / upsert metadata.
+        indexPhysicalRow(numDocsIndexed, updatedRow);
         numDocsIndexed++;
         canTakeMore = numDocsIndexed < _capacity;
         _numDocsIndexed = numDocsIndexed;
@@ -680,25 +689,27 @@ public class MutableSegmentImpl implements MutableSegment {
         // otherwise the latest doc can be missed by query due to 'docId < _numDocs' check in query filter operators.
         // NOTE: out-of-order records can not be dropped or marked when consistent upsert view is enabled.
         _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+        throwPendingRowIndexingExceptionIfStrict();
       } else {
         // if record doesn't need to be dropped, then persist in segment and update metadata hashmap
         // we are doing metadata update first followed by segment data update here, there can be a scenario where
         // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
         // a key is pointing to some other key's docID
-        // TODO fix this metadata mismatch scenario
+        // TODO fix this metadata mismatch scenario (ConsistencyMode.NONE ordering); follow-up to #16316
         boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
         if (_upsertOutOfOrderRecordColumn != null) {
           updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
         }
         if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
-          updateDictionary(updatedRow);
-          addNewRow(numDocsIndexed, updatedRow);
+          // Fail-soft: physical write always completes the row so metadata docId is never a hole.
+          indexPhysicalRow(numDocsIndexed, updatedRow);
           // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
           // once validated
           numDocsIndexed++;
         }
         canTakeMore = numDocsIndexed < _capacity;
         _numDocsIndexed = numDocsIndexed;
+        throwPendingRowIndexingExceptionIfStrict();
       }
       updateIndexedAndIngestionTime(metadata);
       return canTakeMore;
@@ -719,25 +730,38 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
-    // Update dictionary first
-    updateDictionary(row);
-
     // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing
-    // docId, else this will return a new docId.
+    // docId, else this will return a new docId. Dictionary must be updated before the rollup key is computed.
+    boolean dictHadError = updateDictionary(row);
     int docId = getOrCreateDocId();
 
     boolean canTakeMore;
     if (docId == numDocsIndexed) {
-      // New row
-      addNewRow(numDocsIndexed, row);
+      // New row: fail-soft complete-the-row so _numDocsIndexed and per-column lengths stay aligned (#16316).
+      boolean rowHadError = addNewRow(numDocsIndexed, row);
+      if (dictHadError || rowHadError) {
+        recordIncompleteRow();
+      }
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = numDocsIndexed++ < _capacity;
     } else {
       assert isAggregateMetricsEnabled();
-      aggregateMetrics(row, docId);
+      try {
+        aggregateMetrics(row, docId);
+        if (dictHadError) {
+          recordIncompleteRow();
+        }
+      } catch (Exception e) {
+        // In-place rollup already has a complete prior row. When continueOnError is disabled, rethrow so
+        // strict ingestion fails the index call. Already-written metrics on this docId are not rolled back
+        // (apply-then-write is per-metric); a two-phase rewrite is left as a follow-up.
+        recordOrThrowIndexingError("AGGREGATE_METRICS", e);
+        recordIncompleteRow();
+      }
       canTakeMore = true;
     }
     _numDocsIndexed = numDocsIndexed;
+    throwPendingRowIndexingExceptionIfStrict();
 
     updateIndexedAndIngestionTime(metadata);
     return canTakeMore;
@@ -840,180 +864,446 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private void updateDictionary(GenericRow row) {
+  /// Runs dictionary + forward/secondary indexing for a new docId and meters an incomplete row when either step had
+  /// to fall back to defaults (issue #16316).
+  private void indexPhysicalRow(int docId, GenericRow row) {
+    boolean dictHadError = updateDictionary(row);
+    boolean rowHadError = addNewRow(docId, row);
+    if (dictHadError || rowHadError) {
+      recordIncompleteRow();
+    }
+  }
+
+  /// @return {@code true} if any column required a default/fallback while updating dictionaries
+  /// When `continueOnError` is false, dictionary failures are stashed and rethrown after the row is published.
+  private boolean updateDictionary(GenericRow row) {
+    boolean hadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       MutableDictionary dictionary = indexContainer._dictionary;
       if (dictionary == null) {
         continue;
       }
-
-      Object value = row.getValue(entry.getKey());
-      if (value == null) {
-        recordIndexingError("DICTIONARY");
-      } else {
+      String column = entry.getKey();
+      Object value = row.getValue(column);
+      try {
+        if (value == null) {
+          // Prefer default-null dict entry so addNewRow can still complete the forward index for this docId
+          // (fail-soft; issue #16316). Meter and fall back to field-spec default.
+          recordIndexingError("DICTIONARY");
+          hadError = true;
+          value = getDefaultNullValueForIndexing(indexContainer._fieldSpec);
+          row.putDefaultNullValue(column, value);
+        }
         if (indexContainer._fieldSpec.isSingleValueField()) {
           indexContainer._dictId = dictionary.index(value);
         } else {
           indexContainer._dictIds = dictionary.index((Object[]) value);
         }
-
         // Update min/max value from dictionary
         indexContainer._minValue = dictionary.getMinVal();
         indexContainer._maxValue = dictionary.getMaxVal();
+      } catch (Exception e) {
+        // Do not abort the row mid-dictionary: remaining columns still get a chance, and addNewRow will fill
+        // defaults for this column if dict ids are unset (Integer.MIN_VALUE / null). When continueOnError is
+        // false the exception is stashed and rethrown after the caller publishes the docId so upsert/dedup
+        // metadata never points at an unpublished row.
+        recordOrDeferIndexingError("DICTIONARY", e);
+        hadError = true;
+        // Error sentinels, kept only if even the default cannot be indexed below. For MV columns the sentinel is a
+        // null array, which is distinct from an empty array (a row that legitimately carries no values).
+        indexContainer._dictId = Integer.MIN_VALUE;
+        indexContainer._dictIds = null;
+        try {
+          // Index the field default instead of leaving the sentinel: with metrics aggregation the rollup key is built
+          // straight from the dict ids (see getOrCreateDocId), and Integer.MIN_VALUE is not a real dict id, so the
+          // sentinel key never matches the default value that addNewRow actually stores for this column. Two failed
+          // rows now deliberately share the default-value key, which is better than colliding on a raw sentinel
+          // shared with any other failing column combination.
+          Object defaultValue = getDefaultNullValueForIndexing(indexContainer._fieldSpec);
+          if (indexContainer._fieldSpec.isSingleValueField()) {
+            indexContainer._dictId = dictionary.index(defaultValue);
+          } else {
+            indexContainer._dictIds = dictionary.index((Object[]) defaultValue);
+          }
+          // Keep the row consistent with the dict id: addNewRow writes this default to the forward and secondary
+          // indexes and marks the value null for null-aware queries.
+          row.putDefaultNullValue(column, defaultValue);
+          indexContainer._minValue = dictionary.getMinVal();
+          indexContainer._maxValue = dictionary.getMaxVal();
+        } catch (Exception fallbackError) {
+          _logger.error("Failed to index default null value into dictionary for column: {}", column, fallbackError);
+        }
       }
-      updateIndexCapacityThresholdBreached(dictionary, entry.getKey());
+      updateIndexCapacityThresholdBreached(dictionary, column);
     }
+    return hadError;
   }
 
-  private void addNewRow(int docId, GenericRow row) {
+  /// Indexes a new physical row. Always completes the row so seal/query lengths stay aligned with [_numDocsIndexed]
+  /// (issue #16316). On forward-index failure the column is completed with the field default/null. Secondary index
+  /// and aggregation-path failures are metered and, when `continueOnError` is false, stashed for
+  /// [#throwPendingRowIndexingExceptionIfStrict] after the caller publishes the docId.
+  ///
+  /// @return {@code true} if any column required a default/fallback while indexing
+  private boolean addNewRow(int docId, GenericRow row) {
+    boolean rowHadError = false;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
-
-      // Handle ingestion aggregation
-      ValueAggregator valueAggregator = indexContainer._valueAggregator;
-      if (valueAggregator != null) {
-        String sourceColumn = indexContainer._sourceColumn;
-        // NOTE: value can be null if the column is not specified in the schema.
-        Object value = row.getValue(sourceColumn);
-        // Handle COUNT(*)
-        if (value == null && sourceColumn.equals(AggregationFunctionColumnPair.STAR)) {
-          assert valueAggregator.getAggregationType() == AggregationFunctionType.COUNT;
-          value = 1;
-        }
-
-        // Update numValues info
-        indexContainer._valuesInfo.updateSVNumValues();
-
-        MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
-        FieldSpec fieldSpec = indexContainer._fieldSpec;
-
-        DataType dataType = fieldSpec.getDataType();
-        value = valueAggregator.getInitialAggregatedValue(value);
-        // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
-        switch (dataType.getStoredType()) {
-          case INT:
-            forwardIndex.add(((Number) value).intValue(), -1, docId);
-            break;
-          case LONG:
-            forwardIndex.add(((Number) value).longValue(), -1, docId);
-            break;
-          case FLOAT:
-            forwardIndex.add(((Number) value).floatValue(), -1, docId);
-            break;
-          case DOUBLE:
-            forwardIndex.add(((Number) value).doubleValue(), -1, docId);
-            break;
-          case BIG_DECIMAL:
-          case BYTES:
-            forwardIndex.add(valueAggregator.serializeAggregatedValue(value), -1, docId);
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "Unsupported data type: " + dataType + " for aggregation: " + column);
-        }
-        continue;
-      }
-
-      // Update the null value vector even if a null value is somehow produced
-      if (indexContainer._nullValueVector != null && row.isNullValue(column)) {
-        indexContainer._nullValueVector.setNull(docId);
-      }
-
-      Object value = row.getValue(column);
-      if (value == null) {
-        // the value should not be null unless something is broken upstream but this will lead to inappropriate reuse
-        // of the dictionary id if this somehow happens. An NPE here can corrupt indexes leading to incorrect query
-        // results, hence the extra care. A metric will already have been emitted when trying to update the dictionary.
-        continue;
-      }
-
-      FieldSpec fieldSpec = indexContainer._fieldSpec;
-      DataType dataType = fieldSpec.getDataType();
-
-      if (fieldSpec.isSingleValueField()) {
-        // Update numValues info
-        indexContainer._valuesInfo.updateSVNumValues();
-
-        // Route OPEN_STRUCT values to the dedicated mutable index. OPEN_STRUCT has no forward
-        // index / dictionary / min-max, so the standard per-IndexType loop and the comparable
-        // tracking below would be no-ops at best and crash at worst (Map is not Comparable).
-        if (dataType == DataType.OPEN_STRUCT) {
-          MutableIndex openStructIndex = indexContainer._mutableIndexes.get(StandardIndexes.openStruct());
-          if (openStructIndex != null) {
-            openStructIndex.add(value, -1, docId);
+      try {
+        if (indexContainer._valueAggregator != null) {
+          if (!addAggregatedColumn(docId, row, column, indexContainer)) {
+            rowHadError = true;
           }
-          continue;
+        } else if (!addPhysicalColumn(docId, row, column, indexContainer)) {
+          rowHadError = true;
         }
-
-        // Update indexes
-        int dictId = indexContainer._dictId;
-        for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
-          try {
-            MutableIndex mutableIndex = indexEntry.getValue();
-            mutableIndex.add(value, dictId, docId);
-            updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
-          } catch (Exception e) {
-            recordIndexingError(indexEntry.getKey(), e);
-          }
-        }
-
-        if (dictId < 0) {
-          // Update min/max value from raw value
-          // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
-          if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-            Comparable comparable = toComparableValue(value, dataType, column);
-            if (indexContainer._minValue == null) {
-              indexContainer._minValue = comparable;
-              indexContainer._maxValue = comparable;
-            } else {
-              if (comparable.compareTo(indexContainer._minValue) < 0) {
-                indexContainer._minValue = comparable;
-              }
-              if (comparable.compareTo(indexContainer._maxValue) > 0) {
-                indexContainer._maxValue = comparable;
-              }
-            }
-          }
-        }
-
-        if (_multiColumnValues != null) {
-          int pos = _multiColumnPos.getInt(column);
-          if (pos > -1) {
-            _multiColumnValues.set(pos, value);
-          }
-        }
-      } else {
-        // Multi-value column
-
-        int[] dictIds = indexContainer._dictIds;
-        indexContainer._valuesInfo.updateVarByteMVMaxRowLengthInBytes(value, dataType.getStoredType());
-        Object[] values = (Object[]) value;
-        for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
-          try {
-            MutableIndex mutableIndex = indexEntry.getValue();
-            mutableIndex.add(values, dictIds, docId);
-            updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
-          } catch (Exception e) {
-            recordIndexingError(indexEntry.getKey(), e);
-          }
-        }
-        indexContainer._valuesInfo.updateMVNumValues(values.length);
-
-        if (_multiColumnValues != null) {
-          int pos = _multiColumnPos.getInt(column);
-          if (pos > -1) {
-            _multiColumnValues.set(pos, value);
-          }
+      } catch (Exception e) {
+        // Last-resort complete-the-row so a single bad column cannot leave a half-written docId.
+        recordOrDeferIndexingError("ROW", e);
+        rowHadError = true;
+        try {
+          indexDefaultNullColumn(docId, indexContainer);
+        } catch (Exception fallbackError) {
+          _logger.error("Failed to index default null for column: {} at docId: {}", column, docId, fallbackError);
         }
       }
     }
 
     if (_multiColumnValues != null) {
-      _multiColumnTextIndex.add(_multiColumnValues);
-      Collections.fill(_multiColumnValues, null);
+      try {
+        _multiColumnTextIndex.add(_multiColumnValues);
+      } catch (Exception e) {
+        recordOrDeferIndexingError("MULTI_COLUMN_TEXT", e);
+        rowHadError = true;
+      } finally {
+        Collections.fill(_multiColumnValues, null);
+      }
     }
+    return rowHadError;
+  }
+
+  /// Returns {@code true} when the aggregated column was written without error.
+  private boolean addAggregatedColumn(int docId, GenericRow row, String column, IndexContainer indexContainer) {
+    ValueAggregator valueAggregator = indexContainer._valueAggregator;
+    String sourceColumn = indexContainer._sourceColumn;
+    // NOTE: value can be null if the column is not specified in the schema.
+    Object value = row.getValue(sourceColumn);
+    // Handle COUNT(*)
+    if (value == null && sourceColumn.equals(AggregationFunctionColumnPair.STAR)) {
+      assert valueAggregator.getAggregationType() == AggregationFunctionType.COUNT;
+      value = 1;
+    }
+
+    MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
+    FieldSpec fieldSpec = indexContainer._fieldSpec;
+    DataType dataType = fieldSpec.getDataType();
+    try {
+      value = valueAggregator.getInitialAggregatedValue(value);
+      // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
+      switch (dataType.getStoredType()) {
+        case INT:
+          forwardIndex.add(((Number) value).intValue(), -1, docId);
+          break;
+        case LONG:
+          forwardIndex.add(((Number) value).longValue(), -1, docId);
+          break;
+        case FLOAT:
+          forwardIndex.add(((Number) value).floatValue(), -1, docId);
+          break;
+        case DOUBLE:
+          forwardIndex.add(((Number) value).doubleValue(), -1, docId);
+          break;
+        case BIG_DECIMAL:
+        case BYTES:
+          forwardIndex.add(valueAggregator.serializeAggregatedValue(value), -1, docId);
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported data type: " + dataType + " for aggregation: " + column);
+      }
+      indexContainer._valuesInfo.updateSVNumValues();
+      return true;
+    } catch (Exception e) {
+      recordOrDeferIndexingError(StandardIndexes.forward(), e);
+      indexDefaultAggregatedValue(docId, indexContainer);
+      return false;
+    }
+  }
+
+  /// Returns {@code true} when the physical column was written from the row value without error and without falling
+  /// back to the field default.
+  private boolean addPhysicalColumn(int docId, GenericRow row, String column, IndexContainer indexContainer) {
+    FieldSpec fieldSpec = indexContainer._fieldSpec;
+    DataType dataType = fieldSpec.getDataType();
+    boolean isNull = row.isNullValue(column);
+    Object value = row.getValue(column);
+    // Folded into every return path so addNewRow meters the row incomplete once, even when several columns fall back.
+    boolean defaultSubstituted = false;
+    if (value == null) {
+      // Should not happen after NullValueTransformer, but complete the row with defaults rather than leaving a hole.
+      recordIndexingError("NULL_VALUE");
+      value = getDefaultNullValueForIndexing(fieldSpec);
+      isNull = true;
+      defaultSubstituted = true;
+    }
+    if (indexContainer._nullValueVector != null && isNull) {
+      indexContainer._nullValueVector.setNull(docId);
+    }
+
+    if (fieldSpec.isSingleValueField()) {
+      // Route OPEN_STRUCT values to the dedicated mutable index. OPEN_STRUCT has no forward
+      // index / dictionary / min-max, so the standard per-IndexType loop and the comparable
+      // tracking below would be no-ops at best and crash at worst (Map is not Comparable).
+      if (dataType == DataType.OPEN_STRUCT) {
+        MutableIndex openStructIndex = indexContainer._mutableIndexes.get(StandardIndexes.openStruct());
+        if (openStructIndex != null) {
+          try {
+            openStructIndex.add(value, -1, docId);
+          } catch (Exception e) {
+            recordOrDeferIndexingError(StandardIndexes.openStruct(), e);
+            return false;
+          }
+        }
+        indexContainer._valuesInfo.updateSVNumValues();
+        return !defaultSubstituted;
+      }
+
+      int dictId = indexContainer._dictId;
+      if (indexContainer._dictionary != null && dictId == Integer.MIN_VALUE) {
+        // Dictionary indexing failed earlier; index the default so forward index can still be written.
+        try {
+          Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
+          dictId = indexContainer._dictionary.index(defaultValue);
+          indexContainer._dictId = dictId;
+          value = defaultValue;
+          if (indexContainer._nullValueVector != null) {
+            indexContainer._nullValueVector.setNull(docId);
+          }
+        } catch (Exception e) {
+          recordOrDeferIndexingError("DICTIONARY", e);
+          return false;
+        }
+      }
+
+      boolean forwardWritten = false;
+      boolean hadError = false;
+      for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
+        IndexType indexType = indexEntry.getKey();
+        try {
+          MutableIndex mutableIndex = indexEntry.getValue();
+          mutableIndex.add(value, dictId, docId);
+          updateIndexCapacityThresholdBreached(mutableIndex, indexType, column);
+          if (indexType.equals(StandardIndexes.forward())) {
+            forwardWritten = true;
+          }
+        } catch (Exception e) {
+          recordOrDeferIndexingError(indexType, e);
+          hadError = true;
+          // Forward-index failure is a row-level integrity issue: complete with default rather than skip.
+          if (indexType.equals(StandardIndexes.forward())) {
+            try {
+              Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
+              int defaultDictId = dictId;
+              if (indexContainer._dictionary != null) {
+                defaultDictId = indexContainer._dictionary.index(defaultValue);
+                indexContainer._dictId = defaultDictId;
+              }
+              indexEntry.getValue().add(defaultValue, defaultDictId, docId);
+              forwardWritten = true;
+              if (indexContainer._nullValueVector != null) {
+                indexContainer._nullValueVector.setNull(docId);
+              }
+              value = defaultValue;
+              dictId = defaultDictId;
+            } catch (Exception fallbackError) {
+              _logger.error("Failed to write default forward index for column: {} at docId: {}", column, docId,
+                  fallbackError);
+            }
+          }
+        }
+      }
+      if (!forwardWritten && indexContainer._mutableIndexes.containsKey(StandardIndexes.forward())) {
+        // Should be unreachable if the fallback above worked; still try once more.
+        indexDefaultNullColumn(docId, indexContainer);
+        hadError = true;
+      } else {
+        indexContainer._valuesInfo.updateSVNumValues();
+      }
+
+      if (dictId < 0) {
+        // Update min/max value from raw value
+        // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
+        if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+          Comparable comparable = toComparableValue(value, dataType, column);
+          if (indexContainer._minValue == null) {
+            indexContainer._minValue = comparable;
+            indexContainer._maxValue = comparable;
+          } else {
+            if (comparable.compareTo(indexContainer._minValue) < 0) {
+              indexContainer._minValue = comparable;
+            }
+            if (comparable.compareTo(indexContainer._maxValue) > 0) {
+              indexContainer._maxValue = comparable;
+            }
+          }
+        }
+      }
+
+      if (_multiColumnValues != null) {
+        int pos = _multiColumnPos.getInt(column);
+        if (pos > -1) {
+          _multiColumnValues.set(pos, value);
+        }
+      }
+      return !hadError && !defaultSubstituted;
+    } else {
+      // Multi-value column
+      Object[] values = value instanceof Object[] ? (Object[]) value
+          : new Object[]{value};
+      int[] dictIds = indexContainer._dictIds;
+      if (indexContainer._dictionary != null && dictIds == null) {
+        try {
+          Object[] defaultValues = (Object[]) getDefaultNullValueForIndexing(fieldSpec);
+          dictIds = indexContainer._dictionary.index(defaultValues);
+          indexContainer._dictIds = dictIds;
+          values = defaultValues;
+          if (indexContainer._nullValueVector != null) {
+            indexContainer._nullValueVector.setNull(docId);
+          }
+        } catch (Exception e) {
+          recordOrDeferIndexingError("DICTIONARY", e);
+          return false;
+        }
+      }
+
+      boolean forwardWritten = false;
+      boolean hadError = false;
+      indexContainer._valuesInfo.updateVarByteMVMaxRowLengthInBytes(values, dataType.getStoredType());
+      for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
+        IndexType indexType = indexEntry.getKey();
+        try {
+          MutableIndex mutableIndex = indexEntry.getValue();
+          mutableIndex.add(values, dictIds, docId);
+          updateIndexCapacityThresholdBreached(mutableIndex, indexType, column);
+          if (indexType.equals(StandardIndexes.forward())) {
+            forwardWritten = true;
+          }
+        } catch (Exception e) {
+          recordOrDeferIndexingError(indexType, e);
+          hadError = true;
+          if (indexType.equals(StandardIndexes.forward())) {
+            try {
+              Object[] defaultValues = (Object[]) getDefaultNullValueForIndexing(fieldSpec);
+              int[] defaultDictIds = dictIds;
+              if (indexContainer._dictionary != null) {
+                defaultDictIds = indexContainer._dictionary.index(defaultValues);
+                indexContainer._dictIds = defaultDictIds;
+              }
+              indexEntry.getValue().add(defaultValues, defaultDictIds, docId);
+              forwardWritten = true;
+              values = defaultValues;
+              if (indexContainer._nullValueVector != null) {
+                indexContainer._nullValueVector.setNull(docId);
+              }
+            } catch (Exception fallbackError) {
+              _logger.error("Failed to write default MV forward index for column: {} at docId: {}", column, docId,
+                  fallbackError);
+            }
+          }
+        }
+      }
+      if (!forwardWritten && indexContainer._mutableIndexes.containsKey(StandardIndexes.forward())) {
+        indexDefaultNullColumn(docId, indexContainer);
+        hadError = true;
+      } else {
+        indexContainer._valuesInfo.updateMVNumValues(values.length);
+      }
+
+      if (_multiColumnValues != null) {
+        int pos = _multiColumnPos.getInt(column);
+        if (pos > -1) {
+          _multiColumnValues.set(pos, values);
+        }
+      }
+      return !hadError && !defaultSubstituted;
+    }
+  }
+
+  private static Object getDefaultNullValueForIndexing(FieldSpec fieldSpec) {
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    if (fieldSpec.isSingleValueField()) {
+      return defaultNullValue;
+    }
+    return new Object[]{defaultNullValue};
+  }
+
+  private void indexDefaultNullColumn(int docId, IndexContainer indexContainer) {
+    FieldSpec fieldSpec = indexContainer._fieldSpec;
+    Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
+    if (indexContainer._nullValueVector != null) {
+      indexContainer._nullValueVector.setNull(docId);
+    }
+    if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
+      MutableIndex openStructIndex = indexContainer._mutableIndexes.get(StandardIndexes.openStruct());
+      if (openStructIndex != null) {
+        openStructIndex.add(defaultValue, -1, docId);
+      }
+      indexContainer._valuesInfo.updateSVNumValues();
+      return;
+    }
+    MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
+    if (forwardIndex == null) {
+      return;
+    }
+    if (fieldSpec.isSingleValueField()) {
+      int dictId = -1;
+      if (indexContainer._dictionary != null) {
+        dictId = indexContainer._dictionary.index(defaultValue);
+        indexContainer._dictId = dictId;
+      }
+      forwardIndex.add(defaultValue, dictId, docId);
+      indexContainer._valuesInfo.updateSVNumValues();
+    } else {
+      Object[] defaultValues = (Object[]) defaultValue;
+      int[] dictIds = null;
+      if (indexContainer._dictionary != null) {
+        dictIds = indexContainer._dictionary.index(defaultValues);
+        indexContainer._dictIds = dictIds;
+      }
+      forwardIndex.add(defaultValues, dictIds, docId);
+      indexContainer._valuesInfo.updateMVNumValues(defaultValues.length);
+    }
+  }
+
+  private void indexDefaultAggregatedValue(int docId, IndexContainer indexContainer) {
+    ValueAggregator valueAggregator = indexContainer._valueAggregator;
+    MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
+    DataType dataType = indexContainer._fieldSpec.getDataType();
+    Object value = valueAggregator.getInitialAggregatedValue(null);
+    switch (dataType.getStoredType()) {
+      case INT:
+        forwardIndex.add(((Number) value).intValue(), -1, docId);
+        break;
+      case LONG:
+        forwardIndex.add(((Number) value).longValue(), -1, docId);
+        break;
+      case FLOAT:
+        forwardIndex.add(((Number) value).floatValue(), -1, docId);
+        break;
+      case DOUBLE:
+        forwardIndex.add(((Number) value).doubleValue(), -1, docId);
+        break;
+      case BIG_DECIMAL:
+      case BYTES:
+        forwardIndex.add(valueAggregator.serializeAggregatedValue(value), -1, docId);
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported data type: " + dataType + " for aggregation default at docId: " + docId);
+    }
+    indexContainer._valuesInfo.updateSVNumValues();
   }
 
   /// Wraps a raw comparison-column value as a Comparable without a per-row schema lookup: a byte[] (a BYTES or UUID
@@ -1069,6 +1359,49 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+
+  /// When [#_continueOnError] is false, rethrows so strict ingestion fails the index operation. When true,
+  /// records the error metric and returns so the caller can complete the row with defaults.
+  private void recordOrThrowIndexingError(String indexType, Exception exception) {
+    if (!_continueOnError) {
+      throw wrapIndexingException(indexType, exception);
+    }
+    recordIndexingError(indexType, exception);
+  }
+
+  /// Records an addNewRow indexing error. When [#_continueOnError] is false the exception is stashed so
+  /// [#index] can publish the completed row (avoiding inverted-index holes) and then rethrow.
+  private void recordOrDeferIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {
+    recordIndexingError(indexType, exception);
+    if (!_continueOnError && _pendingRowIndexingException == null) {
+      _pendingRowIndexingException = exception;
+    }
+  }
+
+  /// Records an addNewRow indexing error. When [#_continueOnError] is false the exception is stashed so
+  /// [#index] can publish the completed row (avoiding inverted-index holes) and then rethrow.
+  private void recordOrDeferIndexingError(String indexType, Exception exception) {
+    recordIndexingError(indexType, exception);
+    if (!_continueOnError && _pendingRowIndexingException == null) {
+      _pendingRowIndexingException = exception;
+    }
+  }
+
+  private void throwPendingRowIndexingExceptionIfStrict() {
+    Exception pending = _pendingRowIndexingException;
+    _pendingRowIndexingException = null;
+    if (pending != null) {
+      throw wrapIndexingException("ROW", pending);
+    }
+  }
+
+  private static RuntimeException wrapIndexingException(String indexType, Exception exception) {
+    if (exception instanceof RuntimeException runtimeException) {
+      return runtimeException;
+    }
+    return new RuntimeException("Failed to index value with " + indexType, exception);
+  }
+
   private void recordIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {
     _logger.error("failed to index value with {}", indexType, exception);
     if (_serverMetrics != null) {
@@ -1083,6 +1416,20 @@ public class MutableSegmentImpl implements MutableSegment {
     if (_serverMetrics != null) {
       String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
       _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+    }
+  }
+
+  private void recordIndexingError(String indexType, Exception exception) {
+    _logger.error("failed to index value with {}", indexType, exception);
+    if (_serverMetrics != null) {
+      String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
+      _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+    }
+  }
+
+  private void recordIncompleteRow() {
+    if (_serverMetrics != null) {
+      _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, 1);
     }
   }
 
