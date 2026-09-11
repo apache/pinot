@@ -59,6 +59,9 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
+      <!-- The parent pom already declares pinot-spi as provided; keep that scope rather than
+           overriding it to compile, which would bundle it into the plugin -->
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.google.auto.service</groupId>

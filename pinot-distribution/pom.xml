@@ -38,6 +38,83 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
+      <!--
+        pinot-tools depends on plugin modules even though ideally it would not; see the comment on
+        its dependencies. Without these exclusions the distribution ships each of those plugins
+        twice: once shaded into lib/pinot-all.jar through pinot-tools, and once as the plugin under
+        plugins/ with its dependencies in plugin-libs/. The copy in the uber-jar also wins on the
+        classpath, so the plugin directory would be dead weight for exactly these plugins.
+
+        A plugin may only be excluded here if the distribution ships it under plugins/, otherwise it
+        would disappear from the distribution entirely rather than move: pinot-compound-metrics is
+        not in the plugin list below, so it stays in the uber-jar, which is the only place it has
+        ever been available from.
+
+        Only plugins pinot-tools never references at compile time are excluded. It genuinely
+        imports classes from pinot-avro, pinot-json, pinot-parquet and pinot-minion-builtin-tasks,
+        which therefore stay; removing those needs the shared classes extracted into library
+        modules first. Everything listed here is reached by fully-qualified name at runtime and is
+        loaded from plugins/ instead.
+
+        Declaring the dependencies `provided` in pinot-tools would keep this list next to what it
+        describes and would be the better mechanism, but `provided` is not on the runtime
+        classpath, so quickstarts needing these plugins would no longer start from Maven or an IDE.
+        This list is the cost of keeping that working; it must stay in step with pinot-tools.
+      -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-kafka-3.0</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-kinesis</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-pulsar</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-batch-ingestion-standalone</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-s3</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-confluent-avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-csv</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-protobuf</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-bson</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-orc</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-thrift</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-yammer</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-dropwizard</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>

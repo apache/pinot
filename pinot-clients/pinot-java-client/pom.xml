@@ -53,6 +53,30 @@
           <target>11</target>
         </configuration>
       </plugin>
+      <!-- This artifact is consumed by a foreign JVM (an embedding application, or a Spark /
+           Hadoop executor), so the jackson/guava/scala it bundles are relocated to keep them
+           off the host's classpath. Pinot's own services no longer relocate anything; see the
+           note on the shade plugin in the root pom. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <relocations>
+            <relocation>
+              <pattern>com.fasterxml.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.scala-lang</pattern>
+              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
