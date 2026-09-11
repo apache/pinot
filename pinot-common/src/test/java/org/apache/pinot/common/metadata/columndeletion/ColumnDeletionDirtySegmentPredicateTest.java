@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,11 +40,44 @@ public class ColumnDeletionDirtySegmentPredicateTest {
   }
 
   @Test
-  public void testCreationTimeAtOrAfterEpochIsClean() {
+  public void testCreationTimeAtOrAfterEpochIsCleanWithoutPresence() {
     SegmentZKMetadata atEpoch = segment("s1", 1_000L, 99L, Map.of());
     SegmentZKMetadata afterEpoch = segment("s2", 1_001L, 99L, Map.of());
     assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(atEpoch, DELETION, false, null)).isFalse();
     assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, DELETION, false, null)).isFalse();
+  }
+
+  @Test
+  public void testPhysicalPresenceOverridesCtime() {
+    SegmentZKMetadata afterEpoch = segment("s2", 1_001L, 99L, Map.of());
+    ColumnDeletionPhysicalOverride present = ColumnDeletionPhysicalOverride.ofPresent(Set.of("city"));
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, DELETION, false, present)).isTrue();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, DELETION, true,
+        ColumnDeletionPhysicalOverride.ofPresent(Set.of("CITY")))).isTrue();
+  }
+
+  @Test
+  public void testPhysicalPresenceOfOpenStructChildOverridesCtime() {
+    ColumnDeletionEntry structDeletion =
+        new ColumnDeletionEntry("payload", "del-struct", 1_000L, 3, ColumnDeletionState.RECLAIMING);
+    SegmentZKMetadata afterEpoch = segment("s2", 5_000L, 99L, Map.of());
+    ColumnDeletionPhysicalOverride childPresent = ColumnDeletionPhysicalOverride.ofPresent(
+        Set.of(OpenStructNaming.materializedColumnName("payload", "userId")));
+    ColumnDeletionPhysicalOverride sparsePresent = ColumnDeletionPhysicalOverride.ofPresent(
+        Set.of(OpenStructNaming.sparseColumnName("payload")));
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, structDeletion, false, childPresent)).isTrue();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, structDeletion, false, sparsePresent)).isTrue();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, structDeletion, false,
+        ColumnDeletionPhysicalOverride.ofPresent(Set.of("other$col")))).isFalse();
+  }
+
+  @Test
+  public void testPhysicalPresenceOverridesCrcMarker() {
+    SegmentZKMetadata marked = segment("s1", 500L, 42L,
+        Map.of(ColumnDeletionDirtySegmentPredicate.processedCrcKey("del-1"), "42"));
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(marked, DELETION, false, null)).isFalse();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(marked, DELETION, false,
+        ColumnDeletionPhysicalOverride.ofPresent(Set.of("city")))).isTrue();
   }
 
   @Test
@@ -91,11 +125,34 @@ public class ColumnDeletionDirtySegmentPredicateTest {
   }
 
   @Test
-  public void testPhysicalAbsenceProofIsClean() {
+  public void testPositiveAbsenceProofIsClean() {
     SegmentZKMetadata segment = segment("s1", 500L, 99L, Map.of());
-    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false, Set.of("city"))).isFalse();
-    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false, Set.of("other"))).isTrue();
-    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, true, Set.of("CITY"))).isFalse();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false,
+        ColumnDeletionPhysicalOverride.ofAbsent(Set.of("city")))).isFalse();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false,
+        ColumnDeletionPhysicalOverride.ofAbsent(Set.of("other")))).isTrue();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, true,
+        ColumnDeletionPhysicalOverride.ofAbsent(Set.of("CITY")))).isFalse();
+  }
+
+  @Test
+  public void testPresenceWinsOverAbsence() {
+    SegmentZKMetadata segment = segment("s1", 5_000L, 99L, Map.of());
+    ColumnDeletionPhysicalOverride both =
+        ColumnDeletionPhysicalOverride.of(Set.of("city"), Set.of("city"));
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false, both)).isTrue();
+  }
+
+  @Test
+  public void testEmptyLiveSetIsNotComplete() {
+    ColumnDeletionMetadata metadata = new ColumnDeletionMetadata("foo_OFFLINE");
+    metadata.addEntry(DELETION);
+
+    List<String> dirtyNames =
+        ColumnDeletionDirtySegmentPredicate.findDirtySegmentNames(List.of(), metadata, false, null);
+    assertThat(dirtyNames).isEmpty();
+    assertThat(metadata.getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.RECLAIMING);
+    assertThat(metadata.blocksReAdd("city", false)).isTrue();
   }
 
   @Test
@@ -131,14 +188,16 @@ public class ColumnDeletionDirtySegmentPredicateTest {
   }
 
   @Test
-  public void testProvenAbsenceBySegment() {
-    SegmentZKMetadata s1 = segment("s1", 100L, 1L, Map.of());
-    SegmentZKMetadata s2 = segment("s2", 100L, 1L, Map.of());
-    Map<String, Set<String>> proven = Map.of("s1", Set.of("city"));
+  public void testPresenceOverrideBySegment() {
+    SegmentZKMetadata postEpoch = segment("s1", 5_000L, 1L, Map.of());
+    SegmentZKMetadata alsoPostEpoch = segment("s2", 5_000L, 1L, Map.of());
+    Map<String, ColumnDeletionPhysicalOverride> overrides =
+        Map.of("s1", ColumnDeletionPhysicalOverride.ofPresent(Set.of("city")));
 
     List<String> dirtyNames =
-        ColumnDeletionDirtySegmentPredicate.findDirtySegmentNames(List.of(s1, s2), DELETION, false, proven);
-    assertThat(dirtyNames).containsExactly("s2");
+        ColumnDeletionDirtySegmentPredicate.findDirtySegmentNames(List.of(postEpoch, alsoPostEpoch), DELETION, false,
+            overrides);
+    assertThat(dirtyNames).containsExactly("s1");
   }
 
   private static SegmentZKMetadata segment(String name, long creationTime, long crc, Map<String, String> customMap) {
