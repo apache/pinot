@@ -33,14 +33,37 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
 ///   - One call to [#cancel(Throwable)] if the sender wants to cancel the receiver
 public interface SendingMailbox extends AutoCloseable {
 
-  /// Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the
-  /// receiver.
+  /// Returns whether blocks can be passed to this mailbox whole, instead of being split into smaller blocks that
+  /// respect the maximum content size of a mailbox message.
+  ///
+  /// This says nothing about whether the receiver ends up with a reference to the block: see
+  /// [#deliversByReference()].
   boolean isLocal();
+
+  /// Returns whether a receiver may keep a reference to the blocks sent to this mailbox, instead of reading their
+  /// contents within [#send(MseBlock.Data)]. The answer must not change during the life of the mailbox, so callers
+  /// can read it once.
+  ///
+  /// A caller that sends the same block instance to more than one mailbox, when anything downstream mutates the
+  /// contents of that block, must:
+  ///
+  /// 1. Give a copy of the block to all the mailboxes that return `true` here, except one.
+  /// 2. Give the original block to that remaining mailbox last, once every other mailbox has returned from
+  ///    [#send(MseBlock.Data)].
+  ///
+  /// Step 2 matters as much as step 1. A receiver of the original block can mutate it as soon as `send` gives it the
+  /// block, which would corrupt the block for a mailbox that is still reading it.
+  ///
+  /// See [org.apache.pinot.query.runtime.operator.exchange.BroadcastExchange].
+  boolean deliversByReference();
 
   /// Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
   /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
   /// an error sending the data, since that would allow
   /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
+  ///
+  /// Implementations that return `false` from [#deliversByReference()] must finish reading the block before this
+  /// method returns, because the caller may then pass the same block to a receiver that mutates it.
   void send(MseBlock.Data data);
 
   /// Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this

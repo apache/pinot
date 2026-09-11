@@ -28,14 +28,14 @@ import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 
 /// Broadcast blocks to all the destinations.
 ///
-/// This is the only exchange that routes the same block to more than one destination, and local (same-JVM) mailboxes
-/// deliver on-heap blocks by reference. Blocks that
+/// This is the only exchange that routes the same block to more than one destination, and some mailboxes
+/// [deliver blocks by reference][SendingMailbox#deliversByReference()]. Blocks that
 /// [carry aggregation intermediate results][RowHeapDataBlock#containsObjectColumns()] cannot be shared this way:
 /// downstream operators mutate those objects in place when they merge them or extract final results, so two
-/// receivers on the same server would corrupt them. For such blocks, [#route] gives every local destination except
-/// the first its own [copy][RowHeapDataBlock#copyObjectColumns()]. Remote destinations only read the block to
-/// serialize it, before any local receiver can mutate it, so they do not need copies. Blocks without OBJECT columns
-/// are shared by reference with all the destinations.
+/// receivers of the same block would corrupt them. For such blocks, [#route] gives every destination that delivers
+/// by reference, except the first, its own [copy][RowHeapDataBlock#copyObjectColumns()]. The other destinations read
+/// the block within [SendingMailbox#send(MseBlock.Data)], before any receiver can mutate it, so they do not need
+/// copies. Blocks without OBJECT columns are shared by reference with all the destinations.
 ///
 /// This also protects multi-send (spool) nodes, which fan each block out to the exchanges of their receiver stages
 /// through this exchange (see [BlockExchange#asSendingMailbox]).
@@ -60,26 +60,26 @@ class BroadcastExchange extends BlockExchange {
       }
       return;
     }
-    // Send a copy to every active local destination except the first one, which receives the original block without
-    // copying. Remote destinations serialize the original block on this thread, and the copies are also made on this
-    // thread, so all reads of the original block finish before it is handed to a local receiver that can start
-    // mutating it.
+    // Send a copy to every active destination that delivers by reference, except the first one, which receives the
+    // original block without copying. The other destinations read the original block within send, and the copies are
+    // also made on this thread, so all reads of the original block finish before it is handed to a receiver that can
+    // start mutating it.
     RowHeapDataBlock rowHeapBlock = block.asRowHeap();
-    SendingMailbox firstLocalDestination = null;
+    SendingMailbox firstByReferenceDestination = null;
     for (SendingMailbox mailbox : destinations) {
       if (mailbox.isEarlyTerminated()) {
         continue;
       }
-      if (!mailbox.isLocal()) {
+      if (!mailbox.deliversByReference()) {
         sendBlock(mailbox, block);
-      } else if (firstLocalDestination == null) {
-        firstLocalDestination = mailbox;
+      } else if (firstByReferenceDestination == null) {
+        firstByReferenceDestination = mailbox;
       } else {
         sendBlock(mailbox, rowHeapBlock.copyObjectColumns());
       }
     }
-    if (firstLocalDestination != null) {
-      sendBlock(firstLocalDestination, block);
+    if (firstByReferenceDestination != null) {
+      sendBlock(firstByReferenceDestination, block);
     }
   }
 }
