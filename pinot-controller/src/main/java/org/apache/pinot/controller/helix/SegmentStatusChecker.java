@@ -300,7 +300,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return false;
     }
 
-    if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
+    boolean tablePaused = PinotLLCRealtimeSegmentManager.isTablePaused(idealState);
+    if (tablePaused) {
       context._pausedTables.add(tableNameWithType);
     }
 
@@ -585,9 +586,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
-          streamConfigs, idealState).findAndEmitMetrics(idealState);
+      if (tablePaused) {
+        // Ingestion is intentionally paused, so PinotLLCRealtimeSegmentManager deliberately does not create a new
+        // CONSUMING segment after the current one commits. MissingConsumingSegmentFinder would otherwise read that as
+        // a missing segment and alert for as long as the pause lasts.
+        MissingConsumingSegmentFinder.resetMetrics(tableNameWithType, _controllerMetrics);
+      } else {
+        List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+        new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
+            streamConfigs, idealState).findAndEmitMetrics(idealState);
+      }
     }
     return true;
   }
