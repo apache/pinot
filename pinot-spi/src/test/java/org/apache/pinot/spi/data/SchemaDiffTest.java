@@ -178,6 +178,21 @@ public class SchemaDiffTest {
   }
 
   @Test
+  public void testDeletedPrimaryKeyColumnWithUnchangedPkList() {
+    Schema oldSchema = baseSchemaBuilder().setPrimaryKeyColumns(List.of("id")).build();
+    Schema newSchema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addSingleValueDimension("country", FieldSpec.DataType.STRING)
+        .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("id")).build();
+
+    SchemaDiff diff = SchemaDiff.compute(oldSchema, newSchema);
+    assertThat(diff.getDeletedColumnNames()).containsExactly("id");
+    assertThat(diff.isExistingPrimaryKeyColumnsChanged()).isFalse();
+    assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isTrue();
+    assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isFalse();
+  }
+
+  @Test
   public void testCaseSensitiveTreatsRenameAsAddAndDelete() {
     Schema oldSchema = baseSchemaBuilder().addSingleValueDimension("City", FieldSpec.DataType.STRING).build();
     Schema newSchema = baseSchemaBuilder().addSingleValueDimension("city", FieldSpec.DataType.STRING).build();

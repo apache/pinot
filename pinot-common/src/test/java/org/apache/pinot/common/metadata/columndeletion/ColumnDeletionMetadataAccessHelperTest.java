@@ -173,24 +173,24 @@ public class ColumnDeletionMetadataAccessHelperTest {
   }
 
   @Test
-  public void testWriteWildcardVersionOnExistingCurrentFormatUsesObservedVersion() {
+  public void testWriteWildcardVersionOnExistingZnodeIsCreateOnly() {
     InMemoryLedgerStore store = new InMemoryLedgerStore();
     ColumnDeletionMetadata created = new ColumnDeletionMetadata(TABLE);
     created.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
     assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), created, -1))
         .isTrue();
 
-    ColumnDeletionMetadata updated = new ColumnDeletionMetadata(TABLE);
-    updated.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.RECLAIMING));
-    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), updated, -1))
-        .isTrue();
-    assertThat(store.version()).isEqualTo(1);
+    ColumnDeletionMetadata staleRetry = new ColumnDeletionMetadata(TABLE);
+    staleRetry.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), staleRetry, -1))
+        .isFalse();
+    assertThat(store.version()).isEqualTo(0);
     assertThat(ColumnDeletionMetadataAccessHelper.getColumnDeletionMetadata(store.propertyStore(), TABLE)
-        .getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.RECLAIMING);
+        .getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.PREPARED);
   }
 
   @Test
-  public void testWriteWildcardVersionLosesCasWhenVersionMoves() {
+  public void testWriteLosesCasWhenVersionMoves() {
     InMemoryLedgerStore store = new InMemoryLedgerStore();
     ColumnDeletionMetadata created = new ColumnDeletionMetadata(TABLE);
     created.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
@@ -200,7 +200,7 @@ public class ColumnDeletionMetadataAccessHelperTest {
     store.bumpVersionAfterNextGet();
     ColumnDeletionMetadata updated = new ColumnDeletionMetadata(TABLE);
     updated.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.RECLAIMING));
-    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), updated, -1))
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), updated, 0))
         .isFalse();
     assertThat(ColumnDeletionMetadata.fromZNRecord(store.record()).getEntry("del-1").getState()).isEqualTo(
         ColumnDeletionState.PREPARED);
