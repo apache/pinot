@@ -490,7 +490,8 @@ public class ReceivingMailbox {
       _dataBlocks = new MseBlock.Data[capacity];
     }
 
-    /// Notifies the downstream that there is data to read.
+    /// Notifies the downstream that the mailbox became readable, either because a data block was buffered or
+    /// because the EOS block is now the next thing to read.
     private void notifyReader() {
       Reader reader = _reader;
       if (reader != null) {
@@ -580,6 +581,9 @@ public class ReceivingMailbox {
     /// distinguish between a timeout and other reasons for not being able to add the block to the queue in order to
     /// report different error messages.
     ///
+    /// On every exit path, if this is the last pending offer and the upstream has finished, the reader is
+    /// notified, because the mailbox becomes readable at that point and no other call site notifies.
+    ///
     /// @return true if the block was added successfully, false if the state changed while waiting.
     /// @throws InterruptedException if the thread is interrupted while waiting for space in the queue.
     /// @throws TimeoutException if the timeout specified elapsed before space was available in the queue.
@@ -625,7 +629,12 @@ public class ReceivingMailbox {
         _count++;
         return true;
       } finally {
-        _pendingData--;
+        // poll() returns null while offers are pending, so the mailbox becomes readable when the last one completes.
+        // A sender that gives up returns without notifying, so deliver the wake-up here. On the success path this
+        // duplicates the notification from offerData, which is harmless because notifications coalesce.
+        if (--_pendingData == 0 && _state == State.UPSTREAM_FINISHED) {
+          notifyReader();
+        }
       }
     }
 
@@ -656,6 +665,7 @@ public class ReceivingMailbox {
             if (_count == 0) {
               if (_pendingData > 0) {
                 // There are still threads trying to add data to the queue. We should wait for them to finish.
+                // The reader is woken again when the last of them completes, see offerDataToBuffer.
                 LOGGER.debug("Mailbox: {} has pending {} data blocks, waiting for them to finish", _id, _pendingData);
                 return null;
               } else {

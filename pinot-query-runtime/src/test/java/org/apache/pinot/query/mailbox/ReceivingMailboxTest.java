@@ -20,11 +20,15 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -47,6 +51,7 @@ public class ReceivingMailboxTest {
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
   private static final MseBlock.Data DATA_BLOCK = new RowHeapDataBlock(List.of(), DATA_SCHEMA, null);
+  private static final ErrorMseBlock ERROR_BLOCK = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "test");
   private ReceivingMailbox.Reader _reader;
 
   @BeforeClass
@@ -352,6 +357,76 @@ public class ReceivingMailboxTest {
     receivingMailbox.offerRaw(DataBlockUtils.serialize(DATA_BLOCK.asSerialized().getDataBlock()), 10_000);
     receivingMailbox.registerReceiveOperatorThreadContext(threadContext);
     assertTrue(receivingMailbox._resourceUsageUpdated);
+  }
+
+  /// An error EOS drains the queued data blocks and makes every parked sender give up. While those offers are still
+  /// in flight `poll` returns `null` and asks the reader to wait for them, but a sender that gives up returns
+  /// `ALREADY_TERMINATED` without notifying, and the reader's notification slot coalesces, so the EOS notification
+  /// cannot stand in for the missing one. Unless the last pending offer notifies on its way out, the reader parks
+  /// until the query deadline and the query reports a timeout instead of the error that caused it.
+  ///
+  /// Asserting on the notification count rather than on a blocking read keeps this deterministic: the wake-up is
+  /// delivered when the last pending offer completes, whether or not the reader managed to poll first.
+  @Test(timeOut = 60_000)
+  public void shouldNotifyReaderWhenLastPendingOfferGivesUp()
+      throws Exception {
+    CountingReader reader = new CountingReader();
+    ReceivingMailbox mailbox = new ReceivingMailbox("id", 1);
+    mailbox.registeredReader(reader);
+
+    // Fill the only queue slot, so the sender below has to park waiting for space.
+    assertEquals(mailbox.offer(DATA_BLOCK, List.of(), 10_000), ReceivingMailbox.ReceivingMailboxStatus.SUCCESS);
+    assertEquals(reader._notifications.get(), 1, "The buffered data block should notify the reader");
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      AtomicReference<Thread> senderThread = new AtomicReference<>();
+      CountDownLatch offering = new CountDownLatch(1);
+      Future<ReceivingMailbox.ReceivingMailboxStatus> sender = executor.submit(() -> {
+        senderThread.set(Thread.currentThread());
+        offering.countDown();
+        return mailbox.offer(DATA_BLOCK, List.of(), 30_000);
+      });
+      assertTrue(offering.await(30, TimeUnit.SECONDS), "Sender should reach the offer call");
+      awaitParked(senderThread.get());
+
+      // The error EOS drains the buffered block and rejects the parked sender.
+      assertEquals(mailbox.offer(ERROR_BLOCK, List.of(), 10_000), ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK);
+      assertEquals(reader._notifications.get(), 2, "The EOS should notify the reader");
+      assertEquals(sender.get(30, TimeUnit.SECONDS), ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED,
+          "The parked sender should be rejected by the error EOS");
+
+      // Once the sender has given up the mailbox is readable again, so the reader owes one more notification. Without
+      // it a reader that already polled and was told to wait for the pending offer is never woken again.
+      assertEquals(reader._notifications.get(), 3,
+          "The last pending offer should notify the reader on its way out, but the reader was left blocked");
+      ReceivingMailbox.MseBlockWithStats read = mailbox.poll();
+      assertNotNull(read, "The reader should be able to read the EOS");
+      assertTrue(read.getBlock().isError(), "The EOS should be the error block");
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  /// Waits until the sender thread is parked waiting for space in the queue.
+  private static void awaitParked(Thread thread)
+      throws Exception {
+    long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (thread.getState() != Thread.State.TIMED_WAITING) {
+      assertTrue(System.nanoTime() < deadlineNs, "Sender never parked waiting for space in the queue");
+      Thread.sleep(1);
+    }
+  }
+
+  /// Counts the wake-ups delivered to the reader. The production reader coalesces them into a single slot and always
+  /// polls the mailbox before parking on that slot, so a wake-up dropped while it is parked is never recovered.
+  private static class CountingReader implements ReceivingMailbox.Reader {
+    final AtomicInteger _notifications = new AtomicInteger();
+
+    @Override
+    public void blockReadyToRead() {
+      _notifications.incrementAndGet();
+    }
   }
 
   private static class TestReceivingMailbox extends ReceivingMailbox {
