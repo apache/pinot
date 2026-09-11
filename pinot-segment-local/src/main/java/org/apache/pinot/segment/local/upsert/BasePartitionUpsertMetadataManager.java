@@ -540,6 +540,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
+  public boolean isAcceptingRecords() {
+    if (!startOperation()) {
+      return false;
+    }
+    finishOperation();
+    return true;
+  }
+
+  @Override
   public boolean addRecord(MutableSegment segment, RecordInfo recordInfo) {
     _gotFirstConsumingSegment = true;
     if (!startOperation()) {

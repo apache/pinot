@@ -281,7 +281,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               assert row != null;
               TransformPipeline.Result result = _transformPipeline.processRow(row);
               for (GenericRow transformedRow : result.getTransformedRows()) {
-                _realtimeSegment.index(transformedRow, metadata);
+                indexTransformedRow(_realtimeSegment, transformedRow, metadata);
               }
             } else {
               _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());
@@ -459,6 +459,22 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
       } catch (Exception e) {
         _logger.warn("Could not close stream metadata provider", e);
       }
+    }
+  }
+
+  /// Continues after a published repair; rethrows unpublished or terminal failures. Same contract as
+  /// [org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager]'s per-row catch.
+  static void indexTransformedRow(MutableSegmentImpl segment, GenericRow row,
+      @Nullable StreamMessageMetadata metadata)
+      throws Exception {
+    int docsBefore = segment.getNumDocsIndexed();
+    try {
+      segment.index(row, metadata);
+    } catch (Exception e) {
+      if (segment.getNumDocsIndexed() > docsBefore && segment.canTakeMoreRows()) {
+        return;
+      }
+      throw e;
     }
   }
 

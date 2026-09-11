@@ -717,6 +717,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           List<GenericRow> transformedRows = result.getTransformedRows();
           for (GenericRow transformedRow : transformedRows) {
+            int docsBeforeIndex = _realtimeSegment.getNumDocsIndexed();
             try {
               canTakeMore = _realtimeSegment.index(transformedRow, metadata);
               indexedMessageCount++;
@@ -735,14 +736,28 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
               }
             } catch (Exception e) {
-              _numRowsErrored++;
-              _numBytesDropped += rowSizeInBytes;
               String errorMessage =
                   "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
               _segmentLogger.error(errorMessage, e);
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-              // index() may publish-then-throw when continueOnError is false; refresh capacity from the segment.
-              canTakeMore = _realtimeSegment.canAddMore();
+              // continueOnError=false finishes a started row, then rethrows. A published repair is consumed;
+              // only an unpublished failure is a drop. An unrecoverable repair is terminal.
+              if (_realtimeSegment.getNumDocsIndexed() > docsBeforeIndex) {
+                indexedMessageCount++;
+                _lastRowMetadata = metadata;
+                _lastConsumedTimestampMs = System.currentTimeMillis();
+                realtimeRowsConsumedMeter =
+                    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                        realtimeRowsConsumedMeter);
+                _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+              } else {
+                _numRowsErrored++;
+                _numBytesDropped += rowSizeInBytes;
+              }
+              canTakeMore = _realtimeSegment.canTakeMoreRows();
+              if (!canTakeMore) {
+                throw new RuntimeException(errorMessage, e);
+              }
             }
           }
         }

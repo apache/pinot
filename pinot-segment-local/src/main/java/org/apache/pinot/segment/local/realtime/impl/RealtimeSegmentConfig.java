@@ -73,8 +73,8 @@ public class RealtimeSegmentConfig {
   @Nullable
   private final MultiColumnTextIndexConfig _multiColIndexConfig;
   private final boolean _dropRecordOnPartitionMismatch;
-  /// Mirrors [IngestionConfig#isContinueOnError]. When false, indexing exceptions propagate instead of
-  /// fail-soft defaulting the column/row.
+  /// Mirrors [IngestionConfig#isContinueOnError]. A started row is always finished or the segment is marked
+  /// terminal. This flag only controls whether [#index] rethrows after a successful repair.
   private final boolean _continueOnError;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
@@ -228,6 +228,8 @@ public class RealtimeSegmentConfig {
     return _dropRecordOnPartitionMismatch;
   }
 
+  /// When true, a recoverable row repair is logged and indexing returns. When false, the repaired row is still
+  /// published and then the original error is rethrown. An unrecoverable repair always marks the segment terminal.
   public boolean isContinueOnError() {
     return _continueOnError;
   }
