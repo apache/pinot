@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1245,9 +1244,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
       ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
       when(segmentMetadata.getTotalDocs()).thenReturn(deleteFlags.length);
-      when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-          this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
-        }});
+      when(segmentMetadata.getColumnMetadataFor(COMPARISON_COLUMNS.get(0))).thenReturn(columnMetadata);
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

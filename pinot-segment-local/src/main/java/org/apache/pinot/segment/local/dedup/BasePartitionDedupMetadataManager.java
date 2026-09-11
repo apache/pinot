@@ -312,7 +312,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       // so far to process this segment, as mutable segment is always considered to be within TTL
       return _largestSeenTime.get();
     }
-    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataFor(_dedupTimeColumn)
         .getMaxValue()).doubleValue();
   }
 

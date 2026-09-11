@@ -122,8 +122,7 @@ public class ImmutableSegmentImplTest {
   private static ImmutableSegmentImpl createSegment(SegmentDirectory segmentDirectory) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("seg");
-    // getColumnMetadataMap() is declared as a TreeMap, so an immutable Map.of() will not do here.
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
+    MockSegmentMetadata.withColumns(segmentMetadata, Map.of());
     return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, Map.of(), null);
   }
 
@@ -443,7 +442,7 @@ public class ImmutableSegmentImplTest {
     for (ColumnMetadata column : columns) {
       columnMetadataMap.put(column.getColumnName(), column);
     }
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    MockSegmentMetadata.withColumns(segmentMetadata, columnMetadataMap);
     return segmentMetadata;
   }
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -80,16 +79,16 @@ public class EmptyIndexSegment implements ImmutableSegment {
     return _segmentMetadata;
   }
 
-  // Both are views of the column metadata map, so neither builds the segment schema (see SegmentMetadataImpl)
+  // Both are views of the segment's column metadata, so neither builds the segment schema (see SegmentMetadataImpl)
 
   @Override
   public Set<String> getColumnNames() {
-    return Collections.unmodifiableSet(_segmentMetadata.getColumnMetadataMap().keySet());
+    return _segmentMetadata.getAllColumns();
   }
 
   @Override
   public Set<String> getPhysicalColumnNames() {
-    return new PhysicalColumnNames(_segmentMetadata.getColumnMetadataMap());
+    return new PhysicalColumnNames(_segmentMetadata);
   }
 
   @Override

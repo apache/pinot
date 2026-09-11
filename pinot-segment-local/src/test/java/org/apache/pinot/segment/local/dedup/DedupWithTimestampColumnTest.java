@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -201,9 +200,7 @@ public class DedupWithTimestampColumnTest {
 
     // TIMESTAMP values are stored as LONG (epoch milliseconds)
     long currentTimeMillis = System.currentTimeMillis();
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-      }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
     doReturn(currentTimeMillis).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 
@@ -214,7 +211,7 @@ public class DedupWithTimestampColumnTest {
 
     // Verify the segment was added successfully
     assertNotNull(segment.getSegmentMetadata());
-    assertEquals(segment.getSegmentMetadata().getColumnMetadataMap().get(DEDUP_TIME_COLUMN_NAME).getMaxValue(),
+    assertEquals(segment.getSegmentMetadata().getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME).getMaxValue(),
         currentTimeMillis);
   }
 
