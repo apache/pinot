@@ -51,8 +51,7 @@ spec:
 {{ toYaml .Values.minionStateless.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.minionStateless.tolerations | indent 8 }}
-      initContainers:
-{{ toYaml .Values.minionStateless.initContainers | indent 8 }}
+{{- include "pinot.jfr.initContainers" (dict "ctx" . "role" .Values.minionStateless "forceEmptyDir" true) }}
       containers:
       - name: minion-stateless
         securityContext:
@@ -67,7 +66,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.minionStateless.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minionStateless.log4j2ConfFile }} -Dplugins.dir={{ .Values.minionStateless.pluginsDir }}"
+            value: "{{ .Values.minionStateless.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minionStateless.log4j2ConfFile }} -Dplugins.dir={{ .Values.minionStateless.pluginsDir }}{{ if .Values.minionStateless.jfr.enabled }} {{ include "pinot.jfr.javaOpts" (dict "ctx" . "role" .Values.minionStateless "forceEmptyDir" true) }}{{ end }}"
 {{- if .Values.minionStateless.extraEnv }}
 {{ toYaml .Values.minionStateless.extraEnv | indent 10 }}
 {{- end }}
@@ -120,6 +119,9 @@ spec:
           - name: data
             mountPath: "{{ .Values.minionStateless.persistence.mountPath }}"
           {{- end }}
+          {{- if .Values.minionStateless.jfr.enabled }}
+          {{- include "pinot.jfr.volumeMount" . | nindent 10 }}
+          {{- end }}
           {{- if ne (len .Values.minionStateless.persistence.extraVolumeMounts) 0 }}
 {{ toYaml .Values.minionStateless.persistence.extraVolumeMounts | indent 10 }}
           {{- end }}
@@ -138,6 +140,20 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ .Values.minionStateless.persistence.pvcName }}
+      {{- end }}
+      {{- if .Values.minionStateless.jfr.enabled }}
+      {{- /*
+        Always an emptyDir, even when jfr.persistence.enabled is true.
+
+        The stateless minion is a Deployment, so it has no volumeClaimTemplates and every replica
+        would have to share one claim. That breaks the property the janitor depends on: it assumes
+        that when it runs, every repository on the volume belongs to a JVM that has already exited.
+        With a shared claim, a starting pod's janitor would see the repository of a *running* pod —
+        and during a rolling update (default maxSurge) or with replicaCount > 1 that is the normal
+        case, not an edge case. A single ReadWriteOnce claim would also stall the rollout with a
+        Multi-Attach error. See helm/pinot/README.md.
+      */}}
+        {{- include "pinot.jfr.emptyDirVolume" . | nindent 8 }}
       {{- end }}
       {{- if ne (len .Values.minionStateless.persistence.extraVolumes) 0 }}
 {{ toYaml .Values.minionStateless.persistence.extraVolumes | indent 8 }}

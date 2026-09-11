@@ -60,8 +60,7 @@ spec:
 {{ toYaml .Values.minion.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.minion.tolerations | indent 8 }}
-      initContainers:
-{{ toYaml .Values.minion.initContainers | indent 8 }}
+{{- include "pinot.jfr.initContainers" (dict "ctx" . "role" .Values.minion) }}
       containers:
       - name: minion
         securityContext:
@@ -76,7 +75,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.minion.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minion.log4j2ConfFile }} -Dplugins.dir={{ .Values.minion.pluginsDir }}"
+            value: "{{ .Values.minion.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minion.log4j2ConfFile }} -Dplugins.dir={{ .Values.minion.pluginsDir }}{{ if .Values.minion.jfr.enabled }} {{ include "pinot.jfr.javaOpts" (dict "ctx" . "role" .Values.minion) }}{{ end }}"
 {{- if .Values.minion.extraEnv }}
 {{ toYaml .Values.minion.extraEnv | indent 10 }}
 {{- end }}
@@ -129,6 +128,9 @@ spec:
           - name: data
             mountPath: "{{ .Values.minion.persistence.mountPath }}"
           {{- end }}
+          {{- if .Values.minion.jfr.enabled }}
+          {{- include "pinot.jfr.volumeMount" . | nindent 10 }}
+          {{- end }}
           {{- if ne (len .Values.minion.persistence.extraVolumeMounts) 0 }}
 {{ toYaml .Values.minion.persistence.extraVolumeMounts | indent 10 }}
           {{- end }}
@@ -143,11 +145,16 @@ spec:
         - name: data
           emptyDir: {}
       {{- end }}
+      {{- if and .Values.minion.jfr.enabled (not .Values.jfr.persistence.enabled) }}
+        {{- include "pinot.jfr.emptyDirVolume" . | nindent 8 }}
+      {{- end }}
       {{- if ne (len .Values.minion.persistence.extraVolumes) 0 }}
 {{ toYaml .Values.minion.persistence.extraVolumes | indent 8 }}
       {{- end }}
-  {{- if .Values.minion.persistence.enabled }}
+  {{- $jfrClaim := and .Values.minion.jfr.enabled .Values.jfr.persistence.enabled }}
+  {{- if or .Values.minion.persistence.enabled $jfrClaim }}
   volumeClaimTemplates:
+    {{- if .Values.minion.persistence.enabled }}
     - metadata:
         name: data
       spec:
@@ -163,5 +170,9 @@ spec:
         resources:
           requests:
             storage: {{ .Values.minion.persistence.size }}
-  {{ end }}
+    {{- end }}
+    {{- if $jfrClaim }}
+    {{- include "pinot.jfr.volumeClaimTemplate" . | nindent 4 }}
+    {{- end }}
+  {{- end }}
 {{- end }}

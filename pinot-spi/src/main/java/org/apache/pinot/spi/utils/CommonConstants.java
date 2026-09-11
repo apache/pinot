@@ -77,6 +77,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
   }
+  /// Prefix of the cluster configs that drive the in-JVM continuous JFR recording.
+  ///
+  /// @deprecated Start JFR with JVM arguments (`-XX:StartFlightRecording` and
+  /// `-XX:FlightRecorderOptions`) instead. The Helm chart renders them from its `jfr` values block.
+  @Deprecated(since = "1.6.0", forRemoval = true)
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";

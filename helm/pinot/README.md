@@ -265,6 +265,29 @@ The chart can be customized using the following configurable parameters:
 | `image.pullPolicy`                             | Pinot Container image pull policy                                                                                                                                          | `IfNotPresent`                                                     |
 | `cluster.name`                                 | Pinot Cluster name                                                                                                                                                         | `pinot-quickstart`                                                 |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
+| `jfr.configuration`                            | JFR event settings: `default`, `profile`, or a path to a `.jfc` inside the container                                                                                        | `default`                                                          |
+| `jfr.recordingName`                            | Name of the recording, as used by `jcmd ... JFR.dump name=...`                                                                                                             | `pinot`                                                            |
+| `jfr.maxSize`                                  | Recording data kept for the current JVM run (Kubernetes quantity)                                                                                                          | `2Gi`                                                              |
+| `jfr.maxAge`                                   | Wall-clock history kept for the current run; empty means bound by size alone                                                                                               | `""`                                                               |
+| `jfr.maxChunkSize`                             | Size of an individual chunk file; the unit of eviction and of loss on SIGKILL                                                                                              | `12Mi`                                                             |
+| `jfr.mountPath`                                | Where the JFR repository is mounted in the container                                                                                                                       | `/var/pinot/jfr`                                                   |
+| `jfr.persistence.enabled`                      | Keep recordings on a PVC (one per pod) rather than an emptyDir; ignored by `minionStateless`                                                                                | `false`                                                            |
+| `jfr.persistence.accessMode`                   | Access mode for the JFR PVC                                                                                                                                                | `ReadWriteOnce`                                                    |
+| `jfr.persistence.size`                         | Size of the JFR PVC, per pod                                                                                                                                               | `10Gi`                                                             |
+| `jfr.persistence.restartHeadroom`              | In-place container restarts to reserve room for in the sizing check                                                                                                        | `1`                                                                |
+| `jfr.persistence.storageClass`                 | StorageClass for the JFR PVC; `-` means the empty class                                                                                                                    | `""`                                                               |
+| `jfr.persistence.emptyDirSizeLimit`            | `sizeLimit` for the emptyDir; empty derives `maxSize + 2 * maxChunkSize`                                                                                                    | `""`                                                               |
+| `jfr.janitor.enabled`                          | Run the init container that reclaims repositories left by previous JVM runs                                                                                                | `true`                                                             |
+| `jfr.janitor.maxAge`                           | Drop leftover repositories older than this (`<n>m`/`<n>h`/`<n>d`); empty skips the pass                                                                                    | `7d`                                                               |
+| `jfr.janitor.maxTotalSize`                     | Trim oldest-first until the repository fits this; empty skips the pass                                                                                                     | `4Gi`                                                              |
+| `jfr.janitor.minIdleMinutes`                   | Never delete a repository written to this recently                                                                                                                         | `15`                                                               |
+| `jfr.janitor.image.repository`                 | Image for the cleanup init container; defaults to the Pinot image                                                                                                          | `""`                                                               |
+| `jfr.janitor.image.tag`                        | Tag for the cleanup init container image                                                                                                                                   | `""`                                                               |
+| `jfr.janitor.image.pullPolicy`                 | Pull policy for the cleanup init container image                                                                                                                           | `""`                                                               |
+| `jfr.janitor.securityContext`                  | Security context for the cleanup init container                                                                                                                            | `{}`                                                               |
+| `jfr.janitor.resources`                        | Resources for the cleanup init container                                                                                                                                   | `{}`                                                               |
+| `controller.jfr.enabled` / `broker.jfr.enabled` / `server.jfr.enabled` / `minion.jfr.enabled` / `minionStateless.jfr.enabled` | Enable continuous JFR for that role | `false` |
+|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `controller.name`                              | Name of Pinot Controller                                                                                                                                                   | `controller`                                                       |
 | `controller.port`                              | Pinot controller port                                                                                                                                                      | `9000`                                                             |
 | `controller.replicaCount`                      | Pinot controller replicas                                                                                                                                                  | `1`                                                                |
@@ -401,6 +424,176 @@ or If you want to use pd-standard storageClass:
 ```bash
 kubectl apply -f gke-pd.yaml
 ```
+
+## Continuous profiling with Java Flight Recorder
+
+Each Pinot role can run a continuous JFR recording, so that when something goes wrong the
+profile of the minutes leading up to it is already on disk. Enable it per role and tune the
+shared `jfr` block:
+
+```yaml
+jfr:
+  configuration: default   # or `profile` for much more detail, at a higher cost
+  maxSize: 2Gi             # recording data kept for the current JVM run
+  persistence:
+    enabled: false         # true keeps recordings on a PVC across rescheduling
+    size: 10Gi
+  janitor:                 # only used when persistence.enabled is true
+    maxAge: 7d             # drop repositories left by runs older than this
+    maxTotalSize: 4Gi      # ...and trim the oldest until the volume fits
+
+server:
+  jfr:
+    enabled: true
+broker:
+  jfr:
+    enabled: true
+```
+
+The recording is started by the JVM itself: the chart appends `-XX:StartFlightRecording` and
+`-XX:FlightRecorderOptions` to that role's `JAVA_OPTS`. It is therefore live from the first
+instruction, and it does not depend on ZooKeeper, Helix or any Pinot config being reachable —
+which matters, because those are not safe assumptions during the incidents you would most want a
+profile for.
+
+### Sizing
+
+JFR's `maxSize` makes the recording roll like a log file: once the repository exceeds it, the
+oldest chunks are evicted. Nothing has to rotate files by hand. Steady-state disk use for a
+running JVM is about `maxSize + 2 * maxChunkSize`.
+
+Prefer to bound the recording by **size** rather than by age. The event rate depends almost
+entirely on the workload — GC frequency above all — so picking `maxAge` up front means guessing a
+number you do not know. Set the disk budget you can afford, leave `jfr.maxAge` empty, and read the
+window you actually got back off the recording:
+
+```bash
+jfr summary recording.jfr   # prints Start and Duration
+```
+
+### Choosing where recordings are stored
+
+By default (`jfr.persistence.enabled: false`) recordings go to an `emptyDir`. They survive a
+container restart but not the pod being rescheduled, the chart caps the volume with a `sizeLimit`,
+and no cleanup init container is needed. This applies in place with a normal rolling restart, which
+makes it the right choice for "turn on profiling now".
+
+Set `jfr.persistence.enabled: true` to keep recordings on a PersistentVolume, so a profile survives
+the node loss or eviction that destroyed the pod. Two costs come with it:
+
+- It provisions one volume of `jfr.persistence.size` **per pod** — 50 servers at the default `10Gi`
+  is 500Gi — and pods stay `Pending` on a cluster with no default StorageClass unless you set
+  `jfr.persistence.storageClass`.
+- It adds an entry to the StatefulSet's `volumeClaimTemplates`, a field Kubernetes **forbids
+  changing in place**, so it cannot be switched on with a plain `helm upgrade`. See
+  [UPGRADING.md](UPGRADING.md) for the one-time `kubectl delete statefulset --cascade=orphan`
+  procedure.
+
+### The stateless minion is different
+
+`minionStateless` is a Deployment, not a StatefulSet, so it has no `volumeClaimTemplates` and its
+replicas would have to share a single claim. Its recordings therefore always go to an `emptyDir`,
+whatever `jfr.persistence.enabled` says.
+
+This is a correctness constraint, not a limitation we could lift by trying harder. The janitor
+below is safe because when it runs, every repository on the volume belongs to a JVM that has
+already exited. On a shared claim that stops being true: with `replicaCount > 1`, or during any
+rolling update, a starting pod would see a running pod's live repository. (A single
+`ReadWriteOnce` claim would also stall the rollout with a Multi-Attach error.)
+
+### Why there is an init container
+
+`maxSize` bounds the repository of the JVM that is *running*. Nothing inside the JVM ever reclaims
+the repository of a JVM that has already exited, and `preserve-repository=true` — which is what
+keeps recordings across a restart in the first place — means those directories survive on the
+volume forever. Left alone they accumulate one `maxSize` per restart until the volume is full.
+
+The `jfr-janitor` init container reclaims them. Running it as an init container is what makes it
+safe: init containers finish before the Pinot process starts, so every directory it sees belongs to
+a run that is already over and there is no "is this one still in use?" question to get wrong.
+
+As a backstop, the janitor also refuses to delete any repository written to within
+`jfr.janitor.minIdleMinutes` (default 15). A live JFR repository is flushed at least once a second,
+so anything idle that long belongs to a JVM that is gone. Nothing the janitor does is required for
+Pinot to run, so it tolerates every failure and always exits 0 — a failed cleanup must never keep a
+role from starting.
+
+Note that Kubernetes does **not** re-run init containers when it restarts a container in place (an
+OOMKilled process, for example) — only when the pod itself is recreated. Each such restart strands
+another repository until the next pod-level restart. The chart refuses to render if
+`jfr.janitor.maxTotalSize + jfr.maxSize + 2 * jfr.maxChunkSize` exceeds `jfr.persistence.size`,
+which guarantees room for the run that follows a cleanup; raise `jfr.persistence.size` beyond that
+if your workload restarts in place often.
+
+### If the volume fills up
+
+Worth knowing before you enable this. If the JFR volume runs out of space, the JVM cannot create its
+repository and **fails to start** — and because Kubernetes restarts the container rather than the
+pod, the janitor init container does not re-run to clear it. The role stays down until you delete
+the pod:
+
+```bash
+kubectl delete pod <pod>     # recreates the pod, which re-runs the janitor
+```
+
+The chart's sizing check exists to keep you out of that state: it refuses to render unless
+`jfr.janitor.maxTotalSize + (1 + jfr.persistence.restartHeadroom) * (jfr.maxSize + 2 * jfr.maxChunkSize)`
+fits in `jfr.persistence.size`. Raise `jfr.persistence.restartHeadroom` if your workload restarts in
+place (OOMKills, liveness failures) more than occasionally.
+
+### Getting a recording out
+
+```bash
+# Snapshot a running JVM without interrupting the recording
+kubectl exec <pod> -- jcmd 1 JFR.dump name=pinot filename=/tmp/snap.jfr
+kubectl cp <pod>:/tmp/snap.jfr ./snap.jfr
+
+# After a crash: rebuild a recording from the repository left behind, including the
+# chunk that was still open when the JVM died
+kubectl exec <pod> -- ls /var/pinot/jfr
+kubectl exec <pod> -- jfr assemble /var/pinot/jfr/<repository-dir> /tmp/crash.jfr
+```
+
+You never need to copy the whole repository. Every `*.jfr` chunk in it is a valid recording on its
+own and is named with its start timestamp, so you can pull only the chunks covering the window you
+care about; concatenating chunks is a valid merge. To split a large file after the fact, use
+`jfr disassemble --max-size 100M recording.jfr`.
+
+### A note on units
+
+Every size in the `jfr` block is a Kubernetes quantity, the same as everywhere else in this chart:
+`2Gi` is 2^30 and `2G` is 10^9. The chart converts to the byte counts the JVM wants, so JFR's own
+unit table never leaks into your values file.
+
+One trap the chart rejects outright: a lowercase `m` means *milli* in Kubernetes, so `500m` is half
+a byte rather than 500 MB. Use `M` or `Mi`.
+
+### Migrating tuned `pinot.jfr.*` values
+
+| Cluster config | Chart value |
+|---|---|
+| `pinot.jfr.enabled` | `<role>.jfr.enabled` |
+| `pinot.jfr.configuration` | `jfr.configuration` |
+| `pinot.jfr.name` | `jfr.recordingName` |
+| `pinot.jfr.directory` | `jfr.mountPath` |
+| `pinot.jfr.maxSize` | `jfr.maxSize` |
+| `pinot.jfr.maxAge` | `jfr.maxAge` |
+| `pinot.jfr.preserveRepository` | set automatically from `jfr.persistence.enabled` |
+| `pinot.jfr.repositoryMaxTotalSize` | `jfr.janitor.maxTotalSize` |
+| `pinot.jfr.toDisk`, `pinot.jfr.dumpOnExit`, `pinot.jfr.dumpPath` | no equivalent; see above |
+
+**The value formats differ**, so do not copy values across verbatim:
+
+| Old format | New format |
+|---|---|
+| `P7D`, `PT12H` (ISO-8601) | `7d`, `12h` |
+| `2GB`, `20GB` | `2Gi`, `20Gi` (Kubernetes quantities) |
+
+### Relationship to `pinot.jfr.*` cluster configs
+
+This replaces the `pinot.jfr.*` cluster configs, which are deprecated. Those started the recording
+from inside the JVM after it had connected to Helix, which meant startup was never captured and any
+change to a `pinot.jfr.*` key restarted the recording — discarding all recorded history.
 
 ## How to clean up Pinot deployment
 

@@ -26,6 +26,12 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
+/// Quickstart that turns on a continuous JFR recording.
+///
+/// This deliberately uses the deprecated `pinot.jfr.*` cluster configs: a quickstart runs every
+/// Pinot role inside one JVM, so it cannot give each role its own `-XX:StartFlightRecording`. Real
+/// deployments should set the JVM arguments instead — see [ContinuousJfrStarter].
+@SuppressWarnings("removal")
 public class JfrQuickstart extends Quickstart {
   @Override
   public List<String> types() {
