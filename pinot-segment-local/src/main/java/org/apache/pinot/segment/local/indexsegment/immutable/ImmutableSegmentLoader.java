@@ -21,9 +21,12 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
@@ -233,6 +236,14 @@ public class ImmutableSegmentLoader {
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
+    String segmentName = segmentMetadata.getName();
+    if (indexLoadingConfig.isLazyColumnMaterialization()) {
+      ImmutableSegmentImpl segment =
+          loadWithLazyColumns(segmentDirectory, segmentReader, segmentMetadata, indexLoadingConfig);
+      LOGGER.info("Successfully loaded segment: {} with SegmentDirectory, materializing columns lazily", segmentName);
+      return segment;
+    }
+
     Map<String, ColumnIndexContainer> indexContainerMap = new Object2ObjectOpenHashMap<>(columnMetadataMap.size());
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       // FIXME: text-index only works with local SegmentDirectory
@@ -240,20 +251,7 @@ public class ImmutableSegmentLoader {
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
-    // Instantiate virtual columns
-    String segmentName = segmentMetadata.getName();
-    Schema segmentSchema = segmentMetadata.getSchema();
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
-    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
-      if (fieldSpec.isVirtualColumn()) {
-        String columnName = fieldSpec.getName();
-        VirtualColumnContext context =
-            new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), segmentMetadata);
-        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
-        indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-        columnMetadataMap.put(columnName, provider.buildMetadata(context));
-      }
-    }
+    instantiateVirtualColumns(segmentMetadata, indexContainerMap);
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
@@ -277,6 +275,58 @@ public class ImmutableSegmentLoader {
             mcTextReader);
     LOGGER.info("Successfully loaded segment: {} with SegmentDirectory", segmentName);
     return segment;
+  }
+
+  /// Lazy counterpart of the load above (see [ImmutableSegmentImpl]): no per-column container is created here. The
+  /// built-in virtual columns keep their eager containers, the star-tree dimensions are materialized now because the
+  /// star-tree shares their dictionaries, and every other physical column waits for its first access. The
+  /// [ColumnMaterializer] snapshots the per-column index configs before the virtual columns are added to the metadata,
+  /// so it covers exactly the physical columns.
+  private static ImmutableSegmentImpl loadWithLazyColumns(SegmentDirectory segmentDirectory,
+      SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig)
+      throws IOException {
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    MultiColumnLuceneTextIndexReader mcTextReader = null;
+    Set<String> mcTextColumns = Set.of();
+    if (segmentReader.hasMultiColumnTextIndex()) {
+      mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
+      mcTextColumns = Set.copyOf(segmentMetadata.getMultiColumnTextMetadata().getColumns());
+    }
+    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, columnMetadataMap.keySet(),
+        indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.isForwardIndexOnly(), mcTextReader,
+        mcTextColumns);
+
+    ConcurrentMap<String, ColumnIndexContainer> indexContainerMap = new ConcurrentHashMap<>();
+    instantiateVirtualColumns(segmentMetadata, indexContainerMap);
+
+    StarTreeIndexContainer starTreeIndexContainer = null;
+    if (segmentReader.hasStarTreeIndex()) {
+      starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata,
+          column -> indexContainerMap.computeIfAbsent(column,
+              k -> columnMaterializer.createIndexContainer(columnMetadataMap.get(k))));
+    }
+
+    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, columnMaterializer, indexContainerMap,
+        starTreeIndexContainer, mcTextReader);
+  }
+
+  /// Adds the built-in virtual columns to the segment schema and creates their index containers and metadata.
+  private static void instantiateVirtualColumns(SegmentMetadataImpl segmentMetadata,
+      Map<String, ColumnIndexContainer> indexContainerMap) {
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    Schema segmentSchema = segmentMetadata.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentMetadata.getName());
+    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
+        VirtualColumnContext context =
+            new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), segmentMetadata);
+        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
+        indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
+        columnMetadataMap.put(columnName, provider.buildMetadata(context));
+      }
+    }
   }
 
   /// Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing

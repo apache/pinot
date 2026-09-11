@@ -75,9 +75,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
       throws IOException {
+    this(segmentReader, metadata, indexLoadingConfig.getFieldIndexConfig(metadata.getColumnName()),
+        indexLoadingConfig.isForwardIndexOnly());
+  }
+
+  /// Creates the container from the column's own index configs (`null` meaning none, i.e. every index type at its
+  /// default) and the forward-index-only flag, without a reference to the loading config they were taken from.
+  public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
+      @Nullable FieldIndexConfigs fieldIndexConfigs, boolean forwardIndexOnly)
+      throws IOException {
     String columnName = metadata.getColumnName();
 
-    FieldIndexConfigs fieldIndexConfigs = indexLoadingConfig.getFieldIndexConfig(columnName);
     if (fieldIndexConfigs == null) {
       fieldIndexConfigs = FieldIndexConfigs.EMPTY;
     }
@@ -92,7 +100,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     // Scratch array indexed by numeric id; compacted into the exactly-sized _readers below.
     IndexReader[] readersById = new IndexReader[numIndexTypes];
     long presentMask = 0L;
-    boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
       for (IndexType<?, ?, ?> indexType : allIndexes) {
         if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {

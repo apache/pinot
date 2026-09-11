@@ -24,12 +24,18 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -75,6 +81,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Immutable segment served from a [SegmentDirectory].
+///
+/// Physical columns are materialized in one of two modes, chosen at load by
+/// [IndexLoadingConfig#isLazyColumnMaterialization()]:
+///
+/// - **Eager** (the default and the public constructors): the [ColumnIndexContainer] and [DataSource] of every column
+///   exist from construction, so an unreadable index fails the segment load.
+/// - **Lazy** (the package-private constructor, built by [ImmutableSegmentLoader]): a physical column's container and
+///   data source are created on its first access through [#getDataSourceNullable(String)] or
+///   [#getIndex(String, IndexType)], exactly once per column even under concurrent first access; a failed creation
+///   leaves no mapping behind and propagates to the caller, so an unreadable index of a never-queried column is
+///   reported on first access instead of at load. Built-in virtual columns, star-tree dimensions and the segment-level
+///   star-tree and multi-column text indexes keep their eager path, and OPEN_STRUCT child columns are materialized
+///   together with their parent. Whole-segment consumers (`SELECT *`, segment metadata and index listings, record
+///   readers without a projection) materialize every column of the segments they touch, which is never worse than the
+///   eager mode. [#destroy()] closes only what was materialized and refuses any later materialization.
+///
+/// Thread safety: query-path lookups are lock-free in both modes. Lazy materialization holds a read lock while it
+/// creates and registers a container, and [#destroy()] takes the write lock before it closes anything, so every
+/// container whose creation was in flight is registered and closed; callers that hold a reference through the segment
+/// data manager never race destroy() at all.
 public class ImmutableSegmentImpl implements ImmutableSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImmutableSegmentImpl.class);
 
@@ -84,6 +111,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final TextIndexReader _multiColumnTextIndex;
   private final Map<String, DataSource> _dataSources;
+
+  // Lazy column materialization; all null in eager mode. See the class documentation.
+  @Nullable
+  private final ColumnMaterializer _columnMaterializer;
+  // OPEN_STRUCT parent column -> its materialized child columns (col$key, col$__sparse__), restricted to parents that
+  // the segment schema declares as complex; null when the segment has none.
+  @Nullable
+  private final Map<String, List<String>> _openStructChildren;
+  @Nullable
+  private final ReadWriteLock _materializationLock;
+  // Guarded by _materializationLock
+  private boolean _destroyed;
   // Guards the post-registration hook so it reaches the directory at most once per segment instance, even when the
   // same segment is registered more than once (e.g. an upsert replacement with a consistency mode other than NONE
   // registers the new segment through a DuoSegmentDataManager and then directly).
@@ -108,6 +147,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
+    _columnMaterializer = null;
+    _openStructChildren = null;
+    _materializationLock = null;
     _dataSources =
         new Object2ObjectOpenHashMap<>(segmentMetadata.getColumnMetadataMap().size());
 
@@ -164,6 +206,117 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
       @Nullable StarTreeIndexContainer starTreeIndexContainer) {
     this(segmentDirectory, segmentMetadata, columnIndexContainerMap, starTreeIndexContainer, null);
+  }
+
+  /// Creates a segment that materializes its physical columns lazily through `columnMaterializer`.
+  ///
+  /// `materializedIndexContainers` holds the containers created at load (built-in virtual columns and star-tree
+  /// dimensions) and becomes the registry of every container created afterwards, so that [#destroy()] closes exactly
+  /// the materialized ones. The columns already in it get their data source now, as in the eager mode.
+  ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
+      ColumnMaterializer columnMaterializer, ConcurrentMap<String, ColumnIndexContainer> materializedIndexContainers,
+      @Nullable StarTreeIndexContainer starTreeIndexContainer,
+      @Nullable MultiColumnLuceneTextIndexReader multiColumnTextIndex) {
+    _segmentDirectory = segmentDirectory;
+    _segmentMetadata = segmentMetadata;
+    _indexContainerMap = materializedIndexContainers;
+    _starTreeIndexContainer = starTreeIndexContainer;
+    _multiColumnTextIndex = multiColumnTextIndex;
+    _columnMaterializer = columnMaterializer;
+    _openStructChildren = groupOpenStructChildren(segmentMetadata);
+    _materializationLock = new ReentrantReadWriteLock();
+    _dataSources = new ConcurrentHashMap<>();
+    for (String column : materializedIndexContainers.keySet()) {
+      materializeDataSource(column);
+    }
+  }
+
+  /// Groups the materialized OPEN_STRUCT child columns under their parent, keeping only the parents the segment schema
+  /// declares as complex (the same rule the eager constructor applies).
+  @Nullable
+  private static Map<String, List<String>> groupOpenStructChildren(SegmentMetadataImpl segmentMetadata) {
+    Map<String, List<String>> children = null;
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      if (entry.getValue() instanceof ColumnMetadataImpl impl && impl.isMaterializedChild()) {
+        if (children == null) {
+          children = new HashMap<>();
+        }
+        children.computeIfAbsent(impl.getParentColumn(), k -> new ArrayList<>()).add(entry.getKey());
+      }
+    }
+    if (children == null) {
+      return null;
+    }
+    Schema schema = segmentMetadata.getSchema();
+    children.keySet()
+        .removeIf(parent -> !(schema != null && schema.getFieldSpecFor(parent) instanceof ComplexFieldSpec));
+    return children.isEmpty() ? null : children;
+  }
+
+  /// Lazy mode: returns the data source of the column, creating it on first access, or `null` when the segment has no
+  /// such column. OPEN_STRUCT child columns are reachable only through their parent, as in the eager mode.
+  @Nullable
+  private DataSource materializeDataSource(String column) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataMap().get(column);
+    boolean openStructParent = _openStructChildren != null && _openStructChildren.containsKey(column);
+    if (!openStructParent && (columnMetadata == null || isMaterializedChild(columnMetadata))) {
+      return null;
+    }
+    Lock lock = _materializationLock.readLock();
+    lock.lock();
+    try {
+      checkNotDestroyed(column);
+      // Single flight per column: the mapping function runs at most once per column and leaves no mapping when it
+      // fails. It never reads this map again (creating the children of an OPEN_STRUCT parent goes through
+      // _indexContainerMap only), which computeIfAbsent forbids.
+      return _dataSources.computeIfAbsent(column,
+          k -> openStructParent ? createOpenStructDataSource(k) : createDataSource(k, columnMetadata));
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private DataSource createDataSource(String column, ColumnMetadata columnMetadata) {
+    ColumnIndexContainer container = materializedIndexContainer(column, columnMetadata);
+    return columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP
+        ? new ImmutableMapDataSource(columnMetadata, container) : new ImmutableDataSource(columnMetadata, container);
+  }
+
+  private DataSource createOpenStructDataSource(String parent) {
+    Map<String, ColumnMetadata> columnMetadataMap = _segmentMetadata.getColumnMetadataMap();
+    Map<String, DataSource> denseChildren = new HashMap<>();
+    DataSource sparseChild = null;
+    for (String child : _openStructChildren.get(parent)) {
+      ColumnMetadata childMetadata = columnMetadataMap.get(child);
+      DataSource childDataSource =
+          new ImmutableDataSource(childMetadata, materializedIndexContainer(child, childMetadata));
+      if (OpenStructNaming.isSparseColumn(child)) {
+        sparseChild = childDataSource;
+      } else {
+        denseChildren.put(OpenStructNaming.parseKey(child), childDataSource);
+      }
+    }
+    ComplexFieldSpec fieldSpec = (ComplexFieldSpec) _segmentMetadata.getSchema().getFieldSpecFor(parent);
+    List<String> sparseKeys =
+        columnMetadataMap.get(parent) instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
+    return new ImmutableOpenStructDataSource(fieldSpec, denseChildren, sparseChild, _segmentMetadata.getTotalDocs(),
+        sparseKeys);
+  }
+
+  /// Lazy mode: returns the index container of the column, creating and registering it on first access. The mapping
+  /// function opens the column's index readers while it holds the map's bin lock, so a slow open (e.g. an on-heap
+  /// dictionary) can briefly stall the first access to an unrelated column in the same bin.
+  private ColumnIndexContainer materializedIndexContainer(String column, ColumnMetadata columnMetadata) {
+    return _indexContainerMap.computeIfAbsent(column, k -> _columnMaterializer.createIndexContainer(columnMetadata));
+  }
+
+  private void checkNotDestroyed(String column) {
+    Preconditions.checkState(!_destroyed, "Cannot materialize column: %s of destroyed segment: %s", column,
+        getSegmentName());
+  }
+
+  private static boolean isMaterializedChild(ColumnMetadata columnMetadata) {
+    return columnMetadata instanceof ColumnMetadataImpl impl && impl.isMaterializedChild();
   }
 
   public void enableDedup(PartitionDedupMetadataManager partitionDedupMetadataManager) {
@@ -247,6 +400,19 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public <I extends IndexReader> I getIndex(String column, IndexType<?, I, ?> type) {
     ColumnIndexContainer container = _indexContainerMap.get(column);
+    if (container == null && _columnMaterializer != null) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataMap().get(column);
+      if (columnMetadata != null) {
+        Lock lock = _materializationLock.readLock();
+        lock.lock();
+        try {
+          checkNotDestroyed(column);
+          container = materializedIndexContainer(column, columnMetadata);
+        } finally {
+          lock.unlock();
+        }
+      }
+    }
     if (container == null) {
       throw new NullPointerException("Invalid column: " + column);
     }
@@ -355,6 +521,17 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
+    if (_materializationLock != null) {
+      // Waits for in-flight materialization to register its containers, then refuses any further one, so the loop
+      // below closes exactly the materialized containers
+      Lock lock = _materializationLock.writeLock();
+      lock.lock();
+      try {
+        _destroyed = true;
+      } finally {
+        lock.unlock();
+      }
+    }
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
@@ -391,7 +568,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Nullable
   @Override
   public DataSource getDataSourceNullable(String column) {
-    return _dataSources.get(column);
+    DataSource dataSource = _dataSources.get(column);
+    if (dataSource == null && _columnMaterializer != null) {
+      dataSource = materializeDataSource(column);
+    }
+    return dataSource;
   }
 
   @Nullable

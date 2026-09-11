@@ -79,6 +79,7 @@ public class IndexLoadingConfig {
   private String _segmentStoreURI;
   private String _segmentDirectoryLoader;
   private Map<String, Map<String, String>> _instanceTierConfigs;
+  private boolean _lazyColumnMaterialization;
 
   // Initialized by table config and schema
   private List<String> _sortedColumns = List.of();
@@ -168,6 +169,7 @@ public class IndexLoadingConfig {
 
     Map<String, Map<String, String>> tierConfigs = _instanceDataManagerConfig.getTierConfigs();
     _instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
+    _lazyColumnMaterialization = _instanceDataManagerConfig.isLazyColumnMaterialization();
   }
 
   private void extractFromTableConfigAndSchema() {
@@ -349,6 +351,18 @@ public class IndexLoadingConfig {
 
   public void setForwardIndexOnly(boolean forwardIndexOnly) {
     _forwardIndexOnly = forwardIndexOnly;
+  }
+
+  /// Whether immutable segments materialize the index container and data source of a physical column on its first
+  /// access instead of for every column at load. Sourced from
+  /// [InstanceDataManagerConfig#isLazyColumnMaterialization()] (off by default), so a segment loaded without an
+  /// instance config is always eager unless a caller opts in through [#setLazyColumnMaterialization(boolean)].
+  public boolean isLazyColumnMaterialization() {
+    return _lazyColumnMaterialization;
+  }
+
+  public void setLazyColumnMaterialization(boolean lazyColumnMaterialization) {
+    _lazyColumnMaterialization = lazyColumnMaterialization;
   }
 
   public boolean isSkipSegmentPreprocess() {
