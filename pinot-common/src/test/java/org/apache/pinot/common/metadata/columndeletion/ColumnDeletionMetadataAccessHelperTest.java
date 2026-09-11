@@ -163,6 +163,50 @@ public class ColumnDeletionMetadataAccessHelperTest {
   }
 
   @Test
+  public void testWriteSpecificVersionOnMissingZnodeReturnsFalse() {
+    InMemoryLedgerStore store = new InMemoryLedgerStore();
+    ColumnDeletionMetadata metadata = new ColumnDeletionMetadata(TABLE);
+    metadata.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), metadata, 0))
+        .isFalse();
+    assertThat(store.record()).isNull();
+  }
+
+  @Test
+  public void testWriteWildcardVersionOnExistingCurrentFormatUsesObservedVersion() {
+    InMemoryLedgerStore store = new InMemoryLedgerStore();
+    ColumnDeletionMetadata created = new ColumnDeletionMetadata(TABLE);
+    created.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), created, -1))
+        .isTrue();
+
+    ColumnDeletionMetadata updated = new ColumnDeletionMetadata(TABLE);
+    updated.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.RECLAIMING));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), updated, -1))
+        .isTrue();
+    assertThat(store.version()).isEqualTo(1);
+    assertThat(ColumnDeletionMetadataAccessHelper.getColumnDeletionMetadata(store.propertyStore(), TABLE)
+        .getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.RECLAIMING);
+  }
+
+  @Test
+  public void testWriteWildcardVersionLosesCasWhenVersionMoves() {
+    InMemoryLedgerStore store = new InMemoryLedgerStore();
+    ColumnDeletionMetadata created = new ColumnDeletionMetadata(TABLE);
+    created.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), created, -1))
+        .isTrue();
+
+    store.bumpVersionAfterNextGet();
+    ColumnDeletionMetadata updated = new ColumnDeletionMetadata(TABLE);
+    updated.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.RECLAIMING));
+    assertThat(ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), updated, -1))
+        .isFalse();
+    assertThat(ColumnDeletionMetadata.fromZNRecord(store.record()).getEntry("del-1").getState()).isEqualTo(
+        ColumnDeletionState.PREPARED);
+  }
+
+  @Test
   public void testWriteWildcardVersionDoesNotClobberNewerStoredFormat() {
     InMemoryLedgerStore store = new InMemoryLedgerStore();
     ZNRecord newer = new ZNRecord(TABLE);
@@ -185,6 +229,7 @@ public class ColumnDeletionMetadataAccessHelperTest {
   private static final class InMemoryLedgerStore {
     private final AtomicReference<ZNRecord> _record = new AtomicReference<>();
     private final AtomicInteger _version = new AtomicInteger(-1);
+    private final AtomicInteger _bumpAfterGet = new AtomicInteger(0);
     private final ZkHelixPropertyStore<ZNRecord> _propertyStore = mockPropertyStore();
 
     @SuppressWarnings("unchecked")
@@ -195,6 +240,9 @@ public class ColumnDeletionMetadataAccessHelperTest {
         ZNRecord record = _record.get();
         if (record != null && stat != null) {
           stat.setVersion(_version.get());
+        }
+        if (record != null && _bumpAfterGet.getAndSet(0) > 0) {
+          _version.incrementAndGet();
         }
         return record;
       });
@@ -235,6 +283,10 @@ public class ColumnDeletionMetadataAccessHelperTest {
     void seed(ZNRecord record) {
       _record.set(record);
       _version.set(0);
+    }
+
+    void bumpVersionAfterNextGet() {
+      _bumpAfterGet.set(1);
     }
   }
 }
