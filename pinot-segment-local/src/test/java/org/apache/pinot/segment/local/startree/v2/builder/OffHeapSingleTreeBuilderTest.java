@@ -53,6 +53,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -60,6 +61,7 @@ public class OffHeapSingleTreeBuilderTest {
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "OffHeapSingleTreeBuilderTest");
   private static final File INDEX_DIR = new File(TEMP_DIR, "testSegment");
+  private static final String SEGMENT_RECORD_BUFFER_DESCRIPTION = "OffHeapSingleTreeBuilder: segment record buffer";
 
   @BeforeMethod
   public void setUp()
@@ -100,9 +102,9 @@ public class OffHeapSingleTreeBuilderTest {
   }
 
   /// Drives `sortAndAggregateSegmentRecords` on a real segment and asserts the segment record
-  /// buffer allocated in Sub-phase A is released once the iterator is drained. Direct-buffer
-  /// count/usage must return to the pre-call baseline — proves `releaseSegmentRecordBuffer()`
-  /// runs on the terminal `next()`.
+  /// buffer allocated in Sub-phase A is released once the iterator is drained. Targets our
+  /// specific buffer by description via `PinotDataBuffer.getBufferInfo()` so the assertion is
+  /// invariant under any concurrent JVM-wide buffer traffic.
   @Test
   public void testSegmentRecordBufferReleasedAfterIteratorDrain()
       throws Exception {
@@ -113,26 +115,22 @@ public class OffHeapSingleTreeBuilderTest {
       List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs(segment);
       File outputDir = new File(TEMP_DIR, "starTreeOutputDrain");
       FileUtils.forceMkdir(outputDir);
-
-      long baselineCount = PinotDataBuffer.getDirectBufferCount();
-      long baselineUsage = PinotDataBuffer.getDirectBufferUsage();
+      assertFalse(isSegmentRecordBufferLive(), "No pre-existing segment record buffer");
 
       try (OffHeapSingleTreeBuilder builder = new OffHeapSingleTreeBuilder(builderConfigs.get(0), outputDir, segment,
           new PropertiesConfiguration())) {
         int numDocs = segment.getSegmentMetadata().getTotalDocs();
         Iterator<?> iterator = builder.sortAndAggregateSegmentRecords(numDocs);
-        assertTrue(PinotDataBuffer.getDirectBufferCount() > baselineCount,
-            "Segment record buffer should be allocated during sortAndAggregateSegmentRecords");
+        assertTrue(isSegmentRecordBufferLive(),
+            "Segment record buffer should be live after sortAndAggregateSegmentRecords");
 
         while (iterator.hasNext()) {
           iterator.next();
         }
 
-        assertEquals(PinotDataBuffer.getDirectBufferCount(), baselineCount,
-            "Direct buffer count should return to baseline after iterator drain");
-        assertEquals(PinotDataBuffer.getDirectBufferUsage(), baselineUsage,
-            "Direct buffer usage should return to baseline after iterator drain");
+        assertFalse(isSegmentRecordBufferLive(), "Segment record buffer should be released after iterator drain");
       }
+      assertFalse(isSegmentRecordBufferLive(), "Segment record buffer should remain released after close()");
     } finally {
       segment.destroy();
     }
@@ -152,30 +150,29 @@ public class OffHeapSingleTreeBuilderTest {
       List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs(segment);
       File outputDir = new File(TEMP_DIR, "starTreeOutputAbandon");
       FileUtils.forceMkdir(outputDir);
-
-      long baselineCount = PinotDataBuffer.getDirectBufferCount();
-      long baselineUsage = PinotDataBuffer.getDirectBufferUsage();
+      assertFalse(isSegmentRecordBufferLive(), "No pre-existing segment record buffer");
 
       OffHeapSingleTreeBuilder builder = new OffHeapSingleTreeBuilder(builderConfigs.get(0), outputDir, segment,
           new PropertiesConfiguration());
       try {
         int numDocs = segment.getSegmentMetadata().getTotalDocs();
         Iterator<?> iterator = builder.sortAndAggregateSegmentRecords(numDocs);
-        // Pull exactly one element; leave the iterator undrained.
+        // Pull exactly one element; leave the iterator undrained so close() must release the buffer.
         iterator.next();
-        assertTrue(PinotDataBuffer.getDirectBufferCount() > baselineCount,
-            "Buffer should be allocated mid-iteration");
+        assertTrue(isSegmentRecordBufferLive(), "Segment record buffer should be live mid-iteration");
       } finally {
         builder.close();
       }
 
-      assertEquals(PinotDataBuffer.getDirectBufferCount(), baselineCount,
-          "Direct buffer count should return to baseline after close() on undrained iterator");
-      assertEquals(PinotDataBuffer.getDirectBufferUsage(), baselineUsage,
-          "Direct buffer usage should return to baseline after close() on undrained iterator");
+      assertFalse(isSegmentRecordBufferLive(),
+          "Segment record buffer should be released after close() on undrained iterator");
     } finally {
       segment.destroy();
     }
+  }
+
+  private static boolean isSegmentRecordBufferLive() {
+    return PinotDataBuffer.getBufferInfo().stream().anyMatch(info -> info.contains(SEGMENT_RECORD_BUFFER_DESCRIPTION));
   }
 
   /// Builds the same segment twice — once with OFF_HEAP and once with ON_HEAP — then compares the
