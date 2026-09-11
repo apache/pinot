@@ -1,0 +1,4 @@
+userUUID,deviceOS,cityName,tripAmount,distanceMeters
+user-1,android,NYC,10.5,100.0
+user-2,ios,LA,20.0,200.0
+user-3,ios,SF,15.5,150.0

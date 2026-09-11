@@ -1,0 +1,11 @@
+{
+  "schemaName": "userAttributes",
+  "dimensionFieldSpecs": [
+    {"dataType": "STRING", "name": "userUUID"},
+    {"dataType": "STRING", "name": "deviceOS"}
+  ],
+  "metricFieldSpecs": [
+    {"dataType": "INT", "name": "daysSinceFirstTrip"},
+    {"dataType": "INT", "name": "totalTrips"}
+  ]
+}
