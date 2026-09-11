@@ -32,6 +32,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -81,17 +82,33 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_predicateType == Predicate.Type.IS_NULL) {
-      return getNulls();
+      return getExpressionNulls();
     } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
-      return new NotDocIdSet(getNulls(), _numDocs);
+      return new NotDocIdSet(getExpressionNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
           ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext);
     }
   }
 
+  /// `IS NULL` and `IS NOT NULL` are two-valued: a null expression makes them true or false, never UNKNOWN. Every other
+  /// predicate is UNKNOWN where the expression is null.
   @Override
   protected BlockDocIdSet getNulls() {
+    return isNullCheck() ? EmptyDocIdSet.getInstance() : getExpressionNulls();
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    return _nullHandlingEnabled && !isNullCheck();
+  }
+
+  private boolean isNullCheck() {
+    return _predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL;
+  }
+
+  /// Returns the documents the expression evaluates to null for.
+  private BlockDocIdSet getExpressionNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
         ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext);
   }
@@ -99,9 +116,9 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getFalses() {
     if (_predicateType == Predicate.Type.IS_NULL) {
-      return new NotDocIdSet(getNulls(), _numDocs);
+      return new NotDocIdSet(getExpressionNulls(), _numDocs);
     } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
-      return getNulls();
+      return getExpressionNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
           ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext);

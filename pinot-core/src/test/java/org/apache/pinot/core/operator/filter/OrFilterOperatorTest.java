@@ -276,6 +276,74 @@ public class OrFilterOperatorTest {
     assertEquals(orOperator.getBitmaps().reduce().toArray(), new int[]{1, 2, 3, 6, 8, 30});
   }
 
+  @Test
+  public void testGetBitmapsWithNullChild() {
+    int numDocs = 8;
+    // The second child is UNKNOWN on {4, 5, 6}. The OR is UNKNOWN only where no child is true: 4 is true through the
+    // first child, so only 5 and 6 stay UNKNOWN
+    OrFilterOperator orOperator = new OrFilterOperator(List.of(bitmapOp(numDocs, false, 1, 2, 4),
+        new BitmapBasedFilterOperator(MutableRoaringBitmap.bitmapOf(0, 1), false, numDocs,
+            MutableRoaringBitmap.bitmapOf(4, 5, 6))), null, numDocs, true);
+
+    assertTrue(orOperator.canProduceBitmaps());
+    assertTrue(orOperator.mayHaveNulls());
+    BitmapCollection bitmaps = orOperator.getBitmaps();
+    assertEquals(bitmaps.reduce().toArray(), new int[]{0, 1, 2, 4});
+    assertEquals(bitmaps.getNullBitmap().toArray(), new int[]{5, 6});
+    assertEquals(orOperator.getNumMatchingDocs(), 4);
+
+    NotFilterOperator notOperator = new NotFilterOperator(orOperator, numDocs, true);
+    assertTrue(notOperator.canOptimizeCount());
+    assertEquals(notOperator.getNumMatchingDocs(), 2);
+    assertEquals(notOperator.getBitmaps().reduce().toArray(), new int[]{3, 7});
+    assertEquals(TestUtils.getDocIds(notOperator.getTrues()), List.of(3, 7));
+  }
+
+  @Test
+  public void testGetNulls() {
+    int numDocs = 8;
+    // The second child is UNKNOWN on {4, 5, 6}; the OR is UNKNOWN only on 5 and 6, since 4 is true through the first
+    // child
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        List.of(new TestFilterOperator(new int[]{1, 2, 4}, numDocs),
+            new TestFilterOperator(new int[]{0, 1}, new int[]{4, 5, 6}, numDocs)), null, numDocs, true);
+
+    assertTrue(orFilterOperator.mayHaveNulls());
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 4));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getNulls()), List.of(5, 6));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(3, 7));
+  }
+
+  @Test
+  public void testChildTrueNowhereButUnknownSomewhere() {
+    int numDocs = 5;
+    // The first child is true nowhere and UNKNOWN on {1, 2}; the OR is UNKNOWN on 2, where the second child is
+    // false, and false on {0, 4}
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        List.of(new TestFilterOperator(new int[0], new int[]{1, 2}, numDocs),
+            new TestFilterOperator(new int[]{1, 3}, numDocs)), null, numDocs, true);
+
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(1, 3));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getNulls()), List.of(2));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(0, 4));
+  }
+
+  @Test
+  public void testGetNullsPropagateThroughNestedAnd() {
+    int numDocs = 6;
+    // The AND is UNKNOWN on 3, where its first child is UNKNOWN and its second true; the OR above it inherits that
+    // where its own other child is false, and the outer negation has to leave that document out
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        List.of(new TestFilterOperator(new int[]{1, 2}, new int[]{3, 4}, numDocs),
+            new TestFilterOperator(new int[]{2, 3, 5}, numDocs)), null, numDocs, true);
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        List.of(new TestFilterOperator(new int[]{0}, numDocs), andFilterOperator), null, numDocs, true);
+
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getNulls()), List.of(3));
+    NotFilterOperator notFilterOperator = new NotFilterOperator(orFilterOperator, numDocs, true);
+    assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(1, 4, 5));
+  }
+
   private static BitmapBasedFilterOperator bitmapOp(int numDocs, boolean exclusive, int... docIds) {
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
     bitmap.add(docIds);

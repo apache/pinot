@@ -103,15 +103,31 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+    if (nullBitmap != null && !_isSingleValue) {
+      // Per-dictId bitmaps overlap on a multi-value column, so the null rows among the matches can only be counted on
+      // the materialized union
+      return getBitmaps().getCardinality();
+    }
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int count;
+    // Null rows among the matches are UNKNOWN rather than true
+    int numNulls = 0;
     if (_isSingleValue) {
       // On a single-value column, per-dictId bitmaps partition the docId space (each docId has exactly one
       // dictId), so the union cardinality equals the sum of per-bitmap cardinalities. No scratch bitmap is
       // allocated and no OR pass is performed.
       count = 0;
-      for (int dictId : dictIds) {
-        count += _invertedIndexReader.getDocIds(dictId).getCardinality();
+      if (nullBitmap == null) {
+        for (int dictId : dictIds) {
+          count += _invertedIndexReader.getDocIds(dictId).getCardinality();
+        }
+      } else {
+        for (int dictId : dictIds) {
+          ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictId);
+          count += docIds.getCardinality();
+          numNulls += ImmutableRoaringBitmap.andCardinality(docIds, nullBitmap);
+        }
       }
     } else {
       // TODO: For MV column, per-dictId bitmaps may overlap, so we must materialize the union to count.
@@ -137,7 +153,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
           break;
       }
     }
-    return _exclusive ? _numDocs - count : count;
+    return toNumTrueDocs(count, numNulls, _exclusive);
   }
 
   @Override
@@ -152,7 +168,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     for (int i = 0; i < dictIds.length; i++) {
       bitmaps[i] = _invertedIndexReader.getDocIds(dictIds[i]);
     }
-    return new BitmapCollection(_numDocs, _exclusive, bitmaps);
+    return new BitmapCollection(_numDocs, _exclusive, bitmaps).excludingNulls(getNullBitmap());
   }
 
   @Override
