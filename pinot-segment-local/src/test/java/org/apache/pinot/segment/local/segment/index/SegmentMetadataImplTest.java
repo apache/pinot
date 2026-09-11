@@ -32,11 +32,14 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -54,7 +57,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -63,6 +69,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -284,6 +291,123 @@ public class SegmentMetadataImplTest {
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }
+  }
+
+  /// A server retains the metadata of every loaded segment, and a Schema costs a TreeMap entry plus list slots per
+  /// column on top of the FieldSpecs the column metadata already holds, so the schema is derived on the first
+  /// getSchema() rather than at load. It equals the one that used to be built eagerly, is built exactly once, and
+  /// listing the columns or rendering the metadata JSON does not build it.
+  @Test
+  public void testSchemaDerivedLazilyFromColumnMetadata()
+      throws Exception {
+    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    assertFalse(metadata.isSchemaMaterialized());
+    assertEquals(metadata.getAllColumns(), metadata.getColumnMetadataMap().keySet());
+    assertEquals(metadata.toJson(null).get("columns").size(), metadata.getAllColumns().size());
+    assertTrue(metadata.toJson(null).get("schemaName").isNull());
+    assertFalse(metadata.isSchemaMaterialized());
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
+
+    Schema eager = new Schema();
+    for (ColumnMetadata columnMetadata : metadata.getColumnMetadataMap().values()) {
+      eager.addField(columnMetadata.getFieldSpec());
+    }
+    Schema schema = metadata.getSchema();
+    assertTrue(metadata.isSchemaMaterialized());
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations + 1);
+    assertEquals(schema, eager);
+    assertEquals(schema.getColumnNames(), metadata.getAllColumns());
+    for (String column : metadata.getAllColumns()) {
+      assertSame(schema.getFieldSpecFor(column), metadata.getColumnMetadataFor(column).getFieldSpec(), column);
+    }
+    assertSame(metadata.getSchema(), schema);
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations + 1);
+  }
+
+  /// Loading a segment registers the built-in virtual columns in the column metadata, so the schema derived afterwards
+  /// includes them exactly as the schema the loader used to build eagerly did, while neither the load nor serving the
+  /// segment (column listings, data sources, the metadata JSON) builds any schema.
+  @Test
+  public void testSchemaIncludesBuiltInVirtualColumnsAfterLoad()
+      throws Exception {
+    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
+    ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+    try {
+      SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+      assertFalse(metadata.isSchemaMaterialized(), "the load path must not build the segment schema");
+      assertTrue(segment.getColumnNames().containsAll(BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS));
+      assertTrue(metadata.getAllColumns().containsAll(BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS));
+      assertFalse(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.DOCID));
+      assertEquals(segment.getPhysicalColumnNames().size(),
+          segment.getColumnNames().size() - BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.size());
+      for (String column : segment.getColumnNames()) {
+        assertNotNull(segment.getDataSource(column), column);
+      }
+      metadata.toJson(null);
+      assertFalse(metadata.isSchemaMaterialized(), "serving the segment must not build the segment schema");
+      assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
+
+      Schema legacy = new Schema();
+      for (String column : segment.getPhysicalColumnNames()) {
+        legacy.addField(metadata.getColumnMetadataFor(column).getFieldSpec());
+      }
+      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(legacy, metadata.getName());
+      Schema schema = metadata.getSchema();
+      assertEquals(schema, legacy);
+      assertEquals(schema.getColumnNames(), metadata.getAllColumns());
+      assertEquals(schema.getPhysicalColumnNames(), segment.getPhysicalColumnNames());
+      for (String column : BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        assertTrue(fieldSpec.isVirtualColumn(), column);
+        assertSame(fieldSpec, metadata.getColumnMetadataFor(column).getFieldSpec(), column);
+      }
+      assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.SEGMENTNAME).getDefaultNullValue(),
+          metadata.getName());
+      assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.HOSTNAME).getDefaultNullValue(),
+          NetUtils.getHostnameOrAddress());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// removeColumn() drops the column from the column metadata and from any schema derived afterwards.
+  @Test
+  public void testRemoveColumnInvalidatesDerivedSchema()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    Schema before = metadata.getSchema();
+    String column = metadata.getAllColumns().stream().filter(c -> !c.equals(metadata.getTimeColumn())).findFirst()
+        .orElseThrow();
+    assertTrue(before.hasColumn(column));
+
+    metadata.removeColumn(column);
+    assertFalse(metadata.isSchemaMaterialized());
+    assertFalse(metadata.getAllColumns().contains(column));
+    assertNull(metadata.getColumnMetadataFor(column));
+    Schema after = metadata.getSchema();
+    assertNotSame(after, before);
+    assertFalse(after.hasColumn(column));
+    assertEquals(after.size(), before.size() - 1);
+    assertEquals(after.getColumnNames(), metadata.getAllColumns());
+  }
+
+  /// A CONSUMING segment is constructed with its schema, which is handed back as is (and named in the JSON) rather
+  /// than derived: it has no column metadata to derive from.
+  @Test
+  public void testExplicitSchemaIsReturnedAsIs() {
+    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("consuming")
+        .addSingleValueDimension("dim", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.LONG)
+        .build();
+    SegmentMetadataImpl metadata =
+        new SegmentMetadataImpl("testTable", "testTable__0__0__20240101T0000Z", schema, 123L);
+    assertTrue(metadata.isSchemaMaterialized());
+    assertSame(metadata.getSchema(), schema);
+    assertEquals(metadata.getAllColumns(), schema.getColumnNames());
+    assertEquals(metadata.toJson(null).get("schemaName").asText(), "consuming");
+    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
   }
 
   private static File buildOpenStructSegment(String parent)

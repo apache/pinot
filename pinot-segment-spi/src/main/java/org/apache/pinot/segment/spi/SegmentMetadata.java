@@ -70,6 +70,10 @@ public interface SegmentMetadata {
   /// segment (of this table or any other) whose column parses to an equal spec, and must be treated as immutable: never
   /// call a setter on one; copy it (e.g. through a JSON round-trip) before mutating. Removing a column from this schema
   /// does not affect other segments.
+  ///
+  /// An implementation may derive the schema on demand rather than hold it per segment, so load- and query-path code
+  /// should read column names through [#getAllColumns()] and field specs through [#getColumnMetadataFor(String)]
+  /// instead of building a schema for every segment it touches.
   Schema getSchema();
 
   int getTotalDocs();

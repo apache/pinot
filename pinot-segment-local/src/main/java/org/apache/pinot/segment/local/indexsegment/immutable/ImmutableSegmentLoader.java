@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
@@ -311,21 +312,26 @@ public class ImmutableSegmentLoader {
         starTreeIndexContainer, mcTextReader);
   }
 
-  /// Adds the built-in virtual columns to the segment schema and creates their index containers and metadata.
+  /// Creates the index containers and column metadata of the built-in virtual columns and registers them in the
+  /// segment metadata. Registering the metadata is what makes the segment schema include the virtual columns: the
+  /// schema is derived from the column metadata map on demand ([SegmentMetadataImpl#getSchema()]) and is deliberately
+  /// not built here, so a loaded segment retains no per-column schema entries until something asks for its schema.
+  /// A physical column of the same name wins, as in the schema-based registration this replaces.
   private static void instantiateVirtualColumns(SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap) {
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-    Schema segmentSchema = segmentMetadata.getSchema();
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentMetadata.getName());
-    for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
-      if (fieldSpec.isVirtualColumn()) {
-        String columnName = fieldSpec.getName();
-        VirtualColumnContext context =
-            new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), segmentMetadata);
-        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
-        indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-        columnMetadataMap.put(columnName, provider.buildMetadata(context));
+    String segmentName = segmentMetadata.getName();
+    for (BuiltInVirtualColumnDefinitions.Definition definition : BuiltInVirtualColumnDefinitions.DEFINITIONS) {
+      String columnName = definition.getName();
+      if (columnMetadataMap.containsKey(columnName)) {
+        continue;
       }
+      FieldSpec fieldSpec = VirtualColumnProviderFactory.createBuiltInFieldSpec(definition, segmentName);
+      VirtualColumnContext context =
+          new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), segmentMetadata);
+      VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
+      indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
+      columnMetadataMap.put(columnName, provider.buildMetadata(context));
     }
   }
 

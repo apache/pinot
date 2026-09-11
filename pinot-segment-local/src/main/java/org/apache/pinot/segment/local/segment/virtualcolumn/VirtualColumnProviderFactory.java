@@ -86,24 +86,30 @@ public class VirtualColumnProviderFactory {
   /// [BuiltInVirtualColumnDefinitions#DEFINITIONS], which the broker side uses as well, so the two can never
   /// disagree on a type.
   /// This method only layers on the provider class, and the constant value for the columns whose value is already
-  /// known here.
+  /// known here (see [#createBuiltInFieldSpec(BuiltInVirtualColumnDefinitions.Definition, String)]).
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
     for (BuiltInVirtualColumnDefinitions.Definition definition : BuiltInVirtualColumnDefinitions.DEFINITIONS) {
-      String column = definition.getName();
-      if (schema.hasColumn(column)) {
-        continue;
+      if (!schema.hasColumn(definition.getName())) {
+        schema.addField(createBuiltInFieldSpec(definition, segmentName));
       }
-      DimensionFieldSpec fieldSpec = definition.createFieldSpec();
-      fieldSpec.setVirtualColumnProvider(getProviderClass(column).getName());
-      // $hostName and $segmentName are constants known at schema construction time, and are carried as the field's
-      // default null value, which DefaultNullValueVirtualColumnProvider reads back.
-      if (BuiltInVirtualColumn.HOSTNAME.equals(column)) {
-        fieldSpec.setDefaultNullValue(NetUtils.getHostnameOrAddress());
-      } else if (BuiltInVirtualColumn.SEGMENTNAME.equals(column)) {
-        fieldSpec.setDefaultNullValue(segmentName);
-      }
-      schema.addField(fieldSpec);
     }
+  }
+
+  /// Creates the field spec a segment gets for one built-in virtual column: the shape from `definition`, the provider
+  /// class that produces its values, and for `$hostName` / `$segmentName` the constant value, carried as the field's
+  /// default null value, which `DefaultNullValueVirtualColumnProvider` reads back. Fresh per call: the spec is
+  /// mutable and the `$segmentName` value differs per segment, so it must not be shared across segments.
+  public static DimensionFieldSpec createBuiltInFieldSpec(BuiltInVirtualColumnDefinitions.Definition definition,
+      String segmentName) {
+    String column = definition.getName();
+    DimensionFieldSpec fieldSpec = definition.createFieldSpec();
+    fieldSpec.setVirtualColumnProvider(getProviderClass(column).getName());
+    if (BuiltInVirtualColumn.HOSTNAME.equals(column)) {
+      fieldSpec.setDefaultNullValue(NetUtils.getHostnameOrAddress());
+    } else if (BuiltInVirtualColumn.SEGMENTNAME.equals(column)) {
+      fieldSpec.setDefaultNullValue(segmentName);
+    }
+    return fieldSpec;
   }
 
   private static Class<? extends VirtualColumnProvider> getProviderClass(String column) {
