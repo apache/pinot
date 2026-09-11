@@ -44,6 +44,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentMetadataImplTest {
@@ -129,16 +130,16 @@ public class SegmentMetadataImplTest {
     assertEquals(fromStreams.getSchema(), fromDir.getSchema());
     for (Map.Entry<String, ColumnMetadata> entry : fromDir.getColumnMetadataMap().entrySet()) {
       ColumnMetadata dirColumn = entry.getValue();
-      Assert.assertTrue(dirColumn.getNumIndexes() > 0, entry.getKey());
+      assertTrue(dirColumn.getNumIndexes() > 0, entry.getKey());
       long forwardSize = dirColumn.getIndexSizeFor(StandardIndexes.forward());
-      Assert.assertTrue(forwardSize > 0, entry.getKey());
+      assertTrue(forwardSize > 0, entry.getKey());
       assertEquals(((ColumnMetadataImpl) dirColumn).getIndexSizeMap().get(StandardIndexes.forward()),
           (Long) forwardSize, entry.getKey());
       ColumnMetadata streamColumn = fromStreams.getColumnMetadataMap().get(entry.getKey());
       assertEquals(streamColumn.getNumIndexes(), 0, entry.getKey());
       assertEquals(streamColumn.getIndexSizeFor(StandardIndexes.forward()), ColumnMetadata.UNAVAILABLE,
           entry.getKey());
-      Assert.assertTrue(((ColumnMetadataImpl) streamColumn).getIndexSizeMap().isEmpty(), entry.getKey());
+      assertTrue(((ColumnMetadataImpl) streamColumn).getIndexSizeMap().isEmpty(), entry.getKey());
     }
   }
 }

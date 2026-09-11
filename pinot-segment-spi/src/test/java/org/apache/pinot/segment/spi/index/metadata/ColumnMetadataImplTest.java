@@ -216,6 +216,10 @@ public class ColumnMetadataImplTest {
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
     assertEquals(metadata.getNumIndexes(), 0);
     assertTrue(metadata.getIndexSizeMap().isEmpty());
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(0));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(0));
     // The REST segment-metadata payload keeps its shape: an empty object, never null.
     JsonNode indexSizeMap = JsonUtils.objectToJsonNode(metadata).get("indexSizeMap");
     assertTrue(indexSizeMap.isObject() && indexSizeMap.isEmpty(), String.valueOf(indexSizeMap));
@@ -224,21 +228,21 @@ public class ColumnMetadataImplTest {
   @Test
   public void indexSizesRoundTripAfterAdd() {
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
-    metadata.addIndexSize(FORWARD_ID, 100);
-    metadata.addIndexSize(DICTIONARY_ID, 200);
-    metadata.addIndexSize(JSON_ID, 0);
+    short[] indexTypes = {FORWARD_ID, DICTIONARY_ID, JSON_ID, 7, Short.MAX_VALUE, Short.MIN_VALUE};
+    long[] indexSizes = {100, 200, 0, (1L << 48) - 1, 1L << 32, 1};
+    for (int i = 0; i < indexTypes.length; i++) {
+      metadata.addIndexSize(indexTypes[i], indexSizes[i]);
+    }
 
-    assertEquals(metadata.getNumIndexes(), 3);
-    assertEquals(metadata.getIndexType(0), FORWARD_ID);
-    assertEquals(metadata.getIndexSize(0), 100);
-    assertEquals(metadata.getIndexType(1), DICTIONARY_ID);
-    assertEquals(metadata.getIndexSize(1), 200);
-    assertEquals(metadata.getIndexType(2), JSON_ID);
-    assertEquals(metadata.getIndexSize(2), 0);
-    // A 48-bit size survives the packing.
-    metadata.addIndexSize((short) 7, (1L << 48) - 1);
-    assertEquals(metadata.getIndexSize(3), (1L << 48) - 1);
-    assertEquals(metadata.getIndexType(3), 7);
+    assertEquals(metadata.getNumIndexes(), indexTypes.length);
+    for (int i = 0; i < indexTypes.length; i++) {
+      assertEquals(metadata.getIndexType(i), indexTypes[i]);
+      assertEquals(metadata.getIndexSize(i), indexSizes[i]);
+    }
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(indexTypes.length));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(indexTypes.length));
   }
 
   @Test
@@ -247,15 +251,22 @@ public class ColumnMetadataImplTest {
     ColumnMetadataImpl second = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
     ColumnMetadataImpl third = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
     ColumnMetadataImpl noSizes = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    assertEquals(first, noSizes);
+    assertEquals(first.hashCode(), noSizes.hashCode());
     first.addIndexSize(FORWARD_ID, 100);
     second.addIndexSize(FORWARD_ID, 100);
     third.addIndexSize(FORWARD_ID, 101);
+    for (ColumnMetadataImpl metadata : new ColumnMetadataImpl[]{first, second, third}) {
+      metadata.addIndexSize(DICTIONARY_ID, (1L << 48) - 1);
+      metadata.addIndexSize(JSON_ID, 0);
+    }
 
     assertEquals(first, second);
     assertEquals(first.hashCode(), second.hashCode());
     assertNotEquals(first, third);
     assertNotEquals(first, noSizes);
-    assertTrue(first.toString().contains("_indexTypeSizes=["), first.toString());
+    assertEquals(first.toString(), second.toString());
+    assertNotEquals(first.toString(), noSizes.toString());
   }
 
   @Test
@@ -264,6 +275,16 @@ public class ColumnMetadataImplTest {
     expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, -1));
     expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, 1L << 48));
     assertEquals(metadata.getNumIndexes(), 0, "a rejected size must not be recorded");
+
+    metadata.addIndexSize(FORWARD_ID, 100);
+    metadata.addIndexSize(DICTIONARY_ID, 200);
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(JSON_ID, -1));
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(JSON_ID, 1L << 48));
+    assertEquals(metadata.getNumIndexes(), 2, "a rejected size must preserve existing entries");
+    assertEquals(metadata.getIndexType(0), FORWARD_ID);
+    assertEquals(metadata.getIndexSize(0), 100);
+    assertEquals(metadata.getIndexType(1), DICTIONARY_ID);
+    assertEquals(metadata.getIndexSize(1), 200);
   }
 
   private static PropertiesConfiguration baseConfig(String column) {
