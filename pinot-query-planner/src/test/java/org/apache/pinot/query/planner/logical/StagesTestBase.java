@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -200,6 +201,26 @@ public class StagesTestBase {
       return new WindowNode(stageId, schema, myHints, List.of(input), List.of(0), List.of(), List.of(aggCall),
           WindowNode.WindowFrameType.ROWS, Integer.MIN_VALUE, 0, exclude, List.of());
     };
+  }
+
+  /// Creates an unnest node over the given child with the given table function context.
+  ///
+  /// The unnested expression is always the first input column. Tests vary the context, because that is what the
+  /// equivalence check compares.
+  public SimpleChildBuilder<UnnestNode> unnest(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      UnnestNode.TableFunctionContext tableFunctionContext) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new UnnestNode(stageId, schema, myHints, List.of(input), List.of(new RexExpression.InputRef(0)),
+          tableFunctionContext);
+    };
+  }
+
+  /// Creates a table function context that unnests one column, varying only the passthrough fields.
+  public static UnnestNode.TableFunctionContext passthrough(List<Integer> passthroughInputIndexes,
+      boolean prunedPassthrough) {
+    return new UnnestNode.TableFunctionContext(false, List.of(0), -1, passthroughInputIndexes, prunedPassthrough);
   }
 
   /// Creates a `LAST_VALUE` window aggregate call over the first input column that respects nulls.
