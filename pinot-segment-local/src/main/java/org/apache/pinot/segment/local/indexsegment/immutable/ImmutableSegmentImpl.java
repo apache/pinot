@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -449,6 +450,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public SegmentMetadataImpl getSegmentMetadata() {
     return _segmentMetadata;
+  }
+
+  /// Answers from the column metadata, so a caller that needs only the column's statistics does not materialize the
+  /// column. That matters most under lazy column materialization: segment pruning asks this for every segment the
+  /// server holds, and building an index container per segment there would put a reader — and, for an external
+  /// table, a Parquet footer parse — on the query thread for segments that are about to be pruned away.
+  ///
+  /// Falls back to the data source for a column the segment does not have, which is where the schema-driven default
+  /// and virtual columns are created.
+  @Override
+  public DataSourceMetadata getDataSourceMetadata(String column, Schema schema) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    return columnMetadata != null ? ImmutableDataSource.metadataOf(columnMetadata)
+        : getDataSource(column, schema).getDataSourceMetadata();
   }
 
   @Override
