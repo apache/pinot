@@ -1,0 +1,54 @@
+{
+  "mode_string_timestamp_distributed": {
+    "comments": "Merge STRING and TIMESTAMP frequency states across four partitions on two servers.",
+    "extraProps": {"enableColumnBasedNullHandling": true},
+    "tables": {
+      "items": {
+        "schema": [
+          {"name": "lpn_id", "type": "STRING"},
+          {"name": "pallet_id", "type": "STRING"},
+          {"name": "created_on", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          ["a", "p2", "2026-09-03 08:00:00.001"],
+          ["a", "p2", "2026-09-03 08:00:00.001"],
+          ["a", "p2", "2026-09-03 09:00:00.123"],
+          ["a", "p1", "2026-09-03 09:00:00.123"],
+          ["a", "p1", "2026-09-03 09:00:00.123"],
+          ["a", "p3", "2026-09-03 10:00:00.999"],
+          ["nulls", null, null],
+          ["nulls", null, null],
+          ["ties", "z", "1970-01-01 00:00:00.001"],
+          ["ties", "a", "1969-12-31 23:59:59.999"],
+          ["ties", "z", "1970-01-01 00:00:00.001"],
+          ["ties", "a", "1969-12-31 23:59:59.999"],
+          ["empty", "", "2026-09-03 00:00:00.001"],
+          ["empty", "z", null],
+          ["empty", "", null]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Grouped modes ignore nulls, retain empty strings, and break ties by the smallest value",
+        "sql": "SELECT lpn_id, MODE(pallet_id), MODE(created_on) FROM {items} GROUP BY lpn_id",
+        "outputs": [
+          ["a", "p2", "2026-09-03 09:00:00.123"],
+          ["nulls", null, null],
+          ["ties", "a", "1969-12-31 23:59:59.999"],
+          ["empty", "", "2026-09-03 00:00:00.001"]
+        ]
+      },
+      {
+        "description": "Typed MAX tie reducers select the largest original value",
+        "sql": "SELECT MODE(pallet_id, 'MAX'), MODE(created_on, 'MAX') FROM {items} WHERE lpn_id = 'ties'",
+        "outputs": [["z", "1970-01-01 00:00:00.001"]]
+      },
+      {
+        "description": "Empty aggregate inputs return null for both types",
+        "sql": "SELECT MODE(pallet_id), MODE(created_on) FROM {items} WHERE lpn_id = 'missing'",
+        "outputs": [[null, null]]
+      }
+    ]
+  }
+}

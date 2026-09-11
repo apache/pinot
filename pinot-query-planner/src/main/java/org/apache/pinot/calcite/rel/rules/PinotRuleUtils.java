@@ -27,6 +27,7 @@ import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
@@ -34,6 +35,7 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -51,6 +53,10 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PinotRuleUtils {
@@ -95,6 +101,36 @@ public class PinotRuleUtils {
 
   public static boolean isAggregate(RelNode rel) {
     return unboxRel(rel) instanceof Aggregate;
+  }
+
+  /// Appends arguments inferred by the aggregation's metadata using its original input types. Final stages must
+  /// resolve against the original input rather than the intermediate accumulator referenced by `arguments`.
+  public static List<RexNode> inferAggregateArguments(AggregateCall aggregateCall, RelNode originalInput,
+      List<RexNode> arguments) {
+    String functionName = aggregateCall.getAggregation().getName();
+    if (!AggregationFunctionType.isAggregationFunction(functionName)) {
+      return arguments;
+    }
+    List<Integer> argList = aggregateCall.getArgList();
+    List<String> inferredArguments = AggregationFunctionType.getAggregationFunctionType(functionName)
+        .inferArguments(argList.size(), ordinal -> {
+          ColumnDataType type = RelToPlanNodeConverter.convertToColumnDataType(
+              originalInput.getRowType().getFieldList().get(argList.get(ordinal)).getType());
+          if (type.isArray() || type == ColumnDataType.OBJECT) {
+            return DataType.UNKNOWN;
+          }
+          return type == ColumnDataType.MAP ? DataType.MAP : type.toDataType();
+        });
+    if (inferredArguments.isEmpty()) {
+      return arguments;
+    }
+    List<RexNode> resolvedArguments = new ArrayList<>(arguments.size() + inferredArguments.size());
+    resolvedArguments.addAll(arguments);
+    RexBuilder rexBuilder = originalInput.getCluster().getRexBuilder();
+    for (String argument : inferredArguments) {
+      resolvedArguments.add(rexBuilder.makeLiteral(argument));
+    }
+    return resolvedArguments;
   }
 
   /// utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the

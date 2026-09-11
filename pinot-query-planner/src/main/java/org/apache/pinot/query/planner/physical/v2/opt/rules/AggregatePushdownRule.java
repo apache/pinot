@@ -236,6 +236,7 @@ public class AggregatePushdownRule extends PRelOptRule {
           }
         }
       }
+      rexList = PinotRuleUtils.inferAggregateArguments(orgAggCall, aggRel.getInput(), rexList);
       aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, finalGroupCount, AggType.FINAL, false));
     }
     ImmutableBitSet groupSet = ImmutableBitSet.range(finalGroupCount);
@@ -322,6 +323,7 @@ public class AggregatePushdownRule extends PRelOptRule {
           }
         }
       }
+      rexList = PinotRuleUtils.inferAggregateArguments(orgAggCall, input, rexList);
       aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, groupCount, aggType, leafReturnFinalResult));
     }
     ImmutableBitSet.Builder groupSetBuilder = ImmutableBitSet.builder();
@@ -370,6 +372,7 @@ public class AggregatePushdownRule extends PRelOptRule {
           }
         }
       }
+      rexList = PinotRuleUtils.inferAggregateArguments(orgAggCall, input, rexList);
       aggCalls.add(buildAggCall(input, orgAggCall, rexList, aggRel.getGroupCount(), aggType, leafReturnFinalResult));
     }
     return aggCalls;

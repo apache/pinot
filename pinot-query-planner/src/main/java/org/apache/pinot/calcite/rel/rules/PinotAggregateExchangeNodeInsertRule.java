@@ -511,6 +511,7 @@ public class PinotAggregateExchangeNodeInsertRule {
           }
         }
       }
+      rexList = PinotRuleUtils.inferAggregateArguments(orgAggCall, input, rexList);
       aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, aggColumnOffset, aggType, leafReturnFinalResult));
     }
 
@@ -550,6 +551,7 @@ public class PinotAggregateExchangeNodeInsertRule {
           }
         }
       }
+      rexList = PinotRuleUtils.inferAggregateArguments(orgAggCall, input, rexList);
       aggCalls.add(buildAggCall(input, orgAggCall, rexList, aggRel.getGroupCount(), aggType, leafReturnFinalResult));
     }
     return aggCalls;

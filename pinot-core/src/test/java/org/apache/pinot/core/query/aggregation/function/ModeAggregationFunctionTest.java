@@ -19,12 +19,23 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.expectThrows;
 
 
 public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -38,6 +49,58 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
         new Scenario(DataType.FLOAT, false),
         new Scenario(DataType.DOUBLE, false),
     };
+  }
+
+  @DataProvider
+  Object[] typedScenarios() {
+    return new Object[]{new Scenario(DataType.STRING, true), new Scenario(DataType.STRING, false),
+        new Scenario(DataType.TIMESTAMP, true), new Scenario(DataType.TIMESTAMP, false)};
+  }
+
+  @Test(dataProvider = "typedScenarios")
+  void typedModeMergesCountsAndHandlesNulls(Scenario scenario) {
+    String type = scenario._dataType.name();
+    String first = scenario._dataType == DataType.STRING ? "apple" : "2026-09-03 10:11:12.123";
+    String shared = scenario._dataType == DataType.STRING ? "banana" : "2026-09-04 10:11:12.456";
+    String last = scenario._dataType == DataType.STRING ? "cherry" : "2026-09-05 10:11:12.789";
+    // Each instance has a different local mode; the shared value wins only after merging full counts.
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField", first, first, first, shared, shared, "null")
+        .andOnSecondInstance("myField", last, last, last, shared, shared, "null")
+        .whenQuery("select mode(myField, 'MIN', '" + type + "') as mode from testTable")
+        .thenResultTextIs("mode[" + type + "]\n" + shared)
+        .whenQuery("select mode(myField, 'MIN', '" + type + "') from testTable where myField is null")
+        .thenResultIs(new Object[]{null})
+        .whenQuery("select myField, mode(myField, 'MIN', '" + type + "') from testTable "
+            + "group by myField order by myField")
+        .thenResultIs(new Object[]{first, first}, new Object[]{shared, shared}, new Object[]{last, last},
+            new Object[]{null, null});
+  }
+
+  @DataProvider
+  Object[][] typedStates() {
+    return new Object[][]{{"STRING", "", "zebra"}, {"TIMESTAMP", 9_007_199_254_740_992L, 9_007_199_254_740_993L}};
+  }
+
+  @Test(dataProvider = "typedStates")
+  void typedModePreservesSerializedValuesAndTieReducers(String type, Object smaller, Object larger) {
+    ModeAggregationFunction min = typedMode(type, "MIN");
+    AggregationFunction.SerializedIntermediateResult serialized =
+        min.serializeIntermediateResult(Map.of(smaller, 2L, larger, 1L));
+    Map<?, Long> counts = min.deserializeIntermediateResult(
+        new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+    counts = min.merge(counts, Map.of(larger, 1L));
+    assertEquals(min.getFinalResultColumnType(), ColumnDataType.valueOf(type));
+    assertEquals(min.extractFinalResult(counts), smaller);
+    assertEquals(typedMode(type, "MAX").extractFinalResult(counts), larger);
+    assertNull(min.extractFinalResult(null));
+    expectThrows(IllegalArgumentException.class, () -> typedMode(type, "AVG"));
+  }
+
+  private static ModeAggregationFunction typedMode(String type, String reducer) {
+    return new ModeAggregationFunction(List.of(ExpressionContext.forIdentifier("value"),
+        ExpressionContext.forLiteral(Literal.stringValue(reducer)),
+        ExpressionContext.forLiteral(Literal.stringValue(type))), true);
   }
 
   public class Scenario {
