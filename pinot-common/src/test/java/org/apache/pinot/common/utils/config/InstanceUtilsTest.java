@@ -182,6 +182,21 @@ public class InstanceUtilsTest {
   }
 
   @Test
+  public void testGetInstanceBaseUriHandlesLegacyHostNames() {
+    InstanceConfig brokerConfig = new InstanceConfig("Broker_localhost_1234");
+    brokerConfig.setHostName("Broker_localhost");
+    brokerConfig.setPort("1234");
+    brokerConfig.getRecord().setIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, 8123);
+    assertEquals(InstanceUtils.getInstanceBaseUri(brokerConfig), "http://localhost:8123");
+
+    InstanceConfig serverConfig = new InstanceConfig("Server_localhost_2345");
+    serverConfig.setHostName("Server_localhost");
+    serverConfig.setPort("2345");
+    serverConfig.getRecord().setIntField(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY, 8443);
+    assertEquals(InstanceUtils.getInstanceBaseUri(serverConfig), "https://localhost:8443");
+  }
+
+  @Test
   public void testUpdateHelixInstanceConfig() {
     Instance instance =
         new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,

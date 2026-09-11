@@ -39,8 +39,11 @@ import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import nl.altindag.ssl.SSLFactory;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.compression.CompressionFactory;
 import org.apache.pinot.common.compression.Compressor;
@@ -81,6 +84,8 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
   private final GrpcConfig _queryClientConfig;
   private final BrokerMetrics _brokerMetrics;
   private final BrokerRequestHandler _brokerRequestHandler;
+  @Nullable
+  private final BrokerDrainManager _brokerDrainManager;
 
   // Filter to keep track of gRPC connections.
   private class BrokerGrpcTransportFilter extends ServerTransportFilter {
@@ -105,6 +110,11 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
 
   public BrokerGrpcServer(PinotConfiguration brokerConf, String brokerId, BrokerMetrics brokerMetrics,
       BrokerRequestHandler brokerRequestHandler) {
+    this(brokerConf, brokerId, brokerMetrics, brokerRequestHandler, null);
+  }
+
+  public BrokerGrpcServer(PinotConfiguration brokerConf, String brokerId, BrokerMetrics brokerMetrics,
+      BrokerRequestHandler brokerRequestHandler, @Nullable BrokerDrainManager brokerDrainManager) {
     _brokerMetrics = brokerMetrics;
     _grpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1);
     _queryClientConfig = createQueryClientConfig(brokerConf);
@@ -112,6 +122,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     _secureGrpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PORT, -1);
     _brokerId = brokerId;
     _brokerRequestHandler = brokerRequestHandler;
+    _brokerDrainManager = brokerDrainManager;
 
     // Determine which port to use
     int portToUse;
@@ -212,6 +223,28 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       responseObserver.onError(new RuntimeException("BrokerGrpcServer is not running"));
       return;
     }
+    if (_brokerDrainManager == null) {
+      submit(request, responseObserver, false);
+      return;
+    }
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      responseObserver.onError(Status.UNAVAILABLE.withDescription(_brokerDrainManager.getRejectMessage())
+          .asRuntimeException());
+      return;
+    }
+    PermitReleasingStreamObserver<Broker.BrokerResponse> permitReleasingObserver =
+        new PermitReleasingStreamObserver<>(responseObserver, queryPermit);
+    try {
+      submit(request, permitReleasingObserver, true);
+    } catch (RuntimeException | Error e) {
+      permitReleasingObserver.close();
+      throw e;
+    }
+  }
+
+  private void submit(Broker.BrokerRequest request, StreamObserver<Broker.BrokerResponse> responseObserver,
+      boolean queryPermitOwnedByTransport) {
     long startTime = System.nanoTime();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_QUERIES, 1);
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_RECEIVED, request.getSerializedSize());
@@ -263,8 +296,10 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     RequestContext requestContext = new DefaultRequestContext();
     BrokerResponse brokerResponse;
     try {
-      brokerResponse =
-          _brokerRequestHandler.handleRequest(requestJsonNode, sqlNodeAndOptions, requesterIdentify, requestContext,
+      brokerResponse = queryPermitOwnedByTransport
+          ? _brokerRequestHandler.handleRequestWithPreAcquiredPermit(requestJsonNode, sqlNodeAndOptions,
+              requesterIdentify, requestContext, null)
+          : _brokerRequestHandler.handleRequest(requestJsonNode, sqlNodeAndOptions, requesterIdentify, requestContext,
               null);
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_QUERY_EXCEPTIONS, 1);
@@ -361,6 +396,47 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     }
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, totalBytesSent);
     responseObserver.onCompleted();
+  }
+
+  private static final class PermitReleasingStreamObserver<T> implements StreamObserver<T>, AutoCloseable {
+    private final StreamObserver<T> _delegate;
+    private final BrokerDrainManager.QueryPermit _queryPermit;
+    private final AtomicBoolean _closed = new AtomicBoolean();
+
+    private PermitReleasingStreamObserver(StreamObserver<T> delegate, BrokerDrainManager.QueryPermit queryPermit) {
+      _delegate = delegate;
+      _queryPermit = queryPermit;
+    }
+
+    @Override
+    public void onNext(T value) {
+      _delegate.onNext(value);
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      try {
+        _delegate.onError(throwable);
+      } finally {
+        close();
+      }
+    }
+
+    @Override
+    public void onCompleted() {
+      try {
+        _delegate.onCompleted();
+      } finally {
+        close();
+      }
+    }
+
+    @Override
+    public void close() {
+      if (_closed.compareAndSet(false, true)) {
+        _queryPermit.close();
+      }
+    }
   }
 
   //TODO: move this method from OSS Pinot class into util, and then re-use this util

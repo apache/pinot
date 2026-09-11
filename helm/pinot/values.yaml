@@ -260,11 +260,14 @@ broker:
     builderClass: random
 
   probes:
-    endpoint: "/health"
+    # Deprecated compatibility override. When set, this endpoint is used for all broker probes and takes precedence
+    # over the per-probe endpoints below.
+    # endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
     startupEnabled: false
     liveness:
+      endpoint: "/health?checkType=liveness"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -272,6 +275,7 @@ broker:
       periodSeconds: 10
 
     readiness:
+      endpoint: "/health"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -279,6 +283,7 @@ broker:
       periodSeconds: 10
 
     startup:
+      endpoint: "/health"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10

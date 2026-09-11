@@ -21,6 +21,7 @@ package org.apache.pinot.broker.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
@@ -29,16 +30,19 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -63,6 +67,9 @@ public class PinotBrokerHealthCheck {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
+  private BrokerDrainManager _brokerDrainManager;
+
+  @Inject
   @Named(BrokerAdminApiApplication.START_TIME)
   private Instant _startTime;
 
@@ -75,7 +82,21 @@ public class PinotBrokerHealthCheck {
       @ApiResponse(code = 200, message = "Broker is healthy"),
       @ApiResponse(code = 503, message = "Broker is not healthy")
   })
-  public String getBrokerHealth() {
+  public String getBrokerHealth(
+      @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") @Nullable
+      String checkType) {
+    // Reaching the admin endpoint is sufficient for liveness. Readiness remains the default for backward
+    // compatibility and additionally rejects requests while the broker is draining.
+    if ("liveness".equalsIgnoreCase(checkType)) {
+      return "OK";
+    }
+    if (_brokerDrainManager.isDraining()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
+      String errMessage = "Pinot broker is draining";
+      Response response =
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+      throw new WebApplicationException(errMessage, response);
+    }
     ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
@@ -86,6 +107,11 @@ public class PinotBrokerHealthCheck {
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
+  }
+
+  /// Preserves the programmatic health-check API for callers that do not use JAX-RS parameter injection.
+  public String getBrokerHealth() {
+    return getBrokerHealth(null);
   }
 
   @GET
