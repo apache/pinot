@@ -468,6 +468,12 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
   }
 
+  /// Whether the caller asked for the optimizer's row estimates alongside the actual counts in
+  /// `stageStats`.
+  public static boolean isIncludeEstimatedRows(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INCLUDE_ESTIMATED_ROWS));
+  }
+
   public static boolean isUseMultistageEngine(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
   }

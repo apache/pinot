@@ -81,6 +81,7 @@ import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -2456,6 +2457,34 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode response = postQuery(query);
     assertEquals(response.get("exceptions").get(0), null);
     assertNotNull(response.get("resultTable"), "Should have result table");
+  }
+
+  /// The one hop no unit test can cover: a real query, through the real broker, returning the field
+  /// in its real response. Everything upstream is unit-tested, but a mis-wired argument in the
+  /// broker handler would leave all of those green and the user with nothing.
+  ///
+  /// Deliberately asserts both directions. The absent case is the one that catches a gate that has
+  /// stopped gating -- the failure mode there is extra planning work on every query in the cluster,
+  /// which no assertion on the present case would ever notice.
+  @Test
+  public void testEstimatedRowsInStageStats()
+      throws Exception {
+    String query = "SELECT COUNT(*) FROM mytable";
+
+    JsonNode withOption = postQuery("SET includeEstimatedRows = 'true'; " + query);
+    JsonNode stageStats = withOption.get("stageStats");
+    assertNotNull(stageStats, "Should have stage stats");
+    assertNotNull(stageStats.get("estimatedRows"),
+        "estimatedRows should be reported when the query asks for it, got: " + stageStats);
+    Assertions.assertThat(stageStats.get("estimatedRows").asDouble()).isGreaterThan(0.0);
+    // The actual count sits beside it untouched -- comparing the two is the entire point.
+    assertNotNull(stageStats.get("emittedRows"), "the actual count must still be there");
+
+    JsonNode withoutOption = postQuery(query);
+    JsonNode plainStats = withoutOption.get("stageStats");
+    assertNotNull(plainStats, "Should have stage stats");
+    assertNull(plainStats.get("estimatedRows"),
+        "estimatedRows must be absent unless requested, got: " + plainStats);
   }
 
   @Test

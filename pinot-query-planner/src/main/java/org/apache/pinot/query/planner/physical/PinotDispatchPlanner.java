@@ -79,7 +79,7 @@ public class PinotDispatchPlanner {
     // 5. Run validations
     runValidations(rootFragment, context);
     // 6. convert it into query plan.
-    return finalizeDispatchableSubPlan(rootFragment, context);
+    return finalizeDispatchableSubPlan(rootFragment, context, subPlan.getEstimatedRowCounts());
   }
 
   /// Returns the actual table names taking the case-sensitivity configured within the `TableCache` instance into
@@ -109,7 +109,10 @@ public class PinotDispatchPlanner {
     }
     trackEmptyLeafStages(context);
     runValidations(rootFragment, context);
-    return finalizeDispatchableSubPlan(rootFragment, context);
+    // Always empty on this path: the physical optimizer builds plan fragments from PRelNodes without
+    // going through RelToPlanNodeConverter, so there is nothing to carry. Passed explicitly rather
+    // than defaulted so that adding capture here is a change to this line and not a discovery.
+    return finalizeDispatchableSubPlan(rootFragment, context, subPlan.getEstimatedRowCounts());
   }
 
   /// Records empty leaf stages so that [DispatchablePlanContext#isAllNonReplicatedLeafStagesEmpty()] works for
@@ -164,7 +167,7 @@ public class PinotDispatchPlanner {
   }
 
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
-      DispatchablePlanContext dispatchablePlanContext) {
+      DispatchablePlanContext dispatchablePlanContext, Map<PlanNode, Double> estimatedRowCounts) {
     // Empty leaf stages are tracked for both engines: the legacy path in WorkerManager, and the physical optimizer
     // path in #trackEmptyLeafStages.
     boolean allLeafStagesEmpty = dispatchablePlanContext.isAllNonReplicatedLeafStagesEmpty();
@@ -183,7 +186,8 @@ public class PinotDispatchPlanner {
         dispatchablePlanContext.getTableNames(),
         populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()),
         dispatchablePlanContext.getNumSegmentsPrunedByBroker(),
-        allLeafStagesEmpty);
+        allLeafStagesEmpty,
+        estimatedRowCounts);
   }
 
   static boolean hasNonEmptyReplicatedLeaf(Map<Integer, DispatchablePlanMetadata> metadataMap) {

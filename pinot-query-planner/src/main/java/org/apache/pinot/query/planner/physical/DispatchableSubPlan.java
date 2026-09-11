@@ -28,6 +28,7 @@ import java.util.TreeSet;
 import java.util.function.ToIntFunction;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
 /// The `DispatchableSubPlan` is the dispatchable query execution plan from the result of
@@ -49,6 +50,16 @@ public class DispatchableSubPlan {
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
   private final long _numSegmentsPrunedByBroker;
   private final boolean _allLeafStagesEmpty;
+  /// Row count the optimizer estimated for each plan node, for comparison against the counts the
+  /// runtime reports back. Empty unless the query asked for them.
+  ///
+  /// Must be identity-keyed ([java.util.IdentityHashMap]): [org.apache.pinot.query.planner.plannode.BasePlanNode]
+  /// defines structural `equals`/`hashCode`, so a hash map would merge distinct nodes that happen to
+  /// look alike and misattribute their estimates. Do not replace this with `Map.copyOf`.
+  ///
+  /// Broker-side only — nothing here is serialized to servers, so there is no wire-format or
+  /// mixed-version concern.
+  private final Map<PlanNode, Double> _estimatedRowCounts;
 
   public DispatchableSubPlan(PairList<Integer, String> fields,
       Map<Integer, DispatchablePlanFragment> queryStageMap,
@@ -61,12 +72,27 @@ public class DispatchableSubPlan {
       Map<Integer, DispatchablePlanFragment> queryStageMap,
       Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
       long numSegmentsPrunedByBroker, boolean allLeafStagesEmpty) {
+    this(fields, queryStageMap, tableNames, tableToUnavailableSegmentsMap, numSegmentsPrunedByBroker,
+        allLeafStagesEmpty, Map.of());
+  }
+
+  public DispatchableSubPlan(PairList<Integer, String> fields,
+      Map<Integer, DispatchablePlanFragment> queryStageMap,
+      Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
+      long numSegmentsPrunedByBroker, boolean allLeafStagesEmpty, Map<PlanNode, Double> estimatedRowCounts) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _tableNames = tableNames;
     _tableToUnavailableSegmentsMap = tableToUnavailableSegmentsMap;
     _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
     _allLeafStagesEmpty = allLeafStagesEmpty;
+    _estimatedRowCounts = estimatedRowCounts;
+  }
+
+  /// Estimated row counts by plan node; empty when they were not captured. See
+  /// [#_estimatedRowCounts] for why the map is identity-keyed.
+  public Map<PlanNode, Double> getEstimatedRowCounts() {
+    return Collections.unmodifiableMap(_estimatedRowCounts);
   }
 
   /// Get a map from stage id to stage plan.
