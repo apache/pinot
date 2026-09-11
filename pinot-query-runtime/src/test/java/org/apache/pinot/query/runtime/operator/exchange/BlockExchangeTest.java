@@ -104,6 +104,20 @@ public class BlockExchangeTest {
   }
 
   @Test
+  public void shouldConfirmSortedDataBlocks()
+      throws Exception {
+    List<SendingMailbox> destinations = List.of(_mailbox1);
+    BlockExchange exchange = new TestBlockExchange(destinations, BlockSplitter.NO_OP, true);
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
+
+    exchange.send(block);
+
+    Mockito.verify(_mailbox1).send(Mockito.same(block), Mockito.eq(true));
+    Mockito.verify(_mailbox1, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
+  }
+
+  @Test
   public void shouldSignalEarlyTerminationProperly()
       throws Exception {
     // Given:
@@ -172,6 +186,10 @@ public class BlockExchangeTest {
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
       super(destinations, splitter, BlockExchange.RANDOM_INDEX_CHOOSER);
+    }
+
+    protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter, boolean sortedOnSender) {
+      super(destinations, splitter, BlockExchange.RANDOM_INDEX_CHOOSER, sortedOnSender);
     }
 
     @Override

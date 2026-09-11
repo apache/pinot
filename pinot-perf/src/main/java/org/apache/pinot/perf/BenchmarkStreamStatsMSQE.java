@@ -229,6 +229,27 @@ public class BenchmarkStreamStatsMSQE extends BaseClusterIntegrationTest {
         + "FROM " + TABLE_NAME + " WHERE " + INT_COL + " % 1000 = 42");
   }
 
+  /// Global ordered window over the full input. With the two-server topology, all leaf senders feed one sorted
+  /// receiver, exercising both a local mailbox and a cross-server gRPC mailbox. This is the representative workload
+  /// for comparing receiver-only sorting with sender sorting followed by a k-way merge.
+  @Benchmark
+  public JsonNode globalOrderedWindow()
+      throws Exception {
+    return executeQuery("SELECT SUM(rowCount) FROM ("
+        + "SELECT COUNT(" + METRIC_COL + ") OVER (ORDER BY " + INT_COL + ") AS rowCount "
+        + "FROM " + TABLE_NAME + ")");
+  }
+
+  /// Partitioned ordered window. Hashing the partition key spreads the sorted receivers across the two servers, so
+  /// this complements [#globalOrderedWindow()] with bidirectional local and gRPC sender fan-in.
+  @Benchmark
+  public JsonNode partitionedOrderedWindow()
+      throws Exception {
+    return executeQuery("SELECT SUM(rowCount) FROM ("
+        + "SELECT COUNT(" + METRIC_COL + ") OVER (PARTITION BY " + STR_COL + " ORDER BY " + INT_COL
+        + ") AS rowCount FROM " + TABLE_NAME + ")");
+  }
+
   private JsonNode executeQuery(@Language("sql") String sql)
       throws Exception {
     String queryOptions = "maxRowsInJoin=100000000";
