@@ -43,9 +43,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// The `PercentileSmartTDigestAggregationFunction` calculates the percentile of the values for a given
 /// expression (both single-valued and multi-valued are supported).
 ///
-/// For aggregation-only queries, the values are stored in a [DoubleArrayList] initially. Once the number of
-/// values exceeds a threshold, the list will be converted into a [TDigest], and approximate result will be
-/// returned.
+/// The values are stored in a [DoubleArrayList] initially. Once the number of values exceeds a threshold, the list
+/// will be converted into a [TDigest], and approximate result will be returned. The threshold is applied per
+/// accumulator, which means per group for a group-by query.
 ///
 /// The function takes an optional third argument for parameters:
 /// - threshold: Threshold of the number of values to trigger the conversion, 100_000 by default. Non-positive value
@@ -201,28 +201,17 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-          valueList.add(doubleValues[i]);
+          addValueForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i], _threshold);
         }
       });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-          valueList.addElements(valueList.size(), doubleValues[i]);
+          addValuesForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i], _threshold);
         }
       });
     }
-  }
-
-  private static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
-    DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
-    if (valueList == null) {
-      valueList = new DoubleArrayList();
-      groupByResultHolder.setValueForKey(groupKey, valueList);
-    }
-    return valueList;
   }
 
   @Override
@@ -235,7 +224,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            getValueList(groupByResultHolder, groupKey).add(doubleValues[i]);
+            addValueForGroup(groupByResultHolder, groupKey, doubleValues[i], _threshold);
           }
         }
       });
@@ -244,12 +233,54 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-            valueList.addElements(valueList.size(), doubleValues[i]);
+            addValuesForGroup(groupByResultHolder, groupKey, doubleValues[i], _threshold);
           }
         }
       });
     }
+  }
+
+  /// Adds one value into the accumulator of the given group, converting it once it holds more values than the
+  /// threshold. The accumulator is a [DoubleArrayList] until then and a [TDigest] after. Without this the per-group
+  /// lists grow for the whole segment: it is the group-by counterpart of the check in [#aggregateIntoValueList].
+  private void addValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double value, int threshold) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof TDigest) {
+      ((TDigest) result).add(value);
+      return;
+    }
+    DoubleArrayList valueList = getOrCreateValueList(groupByResultHolder, groupKey, (DoubleArrayList) result);
+    valueList.add(value);
+    if (valueList.size() > threshold) {
+      groupByResultHolder.setValueForKey(groupKey, convertValueListToTDigest(valueList));
+    }
+  }
+
+  /// As [#addValueForGroup], for every value of a multi-valued entry.
+  private void addValuesForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double[] values,
+      int threshold) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof TDigest) {
+      TDigest tDigest = (TDigest) result;
+      for (double value : values) {
+        tDigest.add(value);
+      }
+      return;
+    }
+    DoubleArrayList valueList = getOrCreateValueList(groupByResultHolder, groupKey, (DoubleArrayList) result);
+    valueList.addElements(valueList.size(), values);
+    if (valueList.size() > threshold) {
+      groupByResultHolder.setValueForKey(groupKey, convertValueListToTDigest(valueList));
+    }
+  }
+
+  private static DoubleArrayList getOrCreateValueList(GroupByResultHolder groupByResultHolder, int groupKey,
+      @Nullable DoubleArrayList valueList) {
+    if (valueList == null) {
+      valueList = new DoubleArrayList();
+      groupByResultHolder.setValueForKey(groupKey, valueList);
+    }
+    return valueList;
   }
 
   @Override

@@ -25,7 +25,8 @@ import org.apache.pinot.common.response.CursorResponse;
 
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "brokerId", "numDocsScanned", "totalDocs",
+    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "brokerId",
+    "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
@@ -34,7 +35,7 @@ import org.apache.pinot.common.response.CursorResponse;
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
-    "groupsTrimmed",
+    "groupsTrimmed", "approximateFunctionApplied",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"

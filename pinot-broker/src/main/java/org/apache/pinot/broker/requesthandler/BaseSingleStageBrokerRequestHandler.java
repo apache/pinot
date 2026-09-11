@@ -160,7 +160,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Nullable
   protected final MaterializedViewHandler _materializedViewHandler;
   protected final boolean _disableGroovy;
-  protected final boolean _useApproximateFunction;
   protected final int _defaultHllLog2m;
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
@@ -200,7 +199,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _materializedViewHandler = materializedViewHandler;
     _serverAdminAuthProvider = AuthProviderUtils.extractAuthProvider(config, Broker.SERVER_ADMIN_AUTH_PREFIX);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
-    _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
@@ -673,10 +671,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     QueryConfig realtimeTableQueryConfig = routeInfo.getRealtimeTableQueryConfig();
     TimeBoundaryInfo timeBoundaryInfo = routeInfo.getTimeBoundaryInfo();
 
-    HandlerContext handlerContext = getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig);
+    HandlerContext handlerContext =
+        getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig, pinotQuery.getQueryOptions());
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
+    boolean approximateFunctionApplied = false;
     if (handlerContext._useApproximateFunction) {
-      handleApproximateFunctionOverride(serverPinotQuery);
+      approximateFunctionApplied = handleApproximateFunctionOverride(serverPinotQuery,
+          handlerContext._distinctCountParams, handlerContext._percentileParams);
+      if (approximateFunctionApplied) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
+      }
     }
 
     // Validate the request
@@ -1082,6 +1086,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
+    brokerResponse.setApproximateFunctionApplied(approximateFunctionApplied);
 
     // Record per-server stats on the SSE BrokerResponse so downstream consumers can read it.
     brokerResponse.setServerStats(serverStats.getServerStats());
@@ -1862,7 +1867,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private HandlerContext getHandlerContext(@Nullable QueryConfig offlineTableQueryConfig,
-      @Nullable QueryConfig realtimeTableQueryConfig) {
+      @Nullable QueryConfig realtimeTableQueryConfig, @Nullable Map<String, String> queryOptions) {
     Boolean disableGroovyOverride = null;
     Boolean useApproximateFunctionOverride = null;
     if (offlineTableQueryConfig != null) {
@@ -1897,18 +1902,31 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     boolean disableGroovy = disableGroovyOverride != null ? disableGroovyOverride : _disableGroovy;
+    // Precedence: query option > table config > cluster config > broker conf. One snapshot, so that the flag and the
+    // parameters this query uses come from the same version of the config.
+    Boolean queryOptionOverride =
+        queryOptions != null ? QueryOptionsUtils.isUseApproximateFunction(queryOptions) : null;
+    ApproximateFunctionOverrideProvider.Settings approximateFunctionSettings =
+        _approximateFunctionOverrideProvider.getSettings();
     boolean useApproximateFunction =
-        useApproximateFunctionOverride != null ? useApproximateFunctionOverride : _useApproximateFunction;
-    return new HandlerContext(disableGroovy, useApproximateFunction);
+        approximateFunctionSettings.isEnabled(queryOptionOverride, useApproximateFunctionOverride);
+    return new HandlerContext(disableGroovy, useApproximateFunction,
+        approximateFunctionSettings._distinctCountParams, approximateFunctionSettings._percentileParams);
   }
 
   private static class HandlerContext {
     final boolean _disableGroovy;
     final boolean _useApproximateFunction;
+    /// Parameters for the rewritten calls, empty when the aggregation function defaults apply.
+    final String _distinctCountParams;
+    final String _percentileParams;
 
-    HandlerContext(boolean disableGroovy, boolean useApproximateFunction) {
+    HandlerContext(boolean disableGroovy, boolean useApproximateFunction, String distinctCountParams,
+        String percentileParams) {
       _disableGroovy = disableGroovy;
       _useApproximateFunction = useApproximateFunction;
+      _distinctCountParams = distinctCountParams;
+      _percentileParams = percentileParams;
     }
   }
 
@@ -1972,57 +1990,79 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// Rewrites potential expensive functions to their approximation counterparts.
   /// - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
   /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+  ///
+  /// The rewritten functions stay exact until an accumulator crosses their conversion threshold, which the
+  /// parameters carry. An empty parameter string appends nothing, so the aggregation function defaults apply.
+  ///
+  /// @return true if at least one function was rewritten, which makes the result of the query approximate
   @VisibleForTesting
-  static void handleApproximateFunctionOverride(PinotQuery pinotQuery) {
+  static boolean handleApproximateFunctionOverride(PinotQuery pinotQuery, String distinctCountParams,
+      String percentileParams) {
+    boolean applied = false;
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleApproximateFunctionOverride(expression);
+      applied |= handleApproximateFunctionOverride(expression, distinctCountParams, percentileParams);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleApproximateFunctionOverride(expression.getFunctionCall().getOperands().get(0));
+        applied |= handleApproximateFunctionOverride(expression.getFunctionCall().getOperands().get(0),
+            distinctCountParams, percentileParams);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleApproximateFunctionOverride(havingExpression);
+      applied |= handleApproximateFunctionOverride(havingExpression, distinctCountParams, percentileParams);
     }
+    return applied;
   }
 
-  private static void handleApproximateFunctionOverride(Expression expression) {
+  private static boolean handleApproximateFunctionOverride(Expression expression, String distinctCountParams,
+      String percentileParams) {
     Function function = expression.getFunctionCall();
     if (function == null) {
-      return;
+      return false;
     }
     String functionName = function.getOperator();
     if (functionName.equals("distinctcount") || functionName.equals("distinctcountmv")) {
       function.setOperator("distinctcountsmarthll");
+      appendParams(function, distinctCountParams, 1);
+      return true;
     } else if (functionName.startsWith("percentile")) {
-      String remainingFunctionName = functionName.substring(10);
-      if (remainingFunctionName.isEmpty() || remainingFunctionName.equals("mv")) {
+      String suffix = functionName.substring(10);
+      if (suffix.isEmpty() || suffix.equals("mv")) {
         function.setOperator("percentilesmarttdigest");
-      } else if (remainingFunctionName.matches("\\d+")) {
+      } else if (suffix.matches("\\d+(mv)?")) {
+        // The percentile is in the function name, so it becomes an explicit argument.
+        String digits = suffix.endsWith("mv") ? suffix.substring(0, suffix.length() - 2) : suffix;
+        int percentile;
         try {
-          int percentile = Integer.parseInt(remainingFunctionName);
-          function.setOperator("percentilesmarttdigest");
-          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
+          percentile = Integer.parseInt(digits);
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
-      } else if (remainingFunctionName.matches("\\d+mv")) {
-        try {
-          int percentile = Integer.parseInt(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
-          function.setOperator("percentilesmarttdigest");
-          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
-        } catch (Exception e) {
-          throw new BadQueryRequestException("Illegal function name: " + functionName);
-        }
+        function.setOperator("percentilesmarttdigest");
+        function.addToOperands(RequestUtils.getLiteralExpression(percentile));
+      } else {
+        // An already approximate variant, e.g. PERCENTILE_TDIGEST. Nothing to rewrite.
+        return false;
       }
+      appendParams(function, percentileParams, 2);
+      return true;
     } else {
+      boolean applied = false;
       for (Expression operand : function.getOperands()) {
-        handleApproximateFunctionOverride(operand);
+        applied |= handleApproximateFunctionOverride(operand, distinctCountParams, percentileParams);
       }
+      return applied;
+    }
+  }
+
+  /// Appends the parameters as the trailing argument of a rewritten call, unless the call has an unexpected arity,
+  /// in which case the function defaults apply rather than a call the server cannot construct.
+  private static void appendParams(Function function, String params, int expectedNumOperands) {
+    if (!params.isEmpty() && function.getOperandsSize() == expectedNumOperands) {
+      function.addToOperands(RequestUtils.getLiteralExpression(params));
     }
   }
 

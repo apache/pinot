@@ -575,6 +575,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
+    // Unlike the single-stage engine there is no table-level layer here, because a multi-stage query can span tables.
+    // Precedence is therefore query option > cluster config > broker conf.
+    ApproximateFunctionOverrideProvider.Settings approximateFunctionSettings =
+        _approximateFunctionOverrideProvider.getSettings();
+    boolean useApproximateFunction =
+        approximateFunctionSettings.isEnabled(QueryOptionsUtils.isUseApproximateFunction(queryOptions), null);
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
@@ -587,6 +593,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
+        .useApproximateFunction(useApproximateFunction)
+        .approximateFunctionDistinctCountParams(approximateFunctionSettings._distinctCountParams)
+        .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
         .defaultUseLiteMode(defaultUseLiteMode)
@@ -907,6 +916,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // set if rls (row level security) filters have been applied on the query
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
+
+      // set if an exact aggregation was rewritten into its approximate counterpart, which makes the result
+      // approximate rather than exact
+      if (query.getPlannerContext().isApproximateFunctionApplied()) {
+        brokerResponse.setApproximateFunctionApplied(true);
+        for (String tableName : tableNames) {
+          _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
+        }
+      }
 
       // Log query and stats
       _queryLogger.logQueryCompleted(

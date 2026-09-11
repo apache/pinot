@@ -106,6 +106,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final Map<Long, String> _queriesById;
   /// Maps broker-generated query id to client-provided query id.
   protected final Map<Long, String> _clientQueryIds;
+  /// Resolves the approximate-function rewrite defaults, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getApproximateFunctionOverrideProvider()].
+  protected final ApproximateFunctionOverrideProvider _approximateFunctionOverrideProvider;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -120,6 +123,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _tableCache = tableCache;
     _threadAccountant = threadAccountant;
     _multiClusterRoutingContext = multiClusterRoutingContext;
+    _approximateFunctionOverrideProvider = new ApproximateFunctionOverrideProvider(config);
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -145,6 +149,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _queriesById = null;
       _clientQueryIds = null;
     }
+  }
+
+  /// Returns the provider that resolves the approximate-function rewrite defaults. The broker starter registers it
+  /// with the cluster config change handler so that the defaults reload without a restart.
+  public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
+    return _approximateFunctionOverrideProvider;
   }
 
   @Override

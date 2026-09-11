@@ -793,6 +793,25 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
     }
 
+    /// Whether to rewrite exact aggregations into their approximate counterparts, already resolved from the query
+    /// option and the defaults. See [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION].
+    @Value.Default
+    default boolean useApproximateFunction() {
+      return CommonConstants.Broker.DEFAULT_USE_APPROXIMATE_FUNCTION;
+    }
+
+    /// Parameters appended to the rewritten calls, empty for the aggregation function defaults.
+    /// See [CommonConstants.Broker#APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS].
+    @Value.Default
+    default String approximateFunctionDistinctCountParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
+    }
+
+    @Value.Default
+    default String approximateFunctionPercentileParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
+    }
+
     @Value.Default
     default boolean defaultEnableDynamicFilteringSemiJoin() {
       return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;

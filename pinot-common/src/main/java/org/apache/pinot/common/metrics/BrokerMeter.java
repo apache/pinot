@@ -42,6 +42,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+
+  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
+  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
+  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
+      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
