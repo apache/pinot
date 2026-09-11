@@ -111,6 +111,8 @@ public class QueryContext {
   private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  // Whether to store group-by key tables and fixed-width result holders in off-heap (direct) memory
+  private boolean _groupByOffHeap = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_OFF_HEAP;
   // Warning threshold of number of groups stored in each segment
   private int _numGroupsWarningLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
@@ -429,6 +431,14 @@ public class QueryContext {
 
   public void setNumGroupsLimit(int numGroupsLimit) {
     _numGroupsLimit = numGroupsLimit;
+  }
+
+  public boolean isGroupByOffHeap() {
+    return _groupByOffHeap;
+  }
+
+  public void setGroupByOffHeap(boolean groupByOffHeap) {
+    _groupByOffHeap = groupByOffHeap;
   }
 
   public int getNumGroupsWarningLimit() {

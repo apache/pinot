@@ -35,6 +35,10 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapBytesGroupIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapGroupByUtils;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapIntGroupIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapLongGroupIdMap;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.PeekableIntIterator;
@@ -74,6 +78,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
   private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
   private static final int MAX_DICTIONARY_INTERN_TABLE_SIZE = 10000;
+  // Initial-size hint for off-heap key tables: bounded so sparse/filtered queries do not over-allocate, while
+  // high-cardinality queries reach their final size in a few cheap doublings
+  private static final int OFF_HEAP_INITIAL_ENTRIES_HINT = 8192;
 
   @VisibleForTesting
   static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
@@ -123,6 +130,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
       boolean nullHandlingEnabled, @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
+    this(projectOperator, groupByExpressions, numGroupsLimit, arrayBasedThreshold,
+        nullHandlingEnabled, groupByExpressionSizesFromPredicates, false);
+  }
+
+  public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
+      boolean nullHandlingEnabled, @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates,
+      boolean offHeap) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
 
@@ -197,16 +212,24 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     if (longOverflow) {
       // ArrayMapBasedHolder
       _globalGroupIdUpperBound = cappedNumGroupsLimit;
-      Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
-      clearAndTrim(groupIdMap);
-      _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
+      if (offHeap) {
+        _rawKeyHolder = new OffHeapArrayMapBasedHolder();
+      } else {
+        Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
+        clearAndTrim(groupIdMap);
+        _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
+      }
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         // LongMapBasedHolder
         _globalGroupIdUpperBound = cappedNumGroupsLimit;
-        Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
-        clearAndTrim(groupIdMap);
-        _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
+        if (offHeap) {
+          _rawKeyHolder = new OffHeapLongMapBasedHolder();
+        } else {
+          Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
+          clearAndTrim(groupIdMap);
+          _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
+        }
       } else {
         _globalGroupIdUpperBound = (int) Math.min(cardinalityProduct, cappedNumGroupsLimit);
         // arrayBaseHolder fails with ArrayIndexOutOfBoundsException if numGroupsLimit < cardinalityProduct
@@ -219,9 +242,13 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct
             || optimizedGroupCountUpperBound < cardinalityProduct) {
           // IntMapBasedHolder
-          IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
-          groupIdMap.clearAndTrim();
-          _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
+          if (offHeap) {
+            _rawKeyHolder = new OffHeapIntMapBasedHolder();
+          } else {
+            IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
+            groupIdMap.clearAndTrim();
+            _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
+          }
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
         }
@@ -1075,6 +1102,239 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       groupKeys[i] = getRawValue(i, rawKey._elements[i]);
     }
     return groupKeys;
+  }
+
+  /// Off-heap variant of [IntMapBasedHolder]: same int raw keys and 8-byte slot layout, but the key table
+  /// lives in direct memory. Released through [#close()], never cached across queries.
+  private class OffHeapIntMapBasedHolder implements RawKeyHolder {
+    // Unlike the LongMap/ArrayMap tiers (whose upper bound is just numGroupsLimit), this tier's upper bound is the
+    // exact dict-cardinality product, so pre-sizing to it (capped) is measurement-backed: JMH DICT_INT (80K groups,
+    // 4 segments) shows the expand chain costs ~2.3ms/query (+22% latency) when starting from the small hint, while
+    // the sparse-shape downside is one bounded bulk zero-fill (<=8MB, ~0.2ms) — and predicate-derived bounds
+    // already shrink the upper bound for selective IN/EQ filters.
+    private final OffHeapIntGroupIdMap _groupIdMap =
+        new OffHeapIntGroupIdMap(Math.min(_globalGroupIdUpperBound, 1 << 20));
+
+    @Override
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
+      if (_numGroupByExpressions == 1) {
+        int[] dictIds = _singleValueDictIds[0];
+        for (int i = 0; i < numDocs; i++) {
+          outGroupIds[i] = _groupIdMap.getGroupId(dictIds[i], _globalGroupIdUpperBound);
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          int rawKey = 0;
+          for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
+            rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
+          }
+          outGroupIds[i] = _groupIdMap.getGroupId(rawKey, _globalGroupIdUpperBound);
+        }
+      }
+    }
+
+    @Override
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        int[] groupIds = getIntRawKeys(i);
+        int length = groupIds.length;
+        for (int j = 0; j < length; j++) {
+          groupIds[j] = _groupIdMap.getGroupId(groupIds[j], _globalGroupIdUpperBound);
+        }
+        outGroupIds[i] = groupIds;
+      }
+    }
+
+    @Override
+    public int getGroupIdUpperBound() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public Iterator<GroupKey> getGroupKeys() {
+      return new Iterator<>() {
+        private final Iterator<OffHeapIntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
+        private final GroupKey _groupKey = new GroupKey();
+
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public GroupKey next() {
+          OffHeapIntGroupIdMap.Entry entry = _iterator.next();
+          _groupKey._groupId = entry._groupId;
+          _groupKey._keys = getKeys(entry._rawKey);
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      _groupIdMap.close();
+    }
+  }
+
+  /// Off-heap variant of [LongMapBasedHolder]: same long raw keys, key table in direct memory.
+  private class OffHeapLongMapBasedHolder implements RawKeyHolder {
+    private final OffHeapLongGroupIdMap _groupIdMap =
+        new OffHeapLongGroupIdMap(Math.min(_globalGroupIdUpperBound, OFF_HEAP_INITIAL_ENTRIES_HINT));
+
+    @Override
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        long rawKey = 0L;
+        for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
+          rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
+        }
+        outGroupIds[i] = _groupIdMap.getGroupId(rawKey, _globalGroupIdUpperBound);
+      }
+    }
+
+    @Override
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        long[] rawKeys = getLongRawKeys(i);
+        int length = rawKeys.length;
+        int[] groupIds = new int[length];
+        for (int j = 0; j < length; j++) {
+          groupIds[j] = _groupIdMap.getGroupId(rawKeys[j], _globalGroupIdUpperBound);
+        }
+        outGroupIds[i] = groupIds;
+      }
+    }
+
+    @Override
+    public int getGroupIdUpperBound() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public Iterator<GroupKey> getGroupKeys() {
+      return new Iterator<>() {
+        private final Iterator<OffHeapLongGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
+        private final GroupKey _groupKey = new GroupKey();
+
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public GroupKey next() {
+          OffHeapLongGroupIdMap.Entry entry = _iterator.next();
+          _groupKey._groupId = entry._groupId;
+          _groupKey._keys = getKeys(entry._rawKey);
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      _groupIdMap.close();
+    }
+  }
+
+  /// Off-heap variant of [ArrayMapBasedHolder]: the dictionary ids of all group-by columns are packed into a
+  /// fixed-width byte key (4 bytes per column) held in a direct-memory two-part hash table. Unlike the on-heap
+  /// variant, the per-row lookup is allocation-free (no `IntArray` per row).
+  private class OffHeapArrayMapBasedHolder implements RawKeyHolder {
+    private final OffHeapBytesGroupIdMap _groupIdMap =
+        new OffHeapBytesGroupIdMap(Math.min(_globalGroupIdUpperBound, OFF_HEAP_INITIAL_ENTRIES_HINT));
+    private final byte[] _keyScratch = new byte[_numGroupByExpressions * Integer.BYTES];
+    private final int[] _dictIdScratch = new int[_numGroupByExpressions];
+
+    @Override
+    public void processSingleValue(int numDocs, int[] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        for (int j = 0; j < _numGroupByExpressions; j++) {
+          _dictIdScratch[j] = _singleValueDictIds[j][i];
+        }
+        int keyLength = OffHeapGroupByUtils.packInts(_dictIdScratch, _numGroupByExpressions, _keyScratch);
+        outGroupIds[i] = _groupIdMap.getGroupId(_keyScratch, 0, keyLength, _globalGroupIdUpperBound);
+      }
+    }
+
+    @Override
+    public void processMultiValue(int numDocs, int[][] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        IntArray[] rawKeys = getIntArrayRawKeys(i);
+        int length = rawKeys.length;
+        int[] groupIds = new int[length];
+        for (int j = 0; j < length; j++) {
+          int keyLength = OffHeapGroupByUtils.packInts(rawKeys[j]._elements, _numGroupByExpressions, _keyScratch);
+          groupIds[j] = _groupIdMap.getGroupId(_keyScratch, 0, keyLength, _globalGroupIdUpperBound);
+        }
+        outGroupIds[i] = groupIds;
+      }
+    }
+
+    @Override
+    public int getGroupIdUpperBound() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public Iterator<GroupKey> getGroupKeys() {
+      return new Iterator<>() {
+        private final IntArray _rawKey = new IntArray(new int[_numGroupByExpressions]);
+        private final GroupKey _groupKey = new GroupKey();
+        private int _currentGroupId;
+
+        @Override
+        public boolean hasNext() {
+          return _currentGroupId < _groupIdMap.size();
+        }
+
+        @Override
+        public GroupKey next() {
+          _groupIdMap.readKey(_currentGroupId, _keyScratch, 0);
+          OffHeapGroupByUtils.unpackInts(_keyScratch, _numGroupByExpressions, _rawKey._elements);
+          _groupKey._groupId = _currentGroupId;
+          _groupKey._keys = getKeys(_rawKey);
+          _currentGroupId++;
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
+    }
+
+    @Override
+    public void close() {
+      _groupIdMap.close();
+    }
   }
 
   /// Fast int-to-int hashmap with [#INVALID_ID] as the default return value.

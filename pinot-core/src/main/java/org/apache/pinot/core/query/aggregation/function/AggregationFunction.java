@@ -150,6 +150,18 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// See the null contract on [AggregationFunction].
   GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity);
 
+  /// Returns a group-by result holder that keeps this function's per-group state in off-heap memory, or `null`
+  /// (the default) when the function has no off-heap state implementation and should keep its on-heap holder.
+  ///
+  /// Only consulted when off-heap group-by is enabled for the query. A non-null holder must implement
+  /// [AutoCloseable] — the executor registers it on the query's resource tracker so the existing group key
+  /// generator close sites release the direct memory — and must be indistinguishable from the on-heap holder
+  /// through [#extractGroupByResult], including returning `null` for untouched groups.
+  @Nullable
+  default GroupByResultHolder createOffHeapGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return null;
+  }
+
   /// Performs aggregation on the given block value sets (aggregation only).
   ///
   /// With null handling enabled, null rows must be skipped rather than folded in as the column's default. See the null

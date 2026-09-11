@@ -125,6 +125,19 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
+    try {
+      return processAndBuildResultsBlock(groupByExecutor);
+    } catch (Throwable t) {
+      // Release group-by resources (including off-heap key tables and result holders) that would otherwise leak.
+      // On the success path, ownership either ends inside processAndBuildResultsBlock (trim/sort paths close the
+      // generator there) or moves to the results block consumer (the combine operator closes the generator after
+      // merging the AggregationGroupByResult). Close is idempotent on all generators.
+      groupByExecutor.getGroupKeyGenerator().close();
+      throw t;
+    }
+  }
+
+  private GroupByResultsBlock processAndBuildResultsBlock(GroupByExecutor groupByExecutor) {
     ValueBlock valueBlock;
 
     while ((valueBlock = _projectOperator.nextBlock()) != null) {

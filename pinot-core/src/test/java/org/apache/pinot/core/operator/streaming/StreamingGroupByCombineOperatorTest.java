@@ -38,6 +38,7 @@ import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapGroupByBufferPool;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -46,6 +47,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -475,6 +477,93 @@ public class StreamingGroupByCombineOperatorTest {
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
     }
     return new CombinePlanNode(planNodes, queryContext, EXECUTOR, block -> { }).run();
+  }
+
+  /// With `groupByOffHeap`, every per-segment group-key table and fixed-width result holder lives in direct
+  /// memory owned by the block's group key generator. On the streaming path the generator is closed on the
+  /// producing worker thread by [StreamingGroupByCombineOperator#detachFromWorkerThreadState], so after a fully
+  /// consumed query no direct memory may remain allocated. High-cardinality segments (> the array-based
+  /// threshold of 10000 groups) force the map-based tier, which is the one the off-heap mode replaces.
+  @Test
+  public void testOffHeapStreamingGroupByReleasesDirectMemory()
+      throws Exception {
+    runOffHeapStreamingAndAssertNoDirectMemoryLeak(false);
+  }
+
+  /// The abandonment variant: the consumer stops after the first flushed block, leaving undrained blocks in the
+  /// hand-off queue and workers mid-stream. Because raw results are detached (and their generators closed) on
+  /// the worker thread *before* hand-off, abandoned queued blocks hold no off-heap state, and the exception
+  /// guards in the per-segment operators cover workers interrupted mid-segment — so direct memory must still
+  /// return to the baseline after stop().
+  @Test
+  public void testOffHeapStreamingGroupByReleasesDirectMemoryOnEarlyStop()
+      throws Exception {
+    runOffHeapStreamingAndAssertNoDirectMemoryLeak(true);
+  }
+
+  private void runOffHeapStreamingAndAssertNoDirectMemoryLeak(boolean abandonAfterFirstBlock)
+      throws Exception {
+    int numSegments = 4;
+    int numGroups = 12_000;
+    int flushThreshold = 1000;
+
+    File offHeapDir = new File(FileUtils.getTempDirectory(), "StreamingGroupByCombineOperatorTest_offHeap");
+    FileUtils.deleteDirectory(offHeapDir);
+    List<IndexSegment> segments = new ArrayList<>(numSegments);
+    try {
+      for (int i = 0; i < numSegments; i++) {
+        segments.add(createHighCardinalitySegment(offHeapDir, i, numGroups));
+      }
+      // Disable pooling so every released buffer is freed immediately and the usage returns to the exact baseline
+      OffHeapGroupByBufferPool.setMaxBytesPerThread(0);
+      long directBufferBaseline = PinotDataBuffer.getDirectBufferUsage();
+
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY groupColumn LIMIT " + numGroups);
+      queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      queryContext.setGroupByOffHeap(true);
+
+      List<Operator> operators = new ArrayList<>(numSegments);
+      for (IndexSegment segment : segments) {
+        operators.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment), queryContext).run());
+      }
+      StreamingGroupByCombineOperator combineOperator =
+          new StreamingGroupByCombineOperator(operators, queryContext, EXECUTOR, flushThreshold);
+
+      Map<Integer, Double> groupSums = new HashMap<>();
+      combineOperator.start();
+      try {
+        BaseResultsBlock block = combineOperator.nextBlock();
+        while (!(block instanceof MetadataResultsBlock)) {
+          assertNull(block.getErrorMessages(), "Expected no errors but got: " + block.getErrorMessages());
+          for (Object[] row : ((GroupByResultsBlock) block).getRows()) {
+            groupSums.merge((int) row[0], ((Number) row[1]).doubleValue(), Double::sum);
+          }
+          if (abandonAfterFirstBlock) {
+            break;
+          }
+          block = combineOperator.nextBlock();
+        }
+      } finally {
+        // stop() joins the worker threads, so once it returns every generator close has happened
+        combineOperator.stop();
+      }
+
+      if (!abandonAfterFirstBlock) {
+        assertEquals(groupSums.size(), numGroups, "Wrong number of groups");
+        for (int g = 0; g < numGroups; g++) {
+          assertEquals(groupSums.get(g), numSegments * (double) (g + 1), 0.001, "Incorrect sum for group " + g);
+        }
+      }
+      assertEquals(PinotDataBuffer.getDirectBufferUsage(), directBufferBaseline,
+          "Off-heap group-by state leaked on the streaming path (abandonAfterFirstBlock=" + abandonAfterFirstBlock
+              + ")");
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(offHeapDir);
+    }
   }
 
   private List<Operator> buildOperators(QueryContext queryContext) {
