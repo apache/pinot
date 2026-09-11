@@ -51,4 +51,13 @@ public interface GroupByExecutor {
   GroupKeyGenerator getGroupKeyGenerator();
 
   GroupByResultHolder[] getGroupByResultHolders();
+
+  /// For a grouping-set query, whether this executor aggregated only the BASE (union) grouping so the caller
+  /// must derive the individual grouping-set records from the base groups (see
+  /// [org.apache.pinot.core.util.GroupByUtils#buildGroupingSetsResultsBlockFromBaseGroups]), rather than the
+  /// executor having expanded each row into one group per grouping set. Always `false` for non-grouping-set
+  /// queries. Resolving this on the executor keeps the base-vs-expansion decision in a single place.
+  default boolean isGroupingSetsBaseAggregation() {
+    return false;
+  }
 }

@@ -422,6 +422,67 @@ public class TableResizer {
     return result;
   }
 
+  /// Per-set bucketed trim over already-built [IntermediateRecord]s (the base-aggregation derive path produces
+  /// these directly rather than via a [GroupKeyGenerator]). Keeps the top `perSetSize` records WITHIN each
+  /// grouping set, bucketed by the `discriminatorColumnIndex` ($groupingId) value, with the same across-set
+  /// anti-starvation guarantee and approximation caveats as [#trimInSegmentResultsByGroupingSet].
+  public List<IntermediateRecord> trimInSegmentRecordsByGroupingSet(Collection<IntermediateRecord> records,
+      int perSetSize, int discriminatorColumnIndex) {
+    Comparator<IntermediateRecord> worstFirst = _intermediateRecordComparator.reversed();
+    Map<Integer, PriorityQueue<IntermediateRecord>> bucketsByGroupingId = new HashMap<>();
+    for (IntermediateRecord record : records) {
+      // The derive path builds IntermediateRecords without order-by values; recompute them so the per-set
+      // comparator can rank records within each bucket.
+      IntermediateRecord withValues = getIntermediateRecord(record._key, record._record);
+      int groupingId = ((Number) withValues._record.getValues()[discriminatorColumnIndex]).intValue();
+      PriorityQueue<IntermediateRecord> heap =
+          bucketsByGroupingId.computeIfAbsent(groupingId, k -> new PriorityQueue<>(worstFirst));
+      if (heap.size() < perSetSize) {
+        heap.offer(withValues);
+      } else if (_intermediateRecordComparator.compare(withValues, heap.peek()) < 0) {
+        heap.poll();
+        heap.offer(withValues);
+      }
+    }
+    List<IntermediateRecord> result = new ArrayList<>();
+    for (PriorityQueue<IntermediateRecord> heap : bucketsByGroupingId.values()) {
+      result.addAll(heap);
+    }
+    return result;
+  }
+
+  /// Per-set bucketed trim over a FINISHED [IndexedTable]'s records (the base-aggregation server derive produces
+  /// a full grouping-set table, then trims it). Keeps the top `perSetSize` records WITHIN each grouping set,
+  /// bucketed by the `discriminatorColumnIndex` ($groupingId) value, with the same across-set anti-starvation
+  /// guarantee and approximation caveats as [#trimInSegmentResultsByGroupingSet]. The table's records carry the
+  /// key columns in front, so the [Key] is reconstructed from the leading `_numKeyColumns` values.
+  public List<IntermediateRecord> trimTableByGroupingSet(IndexedTable table, int perSetSize,
+      int discriminatorColumnIndex) {
+    Comparator<IntermediateRecord> worstFirst = _intermediateRecordComparator.reversed();
+    Map<Integer, PriorityQueue<IntermediateRecord>> bucketsByGroupingId = new HashMap<>();
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      Record record = iterator.next();
+      Object[] values = record.getValues();
+      IntermediateRecord withValues =
+          getIntermediateRecord(new Key(Arrays.copyOf(values, _numKeyColumns)), record);
+      int groupingId = ((Number) values[discriminatorColumnIndex]).intValue();
+      PriorityQueue<IntermediateRecord> heap =
+          bucketsByGroupingId.computeIfAbsent(groupingId, k -> new PriorityQueue<>(worstFirst));
+      if (heap.size() < perSetSize) {
+        heap.offer(withValues);
+      } else if (_intermediateRecordComparator.compare(withValues, heap.peek()) < 0) {
+        heap.poll();
+        heap.offer(withValues);
+      }
+    }
+    List<IntermediateRecord> result = new ArrayList<>();
+    for (PriorityQueue<IntermediateRecord> heap : bucketsByGroupingId.values()) {
+      result.addAll(heap);
+    }
+    return result;
+  }
+
   /// Constructs an IntermediateRecord for the given group.
   private IntermediateRecord getIntermediateRecord(GroupKeyGenerator.GroupKey groupKey,
       GroupByResultHolder[] groupByResultHolders) {

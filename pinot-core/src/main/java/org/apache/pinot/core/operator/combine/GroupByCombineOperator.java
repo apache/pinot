@@ -55,10 +55,19 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   private final int _numAggregationFunctions;
-  /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
-  /// Key columns precede the aggregation columns in the record layout.
-  private final int _numKeyColumns;
-  private final int _numColumns;
+  /// Number of key columns used while MERGING segment results. For a base-aggregation grouping-set query this is
+  /// the number of union group-by columns (segments emit base groups without the synthetic $groupingId column,
+  /// which is added later while deriving); otherwise it is the full group-by key count (union columns plus the
+  /// $groupingId column for expansion-path grouping sets). Key columns precede the aggregation columns.
+  ///
+  /// Resolved from the first result block's schema (which reflects whether the segment chose base aggregation or
+  /// expansion, including the MV-column carve-out) rather than the query context alone, so it always matches the
+  /// records actually emitted.
+  private int _numKeyColumns;
+  private int _numColumns;
+  /// Whether segments emitted BASE groups (union grouping only) that this combine merges and then derives into
+  /// the individual grouping sets in [#mergeResults()]. See [QueryContext#isGroupingSetsBaseAggregation].
+  private boolean _groupingSetsBaseAggregation;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
@@ -75,6 +84,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
+    // Default (non-grouping-set / expansion-path) key layout. For base aggregation this is corrected to the
+    // base (union-only) key layout once the first result block reveals its schema (see #resolveMergeLayout).
     _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numKeyColumns + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
@@ -109,6 +120,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
+              resolveMergeLayout(resultsBlock);
               _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
                   _executorService);
             }
@@ -172,6 +184,24 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
   }
 
+  /// Resolves the merge-time record layout from the first result block's schema. A base-aggregation grouping-set
+  /// segment emits base groups whose schema has no synthetic $groupingId column, so it has exactly
+  /// `numUnionColumns + numAggregationFunctions` columns; the expansion path (and non-grouping-set queries)
+  /// carries the full `$groupingId`-including layout. Deriving the mode from the schema (rather than the query
+  /// context alone) also covers the MV-column carve-out, where a grouping-set query still uses expansion.
+  /// Must be called under the same synchronization that guards the one-time `_indexedTable` creation.
+  private void resolveMergeLayout(GroupByResultsBlock resultsBlock) {
+    if (_queryContext.isGroupingSets()) {
+      int numUnionColumns = _queryContext.getGroupByExpressions().size();
+      int numBaseColumns = numUnionColumns + _numAggregationFunctions;
+      if (resultsBlock.getDataSchema() != null && resultsBlock.getDataSchema().size() == numBaseColumns) {
+        _groupingSetsBaseAggregation = true;
+        _numKeyColumns = numUnionColumns;
+        _numColumns = numBaseColumns;
+      }
+    }
+  }
+
   @Override
   public void onProcessSegmentsException(Throwable t) {
     _processingException.compareAndSet(null, t);
@@ -221,6 +251,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     IndexedTable indexedTable = _indexedTable;
+    /// Base aggregation: `indexedTable` holds the merged BASE groups (union grouping). Derive the individual
+    /// grouping sets from them once, in parallel across the combine executor, into the final grouping-set table.
+    /// This is where the per-set fan-out happens -- after the row-collapsing base merge and multi-threaded, so
+    /// it never repeats the per-row expansion the segment phase would otherwise pay.
+    if (_groupingSetsBaseAggregation) {
+      indexedTable = GroupByUtils.deriveGroupingSetsFromMergedBaseTable(indexedTable, _queryContext, _numTasks,
+          _executorService);
+    }
     if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
