@@ -21,7 +21,6 @@ package org.apache.pinot.common.metadata.columndeletion;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;

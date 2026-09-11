@@ -25,25 +25,27 @@ import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.spi.data.SchemaDiff;
 
 
 /// Dirty-segment predicate for an explicit column deletion.
 ///
-/// A live segment is dirty for deletion D when:
+/// A live segment is dirty for deletion D when any of these hold:
 /// <ol>
-///   <li>it predates D's immutable epoch (segment creation time, or a recorded eligibility time), and</li>
-///   <li>it has no successful deletion refresh marker whose CRC matches the current segment CRC, and</li>
-///   <li>cheap physical-absence metadata, if supplied, does not prove the logical column is gone.</li>
+///   <li>a {@link ColumnDeletionPhysicalOverride} says the logical column, or an OPEN_STRUCT child
+///       of it, is still physically present (this overrides {@code ctime} and CRC markers), or</li>
+///   <li>the segment predates D's immutable epoch (creation time, or a recorded eligibility time)
+///       and has no successful deletion CRC marker, and the caller did not positively prove the
+///       logical column absent.</li>
 /// </ol>
 ///
-/// Missing metadata is never treated as proof of cleanliness. {@code RefreshSegmentTask.time} alone
-/// is not a successful marker because today's refresh executor can write that key on a no-op skip
-/// without changing CRC.
+/// Missing metadata is never treated as proof of cleanliness. {@code RefreshSegmentTask.time} is
+/// not a successful marker: today's refresh executor can write that key on a no-op skip without
+/// changing CRC.
 ///
-/// Callers pass only live segments (IdealState / ZK metadata still present, not replaced). This
-/// helper does not consult IdealState itself. In-flight tasks that could still install an older CRC
-/// are also the caller's responsibility.
+/// This helper does not read segment files. Callers that can see physical names pass a
+/// {@link ColumnDeletionPhysicalOverride}. It also does not mark
+/// {@link ColumnDeletionState#COMPLETE}. An empty {@code liveSegments} list yields an empty dirty
+/// set and is not cleanup: deep-store objects and later uploads can still hold the column.
 ///
 /// Thread-safe: the helper is stateless.
 public final class ColumnDeletionDirtySegmentPredicate {
@@ -65,8 +67,11 @@ public final class ColumnDeletionDirtySegmentPredicate {
 
   /// True when {@code segment} still needs reclamation for {@code entry}.
   public static boolean isDirty(SegmentZKMetadata segment, ColumnDeletionEntry entry, boolean ignoreCase,
-      @Nullable Set<String> columnsProvenAbsent) {
-    if (isColumnProvenAbsent(entry.getColumnName(), ignoreCase, columnsProvenAbsent)) {
+      @Nullable ColumnDeletionPhysicalOverride physicalOverride) {
+    if (physicalOverride != null && physicalOverride.indicatesPresent(entry.getColumnName(), ignoreCase)) {
+      return true;
+    }
+    if (physicalOverride != null && physicalOverride.provesLogicalColumnAbsent(entry.getColumnName(), ignoreCase)) {
       return false;
     }
     if (!predatesDeletion(segment, entry.getDeletionEpochMs())) {
@@ -76,13 +81,17 @@ public final class ColumnDeletionDirtySegmentPredicate {
   }
 
   /// Segment names from {@code liveSegments} that are dirty for {@code entry}, sorted.
+  ///
+  /// An empty result is not {@link ColumnDeletionState#COMPLETE}, including when
+  /// {@code liveSegments} itself is empty.
   public static List<String> findDirtySegmentNames(Collection<SegmentZKMetadata> liveSegments,
-      ColumnDeletionEntry entry, boolean ignoreCase, @Nullable Map<String, Set<String>> provenAbsentColumnsBySegment) {
+      ColumnDeletionEntry entry, boolean ignoreCase,
+      @Nullable Map<String, ColumnDeletionPhysicalOverride> physicalOverrideBySegment) {
     Set<String> dirty = new TreeSet<>();
     for (SegmentZKMetadata segment : liveSegments) {
-      Set<String> provenAbsent =
-          provenAbsentColumnsBySegment == null ? null : provenAbsentColumnsBySegment.get(segment.getSegmentName());
-      if (isDirty(segment, entry, ignoreCase, provenAbsent)) {
+      ColumnDeletionPhysicalOverride override =
+          physicalOverrideBySegment == null ? null : physicalOverrideBySegment.get(segment.getSegmentName());
+      if (isDirty(segment, entry, ignoreCase, override)) {
         dirty.add(segment.getSegmentName());
       }
     }
@@ -90,15 +99,18 @@ public final class ColumnDeletionDirtySegmentPredicate {
   }
 
   /// Union of dirty segment names across every active (non-complete) deletion on the table.
+  ///
+  /// An empty result is not {@link ColumnDeletionState#COMPLETE}, including when
+  /// {@code liveSegments} itself is empty.
   public static List<String> findDirtySegmentNames(Collection<SegmentZKMetadata> liveSegments,
       ColumnDeletionMetadata metadata, boolean ignoreCase,
-      @Nullable Map<String, Set<String>> provenAbsentColumnsBySegment) {
+      @Nullable Map<String, ColumnDeletionPhysicalOverride> physicalOverrideBySegment) {
     Set<String> dirty = new TreeSet<>();
     for (ColumnDeletionEntry entry : metadata.getEntries().values()) {
       if (!entry.blocksReAdd()) {
         continue;
       }
-      dirty.addAll(findDirtySegmentNames(liveSegments, entry, ignoreCase, provenAbsentColumnsBySegment));
+      dirty.addAll(findDirtySegmentNames(liveSegments, entry, ignoreCase, physicalOverrideBySegment));
     }
     return List.copyOf(dirty);
   }
@@ -126,24 +138,12 @@ public final class ColumnDeletionDirtySegmentPredicate {
     if (customMap == null) {
       return false;
     }
+    // RefreshSegmentTask.time is intentionally ignored. A matching CRC for this deletionId is required.
     String markedCrc = customMap.get(processedCrcKey(deletionId));
     if (markedCrc == null) {
       return false;
     }
     long currentCrc = segment.getCrc();
     return currentCrc >= 0 && markedCrc.equals(Long.toString(currentCrc));
-  }
-
-  private static boolean isColumnProvenAbsent(String columnName, boolean ignoreCase,
-      @Nullable Set<String> columnsProvenAbsent) {
-    if (columnsProvenAbsent == null || columnsProvenAbsent.isEmpty()) {
-      return false;
-    }
-    for (String provenAbsent : columnsProvenAbsent) {
-      if (SchemaDiff.columnNamesEqual(columnName, provenAbsent, ignoreCase)) {
-        return true;
-      }
-    }
-    return false;
   }
 }
