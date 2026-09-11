@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.Striped;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +88,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+  // Serialize table creation with the previous owner's entire shutdown, including table-scoped resource cleanup.
+  // Acquire it before changing the manager map, and release it before calling the table's segment-add methods.
+  private final Striped<Lock> _tableLifecycleLocks = Striped.lock(1024);
 
   // Logical table metadata cache to cache logical table configs, schemas, and offline/realtime table configs.
   private final LogicalTableMetadataCache _logicalTableMetadataCache = new LogicalTableMetadataCache();
@@ -308,37 +312,54 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception {
-    AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
-    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      _recentlyDeletedTables.put(k, deletionTimeMs);
-      tableDataManagerRef.set(v);
-      return null;
-    });
-    TableDataManager tableDataManager = tableDataManagerRef.get();
-    if (tableDataManager == null) {
-      LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
-      return;
+    Lock lifecycleLock = _tableLifecycleLocks.get(tableNameWithType);
+    lifecycleLock.lock();
+    try {
+      AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
+      _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
+        _recentlyDeletedTables.put(k, deletionTimeMs);
+        tableDataManagerRef.set(v);
+        return null;
+      });
+      TableDataManager tableDataManager = tableDataManagerRef.get();
+      if (tableDataManager == null) {
+        LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
+        return;
+      }
+      // Shutdown can wait for segment callbacks, so do not run it inside a map computation.
+      LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
+      tableDataManager.setDeleted(true);
+      tableDataManager.shutDown();
+      LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
+    } finally {
+      lifecycleLock.unlock();
     }
-    LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
-    tableDataManager.setDeleted(true);
-    tableDataManager.shutDown();
-    LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
   }
 
   @Override
   public void addOnlineSegment(String tableNameWithType, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager).addOnlineSegment(segmentName);
+    getOrCreateTableDataManager(tableNameWithType).addOnlineSegment(segmentName);
   }
 
   @Override
   public void addConsumingSegment(String realtimeTableName, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(realtimeTableName, this::createTableDataManager)
-        .addConsumingSegment(segmentName);
+    getOrCreateTableDataManager(realtimeTableName).addConsumingSegment(segmentName);
   }
 
-  private TableDataManager createTableDataManager(String tableNameWithType) {
+  private TableDataManager getOrCreateTableDataManager(String tableNameWithType) {
+    Lock lifecycleLock = _tableLifecycleLocks.get(tableNameWithType);
+    lifecycleLock.lock();
+    try {
+      return _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager);
+    } finally {
+      lifecycleLock.unlock();
+    }
+  }
+
+  @VisibleForTesting
+  TableDataManager createTableDataManager(String tableNameWithType) {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
     TableConfig tableConfig;
     Long tableDeleteTimeMs = _recentlyDeletedTables.getIfPresent(tableNameWithType);
