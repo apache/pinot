@@ -23,18 +23,42 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.stream.StreamPartitionIdentity;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 
+/// Low-level consumer segment name.
+///
+/// V1 (4 tokens): `{rawTable}__{partitionGroupId}__{sequence}__{creationTime}`
+///
+/// V2 (6 tokens): `{rawTable}__v2__{topicId}__{partitionId}__{sequence}__{creationTime}`
+///
+/// The version token is the literal `v2`, so a name is self-describing without ZK. Uploaded
+/// realtime names stay 5 tokens (`prefix__table__partition__time__suffix`) and are not LLC.
+/// Do not accept a 5-token `table__configId__partition__seq__time` name (apache/pinot#18830).
+///
+/// V1 constructors and generated names are unchanged. Production writers must keep using the
+/// 4-arg constructor. [formatV2] exists for parse/format tests and a later writer PR.
+///
+/// `getPartitionGroupId()` stays an `int` and is V1-only. New call sites should use
+/// [getStreamPartitionIdentity] rather than a packed int or a `TopicPartitionId` wrapper
+/// (apache/pinot#18913).
 public class LLCSegmentName implements Comparable<LLCSegmentName> {
+  public static final int FORMAT_VERSION_V1 = StreamPartitionIdentity.FORMAT_VERSION_V1;
+  public static final int FORMAT_VERSION_V2 = StreamPartitionIdentity.FORMAT_VERSION_V2;
+
   private static final String SEPARATOR = "__";
+  private static final String V2_TOKEN = "v2";
   private static final String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
 
+  private final int _formatVersion;
   private final String _tableName;
   private final int _partitionGroupId;
+  private final int _topicId;
+  private final int _partitionId;
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
@@ -42,8 +66,11 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
+    _formatVersion = FORMAT_VERSION_V1;
     _tableName = parts[0];
     _partitionGroupId = Integer.parseInt(parts[1]);
+    _topicId = StreamPartitionIdentity.UNKNOWN_TOPIC_ID;
+    _partitionId = StreamPartitionIdentity.UNKNOWN_PARTITION_ID;
     _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
     _segmentName = segmentName;
@@ -51,12 +78,28 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
+    _formatVersion = FORMAT_VERSION_V1;
     _tableName = tableName;
     _partitionGroupId = partitionGroupId;
+    _topicId = StreamPartitionIdentity.UNKNOWN_TOPIC_ID;
+    _partitionId = StreamPartitionIdentity.UNKNOWN_PARTITION_ID;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+  }
+
+  /// Formats a V2 LLC name. Do not call this from production writers until the reader-first
+  /// gate is on. Topic and partition must be non-negative; `partitionId` may be
+  /// `0..Integer.MAX_VALUE`.
+  public static String formatV2(String tableName, int topicId, int partitionId, int sequenceNumber,
+      long msSinceEpoch) {
+    Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
+    Preconditions.checkArgument(topicId >= 0, "V2 topicId must be non-negative: %s", topicId);
+    Preconditions.checkArgument(partitionId >= 0, "V2 partitionId must be non-negative: %s", partitionId);
+    String creationTime = DATE_FORMATTER.print(msSinceEpoch);
+    return tableName + SEPARATOR + V2_TOKEN + SEPARATOR + topicId + SEPARATOR + partitionId + SEPARATOR + sequenceNumber
+        + SEPARATOR + creationTime;
   }
 
   /// Returns the [LLCSegmentName] for the given segment name, or `null` if the given segment name does not
@@ -90,8 +133,33 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return _tableName;
   }
 
+  public int getFormatVersion() {
+    return _formatVersion;
+  }
+
+  public boolean isV2() {
+    return _formatVersion == FORMAT_VERSION_V2;
+  }
+
+  /// V1 packed or raw partition-group int. V2 names have no packed id.
   public int getPartitionGroupId() {
     return _partitionGroupId;
+  }
+
+  /// Registry topic id. V1 names do not store one; do not infer it from `% 10000`.
+  public int getTopicId() {
+    Preconditions.checkState(isV2(), "V1 LLC segment name has no topic id: %s", _segmentName);
+    return _topicId;
+  }
+
+  /// Raw stream partition id from a V2 name.
+  public int getPartitionId() {
+    Preconditions.checkState(isV2(), "V1 LLC segment name has no raw partition id: %s", _segmentName);
+    return _partitionId;
+  }
+
+  public StreamPartitionIdentity getStreamPartitionIdentity() {
+    return isV2() ? StreamPartitionIdentity.v2(_topicId, _partitionId) : StreamPartitionIdentity.v1(_partitionGroupId);
   }
 
   public int getSequenceNumber() {
