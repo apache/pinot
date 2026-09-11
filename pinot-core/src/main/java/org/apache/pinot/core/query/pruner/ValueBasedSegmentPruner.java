@@ -43,6 +43,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -172,6 +173,10 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         allSelectedSegments.addAll(taskRes);
       }
     }, e -> {
+      Throwable cause = e.getCause();
+      if (cause instanceof QueryException) {
+        throw (QueryException) cause;
+      }
       if (e instanceof InterruptedException) {
         throw new QueryCancelledException("Cancelled while running " + getClass().getSimpleName(), e);
       }

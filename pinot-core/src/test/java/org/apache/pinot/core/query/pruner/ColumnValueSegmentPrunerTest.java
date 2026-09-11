@@ -45,8 +45,11 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -249,8 +252,6 @@ public class ColumnValueSegmentPrunerTest {
     assertTrue(PRUNER.isApplicableTo(queryContext));
   }
 
-  /// The pruner runs over every segment the server holds, so above a threshold it prunes across the query executor.
-  /// The parallel path must select exactly the same segments as the serial one.
   @Test
   public void testParallelPruningSelectsTheSameSegments() throws Exception {
     int numSegments = 40;
@@ -324,7 +325,44 @@ public class ColumnValueSegmentPrunerTest {
     }
   }
 
-  /// A canceled worker must stop before it accesses another segment, even when metadata reads never block.
+  @DataProvider
+  public Object[][] invalidPredicates() {
+    return new Object[][]{
+        {false, "column = 'potato'"},
+        {false, "column IN (1, 'potato')"},
+        {false, "column > 'potato'"},
+        {true, "column = 'potato'"},
+        {true, "column IN (1, 'potato')"}
+    };
+  }
+
+  @Test(dataProvider = "invalidPredicates", timeOut = 10_000)
+  public void testParallelPruningPreservesValidationErrors(boolean useBloomFilter, String predicate)
+      throws Exception {
+    IndexSegment segment = segmentWithRange(0, 50, () -> { });
+    QueryContext query = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE " + predicate);
+    query.setSchema(mock(Schema.class));
+    query.setMaxExecutionThreads(1);
+    query.setEndTimeMs(System.currentTimeMillis() + 30_000);
+    DataSource dataSource = segment.getDataSource("column", query.getSchema());
+    when(segment.getDataSourceNullable("column")).thenReturn(dataSource);
+    ValueBasedSegmentPruner pruner = useBloomFilter ? new BloomFilterSegmentPruner() : new ColumnValueSegmentPruner();
+    pruner.init(new PinotConfiguration());
+    List<IndexSegment> segments = Collections.nCopies(40, segment);
+    BadQueryRequestException serial = expectThrows(BadQueryRequestException.class, () -> pruner.prune(segments, query));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      BadQueryRequestException parallel = expectThrows(BadQueryRequestException.class,
+          () -> pruner.prune(segments, query, executor));
+      assertEquals(parallel.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+      assertEquals(parallel.getMessage(), serial.getMessage());
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
   @Test(timeOut = 10_000)
   public void testParallelPruningStopsInterruptedWorkerBetweenSegments() throws Exception {
     AtomicInteger visits = new AtomicInteger();
@@ -334,9 +372,8 @@ public class ColumnValueSegmentPrunerTest {
     });
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      RuntimeException failure = expectThrows(RuntimeException.class,
+      expectThrows(QueryCancelledException.class,
           () -> PRUNER.prune(Collections.nCopies(40, segment), pruningQuery(), executor));
-      assertTrue(ExceptionUtils.indexOfType(failure, QueryCancelledException.class) >= 0);
       assertEquals(visits.get(), 1, "An interrupted worker must not keep visiting segments");
     } finally {
       executor.shutdownNow();
