@@ -27,6 +27,7 @@ import {
   TableName,
   TableSize,
   IdealState,
+  QueryProgressStats,
   QueryTables,
   TableSchema,
   SQLResult,
@@ -298,6 +299,14 @@ export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>
 
 export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
   transformApi.post(`/sql`, params, {headers});
+
+export const getClientQueryProgress = (
+  clientQueryId: string,
+  timeoutMs = 1000
+): Promise<AxiosResponse<QueryProgressStats>> =>
+  baseApiWithErrors.get(`/clientQuery/${encodeURIComponent(clientQueryId)}/progress`, {
+    params: { timeoutMs },
+  });
 
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
   transformApi.post(`/query/timeseries`, params);

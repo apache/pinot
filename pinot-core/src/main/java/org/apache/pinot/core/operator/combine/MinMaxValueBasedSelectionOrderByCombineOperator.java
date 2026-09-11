@@ -142,6 +142,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     int operatorId;
     while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       if (operatorId >= _endOperatorId.get()) {
+        markSegmentProcessed();
         _blockingQueue.offer(EMPTY_RESULTS_BLOCK);
         continue;
       }
@@ -174,6 +175,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
               _endOperatorId.set(operatorId);
+              markSegmentProcessed();
               _blockingQueue.offer(EMPTY_RESULTS_BLOCK);
               continue;
             }
@@ -185,6 +187,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
               _endOperatorId.set(operatorId);
+              markSegmentProcessed();
               _blockingQueue.offer(EMPTY_RESULTS_BLOCK);
               continue;
             }
@@ -228,6 +231,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
         }
       }
       threadBoundaryValue = boundaryValue;
+      markSegmentProcessed();
       _blockingQueue.offer(resultsBlock);
     }
   }

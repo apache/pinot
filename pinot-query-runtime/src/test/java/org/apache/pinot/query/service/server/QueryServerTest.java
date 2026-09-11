@@ -59,6 +59,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -230,6 +231,32 @@ public class QueryServerTest extends QueryTestSet {
     assertTrue(responseHolder[0].getMetadataMap()
             .containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR),
         "Malformed metadata should still return an error response");
+  }
+
+  @Test
+  public void testGetQueryProgressReturnsNestedProgressPayload() {
+    Map.Entry<Integer, QueryRunner> queryRunnerEntry = _queryRunnerMap.entrySet().iterator().next();
+    int port = queryRunnerEntry.getKey();
+    QueryRunner queryRunner = queryRunnerEntry.getValue();
+    QueryProgressStats detail = new QueryProgressStats("Stage 1", 2, 4, 1, 2, true);
+    QueryProgressStats progressStats = new QueryProgressStats("Server", 3, 6, 1, 2, true)
+        .withDetails(List.of(detail));
+    when(queryRunner.getQueryProgressStats(42L)).thenReturn(progressStats);
+    ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", port).usePlaintext().build();
+    try {
+      Worker.QueryProgressResponse response = PinotQueryWorkerGrpc.newBlockingStub(channel)
+          .withDeadline(Deadline.after(10, TimeUnit.SECONDS))
+          .getQueryProgress(Worker.QueryProgressRequest.newBuilder().setRequestId(42L).build());
+
+      assertTrue(response.hasProgress());
+      assertEquals(response.getProgress().getProcessedWorkUnits(), 3L);
+      assertEquals(response.getProgress().getTotalWorkUnits(), 6L);
+      assertEquals(response.getProgress().getDetailsCount(), 1);
+      assertEquals(response.getProgress().getDetails(0).getLabel(), "Stage 1");
+    } finally {
+      channel.shutdownNow();
+      reset(queryRunner);
+    }
   }
 
   @Test(dataProvider = "testSql")
