@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -132,6 +133,14 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   @Override
   public StringBuilder visitWindow(WindowNode node, Context context) {
     return visitSimpleNode(node, context);
+  }
+
+  @Override
+  public StringBuilder visitMatch(MatchNode node, Context context) {
+    // MatchNode#explain() is just "MATCH_RECOGNIZE", which would render two different patterns identically. Append
+    // the pattern so the physical plan of a MATCH_RECOGNIZE query is self-describing.
+    appendInfo(node, context).append("(pattern=[").append(node.getPatternString()).append("])").append('\n');
+    return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
 
   @Override

@@ -90,6 +90,12 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
   }
 
   @Override
+  public T visitMatch(MatchNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
+  }
+
+  @Override
   public T visitSetOp(SetOpNode node, C context) {
     node.getInputs().forEach(input -> input.visit(this, context));
     return process(node, context);

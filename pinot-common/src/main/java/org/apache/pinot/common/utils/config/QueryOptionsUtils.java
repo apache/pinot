@@ -670,6 +670,18 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMaxRowsInMatchPartition(Map<String, String> queryOptions) {
+    String maxRowsInMatchPartition = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, maxRowsInMatchPartition);
+  }
+
+  @Nullable
+  public static Long getMaxStepsPerMatchAttempt(Map<String, String> queryOptions) {
+    String maxStepsPerMatchAttempt = queryOptions.get(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT);
+    return checkedParseLongPositive(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, maxStepsPerMatchAttempt);
+  }
+
+  @Nullable
   public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
     String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
     return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;

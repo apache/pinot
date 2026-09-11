@@ -93,6 +93,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.MatchRecognizeValidator;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -419,6 +420,19 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      // MATCH_RECOGNIZE checks and rewrites must run on the raw SqlNode tree: the omitted-vs-explicit AFTER MATCH
+      // distinction is lost during conversion to RelNode, and some unsupported constructs fail inside
+      // SqlToRelConverter with an assertion instead of a usable message. See MatchRecognizeValidator.
+      MatchRecognizeValidator matchRecognizeValidator = new MatchRecognizeValidator();
+      sqlNode.accept(matchRecognizeValidator);
+      if (matchRecognizeValidator.hasMatchRecognize() && plannerContext.isUsePhysicalOptimizer()) {
+        PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+        boolean useLiteMode = physicalPlannerContext != null && physicalPlannerContext.isUseLiteMode();
+        throw new MatchRecognizeValidator.UnsupportedMatchRecognizeException(
+            "MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
+                + (useLiteMode ? " in lite mode" : "")
+                + ". Retry with the query option 'usePhysicalOptimizer=false'.");
+      }
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);

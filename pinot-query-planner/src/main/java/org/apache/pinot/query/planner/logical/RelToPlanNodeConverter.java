@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
@@ -34,6 +36,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.Match;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
@@ -50,13 +53,18 @@ import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexCorrelVariable;
 import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
@@ -75,15 +83,20 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +106,13 @@ import org.slf4j.LoggerFactory;
 public final class RelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
+  /// Largest repetition count accepted in a MATCH_RECOGNIZE pattern quantifier such as `A{n,m}`. Every
+  /// repetition expands into pattern matcher state, so an unbounded count would let a tiny query request an
+  /// arbitrary amount of work. BigQuery applies the same limit.
+  static final int MAX_PATTERN_QUANTIFIER_BOUND = 10_000;
+  /// The value Calcite's parser writes for an unspecified MATCH_RECOGNIZE quantifier bound, i.e. the maximum of
+  /// `*` / `+` / `{n,}` and the minimum of `{,m}`.
+  private static final int UNSPECIFIED_QUANTIFIER_BOUND = -1;
   /// Pattern used to detect Calcite/Pinot auto-generated aliases such as expr$0, item0, ord0, arr0, unnest_col_0, col0.
   /// The matcher is case-insensitive because connectors may emit the aliases in different cases (e.g., EXPR$0 vs
   /// expr$0).
@@ -166,6 +186,8 @@ public final class RelToPlanNodeConverter {
         _windowFunctionFound = true;
       }
       result = convertLogicalWindow((LogicalWindow) node);
+    } else if (node instanceof Match) {
+      result = convertLogicalMatch((Match) node);
     } else if (node instanceof LogicalValues) {
       result = convertLogicalValues((LogicalValues) node);
     } else if (node instanceof SetOp) {
@@ -679,6 +701,376 @@ public final class RelToPlanNodeConverter {
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
         aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
+  }
+
+  /// Converts Calcite's [Match] (SQL:2016 MATCH_RECOGNIZE) into a [MatchNode].
+  ///
+  /// The main job is lowering Calcite's encoding of the `PATTERN` clause - a `RexCall` tree of
+  /// PATTERN_CONCAT / PATTERN_ALTER / PATTERN_QUANTIFIER over string literals - into the explicit
+  /// [RowPattern] tree, and binding every pattern variable reference to an ordinal in the symbol table so that
+  /// the operator never string-matches variable names.
+  ///
+  /// [org.apache.pinot.query.validate.MatchRecognizeValidator] runs on the `SqlNode` tree before
+  /// conversion: it rewrites an omitted `AFTER MATCH` to `SKIP PAST LAST ROW` (the SQL:2016 default, not
+  /// Calcite's `SKIP TO NEXT ROW`) and rejects the constructs that are not supported yet. No default is
+  /// re-applied here. The rejections repeated below are a safety net: [MatchNode] cannot represent those
+  /// constructs, so dropping one silently would return wrong rows.
+  private MatchNode convertLogicalMatch(Match node) {
+    if (node.isAllRows()) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "ALL ROWS PER MATCH is not supported yet in MATCH_RECOGNIZE. Use ONE ROW PER MATCH (the default) and "
+              + "expose the per-match values you need through the MEASURES clause.");
+    }
+    if (!node.getSubsets().isEmpty()) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "SUBSET is not supported yet in MATCH_RECOGNIZE. Remove the SUBSET clause and reference the individual "
+              + "pattern variables directly.");
+    }
+    if (node.getInterval() != null) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "WITHIN is not supported yet in MATCH_RECOGNIZE. Remove the WITHIN clause and bound the match with a "
+              + "predicate in the DEFINE clause instead.");
+    }
+    if (node.getMeasures().isEmpty()) {
+      // Calcite's SqlValidatorImpl.validateMatchRecognize sets the row type of a measures-less MATCH_RECOGNIZE to the
+      // whole input row type, which is not the ONE ROW PER MATCH shape at all. MatchRecognizeValidator already
+      // rejects this on the SqlNode tree; this is the safety net, because the output schema below would otherwise be
+      // silently wrong rather than merely unsupported.
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "MATCH_RECOGNIZE requires a MEASURES clause. ONE ROW PER MATCH emits the PARTITION BY columns plus the "
+              + "MEASURES, so add at least one measure, e.g. MEASURES MATCH_NUMBER() AS mno.");
+    }
+
+    validateMatchPartitionKeyTypes(node);
+    for (Map.Entry<String, RexNode> measure : node.getMeasures().entrySet()) {
+      validateMatchAggregateOperandTypes(measure.getValue(), measure.getKey());
+    }
+
+    // Order the symbol table by first appearance in PATTERN so the ordinals are deterministic and independent of the
+    // iteration order of Calcite's pattern definition map.
+    Map<String, Integer> symbolOrdinals = new LinkedHashMap<>();
+    collectPatternSymbols(node.getPattern(), symbolOrdinals);
+    Map<String, RexNode> patternDefinitions = node.getPatternDefinitions();
+    // A DEFINE for a variable that never appears in PATTERN is dead code, but keep it in the table rather than
+    // dropping it silently.
+    for (String name : patternDefinitions.keySet()) {
+      symbolOrdinals.putIfAbsent(name, symbolOrdinals.size());
+    }
+
+    List<PatternSymbol> patternSymbols = new ArrayList<>(symbolOrdinals.size());
+    for (String name : symbolOrdinals.keySet()) {
+      RexNode definition = patternDefinitions.get(name);
+      // Per SQL:2016 a pattern variable with no DEFINE entry matches every row; that is modeled as a null definition.
+      patternSymbols.add(new PatternSymbol(name,
+          definition != null ? toBoundRexExpression(definition, symbolOrdinals) : null));
+    }
+
+    List<MatchNode.Measure> measures = new ArrayList<>(node.getMeasures().size());
+    for (Map.Entry<String, RexNode> measure : node.getMeasures().entrySet()) {
+      measures.add(
+          new MatchNode.Measure(measure.getKey(), toBoundRexExpression(measure.getValue(), symbolOrdinals)));
+    }
+
+    RowPattern pattern =
+        withAnchors(toRowPattern(node.getPattern(), symbolOrdinals), node.isStrictStart(), node.isStrictEnd());
+
+    RexNode after = node.getAfter();
+    MatchNode.AfterMatchSkipMode afterMatchSkipMode = toAfterMatchSkipMode(after);
+    // Only SKIP TO FIRST / SKIP TO LAST have a target variable; the other modes keep NO_SKIP_TO_SYMBOL, which must
+    // stay distinguishable from the legitimate ordinal 0.
+    boolean hasSkipTarget = afterMatchSkipMode == MatchNode.AfterMatchSkipMode.TO_FIRST
+        || afterMatchSkipMode == MatchNode.AfterMatchSkipMode.TO_LAST;
+    int afterMatchSkipToSymbolOrdinal =
+        hasSkipTarget ? toAfterMatchSkipToSymbolOrdinal((RexCall) after, symbolOrdinals)
+            : MatchNode.NO_SKIP_TO_SYMBOL;
+
+    return new MatchNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.EMPTY,
+        convertInputs(node.getInputs()), patternSymbols, pattern, measures, partitionKeysInSourceOrder(node),
+        node.getOrderKeys().getFieldCollations(), afterMatchSkipMode, afterMatchSkipToSymbolOrdinal,
+        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+  }
+
+  private static void validateMatchPartitionKeyTypes(Match node) {
+    List<RelDataTypeField> inputFields = node.getInput().getRowType().getFieldList();
+    for (int partitionKey : node.getPartitionKeys()) {
+      RelDataTypeField field = inputFields.get(partitionKey);
+      if (field.getType().getSqlTypeName() == SqlTypeName.ARRAY) {
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "MATCH_RECOGNIZE does not support multi-value or ARRAY PARTITION BY columns: '" + field.getName()
+                + "'. Partition by a single-value column instead.");
+      }
+    }
+  }
+
+  private static void validateMatchAggregateOperandTypes(RexNode expression, String measureName) {
+    if (!(expression instanceof RexCall)) {
+      return;
+    }
+    RexCall call = (RexCall) expression;
+    if (call.getOperator() instanceof SqlAggFunction) {
+      for (RexNode operand : call.getOperands()) {
+        if (operand.getType().getSqlTypeName() == SqlTypeName.ARRAY) {
+          throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+              "MATCH_RECOGNIZE measure '" + measureName + "' applies aggregate '" + call.getOperator().getName()
+                  + "' to a multi-value or ARRAY operand, which is not supported. Aggregate a single-value column "
+                  + "instead.");
+        }
+      }
+    }
+    for (RexNode operand : call.getOperands()) {
+      validateMatchAggregateOperandTypes(operand, measureName);
+    }
+  }
+
+  /// The input column indexes of the `PARTITION BY` keys, in `PARTITION BY` **source** order.
+  ///
+  /// [Match#getPartitionKeys()] is an [ImmutableBitSet], so `asList()` always returns the keys in
+  /// ascending index order and the order the user wrote them in is gone. The output row type built by
+  /// `SqlValidatorImpl.validateMatchRecognize` does keep it: its leading fields are the partition columns in
+  /// source order, named after the last component of each `PARTITION BY` identifier. `MatchOperator` fills
+  /// the output row positionally, so the two have to agree - otherwise
+  /// `PARTITION BY <later column>, <earlier column>` reports each partition column's value under the other one's
+  /// name, or fails with a `ClassCastException` when the two types differ.
+  ///
+  /// The number of leading partition fields is derived from the measure count rather than from
+  /// `partitionKeys.cardinality()`, because `PARTITION BY col, col` contributes two output fields but only
+  /// one bit. The names are resolved against the partition key set only, case-sensitively first, because the schema may
+  /// be case-insensitive and the row type carries the identifier as it was written rather than as it was resolved.
+  private static List<Integer> partitionKeysInSourceOrder(Match node) {
+    ImmutableBitSet partitionKeys = node.getPartitionKeys();
+    List<String> outputFieldNames = node.getRowType().getFieldNames();
+    int numPartitionFields = outputFieldNames.size() - node.getMeasures().size();
+    if (numPartitionFields <= 1) {
+      // Nothing to reorder, and no name to resolve: keep the cheap and always correct path.
+      return partitionKeys.asList();
+    }
+    List<String> inputFieldNames = node.getInput().getRowType().getFieldNames();
+    List<Integer> ordered = new ArrayList<>(numPartitionFields);
+    for (int i = 0; i < numPartitionFields; i++) {
+      ordered.add(resolvePartitionKey(outputFieldNames.get(i), partitionKeys, inputFieldNames));
+    }
+    // A future Calcite change to how the Match row type is built must fail loudly rather than silently misalign rows.
+    Preconditions.checkState(ImmutableBitSet.of(ordered).equals(partitionKeys),
+        "MATCH_RECOGNIZE partition keys %s recovered from the output row type %s do not match Calcite's %s", ordered,
+        outputFieldNames, partitionKeys);
+    return ordered;
+  }
+
+  private static int resolvePartitionKey(String name, ImmutableBitSet partitionKeys, List<String> inputFieldNames) {
+    int caseInsensitiveMatch = -1;
+    for (int index : partitionKeys) {
+      String inputFieldName = inputFieldNames.get(index);
+      if (inputFieldName.equals(name)) {
+        return index;
+      }
+      if (inputFieldName.equalsIgnoreCase(name)) {
+        caseInsensitiveMatch = index;
+      }
+    }
+    Preconditions.checkState(caseInsensitiveMatch >= 0,
+        "MATCH_RECOGNIZE partition column '%s' does not resolve to any of the partition key columns %s of %s", name,
+        partitionKeys, inputFieldNames);
+    return caseInsensitiveMatch;
+  }
+
+  /// Registers every pattern variable of `pattern` in `symbolOrdinals`, in order of first appearance.
+  private static void collectPatternSymbols(RexNode pattern, Map<String, Integer> symbolOrdinals) {
+    if (pattern instanceof RexLiteral) {
+      symbolOrdinals.putIfAbsent(RexLiteral.stringValue(pattern), symbolOrdinals.size());
+      return;
+    }
+    if (pattern instanceof RexCall) {
+      for (RexNode operand : patternChildren((RexCall) pattern)) {
+        collectPatternSymbols(operand, symbolOrdinals);
+      }
+    }
+  }
+
+  /// The sub-pattern operands of a pattern call. All operands are sub-patterns except for a quantifier, whose last
+  /// three operands are the bounds and the reluctant flag rather than pattern variables.
+  private static List<RexNode> patternChildren(RexCall call) {
+    return call.getKind() == SqlKind.PATTERN_QUANTIFIER ? call.getOperands().subList(0, 1) : call.getOperands();
+  }
+
+  private RowPattern toRowPattern(RexNode pattern, Map<String, Integer> symbolOrdinals) {
+    if (pattern instanceof RexLiteral) {
+      String name = RexLiteral.stringValue(pattern);
+      Integer ordinal = symbolOrdinals.get(name);
+      Preconditions.checkState(ordinal != null, "Unknown MATCH_RECOGNIZE pattern variable: %s", name);
+      return new RowPattern.Symbol(ordinal);
+    }
+    Preconditions.checkState(pattern instanceof RexCall, "Unsupported MATCH_RECOGNIZE PATTERN node: %s", pattern);
+    RexCall call = (RexCall) pattern;
+    switch (call.getKind()) {
+      case PATTERN_CONCAT:
+        return new RowPattern.Concat(flattenRowPatterns(call, symbolOrdinals));
+      case PATTERN_ALTER:
+        return new RowPattern.Alternate(flattenRowPatterns(call, symbolOrdinals));
+      case PATTERN_QUANTIFIER:
+        return toQuantifier(call, symbolOrdinals);
+      case PATTERN_PERMUTE:
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "PERMUTE is not supported yet in the MATCH_RECOGNIZE PATTERN clause. Expand the permutation into an "
+                + "explicit alternation, e.g. PATTERN ((A B) | (B A)).");
+      case PATTERN_EXCLUDED:
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "Pattern exclusions '{- -}' are not supported yet in the MATCH_RECOGNIZE PATTERN clause. Remove the "
+                + "exclusion; note that exclusions only affect ALL ROWS PER MATCH output, which is also not "
+                + "supported yet.");
+      default:
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "Unsupported MATCH_RECOGNIZE PATTERN construct: '" + call + "'.");
+    }
+  }
+
+  /// Flattens the left-deep binary tree Calcite builds for `A B C` and `A | B | C` into the operands of a
+  /// single n-ary node. Both operators are associative and the operand order is preserved, so the SQL:2016
+  /// leftmost-alternative-wins rule is unaffected.
+  private List<RowPattern> flattenRowPatterns(RexCall call, Map<String, Integer> symbolOrdinals) {
+    List<RowPattern> children = new ArrayList<>(call.getOperands().size());
+    flattenRowPatterns(call, call.getKind(), symbolOrdinals, children);
+    return children;
+  }
+
+  private void flattenRowPatterns(RexNode pattern, SqlKind kind, Map<String, Integer> symbolOrdinals,
+      List<RowPattern> children) {
+    if (pattern instanceof RexCall && pattern.getKind() == kind) {
+      for (RexNode operand : ((RexCall) pattern).getOperands()) {
+        flattenRowPatterns(operand, kind, symbolOrdinals, children);
+      }
+    } else {
+      children.add(toRowPattern(pattern, symbolOrdinals));
+    }
+  }
+
+  private RowPattern toQuantifier(RexCall call, Map<String, Integer> symbolOrdinals) {
+    List<RexNode> operands = call.getOperands();
+    Preconditions.checkState(operands.size() == 4,
+        "Expecting 4 operands in MATCH_RECOGNIZE pattern quantifier, got: %s", operands.size());
+    RowPattern child = toRowPattern(operands.get(0), symbolOrdinals);
+    // Calcite writes -1 for an unspecified bound: `*`, `+` and `{n,}` leave the maximum open, `{,m}` leaves the
+    // minimum open. SQL:2016 reads an omitted minimum as 0, while an omitted maximum stays unbounded.
+    int minRepeat = toQuantifierBound(operands.get(1), call);
+    int maxRepeat = toQuantifierBound(operands.get(2), call);
+    if (minRepeat == UNSPECIFIED_QUANTIFIER_BOUND) {
+      minRepeat = 0;
+    }
+    if (maxRepeat != RowPattern.Quantifier.UNBOUNDED && maxRepeat < minRepeat) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "MATCH_RECOGNIZE pattern quantifier '" + call + "' has an upper bound (" + maxRepeat
+              + ") smaller than its lower bound (" + minRepeat + "), so it can never match.");
+    }
+    // The reluctant forms (`*?`, `+?`, `??`, `{n,m}?`) prefer the shortest match.
+    return new RowPattern.Quantifier(child, minRepeat, maxRepeat, !RexLiteral.booleanValue(operands.get(3)));
+  }
+
+  private int toQuantifierBound(RexNode bound, RexCall call) {
+    int value = RexExpressionUtils.getValueAsInt(bound);
+    if (value < UNSPECIFIED_QUANTIFIER_BOUND) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "MATCH_RECOGNIZE pattern quantifier '" + call + "' has a negative repetition bound: " + value + ".");
+    }
+    if (value > MAX_PATTERN_QUANTIFIER_BOUND) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "MATCH_RECOGNIZE pattern quantifier bound " + value + " exceeds the maximum supported bound of "
+              + MAX_PATTERN_QUANTIFIER_BOUND + ": '" + call + "'. Every repetition expands into pattern matcher "
+              + "state, so rewrite the pattern with a smaller repetition count, or use an unbounded quantifier "
+              + "such as '*' or '+' together with a DEFINE predicate that bounds the match.");
+    }
+    return value;
+  }
+
+  /// Turns Calcite's `strictStart` / `strictEnd` booleans back into the `^` and `$` anchor
+  /// nodes that [RowPattern] models explicitly.
+  private static RowPattern withAnchors(RowPattern pattern, boolean strictStart, boolean strictEnd) {
+    if (!strictStart && !strictEnd) {
+      return pattern;
+    }
+    List<RowPattern> children = new ArrayList<>();
+    if (strictStart) {
+      children.add(RowPattern.AnchorStart.INSTANCE);
+    }
+    if (pattern.getKind() == RowPattern.Kind.CONCAT) {
+      children.addAll(((RowPattern.Concat) pattern).getChildren());
+    } else {
+      children.add(pattern);
+    }
+    if (strictEnd) {
+      children.add(RowPattern.AnchorEnd.INSTANCE);
+    }
+    return new RowPattern.Concat(children);
+  }
+
+  private static MatchNode.AfterMatchSkipMode toAfterMatchSkipMode(RexNode after) {
+    // SKIP TO FIRST / SKIP TO LAST carry their target variable, so they arrive as a call; the other two modes are
+    // symbol literals.
+    if (after instanceof RexCall) {
+      SqlKind kind = after.getKind();
+      if (kind == SqlKind.SKIP_TO_FIRST) {
+        return MatchNode.AfterMatchSkipMode.TO_FIRST;
+      }
+      if (kind == SqlKind.SKIP_TO_LAST) {
+        return MatchNode.AfterMatchSkipMode.TO_LAST;
+      }
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Unsupported MATCH_RECOGNIZE AFTER MATCH SKIP clause: '" + after + "'.");
+    }
+    Preconditions.checkState(after instanceof RexLiteral,
+        "Expecting a literal for MATCH_RECOGNIZE AFTER MATCH SKIP, got: %s", after);
+    Object option = ((RexLiteral) after).getValue();
+    if (option == SqlMatchRecognize.AfterOption.SKIP_PAST_LAST_ROW) {
+      return MatchNode.AfterMatchSkipMode.PAST_LAST_ROW;
+    }
+    if (option == SqlMatchRecognize.AfterOption.SKIP_TO_NEXT_ROW) {
+      return MatchNode.AfterMatchSkipMode.TO_NEXT_ROW;
+    }
+    throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+        "Unsupported MATCH_RECOGNIZE AFTER MATCH SKIP clause: '" + after + "'.");
+  }
+
+  private static int toAfterMatchSkipToSymbolOrdinal(RexCall after, Map<String, Integer> symbolOrdinals) {
+    String name = RexLiteral.stringValue(after.getOperands().get(0));
+    Integer ordinal = symbolOrdinals.get(name);
+    if (ordinal == null) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "MATCH_RECOGNIZE AFTER MATCH SKIP TO references pattern variable '" + name
+              + "', which does not appear in the PATTERN clause.");
+    }
+    return ordinal;
+  }
+
+  private RexExpression toBoundRexExpression(RexNode rexNode, Map<String, Integer> symbolOrdinals) {
+    return bindPatternFieldRefs(RexExpressionUtils.fromRexNode(rexNode), symbolOrdinals);
+  }
+
+  /// Binds every [RexExpression.PatternFieldRef] in `expression` to its pattern symbol ordinal.
+  /// [RexExpressionUtils] has no symbol table, so the references it produces are unresolved; the plan
+  /// serializer rejects an unresolved reference rather than writing an ambiguous one to the wire.
+  ///
+  /// An alpha that is not a pattern variable is the SQL:2016 universal row pattern variable: Calcite has no
+  /// dedicated representation for an unqualified column reference such as `price` in
+  /// `DEFINE UP AS price > PREV(price)` and reuses the row source alias instead. Those bind to
+  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL].
+  private RexExpression bindPatternFieldRefs(RexExpression expression, Map<String, Integer> symbolOrdinals) {
+    if (expression instanceof RexExpression.PatternFieldRef) {
+      RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;
+      return ref.withSymbolOrdinal(symbolOrdinals.getOrDefault(ref.getAlpha(),
+          RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL));
+    }
+    if (!(expression instanceof RexExpression.FunctionCall)) {
+      return expression;
+    }
+    RexExpression.FunctionCall call = (RexExpression.FunctionCall) expression;
+    List<RexExpression> operands = call.getFunctionOperands();
+    List<RexExpression> boundOperands = new ArrayList<>(operands.size());
+    boolean changed = false;
+    for (RexExpression operand : operands) {
+      RexExpression bound = bindPatternFieldRefs(operand, symbolOrdinals);
+      changed |= bound != operand;
+      boundOperands.add(bound);
+    }
+    return changed ? new RexExpression.FunctionCall(call.getDataType(), call.getFunctionName(), boundOperands,
+        call.isDistinct(), call.isIgnoreNulls()) : call;
   }
 
   public static WindowNode.WindowExclusion fromRexWindowExclusion(RexWindowExclusion exclude) {
