@@ -416,6 +416,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       String instanceId = instanceConfigZNRecord.getId();
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
+          // Match the interned instance IDs decoded from IS/EV map keys for per-segment routing lookups.
+          instanceId = instanceId.intern();
           enabledServers.add(instanceId);
 
           // Always refresh the server instance with the latest instance config in case it changes
