@@ -20,9 +20,11 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -37,10 +39,11 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -50,14 +53,13 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class OffHeapSingleTreeBuilderTest {
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "OffHeapSingleTreeBuilderTest");
   private static final File INDEX_DIR = new File(TEMP_DIR, "testSegment");
-  private static final String SEGMENT_RECORD_FILE_NAME = "segment.record";
 
   @BeforeMethod
   public void setUp()
@@ -97,71 +99,115 @@ public class OffHeapSingleTreeBuilderTest {
     assertEquals(offsets.getEndOffset(), Integer.MAX_VALUE + 456L + 789L);
   }
 
-  /// Builds a star-tree with the off-heap builder and asserts the intermediate segment record file
-  /// is cleaned up after build. Exercises the full sortAndAggregateSegmentRecords → iterator → close
-  /// lifecycle, including buffer allocation, sequential fill in Sub-phase A, sort in Sub-phase B,
-  /// and dim-from-buffer reads in Sub-phase C.
+  /// Drives `sortAndAggregateSegmentRecords` on a real segment and asserts the segment record
+  /// buffer allocated in Sub-phase A is released once the iterator is drained. Direct-buffer
+  /// count/usage must return to the pre-call baseline — proves `releaseSegmentRecordBuffer()`
+  /// runs on the terminal `next()`.
   @Test
-  public void testBuildCleansUpSegmentRecordFile()
+  public void testSegmentRecordBufferReleasedAfterIteratorDrain()
       throws Exception {
     buildTestSegment();
-
-    List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs();
     File segmentDir = INDEX_DIR.listFiles()[0];
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+    try {
+      List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs(segment);
+      File outputDir = new File(TEMP_DIR, "starTreeOutputDrain");
+      FileUtils.forceMkdir(outputDir);
 
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, segmentDir,
-        MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
-      builder.build();
+      long baselineCount = PinotDataBuffer.getDirectBufferCount();
+      long baselineUsage = PinotDataBuffer.getDirectBufferUsage();
+
+      try (OffHeapSingleTreeBuilder builder = new OffHeapSingleTreeBuilder(builderConfigs.get(0), outputDir, segment,
+          new PropertiesConfiguration())) {
+        int numDocs = segment.getSegmentMetadata().getTotalDocs();
+        Iterator<?> iterator = builder.sortAndAggregateSegmentRecords(numDocs);
+        assertTrue(PinotDataBuffer.getDirectBufferCount() > baselineCount,
+            "Segment record buffer should be allocated during sortAndAggregateSegmentRecords");
+
+        while (iterator.hasNext()) {
+          iterator.next();
+        }
+
+        assertEquals(PinotDataBuffer.getDirectBufferCount(), baselineCount,
+            "Direct buffer count should return to baseline after iterator drain");
+        assertEquals(PinotDataBuffer.getDirectBufferUsage(), baselineUsage,
+            "Direct buffer usage should return to baseline after iterator drain");
+      }
+    } finally {
+      segment.destroy();
     }
-
-    // OffHeapSingleTreeBuilder writes an intermediate segment.record file during Sub-phase A/B/C.
-    // The dim-buffer optimization keeps that file alive through iterator exhaustion; close() must
-    // release the buffer and delete the file.
-    File segmentRecordFile = findSegmentRecordFile(segmentDir);
-    assertFalse(segmentRecordFile != null && segmentRecordFile.exists(),
-        "segment.record file should be deleted after build: " + segmentRecordFile);
   }
 
-  /// close() before build() must not throw and must leave no leftover segment record file.
+  /// Closes the builder without draining the iterator — `releaseSegmentRecordBuffer()` on the
+  /// close path must still release the buffer. Prior to the fix, `close()` did not release
+  /// `_segmentRecordBuffer`, so an operator abandoning a partial build would leak direct memory
+  /// until the JVM cleaner ran (unbounded).
   @Test
-  public void testCloseWithoutBuildDoesNotThrow()
+  public void testSegmentRecordBufferReleasedOnCloseWithoutDrain()
       throws Exception {
     buildTestSegment();
-
-    List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs();
     File segmentDir = INDEX_DIR.listFiles()[0];
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+    try {
+      List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs(segment);
+      File outputDir = new File(TEMP_DIR, "starTreeOutputAbandon");
+      FileUtils.forceMkdir(outputDir);
 
-    // Construct and immediately close — no build().
-    MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, segmentDir,
-        MultipleTreesBuilder.BuildMode.OFF_HEAP);
-    builder.close();
+      long baselineCount = PinotDataBuffer.getDirectBufferCount();
+      long baselineUsage = PinotDataBuffer.getDirectBufferUsage();
 
-    File segmentRecordFile = findSegmentRecordFile(segmentDir);
-    assertFalse(segmentRecordFile != null && segmentRecordFile.exists(),
-        "segment.record file should not exist when build() was never called: " + segmentRecordFile);
+      OffHeapSingleTreeBuilder builder = new OffHeapSingleTreeBuilder(builderConfigs.get(0), outputDir, segment,
+          new PropertiesConfiguration());
+      try {
+        int numDocs = segment.getSegmentMetadata().getTotalDocs();
+        Iterator<?> iterator = builder.sortAndAggregateSegmentRecords(numDocs);
+        // Pull exactly one element; leave the iterator undrained.
+        iterator.next();
+        assertTrue(PinotDataBuffer.getDirectBufferCount() > baselineCount,
+            "Buffer should be allocated mid-iteration");
+      } finally {
+        builder.close();
+      }
+
+      assertEquals(PinotDataBuffer.getDirectBufferCount(), baselineCount,
+          "Direct buffer count should return to baseline after close() on undrained iterator");
+      assertEquals(PinotDataBuffer.getDirectBufferUsage(), baselineUsage,
+          "Direct buffer usage should return to baseline after close() on undrained iterator");
+    } finally {
+      segment.destroy();
+    }
   }
 
   /// Builds the same segment twice — once with OFF_HEAP and once with ON_HEAP — then compares the
   /// resulting star-trees by grouping star-tree records by dim tuple and summing the aggregate
-  /// column. Directly regressions-tests dim-read parity: if the buffer read returned wrong bytes,
+  /// column. Direct regression test for dim-read parity: if the buffer read returned wrong bytes,
   /// OFF_HEAP would aggregate metrics under the wrong dim tuples and the maps would diverge.
   @Test
   public void testOffHeapProducesSameStarTreeAsOnHeap()
       throws Exception {
     buildTestSegment();
     File sourceSegmentDir = INDEX_DIR.listFiles()[0];
-    List<StarTreeV2BuilderConfig> builderConfigs = createBuilderConfigs();
 
     File offHeapDir = new File(TEMP_DIR, "offHeapCopy");
     File onHeapDir = new File(TEMP_DIR, "onHeapCopy");
     FileUtils.copyDirectory(sourceSegmentDir, offHeapDir);
     FileUtils.copyDirectory(sourceSegmentDir, onHeapDir);
 
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, offHeapDir,
+    List<StarTreeV2BuilderConfig> offHeapBuilderConfigs;
+    List<StarTreeV2BuilderConfig> onHeapBuilderConfigs;
+    ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(sourceSegmentDir, ReadMode.mmap);
+    try {
+      offHeapBuilderConfigs = createBuilderConfigs(sourceSegment);
+      onHeapBuilderConfigs = createBuilderConfigs(sourceSegment);
+    } finally {
+      sourceSegment.destroy();
+    }
+
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(offHeapBuilderConfigs, offHeapDir,
         MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
       builder.build();
     }
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(builderConfigs, onHeapDir,
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(onHeapBuilderConfigs, onHeapDir,
         MultipleTreesBuilder.BuildMode.ON_HEAP)) {
       builder.build();
     }
@@ -214,9 +260,9 @@ public class OffHeapSingleTreeBuilderTest {
   private void buildTestSegment()
       throws Exception {
     Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
-        .addMetric("longCol", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("stringCol", DataType.STRING)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addMetric("longCol", DataType.LONG)
         .build();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -251,7 +297,7 @@ public class OffHeapSingleTreeBuilderTest {
     return row;
   }
 
-  private List<StarTreeV2BuilderConfig> createBuilderConfigs()
+  private List<StarTreeV2BuilderConfig> createBuilderConfigs(ImmutableSegment segment)
       throws Exception {
     StarTreeIndexConfig starTreeConfig = new StarTreeIndexConfig(
         Arrays.asList("stringCol", "intCol"),
@@ -259,44 +305,9 @@ public class OffHeapSingleTreeBuilderTest {
         Arrays.asList("SUM__longCol"),
         null,
         1000);
-
-    File segmentDir = INDEX_DIR.listFiles()[0];
-    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
-    try {
-      return StarTreeBuilderUtils.generateBuilderConfigs(
-          Arrays.asList(starTreeConfig),
-          false,
-          segment.getSegmentMetadata());
-    } finally {
-      segment.destroy();
-    }
-  }
-
-  private File findSegmentRecordFile(File segmentDir) {
-    // segment.record lives under the star-tree output directory created by MultipleTreesBuilder;
-    // walk the segment dir tree to locate any leftover.
-    return findByName(segmentDir, SEGMENT_RECORD_FILE_NAME);
-  }
-
-  private File findByName(File dir, String name) {
-    if (!dir.isDirectory()) {
-      return null;
-    }
-    File[] children = dir.listFiles();
-    if (children == null) {
-      return null;
-    }
-    for (File child : children) {
-      if (child.getName().equals(name)) {
-        return child;
-      }
-      if (child.isDirectory()) {
-        File found = findByName(child, name);
-        if (found != null) {
-          return found;
-        }
-      }
-    }
-    return null;
+    return StarTreeBuilderUtils.generateBuilderConfigs(
+        Arrays.asList(starTreeConfig),
+        false,
+        segment.getSegmentMetadata());
   }
 }
