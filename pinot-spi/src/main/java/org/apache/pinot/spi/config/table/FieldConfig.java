@@ -148,23 +148,45 @@ public class FieldConfig extends BaseJsonConfig {
 
   public enum CompressionCodec {
     //@formatter:off
+    /// No compression. This is the default for `METRIC` columns and has no `codecSpec` equivalent:
+    /// the DSL has no identity codec and rejects a blank spec, so this remains the only way to state
+    /// "uncompressed" explicitly.
     PASS_THROUGH(true, false),
+    /// Snappy compression for raw forward indexes. Prefer `codecSpec="SNAPPY"` in new configs;
+    /// existing `compressionCodec` uses remain supported.
     SNAPPY(true, false),
+    /// Zstandard compression for raw forward indexes. Prefer `codecSpec="ZSTD(3)"` in new configs;
+    /// existing `compressionCodec` uses remain supported.
     ZSTANDARD(true, false),
+    /// LZ4 compression for raw forward indexes. Prefer `codecSpec="LZ4"` in new configs;
+    /// existing `compressionCodec` uses remain supported.
     LZ4(true, false),
+    /// GZIP (DEFLATE) compression for raw forward indexes. Prefer `codecSpec="GZIP"` in new configs;
+    /// existing `compressionCodec` uses remain supported.
     GZIP(true, false),
 
-    // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
+    /// Second-level dictionary encoding of the multi-value entries of a dictionary-encoded MV forward
+    /// index. No `codecSpec` equivalent: `codecSpec` applies only to RAW forward indexes, so this
+    /// remains the only way to express it.
     MV_ENTRY_DICT(false, true),
 
-    // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a special
-    // handling for log lines (see {@link CLPForwardIndexCreatorV1} and {@link CLPForwardIndexCreatorV2)
+    /// CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has
+    /// special handling for log lines (see `CLPForwardIndexCreatorV1` and `CLPForwardIndexCreatorV2`).
+    /// The CLP family has no `codecSpec` equivalent and remains the only way to express it: these are
+    /// whole-index formats for STRING columns rather than chunk codecs, and they are validated against the
+    /// column's stored type instead of the raw/dictionary applicability flags below.
     CLP(false, false),
     CLPV2(false, false),
     CLPV2_ZSTD(false, false),
     CLPV2_LZ4(false, false),
 
+    /// Delta encoding for raw forward indexes. Rejected by table-config validation: it is applicable to
+    /// neither raw nor dictionary-encoded columns, so a config that sets it fails validation for every
+    /// column shape. Use `codecSpec="DELTA,LZ4"` on SV INT/LONG raw columns instead, which writes the
+    /// codec-pipeline format rather than the legacy chunk format.
     DELTA(false, false),
+    /// Second-order delta encoding for raw forward indexes. Rejected by table-config validation for the
+    /// same reason as [#DELTA]; use `codecSpec="DELTADELTA,LZ4"` on SV INT/LONG raw columns instead.
     DELTADELTA(false, false);
 
     //@formatter:on
@@ -212,6 +234,8 @@ public class FieldConfig extends BaseJsonConfig {
     return _tierOverwrites;
   }
 
+  /// Returns the raw forward-index compression codec, or `null` when using `codecSpec` or the
+  /// default. Still the only way to express `MV_ENTRY_DICT` and the CLP family — not deprecated.
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
