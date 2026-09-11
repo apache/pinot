@@ -63,6 +63,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -150,6 +151,7 @@ public class SegmentMetadataImplTest {
     assertEquals(fromStreams.getColumnMetadataMap().keySet(), fromDir.getColumnMetadataMap().keySet());
     assertEquals(fromStreams.getTotalDocs(), fromDir.getTotalDocs());
     assertEquals(fromStreams.getSchema(), fromDir.getSchema());
+    assertSame(fromStreams.getTimeColumn(), fromDir.getTimeColumn());
     for (Map.Entry<String, ColumnMetadata> entry : fromDir.getColumnMetadataMap().entrySet()) {
       ColumnMetadata dirColumn = entry.getValue();
       assertTrue(dirColumn.getNumIndexes() > 0, entry.getKey());
@@ -174,6 +176,9 @@ public class SegmentMetadataImplTest {
       throws Exception {
     SegmentMetadataImpl first = new SegmentMetadataImpl(_segmentDirectory);
     SegmentMetadataImpl second = new SegmentMetadataImpl(_segmentDirectory);
+    assertEquals(first.getTimeColumn(), "daysSinceEpoch");
+    assertSame(first.getTimeColumn(), second.getTimeColumn());
+    assertSame(first.getTimeColumn(), first.getColumnMetadataMap().ceilingKey(first.getTimeColumn()));
     assertEquals(first.getColumnMetadataMap().keySet(), second.getColumnMetadataMap().keySet());
     assertSame(first.getColumnMetadataMap().firstKey(), second.getColumnMetadataMap().firstKey());
     assertSame(first.getSchema().getDimensionNames().get(0), second.getSchema().getDimensionNames().get(0));
@@ -203,6 +208,8 @@ public class SegmentMetadataImplTest {
     try {
       SegmentMetadataImpl first = new SegmentMetadataImpl(segmentDir);
       SegmentMetadataImpl second = new SegmentMetadataImpl(segmentDir);
+      assertNull(first.getTimeColumn());
+      assertNull(second.getTimeColumn());
       String parentKey = first.getColumnMetadataMap().ceilingKey(parent);
       assertEquals(parentKey, parent);
       assertSame(parentKey, second.getColumnMetadataMap().ceilingKey(parent));

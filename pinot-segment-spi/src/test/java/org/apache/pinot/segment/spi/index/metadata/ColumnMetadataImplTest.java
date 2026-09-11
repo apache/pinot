@@ -379,6 +379,19 @@ public class ColumnMetadataImplTest {
     assertNull(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, null));
   }
 
+  @Test
+  public void customStringDefaultsAreSharedAcrossParses() {
+    Map<DataType, String> customDefaults = Map.of(DataType.STRING, "N/A", DataType.JSON, "{\"missing\":true}");
+    customDefaults.forEach((dataType, literal) -> {
+      // Separate segment metadata loads supply distinct strings; STRING and JSON retain the parsed literal itself.
+      FieldSpec first = parse(FieldType.DIMENSION, dataType, new String(literal));
+      FieldSpec second = parse(FieldType.DIMENSION, dataType, new String(literal));
+      assertEquals(first, new DimensionFieldSpec("col", dataType, true, literal), dataType.name());
+      assertEquals(second, first, dataType.name());
+      assertSame(first.getDefaultNullValue(), second.getDefaultNullValue(), dataType.name());
+    });
+  }
+
   /// A STRING default with a leading/trailing space or a comma is escaped by the segment creator and recovered here
   /// before the type-default comparison, so it round-trips verbatim.
   @Test

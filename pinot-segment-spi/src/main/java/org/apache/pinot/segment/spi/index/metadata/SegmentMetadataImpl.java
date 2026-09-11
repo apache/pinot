@@ -159,7 +159,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /// - Time Interval.
   /// - Start and End time.
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    String timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    _timeColumn = timeColumn != null ? timeColumn.intern() : null;
     if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_END_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.TIME_UNIT)) {
