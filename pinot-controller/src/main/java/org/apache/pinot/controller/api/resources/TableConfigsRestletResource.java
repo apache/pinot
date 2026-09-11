@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -30,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +53,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionMismatchException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -78,7 +81,9 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -154,28 +159,55 @@ public class TableConfigsRestletResource {
   /// tableName_OFFLINE,
   /// realtime table config for tableName_REALTIME and schema for tableName
   @GET
-  @Produces(MediaType.APPLICATION_JSON)
+  @Produces({MediaType.APPLICATION_JSON, RedactedTableConfigsResponse.MEDIA_TYPE})
   @Path("/tableConfigs/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIGS)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
-      notes = "Get the TableConfigs for a given raw tableName")
+      notes = "Returns a versioned redacted response. Submit the complete response to PUT when retaining markers.")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
-      Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
-      if (schema == null) {
+      Pair<Schema, Integer> schemaWithVersion = _pinotHelixResourceManager.getSchemaWithVersion(tableName);
+      if (schemaWithVersion == null) {
         throw new NotFoundException(
             String.format("Schema does not exist for table %s Use POST to create it first.", tableName));
       }
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false, false);
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false, false);
-      TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
-      return config.toJsonString();
+      Schema schema = schemaWithVersion.getLeft();
+      Pair<TableConfig, Integer> offlineTableConfigWithVersion =
+          _pinotHelixResourceManager.getTableConfigWithVersion(
+              TableNameBuilder.OFFLINE.tableNameWithType(tableName), false, false);
+      Pair<TableConfig, Integer> realtimeTableConfigWithVersion =
+          _pinotHelixResourceManager.getTableConfigWithVersion(
+              TableNameBuilder.REALTIME.tableNameWithType(tableName), false, false);
+      TableConfig offlineTableConfig =
+          offlineTableConfigWithVersion != null ? offlineTableConfigWithVersion.getLeft() : null;
+      TableConfig realtimeTableConfig =
+          realtimeTableConfigWithVersion != null ? realtimeTableConfigWithVersion.getLeft() : null;
+      Map<String, Integer> baseVersions = new LinkedHashMap<>();
+      baseVersions.put(RedactedTableConfigsResponse.SCHEMA_VERSION_KEY, schemaWithVersion.getRight());
+      if (offlineTableConfigWithVersion != null) {
+        baseVersions.put(RedactedTableConfigsResponse.OFFLINE_VERSION_KEY, offlineTableConfigWithVersion.getRight());
+      } else {
+        baseVersions.put(RedactedTableConfigsResponse.OFFLINE_VERSION_KEY,
+            RedactedTableConfigsResponse.ABSENT_VERSION);
+      }
+      if (realtimeTableConfigWithVersion != null) {
+        baseVersions.put(RedactedTableConfigsResponse.REALTIME_VERSION_KEY,
+            realtimeTableConfigWithVersion.getRight());
+      } else {
+        baseVersions.put(RedactedTableConfigsResponse.REALTIME_VERSION_KEY,
+            RedactedTableConfigsResponse.ABSENT_VERSION);
+      }
+      TableConfigs config = new TableConfigs(tableName, schema,
+          offlineTableConfig != null ? TableConfigRedactionUtils.redact(offlineTableConfig) : null,
+          realtimeTableConfig != null ? TableConfigRedactionUtils.redact(realtimeTableConfig) : null);
+      return JsonUtils.objectToString(new RedactedTableConfigsResponse(config, baseVersions));
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Failed to retrieve TableConfigs",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -199,11 +231,24 @@ public class TableConfigsRestletResource {
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
-          Response.Status.BAD_REQUEST, e);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs JSON", Response.Status.BAD_REQUEST);
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    TableConfig offlineTableConfig = tableConfigs.getOffline();
+    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+    try {
+      if (offlineTableConfig != null) {
+        offlineTableConfig = TableConfigRedactionUtils.restoreRedactedValues(offlineTableConfig, null);
+      }
+      if (realtimeTableConfig != null) {
+        realtimeTableConfig = TableConfigRedactionUtils.restoreRedactedValues(realtimeTableConfig, null);
+      }
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs", Response.Status.BAD_REQUEST);
+    }
+    tableConfigs = new TableConfigs(tableConfigs.getTableName(), tableConfigs.getSchema(), offlineTableConfig,
+        realtimeTableConfig);
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager.hasRealtimeTable(
@@ -216,8 +261,8 @@ public class TableConfigsRestletResource {
     validateConfig(tableConfigs, databaseName, typesToSkip);
     tableConfigs.setTableName(rawTableName);
 
-    TableConfig offlineTableConfig = tableConfigs.getOffline();
-    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+    offlineTableConfig = tableConfigs.getOffline();
+    realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
 
     try {
@@ -267,14 +312,16 @@ public class TableConfigsRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
-        throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s",
-            rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+        throw new ControllerApplicationException(LOGGER,
+            redactedTableConfigsError("Invalid TableConfigs: " + rawTableName, e, tableConfigs),
+            Response.Status.BAD_REQUEST);
       } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else if (e instanceof ControllerApplicationException) {
         throw e;
       } else {
-        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+        throw new ControllerApplicationException(LOGGER, "Failed to add TableConfigs: " + rawTableName,
+            Response.Status.INTERNAL_SERVER_ERROR);
       }
     }
   }
@@ -348,8 +395,7 @@ public class TableConfigsRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIGS)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json", notes = "Update the "
-      + "TableConfigs provided by the tableConfigsStr json")
+  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json")
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
@@ -362,20 +408,62 @@ public class TableConfigsRestletResource {
       throws Exception {
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
-    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
+    ParsedTableConfigsUpdate parsedUpdate;
     TableConfigs tableConfigs;
+    Pair<Schema, Integer> storedSchemaWithVersion;
+    Map<TableType, TableConfig> storedTableConfigs = new LinkedHashMap<>();
+    Map<TableType, Integer> expectedVersions = new LinkedHashMap<>();
+    TableType typeToCreate = null;
     try {
-      tableConfigsAndUnrecognizedProps =
-          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, databaseName, typesToSkip);
+      parsedUpdate = parseTableConfigsUpdate(tableConfigsStr);
+      tableConfigs = parsedUpdate._tableConfigs;
       Preconditions.checkState(
           DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
       tableConfigs.setTableName(tableName);
+      TableConfig offlineTableConfig = tableConfigs.getOffline();
+      TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+      storedSchemaWithVersion = _pinotHelixResourceManager.getSchemaWithVersion(tableName);
+      if (storedSchemaWithVersion == null) {
+        throw staleTableConfigsResponse();
+      }
+      if (parsedUpdate._envelope
+          && !parsedUpdate._baseVersions.get(RedactedTableConfigsResponse.SCHEMA_VERSION_KEY)
+          .equals(storedSchemaWithVersion.getRight())) {
+        throw staleTableConfigsResponse();
+      }
+
+      Pair<TableConfig, Integer> storedOfflineTableConfigWithVersion =
+          _pinotHelixResourceManager.getTableConfigWithVersion(
+              TableNameBuilder.OFFLINE.tableNameWithType(tableName), false, false);
+      Pair<TableConfig, Integer> storedRealtimeTableConfigWithVersion =
+          _pinotHelixResourceManager.getTableConfigWithVersion(
+              TableNameBuilder.REALTIME.tableNameWithType(tableName), false, false);
+      typeToCreate = compareTableTypeSnapshot(TableType.OFFLINE, offlineTableConfig,
+          storedOfflineTableConfigWithVersion, parsedUpdate, storedTableConfigs, expectedVersions, typeToCreate);
+      typeToCreate = compareTableTypeSnapshot(TableType.REALTIME, realtimeTableConfig,
+          storedRealtimeTableConfigWithVersion, parsedUpdate, storedTableConfigs, expectedVersions, typeToCreate);
+
+      TableConfig storedOfflineTableConfig = storedTableConfigs.get(TableType.OFFLINE);
+      TableConfig storedRealtimeTableConfig = storedTableConfigs.get(TableType.REALTIME);
+      if (offlineTableConfig != null) {
+        offlineTableConfig =
+            TableConfigRedactionUtils.restoreRedactedValues(offlineTableConfig, storedOfflineTableConfig);
+      }
+      if (realtimeTableConfig != null) {
+        realtimeTableConfig =
+            TableConfigRedactionUtils.restoreRedactedValues(realtimeTableConfig, storedRealtimeTableConfig);
+      }
+      tableConfigs = new TableConfigs(tableName, tableConfigs.getSchema(), offlineTableConfig, realtimeTableConfig);
+      validateConfig(tableConfigs, databaseName, typesToSkip,
+          new ExistingTableConfigs(storedOfflineTableConfig, storedRealtimeTableConfig));
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs JSON", Response.Status.BAD_REQUEST);
+    } catch (ControllerApplicationException e) {
+      throw e;
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s", tableName,
-          e.getMessage()), Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs: " + tableName,
+          Response.Status.BAD_REQUEST);
     }
 
     if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager.hasRealtimeTable(
@@ -390,46 +478,149 @@ public class TableConfigsRestletResource {
     Schema schema = tableConfigs.getSchema();
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload, forceTableSchemaUpdate);
-      LOGGER.info("Updated schema: {}", tableName);
-
+      Map<TableType, TableConfig> submittedTableConfigs = new LinkedHashMap<>();
       if (offlineTableConfig != null) {
-        applyTuning(offlineTableConfig, schema);
-        if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceTableSchemaUpdate);
-          LOGGER.info("Updated offline table config: {}", tableName);
-        } else {
-          _pinotHelixResourceManager.addTable(offlineTableConfig);
-          LOGGER.info("Created offline table config: {}", tableName);
-        }
+        submittedTableConfigs.put(TableType.OFFLINE, offlineTableConfig);
       }
       if (realtimeTableConfig != null) {
-        applyTuning(realtimeTableConfig, schema);
-        if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceTableSchemaUpdate);
-          LOGGER.info("Updated realtime table config: {}", tableName);
-        } else {
-          _pinotHelixResourceManager.addTable(realtimeTableConfig);
-          LOGGER.info("Created realtime table config: {}", tableName);
+        submittedTableConfigs.put(TableType.REALTIME, realtimeTableConfig);
+      }
+      if (typeToCreate != null && parsedUpdate._envelope) {
+        throw new ControllerApplicationException(LOGGER,
+            "A versioned TableConfigs edit cannot add a missing table type; use the table creation flow, then "
+                + "retrieve a fresh TableConfigs response before editing",
+            Response.Status.CONFLICT);
+      } else if (typeToCreate == null) {
+        for (TableConfig tableConfig : submittedTableConfigs.values()) {
+          applyTuning(tableConfig, schema);
+        }
+        _pinotHelixResourceManager.updateTableConfigsAtomically(schema, storedSchemaWithVersion.getRight(),
+            submittedTableConfigs, expectedVersions, reload, forceTableSchemaUpdate);
+        LOGGER.info("Atomically updated TableConfigs: {}", tableName);
+      } else {
+        // Keep the legacy literal-body behavior for adding a missing type. Versioned envelopes use the snapshot-gated
+        // path above so a marker-bearing edit can never race a schema or existing-type update.
+        _pinotHelixResourceManager.updateSchema(schema, reload, forceTableSchemaUpdate);
+        for (Map.Entry<TableType, TableConfig> entry : submittedTableConfigs.entrySet()) {
+          applyTuning(entry.getValue(), schema);
+          if (entry.getKey() == typeToCreate) {
+            _pinotHelixResourceManager.addTable(entry.getValue());
+          } else {
+            _pinotHelixResourceManager.updateTableConfig(
+                entry.getValue(), expectedVersions.get(entry.getKey()), forceTableSchemaUpdate);
+          }
         }
       }
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (TableConfigVersionMismatchException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          "TableConfigs changed while the update was in progress; retry the request", Response.Status.CONFLICT);
     } catch (TableConfigBackwardIncompatibleException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          redactedTableConfigsError("Invalid TableConfigs for: " + tableName, e, tableConfigs),
+          Response.Status.BAD_REQUEST);
     } catch (InvalidTableConfigException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          redactedTableConfigsError("Invalid TableConfigs for: " + tableName, e, tableConfigs),
+          Response.Status.BAD_REQUEST);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to update TableConfigs for: %s, %s", tableName, e.getMessage()),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Failed to update TableConfigs for: " + tableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     return new ConfigSuccessResponse("TableConfigs updated for " + tableName,
-        tableConfigsAndUnrecognizedProps.getRight());
+        parsedUpdate._unrecognizedProperties);
+  }
+
+  @Nullable
+  private static TableType compareTableTypeSnapshot(TableType tableType, @Nullable TableConfig submittedConfig,
+      @Nullable Pair<TableConfig, Integer> storedConfigWithVersion, ParsedTableConfigsUpdate parsedUpdate,
+      Map<TableType, TableConfig> storedConfigs, Map<TableType, Integer> expectedVersions,
+      @Nullable TableType typeToCreate) {
+    String versionKey = tableType == TableType.OFFLINE
+        ? RedactedTableConfigsResponse.OFFLINE_VERSION_KEY
+        : RedactedTableConfigsResponse.REALTIME_VERSION_KEY;
+    if (parsedUpdate._envelope) {
+      int baseVersion = parsedUpdate._baseVersions.get(versionKey);
+      if (baseVersion == RedactedTableConfigsResponse.ABSENT_VERSION) {
+        if (storedConfigWithVersion != null) {
+          throw staleTableConfigsResponse();
+        }
+        if (submittedConfig != null) {
+          Preconditions.checkState(typeToCreate == null,
+              "A TableConfigs update cannot create more than one table type");
+          return tableType;
+        }
+        return typeToCreate;
+      }
+      if (storedConfigWithVersion == null || baseVersion != storedConfigWithVersion.getRight()) {
+        throw staleTableConfigsResponse();
+      }
+      storedConfigs.put(tableType, storedConfigWithVersion.getLeft());
+      expectedVersions.put(tableType, baseVersion);
+      return typeToCreate;
+    }
+
+    if (submittedConfig == null) {
+      return typeToCreate;
+    }
+    if (storedConfigWithVersion == null) {
+      Preconditions.checkState(typeToCreate == null,
+          "A TableConfigs update cannot create more than one table type");
+      return tableType;
+    }
+    storedConfigs.put(tableType, storedConfigWithVersion.getLeft());
+    expectedVersions.put(tableType, storedConfigWithVersion.getRight());
+    return typeToCreate;
+  }
+
+  private static ParsedTableConfigsUpdate parseTableConfigsUpdate(String tableConfigsString)
+      throws IOException {
+    JsonNode requestNode = JsonUtils.stringToJsonNode(tableConfigsString);
+    if (RedactedTableConfigsResponse.isEnvelope(requestNode)) {
+      Pair<RedactedTableConfigsResponse, Map<String, Object>> responseAndUnrecognizedProperties =
+          JsonUtils.stringToObjectAndUnrecognizedProperties(
+              tableConfigsString, RedactedTableConfigsResponse.class);
+      return new ParsedTableConfigsUpdate(responseAndUnrecognizedProperties.getLeft().getConfigs(),
+          responseAndUnrecognizedProperties.getLeft().getBaseVersions(),
+          true, responseAndUnrecognizedProperties.getRight());
+    }
+
+    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProperties =
+        JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsString, TableConfigs.class);
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProperties.getLeft();
+    TableConfig offline = tableConfigs.getOffline() != null
+        ? TableConfigRedactionUtils.restoreRedactedValues(tableConfigs.getOffline(), null) : null;
+    TableConfig realtime = tableConfigs.getRealtime() != null
+        ? TableConfigRedactionUtils.restoreRedactedValues(tableConfigs.getRealtime(), null) : null;
+    return new ParsedTableConfigsUpdate(
+        new TableConfigs(tableConfigs.getTableName(), tableConfigs.getSchema(), offline, realtime), Map.of(),
+        false, tableConfigsAndUnrecognizedProperties.getRight());
+  }
+
+  private static ControllerApplicationException staleTableConfigsResponse() {
+    return new ControllerApplicationException(LOGGER,
+        "TableConfigs changed after they were read; retrieve them again before updating", Response.Status.CONFLICT);
+  }
+
+  private static final class ParsedTableConfigsUpdate {
+    private final TableConfigs _tableConfigs;
+    private final Map<String, Integer> _baseVersions;
+    private final boolean _envelope;
+    private final Map<String, Object> _unrecognizedProperties;
+
+    private ParsedTableConfigsUpdate(TableConfigs tableConfigs, Map<String, Integer> baseVersions, boolean envelope,
+        Map<String, Object> unrecognizedProperties) {
+      _tableConfigs = tableConfigs;
+      _baseVersions = baseVersions;
+      _envelope = envelope;
+      _unrecognizedProperties = unrecognizedProperties;
+    }
   }
 
   /// Validates the [TableConfigs] as provided in the tableConfigsStr json, by validating the schema,
@@ -488,9 +679,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs json string: %s. Reason: %s", tableConfigsStr, e.getMessage()),
-          Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Invalid TableConfigs JSON", Response.Status.BAD_REQUEST);
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
@@ -516,7 +705,8 @@ public class TableConfigsRestletResource {
       throw e;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          redactedTableConfigsError("Invalid TableConfigs: " + rawTableName, e, tableConfigs),
+          Response.Status.BAD_REQUEST);
     }
 
     // validate permission
@@ -547,10 +737,14 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-
   /// Validates the provided TableConfigs. Hybrid table validation is performed only on the provided
   /// configs and does not check for conflicts with existing tables in the cluster.
   private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
+    validateConfig(tableConfigs, database, typesToSkip, null);
+  }
+
+  private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip,
+      @Nullable ExistingTableConfigs existingTableConfigs) {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -573,8 +767,11 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
+        TableConfig existingOfflineTableConfig = existingTableConfigs != null
+            ? existingTableConfigs._offline : _pinotHelixResourceManager.getOfflineTableConfig(rawTableName, false,
+                false);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip,
-            _pinotHelixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)));
+            existingOfflineTableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(offlineTableConfig, schema);
       }
@@ -584,8 +781,11 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
+        TableConfig existingRealtimeTableConfig = existingTableConfigs != null
+            ? existingTableConfigs._realtime : _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName, false,
+                false);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip,
-            _pinotHelixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
+            existingRealtimeTableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
         TableConfigValidatorRegistry.validate(realtimeTableConfig, schema);
       }
@@ -594,7 +794,29 @@ public class TableConfigsRestletResource {
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          redactedTableConfigsError("Invalid TableConfigs: " + rawTableName, e, tableConfigs),
+          Response.Status.BAD_REQUEST);
     }
+  }
+
+  private static final class ExistingTableConfigs {
+    private final TableConfig _offline;
+    private final TableConfig _realtime;
+
+    private ExistingTableConfigs(@Nullable TableConfig offline, @Nullable TableConfig realtime) {
+      _offline = offline;
+      _realtime = realtime;
+    }
+  }
+
+  private static String redactedTableConfigsError(String prefix, Exception exception, TableConfigs tableConfigs) {
+    String diagnostic = exception.getMessage();
+    if (tableConfigs.getOffline() != null) {
+      diagnostic = TableConfigRedactionUtils.redactDiagnostic(diagnostic, tableConfigs.getOffline());
+    }
+    if (tableConfigs.getRealtime() != null) {
+      diagnostic = TableConfigRedactionUtils.redactDiagnostic(diagnostic, tableConfigs.getRealtime());
+    }
+    return prefix + ": " + (diagnostic != null ? diagnostic : "Invalid table config");
   }
 }

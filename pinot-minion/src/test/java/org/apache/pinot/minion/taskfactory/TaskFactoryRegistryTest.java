@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.minion.taskfactory;
 
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.spi.utils.Obfuscator;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,48 +27,26 @@ import org.testng.annotations.Test;
 public class TaskFactoryRegistryTest {
 
   @Test
-  public void testObfuscatorMasksSensitiveConfigs() {
-    // Test that the Obfuscator properly masks sensitive configuration values
-    Map<String, String> configs = new HashMap<>();
-    configs.put("tableName", "myTable");
-    configs.put("authToken", "Basic YWRtaW46dmVyeXNlY3JldA");
-    configs.put("password", "verysecret");
-    configs.put("secretKey", "mySecretKey123");
-    configs.put("apiKey", "sk-1234567890abcdef");
-    configs.put("normalConfig", "normalValue");
+  public void testSafeExceptionTypeDoesNotIncludeMessage() {
+    String opaqueLiteral = "opaque-resolved-literal";
+    IllegalStateException exception = new IllegalStateException(opaqueLiteral);
 
-    String obfuscatedJson = Obfuscator.DEFAULT.toJsonString(configs);
+    String diagnostic = TaskFactoryRegistry.safeExceptionType(exception);
 
-    // Verify that sensitive values are masked
-    Assert.assertTrue(obfuscatedJson.contains("tableName"));
-    Assert.assertTrue(obfuscatedJson.contains("normalConfig"));
-    Assert.assertTrue(obfuscatedJson.contains("normalValue"));
-
-    // Verify that sensitive values are masked with "*****"
-    Assert.assertTrue(obfuscatedJson.contains("\"authToken\":\"*****\""));
-    Assert.assertTrue(obfuscatedJson.contains("\"password\":\"*****\""));
-    Assert.assertTrue(obfuscatedJson.contains("\"secretKey\":\"*****\""));
-    Assert.assertTrue(obfuscatedJson.contains("\"apiKey\":\"*****\""));
-
-    // Verify that the original sensitive values are not present
-    Assert.assertFalse(obfuscatedJson.contains("Basic YWRtaW46dmVyeXNlY3JldA"));
-    Assert.assertFalse(obfuscatedJson.contains("verysecret"));
-    Assert.assertFalse(obfuscatedJson.contains("mySecretKey123"));
-    Assert.assertFalse(obfuscatedJson.contains("sk-1234567890abcdef"));
+    Assert.assertEquals(diagnostic, IllegalStateException.class.getName());
+    Assert.assertFalse(diagnostic.contains(opaqueLiteral));
   }
 
   @Test
-  public void testObfuscatorHandlesNullAndEmptyValues() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("authToken", null);
-    configs.put("password", "");
-    configs.put("normalConfig", "value");
+  public void testTaskStartDiagnosticDoesNotIncludeConfigBody() {
+    String opaqueLiteral = "opaque-resolved-literal";
+    PinotTaskConfig taskConfig = new PinotTaskConfig("MaterializedViewTask",
+        Map.of("definedSQL", "SELECT * FROM source WHERE value = '" + opaqueLiteral + "'"));
 
-    String obfuscatedJson = Obfuscator.DEFAULT.toJsonString(configs);
+    String diagnostic = TaskFactoryRegistry.safeTaskStartDiagnostic(taskConfig, "task-id");
 
-    // Verify that null and empty values are handled properly
-    Assert.assertTrue(obfuscatedJson.contains("\"authToken\":\"*****\""));
-    Assert.assertTrue(obfuscatedJson.contains("\"password\":\"*****\""));
-    Assert.assertTrue(obfuscatedJson.contains("\"normalConfig\":\"value\""));
+    Assert.assertEquals(diagnostic, "Start running MaterializedViewTask: task-id");
+    Assert.assertFalse(diagnostic.contains(opaqueLiteral));
+    Assert.assertFalse(diagnostic.contains("definedSQL"));
   }
 }

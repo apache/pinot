@@ -118,12 +118,16 @@ public final class BasicAuthPrincipalUtils {
               .stream().collect(Collectors.toSet());
           Set<String> permissions = Optional.ofNullable(user.getPermissions())
               .orElseGet(() -> List.of())
-              .stream().map(x -> x.toString())
+              .stream().map(Object::toString)
+              .collect(Collectors.toSet());
+          Set<String> fineGrainedPermissions = Optional.ofNullable(user.getFineGrainedPermissions())
+              .orElseGet(() -> List.of())
+              .stream()
               .collect(Collectors.toSet());
           //todo: Handle RLS filters properly
           return new ZkBasicAuthPrincipal(name,
               BasicAuthTokenUtils.toBasicAuthToken(name, password), password, component, role,
-              tables, excludeTables, permissions, Map.of());
+              tables, excludeTables, permissions, fineGrainedPermissions, Map.of());
         }).collect(Collectors.toList());
   }
 
