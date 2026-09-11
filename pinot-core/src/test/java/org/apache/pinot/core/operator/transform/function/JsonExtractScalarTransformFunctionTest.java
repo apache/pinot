@@ -900,7 +900,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testExtractStringPreservesNumericPrecision() {
-    // STRING uses JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL so floats that exceed Double precision survive
+    // STRING uses JsonFunctions.PARSE_CONTEXT_WITH_BIG_DECIMAL so floats that exceed Double precision survive
     // the JSON → Java → JSON round-trip without truncation. Symmetric with BIG_DECIMAL precision.
     assertJsonExtractScalar(
         "{\"v\": 12345678901234567890.123456789}", "STRING",
