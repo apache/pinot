@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -60,10 +61,20 @@ public class RealtimeSegmentConverter {
   private final boolean _nullHandlingEnabled;
   private final boolean _enableColumnMajor;
   private final ServerMetrics _serverMetrics;
+  // Fully-qualified decoder class name to persist in segment metadata under custom.decoder.class, or null to skip.
+  @Nullable
+  private final String _decoderClassName;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
       boolean nullHandlingEnabled) {
+    this(realtimeSegment, segmentZKPropsConfig, outputPath, schema, tableName, tableConfig, segmentName,
+        nullHandlingEnabled, null);
+  }
+
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
+      String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
+      boolean nullHandlingEnabled, @Nullable String decoderClassName) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
@@ -72,6 +83,7 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
+    _decoderClassName = decoderClassName;
     if (_tableConfig.getIngestionConfig() != null
         && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       _enableColumnMajor =
@@ -85,6 +97,13 @@ public class RealtimeSegmentConverter {
   public void build(@Nullable SegmentVersion segmentVersion)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
+    if (_decoderClassName != null) {
+      // Durably record the decoder in segment metadata; merges (putAll) so other custom properties are preserved.
+      // Harvested back by SegmentMetadataImpl.subset("custom"), surfacing as custom.decoder.class.
+      genConfig.setCustomProperties(Map.of(
+          V1Constants.MetadataKeys.Segment.CUSTOM_SUBSET + "." + V1Constants.MetadataKeys.Segment.DECODER_CLASS,
+          _decoderClassName));
+    }
     genConfig.setInstanceType(InstanceType.SERVER);
     genConfig.setRealtimeConversion(true);
     genConfig.setConsumerDir(_realtimeSegmentImpl.getConsumerDir());
