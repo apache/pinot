@@ -71,9 +71,10 @@ public final class ColumnDeletionMetadataAccessHelper {
 
   /// Write the ledger with an expected znode version.
   ///
-  /// First write uses {@code create}. {@code expectedVersion} of {@code -1} against an existing
-  /// current-format znode CASes against the version observed by this call; it is not Helix
-  /// match-any. A stored format newer than this process can parse is never overwritten.
+  /// First write uses {@code create}. {@code expectedVersion} of {@code -1} is create-only: if the
+  /// znode already exists the write returns {@code false} and does not overwrite. Updates must pass
+  /// the version from {@link #getColumnDeletionMetadataZNRecord}. A stored format newer than this
+  /// process can parse is never overwritten.
   ///
   /// @return true if the write succeeded
   public static boolean writeColumnDeletionMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -105,20 +106,24 @@ public final class ColumnDeletionMetadataAccessHelper {
       throw new ColumnDeletionUnsupportedFormatException(storedFormatVersion,
           ColumnDeletionMetadata.CURRENT_FORMAT_VERSION);
     }
-    // -1 is create-or-CAS-against-the-version-just-read, not Helix match-any.
-    int casVersion = expectedVersion == -1 ? stat.getVersion() : expectedVersion;
+    if (expectedVersion == -1) {
+      LOGGER.warn("Refusing create-only write of column deletion metadata for table: {} (znode exists at version: {})",
+          tableNameWithType, stat.getVersion());
+      return false;
+    }
     try {
-      boolean result = propertyStore.set(path, metadata.toZNRecord(), casVersion, AccessOption.PERSISTENT);
+      boolean result = propertyStore.set(path, metadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
       if (result) {
-        LOGGER.info("Wrote column deletion metadata for table: {} at CAS version: {}", tableNameWithType, casVersion);
+        LOGGER.info("Wrote column deletion metadata for table: {} at expected version: {}", tableNameWithType,
+            expectedVersion);
       } else {
-        LOGGER.warn("Failed to write column deletion metadata for table: {} at CAS version: {}", tableNameWithType,
-            casVersion);
+        LOGGER.warn("Failed to write column deletion metadata for table: {} at expected version: {}",
+            tableNameWithType, expectedVersion);
       }
       return result;
     } catch (ZkBadVersionException e) {
-      LOGGER.warn("CAS conflict writing column deletion metadata for table: {} at CAS version: {}", tableNameWithType,
-          casVersion);
+      LOGGER.warn("CAS conflict writing column deletion metadata for table: {} at expected version: {}",
+          tableNameWithType, expectedVersion);
       return false;
     }
   }
