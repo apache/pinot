@@ -64,6 +64,12 @@ public interface SegmentMetadata {
 
   SegmentVersion getVersion();
 
+  /// Returns the schema of the segment, one [org.apache.pinot.spi.data.FieldSpec] per column.
+  ///
+  /// The `Schema` object itself belongs to this segment, but the specs it holds are shared with every other loaded
+  /// segment (of this table or any other) whose column parses to an equal spec, and must be treated as immutable: never
+  /// call a setter on one; copy it (e.g. through a JSON round-trip) before mutating. Removing a column from this schema
+  /// does not affect other segments.
   Schema getSchema();
 
   int getTotalDocs();
