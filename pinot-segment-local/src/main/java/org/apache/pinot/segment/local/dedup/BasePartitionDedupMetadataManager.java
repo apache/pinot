@@ -168,18 +168,15 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     }
     try {
       // Bump watermark after doPreloadSegment; a concurrent removeExpiredPrimaryKeys sweep reading a pre-bumped
-      // watermark could expire keys this preload is about to insert. On the skip path no rows are added, so it is
-      // safe to bump before returning.
-      if (skipSegmentOutOfTTL(segment)) {
-        updateLargestSeenTime(segment);
-        return;
-      }
-      try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
-          _primaryKeyColumns, _dedupTimeColumn)) {
-        Iterator<DedupRecordInfo> dedupRecordInfoIterator =
-            DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-        doPreloadSegment(segment, dedupRecordInfoIterator);
-        updatePrimaryKeyGauge();
+      // watermark could expire keys this preload is about to insert.
+      if (!skipSegmentOutOfTTL(segment)) {
+        try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
+            _primaryKeyColumns, _dedupTimeColumn)) {
+          Iterator<DedupRecordInfo> dedupRecordInfoIterator =
+              DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+          doPreloadSegment(segment, dedupRecordInfoIterator);
+          updatePrimaryKeyGauge();
+        }
       }
       updateLargestSeenTime(segment);
     } catch (Exception e) {
@@ -209,12 +206,10 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     }
     try {
       // Bump watermark after add; see preloadSegment.
-      if (skipSegmentOutOfTTL(segment)) {
-        updateLargestSeenTime(segment);
-      } else {
+      if (!skipSegmentOutOfTTL(segment)) {
         addOrReplaceSegment(null, segment);
-        updateLargestSeenTime(segment);
       }
+      updateLargestSeenTime(segment);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while adding segment: %s of table: %s to %s", segmentName, _tableNameWithType,
@@ -233,12 +228,10 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     }
     try {
       // Bump watermark after replace; see preloadSegment.
-      if (skipSegmentOutOfTTL(newSegment)) {
-        updateLargestSeenTime(newSegment);
-      } else {
+      if (!skipSegmentOutOfTTL(newSegment)) {
         addOrReplaceSegment(oldSegment, newSegment);
-        updateLargestSeenTime(newSegment);
       }
+      updateLargestSeenTime(newSegment);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while replacing segment: %s with segment: %s of table: %s in %s",
