@@ -19,8 +19,10 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CompressionStatsTrackingForwardIndexCreator;
@@ -52,6 +54,9 @@ public class ForwardIndexCreatorFactory {
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
+    Preconditions.checkArgument(
+        indexConfig.getCodecSpec() == null || indexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", columnName);
 
     if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
       // Dictionary-encoded forward index requires a dictionary to translate dict ids to values.
@@ -74,8 +79,18 @@ public class ForwardIndexCreatorFactory {
     } else {
       // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      ForwardIndexCreator creator;
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+      ForwardIndexCreator creator = null;
+      ChunkCompressionType chunkCompressionType = null;
+
+      // codecSpec always selects the self-describing V7 codec-pipeline format. The legacy raw
+      // writers remain available only through compressionCodec/chunkCompressionType.
+      if (indexConfig.getCodecSpec() != null) {
+        String codecSpec = indexConfig.getCodecSpec();
+        ForwardIndexType.validateCodecPipelineShape(codecSpec, fieldSpec);
+        CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
+        creator = new SingleValueFixedByteRawIndexCreator(indexDir, columnName, numTotalDocs, storedType,
+            indexConfig.getTargetDocsPerChunk(), executor);
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
         creator = new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
       } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
@@ -85,8 +100,12 @@ public class ForwardIndexCreatorFactory {
         creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
       } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
         creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
-      } else {
-        ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
+      }
+
+      if (creator == null) {
+        if (chunkCompressionType == null) {
+          chunkCompressionType = indexConfig.getChunkCompressionType();
+        }
         if (chunkCompressionType == null) {
           chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
         }

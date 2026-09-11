@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -43,6 +44,7 @@ import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexTy
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -61,7 +63,9 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -726,7 +730,7 @@ public class ForwardIndexHandlerTest {
       _fieldConfigMap.put(column,
           new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), newCompressionCodec, null));
       assertEquals(computeOperations(),
-          Map.of(column, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+          Map.of(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
 
       // TEST2: Change compression and add index. Change compressionType for more than 1 column.
       resetIndexConfigs();
@@ -738,8 +742,8 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_SNAPPY_STRING, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
               CompressionCodec.ZSTANDARD, null));
       assertEquals(computeOperations(),
-          Map.of(DIM_SNAPPY_INTEGER, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
-              DIM_SNAPPY_STRING, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+          Map.of(DIM_SNAPPY_INTEGER, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX),
+              DIM_SNAPPY_STRING, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
     }
   }
 
@@ -1129,7 +1133,7 @@ public class ForwardIndexHandlerTest {
 
         ForwardIndexHandler handler = createForwardIndexHandler();
         assertEquals(handler.computeOperations(writer),
-            Map.of(column, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+            Map.of(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
         assertTrue(handler.needUpdateIndices(writer));
         handler.updateIndices(writer);
         handler.postUpdateIndicesCleanup(writer);
@@ -1159,7 +1163,7 @@ public class ForwardIndexHandlerTest {
 
         ForwardIndexHandler handler = createForwardIndexHandler();
         assertEquals(handler.computeOperations(writer),
-            Map.of(column, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+            Map.of(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX)));
         assertTrue(handler.needUpdateIndices(writer));
         handler.updateIndices(writer);
         handler.postUpdateIndicesCleanup(writer);
@@ -2832,6 +2836,154 @@ public class ForwardIndexHandlerTest {
         assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
       }
     }
+  }
+
+  /// Exercises a real legacy-to-V7 reload and the remove-only rollback path. Removing `codecSpec`
+  /// without specifying `compressionCodec` must restore the field-type legacy default.
+  @Test
+  public void testCodecSpecRemoveOnlyRollback()
+      throws Exception {
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "DELTA,ZSTD"));
+    applyCodecRewrite(DIM_LZ4_INTEGER);
+    assertRawForwardIndexState(DIM_LZ4_INTEGER, "DELTA,ZSTD(3)", null);
+
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "delta,zstd(3)"));
+    assertNoCodecRewrite(DIM_LZ4_INTEGER);
+
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "DELTA,LZ4"));
+    applyCodecRewrite(DIM_LZ4_INTEGER);
+    assertRawForwardIndexState(DIM_LZ4_INTEGER, "DELTA,LZ4", null);
+
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, new FieldConfig.Builder(DIM_LZ4_INTEGER)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .build());
+    applyCodecRewrite(DIM_LZ4_INTEGER);
+    assertRawForwardIndexState(DIM_LZ4_INTEGER, null, ChunkCompressionType.LZ4);
+  }
+
+  private void assertNoCodecRewrite(String column)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      assertTrue(createForwardIndexHandler().computeOperations(writer).isEmpty(),
+          "Equivalent canonical codecSpec should not rewrite column " + column);
+    }
+  }
+
+  /// One config push can toggle a standalone dictionary and change the codec of the same RAW column.
+  /// Both operations must be queued in a single reload: the dictionary is built from the existing
+  /// forward index first, then the forward index is rewritten to V7 while staying RAW. The mirror
+  /// drops the dictionary while changing the codec again.
+  @Test
+  public void testDictionaryToggleAndCodecSpecTogether()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", "DELTA,LZ4");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    _invertedIndexColumns.add(column);
+    _noDictionaryColumns.remove(column);
+    _fieldConfigMap.put(column, new FieldConfig(column, FieldConfig.EncodingType.RAW, null,
+        List.of(FieldConfig.IndexType.INVERTED), null, null, indexes, null, null));
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, "DELTA,LZ4", null);
+    assertStandaloneDictionaryState(column, true);
+
+    _invertedIndexColumns.remove(column);
+    _noDictionaryColumns.add(column);
+    _fieldConfigMap.put(column, rawFieldConfigWithCodecSpec(column, "DELTA,ZSTD(3)"));
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, "DELTA,ZSTD(3)", null);
+    assertStandaloneDictionaryState(column, false);
+  }
+
+  private void assertStandaloneDictionaryState(String column, boolean expectDictionary)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertEquals(metadata.hasDictionary(), expectDictionary);
+      assertEquals(metadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertEquals(reader.hasIndexFor(column, StandardIndexes.dictionary()), expectDictionary);
+      if (expectDictionary) {
+        // Check the dictionary against the source data, not against metadata derived from the same rebuild.
+        TreeSet<Integer> expectedValues = new TreeSet<>();
+        for (GenericRow row : TEST_DATA) {
+          expectedValues.add(((Number) row.getValue(column)).intValue());
+        }
+        try (Dictionary dictionary = DictionaryIndexType.read(reader, metadata)) {
+          assertEquals(dictionary.length(), expectedValues.size());
+          int dictId = 0;
+          for (int expected : expectedValues) {
+            assertEquals(dictionary.getIntValue(dictId++), expected);
+          }
+        }
+      }
+    }
+  }
+
+  private void applyCodecRewrite(String column)
+      throws Exception {
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+  }
+
+  private void applyOperations(String column, List<ForwardIndexHandler.Operation> expectedOperations)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertEquals(handler.computeOperations(writer), Map.of(column, expectedOperations));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void assertRawForwardIndexState(String column, @Nullable String codecSpec,
+      @Nullable ChunkCompressionType compressionType)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader segmentReader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      PinotDataBuffer forwardIndexBuffer = segmentReader.getIndexFor(column, StandardIndexes.forward());
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader forwardReader = readerFactory.createIndexReader(segmentReader,
+          createFieldIndexConfigsFromMetadata(metadata), metadata);
+          ForwardIndexReaderContext context = forwardReader.createContext()) {
+        if (codecSpec != null) {
+          assertTrue(forwardReader instanceof FixedByteChunkSVForwardIndexReaderV7);
+          assertEquals(FixedByteChunkSVForwardIndexReaderV7.readCodecSpec(forwardIndexBuffer), codecSpec);
+        } else {
+          assertFalse(forwardReader instanceof FixedByteChunkSVForwardIndexReaderV7);
+          assertFalse(FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(forwardIndexBuffer));
+        }
+        assertEquals(forwardReader.getCompressionType(), compressionType);
+        for (int docId = 0; docId < TEST_DATA.size(); docId++) {
+          int expected = ((Number) TEST_DATA.get(docId).getValue(column)).intValue();
+          assertEquals(forwardReader.getInt(docId, context), expected,
+              "Value changed during codec reload at docId " + docId);
+        }
+      }
+    }
+  }
+
+  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 
   private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {

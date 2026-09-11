@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Throwables;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -1795,6 +1796,107 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       fail("Should pass since inverted index has explicit dictionary config, but got: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void testCodecSpecTableConfigValidation() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addSingleValueDimension("longCol", DataType.LONG)
+        .addSingleValueDimension("stringCol", DataType.STRING)
+        .addMultiValueDimension("mvIntCol", DataType.INT)
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(
+        fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4"),
+        fieldConfigWithCodecSpec("longCol", FieldConfig.EncodingType.RAW, "ZSTD(3)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,UNKNOWN", "Unknown codec");
+    assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,DELTA",
+        "all transforms must precede any compression stage");
+    assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "LZ4",
+        "only supports single-value columns");
+    assertCodecSpecValidationFails(schema, "stringCol", FieldConfig.EncodingType.RAW, "SNAPPY",
+        "only supports INT and LONG columns");
+    assertCodecSpecChunkSizeValidationFails(schema, -1, "numDocsPerChunk must be positive");
+    assertCodecSpecChunkSizeValidationFails(schema, 16_777_217, "exceeds V7 limit");
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(
+        List.of(fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.DICTIONARY, "LZ4")));
+    TableConfig dictionaryTableConfig = tableConfig;
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(dictionaryTableConfig, schema));
+    assertEquals(exception.getMessage(), "Failed to create FieldIndexConfigs");
+    assertEquals(Throwables.getRootCause(exception).getMessage(), "codecSpec requires RAW forward-index encoding");
+
+    ObjectNode disabledForward = JsonUtils.newObjectNode();
+    disabledForward.put("disabled", true);
+    disabledForward.put("codecSpec", "LZ4");
+    ObjectNode disabledIndexes = JsonUtils.newObjectNode();
+    disabledIndexes.set("forward", disabledForward);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(disabledIndexes)
+        .build()));
+    TableConfig disabledTableConfig = tableConfig;
+    exception = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(disabledTableConfig, schema));
+    assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled"),
+        exception.getMessage());
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(disabledIndexes)
+        .withProperties(Map.of(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString()))
+        .build()));
+    TableConfig legacyDisabledTableConfig = tableConfig;
+    exception = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(legacyDisabledTableConfig, schema));
+    assertTrue(Throwables.getRootCause(exception).getMessage()
+            .contains("codecSpec cannot be configured when the forward index is disabled"),
+        exception.getMessage());
+  }
+
+  private static void assertCodecSpecValidationFails(Schema schema, String column,
+      FieldConfig.EncodingType encodingType, String codecSpec, String expectedMessage) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(fieldConfigWithCodecSpec(column, encodingType, codecSpec)));
+    Exception exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(tableConfig, schema));
+    assertTrue(exception.getMessage().contains(expectedMessage), exception.getMessage());
+  }
+
+  private static FieldConfig fieldConfigWithCodecSpec(String column, FieldConfig.EncodingType encodingType,
+      String codecSpec) {
+    return fieldConfigWithCodecSpec(column, encodingType, codecSpec, null);
+  }
+
+  private static void assertCodecSpecChunkSizeValidationFails(Schema schema, int targetDocsPerChunk,
+      String expectedMessage) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(
+        fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.RAW, "LZ4", targetDocsPerChunk)));
+    Exception exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(tableConfig, schema));
+    assertTrue(exception.getMessage().contains(expectedMessage), exception.getMessage());
+  }
+
+  private static FieldConfig fieldConfigWithCodecSpec(String column, FieldConfig.EncodingType encodingType,
+      String codecSpec, @Nullable Integer targetDocsPerChunk) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    if (targetDocsPerChunk != null) {
+      forward.put("targetDocsPerChunk", targetDocsPerChunk);
+    }
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column)
+        .withEncodingType(encodingType)
+        .withIndexes(indexes)
+        .build();
   }
 
   @Test

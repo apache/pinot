@@ -373,7 +373,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       return;
     }
 
-    // Write the combined file to V3 format (similar to rewriteForwardIndexForCompressionChange)
+    // Write the combined file to V3 format (similar to ForwardIndexHandler.rewriteForwardIndex)
     LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, combinedTextIndexFile, StandardIndexes.text());
 
     LOGGER.info("Successfully converted text index to V3 combined format for column: {}", columnName);
