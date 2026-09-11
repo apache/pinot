@@ -841,4 +841,17 @@ public class SchemaTest {
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
     Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
+
+  @Test
+  public void testSchemaDiffDoesNotRelaxCompatibilityContract() {
+    Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addMetric("metric", FieldSpec.DataType.INT).build();
+    Schema deletedColumn = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .build();
+
+    Assert.assertFalse(deletedColumn.isBackwardCompatibleWith(oldSchema));
+    SchemaDiff diff = SchemaDiff.compute(oldSchema, deletedColumn);
+    assertThat(diff.getDeletedColumnNames()).containsExactly("metric");
+    assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isTrue();
+  }
 }
