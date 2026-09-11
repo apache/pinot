@@ -46,7 +46,7 @@ public final class StreamPartitionIdentity implements Comparable<StreamPartition
   public static final int FORMAT_VERSION_V2 = 2;
 
   /// Sentinel topic id for V1 names, which do not store a topic id. Never infer a topic from
-  /// `{@code partitionGroupId % 10000}`.
+  /// `partitionGroupId % 10000`.
   public static final int UNKNOWN_TOPIC_ID = -1;
 
   /// Sentinel raw partition id on V1 names. The persisted value lives in [getPartitionId] as the

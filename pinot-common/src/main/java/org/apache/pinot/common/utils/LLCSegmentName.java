@@ -65,14 +65,25 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
-    _formatVersion = FORMAT_VERSION_V1;
+    if (parts.length == 4) {
+      _formatVersion = FORMAT_VERSION_V1;
+      _tableName = parts[0];
+      _partitionGroupId = Integer.parseInt(parts[1]);
+      _topicId = StreamPartitionIdentity.UNKNOWN_TOPIC_ID;
+      _partitionId = StreamPartitionIdentity.UNKNOWN_PARTITION_ID;
+      _sequenceNumber = Integer.parseInt(parts[2]);
+      _creationTime = parts[3];
+      _segmentName = segmentName;
+      return;
+    }
+    Preconditions.checkArgument(isV2Parts(parts), "Invalid LLC segment name: %s", segmentName);
+    _formatVersion = FORMAT_VERSION_V2;
     _tableName = parts[0];
-    _partitionGroupId = Integer.parseInt(parts[1]);
-    _topicId = StreamPartitionIdentity.UNKNOWN_TOPIC_ID;
-    _partitionId = StreamPartitionIdentity.UNKNOWN_PARTITION_ID;
-    _sequenceNumber = Integer.parseInt(parts[2]);
-    _creationTime = parts[3];
+    _partitionGroupId = 0;
+    _topicId = parseNonNegativeInt(parts[2], "topicId", segmentName);
+    _partitionId = parseNonNegativeInt(parts[3], "partitionId", segmentName);
+    _sequenceNumber = Integer.parseInt(parts[4]);
+    _creationTime = parts[5];
     _segmentName = segmentName;
   }
 
@@ -102,8 +113,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
         + SEPARATOR + creationTime;
   }
 
-  /// Returns the [LLCSegmentName] for the given segment name, or `null` if the given segment name does not
-  /// represent an LLC segment.
+  /// Returns the [LLCSegmentName] for the given V1 or V2 segment name, or `null` if the given
+  /// segment name does not represent an LLC segment.
   @Nullable
   public static LLCSegmentName of(String segmentName) {
     try {
@@ -114,6 +125,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   }
 
   /// Returns whether the given segment name represents an LLC segment.
+  ///
+  /// V1 names have 3 `__` separators. V2 names have 5 and token 2 is the literal `v2`.
+  /// Five-token uploaded names and 5-part `table__configId__partition__seq__time` names are not LLC.
   public static boolean isLLCSegment(String segmentName) {
     int numSeparators = 0;
     int index = 0;
@@ -121,12 +135,34 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
       numSeparators++;
       index += 2; // SEPARATOR.length()
     }
-    return numSeparators == 3;
+    if (numSeparators == 3) {
+      return true;
+    }
+    if (numSeparators == 5) {
+      return isV2Parts(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR));
+    }
+    return false;
   }
 
-  /// Returns the sequence number of the given segment name.
+  /// Returns the sequence number of the given V1 or V2 LLC segment name.
   public static int getSequenceNumber(String segmentName) {
-    return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    if (parts.length == 4) {
+      return Integer.parseInt(parts[2]);
+    }
+    Preconditions.checkArgument(isV2Parts(parts), "Invalid LLC segment name: %s", segmentName);
+    return Integer.parseInt(parts[4]);
+  }
+
+  private static boolean isV2Parts(String[] parts) {
+    return parts.length == 6 && V2_TOKEN.equals(parts[1]);
+  }
+
+  private static int parseNonNegativeInt(String raw, String fieldName, String segmentName) {
+    int value = Integer.parseInt(raw);
+    Preconditions.checkArgument(value >= 0, "Invalid LLC segment name %s: %s must be non-negative", segmentName,
+        fieldName);
+    return value;
   }
 
   public String getTableName() {
@@ -143,6 +179,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   /// V1 packed or raw partition-group int. V2 names have no packed id.
   public int getPartitionGroupId() {
+    Preconditions.checkState(!isV2(), "V2 LLC segment name has no packed partition group id: %s", _segmentName);
     return _partitionGroupId;
   }
 
@@ -184,8 +221,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public int compareTo(LLCSegmentName other) {
     Preconditions.checkArgument(_tableName.equals(other._tableName),
         "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
-    if (_partitionGroupId != other._partitionGroupId) {
-      return Integer.compare(_partitionGroupId, other._partitionGroupId);
+    int identityCmp = getStreamPartitionIdentity().compareTo(other.getStreamPartitionIdentity());
+    if (identityCmp != 0) {
+      return identityCmp;
     }
     return Integer.compare(_sequenceNumber, other._sequenceNumber);
   }
