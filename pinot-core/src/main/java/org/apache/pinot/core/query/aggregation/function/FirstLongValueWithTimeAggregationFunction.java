@@ -40,9 +40,18 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Long> {
   private final static ValueLongPair<Long> DEFAULT_VALUE_TIME_PAIR = new LongLongPair(Long.MIN_VALUE, Long.MAX_VALUE);
 
+  private final ColumnDataType _resultType;
+
   public FirstLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    this(dataCol, timeCol, nullHandlingEnabled, false, ColumnDataType.LONG);
+  }
+
+  public FirstLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, boolean typeInferred,
+      ColumnDataType resultType) {
+    super(dataCol, timeCol, ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE, nullHandlingEnabled, typeInferred);
+    _resultType = resultType;
   }
 
   @Override
@@ -93,11 +102,6 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
   }
 
   @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'LONG')";
-  }
-
-  @Override
   public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Long> longLongPair) {
     return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongLongPair.getValue(),
         ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE.serialize((LongLongPair) longLongPair));
@@ -110,6 +114,6 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.LONG;
+    return _resultType;
   }
 }

@@ -18,20 +18,44 @@
  */
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
+import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// Wrapper class for projection block value set for exprmin/max aggregation function.
 /// Used to get the value from val set of different data types.
 public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {
+  private final boolean _nullHandlingEnabled;
+  @Nullable
+  private RoaringBitmap _nullBitmap;
 
   public ExprMinMaxProjectionValSetWrapper(BlockValSet blockValSet) {
-    super(ColumnDataType.fromDataType(blockValSet.getValueType().getStoredType(), blockValSet.isSingleValue()));
+    this(blockValSet, ColumnDataType.fromDataType(blockValSet.getValueType().getStoredType(),
+        blockValSet.isSingleValue()), false);
+  }
+
+  /// Preserves the bound projection type and nulls while reading each physical block through its conversion getters.
+  public ExprMinMaxProjectionValSetWrapper(BlockValSet blockValSet, ColumnDataType type, boolean nullHandlingEnabled) {
+    super(type.getStoredType());
+    Preconditions.checkState(type.isArray() != blockValSet.isSingleValue(),
+        "ExprMinMax projection cardinality does not match its bound type: %s", type);
+    _nullHandlingEnabled = nullHandlingEnabled;
     setNewBlock(blockValSet);
   }
 
+  @Override
+  public void setNewBlock(BlockValSet blockValSet) {
+    super.setNewBlock(blockValSet);
+    _nullBitmap = _nullHandlingEnabled ? blockValSet.getNullBitmap() : null;
+  }
+
   public Object getValue(int i) {
+    if (_nullBitmap != null && _nullBitmap.contains(i)) {
+      return null;
+    }
     switch (_storedType) {
       case INT:
         return _intValues[i];

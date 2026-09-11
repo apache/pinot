@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.math.DoubleMath;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -349,11 +350,32 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         assertTrue(value instanceof String[], "Got unexpected value type: " + value.getClass()
             + " for STRING_ARRAY column, expected: String[], List or JdbcArray");
         return value;
+      case LONG_ARRAY:
+      case DOUBLE_ARRAY:
+      case BOOLEAN_ARRAY:
+      case TIMESTAMP_ARRAY:
+        if (value instanceof JdbcArray) {
+          try {
+            value = ((JdbcArray) value).getArray();
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        }
+        int length = value instanceof List ? ((List<?>) value).size() : Array.getLength(value);
+        Object[] canonicalValues = new Object[length];
+        ColumnDataType elementType = ColumnDataType.fromDataTypeSV(columnDataType.toDataType());
+        for (int i = 0; i < length; i++) {
+          Object element = value instanceof List ? ((List<?>) value).get(i) : Array.get(value, i);
+          canonicalValues[i] = canonicalizeValue(elementType, element);
+        }
+        return canonicalValues;
       default:
         throw new UnsupportedOperationException("Unsupported ColumnDataType: " + columnDataType);
     }
   }
 
+  // Canonicalization gives each column matching Comparable types; the heterogeneous row type cannot express that.
+  @SuppressWarnings("unchecked")
   protected static void sortRows(List<Object[]> rows) {
     Comparator<Object> valueComparator = (v1, v2) -> {
       if (v1 == null && v2 == null) {
@@ -371,6 +393,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
       if (v1 instanceof String[]) {
         return Arrays.compare((String[]) v1, (String[]) v2);
+      }
+      if (v1 instanceof Object[]) {
+        return Arrays.compare((Object[]) v1, (Object[]) v2,
+            Comparator.nullsFirst((first, second) -> ((Comparable) first).compareTo(second)));
       }
       throw new UnsupportedOperationException("Unsupported class: " + v1.getClass());
     };
@@ -424,6 +450,22 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return Arrays.equals((int[]) actual, (int[]) expected);
       case STRING_ARRAY:
         return Arrays.equals((String[]) actual, (String[]) expected);
+      case LONG_ARRAY:
+      case DOUBLE_ARRAY:
+      case BOOLEAN_ARRAY:
+      case TIMESTAMP_ARRAY:
+        Object[] actualArray = (Object[]) actual;
+        Object[] expectedArray = (Object[]) expected;
+        if (actualArray.length != expectedArray.length) {
+          return false;
+        }
+        ColumnDataType elementType = ColumnDataType.fromDataTypeSV(columnDataType.toDataType());
+        for (int i = 0; i < actualArray.length; i++) {
+          if (!typeCompatibleFuzzyEquals(elementType, actualArray[i], expectedArray[i])) {
+            return false;
+          }
+        }
+        return true;
       default:
         throw new UnsupportedOperationException("Unsupported ColumnDataType: " + columnDataType);
     }

@@ -35,6 +35,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriteUtils;
+import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -104,8 +106,8 @@ public class EmptyResponseUtils {
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
     Object[] resultRow = postAggregationHandler.getResult(rawRow);
 
-    applyAliases(queryContext, resultDataSchema);
-    return new ResultTable(resultDataSchema, List.<Object[]>of(resultRow));
+    return rewriteAndFormatResults(queryContext, resultDataSchema,
+        queryContext.getLimit() == 0 ? List.of() : List.<Object[]>of(resultRow));
   }
 
   private static ResultTable buildEmptyGroupByResultTable(QueryContext queryContext) {
@@ -138,8 +140,24 @@ public class EmptyResponseUtils {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, prePostAggDataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
 
-    applyAliases(queryContext, resultDataSchema);
-    return new ResultTable(resultDataSchema, List.of());
+    return rewriteAndFormatResults(queryContext, resultDataSchema, List.of());
+  }
+
+  private static ResultTable rewriteAndFormatResults(QueryContext queryContext, DataSchema dataSchema,
+      List<Object[]> rows) {
+    RewriterResult rewritten = ResultRewriteUtils.rewriteResult(dataSchema, rows);
+    DataSchema resultSchema = rewritten.getDataSchema();
+    List<Object[]> resultRows = rewritten.getRows();
+    ColumnDataType[] types = resultSchema.getColumnDataTypes();
+    for (Object[] row : resultRows) {
+      for (int i = 0; i < types.length; i++) {
+        if (row[i] != null) {
+          row[i] = types[i].format(row[i]);
+        }
+      }
+    }
+    applyAliases(queryContext, resultSchema);
+    return new ResultTable(resultSchema, resultRows);
   }
 
   private static void applyAliases(QueryContext queryContext, DataSchema dataSchema) {

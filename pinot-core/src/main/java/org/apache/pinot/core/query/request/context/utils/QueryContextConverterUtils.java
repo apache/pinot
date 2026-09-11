@@ -50,13 +50,18 @@ public class QueryContextConverterUtils {
 
   /// Converts the given [PinotQuery] into a [QueryContext].
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
+    return getQueryContext(pinotQuery, false);
+  }
+
+  /// For direct server SQL, defer aggregation construction until the executor supplies the table schema.
+  public static QueryContext getQueryContext(PinotQuery pinotQuery, boolean requiresSchemaBinding) {
     // FROM
     String tableName;
     DataSource dataSource = pinotQuery.getDataSource();
     tableName = dataSource.getTableName();
     QueryContext subquery = null;
     if (dataSource.getSubquery() != null) {
-      subquery = getQueryContext(dataSource.getSubquery());
+      subquery = getQueryContext(dataSource.getSubquery(), requiresSchemaBinding);
     }
 
     // SELECT
@@ -220,6 +225,7 @@ public class QueryContextConverterUtils {
         .setQueryOptions(pinotQuery.getQueryOptions())
         .setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode)
+        .setRequiresSchemaBinding(requiresSchemaBinding)
         .build();
   }
 

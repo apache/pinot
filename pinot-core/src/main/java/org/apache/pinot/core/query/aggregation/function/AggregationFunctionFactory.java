@@ -21,22 +21,9 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBigDecimalFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBytesFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBigDecimalFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBytesFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctStringFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
-import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggregationFunction;
@@ -48,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatc
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelStepDurationStatsAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -217,6 +203,14 @@ public class AggregationFunctionFactory {
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
         AggregationFunctionType functionType = AggregationFunctionType.valueOf(upperCaseFunctionName);
+        AggregationFunctionProvider provider = AggregationFunctionProviderRegistry.getProvider(functionType);
+        if (provider != null) {
+          AggregationFunction<?, ?> result = provider.create(function, nullHandlingEnabled);
+          AggregateCallBinding binding = function.getAggregationBinding();
+          Preconditions.checkState(binding == null || result.getFinalResultColumnType() == binding.getResultType(),
+              "Aggregation provider for %s did not preserve its bound result type", functionType);
+          return result;
+        }
         switch (functionType) {
           case COUNT:
             return new CountAggregationFunction(arguments, nullHandlingEnabled);
@@ -243,39 +237,6 @@ public class AggregationFunctionFactory {
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
-          case MODE:
-            return new ModeAggregationFunction(arguments, nullHandlingEnabled);
-          case ANYVALUE:
-            return new AnyValueAggregationFunction(arguments, nullHandlingEnabled);
-          case FIRSTWITHTIME: {
-            Preconditions.checkArgument(numArguments == 3,
-                "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
-                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
-            ExpressionContext timeCol = arguments.get(1);
-            ExpressionContext dataTypeExp = arguments.get(2);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "FIRST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
-                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            switch (dataType) {
-              case BOOLEAN:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
-                    true);
-              case INT:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
-                    false);
-              case LONG:
-                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case FLOAT:
-                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case DOUBLE:
-                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case STRING:
-                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
-            }
-          }
           case LISTAGG: {
             Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
                 "LISTAGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -302,97 +263,6 @@ public class AggregationFunctionFactory {
             return new SumArrayLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMARRAYDOUBLE:
             return new SumArrayDoubleAggregationFunction(arguments, nullHandlingEnabled);
-          case ARRAYAGG: {
-            Preconditions.checkArgument(numArguments >= 2,
-                "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
-                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", numArguments);
-            ExpressionContext dataTypeExp = arguments.get(1);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
-                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            boolean isDistinct = false;
-            if (numArguments == 3) {
-              ExpressionContext isDistinctExp = arguments.get(2);
-              Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
-                  "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
-                      + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
-              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
-            }
-            if (isDistinct) {
-              switch (dataType) {
-                case BOOLEAN:
-                case INT:
-                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullHandlingEnabled);
-                case LONG:
-                case TIMESTAMP:
-                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
-                case FLOAT:
-                  return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
-                case DOUBLE:
-                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
-                case BIG_DECIMAL:
-                  return new ArrayAggDistinctBigDecimalFunction(firstArgument, nullHandlingEnabled);
-                case STRING:
-                case JSON:
-                  return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
-                case BYTES:
-                case UUID:
-                  return new ArrayAggDistinctBytesFunction(firstArgument, dataType, nullHandlingEnabled);
-                default:
-                  throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
-              }
-            }
-            switch (dataType) {
-              case BOOLEAN:
-              case INT:
-                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
-              case LONG:
-              case TIMESTAMP:
-                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
-              case FLOAT:
-                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
-              case DOUBLE:
-                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
-              case BIG_DECIMAL:
-                return new ArrayAggBigDecimalFunction(firstArgument, nullHandlingEnabled);
-              case STRING:
-              case JSON:
-                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
-              case BYTES:
-              case UUID:
-                return new ArrayAggBytesFunction(firstArgument, dataType, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
-            }
-          }
-          case LASTWITHTIME: {
-            Preconditions.checkArgument(numArguments == 3,
-                "LAST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
-                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
-            ExpressionContext timeCol = arguments.get(1);
-            ExpressionContext dataTypeExp = arguments.get(2);
-            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "LAST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
-                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
-            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            switch (dataType) {
-              case BOOLEAN:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, true);
-              case INT:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, false);
-              case LONG:
-                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case FLOAT:
-                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case DOUBLE:
-                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              case STRING:
-                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
-              default:
-                throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
-            }
-          }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
@@ -498,14 +368,6 @@ public class AggregationFunctionFactory {
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
                 nullHandlingEnabled);
-          case PINOTPARENTAGGEXPRMAX:
-            return new ParentExprMinMaxAggregationFunction(arguments, true, nullHandlingEnabled);
-          case PINOTPARENTAGGEXPRMIN:
-            return new ParentExprMinMaxAggregationFunction(arguments, false, nullHandlingEnabled);
-          case PINOTCHILDAGGEXPRMAX:
-            return new ChildExprMinMaxAggregationFunction(arguments, true);
-          case PINOTCHILDAGGEXPRMIN:
-            return new ChildExprMinMaxAggregationFunction(arguments, false);
           case EXPRMAX:
           case EXPRMIN:
             throw new IllegalArgumentException(

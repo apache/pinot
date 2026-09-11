@@ -73,6 +73,8 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -85,6 +87,8 @@ import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
+import org.apache.pinot.core.query.aggregation.GapfillAggregationFunctionBinder;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
@@ -714,7 +718,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
-      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName), schema);
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       // Re-optimize after attaching the time boundary filter so that filter optimizers (e.g. NumericalFilterOptimizer,
       // FlattenAndOrFilterOptimizer, MergeRangeFilterOptimizer) are applied to the time boundary predicate.
@@ -724,7 +728,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
-      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName), schema);
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
@@ -735,7 +739,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName), schema);
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
       offlineBrokerRequest = serverBrokerRequest;
 
@@ -744,7 +748,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName), schema);
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
       realtimeBrokerRequest = serverBrokerRequest;
 
@@ -1249,6 +1253,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
+    if (pinotQuery != serverPinotQuery) {
+      // Retain the inner logical contract before a materialized expression override can replace an aggregate.
+      GapfillAggregationFunctionBinder.bind(pinotQuery, serverPinotQuery, null);
+    }
 
     return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
   }
@@ -1504,6 +1512,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       /// MV-rewrite case is recognized via the broker-internal marker stamped on the swap;
       /// see `BrokerReduceService#isMaterializedViewRewrite` for the matching predicate.
       if (pinotQuery != serverPinotQuery) {
+        GapfillAggregationFunctionBinder.bind(pinotQuery, serverPinotQuery, resultTable.getDataSchema());
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
         GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
         if (gapfillType != null) {
@@ -2026,11 +2035,24 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  private static void handleExpressionOverride(PinotQuery pinotQuery,
-      @Nullable Map<Expression, Expression> expressionOverrideMap) {
-    if (expressionOverrideMap == null) {
-      return;
+  @VisibleForTesting
+  static void handleExpressionOverride(PinotQuery pinotQuery,
+      @Nullable Map<Expression, Expression> expressionOverrideMap, @Nullable Schema schema) {
+    if (expressionOverrideMap != null) {
+      Map<ExpressionContext, Expression> overrides = new HashMap<>();
+      // Execution metadata is excluded from expression identity, including an aggregate nested in a transform.
+      expressionOverrideMap.forEach((expression, replacement) ->
+          overrides.put(RequestContextUtils.getExpression(expression), replacement));
+      applyExpressionOverrides(pinotQuery, overrides);
     }
+    if (schema != null) {
+      // Preserve the logical contract of existing calls, and bind calls newly introduced by a rewrite.
+      AggregationFunctionBinder.bind(pinotQuery, schema);
+    }
+  }
+
+  private static void applyExpressionOverrides(PinotQuery pinotQuery,
+      Map<ExpressionContext, Expression> expressionOverrideMap) {
     pinotQuery.getSelectList().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
@@ -2054,8 +2076,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private static Expression handleExpressionOverride(Expression expression,
-      Map<Expression, Expression> expressionOverrideMap) {
-    Expression override = expressionOverrideMap.get(expression);
+      Map<ExpressionContext, Expression> expressionOverrideMap) {
+    Expression override = expressionOverrideMap.get(RequestContextUtils.getExpression(expression));
     if (override != null) {
       return new Expression(override);
     }
@@ -2524,7 +2546,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// Apply MV-table expression overrides and `$ts$DAY` timestamp-index hints before
     /// optimization, mirroring the non-split path.  Without this, overrides configured on the
     /// MV table would be silently dropped on the SPLIT path.
-    handleExpressionOverride(viewQueryWithTimeFilter, _tableCache.getExpressionOverrideMap(viewTableNameWithType));
+    handleExpressionOverride(viewQueryWithTimeFilter, _tableCache.getExpressionOverrideMap(viewTableNameWithType),
+        viewSchema);
     handleTimestampIndexOverride(viewQueryWithTimeFilter, _tableCache.getTableConfig(viewTableNameWithType));
     _queryOptimizer.optimize(viewQueryWithTimeFilter, viewSchema);
     BrokerRequest viewBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(viewQueryWithTimeFilter);
@@ -2638,7 +2661,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       }
-      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName), schema);
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(offlinePinotQuery, schema);
       BrokerRequest offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
@@ -2648,7 +2671,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       }
-      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName), schema);
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
       BrokerRequest realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
@@ -2658,13 +2681,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (baseRouteInfo.isOffline()) {
       setTableName(baseBrokerRequest, offlineTableName);
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
-          _tableCache.getExpressionOverrideMap(offlineTableName));
+          _tableCache.getExpressionOverrideMap(offlineTableName), schema);
       handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), offlineTableConfig);
       hybridRoute.setOfflineBrokerRequest(baseBrokerRequest);
     } else {
       setTableName(baseBrokerRequest, realtimeTableName);
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
-          _tableCache.getExpressionOverrideMap(realtimeTableName));
+          _tableCache.getExpressionOverrideMap(realtimeTableName), schema);
       handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), realtimeTableConfig);
       hybridRoute.setRealtimeBrokerRequest(baseBrokerRequest);
     }

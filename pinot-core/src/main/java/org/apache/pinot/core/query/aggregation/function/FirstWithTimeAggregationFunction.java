@@ -51,13 +51,30 @@ import org.roaringbitmap.IntIterator;
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
+  private final boolean _typeInferred;
   private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
   public FirstWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+    this(dataCol, timeCol, objectSerDe, nullHandlingEnabled, false);
+  }
+
+  protected FirstWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled,
+      boolean typeInferred) {
     super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
     _objectSerDe = objectSerDe;
+    _typeInferred = typeInferred;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    String arguments = _expression + "," + _timeCol;
+    if (!_typeInferred) {
+      arguments += ",'" + getFinalResultColumnType() + "'";
+    }
+    return getType().getName().toLowerCase() + "(" + arguments + ")";
   }
 
   public abstract ValueLongPair<V> constructValueLongPair(V value, long time);
@@ -116,6 +133,9 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       });
       V bestValue;
       if (bestPair.getValue() < 0) {
+        if (_typeInferred) {
+          return;
+        }
         bestValue = getDefaultValueTimePair().getValue();
       } else {
         bestValue = readCell(blockValSet, bestPair.getValue());
@@ -202,21 +222,23 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     }
   }
 
+  @Nullable
   @Override
   public ValueLongPair<V> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     ValueLongPair firstWithTimePair = aggregationResultHolder.getResult();
     if (firstWithTimePair == null) {
-      return getDefaultValueTimePair();
+      return _typeInferred ? null : getDefaultValueTimePair();
     } else {
       return firstWithTimePair;
     }
   }
 
+  @Nullable
   @Override
   public ValueLongPair<V> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     ValueLongPair<V> firstWithTimePair = groupByResultHolder.getResult(groupKey);
     if (firstWithTimePair == null) {
-      return getDefaultValueTimePair();
+      return _typeInferred ? null : getDefaultValueTimePair();
     } else {
       return firstWithTimePair;
     }

@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
+import org.roaringbitmap.RoaringBitmap;
 
 
 @SuppressWarnings("rawtypes")
@@ -82,6 +83,8 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   // used for ser/de
   private DataBlock _immutableMeasuringKeys;
   private DataBlock _immutableProjectionVals;
+  // Decoding a null bitmap copies it from the data block; cache once per column instead of once per projected cell.
+  private RoaringBitmap[] _immutableProjectionNullRows;
 
   public ExprMinMaxObject(DataSchema measuringSchema, DataSchema projectionSchema) {
     _isNull = true;
@@ -108,6 +111,10 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
 
     _sizeOfExtremumMeasuringKeys = _measuringSchema.size();
     _sizeOfExtremumProjectionVals = _projectionSchema.size();
+    _immutableProjectionNullRows = new RoaringBitmap[_sizeOfExtremumProjectionVals];
+    for (int i = 0; i < _sizeOfExtremumProjectionVals; i++) {
+      _immutableProjectionNullRows[i] = _immutableProjectionVals.getNullRowIds(i);
+    }
   }
 
   public static ExprMinMaxObject fromBytes(byte[] bytes)
@@ -215,7 +222,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     } else {
       Comparable[] extremumKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
       for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        switch (_measuringSchema.getColumnDataType(i)) {
+        switch (_measuringSchema.getColumnDataType(i).getStoredType()) {
           case INT:
             extremumKeys[i] = _immutableMeasuringKeys.getInt(0, i);
             break;
@@ -250,7 +257,11 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     if (_mutable) {
       return _extremumProjectionValues.get(rowId)[colId];
     } else {
-      switch (_projectionSchema.getColumnDataType(colId)) {
+      RoaringBitmap nullRows = _immutableProjectionNullRows[colId];
+      if (nullRows != null && nullRows.contains(rowId)) {
+        return null;
+      }
+      switch (_projectionSchema.getColumnDataType(colId).getStoredType()) {
         case INT:
           return _immutableProjectionVals.getInt(rowId, colId);
         case LONG:
@@ -311,7 +322,6 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
       // If the keys are equal, add the values of the other object to this object
       if (!_mutable) {
         // If the result is immutable, we need to copy the values from the serialized result to the mutable result
-        _mutable = true;
         for (int i = 0; i < getNumberOfRows(); i++) {
           Object[] val = new Object[_sizeOfExtremumProjectionVals];
           for (int j = 0; j < _sizeOfExtremumProjectionVals; j++) {
@@ -319,6 +329,8 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
           }
           _extremumProjectionValues.add(val);
         }
+        _extremumMeasuringKeys = key;
+        _mutable = true;
       }
       for (int i = 0; i < other.getNumberOfRows(); i++) {
         Object[] val = new Object[_sizeOfExtremumProjectionVals];

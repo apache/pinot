@@ -33,6 +33,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.query.aggregation.GapfillAggregationFunctionBinder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -144,6 +145,8 @@ public class BrokerReduceService extends BaseReduceService {
       /// mismatched `brokerRequest != serverBrokerRequest` caller is rejected to preserve the
       /// original `BadQueryRequestException` invariant ("Nested query is not supported without
       /// gapfill") that pre-dated MV rewrite.
+      GapfillAggregationFunctionBinder.bind(brokerRequest.getPinotQuery(), serverBrokerRequest.getPinotQuery(),
+          brokerResponseNative.getResultTable() != null ? brokerResponseNative.getResultTable().getDataSchema() : null);
       queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
       GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
       if (gapfillType != null) {

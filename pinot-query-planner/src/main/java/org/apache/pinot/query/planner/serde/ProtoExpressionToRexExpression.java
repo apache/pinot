@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -56,8 +57,17 @@ public class ProtoExpressionToRexExpression {
     for (Expressions.Expression protoOperand : protoOperands) {
       operands.add(convertExpression(protoOperand));
     }
+    AggregateCallBinding binding = null;
+    if (functionCall.hasAggregationBinding()) {
+      Expressions.AggregationFunctionBinding protoBinding = functionCall.getAggregationBinding();
+      List<ColumnDataType> argumentTypes = new ArrayList<>(protoBinding.getArgumentTypesCount());
+      for (Expressions.ColumnDataType argumentType : protoBinding.getArgumentTypesList()) {
+        argumentTypes.add(convertColumnDataType(argumentType));
+      }
+      binding = new AggregateCallBinding(argumentTypes, convertColumnDataType(protoBinding.getResultType()));
+    }
     return new RexExpression.FunctionCall(convertColumnDataType(functionCall.getDataType()),
-        functionCall.getFunctionName(), operands, functionCall.getIsDistinct(), functionCall.getIgnoreNulls());
+        functionCall.getFunctionName(), operands, functionCall.getIsDistinct(), functionCall.getIgnoreNulls(), binding);
   }
 
   public static RexExpression.Literal convertLiteral(Expressions.Literal literal) {

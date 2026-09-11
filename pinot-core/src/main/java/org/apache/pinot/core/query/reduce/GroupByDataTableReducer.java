@@ -243,6 +243,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Rewrite and set result table
     RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    formatResultRows(rewriterResult);
     brokerResponseNative.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
   }
 
@@ -478,24 +479,30 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Rewrite and set result table
     RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    formatResultRows(rewriterResult);
     brokerResponseNative.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
   }
 
   private List<Object[]> calculateFinalResultRows(PostAggregationHandler postAggregationHandler, List<Object[]> rows) {
     List<Object[]> resultRows = new ArrayList<>(rows.size());
-    ColumnDataType[] resultColumnDataTypes = postAggregationHandler.getResultDataSchema().getColumnDataTypes();
-    int numResultColumns = resultColumnDataTypes.length;
     for (Object[] row : rows) {
-      Object[] resultRow = postAggregationHandler.getResult(row);
-      for (int i = 0; i < numResultColumns; i++) {
-        Object value = resultRow[i];
-        if (value != null) {
-          resultRow[i] = resultColumnDataTypes[i].format(value);
-        }
-      }
-      resultRows.add(resultRow);
+      resultRows.add(postAggregationHandler.getResult(row));
     }
     return resultRows;
+  }
+
+  /// Parent aggregate expansion can introduce logical values such as Timestamp. Format the rewritten schema only
+  /// after HAVING, ordering, and post-aggregation have consumed the logical values.
+  private static void formatResultRows(RewriterResult result) {
+    ColumnDataType[] resultColumnDataTypes = result.getDataSchema().getColumnDataTypes();
+    for (Object[] row : result.getRows()) {
+      for (int i = 0; i < resultColumnDataTypes.length; i++) {
+        Object value = row[i];
+        if (value != null) {
+          row[i] = resultColumnDataTypes[i].format(value);
+        }
+      }
+    }
   }
 
   private Object[] getConvertedRowWithFinalResult(DataTable dataTable, int rowId) {

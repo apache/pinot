@@ -21,19 +21,52 @@ package org.apache.pinot.core.query.request;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.TableSegmentsInfo;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 /// Tests how a request answers whether it has segments to read, which depends on which of its two mutually
 /// exclusive segment representations is populated.
 public class ServerQueryRequestTest {
+
+  @Test
+  public void testDirectSqlBindsBeforeEmptyResults() throws Exception {
+    Server.ServerRequest grpcRequest = Server.ServerRequest.newBuilder()
+        .putMetadata(Request.MetadataKeys.REQUEST_ID, "1")
+        .setSql("SET enableNullHandling=true; SELECT firstWithTime(name, ts), mode(ts), lastWithTime(flag, ts) "
+            + "FROM tbl_OFFLINE WHERE 1=0")
+        .build();
+    QueryContext query = new ServerQueryRequest(grpcRequest, ServerMetrics.get()).getQueryContext();
+    assertThrows(IllegalStateException.class, query::getAggregationFunctions);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("name", DataType.STRING)
+        .addSingleValueDimension("ts", DataType.TIMESTAMP).addSingleValueDimension("flag", DataType.BOOLEAN).build();
+    query.setSchema(schema);
+    AggregationFunction<?, ?>[] functions = query.getAggregationFunctions();
+    assertEquals(functions[0].getFinalResultColumnType(), ColumnDataType.STRING);
+    assertEquals(functions[1].getFinalResultColumnType(), ColumnDataType.TIMESTAMP);
+    assertEquals(functions[2].getFinalResultColumnType(), ColumnDataType.BOOLEAN);
+    for (AggregationFunction<?, ?> function : functions) {
+      assertNull(function.extractAggregationResult(function.createAggregationResultHolder()));
+    }
+    query.setSchema(schema);
+    assertSame(query.getAggregationFunctions(), functions, "Binding should only construct instances once");
+  }
 
   @Test
   public void shouldHaveSegmentsWhenTheFlatListIsPopulated() {

@@ -192,7 +192,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       PinotMinMaxFunction.MIN,
       PinotMinMaxFunction.MAX,
       PinotAvgFunction.INSTANCE,
-      SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
       SqlStdOperatorTable.COVAR_SAMP,
