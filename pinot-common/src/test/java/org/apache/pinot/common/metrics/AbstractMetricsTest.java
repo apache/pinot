@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
@@ -77,6 +78,107 @@ public abstract class AbstractMetricsTest {
   @AfterClass
   public void cleanUpMetricsFactory() {
     PinotMetricUtils.cleanUp();
+  }
+
+  @Test
+  public void testRemoveTableMetricsReachesNamesNoCallerCanReconstruct() {
+    ControllerMetrics metrics = buildTestMetrics();
+    String table = "myTable_OFFLINE";
+
+    // The four shapes a table series can take. The keyed timer is the one that matters: it is how
+    // tableRebalanceExecutionTimeMs is emitted, and no sweep that rebuilds names from the enums can reach it.
+    metrics.addMeteredTableValue(table, ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    metrics.setValueOfTableGauge(table, ControllerGauge.NUMBER_OF_REPLICAS, 3);
+    metrics.setOrUpdateTableGauge(table, "someTenant", ControllerGauge.TABLE_TENANT_INFO, 1);
+    metrics.addTimedTableValue(table, RebalanceResult.Status.DONE.toString(),
+        ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, 100, TimeUnit.MILLISECONDS);
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 4);
+
+    Assert.assertEquals(metrics.removeTableMetrics(table), 4);
+    Assert.assertTrue(metrics.getMetricsRegistry().allMetrics().isEmpty());
+
+    // A gauge removed here must be able to come back: _gaugeValues gates re-registration, so a stale entry there
+    // would silently retire the series for the life of the process.
+    metrics.setValueOfTableGauge(table, ControllerGauge.NUMBER_OF_REPLICAS, 5);
+    Assert.assertEquals(getGaugeValue(metrics, ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + table), 5);
+  }
+
+  /// Two AbstractMetrics routinely share a registry and a prefix -- OSS and a vendor extension do exactly that.
+  /// A sweep by one must not take the other's gauges with it: gauges are the only kind carrying a
+  /// re-registration gate, so dropping one from under its owner silences it for the life of the process. The
+  /// guarantee comes from the gauge-vocabulary check rather than from key identity, so it holds even on a
+  /// registry whose key does not record the owning class.
+  @Test
+  public void testSweepLeavesASiblingInstancesGaugesAlone() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    PinotMetricsRegistry registry = buildRegistry();
+    String table = "shared_OFFLINE";
+
+    ControllerMetrics mine = new ControllerMetrics(registry);
+    ServerMetrics sibling = new ServerMetrics(mine.getMetricPrefix(), registry, true, java.util.Set.of());
+    mine.setValueOfTableGauge(table, ControllerGauge.NUMBER_OF_REPLICAS, 3);
+    sibling.setValueOfTableGauge(table, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+    Assert.assertEquals(registry.allMetrics().size(), 2);
+
+    mine.removeTableMetrics(table);
+
+    // Asserted against the registry rather than through getGaugeValue: that helper derives the prefix from the
+    // instance type, so it would look the sibling up under "pinot.server." and miss the point of the test.
+    Assert.assertEquals(registry.allMetrics().size(), 1, "only the sweeping instance's gauge should be gone");
+    String survivor = mine.getMetricPrefix() + ServerGauge.LLC_PARTITION_CONSUMING.getGaugeName() + "." + table;
+    Assert.assertTrue(registry.allMetrics().keySet().stream().anyMatch(name -> survivor.equals(name.getName())),
+        "a sibling instance's gauge must survive a sweep by an instance sharing its prefix");
+  }
+
+  @Test
+  public void testRemoveTableMetricsMatchesWholeSegmentsOnly() {
+    ControllerMetrics metrics = buildTestMetrics();
+    metrics.addMeteredTableValue("foo_OFFLINE", ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    metrics.addMeteredTableValue("foobar_OFFLINE", ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    // Database-qualified names span two segments and must still match, but only as a unit.
+    metrics.addMeteredTableValue("db.foo_OFFLINE", ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    // Gauges put the table in a different slot, so both shapes need covering.
+    metrics.setValueOfTableGauge("foo_OFFLINE", ControllerGauge.NUMBER_OF_REPLICAS, 1);
+    metrics.setValueOfTableGauge("db.foo_OFFLINE", ControllerGauge.NUMBER_OF_REPLICAS, 1);
+
+    // `db.foo_OFFLINE` is a different table, not a suffix of this one -- in either slot.
+    Assert.assertEquals(metrics.removeTableMetrics("foo_OFFLINE"), 2);
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 3);
+
+    Assert.assertEquals(metrics.removeTableMetrics("db.foo_OFFLINE"), 2);
+    // foobar survived every sweep: a prefix match is not a segment match.
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 1);
+  }
+
+  @Test
+  public void testRemoveTableMetricsLeavesGlobalAndOtherTablesAlone() {
+    ControllerMetrics metrics = buildTestMetrics();
+    metrics.addMeteredTableValue("doomed_OFFLINE", ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    metrics.addMeteredTableValue("keep_OFFLINE", ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    metrics.addMeteredGlobalValue(ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
+    metrics.setValueOfGlobalGauge(ControllerGauge.VERSION, "1.0", 1);
+
+    Assert.assertEquals(metrics.removeTableMetrics("doomed_OFFLINE"), 1);
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 3);
+  }
+
+  /// With table-level metrics off every table folds into the shared `allTables` series. A sweep must not touch it:
+  /// deleting one table would otherwise zero the aggregate for all of them.
+  @Test
+  public void testRemoveTableMetricsCannotDeleteTheAllTablesAggregate() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    ServerMetrics metrics = new ServerMetrics(buildRegistry(), false, java.util.Set.of());
+
+    metrics.addMeteredTableValue("folded_OFFLINE", ServerMeter.QUERIES_ON_TABLE, 1);
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 1);
+
+    Assert.assertEquals(metrics.removeTableMetrics("folded_OFFLINE"), 0);
+    Assert.assertEquals(metrics.removeTableMetrics("allTables"), 0);
+    Assert.assertEquals(metrics.getMetricsRegistry().allMetrics().size(), 1);
   }
 
   @Test

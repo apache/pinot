@@ -19,8 +19,11 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -48,6 +51,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
+
+  /// Name every table's series collapses into when table-level metrics are off. Shared by every table, so a
+  /// table-scoped sweep must never target it.
+  private static final String ALL_TABLES = "allTables";
 
   protected final String _metricPrefix;
 
@@ -711,6 +718,106 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return gauge.getGaugeName() + "." + pluginName;
   }
 
+  /// Removes every series this instance registered for the given table.
+  ///
+  /// Unlike the targeted `removeTable*` methods, this does not rebuild names from the rules used to emit them -- it
+  /// scans what is actually registered. That is the whole point. A series emitted with an extra key, or with a
+  /// composite table name, embeds a segment no caller can rediscover from the table name alone, so a sweep built on
+  /// reconstruction strands exactly those series and keeps stranding each new one that gets added.
+  ///
+  /// Matching is deliberately narrow:
+  ///
+  ///   - Only names under this instance's metric prefix are considered, so a table named after a component
+  ///     (`broker`) cannot match the prefix itself.
+  ///   - The table name must occupy whole `.`-delimited segments, never part of one -- `foo` does not match
+  ///     `foobar`, and a database-qualified `db.tbl_OFFLINE` matches only as a unit.
+  ///   - A sibling [AbstractMetrics] sharing this registry and prefix keeps its **gauges**. The ownership check
+  ///     below -- re-deriving the key under this instance's class -- is exact only where the registry key carries
+  ///     the owning class; yammer's does, dropwizard's discards it. What protects the case that actually matters,
+  ///     on every implementation, is the vocabulary check above: a sibling's gauge name is absent from this
+  ///     instance's [#getGauges()], so `<siblingGauge>.<table>` reads as meter-shaped and the table is not at
+  ///     offset 0, so it cannot match. Gauges are the only kind with a re-registration gate ([#_gaugeValues]), so
+  ///     dropping one from under its owner would silence it for the life of the process. A sibling's meter or
+  ///     timer may be dropped early where the key cannot distinguish owners; that is harmless -- they carry no
+  ///     gate and re-register on the next emission. Every instance should still run its own sweep, since that is
+  ///     what clears its own [#_gaugeValues].
+  ///
+  /// A table folded into the shared `allTables` aggregate is safe without a special case: no registered name
+  /// contains its name, so nothing matches. Passing `allTables` itself is rejected for the same reason it would be
+  /// a disaster -- it would delete the aggregate for every table at once.
+  ///
+  /// Two residual false positives are accepted: a workload or remote-cluster name exactly equal to a table name
+  /// sits in the same slot and would be swept. Both re-register on next use, so the cost is one counter reset.
+  ///
+  /// Two things this deliberately does **not** reach, both of which need their owner to clean up:
+  ///
+  ///   - Series a component registers outside any [AbstractMetrics] -- [ValidationMetrics] composes its own
+  ///     `pinot.controller.<table>.<gauge>` names against its own class and keeps its own value map, so the
+  ///     ownership check above skips it. Dropping its registry entries from here would strand that map and retire
+  ///     those gauges for the life of the process.
+  ///   - Names where the table is not followed by a path separator, such as the consumer client id form
+  ///     `<gauge>.<table>-<topic>-<partition>`. Matching those would mean accepting any prefix match, which is
+  ///     what makes `tbl` match `tbl_OFFLINE` and `db.tbl`.
+  ///
+  /// @param tableName the table to sweep, in whichever name form its emitters used (raw or with type)
+  /// @return the number of series removed
+  public int removeTableMetrics(String tableName) {
+    return removeTableMetrics(List.of(tableName));
+  }
+
+  /// Like [#removeTableMetrics(String)], for several tables at once. Prefer this when sweeping a batch: the
+  /// registry is scanned once per call, and yammer and dropwizard both materialise a fresh map on every
+  /// `allMetrics()`.
+  public int removeTableMetrics(Collection<String> tableNames) {
+    Set<String> targets = tableNames.stream().filter(t -> !ALL_TABLES.equals(t)).collect(Collectors.toSet());
+    if (targets.isEmpty()) {
+      return 0;
+    }
+    Set<String> gaugeNames =
+        Arrays.stream(getGauges()).map(Gauge::getGaugeName).collect(Collectors.toCollection(HashSet::new));
+    int removed = 0;
+    // Snapshot the keys before mutating: the compound registry hands back its live map.
+    for (PinotMetricName registeredName : new ArrayList<>(_metricsRegistry.allMetrics().keySet())) {
+      String name = registeredName.getName();
+      if (!name.startsWith(_metricPrefix)
+          || !matchesAnyTable(name.substring(_metricPrefix.length()), targets, gaugeNames)) {
+        continue;
+      }
+      // Re-deriving the key under this class is the ownership test: an identically named series registered by a
+      // sibling AbstractMetrics is a different key, so it compares unequal and is left for that instance to sweep.
+      if (registeredName.equals(PinotMetricUtils.makePinotMetricName(_clazz, name))) {
+        PinotMetricUtils.removeMetric(_metricsRegistry, registeredName);
+        removed++;
+      }
+    }
+    // The deprecated gauge paths gate re-registration on _gaugeValues, so an entry left here would stop a removed
+    // gauge from ever coming back. Swept from this instance's own map rather than from what matched above, so it
+    // stays correct even where the registry cannot tell two instances' series apart.
+    synchronized (_gaugeValues) {
+      _gaugeValues.keySet().removeIf(gaugeName -> matchesAnyTable(gaugeName, targets, gaugeNames));
+    }
+    return removed;
+  }
+
+  /// Whether the prefix-stripped metric name names one of the given tables.
+  ///
+  /// The table sits at exactly one offset, decided by the shape: gauges compose `<gauge>.<table>[.<key>]`, while
+  /// meters, timers and query phases compose `<table>.<rest>`. Which one applies is settled by asking whether the
+  /// leading segment is a known gauge name -- and that question is what keeps a bare `tbl_OFFLINE` from matching
+  /// `db.tbl_OFFLINE`, a genuinely different table whose series must survive. A free search for the name anywhere
+  /// in the string cannot tell those two apart.
+  private static boolean matchesAnyTable(String name, Set<String> tableNames, Set<String> gaugeNames) {
+    int firstDot = name.indexOf('.');
+    int start = firstDot > 0 && gaugeNames.contains(name.substring(0, firstDot)) ? firstDot + 1 : 0;
+    for (String tableName : tableNames) {
+      int end = start + tableName.length();
+      if (name.startsWith(tableName, start) && (end == name.length() || name.charAt(end) == '.')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Remove gauge from Pinot metrics.
   /// @param gaugeName gauge name
   public void removeGauge(final String gaugeName) {
@@ -739,6 +846,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : ALL_TABLES;
   }
 }

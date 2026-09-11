@@ -43,6 +43,11 @@ public class CompoundPinotMetricName implements PinotMetricName {
   }
 
   @Override
+  public String getName() {
+    return _toString;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
