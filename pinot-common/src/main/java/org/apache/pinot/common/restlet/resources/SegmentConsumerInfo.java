@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /// Information regarding the consumer of a segment
@@ -31,21 +33,39 @@ public class SegmentConsumerInfo {
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
   private final PartitionOffsetInfo _partitionOffsetInfo;
+  // FQCN of the StreamMessageDecoder instantiated on the consumer, or null if decoder init has not completed.
+  @Nullable
+  private final String _decoderClassName;
 
+  /// Kept for source and binary compatibility with callers that build this DTO without the decoder class name. Not a
+  /// Jackson creator; deserialization goes through the `@JsonCreator` constructor below.
+  public SegmentConsumerInfo(String segmentName, String consumerState, long lastConsumedTimestamp,
+      Map<String, String> partitionToOffsetMap, PartitionOffsetInfo partitionOffsetInfo) {
+    this(segmentName, consumerState, lastConsumedTimestamp, partitionToOffsetMap, partitionOffsetInfo, null);
+  }
+
+  @JsonCreator
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
       @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-      @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo) {
+      @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo,
+      @JsonProperty("decoderClassName") @Nullable String decoderClassName) {
     _segmentName = segmentName;
     _consumerState = consumerState;
     _lastConsumedTimestamp = lastConsumedTimestamp;
     _partitionToOffsetMap = partitionToOffsetMap;
     _partitionOffsetInfo = partitionOffsetInfo;
+    _decoderClassName = decoderClassName;
   }
 
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  @Nullable
+  public String getDecoderClassName() {
+    return _decoderClassName;
   }
 
   public String getConsumerState() {
