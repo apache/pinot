@@ -106,7 +106,8 @@ public final class SchemaDiff {
 
     List<String> oldPrimaryKeyColumns = copyPrimaryKeyColumns(oldSchema);
     List<String> newPrimaryKeyColumns = copyPrimaryKeyColumns(newSchema);
-    boolean primaryKeyColumnsChanged = !primaryKeyColumnsEqual(oldPrimaryKeyColumns, newPrimaryKeyColumns, ignoreCase);
+    // Primary-key equality stays exact-name, matching Schema.isBackwardCompatibleWith.
+    boolean primaryKeyColumnsChanged = !oldPrimaryKeyColumns.equals(newPrimaryKeyColumns);
     boolean existingPrimaryKeyColumnsChanged = !oldPrimaryKeyColumns.isEmpty() && primaryKeyColumnsChanged;
 
     return new SchemaDiff(List.copyOf(deletedColumnNames), List.copyOf(addedColumnNames),
@@ -156,12 +157,16 @@ public final class SchemaDiff {
   }
 
   /// True when there are no deletes, no adds, no retained incompatibilities, and no primary-key change.
-  public boolean isNoOp() {
+  ///
+  /// Default-null, max-length, transform, and description edits are not structural and do not
+  /// affect this result. Do not skip a schema write based on this method alone.
+  public boolean isStructurallyUnchanged() {
     return _deletedColumnNames.isEmpty() && _addedColumnNames.isEmpty() && _retainedIncompatibleColumns.isEmpty()
         && !_primaryKeyColumnsChanged;
   }
 
-  /// True when the only incompatibility versus {@link Schema#isBackwardCompatibleWith(Schema)} is missing columns.
+  /// True when column deletion would be the only extra permission needed versus today's update rules,
+  /// plus field-kind changes which {@link Schema#isBackwardCompatibleWith(Schema)} does not check.
   ///
   /// Type, field-kind, and existing primary-key changes still fail this check. An empty deleted set
   /// is a normal compatible update from the deletion-flag point of view.
@@ -170,6 +175,7 @@ public final class SchemaDiff {
   }
 
   public static String normalizeColumnName(String columnName, boolean ignoreCase) {
+    Preconditions.checkNotNull(columnName, "columnName");
     return ignoreCase ? columnName.toLowerCase(Locale.ROOT) : columnName;
   }
 
@@ -205,19 +211,6 @@ public final class SchemaDiff {
       return List.of();
     }
     return List.copyOf(primaryKeyColumns);
-  }
-
-  private static boolean primaryKeyColumnsEqual(List<String> oldPrimaryKeyColumns, List<String> newPrimaryKeyColumns,
-      boolean ignoreCase) {
-    if (oldPrimaryKeyColumns.size() != newPrimaryKeyColumns.size()) {
-      return false;
-    }
-    for (int i = 0; i < oldPrimaryKeyColumns.size(); i++) {
-      if (!columnNamesEqual(oldPrimaryKeyColumns.get(i), newPrimaryKeyColumns.get(i), ignoreCase)) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @Override

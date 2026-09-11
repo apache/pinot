@@ -122,7 +122,12 @@ public final class ColumnDeletionDirtySegmentPredicate {
       if (customMap != null) {
         String recorded = customMap.get(ELIGIBILITY_TIME_KEY);
         if (recorded != null) {
-          eligibilityTimeMs = Long.parseLong(recorded);
+          try {
+            eligibilityTimeMs = Long.parseLong(recorded);
+          } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                "Segment '" + segment.getSegmentName() + "' has invalid " + ELIGIBILITY_TIME_KEY + ": " + recorded, e);
+          }
         }
       }
     }
@@ -130,7 +135,8 @@ public final class ColumnDeletionDirtySegmentPredicate {
       // Missing ctime and eligibility time cannot prove the segment postdates the deletion.
       return true;
     }
-    return eligibilityTimeMs < deletionEpochMs;
+    // Equal timestamps cannot prove the segment was built after the delete.
+    return eligibilityTimeMs <= deletionEpochMs;
   }
 
   static boolean hasSuccessfulRefreshMarker(SegmentZKMetadata segment, String deletionId) {

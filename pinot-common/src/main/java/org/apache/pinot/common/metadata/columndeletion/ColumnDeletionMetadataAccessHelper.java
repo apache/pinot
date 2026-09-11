@@ -69,8 +69,11 @@ public final class ColumnDeletionMetadataAccessHelper {
     return ColumnDeletionMetadata.fromZNRecord(znRecord);
   }
 
-  /// Write the ledger with an expected znode version. {@code expectedVersion} of {@code -1} matches any
-  /// version, including create.
+  /// Write the ledger with an expected znode version.
+  ///
+  /// First write uses {@code create}. {@code expectedVersion} of {@code -1} against an existing
+  /// current-format znode still matches any version. A stored format newer than this process can
+  /// parse is never overwritten, including when {@code expectedVersion} is {@code -1}.
   ///
   /// @return true if the write succeeded
   public static boolean writeColumnDeletionMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -81,6 +84,26 @@ public final class ColumnDeletionMetadataAccessHelper {
     }
     String tableNameWithType = metadata.getTableNameWithType();
     String path = ZKMetadataProvider.constructPropertyStorePathForColumnDeletionMetadata(tableNameWithType);
+    ZNRecord existing = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    if (existing == null) {
+      if (expectedVersion != -1) {
+        LOGGER.warn("Failed to write column deletion metadata for table: {} at expected version: {} (znode missing)",
+            tableNameWithType, expectedVersion);
+        return false;
+      }
+      boolean created = propertyStore.create(path, metadata.toZNRecord(), AccessOption.PERSISTENT);
+      if (created) {
+        LOGGER.info("Created column deletion metadata for table: {}", tableNameWithType);
+      } else {
+        LOGGER.warn("Failed to create column deletion metadata for table: {}", tableNameWithType);
+      }
+      return created;
+    }
+    int storedFormatVersion = ColumnDeletionMetadata.peekFormatVersion(existing);
+    if (storedFormatVersion > ColumnDeletionMetadata.CURRENT_FORMAT_VERSION) {
+      throw new ColumnDeletionUnsupportedFormatException(storedFormatVersion,
+          ColumnDeletionMetadata.CURRENT_FORMAT_VERSION);
+    }
     try {
       boolean result = propertyStore.set(path, metadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
       if (result) {

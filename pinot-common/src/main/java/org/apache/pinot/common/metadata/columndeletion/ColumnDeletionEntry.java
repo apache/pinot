@@ -124,6 +124,11 @@ public final class ColumnDeletionEntry {
         _state, _lastError, outstandingSegmentCount);
   }
 
+  public ColumnDeletionEntry withSchemaZkMtimeMs(long schemaZkMtimeMs) {
+    return new ColumnDeletionEntry(_columnName, _deletionId, _deletionEpochMs, _schemaZkVersion, schemaZkMtimeMs,
+        _state, _lastError, _outstandingSegmentCount);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

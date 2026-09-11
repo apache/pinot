@@ -23,8 +23,11 @@ package org.apache.pinot.common.metadata.columndeletion;
 ///
 /// {@link #PREPARED} exists so the ledger can be written before the schema znode. If the controller
 /// dies in that window, the next scan either aborts the entry (column still present) or advances it
-/// to {@link #RECLAIMING} (schema write already landed). {@link #COMPLETE} is a bounded tombstone
-/// and must not block a legal same-name re-add.
+/// to {@link #RECLAIMING} (schema write already landed). {@link #PENDING} means the schema write
+/// landed and reclamation has not started. {@link #FAILED} means a reclaim attempt failed; the
+/// entry still blocks a same-name re-add until an operator or later reconciler moves it to
+/// {@link #COMPLETE}. {@link #COMPLETE} is a bounded tombstone and must not block a legal
+/// same-name re-add.
 public enum ColumnDeletionState {
   PREPARED,
   PENDING,

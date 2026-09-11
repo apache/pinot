@@ -20,6 +20,7 @@ package org.apache.pinot.common.metadata.columndeletion;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -69,6 +70,7 @@ public final class ColumnDeletionMetadata {
     _tableNameWithType = tableNameWithType;
     _formatVersion = formatVersion;
     _entries = new LinkedHashMap<>(entries);
+    checkNoDuplicateActiveColumns(_entries.values(), false);
   }
 
   public static String newDeletionId() {
@@ -94,16 +96,37 @@ public final class ColumnDeletionMetadata {
   }
 
   public void addEntry(ColumnDeletionEntry entry) {
+    addEntry(entry, false);
+  }
+
+  /// Adds an entry. Rejects a second {@link ColumnDeletionEntry#blocksReAdd()} row for the same
+  /// column. A {@link ColumnDeletionState#COMPLETE} tombstone plus a new active row is allowed.
+  public void addEntry(ColumnDeletionEntry entry, boolean ignoreCase) {
     Preconditions.checkNotNull(entry, "entry");
     Preconditions.checkArgument(!_entries.containsKey(entry.getDeletionId()),
         "Deletion id '%s' already exists", entry.getDeletionId());
+    if (entry.blocksReAdd() && findActiveEntryForColumn(entry.getColumnName(), ignoreCase) != null) {
+      throw new IllegalArgumentException(
+          "Active column deletion already exists for column '" + entry.getColumnName() + "'");
+    }
     _entries.put(entry.getDeletionId(), entry);
   }
 
   public void updateEntry(ColumnDeletionEntry entry) {
+    updateEntry(entry, false);
+  }
+
+  public void updateEntry(ColumnDeletionEntry entry, boolean ignoreCase) {
     Preconditions.checkNotNull(entry, "entry");
     Preconditions.checkArgument(_entries.containsKey(entry.getDeletionId()),
         "Deletion id '%s' does not exist", entry.getDeletionId());
+    if (entry.blocksReAdd()) {
+      ColumnDeletionEntry existingActive = findActiveEntryForColumn(entry.getColumnName(), ignoreCase);
+      if (existingActive != null && !existingActive.getDeletionId().equals(entry.getDeletionId())) {
+        throw new IllegalArgumentException(
+            "Active column deletion already exists for column '" + entry.getColumnName() + "'");
+      }
+    }
     _entries.put(entry.getDeletionId(), entry);
   }
 
@@ -224,6 +247,37 @@ public final class ColumnDeletionMetadata {
       entries.put(entry.getDeletionId(), entry);
     }
     return new ColumnDeletionMetadata(record.getId(), formatVersion, entries);
+  }
+
+  /// Stored format version without refusing newer values. Used by writers that must not clobber
+  /// a znode they cannot parse.
+  static int peekFormatVersion(ZNRecord record) {
+    Preconditions.checkNotNull(record, "record");
+    String formatVersionString = record.getSimpleField(FORMAT_VERSION_KEY);
+    if (StringUtils.isBlank(formatVersionString)) {
+      throw new IllegalArgumentException(
+          "Column deletion metadata for '" + record.getId() + "' is missing formatVersion");
+    }
+    try {
+      return Integer.parseInt(formatVersionString);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Column deletion metadata for '" + record.getId() + "' has invalid formatVersion: " + formatVersionString, e);
+    }
+  }
+
+  private static void checkNoDuplicateActiveColumns(Iterable<ColumnDeletionEntry> entries, boolean ignoreCase) {
+    Set<String> activeNames = new HashSet<>();
+    for (ColumnDeletionEntry entry : entries) {
+      if (!entry.blocksReAdd()) {
+        continue;
+      }
+      String key = SchemaDiff.normalizeColumnName(entry.getColumnName(), ignoreCase);
+      if (!activeNames.add(key)) {
+        throw new IllegalArgumentException(
+            "Active column deletion already exists for column '" + entry.getColumnName() + "'");
+      }
+    }
   }
 
   private static ColumnDeletionEntry parseEntry(String tableNameWithType, String deletionIdKey,
