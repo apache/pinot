@@ -40,7 +40,7 @@ public class SchemaDiffTest {
     assertThat(diff.isPrimaryKeyColumnsChanged()).isFalse();
     assertThat(diff.isExistingPrimaryKeyColumnsChanged()).isFalse();
     assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isTrue();
-    assertThat(diff.isNoOp()).isFalse();
+    assertThat(diff.isStructurallyUnchanged()).isFalse();
     assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isFalse();
   }
 
@@ -130,7 +130,7 @@ public class SchemaDiffTest {
     SchemaDiff diff = SchemaDiff.compute(oldSchema, newSchema);
     assertThat(diff.getRetainedIncompatibleColumns()).isEmpty();
     assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isTrue();
-    assertThat(diff.isNoOp()).isTrue();
+    assertThat(diff.isStructurallyUnchanged()).isTrue();
     assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isTrue();
   }
 
@@ -158,6 +158,23 @@ public class SchemaDiffTest {
     assertThat(diff.isExistingPrimaryKeyColumnsChanged()).isTrue();
     assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isFalse();
     assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isFalse();
+  }
+
+  @Test
+  public void testPrimaryKeyCaseChangeIsReportedEvenWhenIgnoreCase() {
+    Schema oldSchema = baseSchemaBuilder().setPrimaryKeyColumns(List.of("id")).build();
+    Schema newSchema = baseSchemaBuilder().setPrimaryKeyColumns(List.of("ID")).build();
+
+    SchemaDiff ignoreCase = SchemaDiff.compute(oldSchema, newSchema, true);
+    assertThat(ignoreCase.isExistingPrimaryKeyColumnsChanged()).isTrue();
+    assertThat(ignoreCase.isCompatibleWhenColumnDeletionAllowed()).isFalse();
+    assertThat(ignoreCase.getDeletedColumnNames()).isEmpty();
+    assertThat(ignoreCase.getAddedColumnNames()).isEmpty();
+    assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isFalse();
+
+    SchemaDiff exact = SchemaDiff.compute(oldSchema, newSchema, false);
+    assertThat(exact.isExistingPrimaryKeyColumnsChanged()).isTrue();
+    assertThat(exact.isCompatibleWhenColumnDeletionAllowed()).isFalse();
   }
 
   @Test
@@ -214,7 +231,7 @@ public class SchemaDiffTest {
     Schema newSchema = baseSchemaBuilder().build();
 
     SchemaDiff diff = SchemaDiff.compute(oldSchema, newSchema);
-    assertThat(diff.isNoOp()).isTrue();
+    assertThat(diff.isStructurallyUnchanged()).isTrue();
     assertThat(diff.getDeletedColumnNames()).isEmpty();
     assertThat(diff.isCompatibleWhenColumnDeletionAllowed()).isTrue();
     assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isTrue();

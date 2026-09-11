@@ -237,6 +237,78 @@ public class ColumnDeletionMetadataTest {
   }
 
   @Test
+  public void testSecondActiveEntryForSameColumnRejected() {
+    ColumnDeletionMetadata metadata = new ColumnDeletionMetadata("foo_OFFLINE");
+    metadata.addEntry(new ColumnDeletionEntry("city", "del-1", 1L, 0, ColumnDeletionState.RECLAIMING));
+    assertThatThrownBy(
+        () -> metadata.addEntry(new ColumnDeletionEntry("city", "del-2", 2L, 1, ColumnDeletionState.PREPARED)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("city");
+  }
+
+  @Test
+  public void testCompleteTombstoneAllowsNewActiveEntryForSameColumn() {
+    ColumnDeletionMetadata metadata = new ColumnDeletionMetadata("foo_OFFLINE");
+    metadata.addEntry(new ColumnDeletionEntry("city", "del-1", 1L, 0, ColumnDeletionState.COMPLETE));
+    metadata.addEntry(new ColumnDeletionEntry("city", "del-2", 2L, 1, ColumnDeletionState.PREPARED));
+    assertThat(metadata.findActiveEntryForColumn("city", false).getDeletionId()).isEqualTo("del-2");
+    assertThat(metadata.getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.COMPLETE);
+  }
+
+  @Test
+  public void testAddEntryIgnoreCaseRejectsCaseVariantActiveName() {
+    ColumnDeletionMetadata metadata = new ColumnDeletionMetadata("foo_OFFLINE");
+    metadata.addEntry(new ColumnDeletionEntry("City", "del-1", 1L, 0, ColumnDeletionState.PENDING));
+    assertThatThrownBy(
+        () -> metadata.addEntry(new ColumnDeletionEntry("city", "del-2", 2L, 1, ColumnDeletionState.PREPARED), true))
+        .isInstanceOf(IllegalArgumentException.class);
+    metadata.addEntry(new ColumnDeletionEntry("city", "del-2", 2L, 1, ColumnDeletionState.PREPARED), false);
+    assertThat(metadata.getEntry("del-2").getColumnName()).isEqualTo("city");
+  }
+
+  @Test
+  public void testFromZNRecordRejectsDuplicateExactActiveNames() {
+    ZNRecord record = new ZNRecord("foo_OFFLINE");
+    record.setSimpleField("formatVersion", "1");
+    record.setMapField("del-1", activeFields("city", "del-1", "RECLAIMING"));
+    record.setMapField("del-2", activeFields("city", "del-2", "FAILED"));
+
+    assertThatThrownBy(() -> ColumnDeletionMetadata.fromZNRecord(record)).isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("city");
+  }
+
+  @Test
+  public void testFromZNRecordAllowsCompletePlusActiveSameName() {
+    ZNRecord record = new ZNRecord("foo_OFFLINE");
+    record.setSimpleField("formatVersion", "1");
+    record.setMapField("del-1", activeFields("city", "del-1", "COMPLETE"));
+    record.setMapField("del-2", activeFields("city", "del-2", "PREPARED"));
+
+    ColumnDeletionMetadata metadata = ColumnDeletionMetadata.fromZNRecord(record);
+    assertThat(metadata.getEntry("del-1").getState()).isEqualTo(ColumnDeletionState.COMPLETE);
+    assertThat(metadata.getEntry("del-2").getState()).isEqualTo(ColumnDeletionState.PREPARED);
+  }
+
+  @Test
+  public void testWithSchemaZkMtimeMsPreservesEpoch() {
+    ColumnDeletionEntry original = new ColumnDeletionEntry("city", "del-1", 1000L, 3, ColumnDeletionState.PREPARED);
+    ColumnDeletionEntry updated = original.withSchemaZkMtimeMs(2_000L);
+    assertThat(updated.getSchemaZkMtimeMs()).isEqualTo(2_000L);
+    assertThat(updated.getDeletionEpochMs()).isEqualTo(1000L);
+    assertThat(updated.getSchemaZkVersion()).isEqualTo(3);
+  }
+
+  private static Map<String, String> activeFields(String columnName, String deletionId, String state) {
+    Map<String, String> fields = new HashMap<>();
+    fields.put("columnName", columnName);
+    fields.put("deletionId", deletionId);
+    fields.put("deletionEpochMs", "1");
+    fields.put("schemaZkVersion", "1");
+    fields.put("state", state);
+    return fields;
+  }
+
+  @Test
   public void testNewDeletionIdIsUnique() {
     assertThat(ColumnDeletionMetadata.newDeletionId()).isNotEqualTo(ColumnDeletionMetadata.newDeletionId());
   }

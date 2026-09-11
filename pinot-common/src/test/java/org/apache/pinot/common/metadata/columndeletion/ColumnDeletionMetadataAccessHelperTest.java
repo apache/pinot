@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -161,6 +162,25 @@ public class ColumnDeletionMetadataAccessHelperTest {
         .isInstanceOf(ColumnDeletionUnsupportedFormatException.class);
   }
 
+  @Test
+  public void testWriteWildcardVersionDoesNotClobberNewerStoredFormat() {
+    InMemoryLedgerStore store = new InMemoryLedgerStore();
+    ZNRecord newer = new ZNRecord(TABLE);
+    newer.setSimpleField("formatVersion", Integer.toString(ColumnDeletionMetadata.CURRENT_FORMAT_VERSION + 1));
+    newer.setSimpleField("futureField", "keep-me");
+    store.seed(newer);
+
+    ColumnDeletionMetadata v1 = new ColumnDeletionMetadata(TABLE);
+    v1.addEntry(new ColumnDeletionEntry("city", "del-1", 1000L, 5, ColumnDeletionState.PREPARED));
+    assertThatThrownBy(
+        () -> ColumnDeletionMetadataAccessHelper.writeColumnDeletionMetadata(store.propertyStore(), v1, -1))
+        .isInstanceOf(ColumnDeletionUnsupportedFormatException.class);
+    assertThat(store.record().getSimpleField("formatVersion")).isEqualTo(
+        Integer.toString(ColumnDeletionMetadata.CURRENT_FORMAT_VERSION + 1));
+    assertThat(store.record().getSimpleField("futureField")).isEqualTo("keep-me");
+    assertThat(store.version()).isEqualTo(0);
+  }
+
   /// Minimal PropertyStore stand-in that versions a single ledger znode.
   private static final class InMemoryLedgerStore {
     private final AtomicReference<ZNRecord> _record = new AtomicReference<>();
@@ -170,13 +190,21 @@ public class ColumnDeletionMetadataAccessHelperTest {
     @SuppressWarnings("unchecked")
     private ZkHelixPropertyStore<ZNRecord> mockPropertyStore() {
       ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-      when(propertyStore.get(eq(PATH), any(Stat.class), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      when(propertyStore.get(eq(PATH), nullable(Stat.class), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
         Stat stat = invocation.getArgument(1);
         ZNRecord record = _record.get();
         if (record != null && stat != null) {
           stat.setVersion(_version.get());
         }
         return record;
+      });
+      when(propertyStore.create(eq(PATH), any(ZNRecord.class), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+        if (_record.get() != null) {
+          return false;
+        }
+        _record.set(invocation.getArgument(1));
+        _version.set(0);
+        return true;
       });
       when(propertyStore.set(eq(PATH), any(ZNRecord.class), anyInt(), eq(AccessOption.PERSISTENT))).thenAnswer(
           invocation -> {

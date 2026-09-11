@@ -27,6 +27,7 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
 public class ColumnDeletionDirtySegmentPredicateTest {
@@ -40,10 +41,14 @@ public class ColumnDeletionDirtySegmentPredicateTest {
   }
 
   @Test
-  public void testCreationTimeAtOrAfterEpochIsCleanWithoutPresence() {
+  public void testCreationTimeAtEpochIsDirtyWithoutPresence() {
     SegmentZKMetadata atEpoch = segment("s1", 1_000L, 99L, Map.of());
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(atEpoch, DELETION, false, null)).isTrue();
+  }
+
+  @Test
+  public void testCreationTimeAfterEpochIsCleanWithoutPresence() {
     SegmentZKMetadata afterEpoch = segment("s2", 1_001L, 99L, Map.of());
-    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(atEpoch, DELETION, false, null)).isFalse();
     assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(afterEpoch, DELETION, false, null)).isFalse();
   }
 
@@ -84,10 +89,23 @@ public class ColumnDeletionDirtySegmentPredicateTest {
   public void testMissingCreationTimeUsesEligibilityTime() {
     SegmentZKMetadata dirty = segment("s1", -1L, 99L,
         Map.of(ColumnDeletionDirtySegmentPredicate.ELIGIBILITY_TIME_KEY, "400"));
+    SegmentZKMetadata atEpoch = segment("sAt", -1L, 99L,
+        Map.of(ColumnDeletionDirtySegmentPredicate.ELIGIBILITY_TIME_KEY, "1000"));
     SegmentZKMetadata clean = segment("s2", -1L, 99L,
         Map.of(ColumnDeletionDirtySegmentPredicate.ELIGIBILITY_TIME_KEY, "1500"));
     assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(dirty, DELETION, false, null)).isTrue();
+    assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(atEpoch, DELETION, false, null)).isTrue();
     assertThat(ColumnDeletionDirtySegmentPredicate.isDirty(clean, DELETION, false, null)).isFalse();
+  }
+
+  @Test
+  public void testInvalidEligibilityTimeIncludesSegmentName() {
+    SegmentZKMetadata segment = segment("badSeg", -1L, 99L,
+        Map.of(ColumnDeletionDirtySegmentPredicate.ELIGIBILITY_TIME_KEY, "not-a-number"));
+    assertThatThrownBy(() -> ColumnDeletionDirtySegmentPredicate.isDirty(segment, DELETION, false, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("badSeg")
+        .hasMessageContaining(ColumnDeletionDirtySegmentPredicate.ELIGIBILITY_TIME_KEY);
   }
 
   @Test
