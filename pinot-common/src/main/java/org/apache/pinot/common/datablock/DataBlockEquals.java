@@ -288,6 +288,7 @@ public class DataBlockEquals {
               }
               break;
             case BYTES:
+            case VARIANT:
               for (int did = 0; did < numRows; did++) {
                 if (!left.getBytes(did, colId).equals(right.getBytes(did, colId))) {
                   if (_failOnFalse) {

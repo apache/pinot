@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
@@ -57,6 +58,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /// This class defines all the [SqlOperator]s allowed by Pinot.
@@ -337,8 +339,11 @@ public class PinotOperatorTable implements SqlOperatorTable {
   // Key is canonical name. Multiple operators can share the same name (e.g. binary "-" and unary "-").
   private final Map<String, List<SqlOperator>> _operatorMap;
   private final List<SqlOperator> _operatorList;
+  private final Set<String> _nullHandlingGatedNames;
 
   private PinotOperatorTable(boolean nullHandlingEnabled) {
+    _nullHandlingGatedNames = nullHandlingEnabled ? Set.of()
+        : TransformFunctionType.getNullHandlingRequiredCanonicalNames();
     Map<String, List<SqlOperator>> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -472,9 +477,15 @@ public class PinotOperatorTable implements SqlOperatorTable {
     }
     String canonicalName = FunctionRegistry.canonicalize(opName.getSimple());
     List<SqlOperator> operators = _operatorMap.get(canonicalName);
-    if (operators != null) {
-      operatorList.addAll(operators);
+    if (operators == null) {
+      return;
     }
+    if (!_nullHandlingGatedNames.isEmpty() && _nullHandlingGatedNames.contains(canonicalName)) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "VARIANT function " + opName.getSimple()
+              + " requires query null handling to be enabled; set enableNullHandling=true");
+    }
+    operatorList.addAll(operators);
   }
 
   @Override

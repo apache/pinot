@@ -168,6 +168,54 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testVariantReturningFunctionIsNotConstantFolded() {
+    // Calcite cannot represent a VARIANT RexLiteral. The literal-only evaluation rule must leave parseJson as a
+    // runtime call so it can be composed with functions that consume VARIANT.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT variant_get(parse_json('{\"answer\":42}'), '$.answer', 'INT') FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testVariantToJsonRequiresVariantOperand() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT variant_to_json(parse_json_to_variant(col1)), variant_to_json(parse_json(col1)) FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+
+    String query = "SELECT variant_to_json(col3) FROM a";
+    Throwable thrown = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(query));
+    assertTrue(Throwables.getStackTraceAsString(thrown).contains("Cannot apply 'VARIANTTOJSON"),
+        "Unexpected rejection for " + query + ": " + Throwables.getStackTraceAsString(thrown));
+  }
+
+  @Test
+  public void testVariantFunctionsRequireQueryNullHandling() {
+    QueryEnvironment nullHandlingDisabled = getQueryEnvironment(
+        13, 11, 12, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, false);
+    List<String> expressions = List.of(
+        "variant_get(col1, '$.value')",
+        "try_variant_get(col1, '$.value')",
+        "variant_exists(col1, '$.value')",
+        "is_variant_null(col1)",
+        "variant_type_of(col1)",
+        "variant_to_json(col1)",
+        "parse_json(col1)",
+        "parse_json_to_variant(col1)",
+        "try_parse_json(col1)",
+        "try_parse_json_to_variant(col1)");
+    for (String expression : expressions) {
+      String query = "SELECT " + expression + " FROM a";
+      Throwable thrown = expectThrows(RuntimeException.class, () -> nullHandlingDisabled.compile(query));
+      assertTrue(Throwables.getStackTraceAsString(thrown).contains("requires query null handling"),
+          "Unexpected rejection for " + query + ": " + Throwables.getStackTraceAsString(thrown));
+    }
+
+    assertNotNull(nullHandlingDisabled.compile("SELECT col1 FROM a"));
+  }
+
+  @Test
   public void testPolymorphicArithmeticScalarFunctionsPlanQuery() {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
         "SELECT abs(col3), negate(col7), least(col4, col4), greatest(col4, col4), positiveModulo(col3, col6), "

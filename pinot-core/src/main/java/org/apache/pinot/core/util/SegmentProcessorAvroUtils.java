@@ -244,6 +244,10 @@ public final class SegmentProcessorAvroUtils {
         return Schema.create(Schema.Type.STRING);
       case BYTES:
         return Schema.create(Schema.Type.BYTES);
+      case VARIANT:
+        // Opaque envelope passthrough: the PVAR bytes round-trip through Avro unchanged, matching the CONCAT
+        // segment-processing path. Rollup/dedup merges are rejected upstream for VARIANT tables.
+        return Schema.create(Schema.Type.BYTES);
       case UUID:
         return LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING));
       default:

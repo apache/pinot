@@ -41,3 +41,26 @@ operations:
     useMultiStageQueryEngine: true
     queryFileName: queries/feature-test-multi-stage.queries
     expectedResultsFileName: query-results/feature-test-multi-stage.results
+  - type: queryOp
+    description: Report the deterministic VARIANT wire-type error while servers are still on the old version
+    runIfSystemProperty: pinot.compat.oldServerSupportsVariant
+    runIfSystemPropertyValue: "false"
+    useMultiStageQueryEngine: true
+    nullHandlingEnabled: true
+    queryFileName: queries/variant-wire.queries
+    expectedErrorMessageContains: "Caught exception while deserializing stage plan"
+  - type: queryOp
+    description: Run the VARIANT wire query when the old servers already advertise the type
+    runIfSystemProperty: pinot.compat.oldServerSupportsVariant
+    runIfSystemPropertyValue: "true"
+    useMultiStageQueryEngine: true
+    nullHandlingEnabled: true
+    queryFileName: queries/variant-wire.queries
+    expectedResultsFileName: query-results/variant-wire.results
+  - type: fileContainsOp
+    description: Verify the exact unsupported VARIANT wire type in the old server log
+    runIfSystemProperty: pinot.compat.oldServerSupportsVariant
+    runIfSystemPropertyValue: "false"
+    directorySystemProperty: pinot.compat.logDir
+    fileNameGlob: "server*.log"
+    expectedTextContains: "Unsupported proto ColumnDataType: UNRECOGNIZED"

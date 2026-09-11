@@ -30,6 +30,7 @@ import java.util.function.IntFunction;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -109,7 +110,7 @@ public class DataBlockBuilderTest {
         break;
       case BYTES:
         for (int i = 0; i < numRows; i++) {
-          result.add(new Object[]{new ByteArray(String.valueOf(r.nextInt()).getBytes())});
+          result.add(new Object[]{bytesValue(type, r)});
         }
         break;
       case BIG_DECIMAL:
@@ -262,7 +263,7 @@ public class DataBlockBuilderTest {
         break;
       case BYTES:
         for (int i = 0; i < numRows; i++) {
-          result[i] = new ByteArray(String.valueOf(r.nextInt()).getBytes());
+          result[i] = bytesValue(type, r);
         }
         break;
       case MAP:
@@ -476,5 +477,12 @@ public class DataBlockBuilderTest {
       }
       Assert.assertEquals(actualBitSet, expectedBitSet, "Null row ids mismatch");
     }
+  }
+
+  private static ByteArray bytesValue(ColumnDataType type, Random random) {
+    if (type == ColumnDataType.VARIANT) {
+      return new ByteArray(VariantUtils.parseJsonToVariant("{\"value\":" + random.nextInt() + "}"));
+    }
+    return new ByteArray(String.valueOf(random.nextInt()).getBytes());
   }
 }

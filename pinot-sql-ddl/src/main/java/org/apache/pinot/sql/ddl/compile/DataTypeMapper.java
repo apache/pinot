@@ -51,6 +51,7 @@ public final class DataTypeMapper {
     map.put("BINARY", DataType.BYTES);
     map.put("BYTES", DataType.BYTES);
     map.put("JSON", DataType.JSON);
+    map.put("VARIANT", DataType.VARIANT);
     NAME_TO_DATATYPE = map;
   }
 

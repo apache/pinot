@@ -72,7 +72,8 @@ public interface ResultSet {
   /// Obtains the String value for the given row.
   ///
   /// @param rowIndex The index of the row
-  /// @return The String value for the given row
+  /// @return The String value for the given row, or Java `null` when a VARIANT cell is SQL null
+  @Nullable
   String getString(int rowIndex);
 
   /// Obtains the integer value for the given row and column.
@@ -107,7 +108,8 @@ public interface ResultSet {
   ///
   /// @param rowIndex The index of the row
   /// @param columnIndex The index of the column for which to fetch the value
-  /// @return The String value for the given row and column
+  /// @return The String value for the given row and column, or Java `null` when a VARIANT cell is SQL null
+  @Nullable
   String getString(int rowIndex, int columnIndex);
 
   /// Obtains the length of the group key, or 0 if there is no grouping key.

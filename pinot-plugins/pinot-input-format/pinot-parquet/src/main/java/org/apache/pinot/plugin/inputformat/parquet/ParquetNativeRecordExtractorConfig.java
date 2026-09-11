@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.parquet.schema.GroupType;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
@@ -28,6 +30,8 @@ public class ParquetNativeRecordExtractorConfig implements RecordExtractorConfig
   public static final String EXTRACT_RAW_TIME_VALUES = "extractRawTimeValues";
 
   private boolean _extractRawTimeValues;
+  @Nullable
+  private GroupType _parquetSchema;
 
   @Override
   public void init(Map<String, String> props) {
@@ -40,5 +44,19 @@ public class ParquetNativeRecordExtractorConfig implements RecordExtractorConfig
 
   public void setExtractRawTimeValues(boolean extractRawTimeValues) {
     _extractRawTimeValues = extractRawTimeValues;
+  }
+
+  /// Supplies the immutable Parquet record schema used to initialize schema-bound logical-type converters.
+  ///
+  /// <p>The native record reader sets this before initializing the extractor. Direct extractor users should do the
+  /// same when the schema contains VARIANT columns; otherwise the extractor initializes those converters from the
+  /// first record as a compatibility fallback.
+  public void setParquetSchema(GroupType parquetSchema) {
+    _parquetSchema = parquetSchema;
+  }
+
+  @Nullable
+  GroupType getParquetSchema() {
+    return _parquetSchema;
   }
 }

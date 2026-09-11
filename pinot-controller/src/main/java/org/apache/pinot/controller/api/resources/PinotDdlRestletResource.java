@@ -30,6 +30,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -588,6 +589,10 @@ public class PinotDdlRestletResource {
     if (dataType == FieldSpec.DataType.BIG_DECIMAL && storedDefault instanceof BigDecimal
         && compiledDefault instanceof BigDecimal) {
       return ((BigDecimal) storedDefault).compareTo((BigDecimal) compiledDefault) == 0;
+    }
+    if (dataType == FieldSpec.DataType.VARIANT) {
+      // Schema defaults are structural metadata; this does not enable semantic equality for Variant values.
+      return Arrays.equals((byte[]) storedDefault, (byte[]) compiledDefault);
     }
     return dataType.equals(storedDefault, compiledDefault);
   }

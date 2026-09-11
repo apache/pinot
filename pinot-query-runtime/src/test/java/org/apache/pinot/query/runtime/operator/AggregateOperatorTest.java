@@ -32,6 +32,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -39,9 +40,11 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -94,6 +97,63 @@ public class AggregateOperatorTest {
     // Then:
     verify(_input, times(1)).nextBlock();
     assertTrue(block.isError(), "Input errors should propagate immediately");
+  }
+
+  @Test
+  public void testRejectsRawVariantAggregationAtRuntime() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    ValueNode inputPlanNode = new ValueNode(0, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of());
+    RexExpression.FunctionCall sum =
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM.name(),
+            List.of(new RexExpression.InputRef(0)));
+    DataSchema resultSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
+    AggregateNode aggregateNode =
+        new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY, List.of(inputPlanNode), List.of(sum), List.of(-1),
+            List.of(), AggType.DIRECT, false, List.of(), 0);
+
+    QueryException exception = Assert.expectThrows(QueryException.class,
+        () -> new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, aggregateNode));
+    assertTrue(exception.getMessage().contains("Aggregate function SUM does not support raw VARIANT"));
+    assertTrue(exception.getMessage().contains("variantGet"));
+  }
+
+  @Test
+  public void testAllowsRawVariantCountAtRuntime() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+    ValueNode inputPlanNode = new ValueNode(0, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of());
+    RexExpression.FunctionCall count =
+        new RexExpression.FunctionCall(ColumnDataType.LONG, SqlKind.COUNT.name(),
+            List.of(new RexExpression.InputRef(0)));
+    DataSchema resultSchema = new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG});
+    AggregateNode aggregateNode =
+        new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY, List.of(inputPlanNode), List.of(count), List.of(-1),
+            List.of(), AggType.DIRECT, false, List.of(), 0);
+
+    Assert.assertNotNull(new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, aggregateNode));
+  }
+
+  @Test
+  public void testGroupingSetValidationUsesExpandedInputSchema() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"dimension", "metric"}, new ColumnDataType[]{STRING, INT});
+    ValueNode inputPlanNode = new ValueNode(0, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of());
+    DataSchema expandedInputSchema = new DataSchema(
+        new String[]{"dimension", "metric", "$groupingSetKey$0", "$groupingId"},
+        new ColumnDataType[]{STRING, INT, STRING, INT});
+    RepeatOperator repeatOperator = new RepeatOperator(OperatorTestUtil.getTracingContext(), _input, new int[]{0},
+        List.of(List.of(0), List.of()), expandedInputSchema);
+    RexExpression.FunctionCall sum =
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM.name(),
+            List.of(new RexExpression.InputRef(1)));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"dimension", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
+    AggregateNode rewrittenAggregateNode = new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY,
+        List.of(inputPlanNode), List.of(sum), List.of(-1), List.of(2, 3), AggType.DIRECT, false, List.of(), 0);
+
+    Assert.assertNotNull(
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), repeatOperator, rewrittenAggregateNode));
   }
 
   @Test

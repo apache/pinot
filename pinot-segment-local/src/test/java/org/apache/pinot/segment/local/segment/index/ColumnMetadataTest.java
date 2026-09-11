@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -372,6 +373,17 @@ public class ColumnMetadataTest {
         -1, FieldConfig.EncodingType.RAW, false);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "intMap");
     assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+  }
+
+  @Test
+  public void testVariantFieldSpecRoundTrip() {
+    DimensionFieldSpec variantFieldSpec = new DimensionFieldSpec("payload", DataType.VARIANT, true);
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    BaseSegmentCreator.addFieldSpec(config, "payload", variantFieldSpec);
+
+    FieldSpec restoredFieldSpec = ColumnMetadataImpl.extractFieldSpec("payload", config);
+    assertEquals(restoredFieldSpec, variantFieldSpec);
+    assertEquals((byte[]) restoredFieldSpec.getDefaultNullValue(), new byte[0]);
   }
 
   @Test

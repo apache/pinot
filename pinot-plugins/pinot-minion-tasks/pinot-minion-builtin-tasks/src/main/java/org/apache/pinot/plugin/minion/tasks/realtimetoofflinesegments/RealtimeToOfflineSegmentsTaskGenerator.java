@@ -326,6 +326,17 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
         .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
             .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+    // Rollup and dedup merges group rows by the raw stored bytes of every dimension. Raw VARIANT values
+    // deliberately reject equality and hashing, so only CONCAT is allowed for tables with a VARIANT column.
+    // Resolve the merge type through the same chain generateTasks and the executor use, including the deprecated
+    // collectorType alias. SegmentProcessorConfig re-enforces this at execution time.
+    String effectiveMergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
+    if (effectiveMergeType == null) {
+      effectiveMergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+    }
+    if (schema != null) {
+      MergeTaskUtils.validateMergeTypeForVariantColumns(schema, effectiveMergeType);
+    }
     // check schema is not null
     Preconditions.checkNotNull(schema, "Schema should not be null!");
     // check no mis-configured columns

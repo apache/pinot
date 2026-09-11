@@ -200,6 +200,20 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-variant</artifactId>
+      <!-- VariantBuilder has bytecode descriptors that reference parquet-column classes (for example Binary), so
+           parquet-column must remain in the runtime closure even though Pinot does not call those methods here.
+           Dependencies added to pinot-common are amplified by the global shade; see apache/pinot#18459 for the
+           classloader-realm isolation work that would reduce this dependency impact. -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.parquet</groupId>
+          <artifactId>parquet-jackson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.arrow</groupId>

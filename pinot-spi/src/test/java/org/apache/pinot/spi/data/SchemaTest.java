@@ -841,4 +841,21 @@ public class SchemaTest {
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
     Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
+
+  @Test
+  public void testHasVariantColumnTracksSchemaMutations() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .build();
+    Assert.assertFalse(schema.hasVariantColumn());
+
+    schema.addField(new DimensionFieldSpec("payload1", FieldSpec.DataType.VARIANT, true));
+    schema.addField(new DimensionFieldSpec("payload2", FieldSpec.DataType.VARIANT, true));
+    Assert.assertTrue(schema.hasVariantColumn());
+
+    Assert.assertTrue(schema.removeField("payload1"));
+    Assert.assertTrue(schema.hasVariantColumn());
+    Assert.assertTrue(schema.removeField("payload2"));
+    Assert.assertFalse(schema.hasVariantColumn());
+  }
 }

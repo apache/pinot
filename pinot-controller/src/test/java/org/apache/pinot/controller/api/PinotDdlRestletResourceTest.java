@@ -46,6 +46,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
   private static final String TBL_BASIC = "ddlBasicOffline";
   private static final String TBL_DRY_RUN = "ddlDryRunOffline";
   private static final String TBL_IF_NOT_EXISTS = "ddlIfNotExistsOffline";
+  private static final String TBL_VARIANT = "ddlVariantRoundtrip";
   private static final String TBL_DROP = "ddlDropOffline";
 
   @BeforeClass
@@ -116,6 +117,46 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     assertEquals(second.get("operation").asText(), "CREATE_TABLE");
     assertTrue(second.get("message").asText().toLowerCase().contains("exist"),
         "Expected idempotent message, got: " + second.get("message").asText());
+  }
+
+  @Test
+  public void variantCreateIfNotExistsAndShowCreateRoundTrips()
+      throws IOException {
+    String createSql = "CREATE TABLE IF NOT EXISTS " + TBL_VARIANT + " ("
+        + "  id INT NOT NULL DIMENSION,"
+        + "  payload VARIANT DIMENSION"
+        + ") TABLE_TYPE = OFFLINE PROPERTIES ("
+        + "  'replication' = '1',"
+        + "  'nullHandlingEnabled' = 'true',"
+        + "  'fieldConfigs' = "
+        + "'[{\"name\":\"payload\",\"encodingType\":\"RAW\","
+        + "\"indexes\":{\"forward\":{\"compressionCodec\":\"ZSTANDARD\"}}}]'"
+        + ")";
+
+    JsonNode first = postDdl(createSql, false);
+    assertEquals(first.get("operation").asText(), "CREATE_TABLE");
+    assertEquals(first.get("tableName").asText(), TBL_VARIANT + "_OFFLINE");
+
+    JsonNode second = postDdl(createSql, false);
+    assertEquals(second.get("operation").asText(), "CREATE_TABLE");
+    assertTrue(second.get("message").asText().toLowerCase().contains("exist"),
+        "Expected idempotent message, got: " + second.get("message").asText());
+
+    JsonNode show = postDdl("SHOW CREATE TABLE " + TBL_VARIANT, false);
+    assertEquals(show.get("operation").asText(), "SHOW_CREATE_TABLE");
+    String canonicalDdl = show.get("ddl").asText();
+    assertTrue(canonicalDdl.contains("payload VARIANT DIMENSION"), canonicalDdl);
+    assertFalse(canonicalDdl.contains("payload VARIANT DEFAULT"),
+        "The reserved VARIANT SQL-null sentinel must not be emitted as a user default:\n" + canonicalDdl);
+
+    // DROP intentionally leaves the shared schema in place. Replaying SHOW CREATE therefore exercises the
+    // controller's stored-vs-compiled schema comparison, where VARIANT's byte[] SQL-null sentinel must compare by
+    // content instead of array identity.
+    postDdl("DROP TABLE " + TBL_VARIANT, false);
+    DEFAULT_INSTANCE.waitForEVToDisappear(TBL_VARIANT + "_OFFLINE");
+    JsonNode recreated = postDdl(canonicalDdl, false);
+    assertEquals(recreated.get("operation").asText(), "CREATE_TABLE");
+    assertEquals(recreated.get("tableName").asText(), TBL_VARIANT + "_OFFLINE");
   }
 
   @Test

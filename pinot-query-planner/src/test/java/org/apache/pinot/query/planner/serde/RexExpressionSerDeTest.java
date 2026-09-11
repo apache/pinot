@@ -22,7 +22,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -30,13 +32,16 @@ import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class RexExpressionSerDeTest {
   private static final List<ColumnDataType> SUPPORTED_DATE_TYPES =
       List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
           ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
-          ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
+          ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.VARIANT, ColumnDataType.INT_ARRAY,
+          ColumnDataType.LONG_ARRAY,
           ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY,
           ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY,
           ColumnDataType.UUID_ARRAY,
@@ -103,6 +108,21 @@ public class RexExpressionSerDeTest {
   public void testUuidLiteral() {
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID,
         new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"))));
+  }
+
+  @Test
+  public void testVariantLiteral() {
+    byte[] variant = VariantUtils.parseJsonToVariant("{\"key\":\"value\"}");
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.VARIANT, new ByteArray(variant)));
+  }
+
+  @Test
+  public void testUnknownPeerDataTypeFailsWithUpgradeGuidance() {
+    Expressions.Literal literal =
+        Expressions.Literal.newBuilder().setDataTypeValue(999).setNull(true).build();
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> ProtoExpressionToRexExpression.convertLiteral(literal));
+    assertTrue(exception.getMessage().contains("Upgrade all brokers and servers"));
   }
 
   @Test
