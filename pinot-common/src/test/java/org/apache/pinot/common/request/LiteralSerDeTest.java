@@ -93,7 +93,9 @@ public class LiteralSerDeTest {
   public void testSingleStageQueryUsesNativeBytesArrayLiteral()
       throws TException {
     for (String sql : List.of("SELECT ARRAY[X'00', X'0102'] FROM myTable",
+        "SELECT ARRAY['\\x00'::bytea, CAST('\\x0102' AS BYTEA)] FROM myTable",
         "SELECT id FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY[X'01'])",
+        "SELECT id FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY['\\x01'::bytea])",
         "SELECT ARRAY[X'02'], COUNT(*) FROM myTable GROUP BY ARRAY[X'02']",
         "SELECT COUNT(*) FROM myTable HAVING ARRAYS_OVERLAP(ARRAYAGG(bytesColumn, 'BYTES'), ARRAY[X'03'])",
         "SELECT id FROM myTable "
