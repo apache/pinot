@@ -61,6 +61,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -113,6 +114,9 @@ public class PinotSchemaRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -334,9 +338,9 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    validateSchemaInternal(schema);
     ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
         AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
+    validateSchemaInternal(schema);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -365,9 +369,9 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    validateSchemaInternal(schema);
     ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
         AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
+    validateSchemaInternal(schema);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -408,7 +412,8 @@ public class PinotSchemaRestletResource {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       boolean isIgnoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
       Schema existingSchema = _pinotHelixResourceManager.getSchema(schema.getSchemaName());
-      SchemaUtils.validate(schema, tableConfigs, isIgnoreCase, existingSchema);
+      SchemaUtils.validate(schema, tableConfigs, isIgnoreCase, existingSchema,
+          _controllerConf.isDisableIngestionGroovy());
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);

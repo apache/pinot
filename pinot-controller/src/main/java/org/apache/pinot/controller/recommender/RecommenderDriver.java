@@ -26,11 +26,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +50,12 @@ public class RecommenderDriver {
 
   public static String run(String inputJson)
       throws InvalidInputException, IOException {
+    return run(inputJson,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public static String run(String inputJson, IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws InvalidInputException, IOException {
 
     InputManager inputManager;
     ConfigManager outputManager;
@@ -56,7 +64,7 @@ public class RecommenderDriver {
     objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 
     inputManager = objectMapper.readValue(inputJson, InputManager.class);
-    inputManager.init();
+    inputManager.init(ingestionGroovyPolicy);
     outputManager = inputManager.getOverWrittenConfigs();
 
     // silent rules will run, but their output will only be used in other rules and it will not be present to user

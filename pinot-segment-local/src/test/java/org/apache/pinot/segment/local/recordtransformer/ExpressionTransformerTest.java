@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -36,11 +37,66 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /// Tests the evaluation of transform expressions by the ExpressionTransformer
 public class ExpressionTransformerTest {
+
+  @BeforeClass
+  public void enableGroovyForLegacyTransformTests() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+  }
+
+  @Test
+  public void testRuntimeGroovyPolicyForRealtimeAndOfflineTransforms() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("legacySchema")
+        .addSingleValueDimension("source", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("result", FieldSpec.DataType.STRING).build();
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("legacySchema").build();
+    schema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+    try {
+      IllegalStateException schemaException = Assert.expectThrows(IllegalStateException.class,
+          () -> new ExpressionTransformer(realtimeTableConfig, schema));
+      Assert.assertTrue(schemaException.getMessage().contains("controller.disable.ingestion.groovy=false"));
+
+      schema.getFieldSpecFor("result").setTransformFunction("reverse(source)");
+      ExpressionTransformer builtInTransformer = new ExpressionTransformer(realtimeTableConfig, schema);
+      GenericRow builtInRow = new GenericRow();
+      builtInRow.putValue("source", "pinot");
+      builtInTransformer.transform(builtInRow);
+      Assert.assertEquals(builtInRow.getValue("result"), "tonip");
+
+      schema.getFieldSpecFor("result").setTransformFunction(null);
+      IngestionConfig ingestionConfig = new IngestionConfig();
+      ingestionConfig.setTransformConfigs(
+          List.of(new TransformConfig("result", "Groovy({source.reverse()}, source)")));
+      TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("legacySchema")
+          .setIngestionConfig(ingestionConfig).build();
+      IllegalStateException tableException = Assert.expectThrows(IllegalStateException.class,
+          () -> new ExpressionTransformer(offlineTableConfig, schema));
+      Assert.assertTrue(tableException.getMessage().contains("controller.disable.ingestion.groovy=false"));
+
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+      ExpressionTransformer enabledTransformer = new ExpressionTransformer(offlineTableConfig, schema);
+      GenericRow enabledRow = new GenericRow();
+      enabledRow.putValue("source", "pinot");
+      enabledTransformer.transform(enabledRow);
+      Assert.assertEquals(enabledRow.getValue("result"), "tonip");
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+    }
+  }
 
   @Test
   public void testTransformConfigsFromTableConfig() {

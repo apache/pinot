@@ -39,6 +39,7 @@ import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunne
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -153,6 +154,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       taskSpec.setSequenceId(idx);
       taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
       taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
+      boolean isGroovyDisabled = SegmentGenerationJobUtils.isIngestionGroovyDisabled(_spec);
       taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
       // Start a thread that reports progress every minute during segment generation to prevent job getting killed
@@ -161,7 +163,8 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       progressReporterThread.start();
       String segmentName;
       try {
-        SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
+        SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec,
+            IngestionGroovyPolicy.fromDisabled(isGroovyDisabled));
         segmentName = taskRunner.run();
       } catch (Exception e) {
         LOGGER.error("Caught exception while creating segment with input file: {}, sequence id: {}", path, idx, e);

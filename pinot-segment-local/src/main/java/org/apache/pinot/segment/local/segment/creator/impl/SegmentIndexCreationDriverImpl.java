@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
@@ -59,6 +61,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,10 +101,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void init(SegmentGeneratorConfig config)
       throws Exception {
-    init(config, getRecordReader(config));
+    init(config, getRecordReader(config, isGroovyDisabled(config)));
   }
 
-  private RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
+  private RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig, boolean disableGroovy)
       throws Exception {
     File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
     Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
@@ -111,7 +114,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
     Set<String> sourceFields =
-        IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema());
+        IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema(), disableGroovy);
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -142,7 +145,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        new TransformPipeline(config.getTableConfig(), config.getSchema()));
+        new TransformPipeline(config.getTableConfig(), config.getSchema(),
+            IngestionGroovyPolicy.fromDisabled(isGroovyDisabled(config))));
   }
 
   /// Initialize the driver for columnar segment building using a ColumnReaderFactory.
@@ -183,6 +187,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     _schema = config.getSchema();
     _continueOnError = config.isContinueOnError();
     _instanceType = config.getInstanceType();
+    TableConfigUtils.validateGroovyPolicy(config.getTableConfig(), config.getSchema(), isGroovyDisabled(config));
 
     // Handle columnar data sources differently
     String readerClassName = null;
@@ -356,6 +361,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         metrics.addMeteredTableValue(tableNameWithType, ServerMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
       }
     }
+  }
+
+  private static boolean isGroovyDisabled(SegmentGeneratorConfig config) {
+    return config.resolveIngestionGroovyDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled());
   }
 
   public void buildByColumn(IndexSegment indexSegment, RoaringBitmap validDocIds)

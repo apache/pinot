@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminNotFoundException;
 import org.apache.pinot.client.admin.PinotAdminValidationException;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -174,6 +175,53 @@ public class PinotSchemaRestletResourceTest {
     // Update non-existing schema
     expectNotFoundException(
         () -> adminClient.getSchemaClient().updateSchema(newSchemaName, schema.toSingleLineJsonString()));
+  }
+
+  @Test
+  public void testFieldSpecGroovyPolicyAcrossSchemaEndpoints()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    String schemaName = "fieldSpecGroovyPolicy";
+    String enabledSchemaName = "fieldSpecGroovyPolicyEnabled";
+    String builtInSchemaName = "fieldSpecBuiltInPolicy";
+    Schema groovySchema = new Schema.SchemaBuilder().setSchemaName(schemaName)
+        .addSingleValueDimension("source", DataType.STRING)
+        .addSingleValueDimension("result", DataType.STRING).build();
+    groovySchema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+    String disabledMessage = "controller.disable.ingestion.groovy=false";
+
+    TEST_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, true);
+    try {
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().validateSchema(groovySchema.toSingleLineJsonString()), disabledMessage);
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().createSchema(groovySchema.toSingleLineJsonString()), disabledMessage);
+
+      // Seed metadata below REST validation to model a legacy schema persisted before the policy was enforced.
+      TEST_INSTANCE.getHelixResourceManager().addSchema(groovySchema, false, false);
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().updateSchema(schemaName, groovySchema.toSingleLineJsonString()),
+          disabledMessage);
+
+      Schema builtInSchema = new Schema.SchemaBuilder().setSchemaName(builtInSchemaName)
+          .addSingleValueDimension("source", DataType.STRING)
+          .addSingleValueDimension("result", DataType.STRING).build();
+      builtInSchema.getFieldSpecFor("result").setTransformFunction("reverse(source)");
+      adminClient.getSchemaClient().createSchema(builtInSchema.toSingleLineJsonString());
+
+      TEST_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, false);
+      adminClient.getSchemaClient().validateSchema(groovySchema.toSingleLineJsonString());
+      adminClient.getSchemaClient().updateSchema(schemaName, groovySchema.toSingleLineJsonString());
+
+      groovySchema.setSchemaName(enabledSchemaName);
+      adminClient.getSchemaClient().createSchema(groovySchema.toSingleLineJsonString());
+    } finally {
+      // The shared controller fixture explicitly opts in to Groovy for its legacy tests.
+      TEST_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, false);
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(schemaName);
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(enabledSchemaName);
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(builtInSchemaName);
+    }
   }
 
   @Test

@@ -32,6 +32,18 @@ public interface RecordEnricherFactory {
   RecordEnricher createEnricher(JsonNode enricherProps)
       throws IOException;
 
+  /// Creates an enricher using the given non-null runtime context.
+  ///
+  /// The default implementation preserves compatibility for factories that are not policy-sensitive.
+  default RecordEnricher createEnricher(JsonNode enricherProps, RecordEnricherCreationContext creationContext)
+      throws IOException {
+    return createEnricher(enricherProps);
+  }
+
+  /// Validates security policies that must not be skipped with the rest of table-config validation.
+  default void validateSecurityPolicy(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
+  }
+
   /// Validates the enrichment properties.
   void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
 }

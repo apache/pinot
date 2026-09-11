@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,16 @@ import org.slf4j.LoggerFactory;
 public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RefreshSegmentTaskExecutor.class);
 
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
   private long _taskStartTime;
+
+  public RefreshSegmentTaskExecutor() {
+    this(IngestionGroovyPolicy.DISABLED);
+  }
+
+  public RefreshSegmentTaskExecutor(IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
+  }
 
   /// The code here currently covers segment refresh for the following cases:
   /// 1. Process newly added columns.
@@ -147,7 +157,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       recordReader.init(segment);
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
+          getSchema(tableNameWithType), _ingestionGroovyPolicy.isIngestionGroovyDisabled());
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, recordReader);
       driver.build();
@@ -174,8 +184,9 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
   }
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
-      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema, boolean disableGroovy) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setIngestionGroovyDisabled(disableGroovy);
     config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);

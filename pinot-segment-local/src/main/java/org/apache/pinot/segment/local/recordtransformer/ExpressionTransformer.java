@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,13 @@ public class ExpressionTransformer implements RecordTransformer {
   private final ThrottledLogger _throttledLogger;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
+    this(tableConfig, schema,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema,
+      IngestionGroovyPolicy ingestionGroovyPolicy) {
+    boolean ingestionGroovyDisabled = ingestionGroovyPolicy.isIngestionGroovyDisabled();
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     List<TransformConfig> transformConfigs =
@@ -77,7 +85,8 @@ public class ExpressionTransformer implements RecordTransformer {
     if (transformConfigs != null) {
       for (TransformConfig transformConfig : transformConfigs) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
-            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction(),
+                ingestionGroovyDisabled));
         Preconditions.checkState(previous == null,
             "Cannot set more than one transform function on column: %s.", transformConfig.getColumnName());
       }
@@ -85,7 +94,8 @@ public class ExpressionTransformer implements RecordTransformer {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (!fieldSpec.isVirtualColumn() && !expressionEvaluators.containsKey(fieldName)) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator =
+            FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, ingestionGroovyDisabled);
         if (functionEvaluator != null) {
           expressionEvaluators.put(fieldName, functionEvaluator);
           if (isImplicitMapTransform(fieldSpec)) {
@@ -105,10 +115,18 @@ public class ExpressionTransformer implements RecordTransformer {
   /// transforms where derived columns should be recomputed on the merged row.
   public ExpressionTransformer(List<TransformConfig> transformConfigs, boolean overwriteExistingValues,
       boolean continueOnError) {
+    this(transformConfigs, overwriteExistingValues, continueOnError,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public ExpressionTransformer(List<TransformConfig> transformConfigs, boolean overwriteExistingValues,
+      boolean continueOnError, IngestionGroovyPolicy ingestionGroovyPolicy) {
+    boolean ingestionGroovyDisabled = ingestionGroovyPolicy.isIngestionGroovyDisabled();
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     for (TransformConfig transformConfig : transformConfigs) {
       FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
-          FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+          FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction(),
+              ingestionGroovyDisabled));
       Preconditions.checkState(previous == null,
           "Cannot set more than one transform function on column: %s.", transformConfig.getColumnName());
     }

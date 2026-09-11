@@ -77,6 +77,12 @@ public class SchemaUtils {
 
   public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase,
       @Nullable Schema existingSchema) {
+    validate(schema, tableConfigs, isIgnoreCase, existingSchema,
+        FunctionEvaluatorFactory.isIngestionGroovyDisabled());
+  }
+
+  public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase,
+      @Nullable Schema existingSchema, boolean disableGroovy) {
     // The deprecation reject is intentionally placed only in this REST-driven overload (not in the single-arg
     // `validate(Schema)` that server-side table loading uses), so existing legacy schemas in ZK keep
     // loading. New / updated schemas submitted via the controller REST API are blocked.
@@ -84,9 +90,9 @@ public class SchemaUtils {
     rejectDeprecatedTimeFieldSpec(schema);
     validateIngestionTransformVolatility(schema, existingSchema);
     for (TableConfig tableConfig : tableConfigs) {
-      validateCompatibilityWithTableConfig(schema, tableConfig);
+      validateCompatibilityWithTableConfig(schema, tableConfig, disableGroovy);
     }
-    validate(schema, isIgnoreCase);
+    validate(schema, isIgnoreCase, disableGroovy);
   }
 
   /// Validates that new or changed legacy schema-level transform functions are immutable. An exact transform on the
@@ -140,10 +146,14 @@ public class SchemaUtils {
   /// 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
   /// 6) Schema validations from [Schema#validate]
   public static void validate(Schema schema) {
-    validate(schema, false);
+    validate(schema, false, FunctionEvaluatorFactory.isIngestionGroovyDisabled());
   }
 
   public static void validate(Schema schema, boolean isIgnoreCase) {
+    validate(schema, isIgnoreCase, FunctionEvaluatorFactory.isIngestionGroovyDisabled());
+  }
+
+  public static void validate(Schema schema, boolean isIgnoreCase, boolean disableGroovy) {
     schema.validate();
 
     if (isIgnoreCase) {
@@ -173,8 +183,12 @@ public class SchemaUtils {
       }
       String transformFunction = fieldSpec.getTransformFunction();
       if (transformFunction != null) {
+        // Enforce the ingestion Groovy policy before constructing the evaluator. Besides preserving a clear
+        // configuration error, this guarantees schema validation cannot compile Groovy while it is disabled.
+        FunctionEvaluatorFactory.validateIngestionGroovyPolicy(transformFunction, disableGroovy);
         try {
-          List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
+          List<String> arguments =
+              FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, disableGroovy).getArguments();
           Preconditions.checkState(!arguments.contains(column),
               "The arguments of transform function %s should not contain the destination column %s",
               transformFunction, column);
@@ -231,12 +245,13 @@ public class SchemaUtils {
   }
 
   /// Validates that the schema is compatible with the given table config
-  private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {
+  private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig,
+      boolean disableGroovy) {
     try {
       // The associated table config already exists and is not being changed by schema validation. Pass it as the
       // existing config so unchanged legacy transforms remain grandfathered while all schema-dependent validation
       // still runs against the proposed schema.
-      TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
+      TableConfigUtils.validate(tableConfig, schema, null, tableConfig, disableGroovy);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "

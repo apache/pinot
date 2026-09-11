@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,6 +42,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertThrows;
@@ -50,6 +53,16 @@ import static org.testng.Assert.assertThrows;
 public class SchemaUtilsTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "timeColumn";
+
+  @BeforeClass
+  public void enableGroovyForLegacyValidationTests() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+  }
 
   @Test
   public void testCompatibilityWithTableConfig() {
@@ -475,6 +488,30 @@ public class SchemaUtilsTest {
     pinotSchema.getFieldSpecFor("m1").setTransformFunction("Groovy({function}, m2, m3)");
     pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, millis)");
     SchemaUtils.validate(pinotSchema);
+  }
+
+  @Test
+  public void testFieldSpecTransformGroovyPolicy() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("source", DataType.STRING)
+        .addSingleValueDimension("result", DataType.STRING).build();
+    schema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+    try {
+      IllegalStateException exception =
+          Assert.expectThrows(IllegalStateException.class, () -> SchemaUtils.validate(schema));
+      Assert.assertTrue(exception.getMessage().contains("controller.disable.ingestion.groovy=false"));
+
+      schema.getFieldSpecFor("result").setTransformFunction("reverse(source)");
+      SchemaUtils.validate(schema);
+
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+      schema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+      SchemaUtils.validate(schema);
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+    }
   }
 
   @Test

@@ -50,11 +50,28 @@ public class RecordEnricherRegistry {
     factory.validateEnrichmentConfig(enrichmentConfig.getProperties(), validationConfig);
   }
 
+  public static void validateSecurityPolicy(EnrichmentConfig enrichmentConfig,
+      RecordEnricherValidationConfig validationConfig) {
+    RecordEnricherFactory factory = RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType());
+    if (factory != null) {
+      factory.validateSecurityPolicy(enrichmentConfig.getProperties(), validationConfig);
+    }
+  }
+
   public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
       throws IOException {
     String type = enrichmentConfig.getEnricherType();
     RecordEnricherFactory factory = RECORD_ENRICHER_FACTORY_MAP.get(type);
     Preconditions.checkArgument(factory != null, "No record enricher found for type: %s", type);
     return factory.createEnricher(enrichmentConfig.getProperties());
+  }
+
+  public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig,
+      RecordEnricherCreationContext creationContext)
+      throws IOException {
+    String type = enrichmentConfig.getEnricherType();
+    RecordEnricherFactory factory = RECORD_ENRICHER_FACTORY_MAP.get(type);
+    Preconditions.checkArgument(factory != null, "No record enricher found for type: %s", type);
+    return factory.createEnricher(enrichmentConfig.getProperties(), creationContext);
   }
 }

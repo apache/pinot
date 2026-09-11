@@ -122,9 +122,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
           .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
-    if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
-      _spec.getExecutionFrameworkSpec().setExtraConfigs(new HashMap<>());
-    }
+    SegmentGenerationJobUtils.resolveAndPersistIngestionGroovyPolicy(_spec);
   }
 
   @Override

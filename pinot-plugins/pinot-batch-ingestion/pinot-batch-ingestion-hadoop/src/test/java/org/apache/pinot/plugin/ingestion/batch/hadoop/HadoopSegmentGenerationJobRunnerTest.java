@@ -42,6 +42,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -72,7 +73,9 @@ public class HadoopSegmentGenerationJobRunnerTest {
         .setSchemaName(schemaName)
         .addSingleValueDimension("col1", DataType.STRING)
         .addMetric("col2", DataType.INT)
+        .addSingleValueDimension("derived", DataType.STRING)
         .build();
+    schema.getFieldSpecFor("derived").setTransformFunction("Groovy({col1.reverse()}, col1)");
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
@@ -130,6 +133,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     Map<String, String> extraConfigs = new HashMap<>();
     extraConfigs.put("stagingDir", stagingDir.toURI().toString());
     extraConfigs.put("dependencyJarDir", dependencyJarsDir.getAbsolutePath());
+    extraConfigs.put(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false");
     efSpec.setExtraConfigs(extraConfigs);
     jobSpec.setExecutionFrameworkSpec(efSpec);
 

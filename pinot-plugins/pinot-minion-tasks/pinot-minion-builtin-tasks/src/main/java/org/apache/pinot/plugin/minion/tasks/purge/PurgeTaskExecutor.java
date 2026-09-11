@@ -32,6 +32,7 @@ import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -41,6 +42,15 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
   public static final String RECORD_MODIFIER_KEY = "recordModifier";
   public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
   public static final String NUM_RECORDS_MODIFIED_KEY = "numRecordsModified";
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
+
+  public PurgeTaskExecutor() {
+    this(IngestionGroovyPolicy.DISABLED);
+  }
+
+  public PurgeTaskExecutor(IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
+  }
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -61,7 +71,8 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
     SegmentPurger segmentPurger =
-        new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier, null);
+        new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier, null,
+            _ingestionGroovyPolicy);
     long purgeTaskStartTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
     File purgedSegmentFile = segmentPurger.purgeSegment();
     long purgeTaskEndTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();

@@ -89,6 +89,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _minionConf = minionConf;
   }
 
+  protected boolean isIngestionGroovyDisabled() {
+    return _minionConf == null || _minionConf.isIngestionGroovyDisabled();
+  }
+
   /// Converts the segment based on the given [PinotTaskConfig].
   ///
   /// @param pinotTaskConfig Task config

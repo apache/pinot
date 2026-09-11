@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -57,6 +58,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -124,6 +126,8 @@ public class InputManager {
   Map<String, Integer> _colNameToIntMap = null;
   String[] _intToColNameMap = null;
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
+  private IngestionGroovyPolicy _ingestionGroovyPolicy =
+      IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled());
 
   Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {{
       put(FieldSpec.DataType.INT, Integer.BYTES);
@@ -144,7 +148,14 @@ public class InputManager {
   /// This ensures we do not recommend indices on those dimensions
   public void init()
       throws InvalidInputException {
+    init(IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public void init(IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws InvalidInputException {
     LOGGER.info("Preprocessing Input:");
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
+    SchemaUtils.validate(_schema, false, ingestionGroovyPolicy.isIngestionGroovyDisabled());
     reorderDimsAndBuildMap();
     registerColNameFieldType();
     validateQueries();
@@ -354,7 +365,6 @@ public class InputManager {
   public void setSchema(JsonNode jsonNode)
       throws IOException {
     _schema = JsonUtils.jsonNodeToObject(jsonNode, Schema.class);
-    SchemaUtils.validate(_schema);
     _schemaWithMetaData = JsonUtils.jsonNodeToObject(jsonNode, SchemaWithMetaData.class);
     _schemaWithMetaData.getDimensionFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
@@ -478,6 +488,11 @@ public class InputManager {
 
   public String getTableType() {
     return _tableType;
+  }
+
+  @JsonIgnore
+  public IngestionGroovyPolicy getIngestionGroovyPolicy() {
+    return _ingestionGroovyPolicy;
   }
 
   public long getNumMessagesPerSecInKafkaTopic() {

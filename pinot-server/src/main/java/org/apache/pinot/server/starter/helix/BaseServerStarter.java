@@ -196,7 +196,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
+    boolean disableGroovy = CommonConstants.Groovy.isIngestionGroovyDisabled(
+        _serverConf.getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
     applyCustomConfigs(_serverConf);
+    ServiceStartableUtils.enforceIngestionGroovyPolicy(_serverConf, disableGroovy, ServiceRole.SERVER);
     ServerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_serverConf));
 
     PinotInsecureMode.setPinotInInsecureMode(

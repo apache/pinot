@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.processing.partitioner;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 
 
 /// Partitioner which evaluates a transform function using the row to get the partition value
@@ -29,7 +30,13 @@ public class TransformFunctionPartitioner implements Partitioner {
   private final FunctionEvaluator _functionEvaluator;
 
   public TransformFunctionPartitioner(String transformFunction) {
-    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+    this(transformFunction,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public TransformFunctionPartitioner(String transformFunction, IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction,
+        ingestionGroovyPolicy.isIngestionGroovyDisabled());
   }
 
   @Override
