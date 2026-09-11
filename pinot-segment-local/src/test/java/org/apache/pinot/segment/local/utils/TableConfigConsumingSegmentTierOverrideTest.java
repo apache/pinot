@@ -73,7 +73,8 @@ public class TableConfigConsumingSegmentTierOverrideTest {
     assertEquals(consumingConfig.getMultiColIndexConfig().getColumns(), List.of(PROFILED_COLUMN));
 
     assertEquals(tableConfig.getIndexingConfig().getNoDictionaryColumns(), List.of(PROFILED_COLUMN));
-    assertEquals(tableConfig.getFieldConfigList().get(0).getEncodingType(), FieldConfig.EncodingType.RAW);
+    assertEquals(tableConfig.getFieldConfigList().get(0).getIndexes().get("forward").get("encodingType").asText(),
+        FieldConfig.EncodingType.RAW.name());
   }
 
   @Test
@@ -168,9 +169,9 @@ public class TableConfigConsumingSegmentTierOverrideTest {
   private static FieldConfig profiledFieldConfigWithTierOverwrite(String tier)
       throws Exception {
     return new FieldConfig.Builder(PROFILED_COLUMN)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withTierOverwrites(JsonUtils.stringToJsonNode("{\"" + tier + "\":{\"encodingType\":\"DICTIONARY\","
-            + "\"indexes\":{\"inverted\":{\"disabled\":false}}}}"))
+        .withIndexes(JsonUtils.stringToJsonNode("{\"forward\":{\"encodingType\":\"RAW\"}}"))
+        .withTierOverwrites(JsonUtils.stringToJsonNode("{\"" + tier
+            + "\":{\"indexes\":{\"forward\":{\"encodingType\":\"DICTIONARY\"},\"inverted\":{\"disabled\":false}}}}"))
         .build();
   }
 

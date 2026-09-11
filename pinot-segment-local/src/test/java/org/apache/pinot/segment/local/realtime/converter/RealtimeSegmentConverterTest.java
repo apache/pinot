@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -71,6 +72,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -619,17 +621,19 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.nanoTime());
 
-    Map<String, String> fieldConfigColumnProperties = new HashMap<>();
-    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX,
-        String.valueOf(reuseMutableIndex));
-    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
+    indexes.set("forward", forward);
+    ObjectNode text = JsonUtils.newObjectNode();
+    text.put("reuseMutableIndex", reuseMutableIndex);
+    text.put("useANDForMultiTermQueries", true);
     if (rawValueForTextIndex != null) {
-      fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, rawValueForTextIndex);
+      text.put("rawValue", rawValueForTextIndex);
     }
+    indexes.set("text", text);
     FieldConfig textIndexFieldConfig = new FieldConfig.Builder(STRING_COLUMN1)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
-        .withProperties(fieldConfigColumnProperties)
+        .withIndexes(indexes)
         .build();
     List<FieldConfig> fieldConfigList = List.of(textIndexFieldConfig);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
@@ -742,8 +746,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
         segmentFile.getRecord(docId, readRow);
 
-        // if rawValueForTextIndex is set and mutable index is reused, the forward index should return the dummy value
-        if (rawValueForTextIndex != null && reuseMutableIndex) {
+        // If rawValueForTextIndex is set, the converted forward index should return the dummy value.
+        if (rawValueForTextIndex != null) {
           assertEquals(readRow.getValue(STRING_COLUMN1), rawValueForTextIndex);
           assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
         } else {
