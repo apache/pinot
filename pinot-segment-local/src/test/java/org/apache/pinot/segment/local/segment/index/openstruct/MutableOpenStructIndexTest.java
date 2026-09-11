@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -42,6 +43,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -178,39 +180,45 @@ public class MutableOpenStructIndexTest {
       throws IOException {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
-        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
-      // Unmappable value on a fresh key: falls back to STRING and meters an inference failure.
-      idx.index(0, Map.of("req-42", Map.of("a", 1)));
-      // Unmappable value on a key already typed LONG: dropped by coercion, metered there only.
-      idx.index(1, Map.of("clicks", 5L));
-      idx.index(2, Map.of("clicks", Map.of("a", 1)));
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // Unmappable value on a fresh key: falls back to STRING and meters an inference failure.
+        idx.index(0, Map.of("req-42", Map.of("a", 1)));
+        // Unmappable value on a key already typed LONG: dropped by coercion, metered there only.
+        idx.index(1, Map.of("clicks", 5L));
+        idx.index(2, Map.of("clicks", Map.of("a", 1)));
+      }
 
       verify(metrics).addMeteredTableValue("testTable_REALTIME", "metrics",
-          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L, null);
       verify(metrics).addMeteredTableValue("testTable_REALTIME", "metrics",
-          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1L);
-      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$req-42"), any(), anyLong());
-      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$clicks"), any(), anyLong());
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1L, null);
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$req-42"), any(), anyLong(), any());
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq("metrics$clicks"), any(), anyLong(), any());
     } finally {
       ServerMetrics.deregister();
     }
   }
 
   /// A later unmappable value on a key whose type fell back to STRING is stored as its serialized
-  /// form, so it is metered every time — not just on the first sighting that established the type.
+  /// form, so it is metered every time — live, per value — not just on the first sighting that
+  /// established the type.
   @Test
-  public void testInferenceFailuresMeteredPerValueOnStringFallbackKey()
+  public void testInferenceFailuresMeterLivePerValue()
       throws IOException {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
-        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
-      for (int docId = 0; docId < 3; docId++) {
-        idx.index(docId, Map.of("payload", Map.of("a", docId)));
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        for (int docId = 0; docId < 3; docId++) {
+          idx.index(docId, Map.of("payload", Map.of("a", docId)));
+        }
+
+        verify(metrics, times(3)).addMeteredTableValue(eq("testTable_REALTIME"), eq("metrics"),
+            eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), eq(1L), any());
       }
-      verify(metrics, times(3)).addMeteredTableValue("testTable_REALTIME", "metrics",
-          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
     } finally {
       ServerMetrics.deregister();
     }
@@ -273,6 +281,115 @@ public class MutableOpenStructIndexTest {
 
       verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
           eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// Coercion failures are metered live, per value, and the returned [PinotMeter] is cached and
+  /// reused on later occurrences instead of re-resolving the metric name/registry each time.
+  @Test
+  public void testCoercionFailuresMeterLiveWithReusedMeter()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    PinotMeter reusedMeter = mock(PinotMeter.class);
+    when(metrics.addMeteredTableValue(anyString(), anyString(),
+        eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong(), any())).thenReturn(reusedMeter);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // Establish "clicks" as LONG, then feed three unmappable values that fail coercion.
+        idx.index(0, Map.of("clicks", 5L));
+        idx.index(1, Map.of("clicks", Map.of("a", 1)));
+
+        // First occurrence marks live, with no meter to reuse yet.
+        verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+            ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1L, null);
+
+        idx.index(2, Map.of("clicks", Map.of("a", 2)));
+        idx.index(3, Map.of("clicks", Map.of("a", 3)));
+      }
+
+      verify(metrics, times(3)).addMeteredTableValue(eq("testTable_REALTIME"), eq("metrics"),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), eq(1L), any());
+      // The 2nd and 3rd occurrences reuse the meter the 1st returned.
+      verify(metrics, times(2)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1L, reusedMeter);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testNoFailureMetersEmittedWhenNoFailures()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        idx.index(0, Map.of("clicks", 5L, "country", "US"));
+        idx.index(1, Map.of("clicks", 7L));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong(), any());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong(), any());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testInferenceCheckSkippedForNonStringKeys()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // "clicks" establishes as LONG. Unmappable values on it are a coercion concern only —
+        // inference must never run for a key whose established type is not STRING.
+        idx.index(0, Map.of("clicks", 5L));
+        idx.index(1, Map.of("clicks", Map.of("a", 1)));
+        idx.index(2, Map.of("clicks", Map.of("a", 2)));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong(), any());
+      verify(metrics, times(2)).addMeteredTableValue(eq("testTable_REALTIME"), eq("metrics"),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), eq(1L), any());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// A STRING-established key does run the per-row inference check, so this pins the other side of
+  /// that branch: a later *inferable* value must not be counted. Without the `inferDataType == null`
+  /// guard inside meterIfUninferable, every row on such a key would meter a failure.
+  @Test
+  public void testInferenceCheckOnStringKeyDoesNotMeterInferableValues()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // "country" has no child spec and infers as STRING, so needsInferenceCheck() is true and
+        // meterIfUninferable runs on every later row — but both values infer cleanly.
+        idx.index(0, Map.of("country", "US"));
+        idx.index(1, Map.of("country", "CA"));
+        idx.index(2, Map.of("country", "MX"));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong());
     } finally {
       ServerMetrics.deregister();
     }
