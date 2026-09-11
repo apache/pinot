@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
@@ -47,9 +48,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final QueryContext _queryContext;
-  private final AggregationFunction[] _aggregationFunctions;
-  private final BaseProjectOperator<?> _projectOperator;
-  private final boolean _useStarTree;
+  private final AggregationInfo _aggregationInfo;
   private final int _numTotalDocs;
 
   private int _numDocsScanned = 0;
@@ -80,9 +79,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, int numTotalDocs,
       @Nullable boolean[] nonScanResolvable, @Nullable DataSource[] dataSources) {
     _queryContext = queryContext;
-    _aggregationFunctions = queryContext.getAggregationFunctions();
-    _projectOperator = aggregationInfo.getProjectOperator();
-    _useStarTree = aggregationInfo.isUseStarTree();
+    _aggregationInfo = aggregationInfo;
     _numTotalDocs = numTotalDocs;
     _nonScanResolvable = nonScanResolvable;
     _dataSources = dataSources;
@@ -91,27 +88,27 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   @Override
   protected AggregationResultsBlock getNextBlock() {
     // Perform aggregation on all the transform blocks
-    AggregationExecutor aggregationExecutor;
-    if (_useStarTree) {
-      // StarTreeAggregationExecutor doesn't support non-scan results.
-      aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
-    } else {
-      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, resolveNonScanResults());
-    }
+    AggregationFunction[] aggregationFunctions = _aggregationInfo.getFunctions();
+    AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = _aggregationInfo.getStarTreeFunctionColumnPairs();
+    AggregationExecutor aggregationExecutor = starTreeFunctionColumnPairs != null
+        // StarTreeAggregationExecutor doesn't support non-scan results.
+        ? new StarTreeAggregationExecutor(aggregationFunctions, starTreeFunctionColumnPairs)
+        : new DefaultAggregationExecutor(aggregationFunctions, resolveNonScanResults());
+    BaseProjectOperator<?> projectOperator = _aggregationInfo.getProjectOperator();
     ValueBlock valueBlock;
-    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+    while ((valueBlock = projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(valueBlock.getNumDocs());
         scanCost.addEntriesScannedPostFilter(
-            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
+            (long) valueBlock.getNumDocs() * projectOperator.getNumColumnsProjected());
       }
       aggregationExecutor.aggregate(valueBlock);
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), _queryContext);
+    return new AggregationResultsBlock(aggregationFunctions, aggregationExecutor.getResult(), _queryContext);
   }
 
   /// Returns {@code null} when no function is resolvable without scanning, in which case all functions are computed by
@@ -124,10 +121,11 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     }
 
     Objects.requireNonNull(_dataSources);
-    Object[] nonScanResults = new Object[_aggregationFunctions.length];
-    for (int i = 0; i < _aggregationFunctions.length; i++) {
+    AggregationFunction[] aggregationFunctions = _aggregationInfo.getFunctions();
+    Object[] nonScanResults = new Object[aggregationFunctions.length];
+    for (int i = 0; i < aggregationFunctions.length; i++) {
       if (_nonScanResolvable[i]) {
-        nonScanResults[i] = AggregationFunctionUtils.getAggregationResult(_aggregationFunctions[i],
+        nonScanResults[i] = AggregationFunctionUtils.getAggregationResult(aggregationFunctions[i],
             _dataSources[i], _numTotalDocs, EXPLAIN_NAME);
       }
     }
@@ -136,13 +134,14 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return List.of(_projectOperator);
+    return List.of(_aggregationInfo.getProjectOperator());
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
+    BaseProjectOperator<?> projectOperator = _aggregationInfo.getProjectOperator();
+    long numEntriesScannedInFilter = projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * projectOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
   }
@@ -150,10 +149,11 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(aggregations:");
-    if (_aggregationFunctions.length > 0) {
-      stringBuilder.append(_aggregationFunctions[0].toExplainString());
-      for (int i = 1; i < _aggregationFunctions.length; i++) {
-        stringBuilder.append(", ").append(_aggregationFunctions[i].toExplainString());
+    AggregationFunction[] aggregationFunctions = _aggregationInfo.getFunctions();
+    if (aggregationFunctions.length > 0) {
+      stringBuilder.append(aggregationFunctions[0].toExplainString());
+      for (int i = 1; i < aggregationFunctions.length; i++) {
+        stringBuilder.append(", ").append(aggregationFunctions[i].toExplainString());
       }
     }
 
@@ -168,10 +168,11 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    if (_aggregationFunctions.length == 0) {
+    AggregationFunction[] aggregationFunctions = _aggregationInfo.getFunctions();
+    if (aggregationFunctions.length == 0) {
       return;
     }
-    List<String> aggregations = Arrays.stream(_aggregationFunctions)
+    List<String> aggregations = Arrays.stream(aggregationFunctions)
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("aggregations", aggregations);

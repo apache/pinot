@@ -35,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// The `OffHeapSingleTreeBuilder` class is the single star-tree builder that uses off-heap memory.
@@ -43,11 +44,21 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private static final String STAR_TREE_RECORD_FILE_NAME = "star-tree.record";
   // If the temporary buffer needed is larger than 500M, use MMAP, otherwise use DIRECT
   private static final long MMAP_SIZE_THRESHOLD = 500_000_000;
+  private static final byte[] EMPTY_BYTES = new byte[0];
 
   private final File _segmentRecordFile;
   private final File _starTreeRecordFile;
   private final BufferedOutputStream _starTreeRecordOutputStream;
   private final RecordOffsets _starTreeRecordOffsets;
+
+  /// One bitmap per metric holding the doc ids whose group aggregated over no non-null input, or `null` when null
+  /// handling is disabled. A record is stored the way a regular column is: the metric keeps a placeholder in the
+  /// serialized record and its nullness lives beside it, so the record layout is unchanged and the arithmetic in
+  /// [FixedSizeRecordOffsets] still holds.
+  ///
+  /// Keying on the doc id is safe because records are never moved: sorting permutes an array of doc ids and compares
+  /// through it, leaving each record where it was written.
+  private final RoaringBitmap[] _metricNullBitmaps;
 
   private PinotDataBuffer _starTreeRecordBuffer;
   private int _numReadableStarTreeRecords;
@@ -64,6 +75,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         _starTreeRecordFile);
     _starTreeRecordOutputStream = new BufferedOutputStream(new FileOutputStream(_starTreeRecordFile));
     _starTreeRecordOffsets = createRecordOffsets();
+    _metricNullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[_numMetrics] : null;
   }
 
   /// Returns [FixedSizeRecordOffsets] when all metrics are serialized with a fixed size (see
@@ -86,6 +98,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     return new FixedSizeRecordOffsets(recordSize);
   }
 
+  /// Serializes a record into the temporary star-tree record store.
+  ///
+  /// A metric that aggregated over no non-null input has no value to write, so the aggregated type's zero is written
+  /// in its place and [#appendRecord] records the nullness in [#_metricNullBitmaps]. The placeholder is never read
+  /// back: [#deserializeStarTreeRecord] consults the bitmap first.
   @SuppressWarnings("unchecked")
   private byte[] serializeStarTreeRecord(Record starTreeRecord) {
     int numBytes = _numDimensions * Integer.BYTES;
@@ -99,7 +116,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
           numBytes += Double.BYTES;
           break;
         case BYTES:
-          metricBytes[i] = _valueAggregators[i].serializeAggregatedValue(starTreeRecord._metrics[i]);
+          Object bytesValue = starTreeRecord._metrics[i];
+          metricBytes[i] = bytesValue != null ? _valueAggregators[i].serializeAggregatedValue(bytesValue) : EMPTY_BYTES;
           numBytes += Integer.BYTES + metricBytes[i].length;
           break;
         default:
@@ -114,10 +132,12 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     for (int i = 0; i < _numMetrics; i++) {
       switch (_valueAggregators[i].getAggregatedValueType()) {
         case LONG:
-          byteBuffer.putLong((Long) starTreeRecord._metrics[i]);
+          Object longValue = starTreeRecord._metrics[i];
+          byteBuffer.putLong(longValue != null ? (long) longValue : 0L);
           break;
         case DOUBLE:
-          byteBuffer.putDouble((Double) starTreeRecord._metrics[i]);
+          Object doubleValue = starTreeRecord._metrics[i];
+          byteBuffer.putDouble(doubleValue != null ? (double) doubleValue : 0d);
           break;
         case BYTES:
           byteBuffer.putInt(metricBytes[i].length);
@@ -130,7 +150,11 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     return bytes;
   }
 
-  private Record deserializeStarTreeRecord(PinotDataBuffer buffer, long offset) {
+  /// Deserializes the record at `docId`, whose metrics start at `offset`.
+  ///
+  /// A metric marked null in [#_metricNullBitmaps] comes back as `null` without its placeholder being deserialized,
+  /// which matters for `BYTES`: the placeholder is an empty array that no aggregator can decode.
+  private Record deserializeStarTreeRecord(PinotDataBuffer buffer, long offset, int docId) {
     int[] dimensions = new int[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
       dimensions[i] = buffer.getInt(offset);
@@ -140,20 +164,24 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     for (int i = 0; i < _numMetrics; i++) {
       switch (_valueAggregators[i].getAggregatedValueType()) {
         case LONG:
-          metrics[i] = buffer.getLong(offset);
+          metrics[i] = hasMetricValue(docId, i) ? buffer.getLong(offset) : null;
           offset += Long.BYTES;
           break;
         case DOUBLE:
-          metrics[i] = buffer.getDouble(offset);
+          metrics[i] = hasMetricValue(docId, i) ? buffer.getDouble(offset) : null;
           offset += Double.BYTES;
           break;
         case BYTES:
           int numBytes = buffer.getInt(offset);
           offset += Integer.BYTES;
-          byte[] bytes = new byte[numBytes];
-          buffer.copyTo(offset, bytes);
+          if (hasMetricValue(docId, i)) {
+            byte[] bytes = new byte[numBytes];
+            buffer.copyTo(offset, bytes);
+            metrics[i] = _valueAggregators[i].deserializeAggregatedValue(bytes);
+          } else {
+            metrics[i] = null;
+          }
           offset += numBytes;
-          metrics[i] = _valueAggregators[i].deserializeAggregatedValue(bytes);
           break;
         default:
           throw new IllegalStateException();
@@ -168,13 +196,40 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     byte[] bytes = serializeStarTreeRecord(record);
     _starTreeRecordOutputStream.write(bytes);
     _starTreeRecordOffsets.addRecord(bytes.length);
+    if (_metricNullBitmaps != null) {
+      // The caller assigns this record _numDocs and increments it afterwards, so it is this record's doc id
+      markNullMetrics(record, _numDocs);
+    }
+  }
+
+  /// Records which of the record's metrics aggregated over no non-null input.
+  private void markNullMetrics(Record record, int docId) {
+    for (int i = 0; i < _numMetrics; i++) {
+      if (record._metrics[i] == null) {
+        RoaringBitmap nullBitmap = _metricNullBitmaps[i];
+        if (nullBitmap == null) {
+          nullBitmap = new RoaringBitmap();
+          _metricNullBitmaps[i] = nullBitmap;
+        }
+        nullBitmap.add(docId);
+      }
+    }
+  }
+
+  /// Returns whether the record holds a value for the metric, as opposed to having aggregated over no non-null input.
+  private boolean hasMetricValue(int docId, int metricId) {
+    if (_metricNullBitmaps == null) {
+      return true;
+    }
+    RoaringBitmap nullBitmap = _metricNullBitmaps[metricId];
+    return nullBitmap == null || !nullBitmap.contains(docId);
   }
 
   @Override
   Record getStarTreeRecord(int docId)
       throws IOException {
     ensureBufferReadable(docId);
-    return deserializeStarTreeRecord(_starTreeRecordBuffer, _starTreeRecordOffsets.getStartOffset(docId));
+    return deserializeStarTreeRecord(_starTreeRecordBuffer, _starTreeRecordOffsets.getStartOffset(docId), docId);
   }
 
   @Override

@@ -62,6 +62,9 @@ import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 /// - 1.null.STAR_TREE.OFFSET = 5500
 /// - 1.null.STAR_TREE.SIZE = 2500
 /// - ...
+///
+/// A null-aware star-tree additionally stores a NULL_VALUE_VECTOR entry per dimension and metric that has at least one
+/// null value, e.g. `0.sum__metric.NULL_VALUE_VECTOR.OFFSET`.
 public class StarTreeIndexMapUtils {
   private StarTreeIndexMapUtils() {
   }
@@ -75,7 +78,9 @@ public class StarTreeIndexMapUtils {
 
   /// Type of the index.
   public enum IndexType {
-    STAR_TREE, FORWARD_INDEX
+    // NOTE: NULL_VALUE_VECTOR is only written by a null-aware star-tree. A server running a version that predates it
+    // fails to parse the index map of such a segment, so it must not be enabled before the whole cluster is upgraded.
+    STAR_TREE, FORWARD_INDEX, NULL_VALUE_VECTOR
   }
 
   /// Key of the index map.
@@ -189,10 +194,13 @@ public class StarTreeIndexMapUtils {
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
         if (!dimensionSet.contains(column)) {
-          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
+          // A count__column pair is only ever stored by a null-aware star-tree, where it holds the count of the
+          // non-null values of that column rather than the row count
+          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column,
+              starTreeMetadataList.get(starTreeId).isNullHandlingEnabled());
           column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
         }
-        indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
+        indexKey = new IndexKey(indexType, column);
       }
 
       long value = configuration.getLong(key);

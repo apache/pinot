@@ -214,7 +214,7 @@ public class StarTreeBuilderUtilsTest {
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
     aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col2"),
         new AggregationSpec(null, null, null, null, null, Map.of(Constants.HLL_LOG2M_KEY, 16)));
-    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("col1"), aggregationSpecs, 100, Set.of());
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("col1"), aggregationSpecs, 100, Set.of(), false);
     StarTreeV2Metadata existingStarTreeMetadata = new StarTreeV2Metadata(metadataProperties);
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null, List.of(

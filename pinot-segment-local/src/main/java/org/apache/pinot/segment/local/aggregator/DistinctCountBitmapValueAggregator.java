@@ -41,7 +41,9 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public RoaringBitmap getInitialAggregatedValue(Object rawValue) {
-    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index, and the builder
+    //   never passes a null raw value: a null-aware star-tree leaves the aggregated value null until the group sees
+    //   its first non-null input.
     assert rawValue != null;
     RoaringBitmap initialValue;
     if (rawValue instanceof byte[]) {

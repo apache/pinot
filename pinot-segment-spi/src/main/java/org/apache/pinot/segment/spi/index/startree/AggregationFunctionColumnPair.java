@@ -34,12 +34,27 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   private final String _column;
 
   public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column) {
+    this(functionType, column, false);
+  }
+
+  private AggregationFunctionColumnPair(AggregationFunctionType functionType, String column,
+      boolean preserveCountColumn) {
     _functionType = functionType;
-    if (functionType == AggregationFunctionType.COUNT) {
+    // A regular star-tree counts rows rather than values, so every COUNT collapses to COUNT(*). A null-aware star-tree
+    // instead stores the count of the non-null values of a specific column, which requires keeping the column name.
+    if (functionType == AggregationFunctionType.COUNT && !preserveCountColumn) {
       _column = STAR;
     } else {
       _column = column;
     }
+  }
+
+  /// Returns the pair representing `COUNT(column)`, counting only the non-null values of the column.
+  ///
+  /// Unlike the regular constructor, which normalizes every `COUNT` to [#COUNT_STAR], this keeps the column so that a
+  /// null-aware star-tree can pre-aggregate per-column non-null counts.
+  public static AggregationFunctionColumnPair countColumn(String column) {
+    return new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, column, true);
   }
 
   public AggregationFunctionType getFunctionType() {
@@ -59,12 +74,23 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   }
 
   public static AggregationFunctionColumnPair fromColumnName(String columnName) {
-    String[] parts = columnName.split(DELIMITER, 2);
-    return fromFunctionAndColumnName(parts[0], parts[1]);
+    return fromColumnName(columnName, false);
   }
 
-  public static AggregationFunctionColumnPair fromAggregationConfig(StarTreeAggregationConfig aggregationConfig) {
-    return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName());
+  /// Parses a function-column pair name such as `sum__col`.
+  ///
+  /// When `preserveCountColumn` is `false`, `count__col` resolves to [#COUNT_STAR], matching how a regular star-tree
+  /// stores counts. Pass `true` for a null-aware star-tree, where `count__col` denotes the non-null count of `col`.
+  public static AggregationFunctionColumnPair fromColumnName(String columnName, boolean preserveCountColumn) {
+    String[] parts = columnName.split(DELIMITER, 2);
+    return fromFunctionAndColumnName(parts[0], parts[1], preserveCountColumn);
+  }
+
+  /// Builds a pair from an aggregation config. See [#fromColumnName] for the meaning of `preserveCountColumn`.
+  public static AggregationFunctionColumnPair fromAggregationConfig(StarTreeAggregationConfig aggregationConfig,
+      boolean preserveCountColumn) {
+    return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName(),
+        preserveCountColumn);
   }
 
   /// Return a new `AggregationFunctionColumnPair` from an existing functionColumnPair where the new pair
@@ -72,7 +98,13 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   /// @param functionColumnPair the existing functionColumnPair
   /// @return the new functionColumnPair
   public static AggregationFunctionColumnPair resolveToStoredType(AggregationFunctionColumnPair functionColumnPair) {
-    AggregationFunctionType storedType = getStoredType(functionColumnPair.getFunctionType());
+    AggregationFunctionType functionType = functionColumnPair.getFunctionType();
+    AggregationFunctionType storedType = getStoredType(functionType);
+    // Already in stored form. Returning it as-is also preserves the column of a per-column COUNT, which the
+    // constructor would otherwise normalize back to STAR.
+    if (storedType == functionType) {
+      return functionColumnPair;
+    }
     return new AggregationFunctionColumnPair(storedType, functionColumnPair.getColumn());
   }
 
@@ -114,12 +146,13 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     }
   }
 
-  private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {
+  private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName,
+      boolean preserveCountColumn) {
     AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
-    if (functionType == AggregationFunctionType.COUNT) {
+    if (functionType == AggregationFunctionType.COUNT && !preserveCountColumn) {
       return COUNT_STAR;
     } else {
-      return new AggregationFunctionColumnPair(functionType, columnName);
+      return new AggregationFunctionColumnPair(functionType, columnName, preserveCountColumn);
     }
   }
 

@@ -2000,11 +2000,14 @@ public final class TableConfigUtils {
       Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
       Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
       Set<String> aggregatedColumns = new HashSet<>();
+      // A null-aware star-tree stores COUNT per column rather than collapsing every COUNT to COUNT(*), so the column
+      // of a COUNT pair has to be kept and validated against the schema
+      boolean nullHandlingEnabled = starTreeIndexConfig.isNullHandlingEnabled();
       if (functionColumnPairs != null) {
         for (String functionColumnPair : functionColumnPairs) {
           AggregationFunctionColumnPair columnPair;
           try {
-            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair, nullHandlingEnabled);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                 + "in the form <Aggregation function>__<Column name>");
@@ -2032,7 +2035,7 @@ public final class TableConfigUtils {
         for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
           AggregationFunctionColumnPair columnPair;
           try {
-            columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig, nullHandlingEnabled);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
           }

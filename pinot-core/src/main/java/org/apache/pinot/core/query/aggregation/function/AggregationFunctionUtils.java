@@ -80,20 +80,30 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationFunctionUtils {
-
   private AggregationFunctionUtils() {
   }
 
-  /// (For Star-Tree) Creates an [AggregationFunctionColumnPair] in stored type from the
-  /// [AggregationFunction]. Returns `null` if the [AggregationFunction] cannot be represented as an
-  /// [AggregationFunctionColumnPair] (e.g. has multiple arguments, argument is not column etc.).
+  /// (For Star-Tree) Resolves the [AggregationFunctionColumnPair] stored by a regular star-tree, or by a null-aware
+  /// one when `nullHandlingEnabled` is `true`. Returns `null` if the [AggregationFunction] cannot be represented as a
+  /// pair (e.g. has multiple arguments, argument is not a column etc.).
+  ///
+  /// The two only differ for `COUNT`: a regular star-tree stores a single `count__*` of every row, while a null-aware
+  /// star-tree stores a `count__column` holding the count of that column's non-null values.
   @Nullable
-  public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
+  public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction,
+      boolean nullHandlingEnabled) {
     AggregationFunctionType functionType = aggregationFunction.getType();
-    if (functionType == AggregationFunctionType.COUNT) {
-      return AggregationFunctionColumnPair.COUNT_STAR;
-    }
     List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+    if (functionType == AggregationFunctionType.COUNT) {
+      // CountAggregationFunction only reports an input expression when null handling is enabled and the argument is a
+      // non-star identifier or function, which is exactly when nulls have to be excluded from the count. Everything
+      // else counts every row and maps to COUNT(*).
+      if (!nullHandlingEnabled || inputExpressions.size() != 1
+          || inputExpressions.get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
+        return AggregationFunctionColumnPair.COUNT_STAR;
+      }
+      return AggregationFunctionColumnPair.countColumn(inputExpressions.get(0).getIdentifier());
+    }
     if (inputExpressions.size() == 1) {
       ExpressionContext inputExpression = inputExpressions.get(0);
       if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
@@ -178,7 +188,13 @@ public class AggregationFunctionUtils {
   ///          function pair so that the aggregation result column name is consistent with or without star-tree.
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(
       AggregationFunctionColumnPair aggregationFunctionColumnPair, ValueBlock valueBlock) {
-    ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
+    // A COUNT column holds pre-aggregated counts that have to be summed rather than counted, which
+    // CountAggregationFunction recognizes from the STAR identifier. This also applies to the per-column COUNT of a
+    // null-aware star-tree, so the key is STAR there as well.
+    String column = aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT
+        ? AggregationFunctionColumnPair.STAR
+        : aggregationFunctionColumnPair.getColumn();
+    ExpressionContext expression = ExpressionContext.forIdentifier(column);
     BlockValSet blockValSet = valueBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
     return Map.of(expression, blockValSet);
   }
@@ -343,13 +359,21 @@ public class AggregationFunctionUtils {
   public static class AggregationInfo {
     private final AggregationFunction[] _functions;
     private final BaseProjectOperator<?> _projectOperator;
-    private final boolean _useStarTree;
+    @Nullable
+    private final AggregationFunctionColumnPair[] _starTreeFunctionColumnPairs;
 
+    /// Creates the info for aggregations that do not read a star-tree.
+    public AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator) {
+      this(functions, projectOperator, null);
+    }
+
+    /// Creates the info for aggregations that read the star-tree the given pairs were resolved against, or for
+    /// aggregations that do not read one at all when `starTreeFunctionColumnPairs` is `null`.
     public AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator,
-        boolean useStarTree) {
+        @Nullable AggregationFunctionColumnPair[] starTreeFunctionColumnPairs) {
       _functions = functions;
       _projectOperator = projectOperator;
-      _useStarTree = useStarTree;
+      _starTreeFunctionColumnPairs = starTreeFunctionColumnPairs;
     }
 
     public AggregationFunction[] getFunctions() {
@@ -360,8 +384,13 @@ public class AggregationFunctionUtils {
       return _projectOperator;
     }
 
-    public boolean isUseStarTree() {
-      return _useStarTree;
+    /// Returns the function-column pairs projected from the star-tree, or `null` when star-tree is not used.
+    ///
+    /// These are resolved against the specific star-tree the query was routed to, so the aggregation executors must
+    /// use them rather than re-deriving the pairs, which cannot tell a regular star-tree from a null-aware one.
+    @Nullable
+    public AggregationFunctionColumnPair[] getStarTreeFunctionColumnPairs() {
+      return _starTreeFunctionColumnPairs;
     }
   }
 
@@ -383,17 +412,18 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
-    /// Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
-    /// sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
+    // Star-tree stores pre-aggregated values per group key and cannot expand a row across multiple grouping
+    // sets, so it cannot serve GROUP BY GROUPING SETS / ROLLUP / CUBE queries. Fall back to the regular path.
     if (queryContext.isGroupingSets()) {
       return null;
     }
     if (!filterOperator.isResultEmpty()) {
-      BaseProjectOperator<?> projectOperator =
+      StarTreeUtils.StarTreeProjectPlan projectPlan =
           StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
               aggregationFunctions, filter, predicateEvaluators);
-      if (projectOperator != null) {
-        return new AggregationInfo(aggregationFunctions, projectOperator, true);
+      if (projectPlan != null) {
+        return new AggregationInfo(aggregationFunctions, projectPlan.getProjectOperator(),
+            projectPlan.getFunctionColumnPairs());
       }
     }
     return null;
@@ -408,7 +438,7 @@ public class AggregationFunctionUtils {
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationInfo(aggregationFunctions, projectOperator, false);
+    return new AggregationInfo(aggregationFunctions, projectOperator);
   }
 
   /// Builds {@link AggregationInfo} for aggregations without using star-tree index, projecting only the columns
@@ -423,9 +453,8 @@ public class AggregationFunctionUtils {
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationInfo(allFunctions, projectOperator, false);
+    return new AggregationInfo(allFunctions, projectOperator);
   }
-
 
   /// Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
   public static List<AggregationInfo> buildFilteredAggregationInfos(SegmentContext segmentContext,
@@ -444,7 +473,7 @@ public class AggregationFunctionUtils {
       BaseProjectOperator<?> projectOperator =
           new ProjectPlanNode(segmentContext, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
               mainFilterOperator).run();
-      return List.of(new AggregationInfo(aggregationFunctions, projectOperator, false));
+      return List.of(new AggregationInfo(aggregationFunctions, projectOperator));
     }
 
     // For each aggregation function, check if the aggregation function is a filtered aggregate. If so, populate the

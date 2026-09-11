@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
@@ -74,14 +75,12 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
 
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
-      BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
-      AggregationExecutor aggregationExecutor;
-      if (aggregationInfo.isUseStarTree()) {
-        aggregationExecutor = new StarTreeAggregationExecutor(aggregationFunctions);
-      } else {
-        aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
-      }
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
+      AggregationExecutor aggregationExecutor = starTreeFunctionColumnPairs != null
+          ? new StarTreeAggregationExecutor(aggregationFunctions, starTreeFunctionColumnPairs)
+          : new DefaultAggregationExecutor(aggregationFunctions);
 
+      BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
       ValueBlock valueBlock;
       int numDocsScanned = 0;
       while ((valueBlock = projectOperator.nextBlock()) != null) {
@@ -97,8 +96,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsScanned);
-        scanCost.addEntriesScannedPostFilter(
-            (long) numDocsScanned * projectOperator.getNumColumnsProjected());
+        scanCost.addEntriesScannedPostFilter((long) numDocsScanned * projectOperator.getNumColumnsProjected());
       }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();

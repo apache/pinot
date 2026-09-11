@@ -42,10 +42,13 @@ public class StarTreeV2Metadata {
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
   private final Set<String> _skipStarNodeCreationForDimensions;
+  private final boolean _nullHandlingEnabled;
 
   public StarTreeV2Metadata(Configuration metadataProperties) {
     _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
     _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
+    // NOTE: Must be read before the aggregation specs, which are parsed differently for a null-aware star-tree
+    _nullHandlingEnabled = metadataProperties.getBoolean(MetadataKey.NULL_HANDLING_ENABLED, false);
     _aggregationSpecs = new TreeMap<>();
     int numAggregations = metadataProperties.getInt(MetadataKey.AGGREGATION_COUNT, 0);
     if (numAggregations > 0) {
@@ -54,7 +57,10 @@ public class StarTreeV2Metadata {
         AggregationFunctionType functionType =
             AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getString(MetadataKey.FUNCTION_TYPE));
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
-        AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
+        AggregationFunctionColumnPair functionColumnPair =
+            functionType == AggregationFunctionType.COUNT && _nullHandlingEnabled
+                ? AggregationFunctionColumnPair.countColumn(columnName)
+                : new AggregationFunctionColumnPair(functionType, columnName);
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
@@ -79,7 +85,7 @@ public class StarTreeV2Metadata {
       // Backward compatibility with columnName format
       for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
         AggregationFunctionColumnPair functionColumnPair =
-            AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
+            AggregationFunctionColumnPair.fromColumnName(functionColumnPairName, _nullHandlingEnabled);
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
@@ -120,9 +126,17 @@ public class StarTreeV2Metadata {
     return _skipStarNodeCreationForDimensions;
   }
 
+  /// Returns whether this star-tree was pre-aggregated with null-aware semantics.
+  ///
+  /// A null-aware star-tree stores null dimension values under a dedicated dictionary id and excludes null metric
+  /// values from the pre-aggregation, so it is only consistent with queries that have null handling enabled.
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
   public static void writeMetadata(Configuration metadataProperties, int totalDocs, List<String> dimensionsSplitOrder,
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords,
-      Set<String> skipStarNodeCreationForDimensions) {
+      Set<String> skipStarNodeCreationForDimensions, boolean nullHandlingEnabled) {
     metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
     metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, dimensionsSplitOrder);
     metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, aggregationSpecs.keySet());
@@ -154,5 +168,6 @@ public class StarTreeV2Metadata {
     metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, maxLeafRecords);
     metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         skipStarNodeCreationForDimensions);
+    metadataProperties.setProperty(MetadataKey.NULL_HANDLING_ENABLED, nullHandlingEnabled);
   }
 }
