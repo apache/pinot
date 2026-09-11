@@ -47,6 +47,10 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
   CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR("TableSegmentUploadError", false),
   PERIODIC_TASK_ERROR("periodicTaskError", false),
+  // Config migration: a table config or schema was upgraded to a newer version and persisted.
+  CONFIG_MIGRATION_SUCCESS("configMigrationSuccess", false),
+  // Config migration: a table's config/schema migration failed (validation, or lost the CAS race and will retry).
+  CONFIG_MIGRATION_FAILURE("configMigrationFailure", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
