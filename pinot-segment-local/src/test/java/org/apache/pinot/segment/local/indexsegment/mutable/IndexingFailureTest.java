@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -136,5 +137,22 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     // null string value skipped
     verify(_serverMetrics, times(1)).addMeteredTableValue(matches("DICTIONARY-indexingError$"),
         eq(ServerMeter.INDEXING_FAILURES), eq(1L));
+  }
+
+  @Test
+  public void testJsonIndexUsesParsedCache()
+      throws IOException {
+    GenericRow row = new GenericRow();
+    row.putValue(INT_COL, 0);
+    row.putValue(STRING_COL, "a");
+    row.putValue(JSON_COL, "not valid json");
+    row.putParsedJsonValue(JSON_COL, JsonUtils.stringToJsonNode("{\"cached\":\"value\"}"));
+
+    _mutableSegment.index(row, METADATA);
+
+    assertEquals(_mutableSegment.getDataSource(JSON_COL).getJsonIndex().getMatchingDocIds("cached = 'value'"),
+        ImmutableRoaringBitmap.bitmapOf(0));
+    verify(_serverMetrics, never()).addMeteredTableValue(matches("indexingError$"), eq(ServerMeter.INDEXING_FAILURES),
+        anyLong());
   }
 }
