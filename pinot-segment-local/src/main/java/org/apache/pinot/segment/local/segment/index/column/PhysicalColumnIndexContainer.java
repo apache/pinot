@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import it.unimi.dsi.fastutil.shorts.ShortArrayList;
-import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -41,14 +38,33 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.common.base.Preconditions.checkState;
 
+
+/// Index readers of one physical column of an immutable segment.
+///
+/// Readers are keyed by the numeric index id assigned by [IndexService#getNumericId(IndexType)] and stored as a
+/// presence bit mask plus a dense array holding only the readers that exist, ordered by id. A lookup is a shift, a
+/// mask and a popcount, so it stays O(1) on the query path while the per-column footprint is exactly one array slot
+/// per present reader. A server holding tens of thousands of wide segments creates one of these per (segment, column),
+/// which is why the layout matters: the mask replaces a nested map object and a reader array spanning the whole
+/// numeric-id range of the present readers.
+///
+/// Thread safety: immutable after construction except for the multi-column text reader reference, which is set
+/// once during segment load and cleared on [#close()].
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
   private static final Set<String> FORWARD_INDEX_ONLY_TYPES =
       Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.DICTIONARY_ID, StandardIndexes.NULL_VALUE_VECTOR_ID);
+  private static final IndexReader[] EMPTY_READERS = new IndexReader[0];
 
-  private final IndexTypeMap _indexTypeMap;
+  // Bit i is set when the index type with numeric id i has a reader in this column. Numeric ids are validated to fit
+  // in the mask at construction time.
+  private final long _presentMask;
+  // Readers ordered by numeric index id, holding only the present ones: the reader for id i sits at the number of
+  // bits set in _presentMask below bit i.
+  private final IndexReader[] _readers;
   @Nullable
   private final VectorIndexConfig _vectorIndexConfig;
 
@@ -67,12 +83,18 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
     _vectorIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.vector());
 
-    ArrayList<IndexType> indexTypes = new ArrayList<>();
-    ArrayList<IndexReader> readers = new ArrayList<>();
+    IndexService indexService = IndexService.getInstance();
+    List<IndexType<?, ?, ?>> allIndexes = indexService.getAllIndexes();
+    int numIndexTypes = allIndexes.size();
+    checkState(numIndexTypes <= Long.SIZE,
+        "Cannot track %s index types in a %s-bit presence mask, column: %s", numIndexTypes, Long.SIZE, columnName);
 
+    // Scratch array indexed by numeric id; compacted into the exactly-sized _readers below.
+    IndexReader[] readersById = new IndexReader[numIndexTypes];
+    long presentMask = 0L;
     boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
-      for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      for (IndexType<?, ?, ?> indexType : allIndexes) {
         if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {
           continue;
         }
@@ -81,8 +103,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           try {
             IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
             if (reader != null) {
-              indexTypes.add(indexType);
-              readers.add(reader);
+              short indexId = indexService.getNumericId(indexType);
+              readersById[indexId] = reader;
+              presentMask |= 1L << indexId;
             }
           } catch (IndexReaderConstraintException ex) {
             LOGGER.warn("Constraint violation when indexing {} with {} index", columnName, indexType, ex);
@@ -90,23 +113,42 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         }
       }
     } catch (Throwable t) {
-      for (IndexReader reader : readers) {
-        try {
-          reader.close();
-        } catch (Throwable ct) {
-          LOGGER.warn("Can't close reader on init error, column: " + columnName + " reader: " + reader.getClass(), ct);
+      for (IndexReader reader : readersById) {
+        if (reader != null) {
+          try {
+            reader.close();
+          } catch (Throwable ct) {
+            LOGGER.warn("Can't close reader on init error, column: " + columnName + " reader: " + reader.getClass(),
+                ct);
+          }
         }
       }
       throw t;
     }
 
-    _indexTypeMap = IndexTypeMap.get(indexTypes, readers);
+    _presentMask = presentMask;
+    int numReaders = Long.bitCount(presentMask);
+    if (numReaders == 0) {
+      _readers = EMPTY_READERS;
+    } else {
+      _readers = new IndexReader[numReaders];
+      int pos = 0;
+      for (IndexReader reader : readersById) {
+        if (reader != null) {
+          _readers[pos++] = reader;
+        }
+      }
+    }
   }
 
   @Nullable
   @Override
   public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
-    return _indexTypeMap.getIndex(indexType);
+    short indexId = IndexService.getInstance().getNumericId(indexType);
+    if (((_presentMask >>> indexId) & 1L) == 0) {
+      return null;
+    }
+    return (I) _readers[Long.bitCount(_presentMask & ((1L << indexId) - 1))];
   }
 
   @Nullable
@@ -119,7 +161,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   public void close()
       throws IOException {
     // TODO (index-spi): Verify that readers can be closed in any order
-    _indexTypeMap.close();
+    for (IndexReader reader : _readers) {
+      reader.close();
+    }
 
     // This reader is closed on segment destroy()
     _multiColTextReader = null;
@@ -132,71 +176,5 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   public void setMultiColumnTextIndex(
       MultiColumnLuceneTextIndexReader multiColTextReader) {
     _multiColTextReader = multiColTextReader;
-  }
-
-  static class IndexTypeMap implements Closeable {
-    private static final IndexReader[] EMPTY_READERS = new IndexReader[0];
-
-    public static final IndexTypeMap EMPTY = new IndexTypeMap((short) 0, EMPTY_READERS);
-
-    private final short _shift;
-    //stores index readers ordered by index id, shifted by _shift to conserve memory
-    private final IndexReader[] _readers;
-
-    private IndexTypeMap(short shift, IndexReader[] readers) {
-      _shift = shift;
-      _readers = readers;
-    }
-
-    static IndexTypeMap get(List<IndexType> indexTypes, List<IndexReader> readers) {
-      if (indexTypes.isEmpty()) {
-        return EMPTY;
-      }
-
-      short min = Short.MAX_VALUE;
-      int max = -1;
-
-      ShortArrayList indexIds = new ShortArrayList(indexTypes.size());
-      IndexService indexService = IndexService.getInstance();
-
-      for (IndexType indexType : indexTypes) {
-        short indexId = indexService.getNumericId(indexType);
-        indexIds.add(indexId);
-        if (indexId < min) {
-          min = indexId;
-        }
-        if (indexId > max) {
-          max = indexId;
-        }
-      }
-
-      short shift = min;
-      int size = max - min + 1;
-      IndexReader[] indexReaders = new IndexReader[size];
-      for (int i = 0, n = indexIds.size(); i < n; i++) {
-        short indexId = indexIds.getShort(i);
-        indexReaders[indexId - shift] = readers.get(i);
-      }
-      return new IndexTypeMap(shift, indexReaders);
-    }
-
-    @Nullable
-    public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
-      short indexId = IndexService.getInstance().getNumericId(indexType);
-      if (indexId >= _shift && indexId < _shift + _readers.length) {
-        return (I) _readers[indexId - _shift];
-      }
-      return null;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      for (IndexReader index : _readers) {
-        if (index != null) {
-          index.close();
-        }
-      }
-    }
   }
 }
