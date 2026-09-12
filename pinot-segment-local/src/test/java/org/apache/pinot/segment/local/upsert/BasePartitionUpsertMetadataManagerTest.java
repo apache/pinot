@@ -999,6 +999,54 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentDoesNotReportKeyMovedBeforeRemoval()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
+
+    ThreadSafeMutableRoaringBitmap liveValidDocIds = createDocIds(0);
+    IndexSegment oldSegment = mock(IndexSegment.class);
+    when(oldSegment.getSegmentName()).thenReturn("segment");
+    when(oldSegment.getValidDocIds()).thenReturn(liveValidDocIds);
+    ImmutableSegmentImpl newSegment = mock(ImmutableSegmentImpl.class);
+    when(newSegment.getSegmentName()).thenReturn("segment");
+
+    try (ActionBoundaryMetadataManager upsertMetadataManager =
+        new ActionBoundaryMetadataManager("myTable", 0, upsertContext, () -> liveValidDocIds.remove(0), 0)) {
+      upsertMetadataManager.replaceSegment(newSegment, new ThreadSafeMutableRoaringBitmap(), null,
+          List.<RecordInfo>of().iterator(), oldSegment);
+
+      assertEquals(upsertMetadataManager._numInconsistentRows, 0);
+      assertEquals(upsertMetadataManager._candidateValidDocIds.toArray(), new int[]{0});
+      upsertMetadataManager.stop();
+    }
+  }
+
+  @Test
+  public void testReplaceSegmentReportsOnlyKeysStillOwnedAtRemoval()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
+
+    ThreadSafeMutableRoaringBitmap liveValidDocIds = createDocIds(0, 1);
+    IndexSegment oldSegment = mock(IndexSegment.class);
+    when(oldSegment.getSegmentName()).thenReturn("segment");
+    when(oldSegment.getValidDocIds()).thenReturn(liveValidDocIds);
+    ImmutableSegmentImpl newSegment = mock(ImmutableSegmentImpl.class);
+    when(newSegment.getSegmentName()).thenReturn("segment");
+
+    try (ActionBoundaryMetadataManager upsertMetadataManager =
+        new ActionBoundaryMetadataManager("myTable", 0, upsertContext, () -> liveValidDocIds.remove(0), 1)) {
+      upsertMetadataManager.replaceSegment(newSegment, new ThreadSafeMutableRoaringBitmap(), null,
+          List.<RecordInfo>of().iterator(), oldSegment);
+
+      assertEquals(upsertMetadataManager._numInconsistentRows, 1);
+      assertEquals(upsertMetadataManager._candidateValidDocIds.toArray(), new int[]{0, 1});
+      upsertMetadataManager.stop();
+    }
+  }
+
+  @Test
   public void testResolveComparisonTies() {
     // Build a record info list for testing
     int[] primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
@@ -1138,6 +1186,38 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void clearPrevKeyToRecordLocation() {
+    }
+  }
+
+  private static class ActionBoundaryMetadataManager extends DummyPartitionUpsertMetadataManager {
+    private final Runnable _duringSegmentReplacement;
+    private final int _numKeysRemovedAtActionBoundary;
+    private int _numInconsistentRows;
+    private MutableRoaringBitmap _candidateValidDocIds;
+
+    private ActionBoundaryMetadataManager(String tableNameWithType, int partitionId, UpsertContext context,
+        Runnable duringSegmentReplacement, int numKeysRemovedAtActionBoundary) {
+      super(tableNameWithType, partitionId, context);
+      _duringSegmentReplacement = duringSegmentReplacement;
+      _numKeysRemovedAtActionBoundary = numKeysRemovedAtActionBoundary;
+    }
+
+    @Override
+    protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+        @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
+        @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
+      _duringSegmentReplacement.run();
+    }
+
+    @Override
+    protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+      _candidateValidDocIds = validDocIds.clone();
+      return _numKeysRemovedAtActionBoundary;
+    }
+
+    @Override
+    protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+      _numInconsistentRows += numKeysStillNotReplaced;
     }
   }
 }

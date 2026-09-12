@@ -1350,4 +1350,34 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
   }
+
+  @Test
+  public void testRemoveSegmentCountsOnlyKeysStillOwnedBySegment()
+      throws IOException {
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.build());
+    IndexSegment oldSegment = mock(IndexSegment.class);
+    IndexSegment newerSegment = mock(IndexSegment.class);
+    PrimaryKey oldSegmentKey = makePrimaryKey(10);
+    PrimaryKey newerSegmentKey = makePrimaryKey(20);
+    Object oldSegmentMapKey = HashUtils.hashPrimaryKey(oldSegmentKey, HashFunction.NONE);
+    Object newerSegmentMapKey = HashUtils.hashPrimaryKey(newerSegmentKey, HashFunction.NONE);
+    upsertMetadataManager._primaryKeyToRecordLocationMap.put(oldSegmentMapKey,
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(oldSegment, 0, 100, 1));
+    upsertMetadataManager._primaryKeyToRecordLocationMap.put(newerSegmentMapKey,
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation(newerSegment, 1, 200, 2));
+
+    int numKeysRemoved = upsertMetadataManager.removeSegmentAndGetNumKeysRemoved(oldSegment,
+        List.of(oldSegmentKey, newerSegmentKey).iterator());
+
+    assertEquals(numKeysRemoved, 1);
+    assertFalse(upsertMetadataManager._primaryKeyToRecordLocationMap.containsKey(oldSegmentMapKey));
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation newerLocation =
+        upsertMetadataManager._primaryKeyToRecordLocationMap.get(newerSegmentMapKey);
+    assertSame(newerLocation.getSegment(), newerSegment);
+    assertEquals(newerLocation.getDistinctSegmentCount(), 1);
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
 }
