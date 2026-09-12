@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -40,10 +41,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +54,8 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class JsonIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexHandler.class);
+  /// Metadata key suffix used to persist/restore [JsonIndexConfig] in {@code metadata.properties}.
+  static final String JSON_INDEX_CONFIG_KEY = "jsonIndexConfig";
 
   private final Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
@@ -65,11 +70,43 @@ public class JsonIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.json());
-    // Check if any existing index need to be removed.
+    // Load metadata properties once to avoid repeated disk reads when checking multiple columns.
+    PropertiesConfiguration properties = loadMetadataProperties();
+    // Check if any existing index need to be removed or if the config changed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing json index from segment: {}, column: {}", segmentName, column);
         return true;
+      }
+      // Column exists in both existing indexes and config; check if config changed.
+      // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
+      // only backfill (rebuild) when the forward index is present or reconstructable. If the forward index is
+      // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
+      // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
+      JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
+      JsonIndexConfig storedConfig =
+          readStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, JsonIndexConfig.class, properties);
+      if (properties != null) {
+        // configChanged: stored config exists and differs from current — rebuild regardless of forward
+        // index presence (same pre-existing behaviour; createForwardIndexIfNeeded will fail if the
+        // forward index is truly unrecoverable, which requires an explicit segment refresh).
+        boolean configChanged = storedConfig != null && !storedConfig.equals(currentConfig);
+        // legacyBackfill: stored config is absent (either the index predates config persistence, or
+        // the stored value failed to deserialize and readStoredJsonIndexConfig returned null). Only
+        // backfill when the forward index is present or reconstructable; if it is absent
+        // (forwardIndexDisabled=true with no dictionary/inverted pair) createForwardIndexIfNeeded()
+        // would throw, so preserve the existing JSON index instead.
+        boolean legacyBackfill = storedConfig == null && isForwardIndexAvailable(segmentReader, column);
+        if (configChanged) {
+          LOGGER.info("Need to rebuild json index for segment: {}, column: {} due to config change", segmentName,
+              column);
+          return true;
+        }
+        if (legacyBackfill) {
+          LOGGER.info("Need to rebuild json index for segment: {}, column: {} to backfill stored config "
+              + "(legacy segment or unreadable stored config)", segmentName, column);
+          return true;
+        }
       }
     }
     // Check if any new index need to be added.
@@ -90,19 +127,64 @@ public class JsonIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.json());
+    // Load metadata properties once; track whether we need to save changes.
+    PropertiesConfiguration properties = loadMetadataProperties();
+    boolean metadataModified = false;
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing json index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.json());
         LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Column exists in both existing indexes and config; check if config changed and rebuild if needed.
+        // When properties != null but storedConfig is null the index predates config persistence (legacy segment):
+        // only backfill (rebuild) when the forward index is present or reconstructable. If the forward index is
+        // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
+        // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
+        JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
+        JsonIndexConfig storedConfig =
+            readStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, JsonIndexConfig.class, properties);
+        if (properties != null) {
+          // configChanged: stored config exists and differs — rebuild (see needUpdateIndices for rationale).
+          boolean configChanged = storedConfig != null && !storedConfig.equals(currentConfig);
+          // legacyBackfill: absent/unreadable stored config; only rebuild when forward index is recoverable.
+          boolean legacyBackfill = storedConfig == null && isForwardIndexAvailable(segmentWriter, column);
+          if (configChanged) {
+            LOGGER.info("Rebuilding json index for segment: {}, column: {} due to config change", segmentName, column);
+            segmentWriter.removeIndex(column, StandardIndexes.json());
+            columnsToAddIdx.add(column);
+          } else if (legacyBackfill) {
+            LOGGER.info("Rebuilding json index for segment: {}, column: {} to backfill stored config "
+                + "(legacy segment or unreadable stored config)", segmentName, column);
+            segmentWriter.removeIndex(column, StandardIndexes.json());
+            columnsToAddIdx.add(column);
+          }
+        }
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata);
+        if (properties != null) {
+          setStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, _jsonIndexConfigs.get(column), properties);
+          metadataModified = true;
+        }
       }
     }
+    if (metadataModified && properties != null) {
+      SegmentMetadataUtils.savePropertiesConfiguration(properties,
+          _segmentDirectory.getSegmentMetadata().getIndexDir());
+    }
+  }
+
+  /// Returns {@code true} if the forward index for {@code column} is already present in the segment or can be
+  /// reconstructed from the dictionary and inverted index (the path used by
+  /// {@link BaseIndexHandler#createForwardIndexIfNeeded}).
+  private static boolean isForwardIndexAvailable(SegmentDirectory.Reader segmentReader, String column) {
+    return segmentReader.hasIndexFor(column, StandardIndexes.forward())
+        || (segmentReader.hasIndexFor(column, StandardIndexes.dictionary())
+            && segmentReader.hasIndexFor(column, StandardIndexes.inverted()));
   }
 
   private boolean shouldCreateJsonIndex(ColumnMetadata columnMetadata) {
@@ -186,8 +268,13 @@ public class JsonIndexHandler extends BaseIndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
+      boolean isMapType = columnMetadata.getDataType() == DataType.MAP;
       for (int i = 0; i < numDocs; i++) {
-        jsonIndexCreator.add(forwardIndexReader.getString(i, readerContext));
+        // MAP columns store binary-encoded data; getString() returns garbled bytes.
+        // Use getMap() + MapUtils.toString() to produce the JSON string the index creator expects.
+        String value = isMapType ? MapUtils.toString(forwardIndexReader.getMap(i, readerContext))
+            : forwardIndexReader.getString(i, readerContext);
+        jsonIndexCreator.add(value);
       }
       jsonIndexCreator.seal();
     }
