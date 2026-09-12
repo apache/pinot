@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
@@ -88,5 +89,29 @@ public class TableConfigValidatorRegistryTest {
     });
     TableConfigValidatorRegistry.reset();
     TableConfigValidatorRegistry.validate(DUMMY_TABLE_CONFIG, null);
+  }
+
+  @Test
+  public void testSchemaValidationIsOptIn() {
+    AtomicBoolean tableConfigValidatorCalled = new AtomicBoolean(false);
+    AtomicBoolean schemaValidatorCalled = new AtomicBoolean(false);
+    TableConfigValidatorRegistry.register((tableConfig, schema) -> tableConfigValidatorCalled.set(true));
+    TableConfigValidatorRegistry.register(new TableConfigValidator() {
+      @Override
+      public void validate(TableConfig tableConfig, Schema schema) {
+        tableConfigValidatorCalled.set(true);
+      }
+
+      @Override
+      public void validateSchema(TableConfig tableConfig, Schema schema) {
+        schemaValidatorCalled.set(true);
+      }
+    });
+
+    TableConfigValidatorRegistry.validateSchema(DUMMY_TABLE_CONFIG,
+        new Schema.SchemaBuilder().setSchemaName("testTable").build());
+
+    assertFalse(tableConfigValidatorCalled.get());
+    assertTrue(schemaValidatorCalled.get());
   }
 }

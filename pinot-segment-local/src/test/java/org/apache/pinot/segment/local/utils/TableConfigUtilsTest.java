@@ -3334,6 +3334,44 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @Test
+  public void testPartialUpsertMergerConfigsRequireCustomMerger() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", DataType.LONG)
+        .addSingleValueDimension("payload", DataType.JSON)
+        .addDateTime("eventTime", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("pk"))
+        .build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn("eventTime");
+    upsertConfig.setPartialUpsertMergerConfigs(Map.of("jsonColumns", "payload"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("eventTime")
+        .setUpsertConfig(upsertConfig)
+        .setNullHandlingEnabled(true)
+        .build();
+
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema));
+    assertEquals(e.getMessage(), "partialUpsertMergerConfigs can only be provided with partialUpsertMergerClass");
+
+    upsertConfig.setPartialUpsertMergerClass("  ");
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema));
+
+    upsertConfig.setPartialUpsertMergerClass("example.StructuredMerger");
+    TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+
+    upsertConfig.setPartialUpsertStrategies(Map.of("payload", UpsertConfig.Strategy.OVERWRITE));
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema));
+
+    upsertConfig.setPartialUpsertMergerClass(null);
+    upsertConfig.setPartialUpsertStrategies(null);
+    upsertConfig.setPartialUpsertMergerConfigs(Map.of());
+    TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+  }
+
   /// Utility function that can be used to write simple tests that modify the table config and schema.
   ///
   /// This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
@@ -4512,6 +4550,45 @@ public class TableConfigUtilsTest {
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
     assertTrue(violations.isEmpty(),
         "Expected no violations for partial-upsert strategy and default-strategy changes, but got: " + violations);
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityRejectsCustomMergerChanges() {
+    UpsertConfig existingUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig newUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(newUpsertConfig).build();
+
+    newUpsertConfig.setPartialUpsertMergerClass("example.StructuredMerger");
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("partialUpsertMergerClass"));
+
+    existingUpsertConfig.setPartialUpsertMergerClass("example.StructuredMerger");
+    existingUpsertConfig.setPartialUpsertMergerConfigs(Map.of("jsonColumns", "old"));
+    newUpsertConfig.setPartialUpsertMergerConfigs(Map.of("jsonColumns", "new"));
+    violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("partialUpsertMergerConfigs"));
+
+    newUpsertConfig.setPartialUpsertMergerConfigs(Map.of("jsonColumns", "old"));
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig).isEmpty());
+
+    existingUpsertConfig.setPartialUpsertMergerConfigs(null);
+    newUpsertConfig.setPartialUpsertMergerConfigs(Map.of());
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig).isEmpty());
+
+    TableConfig nonUpsertConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).build();
+    violations = TableConfigUtils.validateBackwardCompatibility(newConfig, nonUpsertConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("partialUpsertMergerClass"));
+
+    violations = TableConfigUtils.validateBackwardCompatibility(nonUpsertConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("partialUpsertMergerClass"));
   }
 
   @Test

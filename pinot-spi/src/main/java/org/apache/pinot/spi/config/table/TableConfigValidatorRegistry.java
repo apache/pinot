@@ -61,6 +61,20 @@ public class TableConfigValidatorRegistry {
     }
   }
 
+  /// Invokes the schema-validation phase of all registered validators in registration order.
+  /// Validators must explicitly opt in by overriding [TableConfigValidator#validateSchema(TableConfig, Schema)];
+  /// the default implementation is a no-op. Short-circuits on the first rejection.
+  ///
+  /// @param tableConfig The existing table config associated with the schema
+  /// @param schema The proposed schema
+  /// @throws ConfigValidationException if any opt-in validator rejects the schema
+  public static void validateSchema(TableConfig tableConfig, Schema schema)
+      throws ConfigValidationException {
+    for (TableConfigValidator validator : VALIDATORS) {
+      validator.validateSchema(tableConfig, schema);
+    }
+  }
+
   /// Removes a previously registered validator. No-op if the validator is not registered. Removes only the
   /// first matching reference if the same validator was registered multiple times.
   ///

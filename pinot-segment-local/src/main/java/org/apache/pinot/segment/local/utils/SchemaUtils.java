@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -237,6 +238,7 @@ public class SchemaUtils {
       // existing config so unchanged legacy transforms remain grandfathered while all schema-dependent validation
       // still runs against the proposed schema.
       TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
+      TableConfigValidatorRegistry.validateSchema(tableConfig, schema);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "

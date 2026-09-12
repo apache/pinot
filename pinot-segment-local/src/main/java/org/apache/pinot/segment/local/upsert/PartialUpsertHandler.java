@@ -75,6 +75,11 @@ public class PartialUpsertHandler {
     }
   }
 
+  /// Prepares an incoming record before looking up a previous record for the same primary key.
+  public void prepare(GenericRow newRow) {
+    _partialUpsertMerger.prepare(newRow);
+  }
+
   public void merge(LazyRow previousRow, GenericRow newRow, Map<String, Object> resultHolder) {
     _partialUpsertMerger.merge(previousRow, newRow, resultHolder);
 

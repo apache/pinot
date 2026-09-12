@@ -828,6 +828,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return record;
     }
     try {
+      _partialUpsertHandler.prepare(record);
       return doUpdateRecord(record, recordInfo);
     } finally {
       finishOperation();

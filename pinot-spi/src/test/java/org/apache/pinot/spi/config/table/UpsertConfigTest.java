@@ -21,9 +21,11 @@ package org.apache.pinot.spi.config.table;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class UpsertConfigTest {
@@ -45,6 +47,10 @@ public class UpsertConfigTest {
     upsertConfig2.setPartialUpsertStrategies(partialUpsertStrategies);
     upsertConfig2.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStrategies);
+
+    Map<String, String> partialUpsertMergerConfigs = Map.of("jsonColumns", "profile,attributes");
+    upsertConfig2.setPartialUpsertMergerConfigs(partialUpsertMergerConfigs);
+    assertEquals(upsertConfig2.getPartialUpsertMergerConfigs(), partialUpsertMergerConfigs);
   }
 
   @Test
@@ -52,5 +58,22 @@ public class UpsertConfigTest {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     assertEquals(upsertConfig.getHashFunction(), HashFunction.NONE);
     assertEquals(upsertConfig.getDefaultPartialUpsertStrategy(), UpsertConfig.Strategy.OVERWRITE);
+  }
+
+  @Test
+  public void testPartialUpsertMergerConfigsJsonRoundTrip()
+      throws Exception {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPartialUpsertMergerClass("example.StructuredMerger");
+    upsertConfig.setPartialUpsertMergerConfigs(Map.of("jsonColumns", "profile", "maxDepth", "32"));
+
+    UpsertConfig deserialized =
+        JsonUtils.stringToObject(JsonUtils.objectToString(upsertConfig), UpsertConfig.class);
+
+    assertEquals(deserialized.getPartialUpsertMergerClass(), "example.StructuredMerger");
+    assertEquals(deserialized.getPartialUpsertMergerConfigs(), Map.of("jsonColumns", "profile", "maxDepth", "32"));
+
+    UpsertConfig oldConfig = JsonUtils.stringToObject("{\"mode\":\"PARTIAL\"}", UpsertConfig.class);
+    assertNull(oldConfig.getPartialUpsertMergerConfigs());
   }
 }
