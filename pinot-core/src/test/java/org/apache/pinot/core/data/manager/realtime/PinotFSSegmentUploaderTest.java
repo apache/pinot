@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -37,11 +39,14 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class PinotFSSegmentUploaderTest {
   private static final int TIMEOUT_IN_MS = 1000;
+  private static final String SERVER_A = "Server_host-a_8098";
+  private static final String SERVER_B = "Server_host-b_8098";
   private File _file;
   private LLCSegmentName _llcSegmentName;
   private ServerMetrics _serverMetrics = Mockito.mock(ServerMetrics.class);
@@ -56,40 +61,90 @@ public class PinotFSSegmentUploaderTest {
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
     properties.put("class.existing",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
+    properties.put("class.record",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$RecordingPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
     _llcSegmentName = new LLCSegmentName("test_REALTIME", 1, 0, System.currentTimeMillis());
   }
 
+  @BeforeMethod
+  public void resetRecordedUploads() {
+    RecordingPinotFS.COPIED_DEST_URIS.clear();
+  }
+
   @Test
   public void testSuccessfulUpload() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics);
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
-        .join(File.separator, "hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertEquals(segmentURI.toString(), expectedTempUri("hdfs://root", SERVER_A));
   }
 
   @Test
   public void testSegmentAlreadyExist() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS, _serverMetrics);
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
-        .join(File.separator, "existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertEquals(segmentURI.toString(), expectedTempUri("existing://root", SERVER_A));
   }
 
   @Test
   public void testUploadTimeOut() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("timeout://root", TIMEOUT_IN_MS, _serverMetrics);
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("timeout://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
+    URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
+    Assert.assertNull(segmentURI);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRejectsUnsafeInstanceId() {
+    new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics, "Server_host/8098");
+  }
+
+  @Test
+  public void testNoSegmentStoreConfigured() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
   }
 
   @Test
-  public void testNoSegmentStoreConfigured() {
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
-    URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertNull(segmentURI);
+  public void testSameServerRetryReusesTempKey() {
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
+    URI first = segmentUploader.uploadSegment(_file, _llcSegmentName);
+    URI retry = segmentUploader.uploadSegment(_file, _llcSegmentName);
+    String expected = expectedTempUri("record://root", SERVER_A);
+    Assert.assertEquals(first.toString(), expected);
+    Assert.assertEquals(retry.toString(), expected);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 2);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(0).toString(), expected);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(1).toString(), expected);
+  }
+
+  @Test
+  public void testTwoReplicasDoNotShareTempKey() {
+    SegmentUploader replicaA = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
+    SegmentUploader replicaB = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_B);
+    URI uriA = replicaA.uploadSegment(_file, _llcSegmentName);
+    URI uriB = replicaB.uploadSegment(_file, _llcSegmentName);
+    String expectedA = expectedTempUri("record://root", SERVER_A);
+    String expectedB = expectedTempUri("record://root", SERVER_B);
+    Assert.assertEquals(uriA.toString(), expectedA);
+    Assert.assertEquals(uriB.toString(), expectedB);
+    Assert.assertNotEquals(uriA, uriB);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 2);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(0).toString(), expectedA);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(1).toString(), expectedB);
+    Assert.assertFalse(expectedA.contains(SERVER_B));
+    Assert.assertFalse(expectedB.contains(SERVER_A));
+  }
+
+  private String expectedTempUri(String storeRoot, String instanceId) {
+    return StringUtil.join(File.separator, storeRoot, _llcSegmentName.getTableName(),
+        SegmentCompletionUtils.generateTmpSegmentFileName(_llcSegmentName.getSegmentName(), instanceId));
   }
 
   public static class AlwaysSucceedPinotFS extends BasePinotFS {
@@ -189,6 +244,15 @@ public class PinotFSSegmentUploaderTest {
     public boolean exists(URI fileUri)
         throws IOException {
       return true;
+    }
+  }
+
+  public static class RecordingPinotFS extends AlwaysSucceedPinotFS {
+    static final List<URI> COPIED_DEST_URIS = new ArrayList<>();
+
+    @Override
+    public void copyFromLocalFile(File srcFile, URI dstUri) {
+      COPIED_DEST_URIS.add(dstUri);
     }
   }
 }

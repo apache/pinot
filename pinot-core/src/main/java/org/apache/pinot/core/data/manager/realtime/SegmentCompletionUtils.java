@@ -22,6 +22,10 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 
 
+/// Helpers for temporary split-commit upload names.
+///
+/// New uploads use `{segment}.tmp.{instanceId}` so a same-server HOLD/retry overwrites one object while two replicas
+/// keep distinct keys. Older servers wrote `{segment}.tmp.{UUID}`; leftover recognition stays in {@link #isTmpFile}.
 public class SegmentCompletionUtils {
   private SegmentCompletionUtils() {
   }
@@ -30,15 +34,27 @@ public class SegmentCompletionUtils {
   private static final String TMP = ".tmp.";
 
   /// Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
-  /// segment when a segment is uploaded using split commit. Each attempt has a unique file name suffix
+  /// segment when a segment is uploaded using split commit.
   /// @param segmentName segment name
-  /// @return
+  /// @return temporary segment file name prefix
   public static String getTmpSegmentNamePrefix(String segmentName) {
     return segmentName + TMP;
   }
 
+  /// Mints a leftover-style UUID temp name. Prefer {@link #generateTmpSegmentFileName(String, String)} for new uploads.
   public static String generateTmpSegmentFileName(String segmentNameStr) {
-    return getTmpSegmentNamePrefix(segmentNameStr) + UUID.randomUUID();
+    return generateTmpSegmentFileName(segmentNameStr, UUID.randomUUID().toString());
+  }
+
+  /// Returns `{segment}.tmp.{instanceId}` so retries from one server reuse a single deep-store key.
+  public static String generateTmpSegmentFileName(String segmentNameStr, String instanceId) {
+    if (StringUtils.isBlank(segmentNameStr)) {
+      throw new IllegalArgumentException("segmentName is required");
+    }
+    if (!isPathSafeTmpSuffix(instanceId)) {
+      throw new IllegalArgumentException("instanceId must be a non-empty path-safe identifier: " + instanceId);
+    }
+    return getTmpSegmentNamePrefix(segmentNameStr) + instanceId;
   }
 
   public static boolean isTmpFile(String uri) {
@@ -46,11 +62,11 @@ public class SegmentCompletionUtils {
     if (splits.length < 2) {
       return false;
     }
-    try {
-      UUID.fromString(splits[splits.length - 1]);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    // Accept leftover UUID temps and {segment}.tmp.{instanceId}. Reject empty or path-like suffixes.
+    return isPathSafeTmpSuffix(splits[splits.length - 1]);
+  }
+
+  private static boolean isPathSafeTmpSuffix(String suffix) {
+    return StringUtils.isNotBlank(suffix) && !suffix.contains("/") && !suffix.contains("\\");
   }
 }

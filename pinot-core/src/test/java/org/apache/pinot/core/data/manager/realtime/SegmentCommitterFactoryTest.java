@@ -110,6 +110,7 @@ public class SegmentCommitterFactoryTest {
     IndexLoadingConfig indexLoadingConfig = Mockito.mock(IndexLoadingConfig.class);
     InstanceDataManagerConfig instanceDataManagerConfig = Mockito.mock(InstanceDataManagerConfig.class);
     Mockito.when(indexLoadingConfig.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
+    Mockito.when(instanceDataManagerConfig.getInstanceId()).thenReturn("Server_test_8098");
     PinotConfiguration pinotConfiguration = Mockito.mock(PinotConfiguration.class);
     Mockito.when(instanceDataManagerConfig.getConfig()).thenReturn(pinotConfiguration);
 

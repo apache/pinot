@@ -264,10 +264,11 @@ public class ServerSegmentCompletionProtocolHandler {
     return response;
   }
 
-  public void uploadReingestedSegment(String segmentName, String segmentStoreUri, File segmentTarFile)
+  public void uploadReingestedSegment(String segmentName, String segmentStoreUri, File segmentTarFile,
+      String instanceId)
       throws Exception {
     String destUriStr = StringUtil.join(File.separator, segmentStoreUri, _rawTableName,
-        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, instanceId));
     try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
       URI destUri = new URI(destUriStr);
       if (pinotFS.exists(destUri)) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
 import java.util.concurrent.Callable;
@@ -38,9 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// A segment uploader which does segment upload to a segment store (with store root dir configured as
-/// \_segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
-/// URI \_segmentStoreUriStr/\_tableNameWithType/segmentName+random_uuid if successful.
+/// A segment uploader which uploads to a segment store (store root configured as \_segmentStoreUriStr) using PinotFS
+/// within a configurable timeout. The temporary location is
+/// `{store}/{table}/{segment}.tmp.{instanceId}` so a same-server retry overwrites one object and two replicas stay on
+/// different keys. The controller still moves that temp object to the final segment name.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
@@ -49,11 +51,16 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private final int _timeoutInMs;
   private final ServerMetrics _serverMetrics;
+  private final String _instanceId;
 
-  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
+  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics,
+      String instanceId) {
+    Preconditions.checkArgument(instanceId != null && !instanceId.isBlank() && !instanceId.contains("/")
+        && !instanceId.contains("\\"), "instanceId must be a non-empty path-safe identifier: %s", instanceId);
     _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
     _serverMetrics = serverMetrics;
+    _instanceId = instanceId;
   }
 
   @Override
@@ -71,7 +78,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
-          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
+          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName(), _instanceId)));
       long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
