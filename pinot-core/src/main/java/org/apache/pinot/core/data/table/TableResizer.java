@@ -238,6 +238,23 @@ public class TableResizer {
       if (comparator.compare(intermediateRecord, heap[0]) > 0) {
         heap[0] = intermediateRecord;
         downHeap(heap, size, 0, comparator);
+      } else {
+        // Reuse the rejected entry's values until a candidate enters the heap. The comparator only reads values,
+        // so the rejected entry's key and record can stay unchanged while its array is outside the heap.
+        Comparable[] orderByValues = intermediateRecord._values;
+        while (mapEntryIterator.hasNext()) {
+          entry = mapEntryIterator.next();
+          Record record = entry.getValue();
+          for (int i = 0; i < _numOrderByExpressions; i++) {
+            orderByValues[i] = _orderByValueExtractors[i].extract(record);
+          }
+          if (comparator.compare(intermediateRecord, heap[0]) > 0) {
+            heap[0] = new IntermediateRecord(entry.getKey(), record, orderByValues);
+            downHeap(heap, size, 0, comparator);
+            // The array now belongs to the heap; start with a fresh candidate on the next outer iteration.
+            break;
+          }
+        }
       }
     }
 
