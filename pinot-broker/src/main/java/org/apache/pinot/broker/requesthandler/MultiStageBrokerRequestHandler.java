@@ -147,6 +147,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final boolean _streamStatsDefault;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
+  @Nullable
+  protected final String _defaultStreamingDistinctFlushThreshold;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -246,6 +248,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // null indicates "feature disabled", which matches the broker-config-unset case.
     _defaultStreamingGroupByFlushThreshold =
         streamingGroupByFlushThreshold > 0 ? Integer.toString(streamingGroupByFlushThreshold) : null;
+    int streamingDistinctFlushThreshold = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD);
+    _defaultStreamingDistinctFlushThreshold =
+        streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
   }
 
   @Override
@@ -604,6 +611,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           _defaultStreamingGroupByFlushThreshold);
     }
+    if (_defaultStreamingDistinctFlushThreshold != null) {
+      queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD,
+          _defaultStreamingDistinctFlushThreshold);
+    }
   }
 
   /// Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
@@ -881,6 +892,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       brokerResponse.setTimeUsedMs(totalTimeMs);
+      // Surface any generic response metadata registered during query handling (e.g. a
+      // degraded-engine note) into the response. Entries are registered via
+      // QueryThreadContext#addResponseBrokerMetadata; the core engine attaches no semantics to them.
+      // The sink is broker-local for now, so this only picks up entries registered on the broker.
+      QueryThreadContext queryThreadContext = QueryThreadContext.getIfAvailable();
+      if (queryThreadContext != null) {
+        queryThreadContext.getExecutionContext().getResponseMetadata().forEach(brokerResponse::putResponseMetadata);
+      }
       augmentStatistics(requestContext, brokerResponse);
       if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
         brokerResponse.setResultTable(null);

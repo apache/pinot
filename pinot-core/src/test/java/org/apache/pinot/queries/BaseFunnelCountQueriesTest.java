@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -58,7 +59,7 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings("rawtypes")
 abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   protected static final File INDEX_DIR =
-      new File(FileUtils.getTempDirectory(), "FunnelCountQueriesTest");
+      new File(FileUtils.getTempDirectory(), "FunnelCountQueriesTest-" + UUID.randomUUID());
   protected static final String RAW_TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
   protected static final Random RANDOM = new Random();

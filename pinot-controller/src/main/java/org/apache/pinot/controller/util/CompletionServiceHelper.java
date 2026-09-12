@@ -29,11 +29,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestBufferedResponse;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +52,21 @@ public class CompletionServiceHelper {
   private final Executor _executor;
   private final HttpClientConnectionManager _httpConnectionManager;
   private final BiMap<String, String> _endpointsToServers;
+  @Nullable
+  private final AuthProvider _authProvider;
 
   public CompletionServiceHelper(Executor executor, HttpClientConnectionManager httpConnectionManager,
       BiMap<String, String> endpointsToServers) {
+    this(executor, httpConnectionManager, endpointsToServers, null);
+  }
+
+  /// Creates a helper whose requests resolve service authentication headers from the provider at request time.
+  public CompletionServiceHelper(Executor executor, HttpClientConnectionManager httpConnectionManager,
+      BiMap<String, String> endpointsToServers, @Nullable AuthProvider authProvider) {
     _executor = executor;
     _httpConnectionManager = httpConnectionManager;
     _endpointsToServers = endpointsToServers;
+    _authProvider = authProvider;
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
@@ -78,9 +90,7 @@ public class CompletionServiceHelper {
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       @Nullable String useCase) {
-    MultiHttpRequest.BufferedRequestExecution execution =
-        new MultiHttpRequest(_executor, _httpConnectionManager).executeGetBuffered(serverURLs, requestHeaders,
-            timeoutMs);
+    MultiHttpRequest.BufferedRequestExecution execution = executeGetBuffered(serverURLs, requestHeaders, timeoutMs);
     return collectBufferedResponse(tableNameWithType, serverURLs.size(), execution, multiRequestPerServer, useCase);
   }
 
@@ -88,8 +98,7 @@ public class CompletionServiceHelper {
   /// [System#nanoTime()] clock is reached.
   public CompletionServiceResponse doMultiGetRequestUntil(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, int timeoutMs, long nanoTimeDeadline, @Nullable String useCase) {
-    MultiHttpRequest.BufferedRequestExecution execution =
-        new MultiHttpRequest(_executor, _httpConnectionManager).executeGetBuffered(serverURLs, null, timeoutMs);
+    MultiHttpRequest.BufferedRequestExecution execution = executeGetBuffered(serverURLs, null, timeoutMs);
     return collectBufferedResponseUntil(tableNameWithType, serverURLs.size(), execution, multiRequestPerServer, useCase,
         nanoTimeDeadline);
   }
@@ -116,8 +125,9 @@ public class CompletionServiceHelper {
       for (Pair<String, String> requestAndBody : serverURLsAndRequestBodies) {
         HttpPost request = new HttpPost(requestAndBody.getLeft());
         request.setEntity(new StringEntity(requestAndBody.getRight()));
-        if (requestHeaders != null) {
-          requestHeaders.forEach(request::setHeader);
+        Map<String, String> mergedRequestHeaders = getRequestHeaders(requestHeaders);
+        if (mergedRequestHeaders != null) {
+          mergedRequestHeaders.forEach(request::setHeader);
         }
         execution.submit(request);
       }
@@ -127,6 +137,41 @@ public class CompletionServiceHelper {
     }
     return collectBufferedResponse(tableNameWithType, serverURLsAndRequestBodies.size(), execution,
         multiRequestPerServer, useCase);
+  }
+
+  @Nullable
+  private Map<String, String> getRequestHeaders(@Nullable Map<String, String> requestHeaders) {
+    Map<String, String> authHeaders = AuthProviderUtils.makeAuthHeadersMap(_authProvider);
+    if (authHeaders.isEmpty()) {
+      return requestHeaders;
+    }
+    Map<String, String> mergedRequestHeaders =
+        requestHeaders != null ? new HashMap<>(requestHeaders) : new HashMap<>();
+    // A configured service identity takes precedence over a caller-supplied end-user credential.
+    mergedRequestHeaders.keySet()
+        .removeIf(header -> authHeaders.keySet().stream().anyMatch(header::equalsIgnoreCase));
+    mergedRequestHeaders.putAll(authHeaders);
+    return mergedRequestHeaders;
+  }
+
+  private MultiHttpRequest.BufferedRequestExecution executeGetBuffered(List<String> serverURLs,
+      @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+    MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(_executor, _httpConnectionManager).createBufferedExecution(timeoutMs);
+    try {
+      for (String serverURL : serverURLs) {
+        HttpGet request = new HttpGet(serverURL);
+        Map<String, String> mergedRequestHeaders = getRequestHeaders(requestHeaders);
+        if (mergedRequestHeaders != null) {
+          mergedRequestHeaders.forEach(request::setHeader);
+        }
+        execution.submit(request);
+      }
+      return execution;
+    } catch (RuntimeException | Error e) {
+      execution.close();
+      throw e;
+    }
   }
 
   private CompletionServiceResponse collectBufferedResponse(String tableNameWithType, int size,

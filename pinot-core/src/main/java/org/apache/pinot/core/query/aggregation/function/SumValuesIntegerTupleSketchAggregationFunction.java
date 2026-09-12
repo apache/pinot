@@ -31,8 +31,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTupleSketchAggregationFunction {
 
-  public SumValuesIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
-    super(arguments, mode);
+  public SumValuesIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode,
+      boolean nullHandlingEnabled) {
+    super(arguments, mode, nullHandlingEnabled);
   }
 
   // TODO if extra aggregation modes are supported, make this switch
@@ -49,9 +50,10 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
   @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
-    // A null intermediate result means nothing was aggregated, and there is nothing to sum
+    // A null intermediate result means nothing was aggregated. With null handling enabled there is nothing to sum,
+    // so the answer is NULL; with it disabled it stays what an empty sketch summed to, which is zero.
     if (accumulator == null) {
-      return null;
+      return _nullHandlingEnabled ? null : 0L;
     }
     double retainedTotal = 0L;
     accumulator.setNominalEntries(_nominalEntries);

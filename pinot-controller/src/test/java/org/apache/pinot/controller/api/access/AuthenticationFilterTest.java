@@ -20,13 +20,25 @@
 package org.apache.pinot.controller.api.access;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
+import org.apache.pinot.controller.api.resources.PinotBrokerRestletResource;
+import org.apache.pinot.controller.api.resources.PinotControllerLogger;
+import org.apache.pinot.controller.api.resources.PinotControllerPeriodicTaskRestletResource;
+import org.apache.pinot.controller.api.resources.PinotInstanceRestletResource;
+import org.apache.pinot.controller.api.resources.PinotQueryResource;
+import org.apache.pinot.controller.api.resources.PinotTableRestletResource;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -107,6 +119,32 @@ public class AuthenticationFilterTest {
   }
 
   @Test
+  public void testAuthorizeTargetPreservesCoarseTableScope() throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "A");
+
+    Method clusterMethod = AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorization");
+    assertEquals(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams), "A");
+
+    queryParams.clear();
+    assertNull(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams));
+
+    queryParams.putSingle("tableName", "A");
+
+    Method tableMethod = AuthenticationFilterTest.class.getMethod("methodWithTableAuthorization");
+    assertEquals(AuthenticationFilter.extractTableName(tableMethod, pathParams, queryParams), "A");
+
+    pathParams.putSingle("materializedViewTableName", "B");
+    Method customTableParamMethod =
+        AuthenticationFilterTest.class.getMethod("methodWithCustomTableParamAuthorization");
+    assertEquals(AuthenticationFilter.extractTableName(customTableParamMethod, pathParams, queryParams), "B");
+
+    pathParams.remove("materializedViewTableName");
+    assertNull(AuthenticationFilter.extractTableName(customTableParamMethod, pathParams, queryParams));
+  }
+
+  @Test
   public void testExtractAccessTypeWithAuthAnnotation() throws Exception {
     Method method = AuthenticationFilterTest.class.getMethod("methodWithAuthAnnotation");
     assertEquals(AccessType.UPDATE, _authFilter.extractAccessType(method));
@@ -122,6 +160,51 @@ public class AuthenticationFilterTest {
     assertEquals(AccessType.UPDATE, _authFilter.extractAccessType(method));
     method = AuthenticationFilterTest.class.getMethod("methodWithDelete");
     assertEquals(AccessType.DELETE, _authFilter.extractAccessType(method));
+  }
+
+  @Test
+  public void testMutatingGetEndpointDeclaresUpdateAccess() throws Exception {
+    Method method = PinotControllerPeriodicTaskRestletResource.class.getMethod("runPeriodicTask", String.class,
+        String.class, String.class, HttpHeaders.class);
+    assertEquals(_authFilter.extractAccessType(method), AccessType.UPDATE);
+  }
+
+  @Test
+  public void testReadOnlyEndpointsDeclareReadAccess() {
+    assertReadAccess(PinotQueryResource.class, "validateMultiStageQuery", "extractTableNames");
+    assertReadAccess(PinotInstanceRestletResource.class, "instanceTagUpdateSafetyCheck");
+    assertReadAccess(PinotTableRestletResource.class, "rebalanceStatus");
+    assertReadAccess(PinotControllerLogger.class, "downloadLogFile", "downloadLogFileFromInstance");
+  }
+
+  @Test
+  public void testSegmentCompletionGetEndpointsDeclareCreateAccess() {
+    for (String methodName : new String[]{"extendBuildTime", "segmentConsumed", "segmentStoppedConsuming",
+        "segmentCommitStart", "reduceSegmentSize"}) {
+      Method method = Arrays.stream(LLCSegmentCompletionHandlers.class.getDeclaredMethods())
+          .filter(candidate -> candidate.getName().equals(methodName)).findFirst().orElseThrow();
+      assertEquals(_authFilter.extractAccessType(method), AccessType.CREATE);
+      assertEquals(method.getAnnotation(Authorize.class).action(), Actions.Cluster.COMMIT_SEGMENT);
+    }
+  }
+
+  @Test
+  public void testBrokerForTableEndpointDeclaresTableAuthorization() throws Exception {
+    Method method = PinotBrokerRestletResource.class.getMethod("getBrokersForTableV2", String.class, String.class,
+        String.class, HttpHeaders.class);
+    Authorize authorize = method.getAnnotation(Authorize.class);
+    assertEquals(authorize.targetType(), TargetType.TABLE);
+    assertEquals(authorize.paramName(), "tableName");
+    assertEquals(authorize.action(), Actions.Table.GET_BROKER);
+  }
+
+  private void assertReadAccess(Class<?> resourceClass, String... methodNames) {
+    for (String methodName : methodNames) {
+      Method method = Arrays.stream(resourceClass.getDeclaredMethods())
+          .filter(candidate -> candidate.getName().equals(methodName)).findFirst().orElseThrow();
+      assertEquals(_authFilter.extractAccessType(method), AccessType.READ,
+          resourceClass.getSimpleName() + "." + methodName);
+    }
   }
 
   // DataProvider supplying test cases
@@ -159,5 +242,18 @@ public class AuthenticationFilterTest {
 
   @DELETE
   public void methodWithDelete() {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
+  public void methodWithClusterAuthorization() {
+  }
+
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  public void methodWithTableAuthorization() {
+  }
+
+  @Authorize(targetType = TargetType.TABLE, paramName = "materializedViewTableName",
+      action = Actions.Table.GET_TABLE_CONFIG)
+  public void methodWithCustomTableParamAuthorization() {
   }
 }

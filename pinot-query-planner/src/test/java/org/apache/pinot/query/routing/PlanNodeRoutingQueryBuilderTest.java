@@ -27,11 +27,15 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class PlanNodeRoutingQueryBuilderTest {
@@ -117,5 +121,57 @@ public class PlanNodeRoutingQueryBuilderTest {
     assertNotNull(filter);
     assertEquals(filter.getFunctionCall().getOperator(), "EQUALS");
     assertEquals(filter.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+  }
+
+  @Test
+  public void testCanBuildRoutingQueryAcceptsASingleInputChain() {
+    TableScanNode tableScanNode =
+        new TableScanNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), "testTable", List.of("col1", "col2"));
+    FilterNode filterNode = new FilterNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(tableScanNode),
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, "EQUALS",
+            List.of(new RexExpression.InputRef(0),
+                new RexExpression.Literal(DataSchema.ColumnDataType.STRING, "foo"))));
+
+    assertTrue(PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(filterNode));
+  }
+
+  /// The pre-check has to recurse exactly as the fold does. Checking only the root would call this tree foldable and
+  /// hand the caller back the thrown-and-caught exception the pre-check exists to avoid.
+  @Test
+  public void testCanBuildRoutingQueryRejectsAMultiInputNodeBelowTheRoot() {
+    PlanNode multiInputNode = setOpOverTwoScans();
+    FilterNode filterAbove = new FilterNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(multiInputNode),
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, "EQUALS",
+            List.of(new RexExpression.InputRef(0),
+                new RexExpression.Literal(DataSchema.ColumnDataType.STRING, "foo"))));
+
+    assertFalse(PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(multiInputNode));
+    assertFalse(PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(filterAbove));
+  }
+
+  /// The two must agree: whatever the pre-check refuses is exactly what the fold would have thrown on, and whatever it
+  /// accepts the fold attempts. Disagreement either restores the per-query exception or silently disables pruning for
+  /// shapes that fold perfectly well.
+  @Test
+  public void testCanBuildRoutingQueryAgreesWithTheFold() {
+    PlanNode foldable =
+        new TableScanNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), "testTable", List.of("col1", "col2"));
+    PlanNode notFoldable = setOpOverTwoScans();
+
+    assertTrue(PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(foldable));
+    assertNotNull(PlanNodeRoutingQueryBuilder.createPinotQueryForRouting("testTable", foldable, false));
+
+    assertFalse(PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(notFoldable));
+    assertThrows(IllegalStateException.class,
+        () -> PlanNodeRoutingQueryBuilder.createPinotQueryForRouting("testTable", notFoldable, false));
+  }
+
+  private static PlanNode setOpOverTwoScans() {
+    TableScanNode first =
+        new TableScanNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), "testTable", List.of("col1", "col2"));
+    TableScanNode second =
+        new TableScanNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), "testTable", List.of("col1", "col2"));
+    return new SetOpNode(1, TEST_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(first, second), SetOpNode.SetOpType.UNION,
+        true);
   }
 }

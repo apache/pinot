@@ -25,8 +25,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class DistinctCountRawHLLPlusMVAggregationFunction extends DistinctCountRawHLLPlusAggregationFunction {
 
-  public DistinctCountRawHLLPlusMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0), new DistinctCountHLLPlusMVAggregationFunction(arguments));
+  public DistinctCountRawHLLPlusMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), new DistinctCountHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled),
+        nullHandlingEnabled);
   }
 
   @Override

@@ -77,7 +77,9 @@ public class HadoopPinotFS extends BasePinotFS {
         UserGroupInformation.setLoginUser(ugi);
         LOGGER.info("Setting HDFS login user to: {}", globalHadoopUser);
       }
-      _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
+      // Hadoop's FileSystem.get() returns a process-cached instance. HadoopPinotFS closes its filesystem, so it must
+      // own a distinct instance to avoid one PinotFS closing a client that is still in use elsewhere.
+      _hadoopFS = org.apache.hadoop.fs.FileSystem.newInstance(_hadoopConf);
       _hadoopFS.setWriteChecksum((config.getProperty(WRITE_CHECKSUM, false)));
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {

@@ -49,6 +49,10 @@ import static org.testng.Assert.expectThrows;
 /// `RAW`. The new "shared dictionary on RAW forward" segment shape is only representable when the key is
 /// explicitly written by the new segment creator.
 public class ColumnMetadataImplTest {
+  // The index-size API works on numeric index ids so this module's tests need no index plugins registered.
+  private static final short FORWARD_ID = 2;
+  private static final short DICTIONARY_ID = 0;
+  private static final short JSON_ID = 5;
 
   /// Old-segment fallback path: no FORWARD_INDEX_ENCODING in metadata, dict present → encoding inferred as DICTIONARY.
   @Test
@@ -239,6 +243,83 @@ public class ColumnMetadataImplTest {
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
 
     assertNull(metadata.getTransformFunction());
+  }
+
+  @Test
+  public void indexSizesAbsentByDefault()
+      throws Exception {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    assertEquals(metadata.getNumIndexes(), 0);
+    assertTrue(metadata.getIndexSizeMap().isEmpty());
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(0));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(0));
+    // The REST segment-metadata payload keeps its shape: an empty object, never null.
+    JsonNode indexSizeMap = JsonUtils.objectToJsonNode(metadata).get("indexSizeMap");
+    assertTrue(indexSizeMap.isObject() && indexSizeMap.isEmpty(), String.valueOf(indexSizeMap));
+  }
+
+  @Test
+  public void indexSizesRoundTripAfterAdd() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    short[] indexTypes = {FORWARD_ID, DICTIONARY_ID, JSON_ID, 7, Short.MAX_VALUE, Short.MIN_VALUE};
+    long[] indexSizes = {100, 200, 0, (1L << 48) - 1, 1L << 32, 1};
+    for (int i = 0; i < indexTypes.length; i++) {
+      metadata.addIndexSize(indexTypes[i], indexSizes[i]);
+    }
+
+    assertEquals(metadata.getNumIndexes(), indexTypes.length);
+    for (int i = 0; i < indexTypes.length; i++) {
+      assertEquals(metadata.getIndexType(i), indexTypes[i]);
+      assertEquals(metadata.getIndexSize(i), indexSizes[i]);
+    }
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(-1));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexType(indexTypes.length));
+    expectThrows(IndexOutOfBoundsException.class, () -> metadata.getIndexSize(indexTypes.length));
+  }
+
+  @Test
+  public void indexSizesParticipateInValueObjectMethods() {
+    ColumnMetadataImpl first = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl second = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl third = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    ColumnMetadataImpl noSizes = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    assertEquals(first, noSizes);
+    assertEquals(first.hashCode(), noSizes.hashCode());
+    first.addIndexSize(FORWARD_ID, 100);
+    second.addIndexSize(FORWARD_ID, 100);
+    third.addIndexSize(FORWARD_ID, 101);
+    for (ColumnMetadataImpl metadata : new ColumnMetadataImpl[]{first, second, third}) {
+      metadata.addIndexSize(DICTIONARY_ID, (1L << 48) - 1);
+      metadata.addIndexSize(JSON_ID, 0);
+    }
+
+    assertEquals(first, second);
+    assertEquals(first.hashCode(), second.hashCode());
+    assertNotEquals(first, third);
+    assertNotEquals(first, noSizes);
+    assertEquals(first.toString(), second.toString());
+    assertNotEquals(first.toString(), noSizes.toString());
+  }
+
+  @Test
+  public void rejectsInvalidIndexSize() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, -1));
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(FORWARD_ID, 1L << 48));
+    assertEquals(metadata.getNumIndexes(), 0, "a rejected size must not be recorded");
+
+    metadata.addIndexSize(FORWARD_ID, 100);
+    metadata.addIndexSize(DICTIONARY_ID, 200);
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(JSON_ID, -1));
+    expectThrows(IllegalArgumentException.class, () -> metadata.addIndexSize(JSON_ID, 1L << 48));
+    assertEquals(metadata.getNumIndexes(), 2, "a rejected size must preserve existing entries");
+    assertEquals(metadata.getIndexType(0), FORWARD_ID);
+    assertEquals(metadata.getIndexSize(0), 100);
+    assertEquals(metadata.getIndexType(1), DICTIONARY_ID);
+    assertEquals(metadata.getIndexSize(1), 200);
   }
 
   private static PropertiesConfiguration baseConfig(String column) {

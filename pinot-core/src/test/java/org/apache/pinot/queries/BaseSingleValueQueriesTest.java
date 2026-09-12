@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -62,7 +63,8 @@ import static org.testng.Assert.assertNotNull;
 /// - column18, METRIC, INT, 1440, F, T
 /// - daysSinceEpoch, TIME, INT, 2, T, F
 public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest-" + UUID.randomUUID());
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   protected static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";

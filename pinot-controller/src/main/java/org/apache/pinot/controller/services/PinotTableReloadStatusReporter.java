@@ -166,7 +166,8 @@ public class PinotTableReloadStatusReporter {
     final List<String> serverUrls = getServerUrls(serverEndPoints, reloadJobMetadata, serverToSegments);
 
     final CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     final CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 

@@ -23,7 +23,8 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -33,11 +34,19 @@ import static org.apache.pinot.core.query.aggregation.utils.StatisticalAggregati
 
 public class VarianceAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  private static final EnumSet<AggregationFunctionType> VARIANCE_FUNCTIONS = EnumSet.of(AggregationFunctionType.VARPOP,
-      AggregationFunctionType.VARSAMP, AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP);
+  private static final EnumSet<AggregationFunctionType> VARIANCE_FUNCTIONS = EnumSet.of(
+      AggregationFunctionType.VARPOP,
+      AggregationFunctionType.VARSAMP,
+      AggregationFunctionType.STDDEVPOP,
+      AggregationFunctionType.STDDEVSAMP
+  );
 
-  private static final Set<FieldSpec.DataType> DATA_TYPES = Set.of(FieldSpec.DataType.INT, FieldSpec.DataType.LONG,
-      FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE);
+  private static final Set<DataType> DATA_TYPES = Set.of(
+      DataType.INT,
+      DataType.LONG,
+      DataType.FLOAT,
+      DataType.DOUBLE
+  );
 
   @DataProvider(name = "scenarios")
   Object[][] scenarios() {
@@ -45,7 +54,7 @@ public class VarianceAggregationFunctionTest extends AbstractAggregationFunction
 
     int i = 0;
     for (AggregationFunctionType functionType : VARIANCE_FUNCTIONS) {
-      for (FieldSpec.DataType dataType : DATA_TYPES) {
+      for (DataType dataType : DATA_TYPES) {
         scenarios[i][0] = functionType;
         scenarios[i][1] = new DataTypeScenario(dataType);
         i++;
@@ -57,127 +66,90 @@ public class VarianceAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingDisabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(false, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select " + functionType.getName() + "(myField) from testTable")
+    scenario.getDeclaringTable(false, FieldType.METRIC)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select " + functionType.getName() + "(myField) from testTable")
         .thenResultIs("DOUBLE", "0.0");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingEnabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(true, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select " + functionType.getName() + "(myField) from testTable")
+    scenario.getDeclaringTable(true, FieldType.METRIC)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select " + functionType.getName() + "(myField) from testTable")
         .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingDisabled(AggregationFunctionType functionType,
       DataTypeScenario scenario) {
-    scenario.getDeclaringTable(false, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
+    scenario.getDeclaringTable(false, FieldType.METRIC)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 0.0");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingEnabled(AggregationFunctionType functionType,
       DataTypeScenario scenario) {
-    scenario.getDeclaringTable(true, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
+    scenario.getDeclaringTable(true, FieldType.METRIC)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingDisabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(false, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "1",
-            "null",
-            "2"
-        ).andOnSecondInstance("myField",
-            "3",
-            "6",
-            "null"
-        ).whenQuery("select " + functionType.getName() + "(myField) from testTable")
-        .thenResultIs("DOUBLE", String.valueOf(calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0),
-            functionType)));
+    scenario.getDeclaringTable(false, FieldType.METRIC)
+        .onFirstInstance("myField", "1", "null", "2")
+        .andOnSecondInstance("myField", "3", "6", "null")
+        .whenQuery("select " + functionType.getName() + "(myField) from testTable")
+        .thenResultIs("DOUBLE", String.valueOf(calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)));
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingEnabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(true, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "1",
-            "null",
-            "2"
-        ).andOnSecondInstance("myField",
-            "3",
-            "6",
-            "null"
-        ).whenQuery("select " + functionType.getName() + "(myField) from testTable")
+    scenario.getDeclaringTable(true, FieldType.METRIC)
+        .onFirstInstance("myField", "1", "null", "2")
+        .andOnSecondInstance("myField", "3", "6", "null")
+        .whenQuery("select " + functionType.getName() + "(myField) from testTable")
         .thenResultIs("DOUBLE", String.valueOf(calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)));
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingDisabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(false, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "1",
-            "null",
-            "2"
-        ).andOnSecondInstance("myField",
-            "3",
-            "6",
-            "null"
-        ).whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | DOUBLE", "literal | "
-            + calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType));
+    scenario.getDeclaringTable(false, FieldType.METRIC)
+        .onFirstInstance("myField", "1", "null", "2")
+        .andOnSecondInstance("myField", "3", "6", "null")
+        .whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "literal | " + calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingEnabled(AggregationFunctionType functionType, DataTypeScenario scenario) {
-    scenario.getDeclaringTable(true, FieldSpec.FieldType.METRIC)
-        .onFirstInstance("myField",
-            "1",
-            "null",
-            "2"
-        ).andOnSecondInstance("myField",
-            "3",
-            "6",
-            "null"
-        ).whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | DOUBLE", "literal | "
-            + calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType));
+    scenario.getDeclaringTable(true, FieldType.METRIC)
+        .onFirstInstance("myField", "1", "null", "2")
+        .andOnSecondInstance("myField", "3", "6", "null")
+        .whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
+        .thenResultIs("STRING | DOUBLE", "literal | " + calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType));
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupByMV(AggregationFunctionType functionType, DataTypeScenario scenario) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", scenario.getDataType())
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", scenario.getDataType())
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},
             new Object[]{"tag1;tag2", null},
@@ -189,11 +161,15 @@ public class VarianceAggregationFunctionTest extends AbstractAggregationFunction
             new Object[]{"tag1;tag2", null}
         )
         .whenQuery("select tags, " + functionType.getName() + "(value) from testTable group by tags order by tags")
-        .thenResultIs(new Object[]{"tag1", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)},
-            new Object[]{"tag2", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)})
-        .whenQueryWithNullHandlingEnabled("select tags, " + functionType.getName() + "(value) from testTable "
-            + "group by tags order by tags")
-        .thenResultIs(new Object[]{"tag1", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)},
-            new Object[]{"tag2", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)});
+        .thenResultIs(
+            new Object[]{"tag1", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)},
+            new Object[]{"tag2", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)}
+        )
+        .whenQueryWithNullHandlingEnabled(
+            "select tags, " + functionType.getName() + "(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            new Object[]{"tag1", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)},
+            new Object[]{"tag2", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)}
+        );
   }
 }

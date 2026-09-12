@@ -49,8 +49,8 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
   private final List<String> _durationFunctions = new ArrayList<>();
   private boolean _canSkipNonMatchedFunnel = true;
 
-  public FunnelStepDurationStatsAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelStepDurationStatsAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
     if (_extraArguments.get("DURATIONFUNCTIONS") != null) {
       String[] durationFunctions = _extraArguments.get("DURATIONFUNCTIONS").split(",");
       for (String durationFunction : durationFunctions) {

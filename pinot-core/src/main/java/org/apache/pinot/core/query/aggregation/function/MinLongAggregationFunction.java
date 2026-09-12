@@ -33,7 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class MinLongAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
+public class MinLongAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
   protected static final Long DEFAULT_VALUE = Long.MAX_VALUE;
 
   public MinLongAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

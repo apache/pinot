@@ -35,7 +35,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class SumAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
+public class SumAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   protected static final double DEFAULT_VALUE = 0.0;
 
   public SumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

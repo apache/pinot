@@ -247,7 +247,8 @@ public interface PinotFS extends Closeable, Serializable {
       throws IOException;
 
   /// For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
-  /// By default, this method does nothing.
+  /// Implementations must only close resources owned by this instance, not clients shared with other PinotFS
+  /// instances. By default, this method does nothing.
   /// @throws IOException on IO failure
   default void close()
       throws IOException {

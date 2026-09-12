@@ -32,8 +32,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFunction<IntArrayList> {
 
-  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

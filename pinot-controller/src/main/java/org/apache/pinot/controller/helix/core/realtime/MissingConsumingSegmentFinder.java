@@ -107,6 +107,18 @@ public class MissingConsumingSegmentFinder {
     _streamPartitionMsgOffsetFactory = streamPartitionMsgOffsetFactory;
   }
 
+  /// Zeroes out every gauge that [#findAndEmitMetrics] emits, for callers that intentionally skip the search (e.g. a
+  /// table whose ingestion is paused, where having no CONSUMING segment is expected rather than a defect). These
+  /// gauges are last-write-wins with no "unset" value, so a skipped table would otherwise keep reporting whatever was
+  /// last written before the skip began. Kept here so the class that owns these gauge names also owns their reset.
+  public static void resetMetrics(String realtimeTableName, ControllerMetrics controllerMetrics) {
+    controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT, 0);
+    controllerMetrics.setValueOfTableGauge(realtimeTableName,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_NEW_PARTITION_COUNT, 0);
+    controllerMetrics.setValueOfTableGauge(realtimeTableName,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES, 0);
+  }
+
   public void findAndEmitMetrics(IdealState idealState) {
     MissingSegmentInfo info = findMissingSegments(idealState.getRecord().getMapFields(), Instant.now());
     _controllerMetrics.setValueOfTableGauge(_realtimeTableName, ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT,

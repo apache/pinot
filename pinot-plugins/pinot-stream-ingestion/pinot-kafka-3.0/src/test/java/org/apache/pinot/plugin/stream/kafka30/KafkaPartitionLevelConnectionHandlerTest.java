@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kafka30;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.plugin.stream.kafka.KafkaConfigProviderTestUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
@@ -42,6 +43,12 @@ public class KafkaPartitionLevelConnectionHandlerTest {
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     return new StreamConfig("testTable_REALTIME", streamConfigMap);
+  }
+
+  @Test
+  public void testConfigProviderReferencesReachKafkaClients()
+      throws Exception {
+    KafkaConfigProviderTestUtils.assertConfigProviderReferencesReachKafkaClients();
   }
 
   @Test

@@ -32,8 +32,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class AvgValueIntegerTupleSketchAggregationFunction
     extends IntegerTupleSketchAggregationFunction {
 
-  public AvgValueIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
-    super(arguments, mode);
+  public AvgValueIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode,
+      boolean nullHandlingEnabled) {
+    super(arguments, mode, nullHandlingEnabled);
   }
 
   // TODO if extra aggregation modes are supported, make this switch
@@ -51,7 +52,8 @@ public class AvgValueIntegerTupleSketchAggregationFunction
   @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
-    // A null intermediate result means nothing was aggregated, and there is nothing to average
+    // A null intermediate result means nothing was aggregated, and so does an empty sketch, which the retained-entry
+    // check below already answers NULL for. The average of nothing is NULL in either mode.
     if (accumulator == null) {
       return null;
     }

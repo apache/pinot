@@ -955,6 +955,9 @@ public class QueryEnvironment {
     /// Explain the query plan.
     /// The original query must be an EXPLAIN query and way it will be explained depends on the options of the EXPLAIN
     /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
+    ///
+    /// Unless the query explicitly asks for a logical plan only (`EXPLAIN PLAN WITHOUT IMPLEMENTATION`), this builds
+    /// the dispatchable subplan and therefore fails wherever [#planQuery] would.
     public QueryEnvironment.QueryPlannerResult explain(long requestId,
         @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
       try {
@@ -971,9 +974,17 @@ public class QueryEnvironment {
           SqlExplainLevel level =
               explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
           Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
-          if (!explain.withImplementation() || onServerExplainer == null) {
+          if (!explain.withImplementation()) {
+            // The query explicitly asked to skip implementation planning, so render the logical plan as-is.
             return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
                 tableNames);
+          } else if (onServerExplainer == null) {
+            // Build the dispatchable subplan even though only the logical plan is rendered: some planning errors are
+            // raised while converting the plan or assigning workers (e.g. a `tableOptions` partition hint that
+            // disagrees with the table's actual partitioning), and EXPLAIN must fail wherever execution would.
+            DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+            return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
+                PlannerUtils.explainPlan(_relRoot.rel, format, level), dispatchableSubPlan.getTableNames());
           } else {
             Map<String, String> options = _sqlNodeAndOptions.getOptions();
             boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
@@ -995,6 +1006,8 @@ public class QueryEnvironment {
                 PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
           }
         }
+      } catch (QueryException e) {
+        throw e;
       } catch (Exception e) {
         throw new RuntimeException("Error explain query plan for: " + _textQuery, e);
       }

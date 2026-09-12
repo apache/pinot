@@ -341,6 +341,8 @@ public class CommonConstants {
   public static class Broker {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    /// Namespace for service credentials used by the broker when invoking Server admin APIs.
+    public static final String SERVER_ADMIN_AUTH_PREFIX = "pinot.broker.server.admin.auth";
     /// Config prefix for the broker-side MaterializedViewHandler.  Implementation class is
     /// loaded from `pinot.broker.materialized.view.handler.class`; other settings sit
     /// under the same prefix and are passed through to the handler's `init`. Default
@@ -381,6 +383,15 @@ public class CommonConstants {
         "pinot.broker.query.log.sqlRedaction";
     public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /// How query option keys supplied through SQL `SET` / `OPTION(...)` on DQL queries are validated.
+    /// Broker config key: `pinot.broker.query.option.validationMode`.
+    /// One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
+    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct
+    /// unknown key) or `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
+    /// `QueryOptionsUtils.registerSqlQueryOptionKey`.
+    public static final String CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE =
+        "pinot.broker.query.option.validationMode";
+    public static final String DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE = "NONE";
     /// When true, the broker initializes the materialized view metadata cache and query rewrite
     /// engine.  When false (default), MV rewrite is disabled regardless of per-MV
     /// `rewriteEnabled` setting.
@@ -423,6 +434,47 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+
+    // Startup data-plane warmup: before readiness is granted, run probe queries so the JIT-compiled query
+    // path and per-query caches are warm before the first real traffic. Off by default; opt-in per
+    // deployment.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_ENABLED = "pinot.broker.startup.warmup.enabled";
+    public static final boolean DEFAULT_BROKER_STARTUP_WARMUP_ENABLED = false;
+    // Hard ceiling on the whole warmup (measured from Helix convergence): readiness opens when it expires
+    // whatever the probe progress, so a slow or unreachable server cannot stall a rolling restart. Sized so
+    // the minIterations floor is actually reachable on a constrained/TLS broker (~1000 serial probes take
+    // ~20-25s there) -- the budget is the safety cap, not the normal exit. A healthy broker reaches the
+    // floor and serves well before this; only a genuinely slow one runs to the cap.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_BUDGET_MS = "pinot.broker.startup.warmup.budgetMs";
+    public static final long DEFAULT_BROKER_STARTUP_WARMUP_BUDGET_MS = 30_000L;
+    // Minimum number of successful probe queries before warmup declares the broker warm. This is a depth
+    // floor, not a latency guess: enough probe invocations to drive the query path's JIT to its top tier.
+    // Warmup exits when this many probes have run OR the budget expires -- whichever comes first. The probe
+    // is always the static `SELECT * FROM "<t>" LIMIT 1` over a set-cover of tables spanning every server.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_MIN_ITERATIONS =
+        "pinot.broker.startup.warmup.minIterations";
+    public static final int DEFAULT_BROKER_STARTUP_WARMUP_MIN_ITERATIONS = 1000;
+    // Number of probe queries fired concurrently per round. Serial (1) warms the serve path; a higher value
+    // additionally warms the concurrency step (channel-lock contention, concurrent scatter/gather/reduce)
+    // that the first real traffic burst hits. Default 1 (serial); raise it to warm closer to the expected
+    // burst.
+    public static final String CONFIG_OF_BROKER_STARTUP_WARMUP_CONCURRENCY =
+        "pinot.broker.startup.warmup.concurrency";
+    public static final int DEFAULT_BROKER_STARTUP_WARMUP_CONCURRENCY = 1;
+    // When enabled, once Helix converges at startup the broker opens a Netty channel to every (server,
+    // table type) it routes to -- including the TLS handshake when broker->server TLS is on -- so the
+    // first real query does not pay the blocking connect on its critical path. Runs on a background
+    // thread and is bounded by CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS; channels that do not make
+    // it fall back to the lazy path. On by default; set to false to restore the pure lazy-connect path,
+    // whose behaviour is then unchanged.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_ENABLED =
+        "pinot.broker.startup.preconnect.enabled";
+    public static final boolean DEFAULT_BROKER_STARTUP_PRECONNECT_ENABLED = true;
+    // Upper bound on the whole pre-connect step so a slow or unreachable server cannot delay it
+    // indefinitely; channels not connected within the budget fall back to the lazy path.
+    public static final String CONFIG_OF_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS =
+        "pinot.broker.startup.preconnect.timeoutMs";
+    public static final long DEFAULT_BROKER_STARTUP_PRECONNECT_TIMEOUT_MS = 30_000L;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     // Config for number of threads to use for Broker reduce-phase.
@@ -535,6 +587,17 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.group.by.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = -1;
+
+    /// Default flush threshold for the streaming distinct leaf-stage operator on MSE. When positive, the broker
+    /// injects this value as the `streamingDistinctFlushThreshold` query option for MSE queries that do not already
+    /// specify it, opting the cluster into the streaming distinct behavior by default. Setting the query option
+    /// explicitly (including to `0` to disable) always wins over the broker default.
+    ///
+    /// See [Request.QueryOptionKey#STREAMING_DISTINCT_FLUSH_THRESHOLD] for the conditions a query must meet before
+    /// the threshold takes effect; queries that do not meet them are unaffected by this default.
+    public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
+        "pinot.broker.mse.streaming.distinct.flush.threshold";
+    public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -625,6 +688,11 @@ public class CommonConstants {
     /// Separated from [#CONFIG_OF_USE_BROKER_PRUNING] so the two paths can be rolled out independently; both
     /// default to enabled now that all logical-planner leaf paths (non-partitioned, partitioned, logical tables)
     /// support broker pruning. Actual pruning still requires segment pruners to be configured on the table.
+    ///
+    /// On a colocated join this governs more than which segments are dispatched: a partition class that every member
+    /// of the colocated group prunes away is dropped from the group's shared class list, so the leaves and the stages
+    /// derived from them run fewer workers and the query is dispatched to fewer servers. Turning it off restores one
+    /// worker per populated class.
     public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
         "pinot.broker.multistage.logical.planner.use.broker.pruning";
     public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = true;
@@ -781,6 +849,27 @@ public class CommonConstants {
         /// Flush threshold for streaming group-by on MSE leaf stages.
         public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
 
+        /// Flush threshold for streaming distinct on MSE leaf stages. When positive, the leaf flushes its
+        /// accumulated distinct values downstream once they reach this count and starts a fresh table, bounding
+        /// server memory and pushing the residual de-duplication into the partitioned intermediate stage.
+        ///
+        /// The value is also a feature gate, so it is a silent no-op unless ALL of the following hold. Setting it
+        /// produces no error and no diagnostic when they do not:
+        ///
+        /// - the query is a DISTINCT query (an MSE aggregate with no aggregate calls; a group-by with real
+        ///   aggregations uses [#STREAMING_GROUP_BY_FLUSH_THRESHOLD] instead)
+        /// - it has no ORDER BY — an ordered distinct already keeps a bounded top-LIMIT heap
+        /// - the leaf-stage LIMIT is strictly greater than this threshold — a smaller LIMIT already bounds the
+        ///   table and gives the early-termination short-circuit, which streaming would throw away
+        /// - the leaf is not returning final results (the `is_partitioned_by_group_by_keys` and
+        ///   `is_leaf_return_final_result` hints), because then no stage above the leaf is guaranteed to
+        ///   de-duplicate across flush windows
+        ///
+        /// NOTE: This relies on a downstream stage de-duplicating the partial flushes, which is what the MSE hash
+        /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
+        /// there is no such stage and the client would observe duplicate rows across flush windows.
+        public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
@@ -860,6 +949,8 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+        /// Query-level override for `inpredicate.threshold`. Negative means always prune.
+        public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
@@ -902,7 +993,10 @@ public class CommonConstants {
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
 
-        // If query submission causes an exception, still continue to submit the query to other servers
+        // If a server is unavailable, still return results from the other servers instead of failing the query. This
+        // covers both a send-time failure at request submission and a mid-query channel-inactive / write failure: the
+        // unavailable server is skipped, its down status is recorded so the failure detector can quarantine it from
+        // routing, and the query returns partial results
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
 
         // Ignore server-side segment missing errors and proceed without marking the query as failed.
@@ -924,6 +1018,9 @@ public class CommonConstants {
         // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
+        // NOTE: Aggregations are counted here no matter whether they are referenced in the SELECT list, the HAVING
+        //       clause or the ORDER-BY clause, so a query that projects no aggregation but orders by (or filters on)
+        //       a filtered one is also covered.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
 
         // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
@@ -1233,6 +1330,13 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS =
           CONFIG_PREFIX + ".stats.metric.export.interval.ms";
       public static final long DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS = 10 * 1000;
+
+      // Controls whether replica-group-level adaptive routing is enabled for StrictReplicaGroupInstanceSelector.
+      // When false, StrictReplicaGroupInstanceSelector falls back to round-robin even if adaptive server
+      // selection is configured.
+      public static final String CONFIG_OF_STRICT_REPLICA_GROUP_ENABLED =
+          CONFIG_PREFIX + ".strict.replica.group.enabled";
+      public static final boolean DEFAULT_STRICT_REPLICA_GROUP_ENABLED = true;
     }
 
     public static class Grpc {
@@ -1501,6 +1605,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
         "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    /// Default IN-pruning threshold. Negative means always prune.
+    /// Can be overridden per query via [Request.QueryOptionKey#IN_PREDICATE_PRUNING_THRESHOLD].
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /// Service token for accessing protected controller APIs.
@@ -2548,6 +2654,68 @@ public class CommonConstants {
     public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
     public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
 
+    /// gRPC keep-alive time for mailbox channels, in milliseconds. Values &gt; 0 enable keep-alive pings on the
+    /// server-to-server (and server-to-broker) data channels, so that a peer that stopped answering *without*
+    /// closing its socket transitions the channel out of `READY` instead of being sent to forever.
+    ///
+    /// The failure this addresses is a peer whose host is hung or unreachable one-way: no `RST` is ever received, so
+    /// gRPC keeps the cached channel `READY`, every mailbox send parks until the query deadline, and — because gRPC
+    /// only re-resolves DNS when a transport is dropped — a peer that has come back at a new address is never
+    /// reached again. The symptom is every multi-stage query timing out while the leaf stages complete in
+    /// milliseconds, for as long as the channel is cached, which is indefinitely by default (see
+    /// [#KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS]).
+    ///
+    /// Defaults are chosen to be safe against a peer running an older version, whose mailbox server enforces
+    /// Netty's gRPC defaults (`permitKeepAliveTime` = 5 minutes, `permitKeepAliveWithoutCalls` = false) and answers
+    /// a faster ping with `GOAWAY(ENHANCE_YOUR_CALM)`. Operators wanting faster detection must lower
+    /// [#KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS] on every peer first.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_TIME_MS = "pinot.query.runner.channel.keep.alive.time.ms";
+    public static final int DEFAULT_CHANNEL_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// gRPC keep-alive timeout for mailbox channels, in milliseconds: how long a keep-alive ping may go unanswered
+    /// before the transport is declared dead. Only applies when keep-alive is enabled.
+    ///
+    /// Sized to survive a long stop-the-world pause on a loaded peer. A ping unanswered for a few seconds is a GC
+    /// pause, not a dead host, and dropping the transport there would fail healthy in-flight queries.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_TIMEOUT_MS =
+        "pinot.query.runner.channel.keep.alive.timeout.ms";
+    public static final int DEFAULT_CHANNEL_KEEP_ALIVE_TIMEOUT_MS = 30_000;
+
+    /// Whether to send gRPC keep-alive pings on mailbox channels even when there are no active calls. Default is
+    /// `false` because Netty's default gRPC server rejects pings-without-calls with `GOAWAY(ENHANCE_YOUR_CALM)`;
+    /// enabling it requires [#KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS] on every peer.
+    ///
+    /// Leaving this off does not blind the ping to a dead peer. The ping deadline is anchored to the last data
+    /// *received* on the transport, not to stream boundaries, so a channel whose streams keep dying at their query
+    /// deadline still accumulates it; the ping is merely deferred until a stream is open again, and then fires at
+    /// once. The difference the two settings make is who pays for the recovery: with pings-without-calls off, the
+    /// transport is torn down by the next query to open a stream, and that query fails; with it on, the tear-down
+    /// happens in the background between queries and no query sees the dead channel at all.
+    public static final String KEY_OF_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.runner.channel.keep.alive.without.calls";
+    public static final boolean DEFAULT_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the mailbox server
+    /// ([org.apache.pinot.query.mailbox.channel.GrpcMailboxServer]) will accept. Pings arriving more frequently than
+    /// this are counted as "bad pings"; once the server's internal threshold is exceeded it sends
+    /// `GOAWAY(ENHANCE_YOUR_CALM)` with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Lowering
+    /// [#KEY_OF_CHANNEL_KEEP_ALIVE_TIME_MS] for faster detection of a silent peer requires this to be less than or
+    /// equal to the configured client keep-alive time **on every instance the channel may reach**, otherwise those
+    /// peers will tear the mailbox channel down. A non-positive value leaves Netty's gRPC server default in place.
+    public static final String KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.runner.mailbox.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the mailbox server permits client gRPC keep-alive pings when there are no active RPCs on the
+    /// connection. Defaults to `false` to match Netty's gRPC server default. Must be set to `true` on every peer if
+    /// [#KEY_OF_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] is enabled, otherwise those peers will close idle channels with
+    /// `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.runner.mailbox.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
+
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;
@@ -2621,11 +2789,20 @@ public class CommonConstants {
 
     /// Max number of rows operators stored in the op stats cache.
     /// Although the cache stores stages, each entry has a weight equal to the number of operators in the stage.
+    ///
+    /// @deprecated No longer read. The op stats cache it sized was removed once its only reader disappeared;
+    /// the key is kept so existing configurations keep starting.
+    @Deprecated
     public static final String KEY_OF_OP_STATS_CACHE_SIZE = "pinot.server.query.op.stats.cache.size";
+    @Deprecated
     public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 10000;
 
     /// Max time to keep the op stats in the cache.
+    ///
+    /// @deprecated No longer read. See [#KEY_OF_OP_STATS_CACHE_SIZE].
+    @Deprecated
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
+    @Deprecated
     public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 600 * 1000;
 
     /// Max number of cancelled queries to keep in the cache.

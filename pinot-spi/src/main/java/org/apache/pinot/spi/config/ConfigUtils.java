@@ -48,7 +48,8 @@ public class ConfigUtils {
     return applyConfigWithEnvVariablesAndSystemProperties(combinedMap, config);
   }
 
-  /// Apply a map of config to any given BaseJsonConfig with templates.
+  /// Apply a map of config to any given BaseJsonConfig with templates. Prefix a template with an additional '$'
+  /// (for example, `$${name:value}`) to preserve it as a literal `${name:value}` for downstream processing.
   ///
   /// @return Config with the configs applied.
   public static <T extends BaseJsonConfig> T applyConfigWithEnvVariablesAndSystemProperties(
@@ -92,6 +93,9 @@ public class ConfigUtils {
         break;
       case STRING:
         final String field = jsonNode.asText();
+        if (field.startsWith("$${") && field.endsWith("}")) {
+          return JsonNodeFactory.instance.textNode(field.substring(1));
+        }
         if (field.startsWith("${") && field.endsWith("}")) {
           String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
           String envVarKey = envVarSplits[0];
