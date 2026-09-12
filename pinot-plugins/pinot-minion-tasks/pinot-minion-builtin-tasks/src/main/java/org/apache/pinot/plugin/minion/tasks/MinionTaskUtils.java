@@ -40,6 +40,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
@@ -470,6 +472,18 @@ public class MinionTaskUtils {
   public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
       SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
       MinionConstants.ValidDocIdsConsensusMode consensusMode) {
+    return selectValidDocIdsMetadataForConsensus(taskType, segmentZKMetadata, replicas, expectedReplicaCount,
+        consensusMode, null, null);
+  }
+
+  /// Same, and additionally reports an EQUAL-mode disagreement on `controllerMetrics` as
+  /// [ControllerMeter#UPSERT_COMPACTION_SEGMENT_SKIPPED_CONSENSUS_FAILURE]. Only that skip reason is metered: the
+  /// others mean "ask again later", not that the replicas hold different data.
+  @Nullable
+  public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
+      SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
+      MinionConstants.ValidDocIdsConsensusMode consensusMode, @Nullable ControllerMetrics controllerMetrics,
+      @Nullable String tableNameWithType) {
     String segmentName = segmentZKMetadata.getSegmentName();
     if (CollectionUtils.isEmpty(replicas)) {
       return null;
@@ -534,9 +548,15 @@ public class MinionTaskUtils {
       // keeps the generator cheap - it avoids serializing a bitmap per replica back to the controller.
       ValidDocIdsMetadataInfo first = usableReplicas.get(0);
       for (int i = 1; i < usableReplicas.size(); i++) {
-        if (usableReplicas.get(i).getTotalValidDocs() != first.getTotalValidDocs()) {
-          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, skipping segment for {}", segmentName,
-              taskType);
+        ValidDocIdsMetadataInfo other = usableReplicas.get(i);
+        if (other.getTotalValidDocs() != first.getTotalValidDocs()) {
+          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, server {} reports {} valid docs and "
+                  + "server {} reports {}, skipping segment for {}", segmentName, first.getInstanceId(),
+              first.getTotalValidDocs(), other.getInstanceId(), other.getTotalValidDocs(), taskType);
+          if (controllerMetrics != null && tableNameWithType != null) {
+            controllerMetrics.addMeteredTableValue(tableNameWithType,
+                ControllerMeter.UPSERT_COMPACTION_SEGMENT_SKIPPED_CONSENSUS_FAILURE, 1L);
+          }
           return null;
         }
       }
