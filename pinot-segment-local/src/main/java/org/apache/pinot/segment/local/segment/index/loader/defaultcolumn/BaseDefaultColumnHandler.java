@@ -340,13 +340,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
         }
 
-        // Segments created before the transform function was tracked in the metadata report null for it. Their values
-        // cannot be told apart from up-to-date ones, so instead of regenerating them, record the configured transform
-        // function in the metadata (values untouched) so that the NEXT transform function change is detected.
+        // Segments created before the transform function was tracked in the metadata report null for both the stored
+        // and the backfilled field. Their values cannot be told apart from up-to-date ones, so instead of regenerating
+        // them, record the configured transform in TRANSFORM_FUNCTION_BACKFILLED (values untouched) so that the NEXT
+        // transform function change is detected. The expression is not written to TRANSFORM_FUNCTION, which is reserved
+        // for transforms that actually produced the stored values.
         // Tradeoff: a transform function change that lands in the very same reload as this backfill is not applied to
         // the existing values (which matches the behavior before the transform function was tracked at all); operators
         // who need those values regenerated can force it with one more change to the expression.
-        if (!defaultColumnActionMap.containsKey(column) && columnMetadata.getTransformFunction() == null
+        if (!defaultColumnActionMap.containsKey(column) && getEffectiveTransformFunction(columnMetadata) == null
             && getTransformFunctionForColumn(column) != null) {
           defaultColumnActionMap.put(column, DefaultColumnAction.BACKFILL_TRANSFORM_FUNCTION);
         }
@@ -397,12 +399,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /// Returns `true` when the segment metadata records a transform function that no longer matches the configured one
   /// (including the case where the transform function has been removed from the config, in which case the column is
   /// regenerated with default values).
-  /// A missing (null) transform function in the metadata is NOT treated as a change: see the backfill handling in
+  /// A missing stored and backfilled transform is NOT treated as a change: see the backfill handling in
   /// [#computeDefaultColumnActionMap()].
   private boolean isTransformFunctionChanged(String column, ColumnMetadata columnMetadata) {
-    String transformFunctionInMetadata = columnMetadata.getTransformFunction();
+    String transformFunctionInMetadata = getEffectiveTransformFunction(columnMetadata);
     return transformFunctionInMetadata != null && !transformFunctionInMetadata.equals(
         getTransformFunctionForColumn(column));
+  }
+
+  /// Prefers the transform that produced the stored values. Falls back to the backward-compat backfill
+  /// so a legacy segment still detects the next real config change after upgrade.
+  @Nullable
+  private static String getEffectiveTransformFunction(ColumnMetadata columnMetadata) {
+    String storedTransformFunction = columnMetadata.getTransformFunction();
+    return storedTransformFunction != null ? storedTransformFunction : columnMetadata.getTransformFunctionBackfilled();
   }
 
   /// Helper method to update default column indices, returns `true` if the update succeeds, `false`

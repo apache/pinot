@@ -243,6 +243,64 @@ public class ColumnMetadataImplTest {
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
 
     assertNull(metadata.getTransformFunction());
+    assertNull(metadata.getTransformFunctionBackfilled());
+  }
+
+  @Test
+  public void storedTransformFunctionIsNotBackfilled() {
+    String transformFunction = "plus(col, 1)";
+    ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setTransformFunction(transformFunction)
+        .build();
+
+    assertEquals(meta.getTransformFunction(), transformFunction);
+    assertNull(meta.getTransformFunctionBackfilled());
+  }
+
+  @Test
+  public void backfilledTransformFunctionIsNotAStoredTransform() {
+    String transformFunction = "plus(col, 1)";
+    PropertiesConfiguration config = baseConfig("col");
+    String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escaped);
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BACKFILLED), escaped);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getTransformFunctionBackfilled(), transformFunction);
+  }
+
+  @Test
+  public void legacyBooleanBackfillMarkerReadsExpressionFromTransformFunction() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BACKFILLED), "true");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getTransformFunctionBackfilled(), transformFunction);
+  }
+
+  @Test
+  public void transformFunctionWithDollarBraceRoundTripsThroughGetString() {
+    String transformFunction = "Groovy({ '${x}' + y }, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty("x", "interpolated");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
   }
 
   @Test

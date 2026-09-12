@@ -138,6 +138,12 @@ public class SimpleColumnMetadata implements ColumnMetadata {
     return null;
   }
 
+  @Nullable
+  @Override
+  public String getTransformFunctionBackfilled() {
+    return null;
+  }
+
   @Override
   public int getNumIndexes() {
     return 0;

@@ -700,28 +700,33 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /// Records the transform function used to generate the given column in the segment metadata properties.
+  /// Records a transform that actually produced the stored column values.
   public static void addTransformFunction(PropertiesConfiguration properties, String column,
       @Nullable String transformFunction) {
     addTransformFunction(properties, column, transformFunction, false);
   }
 
-  /// Records the transform function used to generate the given column.
-  /// When `backfilled` is true, also sets [V1Constants.MetadataKeys.Column#TRANSFORM_FUNCTION_BACKFILLED] so a
-  /// legacy compatibility write can be distinguished from a value that was actually generated from the expression.
+  /// Records transform provenance for a column.
+  /// A real stored transform is written to [V1Constants.MetadataKeys.Column#TRANSFORM_FUNCTION]. A backward-compat
+  /// backfill (values were not regenerated from the expression) is written only to
+  /// [V1Constants.MetadataKeys.Column#TRANSFORM_FUNCTION_BACKFILLED], so the two cases stay distinguishable.
   public static void addTransformFunction(PropertiesConfiguration properties, String column,
       @Nullable String transformFunction, boolean backfilled) {
-    if (transformFunction != null) {
-      String validTransformFunction =
-          CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
-      if (validTransformFunction != null) {
-        properties.setProperty(getKeyFor(column, TRANSFORM_FUNCTION), validTransformFunction);
-      }
+    String transformFunctionKey = getKeyFor(column, TRANSFORM_FUNCTION);
+    String backfilledKey = getKeyFor(column, TRANSFORM_FUNCTION_BACKFILLED);
+    properties.clearProperty(transformFunctionKey);
+    properties.clearProperty(backfilledKey);
+    if (transformFunction == null) {
+      return;
+    }
+    String validTransformFunction = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    if (validTransformFunction == null) {
+      return;
     }
     if (backfilled) {
-      properties.setProperty(getKeyFor(column, TRANSFORM_FUNCTION_BACKFILLED), "true");
+      properties.setProperty(backfilledKey, validTransformFunction);
     } else {
-      properties.clearProperty(getKeyFor(column, TRANSFORM_FUNCTION_BACKFILLED));
+      properties.setProperty(transformFunctionKey, validTransformFunction);
     }
   }
 
