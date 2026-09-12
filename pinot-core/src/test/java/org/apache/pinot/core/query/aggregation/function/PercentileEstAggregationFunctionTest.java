@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
@@ -32,12 +32,16 @@ public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggr
     return "LONG";
   }
 
-  String minValue(FieldSpec.DataType dataType) {
+  String minValue(DataType dataType) {
     switch (dataType) {
-      case INT: return "-2147483648";
-      case LONG: return "-9223372036854775808";
-      case FLOAT: return "-9223372036854775808";
-      case DOUBLE: return "-9223372036854775808";
+      case INT:
+        return "-2147483648";
+      case LONG:
+        return "-9223372036854775808";
+      case FLOAT:
+        return "-9223372036854775808";
+      case DOUBLE:
+        return "-9223372036854775808";
       default:
         throw new IllegalArgumentException("Unexpected type " + dataType);
     }

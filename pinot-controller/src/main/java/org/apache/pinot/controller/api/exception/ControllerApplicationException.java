@@ -26,6 +26,12 @@ import org.slf4j.Logger;
 
 public class ControllerApplicationException extends WebApplicationException {
 
+  /// Controls whether server logs include the supplied exception details or only its type.
+  public enum ExceptionLogMode {
+    FULL,
+    TYPE_ONLY
+  }
+
   public ControllerApplicationException(Logger logger, String message, Response.Status status) {
     this(logger, message, status.getStatusCode(), null);
   }
@@ -35,20 +41,34 @@ public class ControllerApplicationException extends WebApplicationException {
   }
 
   public ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e) {
-    this(logger, message, status.getStatusCode(), e);
+    this(logger, message, status.getStatusCode(), e, ExceptionLogMode.FULL);
+  }
+
+  public ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e,
+      ExceptionLogMode exceptionLogMode) {
+    this(logger, message, status.getStatusCode(), e, exceptionLogMode);
   }
 
   public ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
+    this(logger, message, status, e, ExceptionLogMode.FULL);
+  }
+
+  private ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e,
+      ExceptionLogMode exceptionLogMode) {
     super(message, status);
     if (status >= 300 && status < 500) {
       if (e == null) {
         logger.info(message);
+      } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
+        logger.info("{} exception type: {}", message, e.getClass().getName());
       } else {
         logger.info("{} exception: {}", message, e.getMessage());
       }
     } else {
       if (e == null) {
         logger.error(message);
+      } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
+        logger.error("{} exception type: {}", message, e.getClass().getName());
       } else {
         logger.error(message, e);
       }

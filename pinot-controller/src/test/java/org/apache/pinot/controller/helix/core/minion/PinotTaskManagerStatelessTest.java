@@ -83,6 +83,24 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testSchedulerShutDownWithController()
+      throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    startController(properties);
+    Scheduler scheduler = _controllerStarter.getTaskManager().getScheduler();
+    assertNotNull(scheduler);
+    assertTrue(scheduler.isStarted());
+    assertFalse(scheduler.isShutdown());
+
+    stopController();
+
+    // The scheduler's worker threads are not daemons, so one left running outlives the controller and keeps firing
+    // cron jobs against the ZkClient that the shutdown has already closed.
+    assertTrue(scheduler.isShutdown());
+  }
+
+  @Test
   public void testSkipLateCronSchedule()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();

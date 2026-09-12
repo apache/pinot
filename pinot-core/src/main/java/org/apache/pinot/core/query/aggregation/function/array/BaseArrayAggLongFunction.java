@@ -24,12 +24,12 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggLongFunction<I extends LongCollection>
     extends BaseArrayAggFunction<I, LongArrayList> {
-  public BaseArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+  public BaseArrayAggLongFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }

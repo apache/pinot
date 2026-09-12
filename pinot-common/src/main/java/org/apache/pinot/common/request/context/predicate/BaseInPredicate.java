@@ -25,6 +25,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// Base predicate for `IN` and `NOT_IN`.
@@ -49,6 +50,7 @@ public abstract class BaseInPredicate extends BasePredicate {
   private volatile int[] _booleanValues;
   private volatile long[] _timestampValues;
   private volatile ByteArray[] _bytesValues;
+  private volatile ByteArray[] _uuidValues;
 
   public BaseInPredicate(ExpressionContext lhs, List<String> values) {
     super(lhs);
@@ -161,5 +163,18 @@ public abstract class BaseInPredicate extends BasePredicate {
       _bytesValues = bigDecimalValues;
     }
     return bigDecimalValues;
+  }
+
+  public ByteArray[] getUuidValues() {
+    ByteArray[] uuidValues = _uuidValues;
+    if (uuidValues == null) {
+      int numValues = _values.size();
+      uuidValues = new ByteArray[numValues];
+      for (int i = 0; i < numValues; i++) {
+        uuidValues[i] = new ByteArray(UuidUtils.toBytes(_values.get(i)));
+      }
+      _uuidValues = uuidValues;
+    }
+    return uuidValues;
   }
 }

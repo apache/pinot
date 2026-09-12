@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
-public class LeafOperator extends MultiStageOperator {
+public class LeafOperator extends MultiStageOperator implements ExplainableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
   private static final ErrorMseBlock CANCELLED_BLOCK =
@@ -230,6 +230,7 @@ public class LeafOperator extends MultiStageOperator {
         terminateException.getMessage()) : errorBlock;
   }
 
+  @Override
   public ExplainedNode explain() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
@@ -290,9 +291,28 @@ public class LeafOperator extends MultiStageOperator {
     }
   }
 
+  /// Returns a copy of this operator's stats, extended with [StatKey#NON_ACTIVE_WORKERS] for this single worker.
   @Override
   public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    if (!hasSegmentsAssigned()) {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    return statMap;
+  }
+
+  /// Whether this worker was given at least one segment to read.
+  ///
+  /// Decided from the request rather than from anything the query produces, so that a worker whose segments are all
+  /// pruned, or all of whose rows are filtered out, still counts as having been given work. A hybrid table produces
+  /// one request per table type, and segments on either of them are enough.
+  private boolean hasSegmentsAssigned() {
+    for (ServerQueryRequest request : _requests) {
+      if (request.hasSegmentsToQuery()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -301,14 +321,17 @@ public class LeafOperator extends MultiStageOperator {
     cancelSseTasks();
   }
 
+  /// Stops the single-stage tasks feeding this operator and drains the blocks they have already queued. Routed
+  /// through the release hook rather than through separate `close()`/`cancel()` overrides so that it runs on every
+  /// termination path by construction, and so a failure here cannot abort the rest of the teardown.
   @Override
-  public void cancel(Throwable e) {
+  protected void releaseBuffers() {
     cancelSseTasks();
   }
 
   @Override
-  public void close() {
-    cancelSseTasks();
+  protected boolean hasBufferedState() {
+    return !_blockingQueue.isEmpty();
   }
 
   @VisibleForTesting
@@ -768,11 +791,20 @@ public class LeafOperator extends MultiStageOperator {
     GC_TIME_MS(StatMap.Type.LONG, null),
     /// Time spent in single-stage execution engine for this leaf stage.
     SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
-    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
+    /// How many workers of this stage had no segment assigned to them.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent when every worker was
+    /// given something to read, which is the common case. A worker with no segment was given no work at all, which
+    /// is different from a worker that read segments and produced nothing: compare this against the `parallelism`
+    /// the stats tree renders on this node, and against what the operators above it report.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT, null);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
     //  propagate to the caller, causing the query to timeout.
+    //  New keys must also be appended at the end: StatMap identifies keys by their ordinal on the wire, so
+    //  inserting, reordering or removing a constant breaks the compatibility with other versions.
 
     private final StatMap.Type _type;
     @Nullable

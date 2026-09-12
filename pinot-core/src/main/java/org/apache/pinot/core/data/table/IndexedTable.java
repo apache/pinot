@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
@@ -124,12 +125,13 @@ public abstract class IndexedTable extends BaseTable {
     int index = _numKeyColumns;
     if (!_hasFinalInput) {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+        existingValues[index] =
+            AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
       }
     } else {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].mergeFinalResult((Comparable) existingValues[index],
-            (Comparable) newValues[index]);
+        existingValues[index] = AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
+            (Comparable) existingValues[index], (Comparable) newValues[index]);
       }
     }
     return existingRecord;

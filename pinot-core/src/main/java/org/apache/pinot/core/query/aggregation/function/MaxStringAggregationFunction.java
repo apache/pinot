@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MaxStringAggregationFunction extends NullableSingleInputAggregationFunction<String, String> {
+public class MaxStringAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {
 
   public MaxStringAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "MAXSTRING"), nullHandlingEnabled);
@@ -121,24 +121,20 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     });
   }
 
+  @Nullable
   @Override
   public String extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public String extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public String merge(@Nullable String intermediateResult1, @Nullable String intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
+  public String merge(String intermediateResult1, String intermediateResult2) {
     return intermediateResult1.compareTo(intermediateResult2) > 0 ? intermediateResult1 : intermediateResult2;
   }
 
@@ -152,8 +148,9 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public String extractFinalResult(String intermediateResult) {
+  public String extractFinalResult(@Nullable String intermediateResult) {
     return intermediateResult;
   }
 

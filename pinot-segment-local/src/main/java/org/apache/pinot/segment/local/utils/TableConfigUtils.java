@@ -114,6 +114,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -456,7 +457,8 @@ public final class TableConfigUtils {
   /// - Enrichment configs: each config is valid.
   /// - Transform configs: non-null column and function, no duplicate destination, and each destination is a schema
   ///   column, an intermediate consumed by another transform, or an aggregation source column; the function is valid
-  ///   and does not reference its own destination.
+  ///   and does not reference its own destination. REALTIME tables require immutable functions, while OFFLINE tables
+  ///   allow all volatility categories.
   /// - Complex-type config: no schema field collides with a `prefixesToRename` prefix.
   /// - Schema-conforming transformer config.
   @VisibleForTesting
@@ -620,7 +622,9 @@ public final class TableConfigUtils {
                   + columnName + "'");
         }
         try {
-          validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
+          if (tableConfig.getTableType() == TableType.REALTIME) {
+            validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
+          }
           expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
         } catch (Exception e) {
           throw new IllegalStateException(
@@ -1474,6 +1478,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validatePartitionConfigUpdate(newConfig, existingConfig, violations);
     validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
@@ -1626,6 +1631,38 @@ public final class TableConfigUtils {
           "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
           tableConfig.getTableName()));
     }
+  }
+
+  /// On upsert/dedup tables, rejects `numPartitions` changes on already-partitioned columns — the one
+  /// segmentPartitionConfig change that silently breaks broker query pruning against existing segments.
+  /// Adding, removing, and `functionName` / `functionConfig` changes are all allowed. Bypassable with force update.
+  private static void validatePartitionConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (!(existingConfig.isUpsertEnabled() || existingConfig.isDedupEnabled())
+        || !(newConfig.isUpsertEnabled() || newConfig.isDedupEnabled())) {
+      return;
+    }
+    Map<String, ColumnPartitionConfig> existingMap = getColumnPartitionMap(existingConfig);
+    Map<String, ColumnPartitionConfig> newMap = getColumnPartitionMap(newConfig);
+    for (Map.Entry<String, ColumnPartitionConfig> entry : existingMap.entrySet()) {
+      ColumnPartitionConfig newCol = newMap.get(entry.getKey());
+      if (newCol != null && entry.getValue().getNumPartitions() != newCol.getNumPartitions()) {
+        violations.add(String.format(
+            "segmentPartitionConfig numPartitions cannot change for upsert/dedup column '%s' (%d -> %d)",
+            entry.getKey(), entry.getValue().getNumPartitions(), newCol.getNumPartitions()));
+      }
+    }
+  }
+
+  private static Map<String, ColumnPartitionConfig> getColumnPartitionMap(TableConfig tableConfig) {
+    if (tableConfig.getIndexingConfig() == null) {
+      return Map.of();
+    }
+    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (partitionConfig == null || partitionConfig.getColumnPartitionMap() == null) {
+      return Map.of();
+    }
+    return partitionConfig.getColumnPartitionMap();
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
@@ -1791,7 +1828,8 @@ public final class TableConfigUtils {
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs)) {
-      validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema);
+      validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema,
+          TimestampIndexUtils.extractColumnsWithGranularity(tableConfig));
     }
 
     // TIMESTAMP index is not managed by FieldIndexConfigs, and we need to validate it separately.
@@ -1919,14 +1957,23 @@ public final class TableConfigUtils {
   /// - 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
   /// - Either functionColumnPairs or aggregationConfigs must be specified, but not both
   /// - All referenced columns exist in the schema and are single-valued
+  ///
+  /// `timestampIndexColumns` holds the TIMESTAMP-index derived columns (e.g. `$ts$DAY`) declared via
+  /// [TimestampConfig#getGranularities()]. These are materialized as dictionary-encoded single-value TIMESTAMP
+  /// columns at segment generation time (see [TimestampIndexUtils#applyTimestampIndex(TableConfig, Schema)]), so
+  /// they are absent from the schema at config-validation time and are accepted here without a schema lookup.
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
-      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema, Set<String> timestampIndexColumns) {
     Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
       assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
       for (String dimension : dimensionsSplitOrder) {
+        if (timestampIndexColumns.contains(dimension)) {
+          dimensionColumns.add(dimension);
+          continue;
+        }
         FieldIndexConfigs indexConfigs = indexConfigsMap.get(dimension);
         Preconditions.checkState(indexConfigs != null,
             "Failed to find dimension column: %s specified in star-tree index config in schema", dimension);
@@ -2013,6 +2060,9 @@ public final class TableConfigUtils {
       }
 
       for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
+        if (timestampIndexColumns.contains(column)) {
+          continue;
+        }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
@@ -2021,6 +2071,9 @@ public final class TableConfigUtils {
       }
 
       for (String column : dimensionColumns) {
+        if (timestampIndexColumns.contains(column)) {
+          continue;
+        }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);

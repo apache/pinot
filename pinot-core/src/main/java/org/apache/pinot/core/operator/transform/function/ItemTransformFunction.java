@@ -25,8 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
-import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
@@ -64,21 +62,11 @@ public class ItemTransformFunction extends BaseTransformFunction {
     DataSource dataSource = columnContextMap.get(column).getDataSource();
     Preconditions.checkState(dataSource instanceof MapDataSource || dataSource instanceof OpenStructDataSource,
         "Column: %s must be a MAP or OPEN_STRUCT column", column);
-    DataSource valueDataSource;
-    if (dataSource instanceof MapDataSource) {
-      valueDataSource = ((MapDataSource) dataSource).getDataSource(key);
-      if (valueDataSource == null) {
-        valueDataSource = new NullDataSource(key);
-      }
-      _perKeyNullsAvailable = false;
-    } else {
-      OpenStructDataSource osDs = (OpenStructDataSource) dataSource;
-      valueDataSource = osDs.getDataSource(key);
-      if (valueDataSource == null) {
-        valueDataSource = OpenStructNullDataSource.forAbsentKey(osDs, key);
-      }
-      _perKeyNullsAvailable = true;
-    }
+    DataSource valueDataSource = dataSource instanceof MapDataSource
+        ? ((MapDataSource) dataSource).getDataSource(key) : ((OpenStructDataSource) dataSource).getDataSource(key);
+    // Per-key nulls are exact whenever the key's source tracks them: every OPEN_STRUCT key does, a MAP key only when
+    // it is absent from the segment
+    _perKeyNullsAvailable = valueDataSource.getNullValueVector() != null;
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
     // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.
@@ -105,16 +93,12 @@ public class ItemTransformFunction extends BaseTransformFunction {
     return _dictionary;
   }
 
-  /// Null semantics differ between the two backing column types:
-  ///
-  /// - OPEN_STRUCT keeps a per-key presence bitmap (materialized into a
-  ///   {@link org.apache.pinot.segment.spi.index.reader.NullValueVectorReader} on both the mutable and sealed paths),
-  ///   so the per-key value set knows exactly which docs lack the key. Use it.
-  /// - MAP has no per-key null information — an absent key resolves to a
-  ///   {@link NullDataSource} that carries only a forward index, so the per-key value set would report "no nulls" for
-  ///   a key that is missing from every doc. Fall back to {@link BaseTransformFunction#getNullBitmap} which ORs the
-  ///   argument bitmaps, yielding the MAP column's own null bitmap: a conservative over-estimate that downstream
-  ///   null handling narrows further.
+  /// Uses the per-key null bitmap when the key's data source tracks nulls, which is exact: every OPEN_STRUCT key does
+  /// (the per-key presence bitmap is materialized into a null value vector on both the mutable and sealed paths), and
+  /// so does a key absent from a MAP column, whose all-null source marks every document null. A key present in a MAP
+  /// column carries no per-key null information, so fall back to [BaseTransformFunction#getNullBitmap] which ORs the
+  /// argument bitmaps, yielding the MAP column's own null bitmap: a conservative over-estimate that downstream null
+  /// handling narrows further.
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {

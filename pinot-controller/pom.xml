@@ -172,10 +172,39 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <!-- The stateful and stateless TestNG suites run in separate forks but Surefire names
+               both reports TEST-TestSuite.xml. Keep their reports in fork-specific subdirectories
+               so one suite cannot overwrite the other. -->
+          <reportsDirectory>${project.build.directory}/surefire-reports/$${surefire.forkNumber}</reportsDirectory>
+          <!-- Surefire collapses repeated TestNG invocations onto one class/method key when it
+               computes the XML suite count. Use TestNG's per-class JUnit reporter for this module;
+               it reports every invocation and does not write the shared HTML assets. -->
+          <disableXmlReport>true</disableXmlReport>
+          <properties combine.children="append">
+            <property>
+              <name>reporter</name>
+              <value>org.testng.reporters.JUnitReportReporter</value>
+            </property>
+          </properties>
           <suiteXmlFiles>
             <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
             <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
           </suiteXmlFiles>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-report-plugin</artifactId>
+        <version>${surefire.version}</version>
+        <configuration>
+          <!-- CI uses three possible fork indices, while Controller has only two TestNG suite test
+               sets, so at most two directories are populated. List all three; the report plugin
+               ignores missing directories. -->
+          <reportsDirectories>
+            <reportsDirectory>${project.build.directory}/surefire-reports/1/junitreports</reportsDirectory>
+            <reportsDirectory>${project.build.directory}/surefire-reports/2/junitreports</reportsDirectory>
+            <reportsDirectory>${project.build.directory}/surefire-reports/3/junitreports</reportsDirectory>
+          </reportsDirectories>
         </configuration>
       </plugin>
     </plugins>

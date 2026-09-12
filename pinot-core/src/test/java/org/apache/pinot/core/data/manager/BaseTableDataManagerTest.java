@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -92,7 +93,8 @@ import static org.testng.Assert.*;
 
 
 public class BaseTableDataManagerTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseTableDataManagerTest");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "BaseTableDataManagerTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final File TABLE_DATA_DIR = new File(TEMP_DIR, OFFLINE_TABLE_NAME);

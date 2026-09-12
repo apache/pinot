@@ -123,15 +123,6 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
   }
 
-  @Test
-  public void testMergeWithNullIntermediateResult() {
-    PercentileSmartTDigestAggregationFunction function = newFunction();
-    DoubleArrayList valueList = new DoubleArrayList(new double[]{1.0, 2.0});
-    assertEquals(function.merge(null, valueList), valueList);
-    assertEquals(function.merge(valueList, null), valueList);
-    assertEquals(function.merge(null, null), null);
-  }
-
   /// Broker reduce can merge a server that produced a t-digest with a server that stayed below the
   /// threshold and produced a raw value list; both argument orders must route into the accumulator.
   @Test

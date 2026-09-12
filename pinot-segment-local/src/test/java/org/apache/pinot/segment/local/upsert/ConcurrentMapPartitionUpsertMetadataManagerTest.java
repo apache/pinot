@@ -265,6 +265,39 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.close();
   }
 
+  // Watermark must not advance before addSegment inserts rows, or a concurrent sweep can drop the incoming keys.
+  @Test
+  public void testDoAddSegmentBumpsWatermarkAfterRowInsert()
+      throws Exception {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    double[] watermarkDuringAdd = {Double.NaN};
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build()) {
+          @Override
+          public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+              @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
+            watermarkDuringAdd[0] = getWatermark();
+            super.addSegment(segment, validDocIds, queryableDocIds, recordInfoIterator);
+          }
+        };
+
+    ThreadSafeMutableRoaringBitmap seedValidDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment seedSegment = mockMutableSegment(1, seedValidDocIds, null);
+    upsertMetadataManager.addRecord(seedSegment, new RecordInfo(makePrimaryKey(999), 0, 100, false));
+    assertEquals(upsertMetadataManager.getWatermark(), 100.0);
+
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment =
+        createRealSegment("deferred_bump_segment", new int[]{1, 2, 3}, new int[]{150, 180, 200}, validDocIds);
+    upsertMetadataManager.addSegment(segment);
+
+    assertEquals(watermarkDuringAdd[0], 100.0);
+    assertEquals(upsertMetadataManager.getWatermark(), 200.0);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
   @Test
   public void testManageWatermark()
       throws IOException {

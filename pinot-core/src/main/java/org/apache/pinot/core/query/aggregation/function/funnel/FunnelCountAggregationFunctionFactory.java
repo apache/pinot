@@ -62,7 +62,10 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   final boolean _thetaSketchSetting;
   final boolean _setSetting;
 
-  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions) {
+  private final boolean _nullHandlingEnabled;
+
+  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions, boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
     _expressions = expressions;
     Option.validate(expressions);
     _correlateByExpressions = Option.CORRELATE_BY.getInputExpressions(expressions);
@@ -120,7 +123,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       MergeStrategy<List<Long>> mergeStrategy) {
     if (_sortingSetting) {
       return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+          aggregationStrategy, resultExtractionStrategy, mergeStrategy, _nullHandlingEnabled);
     } else {
       return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
           aggregationStrategy, resultExtractionStrategy, mergeStrategy);
@@ -128,11 +131,12 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   }
 
   AggregationStrategy<UpdatableThetaSketch[]> thetaSketchAggregationStrategy() {
-    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
+    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries,
+        _nullHandlingEnabled);
   }
 
   AggregationStrategy<DictIdsWrapper> bitmapAggregationStrategy() {
-    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
+    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions, _nullHandlingEnabled);
   }
 
   MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy() {

@@ -35,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -60,6 +61,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
   public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
+  /// Namespace for the service credentials used by the controller when invoking Server admin APIs.
+  public static final String CONTROLLER_SERVER_ADMIN_AUTH_PREFIX = "controller.server.admin.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
@@ -354,6 +357,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  /// Compatibility-only opt-in for local sources passed to `/ingestFromURI`. Enabling this allows callers with
+  /// access to the endpoint to read files visible to the controller process. Keep disabled unless callers and source
+  /// paths are fully trusted.
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
@@ -453,6 +459,18 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
+
+  // Knobs governing how long endReplaceSegments blocks while waiting for the new segments to become
+  // ONLINE in the ExternalView (IdealState -> ExternalView convergence). The per-attempt wait is
+  // retried up to the configured number of attempts, so the worst-case block is
+  // maxWaitMs * maxRetryAttempts. Defaults preserve the historical hard-coded values.
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS =
+      "controller.segment.replace.externalViewMaxWaitMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS =
+      "controller.segment.replace.externalViewCheckIntervalMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS =
+      "controller.segment.replace.maxRetryAttempts";
+  public static final int DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS = 5;
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
@@ -1593,6 +1611,20 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMaxForceCommitZkJobs() {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+  }
+
+  public long getSegmentReplaceExternalViewMaxWaitMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS);
+  }
+
+  public long getSegmentReplaceExternalViewCheckIntervalMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+  }
+
+  public int getSegmentReplaceMaxRetryAttempts() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS, DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS);
   }
 
   /// Get the configured timeseries languages from controller configuration.

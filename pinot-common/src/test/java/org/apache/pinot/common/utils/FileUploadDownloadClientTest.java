@@ -31,11 +31,15 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.pinot.common.auth.StaticTokenAuthProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -52,13 +56,17 @@ public class FileUploadDownloadClientTest {
   private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
   private static final String TEST_CRYPTER = "testCrypter";
+  private static final String TEST_AUTH_TOKEN = "Bearer test-token";
+  private static final String TEST_DOWNLOAD_URL = "file:///tmp/testSegment";
   private HttpServer _testServer;
+  private final AtomicInteger _authenticatedRequests = new AtomicInteger();
 
   @BeforeClass
   public void setUp()
       throws Exception {
     _testServer = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
     _testServer.createContext("/v2/segments", new TestSegmentUploadHandler());
+    _testServer.createContext("/segmentStore", new AuthenticatedSegmentStoreHandler());
     _testServer.setExecutor(null); // creates a default executor
     _testServer.start();
   }
@@ -95,6 +103,37 @@ public class FileUploadDownloadClientTest {
       OutputStream os = httpExchange.getResponseBody();
       os.write(response.getBytes());
       os.close();
+    }
+  }
+
+  private class AuthenticatedSegmentStoreHandler implements HttpHandler {
+    @Override
+    public void handle(HttpExchange httpExchange)
+        throws IOException {
+      Assert.assertEquals(httpExchange.getRequestHeaders().getFirst("Authorization"), TEST_AUTH_TOKEN);
+      _authenticatedRequests.incrementAndGet();
+
+      String response;
+      switch (httpExchange.getRequestURI().getPath()) {
+        case "/segmentStore/plain":
+          response = TEST_DOWNLOAD_URL;
+          break;
+        case "/segmentStore/llc":
+          response = JsonUtils.objectToString(
+              new TableLLCSegmentUploadResponse("testSegment", 123L, 456L, TEST_DOWNLOAD_URL));
+          break;
+        case "/segmentStore/metadata":
+          SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("testSegment");
+          segmentZKMetadata.setDownloadUrl(TEST_DOWNLOAD_URL);
+          response = segmentZKMetadata.toJsonString();
+          break;
+        default:
+          throw new IllegalArgumentException("Unexpected test path: " + httpExchange.getRequestURI().getPath());
+      }
+      httpExchange.sendResponseHeaders(HttpStatus.SC_OK, response.length());
+      try (OutputStream outputStream = httpExchange.getResponseBody()) {
+        outputStream.write(response.getBytes());
+      }
     }
   }
 
@@ -136,6 +175,23 @@ public class FileUploadDownloadClientTest {
     URI controllerURI = new URI("https://myhost:9443");
     URI uriWithEndpoint = FileUploadDownloadClient.getBatchSegmentUploadURI(controllerURI);
     Assert.assertEquals(new URI("https://myhost:9443/segments/batchUpload"), uriWithEndpoint);
+  }
+
+  @Test
+  public void testAuthenticatedServerUploadRequests()
+      throws Exception {
+    StaticTokenAuthProvider authProvider = new StaticTokenAuthProvider(TEST_AUTH_TOKEN);
+    String baseUrl = "http://" + TEST_HOST + ":" + TEST_PORT + "/segmentStore";
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      Assert.assertEquals(fileUploadDownloadClient.uploadToSegmentStore(baseUrl + "/plain", authProvider),
+          TEST_DOWNLOAD_URL);
+      Assert.assertEquals(fileUploadDownloadClient.uploadLLCToSegmentStore(baseUrl + "/llc", authProvider)
+          .getDownloadUrl(), TEST_DOWNLOAD_URL);
+      Assert.assertEquals(
+          fileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(baseUrl + "/metadata", authProvider)
+              .getDownloadUrl(), TEST_DOWNLOAD_URL);
+    }
+    Assert.assertEquals(_authenticatedRequests.get(), 3);
   }
 
   @AfterClass

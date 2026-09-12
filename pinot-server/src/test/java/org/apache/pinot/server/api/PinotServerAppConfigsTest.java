@@ -39,7 +39,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
   ///
   /// @throws JsonProcessingException In case an exception is encountered during JSON processing.
   @Test
-  public void testAppConfigs()
+  public void testAppConfigsWithAllowAllAccessControl()
       throws JsonProcessingException, SocketException, UnknownHostException {
     PinotConfiguration expectedServerConf = new PinotConfiguration();
     String hostname = expectedServerConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
@@ -52,6 +52,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
     PinotAppConfigs expected = new PinotAppConfigs(expectedServerConf);
 
     Response response = _webTarget.path("/appconfigs").request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     String configsJson = response.readEntity(String.class);
     PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 

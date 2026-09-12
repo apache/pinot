@@ -107,7 +107,7 @@ public class TableResizer {
     }
     /// Grouping-set queries produce genuine null group-key values for rolled-up columns regardless of the
     /// user's null-handling option, so ORDER BY over a grouping column must use the null-safe comparator.
-    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeySerialization();
+    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeyEvaluation();
     if (nullHandlingEnabled) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {

@@ -523,21 +523,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Set<String> columns = new HashSet<>();
     // TEXT_INDEX is not tracked via _columnEntries, so handled separately.
     if (type == StandardIndexes.text()) {
-      for (String column : _segmentMetadata.getAllColumns()) {
-        if (TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
-          columns.add(column);
-        }
-      }
+      columns.addAll(TextIndexUtils.getColumnsWithTextIndex(_segmentDirectory, _segmentMetadata.getAllColumns()));
     }
     if (type == StandardIndexes.vector()) {
       // Vector may live as a combined file (legacy / storeInSegmentFile=false) or as a typed
       // entry in columns.psf (storeInSegmentFile=true). Collect both. Removed the early-return
       // that previously hid consolidated entries from this view.
-      for (String column : _segmentMetadata.getAllColumns()) {
-        if (VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
-          columns.add(column);
-        }
-      }
+      columns.addAll(VectorIndexUtils.getColumnsWithVectorIndex(_segmentDirectory, _segmentMetadata.getAllColumns()));
     }
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {

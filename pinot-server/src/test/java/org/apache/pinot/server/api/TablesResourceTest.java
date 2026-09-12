@@ -471,7 +471,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     File segmentFile = response.readEntity(File.class);
 
-    File tempMetadataDir = new File(FileUtils.getTempDirectory(), "segment_metadata");
+    File tempMetadataDir = new File(_tempDir, "segment_metadata");
     FileUtils.forceMkdir(tempMetadataDir);
 
     // Extract metadata.properties
@@ -750,7 +750,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .build();
 
     // Segment 1: dictionary-encoded with tracked uncompressed value bytes.
-    File tableDataDir = new File(TEMP_DIR, mixedTableName);
+    File tableDataDir = new File(_tempDir, mixedTableName);
     TableConfig dictTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
     dictTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
     SegmentGeneratorConfig dictConfig = new SegmentGeneratorConfig(dictTableConfig, schema);
