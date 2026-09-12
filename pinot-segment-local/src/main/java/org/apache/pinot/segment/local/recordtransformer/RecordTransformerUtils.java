@@ -65,8 +65,9 @@ public class RecordTransformerUtils {
   /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
   /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`, plus (when
   /// `IngestionConfig#isConvertAggregationSourceTypes` is true) aggregation source columns that are not in the
-  /// schema (see [#addAggregationSourceDataTypes]). It precedes the post-complex-type
-  /// [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields with the corrected types.
+  /// schema and are used only by numeric-safe aggregations (see [#addAggregationSourceDataTypes]). It precedes
+  /// the post-complex-type [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields
+  /// with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before other transformations.
   /// - (Optional) [ExpressionTransformer] to evaluate expressions and fill the values.
   /// - (Optional) [FilterTransformer] to filter records based on custom predicates.
@@ -173,7 +174,8 @@ public class RecordTransformerUtils {
     }
     // Opt-in: convert aggregation source columns that are not in the schema (and not already covered by an explicit
     // SourceFieldConfig) so mistyped JSON/Avro string numbers are converted before MutableSegmentImpl indexes them.
-    // Off by default; uses the stock DataTypeTransformer (no lazy compatibility short-circuit).
+    // A source shared with an identity-sensitive aggregation is left raw. Off by default; uses the stock
+    // DataTypeTransformer (no lazy compatibility short-circuit).
     if (!preComplexTypeTransform && schema != null && ingestionConfig.isConvertAggregationSourceTypes()) {
       addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
     }
@@ -183,11 +185,11 @@ public class RecordTransformerUtils {
   }
 
   /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
-  /// covered by an explicit [SourceFieldConfig] in either phase). Types are inferred from the aggregation function and
-  /// destination metric. When one source feeds multiple aggregations, inferred numeric types are merged by keeping the
-  /// wider type so config order cannot drop precision. Sketch/HLL/COUNT sources are left unconverted so offering
-  /// semantics (e.g. hashing a string vs a number) are preserved.
-  /// [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
+  /// covered by an explicit [SourceFieldConfig] in either phase). A source is registered only when every aggregation
+  /// that reads it is numeric-safe. One conversion-safe aggregation cannot rewrite a field that an identity-sensitive
+  /// consumer (COUNT, HLL, sketches, bitmaps) also reads. When every consumer is numeric-safe, inferred types are
+  /// merged by keeping the wider type so config order cannot drop precision.
+  /// [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net for raw strings.
   @VisibleForTesting
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
       Map<String, PinotDataType> dataTypes) {
@@ -199,6 +201,8 @@ public class RecordTransformerUtils {
     // dataTypes only has this phase's SourceFieldConfigs. Pre-complex-type names are absent from the post-phase map
     // and must still skip inference so an explicit type is not overwritten.
     Set<String> explicitSourceFields = getExplicitSourceFieldNames(ingestionConfig);
+    Map<String, PinotDataType> inferredTypes = new HashMap<>();
+    Set<String> identitySensitiveSources = new HashSet<>();
     for (AggregationConfig aggregationConfig : aggregationConfigs) {
       String destColumn = aggregationConfig.getColumnName();
       String aggregationFunction = aggregationConfig.getAggregationFunction();
@@ -231,17 +235,22 @@ public class RecordTransformerUtils {
       if (AggregationFunctionColumnPair.STAR.equals(sourceColumn) || schema.hasColumn(sourceColumn)
           || explicitSourceFields.contains(sourceColumn)) {
         // Any explicit SourceFieldConfig (including pre-complex-type) or schema column already covers conversion;
-        // COUNT(*) has no source value.
+        // COUNT(*) has no source value and does not veto other aggregations on a real column.
         continue;
       }
       FieldSpec destFieldSpec = schema.getFieldSpecFor(destColumn);
       PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
-      if (inferredType != null) {
-        PinotDataType existing = dataTypes.get(sourceColumn);
-        dataTypes.put(sourceColumn,
+      if (inferredType == null) {
+        // Identity-sensitive consumer: do not rewrite this source for anyone, including earlier numeric aggregations.
+        identitySensitiveSources.add(sourceColumn);
+        inferredTypes.remove(sourceColumn);
+      } else if (!identitySensitiveSources.contains(sourceColumn)) {
+        PinotDataType existing = inferredTypes.get(sourceColumn);
+        inferredTypes.put(sourceColumn,
             existing == null ? inferredType : mergeInferredAggregationSourceTypes(existing, inferredType));
       }
     }
+    dataTypes.putAll(inferredTypes);
   }
 
   /// Returns source field names configured in either transformer phase. Used so a pre-complex-type
@@ -294,8 +303,9 @@ public class RecordTransformerUtils {
     }
   }
 
-  /// Returns the target type for converting an aggregation source column, or `null` when no conversion should be
-  /// applied (COUNT, HLL, sketches: keep raw offering values).
+  /// Returns the target type for converting an aggregation source column, or `null` when the aggregation is
+  /// identity-sensitive or unknown (COUNT, HLL, sketches, bitmaps). A null result vetoes rewriting that source
+  /// for every consumer, so a sibling SUM cannot collapse `"01"` and `"1"` before HLL hashes them.
   @Nullable
   static PinotDataType inferAggregationSourceDataType(AggregationFunctionType functionType,
       @Nullable FieldSpec destFieldSpec) {

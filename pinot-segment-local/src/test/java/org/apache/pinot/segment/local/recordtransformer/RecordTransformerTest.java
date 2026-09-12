@@ -920,6 +920,34 @@ public class RecordTransformerTest {
         .build();
   }
 
+  private static Schema mixedNumericAndBytesSchema(String numericMetric, String bytesMetric) {
+    return new Schema.SchemaBuilder().setSchemaName("mixedAggSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric(numericMetric, DataType.DOUBLE)
+        .addMetric(bytesMetric, DataType.BYTES)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+  }
+
+  private static void assertAggregationSourceNotRegistered(TableConfig tableConfig, Schema schema, String source) {
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertFalse(dataTypes.containsKey(source), source + " must not be auto type-converted");
+    for (RecordTransformer transformer : RecordTransformerUtils.getDefaultTransformers(tableConfig, schema)) {
+      if (transformer instanceof DataTypeTransformer) {
+        assertFalse(transformer.getInputColumns().contains(source), source + " must not be auto type-converted");
+      }
+    }
+  }
+
+  private static Object processMetric(TransformPipeline pipeline, Object metric) {
+    GenericRow row = new GenericRow();
+    row.putValue("dim", "a");
+    row.putValue("ts", 1L);
+    row.putValue("metric", metric);
+    return pipeline.processRow(row).getTransformedRows().get(0).getValue("metric");
+  }
+
   @Test
   public void testAggregationSourceHllNotAutoConverted() {
     // HLL offerings must keep string identity; auto type conversion must not register the source column.
@@ -928,22 +956,191 @@ public class RecordTransformerTest {
         .addMetric("hllMetric", DataType.BYTES)
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")), "hllTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumAndHllNotConverted() {
+    // SUM must not register metric -> DOUBLE when DISTINCTCOUNTHLL also reads the same source.
+    Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")), "sumHllTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    assertEquals(processMetric(pipeline, "01"), "01");
+    assertEquals(processMetric(pipeline, "1"), "1");
+  }
+
+  @Test
+  public void testAggregationSourceMixedHllThenSumNotConverted() {
+    // Config order must not matter: HLL first still vetoes the later SUM inference.
+    Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)"),
+            new AggregationConfig("sumMetric", "SUM(metric)")), "hllSumTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumAndRawHllNotConverted() {
+    Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTRAWHLL(metric, 12)")), "sumRawHllTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumAndHllPlusNotConverted() {
+    Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTHLLPLUS(metric)")), "sumHllPlusTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceMixedMinMaxAndHllNotConverted() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("minMaxHllSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("minMetric", DataType.DOUBLE)
+        .addMetric("maxMetric", DataType.DOUBLE)
+        .addMetric("hllMetric", DataType.BYTES)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("minMetric", "MIN(metric)"),
+            new AggregationConfig("maxMetric", "MAX(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")), "minMaxHllTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+    assertEquals(processMetric(new TransformPipeline(tableConfig, schema), "01"), "01");
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumAndCountNotConverted() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumCountSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("countMetric", DataType.LONG)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("countMetric", "COUNT(metric)")), "sumCountTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceSumAndCountStarStillConverted() {
+    // COUNT(*) does not read the source column, so it must not veto SUM(metric).
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumCountStarSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("countMetric", DataType.LONG)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("countMetric", "COUNT(*)")), "sumCountStarTable");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertEquals(dataTypes.get("metric"), PinotDataType.DOUBLE);
+    assertEquals(processMetric(new TransformPipeline(tableConfig, schema), "01"), 1.0);
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumAndSketchesNotConverted() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumSketchSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("sketchMetric", DataType.BYTES)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    List<String> identityFunctions =
+        List.of("DISTINCTCOUNTBITMAP(metric)", "DISTINCTCOUNTTHETASKETCH(metric)", "DISTINCTCOUNTCPCSKETCH(metric)",
+            "DISTINCTCOUNTULL(metric)");
+    for (String identityFunction : identityFunctions) {
+      TableConfig tableConfig = newAggregationSourceTableConfig(
+          List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+              new AggregationConfig("sketchMetric", identityFunction)), "sumSketchTable");
+      Map<String, PinotDataType> dataTypes = new HashMap<>();
+      RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+      assertFalse(dataTypes.containsKey("metric"), identityFunction + " must veto source rewrite");
+    }
+  }
+
+  @Test
+  public void testAggregationSourceMixedSumMvAndHllNotConverted() {
+    Schema schema = mixedNumericAndBytesSchema("summvMetric", "hllMetric");
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("summvMetric", "SUMMV(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")), "summvHllTable");
+    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+  }
+
+  @Test
+  public void testAggregationSourceMixedDoesNotBlockUnrelatedColumn() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("twoSourceSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("hllMetric", DataType.BYTES)
+        .addMetric("otherSum", DataType.DOUBLE)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)"),
+            new AggregationConfig("otherSum", "SUM(other)")), "twoSourceTable");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertFalse(dataTypes.containsKey("metric"));
+    assertEquals(dataTypes.get("other"), PinotDataType.DOUBLE);
+  }
+
+  @Test
+  public void testAggregationSourceNumericOnlyStillConvertsLeadingZeroStrings() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumMinMaxSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("minMetric", DataType.DOUBLE)
+        .addMetric("maxMetric", DataType.DOUBLE)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("minMetric", "MIN(metric)"),
+            new AggregationConfig("maxMetric", "MAX(metric)")), "sumMinMaxTable");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertEquals(dataTypes.get("metric"), PinotDataType.DOUBLE);
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    assertEquals(processMetric(pipeline, "01"), 1.0);
+    assertEquals(processMetric(pipeline, "1"), 1.0);
+  }
+
+  @Test
+  public void testAggregationSourceExplicitConfigStillConvertsSharedHllSource() {
+    // Explicit SourceFieldConfig still wins, including when HLL shares the column. That rewrite is unsafe for
+    // identity-sensitive consumers and is documented as an override, not an inferred conversion.
+    Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setConvertAggregationSourceTypes(true);
-    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("hllTable")
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+        new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
+    ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("metric", PinotDataType.DOUBLE, false)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("explicitHllTable")
         .setTimeColumnName("ts")
-        .setNoDictionaryColumns(List.of("hllMetric"))
+        .setNoDictionaryColumns(List.of("sumMetric", "hllMetric"))
         .setIngestionConfig(ingestionConfig)
         .build();
-
-    List<RecordTransformer> transformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
-    for (RecordTransformer transformer : transformers) {
-      if (transformer instanceof DataTypeTransformer) {
-        assertFalse(transformer.getInputColumns().contains("metric"),
-            "HLL source column must not be auto type-converted");
-      }
-    }
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertFalse(dataTypes.containsKey("metric"), "Explicit SourceFieldConfig must skip inference");
+    assertEquals(processMetric(new TransformPipeline(tableConfig, schema), "01"), 1.0);
   }
 
   @Test
