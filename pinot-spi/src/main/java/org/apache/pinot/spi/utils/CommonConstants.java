@@ -2949,5 +2949,13 @@ public class CommonConstants {
     /// - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
     /// - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
     public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
+
+    /// Cluster config key to control whether the protobuf decoder falls back to the last successfully fetched
+    /// (and resolved) descriptor when the remote descriptor fetch fails, so a transient DNS / object-store outage
+    /// does not permanently fail the CONSUMING transition. Enabled by default; set to 'false' to fail fast
+    /// instead. Dynamically updatable without a server restart; a table-level decoder prop
+    /// ('descriptorFileFallbackEnabled') overrides this cluster-wide value.
+    public static final String PROTOBUF_DESCRIPTOR_FALLBACK_ENABLED =
+        "pinot.server.protobuf.descriptor.fallback.enabled";
   }
 }

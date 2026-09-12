@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.github.os72.protobuf.dynamic.DynamicSchema;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtobufInternalUtils;
 import java.io.File;
@@ -26,6 +31,11 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.Set;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
@@ -36,33 +46,170 @@ public class ProtoBufUtils {
   public static final String TMP_DIR_PREFIX = "pinot-protobuf";
   public static final String PB_OUTER_CLASS_SUFFIX = "OuterClass";
 
+  // Last content of each remote (S3, GCS, ...) descriptor file that both fetched and resolved successfully, keyed
+  // by URI. The descriptor is still fetched fresh on every decoder creation, so in-place updates of the file keep
+  // propagating exactly as before; this copy is served only when the fetch itself fails (e.g. a transient DNS or
+  // object-store outage), so a CONSUMING transition cannot go to ERROR on a network blip once the descriptor has
+  // been fetched once by this JVM. The weight charges content, key and a fixed per-entry overhead so both total
+  // memory and entry count stay bounded.
+  private static final long FALLBACK_CACHE_MAX_WEIGHT_BYTES = 64L << 20;
+  private static final int FALLBACK_CACHE_ENTRY_OVERHEAD_BYTES = 1024;
+  private static final Cache<String, CachedDescriptor> LAST_KNOWN_GOOD_DESCRIPTORS = CacheBuilder.newBuilder()
+      .maximumWeight(FALLBACK_CACHE_MAX_WEIGHT_BYTES)
+      .weigher((String key, CachedDescriptor value) ->
+          value._content.length + 2 * key.length() + FALLBACK_CACHE_ENTRY_OVERHEAD_BYTES)
+      .build();
+
+  /// Descriptor content stamped with the time its fetch started. Publication keeps the entry whose fetch started
+  /// last, so a slow stale fetch that completes after a newer one can never roll the cache backward.
+  private static class CachedDescriptor {
+    final byte[] _content;
+    final long _fetchStartNanos;
+
+    CachedDescriptor(byte[] content, long fetchStartNanos) {
+      _content = content;
+      _fetchStartNanos = fetchStartNanos;
+    }
+  }
+
   private ProtoBufUtils() {
   }
 
+  /// Downloads the file at the given path into a fresh local temp directory and returns it. This is a plain
+  /// download with no outage fallback: [ProtoBufCodeGenMessageDecoder] calls it directly for its jar file (which
+  /// must live on disk for class loading and cannot be validated as a descriptor set), so a remote jar remains a
+  /// hard dependency on the remote filesystem being reachable. Descriptors should be resolved through
+  /// [#getDescriptor(String, String, boolean)] instead, which reads without temp files and adds the
+  /// last-known-good fallback. On success the caller owns the returned file; on copy failure the temp directory
+  /// is removed (the copy may have left partial content or filesystem sidecars such as Hadoop `.crc` files).
   public static File getFileCopiedToLocal(String filePath)
       throws Exception {
     URI fileURI = URI.create(filePath);
+    PinotFS pinotFS = getPinotFS(fileURI, filePath);
+    Path localTmpDir = Files.createTempDirectory(TMP_DIR_PREFIX + System.currentTimeMillis());
+    File localFile = createLocalFile(fileURI, localTmpDir.toFile());
+    LOGGER.info("Copying protocol buffer jar/descriptor file from source: {} to dst: {}", filePath,
+        localFile.getAbsolutePath());
+    try {
+      pinotFS.copyToLocalFile(fileURI, localFile);
+      return localFile;
+    } catch (Exception e) {
+      deleteRecursivelyQuietly(localTmpDir);
+      throw e;
+    }
+  }
+
+  /// Opens the descriptor file at the given path. This is a plain read with no outage fallback, kept for
+  /// compatibility; realtime decoding should resolve descriptors through
+  /// [#getDescriptor(String, String, boolean)] instead.
+  public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
+      throws Exception {
+    return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
+  }
+
+  /// Resolves a message [Descriptors.Descriptor] from the descriptor set at the given path: the message type with
+  /// the given name, or the first message type in the set when the name is null or empty.
+  ///
+  /// The descriptor set is read fresh on every call via [PinotFS#open(URI)] — no temp files — so in-place updates
+  /// of the file keep propagating. When `fallbackToLastKnownGood` is set, the last remote content that both
+  /// fetched and resolved successfully is remembered per URI and served ONLY when the fetch itself fails (e.g. a
+  /// transient DNS or object-store outage), so decoder creation survives outages instead of permanently marking
+  /// the CONSUMING segment ERROR. Content that fetches successfully but does not resolve (corrupt, empty, or
+  /// missing the requested message type) always fails the call and leaves the remembered copy untouched: a bad
+  /// descriptor deployment must surface as an error, never silently serve an obsolete schema. Local files are
+  /// read fresh and never remembered.
+  ///
+  /// NOTE: Only this method has the fallback. The jar used by [ProtoBufCodeGenMessageDecoder] is downloaded via
+  /// [#getFileCopiedToLocal(String)] without one (see the note there).
+  public static Descriptors.Descriptor getDescriptor(String descriptorFilePath, @Nullable String messageTypeName,
+      boolean fallbackToLastKnownGood)
+      throws Exception {
+    URI fileURI = URI.create(descriptorFilePath);
+    String scheme = fileURI.getScheme();
+    boolean remote = scheme != null && !scheme.equals(PinotFSFactory.LOCAL_PINOT_FS_SCHEME);
+    boolean fallbackEnabled = remote && fallbackToLastKnownGood;
+    // The stamp is taken before the fetch so that publication can reject a slow stale fetch that completes after
+    // a newer one (see CachedDescriptor)
+    long fetchStartNanos = System.nanoTime();
+    byte[] content;
+    try {
+      content = readFileToBytes(fileURI, descriptorFilePath);
+    } catch (Exception fetchException) {
+      CachedDescriptor lastKnownGood =
+          fallbackEnabled ? LAST_KNOWN_GOOD_DESCRIPTORS.getIfPresent(descriptorFilePath) : null;
+      if (lastKnownGood == null) {
+        throw fetchException;
+      }
+      LOGGER.warn("Failed to fetch protocol buffer descriptor file: {}, falling back to the last known good copy",
+          descriptorFilePath, fetchException);
+      return resolveMessageDescriptor(lastKnownGood._content, messageTypeName, descriptorFilePath);
+    }
+    // A fetched-but-unresolvable descriptor fails here, before publication, so it can neither be served nor
+    // overwrite the last known good copy
+    Descriptors.Descriptor descriptor = resolveMessageDescriptor(content, messageTypeName, descriptorFilePath);
+    if (fallbackEnabled) {
+      LAST_KNOWN_GOOD_DESCRIPTORS.asMap().merge(descriptorFilePath,
+          new CachedDescriptor(content, fetchStartNanos),
+          (existing, candidate) -> candidate._fetchStartNanos - existing._fetchStartNanos > 0 ? candidate
+              : existing);
+    }
+    return descriptor;
+  }
+
+  /// Parses the descriptor set and resolves the requested message type (or the first one when no name is given).
+  /// Failures here mean the content is unusable — deliberately distinct from a fetch failure.
+  private static Descriptors.Descriptor resolveMessageDescriptor(byte[] descriptorSetBytes,
+      @Nullable String messageTypeName, String descriptorFilePath)
+      throws Exception {
+    DynamicSchema schema;
+    try {
+      schema = DynamicSchema.parseFrom(descriptorSetBytes);
+    } catch (Exception e) {
+      throw new IllegalStateException("Invalid protocol buffer descriptor set at: " + descriptorFilePath, e);
+    }
+    String typeName = messageTypeName;
+    if (StringUtils.isEmpty(typeName)) {
+      Set<String> messageTypes = schema.getMessageTypes();
+      Preconditions.checkState(!messageTypes.isEmpty(), "Descriptor set at: %s contains no message types",
+          descriptorFilePath);
+      typeName = messageTypes.iterator().next();
+    }
+    Descriptors.Descriptor descriptor = schema.getMessageDescriptor(typeName);
+    Preconditions.checkState(descriptor != null, "Message type: %s not found in descriptor set at: %s", typeName,
+        descriptorFilePath);
+    return descriptor;
+  }
+
+  private static byte[] readFileToBytes(URI fileURI, String filePath)
+      throws Exception {
+    try (InputStream inputStream = getPinotFS(fileURI, filePath).open(fileURI)) {
+      return inputStream.readAllBytes();
+    }
+  }
+
+  private static PinotFS getPinotFS(URI fileURI, String filePath) {
     String scheme = fileURI.getScheme();
     if (scheme == null) {
       scheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
     }
-    if (PinotFSFactory.isSchemeSupported(scheme)) {
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
-      Path localTmpDir = Files.createTempDirectory(TMP_DIR_PREFIX + System.currentTimeMillis());
-      File localFile = createLocalFile(fileURI, localTmpDir.toFile());
-      LOGGER.info("Copying protocol buffer jar/descriptor file from source: {} to dst: {}", filePath,
-          localFile.getAbsolutePath());
-      pinotFS.copyToLocalFile(fileURI, localFile);
-      return localFile;
-    } else {
+    if (!PinotFSFactory.isSchemeSupported(scheme)) {
       throw new RuntimeException(String.format("Scheme: %s not supported in PinotFSFactory"
           + " for protocol buffer jar/descriptor file: %s.", scheme, filePath));
     }
+    return PinotFSFactory.create(scheme);
   }
 
-  public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
-      throws Exception {
-    return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
+  private static void deleteRecursivelyQuietly(Path dir) {
+    try (Stream<Path> paths = Files.walk(dir)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to clean up temporary directory: {}", dir, e);
+    }
+  }
+
+  @VisibleForTesting
+  static void clearDescriptorCache() {
+    LAST_KNOWN_GOOD_DESCRIPTORS.invalidateAll();
   }
 
   public static File createLocalFile(URI srcURI, File dstDir) {

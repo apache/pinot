@@ -18,27 +18,30 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
-import com.github.os72.protobuf.dynamic.DynamicSchema;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.ProtoBufDescriptorFallbackListener;
 
 
 //TODO: Add support for Schema Registry
 public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
+  /// When enabled, a remote descriptor that both fetched and resolved successfully before is served when the
+  /// remote fetch fails, so a transient DNS / object-store outage does not permanently fail the CONSUMING
+  /// transition. When this decoder prop is not set, the cluster config
+  /// 'pinot.server.protobuf.descriptor.fallback.enabled' applies (enabled by default, dynamically updatable);
+  /// setting the prop to 'true' or 'false' overrides the cluster-wide value for the table.
+  public static final String DESCRIPTOR_FILE_FALLBACK_ENABLED = "descriptorFileFallbackEnabled";
 
   private ProtoBufRecordExtractor _recordExtractor;
-  private String _protoClassName;
   private Message.Builder _builder;
 
   @Override
@@ -47,29 +50,20 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
         "Protocol Buffer schema descriptor file must be provided");
 
-    _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
-        props.get(DESCRIPTOR_FILE_PATH));
-    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
+    Descriptors.Descriptor descriptor = ProtoBufUtils.getDescriptor(props.get(DESCRIPTOR_FILE_PATH),
+        props.getOrDefault(PROTO_CLASS_NAME, ""), isDescriptorFallbackEnabled(props));
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     _builder = dynamicMessage.newBuilderForType();
   }
 
-  private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
-      throws IOException {
-    try {
-      DynamicSchema dynamicSchema = DynamicSchema.parseFrom(fin);
-
-      if (!StringUtils.isEmpty(_protoClassName)) {
-        return dynamicSchema.getMessageDescriptor(_protoClassName);
-      } else {
-        return dynamicSchema.getMessageDescriptor(dynamicSchema.getMessageTypes().toArray(new String[]{})[0]);
-      }
-    } catch (Descriptors.DescriptorValidationException e) {
-      throw new IOException("Descriptor file validation failed", e);
-    }
+  /// The table-level decoder prop, when set, overrides the dynamically updatable cluster-wide setting.
+  @VisibleForTesting
+  static boolean isDescriptorFallbackEnabled(Map<String, String> props) {
+    String tableOverride = props.get(DESCRIPTOR_FILE_FALLBACK_ENABLED);
+    return tableOverride != null ? Boolean.parseBoolean(tableOverride)
+        : ProtoBufDescriptorFallbackListener.getInstance().isEnabled();
   }
 
   @Override
