@@ -38,6 +38,10 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("For 'TIME' segment selector, the period after which to select segments for this tier")
   private final String _segmentAge;
 
+  @JsonPropertyDescription("For 'TIME' segment selector, the segment ZK metadata field to compare against for age. "
+      + "Accepts 'endTime' (default, backward-compatible) or 'creationTime'.")
+  private final String _segmentAgeField;
+
   @JsonPropertyDescription("For 'FIXED' segment selector, the list of segments to select for this tier")
   private final List<String> _segmentList;
 
@@ -60,6 +64,7 @@ public class TierConfig extends BaseJsonConfig {
   public TierConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType,
       @JsonProperty("segmentAge") @Nullable String segmentAge,
+      @JsonProperty("segmentAgeField") @Nullable String segmentAgeField,
       @JsonProperty("segmentList") @Nullable List<String> segmentList,
       @JsonProperty(value = "storageType", required = true) String storageType,
       @JsonProperty("serverTag") @Nullable String serverTag,
@@ -72,11 +77,20 @@ public class TierConfig extends BaseJsonConfig {
     _name = name;
     _segmentSelectorType = segmentSelectorType;
     _segmentAge = segmentAge;
+    _segmentAgeField = segmentAgeField;
     _segmentList = segmentList;
     _storageType = storageType;
     _serverTag = serverTag;
     _tierBackend = tierBackend;
     _tierBackendProperties = tierBackendProperties;
+  }
+
+  /// Backward-compatible constructor without segmentAgeField (defaults to endTime).
+  public TierConfig(String name, String segmentSelectorType, @Nullable String segmentAge,
+      @Nullable List<String> segmentList, String storageType, @Nullable String serverTag,
+      @Nullable String tierBackend, @Nullable Map<String, String> tierBackendProperties) {
+    this(name, segmentSelectorType, segmentAge, null, segmentList, storageType, serverTag, tierBackend,
+        tierBackendProperties);
   }
 
   public String getName() {
@@ -90,6 +104,11 @@ public class TierConfig extends BaseJsonConfig {
   @Nullable
   public String getSegmentAge() {
     return _segmentAge;
+  }
+
+  @Nullable
+  public String getSegmentAgeField() {
+    return _segmentAgeField;
   }
 
   @Nullable

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -251,5 +252,28 @@ public class ControllerConfTest {
 
     controllerConf.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
     Assert.assertTrue(controllerConf.isIngestFromUriLocalFileSystemAllowed());
+  }
+
+  @Test
+  public void testSegmentReplaceConvergenceDefaults() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertEquals(conf.getSegmentReplaceExternalViewMaxWaitMs(),
+        PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS);
+    Assert.assertEquals(conf.getSegmentReplaceExternalViewCheckIntervalMs(),
+        PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    Assert.assertEquals(conf.getSegmentReplaceMaxRetryAttempts(),
+        ControllerConf.DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS);
+  }
+
+  @Test
+  public void testSegmentReplaceConvergenceCustomValues() {
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS, 45 * 60_000L);
+    conf.setProperty(ControllerConf.CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS, 500L);
+    conf.setProperty(ControllerConf.CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS, 2);
+
+    Assert.assertEquals(conf.getSegmentReplaceExternalViewMaxWaitMs(), 45 * 60_000L);
+    Assert.assertEquals(conf.getSegmentReplaceExternalViewCheckIntervalMs(), 500L);
+    Assert.assertEquals(conf.getSegmentReplaceMaxRetryAttempts(), 2);
   }
 }

@@ -285,6 +285,20 @@ public class MultiClusterRoutingManagerTest {
     assertTrue(result.containsKey("server2"));
   }
 
+  /// Routable tables union across local and remote clusters. Without this override the RoutingManager
+  /// default returns empty and startup pre-connect would derive no channels on a multi-cluster broker.
+  @Test
+  public void testGetRoutableTablesCombinesAll() {
+    when(_localClusterRoutingManager.getRoutableTables()).thenReturn(Set.of("a_OFFLINE", "shared_OFFLINE"));
+    when(_remoteClusterRoutingManager1.getRoutableTables()).thenReturn(Set.of("b_REALTIME", "shared_OFFLINE"));
+    when(_remoteClusterRoutingManager2.getRoutableTables()).thenReturn(Set.of());
+
+    Set<String> result = _multiClusterRoutingManager.getRoutableTables();
+
+    // Union with the duplicate ("shared_OFFLINE") collapsed.
+    assertEquals(result, Set.of("a_OFFLINE", "b_REALTIME", "shared_OFFLINE"));
+  }
+
   // Helper methods
 
   private BrokerRequest createMockBrokerRequest(String tableName) {

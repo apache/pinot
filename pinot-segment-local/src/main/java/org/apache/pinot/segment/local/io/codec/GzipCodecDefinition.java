@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
-import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 
 /// Legacy `GZIP`-named compression codec backed by the default [java.util.zip.Deflater], which
@@ -102,57 +101,40 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
     int uncompressedSize = src.remaining();
-    ByteBuffer out = ByteBuffer.allocateDirect(maxEncodedSize(options, uncompressedSize));
+    int encodedSizeBound = maxEncodedSize(options, ctx, uncompressedSize);
+    if (encodedSizeBound > dst.capacity()) {
+      throw new IllegalArgumentException(
+          "GZIP: encoded size bound " + encodedSizeBound + " exceeds dst capacity " + dst.capacity());
+    }
+    dst.clear();
+    dst.limit(dst.capacity() - Integer.BYTES);
     Deflater deflater = DEFLATER.get();
-    boolean succeeded = false;
+    deflater.reset();
     try {
-      out.limit(out.capacity() - Integer.BYTES);
-      deflater.reset();
-      deflater.setInput(src.duplicate());
+      deflater.setInput(src);
       deflater.finish();
       while (!deflater.finished()) {
-        if (!out.hasRemaining()) {
-          throw new IOException("GZIP encode exceeded maximum encoded size " + out.capacity()
+        if (!dst.hasRemaining()) {
+          throw new IOException("GZIP encode exceeded maximum encoded size " + dst.capacity()
               + " before deflater finished. Segment build aborted.");
         }
-        int encoded = deflater.deflate(out);
+        int encoded = deflater.deflate(dst);
         if (encoded == 0 && !deflater.finished()) {
           throw new IOException("GZIP deflater made no progress before finishing");
         }
       }
-      out.limit(out.capacity());
-      out.putInt(uncompressedSize);
-      out.flip();
-      succeeded = true;
-      return out;
+      dst.limit(dst.capacity());
+      dst.putInt(uncompressedSize);
+      dst.flip();
     } finally {
       deflater.reset();
-      if (!succeeded) {
-        CleanerUtil.cleanQuietly(out);
-      }
     }
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
-    int decompressedSize = readDecompressedSize(src);
-    ByteBuffer out = ByteBuffer.allocateDirect(decompressedSize);
-    boolean succeeded = false;
-    try {
-      inflateInto(src, out, decompressedSize);
-      succeeded = true;
-      return out;
-    } finally {
-      if (!succeeded) {
-        CleanerUtil.cleanQuietly(out);
-      }
-    }
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
     dst.clear();
     int decompressedSize = readDecompressedSize(src);
     if (decompressedSize > dst.capacity()) {
@@ -163,7 +145,7 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     // DEFLATE worst-case expansion + 4-byte appended uncompressed-size footer
     if (inputSize < 0) {
       throw new IllegalArgumentException("GZIP inputSize must be non-negative: " + inputSize);
@@ -177,7 +159,7 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return false;
   }
 

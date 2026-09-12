@@ -105,12 +105,12 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return false;
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     // Worst case: every value is incompressible XOR → control bits + leading + width + full bits.
     // Approx 2*elementBits + 13 bits per value. Round up generously to elementBits * 2 + 16 bits.
     // Cheap upper bound: header + 2 * inputSize bytes.
@@ -125,7 +125,9 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) {
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
+    dst.clear();
     int remaining = src.remaining();
     DataType dt = ctx.getDataType();
     if (dt != DataType.INT && dt != DataType.LONG) {
@@ -143,27 +145,31 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
     int leadingBits = isLong ? 6 : 5;
     int widthBits = isLong ? 6 : 5;
 
-    ByteBuffer out = ByteBuffer.allocateDirect(maxEncodedSize(options, remaining));
-    out.put((byte) (isLong ? 1 : 0));
-    out.putInt(count);
+    int encodedSizeBound = maxEncodedSize(options, ctx, remaining);
+    if (encodedSizeBound > dst.capacity()) {
+      throw new IllegalArgumentException(
+          "GORILLA: encoded size bound " + encodedSizeBound + " exceeds dst capacity " + dst.capacity());
+    }
+    dst.put((byte) (isLong ? 1 : 0));
+    dst.putInt(count);
     if (count == 0) {
-      out.flip();
-      return out;
+      dst.flip();
+      return;
     }
 
     // First value verbatim
     long prev = isLong ? src.getLong() : (long) src.getInt();
     if (isLong) {
-      out.putLong(prev);
+      dst.putLong(prev);
     } else {
-      out.putInt((int) prev);
+      dst.putInt((int) prev);
     }
     if (count == 1) {
-      out.flip();
-      return out;
+      dst.flip();
+      return;
     }
 
-    BitWriter writer = new BitWriter(out);
+    BitWriter writer = new BitWriter(dst);
     int prevLeading = -1; // sentinel: no previous window
     int prevWidth = -1;
 
@@ -214,31 +220,12 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
     }
 
     writer.flush();
-    out.flip();
-    return out;
+    dst.flip();
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) {
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
-    byte flag = src.get();
-    int count = src.getInt();
-    validateHeader(flag, count, ctx);
-    if (count == 0) {
-      ensureFullyConsumed(src);
-      return ByteBuffer.allocateDirect(0);
-    }
-    boolean isLong = flag == 1;
-    int elementSize = isLong ? Long.BYTES : Integer.BYTES;
-    ByteBuffer out = ByteBuffer.allocateDirect(decodedSize(count, elementSize));
-    decodeValues(src, count, isLong, out);
-    out.flip();
-    return out;
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     byte flag = src.get();
     int count = src.getInt();
@@ -346,15 +333,6 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
       }
     }
     reader.ensureFullyConsumed();
-  }
-
-  private static int decodedSize(int count, int elementSize) {
-    long decodedSize = (long) count * elementSize;
-    if (decodedSize > Integer.MAX_VALUE) {
-      throw new IllegalStateException(
-          "GORILLA: decoded size " + decodedSize + " exceeds Integer.MAX_VALUE. Segment may be corrupt.");
-    }
-    return (int) decodedSize;
   }
 
   private static void ensureFullyConsumed(ByteBuffer src) {
