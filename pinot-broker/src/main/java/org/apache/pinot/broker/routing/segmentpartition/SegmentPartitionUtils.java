@@ -78,7 +78,7 @@ public class SegmentPartitionUtils {
 
     return new SegmentPartitionInfo(partitionColumn,
         PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-        columnPartitionMetadata.getPartitions());
+        columnPartitionMetadata.getPartitions(), columnPartitionMetadata.getFunctionConfig());
   }
 
   /// Returns a map from partition column name to partition info for a given segment with multiple partition columns.
@@ -120,7 +120,7 @@ public class SegmentPartitionUtils {
       }
       SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
           PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-          columnPartitionMetadata.getPartitions());
+          columnPartitionMetadata.getPartitions(), columnPartitionMetadata.getFunctionConfig());
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
