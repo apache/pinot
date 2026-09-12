@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -99,10 +102,12 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
 
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // Allocate the flat map only when a required segment is selected. It avoids one map node per segment without
+    // reserving large arrays for queries whose segments are all optional or unavailable.
+    Map<String, String> segmentToSelectedInstanceMap = null;
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
+    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
     boolean useFixedReplica = ctx.isUseFixedReplica();
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
@@ -141,10 +146,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
       }
 
-      poolToSegmentCount.merge(selectedInstance.getPool(), 1, Integer::sum);
+      poolToSegmentCount.addTo(selectedInstance.getPool(), 1);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
+        if (segmentToSelectedInstanceMap == null) {
+          segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
+        }
         segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
@@ -154,11 +162,12 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
+    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
+          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
     }
-    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentToSelectedInstanceMap != null ? segmentToSelectedInstanceMap : new HashMap<>(),
+        optionalSegmentToInstanceMap);
   }
 
   private List<SegmentInstanceCandidate> fetchCandidateServersForQuery(List<String> segments,

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.manager;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.lang.reflect.Constructor;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.TableReplicaHealth;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
@@ -45,10 +47,13 @@ import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -57,6 +62,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -71,15 +77,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -157,6 +166,89 @@ public class BrokerRoutingManagerTest {
   public void tearDown()
       throws Exception {
     _mocks.close();
+  }
+
+  @Test
+  public void testInstanceConfigIdsInternedAcrossRefreshesAndRouting()
+      throws Exception {
+    ZNRecordSerializer serializer = new ZNRecordSerializer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
+        new InstanceSelector.InstanceMapping(Map.of("required", SERVER_INSTANCE_ID),
+            Map.of("optional", SERVER_INSTANCE_ID)), List.of(), 0));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("required", "optional"), List.of(), instanceSelector));
+
+    for (int grpcPort : List.of(9000, 9001)) {
+      ZNRecord config = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+      config.setIntField(Helix.Instance.GRPC_PORT_KEY, grpcPort);
+      ZNRecord decodedConfig = (ZNRecord) serializer.deserialize(serializer.serialize(config));
+      // Config IDs are JSON values; unlike assignment-map keys, they are not interned by the parser.
+      assertEquals(decodedConfig.getId(), SERVER_INSTANCE_ID);
+      assertNotSame(decodedConfig.getId(), SERVER_INSTANCE_ID);
+      when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+          anyInt())).thenReturn(List.of(decodedConfig));
+
+      _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+      Map<String, ServerInstance> enabledServers = _routingManager.getEnabledServerInstanceMap();
+      assertEquals(enabledServers.size(), 1);
+      assertSame(enabledServers.keySet().iterator().next(), SERVER_INSTANCE_ID);
+      ServerInstance server = enabledServers.get(SERVER_INSTANCE_ID);
+      assertEquals(server.getInstanceId(), SERVER_INSTANCE_ID);
+      assertEquals(server.getHostname(), SERVER_HOST);
+      assertEquals(server.getPort(), SERVER_PORT);
+      // An equal ID on a later config refresh must still replace the server's configuration.
+      assertEquals(server.getGrpcPort(), grpcPort);
+      assertSame(_routingManager.getRoutableServerInstanceMap().get(SERVER_INSTANCE_ID), server);
+
+      RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
+      Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
+      assertEquals(serverSegments.size(), 1);
+      assertSame(serverSegments.keySet().iterator().next(), server);
+      assertEquals(serverSegments.get(server).getSegments(), List.of("required"));
+      assertEquals(serverSegments.get(server).getOptionalSegments(), List.of("optional"));
+      assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    }
+  }
+
+  @Test
+  public void testGroupingPreservesOptionalServerAndMissingServerBehavior()
+      throws Exception {
+    String optionalOnlyInstanceId = "Server_optional_8000";
+    ServerInstance requiredServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    ServerInstance optionalOnlyServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
+    _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
+    _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
+    Map<String, String> required = new Object2ObjectOpenHashMap<>(Map.of(
+        "required0", SERVER_INSTANCE_ID, "required1", SERVER_INSTANCE_ID,
+        "missingRequired0", "Server_missing_8000", "missingRequired1", "Server_missing_8000"));
+    Map<String, String> optional = Map.of("optional", SERVER_INSTANCE_ID,
+        "optionalOnly", optionalOnlyInstanceId, "missingOptional", "Server_missing_optional_8000");
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
+        new InstanceSelector.InstanceMapping(required, optional), List.of(), 0));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE,
+        selectorOf("required0", "required1", "missingRequired0", "missingRequired1", "optional", "optionalOnly",
+            "missingOptional"), List.of(), instanceSelector));
+    clearInvocations(_brokerMetrics);
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
+
+    Map<ServerInstance, SegmentsToQuery> grouped = routingTable.getServerInstanceToSegmentsMap();
+    assertEquals(grouped.keySet(), Set.of(requiredServer));
+    assertEquals(new HashSet<>(grouped.get(requiredServer).getSegments()), Set.of("required0", "required1"));
+    assertEquals(grouped.get(requiredServer).getSegments().size(), 2);
+    assertEquals(grouped.get(requiredServer).getOptionalSegments(), List.of("optional"));
+    assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    // Missing required segments are metered; missing optional segments and optional-only servers are skipped.
+    ArgumentCaptor<Long> increments = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics, atLeastOnce()).addMeteredTableValue(eq(TEST_TABLE),
+        eq(BrokerMeter.SERVER_MISSING_FOR_ROUTING), increments.capture());
+    assertEquals(increments.getAllValues().stream().mapToLong(Long::longValue).sum(), 2L);
+    verifyNoMoreInteractions(_brokerMetrics);
   }
 
   @Test
