@@ -544,32 +544,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   /// Whether null handling is enabled by default. This value is only used if
   /// [Schema#isEnableColumnBasedNullHandling()] is false.
-  ///
-  /// @deprecated Use [#isDefaultNullHandlingEnabled()] instead
-  @Deprecated
-  public boolean isNullHandlingEnabled() {
-    return _defaultNullHandlingEnabled;
-  }
-
-  /// Whether null handling is enabled by default. This value is only used if
-  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   public boolean isDefaultNullHandlingEnabled() {
     return _defaultNullHandlingEnabled;
   }
 
   /// Whether null handling is enabled by default. This value is only used if
   /// [Schema#isEnableColumnBasedNullHandling()] is false.
-  ///
-  /// @deprecated Use [#setDefaultNullHandlingEnabled(boolean)] instead
-  @Deprecated
-  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
-    setDefaultNullHandlingEnabled(nullHandlingEnabled);
-  }
-
-  /// Whether null handling is enabled by default. This value is only used if
-  /// [Schema#isEnableColumnBasedNullHandling()] is false.
-  public void setDefaultNullHandlingEnabled(boolean nullHandlingEnabled) {
-    _defaultNullHandlingEnabled = nullHandlingEnabled;
+  public void setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
+    _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
   }
 
   public boolean isContinueOnError() {

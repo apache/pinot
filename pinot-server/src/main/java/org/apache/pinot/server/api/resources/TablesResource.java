@@ -109,6 +109,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.ServerDataAccess;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -562,6 +563,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @ServerDataAccess
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
@@ -618,6 +620,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ServerDataAccess
   @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
       "Download validDocIds for " + "an immutable segment in bitmap format.")
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
@@ -670,85 +673,6 @@ public class TablesResource {
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
-  }
-
-  /// Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
-  /// peer to avoid recompute when reload segments.
-  @Deprecated
-  @GET
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
-  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
-      + "an immutable segment in bitmap format.")
-  public Response downloadValidDocIds(
-      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") @Nullable String validDocIdsType,
-      @Context HttpHeaders httpHeaders) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
-    segmentName = URIUtils.decode(segmentName);
-    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
-    // Validate data access
-    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
-
-    TableDataManager tableDataManager =
-        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-    if (segmentDataManager == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
-    try {
-      IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
-      }
-
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
-          getValidDocIds(indexSegment, validDocIdsType);
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
-      if (validDocIdSnapshot == null) {
-        String msg = String.format(
-            "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
-        LOGGER.warn(msg);
-        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
-      }
-
-      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
-      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
-      return builder.build();
-    } finally {
-      tableDataManager.releaseSegment(segmentDataManager);
-    }
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tables/{tableNameWithType}/validDocIdMetadata")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
-  })
-  public String getValidDocIdsMetadata(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   @POST

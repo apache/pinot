@@ -18,23 +18,18 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -42,17 +37,10 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.QueryCancelledException;
 
 
-/// The `BloomFilterSegmentPruner` prunes segments based on bloom filter for EQUALITY filter. Because the access
-/// to bloom filter data is required, segment pruning is done in parallel when the number of segments is large.
+/// Prunes segments using bloom filters for EQ and IN predicates, with optional prefetch.
 public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
-  // Try to schedule 10 segments for each thread, or evenly distribute them to all MAX_NUM_THREADS_PER_QUERY threads.
-  // TODO: make this threshold configurable? threshold 10 is also used in CombinePlanNode, which accesses the
-  //       dictionary data to do query planning and if segments are more than 10, planning is done in parallel.
-  private static final int TARGET_NUM_SEGMENTS_PER_THREAD = 10;
-
   private FetchPlanner _fetchPlanner;
 
   @Override
@@ -62,7 +50,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   @Override
-  protected boolean isApplicableToPredicate(Predicate predicate) {
+  protected boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions) {
     // Only prune columns
     if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
       return false;
@@ -73,9 +61,8 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
     if (predicateType == Predicate.Type.IN) {
       List<String> values = ((InPredicate) predicate).getValues();
-      // Skip pruning when there are too many values in the IN predicate
       //noinspection RedundantIfStatement
-      if (values.size() <= _inPredicateThreshold) {
+      if (shouldPruneInPredicate(values.size(), queryOptions)) {
         return true;
       }
     }
@@ -84,80 +71,16 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    if (segments.isEmpty()) {
-      return segments;
-    }
-    if (!query.isEnablePrefetch()) {
-      return super.prune(segments, query);
-    }
-    return prefetch(segments, query, fetchContexts -> {
-      int numSegments = segments.size();
-      FilterContext filter = Objects.requireNonNull(query.getFilter());
-      ValueCache cachedValues = new ValueCache();
-      Map<String, DataSource> dataSourceCache = new HashMap<>();
-      List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
-      for (int i = 0; i < numSegments; i++) {
-        dataSourceCache.clear();
-        IndexSegment segment = segments.get(i);
-        if (!pruneSegmentWithFetchContext(segment, fetchContexts[i], filter, dataSourceCache, cachedValues, query)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    });
+    return prune(segments, query, null);
   }
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
       @Nullable ExecutorService executorService) {
-    if (segments.isEmpty()) {
-      return segments;
+    if (segments.isEmpty() || !query.isEnablePrefetch()) {
+      return super.prune(segments, query, executorService);
     }
-    if (executorService == null || segments.size() <= TARGET_NUM_SEGMENTS_PER_THREAD) {
-      // If executor is not provided, or the number of segments is small, prune them sequentially
-      return prune(segments, query);
-    }
-    // With executor service and large number of segments, prune them in parallel.
-    // NOTE: Even if numTasks=1 i.e. we get a single executor thread, still run it using a separate thread so that
-    //       the timeout can be honored. For example, this may happen when there is only one processor.
-    int numTasks = QueryMultiThreadingUtils.getNumTasks(segments.size(), TARGET_NUM_SEGMENTS_PER_THREAD,
-        query.getMaxExecutionThreads());
-    if (!query.isEnablePrefetch()) {
-      return pruneInParallel(numTasks, segments, query, executorService, null);
-    }
-    return prefetch(segments, query,
-        fetchContexts -> pruneInParallel(numTasks, segments, query, executorService, fetchContexts));
-  }
-
-  private List<IndexSegment> pruneInParallel(int numTasks, List<IndexSegment> segments, QueryContext query,
-      ExecutorService executorService, @Nullable FetchContext[] fetchContexts) {
-    int numSegments = segments.size();
-    List<IndexSegment> allSelectedSegments = new ArrayList<>();
-    QueryMultiThreadingUtils.runTasksWithDeadline(numTasks, index -> {
-      FilterContext filter = Objects.requireNonNull(query.getFilter());
-      ValueCache cachedValues = new ValueCache();
-      Map<String, DataSource> dataSourceCache = new HashMap<>();
-      List<IndexSegment> selectedSegments = new ArrayList<>();
-      for (int i = index; i < numSegments; i += numTasks) {
-        dataSourceCache.clear();
-        IndexSegment segment = segments.get(i);
-        FetchContext fetchContext = fetchContexts != null ? fetchContexts[i] : null;
-        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, query)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    }, taskRes -> {
-      if (taskRes != null) {
-        allSelectedSegments.addAll(taskRes);
-      }
-    }, e -> {
-      if (e instanceof InterruptedException) {
-        throw new QueryCancelledException("Cancelled while running BloomFilterSegmentPruner", e);
-      }
-      throw new RuntimeException("Caught exception while running BloomFilterSegmentPruner", e);
-    }, executorService, query.getEndTimeMs());
-    return allSelectedSegments;
+    return prefetch(segments, query, fetchContexts -> super.prune(segments, query, executorService, fetchContexts));
   }
 
   private List<IndexSegment> prefetch(List<IndexSegment> segments, QueryContext query,
@@ -186,19 +109,6 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
   }
 
-  private boolean pruneSegmentWithFetchContext(IndexSegment segment, @Nullable FetchContext fetchContext,
-      FilterContext filter, Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext query) {
-    if (fetchContext == null) {
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
-    }
-    segment.acquire(fetchContext);
-    try {
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues, query);
-    } finally {
-      segment.release(fetchContext);
-    }
-  }
-
   @Override
   boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
       ValueCache cachedValues, QueryContext query) {
@@ -206,7 +116,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     if (predicateType == Predicate.Type.EQ) {
       return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
     } else if (predicateType == Predicate.Type.IN) {
-      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, query);
     } else {
       return false;
     }
@@ -230,12 +140,10 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   /// For IN predicate, prune the segments based on column bloom filter.
-  /// NOTE: segments will not be pruned if the number of values is greater than the threshold.
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();
-    // Skip pruning when there are too many values in the IN predicate
-    if (values.size() > _inPredicateThreshold) {
+    if (!shouldPruneInPredicate(values.size(), query.getQueryOptions())) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();

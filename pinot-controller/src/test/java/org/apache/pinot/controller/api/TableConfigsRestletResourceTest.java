@@ -519,12 +519,12 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Schema schema = createDummySchema(tableName);
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "now()")));
-    TableConfig legacyOfflineConfig = getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "now()")));
+    TableConfig legacyRealtimeConfig = getBaseTableConfigBuilder(tableName, TableType.REALTIME)
         .setIngestionConfig(ingestionConfig)
         .build();
-    TableConfigs tableConfigs = new TableConfigs(tableName, schema, legacyOfflineConfig, null);
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, null, legacyRealtimeConfig);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     try {
       String createError = Assert.expectThrows(Exception.class,
               () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null))
@@ -533,21 +533,21 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
       // Seed the config below the REST validation layer to model a table persisted before this validation existed.
       DEFAULT_INSTANCE.addSchema(schema);
-      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyOfflineConfig);
+      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyRealtimeConfig);
 
       TableConfigs update = adminClient.getTableClient().getTableConfigsObject(tableName);
-      update.getOffline().getValidationConfig().setRetentionTimeValue("10");
+      update.getRealtime().getValidationConfig().setRetentionTimeValue("10");
       adminClient.getTableClient()
           .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false);
 
       TableConfigs stored = adminClient.getTableClient().getTableConfigsObject(tableName);
-      Assert.assertEquals(stored.getOffline().getValidationConfig().getRetentionTimeValue(), "10");
-      Assert.assertEquals(stored.getOffline().getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(),
+      Assert.assertEquals(stored.getRealtime().getValidationConfig().getRetentionTimeValue(), "10");
+      Assert.assertEquals(stored.getRealtime().getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(),
           "now()");
 
       IngestionConfig changedIngestionConfig = new IngestionConfig();
-      changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "plus(now(), 1)")));
-      update.getOffline().setIngestionConfig(changedIngestionConfig);
+      changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "plus(now(), 1)")));
+      update.getRealtime().setIngestionConfig(changedIngestionConfig);
       String updateError = Assert.expectThrows(Exception.class,
               () -> adminClient.getTableClient()
                   .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false))

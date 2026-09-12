@@ -70,10 +70,10 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
   private static final Map<String, String> H3_INDEX_PROPERTIES = Map.of("resolutions", "5");
   private static final List<FieldConfig> H3_FIELD_CONFIGS = List.of(
-      new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+      new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
           H3_INDEX_PROPERTIES),
-      new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-          H3_INDEX_PROPERTIES));
+      new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
+          null, H3_INDEX_PROPERTIES));
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setFieldConfigList(H3_FIELD_CONFIGS).build();
   // Null handling enabled so the segment stores a null-value vector, and continueOnError enabled so the H3 index

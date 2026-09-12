@@ -80,17 +80,6 @@ public class SegmentPrunerService {
 
   /// Prunes the segments based on the query request, returns the segments that are not pruned.
   ///
-  /// @deprecated this method is here for compatibility reasons and may be removed soon.
-  /// Call [#prune(List, QueryContext, SegmentPrunerStatistics)] instead
-  /// @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
-  ///                 undefined way. Therefore, this list should not be used after calling this method.
-  @Deprecated
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    return prune(segments, query, new SegmentPrunerStatistics());
-  }
-
-  /// Prunes the segments based on the query request, returns the segments that are not pruned.
-  ///
   /// @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
   ///                 undefined way. Therefore, this list should not be used after calling this method.
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats) {

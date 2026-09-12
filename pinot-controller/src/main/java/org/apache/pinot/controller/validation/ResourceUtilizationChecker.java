@@ -75,7 +75,8 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       BiMap<String, String> instanceAdminEndpoints = _helixResourceManager.getDataInstanceAdminEndpoints(instances);
       BiMap<String, String> endpointsToInstances = instanceAdminEndpoints.inverse();
       CompletionServiceHelper completionServiceHelper =
-          new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
+          new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances,
+              _helixResourceManager.getServerAdminAuthProvider());
       for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
         LOGGER.debug("Computing resource utilization for checker: {}", utilizationChecker.getName());
         utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);

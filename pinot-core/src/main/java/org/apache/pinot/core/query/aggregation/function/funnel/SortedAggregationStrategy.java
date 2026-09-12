@@ -28,8 +28,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 /// keys are handled within each primary-key group by [SortedAggregationResult].
 class SortedAggregationStrategy extends AggregationStrategy<SortedAggregationResult> {
   public SortedAggregationStrategy(List<ExpressionContext> stepExpressions,
-      List<ExpressionContext> correlateByExpressions) {
-    super(stepExpressions, correlateByExpressions);
+      List<ExpressionContext> correlateByExpressions, boolean nullHandlingEnabled) {
+    super(stepExpressions, correlateByExpressions, nullHandlingEnabled);
   }
 
   @Override

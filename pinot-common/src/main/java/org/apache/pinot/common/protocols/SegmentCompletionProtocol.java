@@ -32,9 +32,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /*
  * This class encapsulates the segment completion protocol used by the server and the controller for
- * low-level consumer realtime segments. The protocol has two requests: SegmentConsumedRequest
- * and SegmentCommitRequest.It has a response that may contain different status codes depending on the state machine
- * that the controller drives for that segment. All responses have two elements -- status and an offset.
+ * low-level consumer realtime segments. The protocol has a SegmentConsumedRequest and a split-commit request
+ * sequence (SegmentCommitStartRequest, segment upload, SegmentCommitEndWithMetadataRequest). It has a response that
+ * may contain different status codes depending on the state machine that the controller drives for that segment. All
+ * responses have two elements -- status and an offset.
  *
  * The overall idea is that when a server has completed consuming a segment until the "end criteria" that
  * is set (in the table configuration), it sends a SegmentConsumedRequest to the controller (leader).  The
@@ -42,8 +43,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * to the controller after a while.
  *
  * Meanwhile, the controller co-ordinates the SegmentConsumedRequest messages from replicas and selects a server
- * to commit the segment. The server uses SegmentCommitRequest message, in which it also posts the completed
- * segment to the controller.
+ * to commit the segment. The selected server commits the segment via the split-commit sequence: it sends a
+ * SegmentCommitStartRequest, uploads the completed segment, and finishes with a SegmentCommitEndWithMetadataRequest.
  *
  * The controller may respond with a failure for this commit message, but on success, the controller changes the
  * segment state to ONLINE in idealstate, and adds new CONSUMING segments as well.
@@ -69,7 +70,7 @@ public class SegmentCompletionProtocol {
     /// Never sent by the controller, but locally used by server when sending a request fails
     NOT_SENT,
 
-    /// Server should send back a SegmentCommitRequest after processing this response
+    /// Server should start the split-commit sequence (SegmentCommitStartRequest) after processing this response
     COMMIT,
 
     /// Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS
@@ -112,10 +113,10 @@ public class SegmentCompletionProtocol {
   public static final String STREAM_PARTITION_MSG_OFFSET_KEY = "streamPartitionMsgOffset";
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
+  // The non-split-commit endpoint is gone, but this message type remains as the segment-completion FSM lookup key.
   public static final String MSG_TYPE_COMMIT = "segmentCommit";
   public static final String MSG_TYPE_COMMIT_START = "segmentCommitStart";
   public static final String MSG_TYPE_SEGMENT_UPLOAD = "segmentUpload";
-  public static final String MSG_TYPE_COMMIT_END = "segmentCommitEnd";
   public static final String MSG_TYPE_COMMIT_END_METADATA = "segmentCommitEndWithMetadata";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
   public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
@@ -395,12 +396,6 @@ public class SegmentCompletionProtocol {
     }
   }
 
-  public static class SegmentCommitRequest extends Request {
-    public SegmentCommitRequest(Params params) {
-      super(params, MSG_TYPE_COMMIT);
-    }
-  }
-
   public static class SegmentCommitStartRequest extends Request {
     public SegmentCommitStartRequest(Params params) {
       super(params, MSG_TYPE_COMMIT_START);
@@ -410,12 +405,6 @@ public class SegmentCompletionProtocol {
   public static class SegmentCommitUploadRequest extends Request {
     public SegmentCommitUploadRequest(Params params) {
       super(params, MSG_TYPE_SEGMENT_UPLOAD);
-    }
-  }
-
-  public static class SegmentCommitEndRequest extends Request {
-    public SegmentCommitEndRequest(Params params) {
-      super(params, MSG_TYPE_COMMIT_END);
     }
   }
 

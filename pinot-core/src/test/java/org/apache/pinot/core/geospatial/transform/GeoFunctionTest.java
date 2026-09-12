@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -61,7 +62,8 @@ public abstract class GeoFunctionTest {
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
 
   private static final double DELTA = 0.00001;
 

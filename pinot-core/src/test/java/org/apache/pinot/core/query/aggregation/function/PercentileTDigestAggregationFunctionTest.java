@@ -344,10 +344,7 @@ public class PercentileTDigestAggregationFunctionTest {
     RoaringBitmap nullBitmap = new RoaringBitmap();
     nullBitmap.add(0L, values.length);
 
-    TDigest result = aggregateSerialized(values, nullBitmap, true);
-    Assert.assertEquals(result.size(), 0L);
-    Assert.assertEquals(result.compression(), PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
-    Assert.assertTrue(Double.isNaN(result.quantile(0.75)));
+    Assert.assertNull(aggregateSerialized(values, nullBitmap, true));
   }
 
   @Test
@@ -413,7 +410,7 @@ public class PercentileTDigestAggregationFunctionTest {
         (99.0 * numDigests + 10.0) / denominator);
     assertGroupResult(function, resultHolder, 2, 8L * valuesPerDigest, compression, 2.0 / denominator,
         (99.0 * numDigests + 11.0) / denominator);
-    Assert.assertEquals(function.extractGroupByResult(resultHolder, 3).size(), 0L);
+    Assert.assertNull(function.extractGroupByResult(resultHolder, 3));
   }
 
   @Test

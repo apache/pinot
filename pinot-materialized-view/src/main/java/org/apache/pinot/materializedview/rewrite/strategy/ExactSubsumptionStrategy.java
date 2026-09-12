@@ -63,9 +63,12 @@ public class ExactSubsumptionStrategy extends AbstractSubsumptionStrategy {
     return true;
   }
 
-  /// Requires GROUP BY lists to be identical (same expressions, same order).
+  /// Requires GROUP BY lists to be identical (same expressions, same order).  The projection map
+  /// is not consulted: [#projectionSubsumes] already requires the SELECT lists to be equal, so an
+  /// identical GROUP BY key is necessarily materialized.
   @Override
-  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery) {
+  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery,
+      Map<Expression, String> viewProjectionMap) {
     List<Expression> userList = userQuery.getGroupByList();
     List<Expression> materializedViewList = viewQuery.getGroupByList();
     if (userList == null && materializedViewList == null) {

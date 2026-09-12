@@ -28,8 +28,10 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 public class MinionConf extends PinotConfiguration {
   public static final String END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY = "pinot.minion.endReplaceSegments.timeoutMs";
+  public static final String START_REPLACE_SEGMENTS_TIMEOUT_MS_KEY = "pinot.minion.startReplaceSegments.timeoutMs";
   public static final String MINION_TASK_PROGRESS_MANAGER_CLASS = "pinot.minion.taskProgressManager.class";
   public static final int DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
+  public static final int DEFAULT_START_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
 
   /// The number of threads to use for downloading segments from the deepstore.
   /// This is a global setting that applies to all tasks of BaseMultipleSegmentsConversionExecutor class.
@@ -70,6 +72,10 @@ public class MinionConf extends PinotConfiguration {
 
   public int getEndReplaceSegmentsTimeoutMs() {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
+  }
+
+  public int getStartReplaceSegmentsTimeoutMs() {
+    return getProperty(START_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_START_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
   }
 
   public boolean isAllowDownloadFromServer() {

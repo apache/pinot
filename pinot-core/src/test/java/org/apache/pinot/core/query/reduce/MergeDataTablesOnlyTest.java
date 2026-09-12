@@ -269,6 +269,33 @@ public class MergeDataTablesOnlyTest {
     assertRoundTrip(brokerRequest, serverTables);
   }
 
+  /// A null intermediate result reaches the merge-only path with null handling disabled too, so the merged
+  /// DataTable has to carry it.
+  ///
+  /// The aggregate has to be `MAXSTRING`: its accumulator has no identity element, so a server that aggregated no
+  /// rows contributes null in either mode, and its `merge` is null-safe. `MIN` / `SUM` cannot reach this state --
+  /// their accumulators are primitive and always hold an identity value -- so a nulled DOUBLE fixture would be an
+  /// input no server produces, and `MinAggregationFunction#merge` would NPE on it since it only null-guards when
+  /// null handling is enabled.
+  @Test
+  public void testNullAggregationRoundTripWithNullHandlingDisabled()
+      throws IOException {
+    String query = "SELECT MAXSTRING(s) FROM testTable";
+    DataSchema schema = new DataSchema(new String[]{"maxstring(s)"}, new ColumnDataType[]{ColumnDataType.STRING});
+    // One server aggregated rows, the other matched none.
+    assertRoundTrip(query, List.of(buildNullableString(schema, "alpha"), buildNullableString(schema, null)));
+  }
+
+  /// When every server contributes null, the merged intermediate DataTable itself holds a null, so the null has to
+  /// survive `buildIntermediateDataTable`'s write as well as the restore on the way back in.
+  @Test
+  public void testAllNullAggregationRoundTripWithNullHandlingDisabled()
+      throws IOException {
+    String query = "SELECT MAXSTRING(s) FROM testTable";
+    DataSchema schema = new DataSchema(new String[]{"maxstring(s)"}, new ColumnDataType[]{ColumnDataType.STRING});
+    assertRoundTrip(query, List.of(buildNullableString(schema, null), buildNullableString(schema, null)));
+  }
+
   @Test
   public void testConflictingSchemaSurfacedAsIncompleteMerge() {
     // When one server's column types conflict with the first non-empty table's, filterDataTablesAndPickSchema
@@ -571,6 +598,19 @@ public class MergeDataTablesOnlyTest {
     }
     builder.finishRow();
     builder.setNullRowIds(nullBitmap);
+    return builder.build();
+  }
+
+  private static DataTable buildNullableString(DataSchema schema, String value)
+      throws IOException {
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(schema);
+    builder.startRow();
+    if (value == null) {
+      builder.setNull(0);
+    } else {
+      builder.setColumn(0, value);
+    }
+    builder.finishRow();
     return builder.build();
   }
 

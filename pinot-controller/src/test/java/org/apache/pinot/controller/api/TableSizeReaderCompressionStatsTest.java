@@ -84,7 +84,7 @@ import static org.testng.Assert.*;
 
 /// Tests compression-statistics aggregation in [TableSizeReader].
 public class TableSizeReaderCompressionStatsTest {
-  private static final String URI_PATH = "/table/";
+  private static final String URI_PATH = "/tables/";
   private static final int TIMEOUT_MSEC = 10000;
   private static final int NUM_REPLICAS = 2;
 
@@ -188,8 +188,16 @@ public class TableSizeReaderCompressionStatsTest {
 
   private void startServer(FakeCompressionServer server, List<SegmentSizeInfo> sizes, int metadataVersion)
       throws IOException {
-    server.start(URI_PATH, createHandler(200, sizes, metadataVersion));
-    server._httpServer.createContext("/tables/", createCompressionHandler(server, sizes, metadataVersion));
+    // Size and compression-stats share the "/tables/" prefix, so a single context dispatches on the suffix.
+    HttpHandler sizeHandler = createHandler(200, sizes, metadataVersion);
+    HttpHandler compressionHandler = createCompressionHandler(server, sizes, metadataVersion);
+    server.start(URI_PATH, httpExchange -> {
+      if (httpExchange.getRequestURI().getPath().endsWith("/compression-stats")) {
+        compressionHandler.handle(httpExchange);
+      } else {
+        sizeHandler.handle(httpExchange);
+      }
+    });
   }
 
   private HttpHandler createHandler(int status, List<SegmentSizeInfo> segmentSizes, int metadataVersion) {

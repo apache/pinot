@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -62,6 +63,13 @@ public class DataFetcher implements AutoCloseable {
     int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       DataSource dataSource = entry.getValue();
+      // An OPEN_STRUCT parent holds no readers of its own — every value is read through a per-key data source that
+      // ProjectionBlock#getBlockValueSet(String[]) registers lazily via addDataSource. Registering the parent here
+      // would trip the forward-index precondition. (MAP parents do carry a MapIndexReader forward index, so they
+      // are registered normally.)
+      if (dataSource instanceof OpenStructDataSource) {
+        continue;
+      }
       addDataSource(entry.getKey(), dataSource);
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       if (!dataSourceMetadata.isSingleValue()) {
@@ -73,6 +81,13 @@ public class DataFetcher implements AutoCloseable {
   }
 
   public void addDataSource(String column, DataSource dataSource) {
+    // Idempotent: ProjectionBlock#getBlockValueSet(String[]) re-resolves the per-key data source on every block, and
+    // an unconditional put would orphan the displaced ColumnValueReader together with its off-heap reader context —
+    // close() only walks the readers still in the map. The key resolves to the same underlying index for the life of
+    // one ProjectionOperator, so keeping the first reader is equivalent.
+    if (_columnValueReaderMap.containsKey(column)) {
+      return;
+    }
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
     Preconditions.checkState(forwardIndexReader != null,
         "Forward index disabled for column: %s, cannot create DataFetcher!", column);

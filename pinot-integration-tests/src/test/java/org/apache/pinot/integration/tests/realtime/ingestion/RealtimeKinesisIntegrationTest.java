@@ -36,6 +36,7 @@ import javax.activation.UnsupportedDataTypeException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.util.TestUtils;
@@ -51,6 +52,8 @@ import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
 public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
 
+  private static final String TABLE_NAME = "realtimeKinesis";
+  private static final String STREAM_NAME = "realtime-kinesis";
   private static final int NUM_SHARDS = 10;
 
   // Localstack Kinesis doesn't support large rows.
@@ -71,8 +74,10 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
     createStream(NUM_SHARDS);
 
     // Create and upload the schema and table config
-    addSchema(createSchema(SCHEMA_FILE_PATH));
-    addTableConfig(createRealtimeTableConfig(null));
+    Schema schema = createSchema(SCHEMA_FILE_PATH);
+    schema.setSchemaName(getTableName());
+    addTrackedSchema(schema);
+    addTrackedTable(createRealtimeTableConfig(null));
 
     createH2ConnectionAndTable();
 
@@ -106,6 +111,16 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
   @Override
   public String getSortedColumn() {
     return null;
+  }
+
+  @Override
+  protected String getTableName() {
+    return TABLE_NAME;
+  }
+
+  @Override
+  protected String getKinesisStreamName() {
+    return STREAM_NAME;
   }
 
   private void publishRecordsToKinesis() {
@@ -284,10 +299,16 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
         _h2FieldNameAndTypes.toArray(new String[_h2FieldNameAndTypes.size()])) + ")").execute();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    super.tearDown();
+    try {
+      if (_h2Connection != null) {
+        _h2Connection.close();
+        _h2Connection = null;
+      }
+    } finally {
+      super.tearDown();
+    }
   }
 }

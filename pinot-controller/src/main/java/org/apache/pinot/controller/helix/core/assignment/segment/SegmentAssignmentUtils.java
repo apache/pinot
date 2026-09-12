@@ -307,25 +307,6 @@ public class SegmentAssignmentUtils {
     return instanceStateMap;
   }
 
-  /// Returns a map from instance name to number of segments to be moved to it.
-  @Deprecated
-  public static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
-      Map<String, Map<String, String>> newAssignment) {
-    Map<String, Integer> numSegmentsToBeMovedPerInstance = new TreeMap<>();
-    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Set<String> newInstancesAssigned = entry.getValue().keySet();
-      Set<String> oldInstancesAssigned = oldAssignment.get(segmentName).keySet();
-      // For each new assigned instance, check if the segment needs to be moved to it
-      for (String instanceName : newInstancesAssigned) {
-        if (!oldInstancesAssigned.contains(instanceName)) {
-          numSegmentsToBeMovedPerInstance.merge(instanceName, 1, Integer::sum);
-        }
-      }
-    }
-    return numSegmentsToBeMovedPerInstance;
-  }
-
   /// Returns a map from instance name to number of segments to be added/removed.
   public static Map<String, IntIntPair> getNumSegmentsToMovePerInstance(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {

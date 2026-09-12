@@ -42,6 +42,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FastJsonPathExtractor;
+import org.apache.pinot.common.function.ForyJsonPathExtractor;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.function.SimpleJsonPath;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -127,6 +128,29 @@ public class JsonFunctions {
     }
     /// Complex path, non-JSON input, or an already-parsed container: the existing Jayway implementation.
     return jsonPath(object, jsonPath);
+  }
+
+  /// Resolves a simple path over a JSON string with Fory's streaming reader. Complex paths, already-parsed inputs,
+  /// container results, and Fory extraction failures use the existing Jayway implementation so the experimental
+  /// functions below retain the current behavior outside Fory's supported envelope.
+  @Nullable
+  private static Object foryJsonPath(Object object, String jsonPath) {
+    if (!(object instanceof String)) {
+      return jsonPath(object, jsonPath);
+    }
+    SimpleJsonPath simpleJsonPath = SimpleJsonPath.compile(jsonPath);
+    if (simpleJsonPath == null) {
+      return jsonPath(object, jsonPath);
+    }
+    try {
+      if (!ForyJsonPathExtractor.isAvailable()) {
+        return jsonPath(object, jsonPath);
+      }
+      Object value = ForyJsonPathExtractor.extract((String) object, simpleJsonPath);
+      return ForyJsonPathExtractor.isFallbackRequired(value) ? jsonPath(object, jsonPath) : value;
+    } catch (RuntimeException | LinkageError e) {
+      return jsonPath(object, jsonPath);
+    }
   }
 
   /// Returns `false` when the input is known to be non-extractable by a json path without invoking the JSON
@@ -278,6 +302,24 @@ public class JsonFunctions {
     }
   }
 
+  /// **Experimental.** Fory-backed variant of [#jsonPathString(Object, String, String)]. Fory parses JSON strings
+  /// for simple paths; unsupported inputs and parse failures fall back to Jayway. This function can change or be
+  /// removed while the Fory integration is evaluated and must be explicitly selected by name. The optional
+  /// `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to activate Fory; otherwise this
+  /// function uses Jayway.
+  @ScalarFunction(nullableParameters = true)
+  public static String jsonPathStringFory(@Nullable Object object, String jsonPath, String defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = foryJsonPath(object, jsonPath);
+      return jsonValue != null ? jsonValueToString(jsonValue) : defaultValue;
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
   /// Extract from Json with path to Long
   @ScalarFunction
   public static long jsonPathLong(Object object, String jsonPath) {
@@ -352,6 +394,22 @@ public class JsonFunctions {
     }
   }
 
+  /// **Experimental.** Fory-backed variant of [#jsonPathLong(Object, String, long)]. Unsupported inputs and parse
+  /// failures fall back to Jayway. This function can change or be removed while the Fory integration is evaluated.
+  /// The optional `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to activate Fory.
+  @ScalarFunction(nullableParameters = true)
+  public static long jsonPathLongFory(@Nullable Object object, String jsonPath, long defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = foryJsonPath(object, jsonPath);
+      return jsonValue != null ? jsonValueToLong(jsonValue) : defaultValue;
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
   /// Extract from Json with path to Double
   @ScalarFunction
   public static double jsonPathDouble(Object object, String jsonPath) {
@@ -419,6 +477,23 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
+      return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
+    } catch (Exception ignore) {
+      return defaultValue;
+    }
+  }
+
+  /// **Experimental.** Fory-backed variant of [#jsonPathDouble(Object, String, double)]. Unsupported inputs and
+  /// parse failures fall back to Jayway. This function can change or be removed while the Fory integration is
+  /// evaluated. The optional `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to
+  /// activate Fory.
+  @ScalarFunction(nullableParameters = true)
+  public static double jsonPathDoubleFory(@Nullable Object object, String jsonPath, double defaultValue) {
+    if (!canExtractJsonPath(object)) {
+      return defaultValue;
+    }
+    try {
+      Object jsonValue = foryJsonPath(object, jsonPath);
       return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;

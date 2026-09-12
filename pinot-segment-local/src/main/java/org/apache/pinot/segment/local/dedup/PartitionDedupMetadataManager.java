@@ -22,7 +22,6 @@ import java.io.Closeable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 public interface PartitionDedupMetadataManager extends Closeable {
@@ -56,22 +55,14 @@ public interface PartitionDedupMetadataManager extends Closeable {
   /// Remove the expired primary keys from the metadata when TTL is enabled.
   void removeExpiredPrimaryKeys();
 
-  /// Add the primary key to the given segment to the dedup matadata if it is absent.
-  /// Returns true if the key was already present, i.e., the new record associated with the given [PrimaryKey]
-  /// is a duplicate and should be skipped/dropped.
-  @Deprecated
-  boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment);
-
-  /// Add the primary key to the given segment to the dedup matadata if it is absent and with in the retention time.
+  /// Add the primary key to the given segment to the dedup metadata if it is absent and within the retention time.
   /// Returns true if the key was already present, i.e., the new record associated with the given
   /// [DedupRecordInfo] is a duplicate and should be skipped/dropped.
   /// @param dedupRecordInfo  The primary key and the dedup time.
   /// @param indexSegment  The segment to which the record belongs.
   /// @return true if the key was already present, i.e., the new record associated with the given
   /// [DedupRecordInfo] is a duplicate and should be skipped/dropped.
-  default boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
-    return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);
-  }
+  boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment);
 
   /// Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
   void stop();

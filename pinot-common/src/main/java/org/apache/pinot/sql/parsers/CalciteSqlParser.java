@@ -133,7 +133,13 @@ public class CalciteSqlParser {
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+        Map<String, String> optionMap = extractOptionsMap(options);
+        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+          // No-op unless the broker enables query option validation. DML (e.g.
+          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+        }
+        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -190,6 +196,11 @@ public class CalciteSqlParser {
     }
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
+    }
+    if (sqlType == PinotSqlType.DQL) {
+      // No-op unless the broker enables query option validation. DML (e.g. INSERT INTO FILE) carries
+      // free-form task/FS properties via SET, and REST/JSON queryOptions never reach this path.
+      QueryOptionsUtils.validateSqlQueryOptions(options);
     }
     return new SqlNodeAndOptions(statementNode, sqlType, QueryOptionsUtils.resolveCaseInsensitiveOptions(options));
   }

@@ -330,12 +330,6 @@ public final class Schema implements Serializable {
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
-  @Deprecated
-  // For third-eye backward compatible.
-  public void addField(String columnName, FieldSpec fieldSpec) {
-    addField(fieldSpec);
-  }
-
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
     if (existingFieldSpec != null) {
@@ -903,22 +897,6 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
     result = EqualityUtils.hashCodeOf(result, _enableColumnBasedNullHandling);
     return result;
-  }
-
-  /// @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
-  /// of the fieldSpecs.
-  @Deprecated
-  @Override
-  public Schema clone() {
-    Schema cloned = new SchemaBuilder()
-        .setSchemaName(getSchemaName())
-        .setDescription(getDescription())
-        .setTags(getTags())
-        .setPrimaryKeyColumns(getPrimaryKeyColumns())
-        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
-        .build();
-    getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
-    return cloned;
   }
 
   public static Schema cloneSchemaWithName(Schema source, String newName) {

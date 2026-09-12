@@ -74,13 +74,32 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     int maxRowLength = 0;
 
     if (isSingleValue) {
-      if (_sortedDocIds != null) {
+      totalEntries = _totalDocs;
+
+      // Min and max are tracked per raw value during ingestion, so equal bounds identify a constant column without
+      // any scan. They are left null when aggregated metrics are enabled, in which case the scan below still runs.
+      // The bounds span the whole segment, so this is sufficient but not necessary: a column that is constant only
+      // among the valid documents is still scanned.
+      Comparable segmentMinValue = _dataSourceMetadata.getMinValue();
+      if (segmentMinValue != null && segmentMinValue.equals(_dataSourceMetadata.getMaxValue())) {
+        // Every document holds the same value, so every stat collected below collapses to that one value
+        minValue = segmentMinValue;
+        maxValue = segmentMinValue;
+        if (isVariableWidth) {
+          int length = getElementLength(segmentMinValue, storedType);
+          minElementLength = length;
+          maxElementLength = length;
+          if (isAscii) {
+            isAscii = length == ((String) segmentMinValue).length();
+          }
+        }
+        isSorted = true;
+      } else if (_sortedDocIds != null) {
         // Iterate in sorted doc order, filtered to valid docs, to track sortedness inline
         for (int docId : _sortedDocIds) {
           if (!validDocIds.contains(docId)) {
             continue;
           }
-          totalEntries++;
           Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;
@@ -107,7 +126,6 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
         IntIterator iterator = validDocIds.getIntIterator();
         while (iterator.hasNext()) {
           int docId = iterator.next();
-          totalEntries++;
           Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;

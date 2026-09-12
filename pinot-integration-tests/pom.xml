@@ -32,7 +32,20 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <pinot.integration.test.build.directory>${project.basedir}/target</pinot.integration.test.build.directory>
+    <pinot.integration.test.heap.min>4g</pinot.integration.test.heap.min>
+    <pinot.integration.test.heap.max>8g</pinot.integration.test.heap.max>
+    <pinot.integration.test.tmp.directory>${java.io.tmpdir}</pinot.integration.test.tmp.directory>
+    <pinot.integration.test.port.base>20000</pinot.integration.test.port.base>
+    <pinot.integration.test.zk.port.base>0</pinot.integration.test.zk.port.base>
+    <pinot.integration.test.active.processor.args />
+    <pinot.integration.test.skip.named.suites>false</pinot.integration.test.skip.named.suites>
+    <pinot.integration.test.jvm.args>-Xms${pinot.integration.test.heap.min} -Xmx${pinot.integration.test.heap.max} ${pinot.integration.test.active.processor.args} -Djava.io.tmpdir=${pinot.integration.test.tmp.directory} -Dpinot.test.port.base=${pinot.integration.test.port.base} -Dpinot.test.zk.port.base=${pinot.integration.test.zk.port.base} -Dlog4j2.configurationFile=log4j2.xml</pinot.integration.test.jvm.args>
   </properties>
+
+  <build>
+    <directory>${pinot.integration.test.build.directory}</directory>
+  </build>
 
   <profiles>
     <profile>
@@ -75,11 +88,31 @@
         </plugins>
       </build>
     </profile>
+    <!-- A direct -Dtest selection must run only in Surefire's default execution. -->
+    <profile>
+      <id>skip-named-integration-test-suites-for-direct-test</id>
+      <activation>
+        <property>
+          <name>test</name>
+        </property>
+      </activation>
+      <properties>
+        <pinot.integration.test.skip.named.suites>true</pinot.integration.test.skip.named.suites>
+      </properties>
+    </profile>
+    <!--
+      Keep every top-level A-Z test prefix in exactly one set. TenantRebalanceIntegrationTest runs in set 1 to
+      balance the observed GitHub Actions runtime across the two jobs. The CI-only lane profiles below own the
+      focused data-source suites and their finer-grained balancing.
+    -->
     <profile>
       <id>integration-tests-set-1</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -102,8 +135,72 @@
                 <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
+              </excludes>
             </configuration>
+            <executions>
+              <execution>
+                <id>shared-kafka-realtime-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-kafka</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>multi-nodes-offline-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>multi-nodes-offline</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>shared-hybrid-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-hybrid</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
@@ -113,6 +210,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -127,15 +227,257 @@
                 <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
                 <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!--
+      The CI-only lane profiles split each integration-test set into two isolated Maven processes. Each source test
+      is selected by exactly one default execution or by one focused suite execution.
+    -->
+    <profile>
+      <id>integration-tests-set-1-lane-a</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+              </excludes>
+            </configuration>
+            <executions>
+              <execution>
+                <id>shared-kafka-realtime-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-kafka</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>kinesis-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>kinesis</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>integration-tests-set-1-lane-b</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
+                <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
+              </excludes>
+            </configuration>
+            <executions>
+              <execution>
+                <id>multi-nodes-offline-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>multi-nodes-offline</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>custom-cluster-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>custom-cluster</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>shared-hybrid-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-hybrid</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>integration-tests-set-2-lane-a</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>integration-tests-set-2-lane-b</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</include>
+                <include>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</include>
+                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
+                <include>**/org/apache/pinot/server/realtime/**</include>
+              </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
@@ -146,6 +488,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -155,6 +500,29 @@
               <skipTests>false</skipTests>
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>kinesis-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <argLine>${pinot.integration.test.jvm.args}</argLine>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
               </suiteXmlFiles>
             </configuration>
           </plugin>
@@ -183,6 +551,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>

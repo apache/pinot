@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,7 +56,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   private static final String[] JSON_EXTRACT_SCALAR_FUNCTIONS = {
       JsonExtractScalarTransformFunction.FUNCTION_NAME,
       JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME,
-      JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME
+      JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME,
+      JsonExtractScalarTransformFunction.FORY_FUNCTION_NAME
   };
 
   protected File _baseDir;
@@ -544,6 +546,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{String.format("jsonExtractScalarFast(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalarFirstMatch(%s, '$.store.book[0].author', \"String\")",
             JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalarFory(%s)", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalarFory(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
     //@formatter:on
@@ -719,6 +723,23 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   }
 
   @Test
+  public void testForyFallsBackForJacksonNumberConstraint() {
+    String oversizedNumber = "1".repeat(StreamReadConstraints.defaults().getMaxNumberLength() + 1);
+    String json = "{\"oversized\":" + oversizedNumber + ",\"v\":7}";
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FUNCTION_NAME, json, DataType.STRING, "INT", "-1", -1);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FORY_FUNCTION_NAME, json, DataType.STRING, "INT", "-1",
+        -1);
+  }
+
+  @Test
+  public void testForyStreamingParserFallsBackForMalformedAndTrailingContent() {
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FORY_FUNCTION_NAME,
+        "{\"v\":1,\"broken\":[}", DataType.STRING, "INT", "-1", -1);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FORY_FUNCTION_NAME,
+        "{\"v\":7} {\"ignored\":true}", DataType.STRING, "INT", "-1", 7);
+  }
+
+  @Test
   public void testFastExtractionFromBytesWithBigDecimal() {
     byte[] json = "{\"label\":\"crème brûlée\",\"v\":12345678901234567890.123456789}"
         .getBytes(StandardCharsets.UTF_8);
@@ -728,6 +749,36 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         "BIG_DECIMAL", null, expected);
     assertJsonExtractScalar(JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME, hexEncodedJson,
         DataType.BYTES, "BIG_DECIMAL", null, expected);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FORY_FUNCTION_NAME, hexEncodedJson, DataType.BYTES,
+        "BIG_DECIMAL", null, expected);
+
+    byte[] hostileJson = ("{\"v\":12345678901234567890.123456789,"
+        + "\"ignored\":1e999999999999}").getBytes(StandardCharsets.UTF_8);
+    String hostileHexEncodedJson = BytesUtils.toHexString(hostileJson);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FAST_FUNCTION_NAME, hostileHexEncodedJson,
+        DataType.BYTES, "BIG_DECIMAL", null, expected);
+    assertJsonExtractScalar(JsonExtractScalarTransformFunction.FIRST_MATCH_FUNCTION_NAME, hostileHexEncodedJson,
+        DataType.BYTES, "BIG_DECIMAL", null, expected);
+  }
+
+  @Test
+  public void testForyEligibilityEnvelope() {
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "LONG", true);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "DOUBLE", true);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "STRING", false);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "JSON", false);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "BIG_DECIMAL", false);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$.v", "LONG_ARRAY", false);
+    assertForyEligibility(JSON_STRING_SV_COLUMN, "$..v", "LONG", false);
+    assertForyEligibility(BYTES_SV_COLUMN, "$.v", "LONG", false);
+  }
+
+  private void assertForyEligibility(String column, String path, String resultType, boolean expected) {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        "jsonExtractScalarFory(" + column + ", '" + path + "', '" + resultType + "')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction.Fory);
+    Assert.assertEquals(((JsonExtractScalarTransformFunction) transformFunction).isForyEligible(), expected);
   }
 
   @Test

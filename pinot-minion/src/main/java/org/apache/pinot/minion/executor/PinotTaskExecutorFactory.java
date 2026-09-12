@@ -25,10 +25,6 @@ import org.apache.pinot.minion.MinionConf;
 public interface PinotTaskExecutorFactory {
 
   /// Initializes the task executor factory.
-  @Deprecated
-  void init(MinionTaskZkMetadataManager zkMetadataManager);
-
-  /// Initializes the task executor factory.
   void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf);
 
   /// Returns the task type of the executor.

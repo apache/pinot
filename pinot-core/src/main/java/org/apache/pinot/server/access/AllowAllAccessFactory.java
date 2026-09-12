@@ -19,6 +19,8 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
@@ -27,6 +29,11 @@ public class AllowAllAccessFactory implements AccessControlFactory {
     @Override
     public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
       return true;
+    }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      return BasicAuthorizationResultImpl.success();
     }
 
     @Override

@@ -434,7 +434,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[AND(IS NOT NULL($8), <>($8, 0))])\n"
+            + "  LogicalFilter(condition=[AND(IS NOT NULL($13), <>($13, 0))])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }
@@ -452,7 +452,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[<>($8, 0)])\n"
+            + "  LogicalFilter(condition=[<>($13, 0)])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
   }
@@ -470,7 +470,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[AND(IS NULL($8), <>($8, 0))])\n"
+            + "  LogicalFilter(condition=[AND(IS NULL($13), <>($13, 0))])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }
@@ -537,7 +537,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
               + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
               + "  PinotLogicalExchange(distribution=[hash[0]])\n"
               + "    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[COUNT() FILTER $1], aggType=[LEAF])\n"
-              + "      LogicalProject(city=[$5], $f1=[IS TRUE(=($7, _UTF-8'unknown'))])\n"
+              + "      LogicalProject(city=[$10], $f1=[IS TRUE(=($12, _UTF-8'unknown'))])\n"
               + "        PinotLogicalTableScan(table=[[default, mytable]])\n");
       // IS_TRUE should be trimmed off, then the filter becomes always false in the server execution plan
       explainAskingServers(query,

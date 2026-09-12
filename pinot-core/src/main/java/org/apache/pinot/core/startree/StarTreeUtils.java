@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree;
 
+import com.google.common.annotations.VisibleForTesting;
 import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -335,10 +337,23 @@ public class StarTreeUtils {
     }
     for (Pair<Predicate, PredicateEvaluator> pair : predicatesEvaluatorMapping) {
       if (pair.getKey() == predicate) {
-        return pair.getValue();
+        return toDictionaryBased(pair.getValue(), predicate, dataSource);
       }
     }
     return null;
+  }
+
+  /// Star-tree traversal reads dictionary ids; a raw-value evaluator (built when the forward index is RAW and no
+  /// dict-consuming scan operator was available) would throw from `getMatchingDictIds` / `applySV(int)`. Rebuild
+  /// against the segment dictionary when needed.
+  @VisibleForTesting
+  static PredicateEvaluator toDictionaryBased(PredicateEvaluator evaluator, Predicate predicate,
+      DataSource dataSource) {
+    if (evaluator.isDictionaryBased()) {
+      return evaluator;
+    }
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+        dataSource.getDataSourceMetadata().getDataType(), null);
   }
 
   /// Returns a [BaseProjectOperator] when the filter can be solved with star-tree, or `null` otherwise.

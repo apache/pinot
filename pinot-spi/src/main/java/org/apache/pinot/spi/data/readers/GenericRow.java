@@ -265,14 +265,4 @@ public class GenericRow implements Serializable {
       throw new RuntimeException(e);
     }
   }
-
-  @Deprecated
-  public void init(Map<String, Object> fieldToValueMap) {
-    putValues(fieldToValueMap);
-  }
-
-  @Deprecated
-  public void putField(String fieldName, @Nullable Object value) {
-    putValue(fieldName, value);
-  }
 }

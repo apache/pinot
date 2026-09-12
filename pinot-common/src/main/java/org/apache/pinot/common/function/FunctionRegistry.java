@@ -39,6 +39,7 @@ import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
@@ -195,13 +196,6 @@ public class FunctionRegistry {
     return FUNCTION_MAP.containsKey(canonicalName);
   }
 
-  /// @deprecated For performance concern, use [#contains(String)] instead to avoid invoking
-  ///             [#canonicalize(String)] multiple times.
-  @Deprecated
-  public static boolean containsFunction(String name) {
-    return contains(canonicalize(name));
-  }
-
   /// Returns the [FunctionInfo] associated with the given canonical name and argument types, or `null` if
   /// there is no matching method. This method should be called after the FunctionRegistry is initialized and all
   /// methods
@@ -220,14 +214,6 @@ public class FunctionRegistry {
   public static FunctionInfo lookupFunctionInfo(String canonicalName, int numArguments) {
     PinotScalarFunction function = FUNCTION_MAP.get(canonicalName);
     return function != null ? function.getFunctionInfo(numArguments) : null;
-  }
-
-  /// @deprecated For performance concern, use [#lookupFunctionInfo(String, int)] instead to avoid invoking
-  ///             [#canonicalize(String)] multiple times.
-  @Deprecated
-  @Nullable
-  public static FunctionInfo getFunctionInfo(String name, int numArguments) {
-    return lookupFunctionInfo(canonicalize(name), numArguments);
   }
 
   public static String canonicalize(String name) {
@@ -264,7 +250,8 @@ public class FunctionRegistry {
 
     @Override
     public PinotSqlFunction toPinotSqlFunction() {
-      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker(), isDeterministic());
+      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker(), isDeterministic(),
+          isVolatile());
     }
 
     private SqlReturnTypeInference getReturnTypeInference() {
@@ -341,6 +328,18 @@ public class FunctionRegistry {
         }
       }
       return true;
+    }
+
+    /// Conservatively reports the function as volatile if any registered overload is, matching [#isDeterministic()].
+    /// Both are operator-level properties, whereas the operand types that would select a single overload are only
+    /// known per call site.
+    private boolean isVolatile() {
+      for (FunctionInfo functionInfo : _functionInfoMap.values()) {
+        if (functionInfo.getVolatility() == FunctionVolatility.VOLATILE) {
+          return true;
+        }
+      }
+      return false;
     }
 
     @Override

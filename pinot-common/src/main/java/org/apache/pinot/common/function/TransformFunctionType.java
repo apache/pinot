@@ -107,6 +107,8 @@ public enum TransformFunctionType {
       TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_SCALAR_FIRST_MATCH("jsonExtractScalarFirstMatch",
       TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
+  JSON_EXTRACT_SCALAR_FORY("jsonExtractScalarFory",
+      TransformFunctionType::jsonExtractScalarReturnTypeInference, jsonExtractScalarOperandTypeChecker()),
   JSON_EXTRACT_INDEX("jsonExtractIndex",
       opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
       OperandTypes.family(
@@ -287,11 +289,6 @@ public enum TransformFunctionType {
   }
 
   public List<String> getNames() {
-    return _names;
-  }
-
-  @Deprecated
-  public List<String> getAlternativeNames() {
     return _names;
   }
 

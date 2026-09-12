@@ -38,24 +38,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.restlet.resources.ServerTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.UrlBuilderUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,15 +71,23 @@ public class ServerSegmentMetadataReader {
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
+  @Nullable
+  private final AuthProvider _authProvider;
 
   public ServerSegmentMetadataReader() {
-    _executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    _connectionManager = new PoolingHttpClientConnectionManager();
+    this(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()),
+        new PoolingHttpClientConnectionManager(), null);
   }
 
   public ServerSegmentMetadataReader(Executor executor, HttpClientConnectionManager connectionManager) {
+    this(executor, connectionManager, null);
+  }
+
+  public ServerSegmentMetadataReader(Executor executor, HttpClientConnectionManager connectionManager,
+      @Nullable AuthProvider authProvider) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _authProvider = authProvider;
   }
 
   /// This method is called when the API request is to fetch aggregated segment metadata for all segments of the table.
@@ -115,7 +123,7 @@ public class ServerSegmentMetadataReader {
 
     // Helper service to run a http get call to the server
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse = compressionStatsEnabled
         ? completionServiceHelper.doMultiGetRequestUntil(serverUrls, tableNameWithType, false, timeoutMs, deadlineNanos,
             "aggregate segment metadata")
@@ -179,7 +187,7 @@ public class ServerSegmentMetadataReader {
     totalNumRows /= numReplica;
 
     ServerCompressionStatsReader.CompressionStatsResult compressionStats = compressionStatsEnabled
-        ? new ServerCompressionStatsReader(_executor, _connectionManager).read(tableNameWithType,
+        ? new ServerCompressionStatsReader(_executor, _connectionManager, _authProvider).read(tableNameWithType,
             serverToSegmentsMap, serverEndPoints, columns, includeColumnCompressionStats, deadlineNanos) : null;
 
     TableMetadataInfo aggregateTableMetadataInfo =
@@ -213,7 +221,7 @@ public class ServerSegmentMetadataReader {
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
@@ -249,7 +257,7 @@ public class ServerSegmentMetadataReader {
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
     List<String> serversNeedReloadResponses = new ArrayList<>();
@@ -324,7 +332,7 @@ public class ServerSegmentMetadataReader {
 
     // request the urls from the servers
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
@@ -397,28 +405,6 @@ public class ServerSegmentMetadataReader {
   /// will pick a server that hosts the target segment and fetch the validDocIds result.
   ///
   /// @return a bitmap of validDocIds
-  @Deprecated
-  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdsType,
-      String endpoint, int timeoutMs) {
-    // Build the endpoint url
-    String url = generateValidDocIdsURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
-
-    // Set timeout
-    ClientConfig clientConfig = new ClientConfig();
-    clientConfig.property(ClientProperties.CONNECT_TIMEOUT, timeoutMs);
-    clientConfig.property(ClientProperties.READ_TIMEOUT, timeoutMs);
-
-    Response response = ClientBuilder.newClient(clientConfig).target(url).request().get(Response.class);
-    Preconditions.checkState(response.getStatus() == Response.Status.OK.getStatusCode(),
-        "Unable to retrieve validDocIds from %s", url);
-    byte[] validDocIds = response.readEntity(byte[].class);
-    return RoaringBitmapUtils.deserialize(validDocIds);
-  }
-
-  /// This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
-  /// will pick a server that hosts the target segment and fetch the validDocIds result.
-  ///
-  /// @return a bitmap of validDocIds
   public ValidDocIdsBitmapResponse getValidDocIdsBitmapFromServer(String tableNameWithType, String segmentName,
       String endpoint, String validDocIdsType, int timeoutMs) {
     // Build the endpoint url
@@ -429,9 +415,9 @@ public class ServerSegmentMetadataReader {
     clientConfig.property(ClientProperties.CONNECT_TIMEOUT, timeoutMs);
     clientConfig.property(ClientProperties.READ_TIMEOUT, timeoutMs);
 
-    ValidDocIdsBitmapResponse response =
-        ClientBuilder.newClient(clientConfig).target(url).request(MediaType.APPLICATION_JSON)
-            .get(ValidDocIdsBitmapResponse.class);
+    Invocation.Builder request = ClientBuilder.newClient(clientConfig).target(url).request(MediaType.APPLICATION_JSON);
+    AuthProviderUtils.makeAuthHeadersMap(_authProvider).forEach(request::header);
+    ValidDocIdsBitmapResponse response = request.get(ValidDocIdsBitmapResponse.class);
     Preconditions.checkNotNull(response, "Unable to retrieve validDocIdsBitmap from %s", url);
     return response;
   }
@@ -445,7 +431,7 @@ public class ServerSegmentMetadataReader {
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, false, timeoutMs);
     Map<String, TableStaleSegmentResponse> serverResponses = new HashMap<>();
@@ -501,18 +487,6 @@ public class ServerSegmentMetadataReader {
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = encode(tableNameWithType);
     return String.format("%s/tables/%s/segments/needReload", endpoint, tableNameWithType);
-  }
-
-  @Deprecated
-  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String validDocIdsType,
-      String endpoint) {
-    tableNameWithType = encode(tableNameWithType);
-    segmentName = encode(segmentName);
-    String url = String.format("%s/segments/%s/%s/validDocIds", endpoint, tableNameWithType, segmentName);
-    if (validDocIdsType != null) {
-      url = url + "?validDocIdsType=" + validDocIdsType;
-    }
-    return url;
   }
 
   private String generateValidDocIdsBitmapURL(String tableNameWithType, String segmentName, String validDocIdsType,

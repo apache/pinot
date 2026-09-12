@@ -133,6 +133,8 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Flush threshold for streaming distinct (0 = disabled)
+  private int _streamingDistinctFlushThreshold;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -257,10 +259,14 @@ public class QueryContext {
     return numGroupByExpressions + getNumExtraGroupByKeyColumns();
   }
 
-  /// Returns whether group-by key columns must be serialized/deserialized through the null-aware path (null
-  /// bitmaps). True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
+  /// Returns whether group-by key columns must be compared and filtered null-aware, i.e. whether ORDER BY
+  /// comparators and HAVING predicates over group keys have to treat `null` as a distinct value rather than as the
+  /// type's default. True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
   /// for rolled-up columns regardless of the user's null-handling option.
-  public boolean requiresNullAwareKeySerialization() {
+  ///
+  /// NOTE: This does not gate serialization -- [org.apache.pinot.core.common.datatable.DataTableBuilder] always
+  /// supports nulls, so a null key or intermediate result round-trips through a DataTable in either mode.
+  public boolean requiresNullAwareKeyEvaluation() {
     return isNullHandlingEnabled() || isGroupingSets();
   }
 
@@ -297,12 +303,14 @@ public class QueryContext {
   }
 
   /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
-  ///
-  /// This is just an alias on top of [`!= ExplainMode.NONE`]\[#getExplain()\]
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
 
+  /// Returns the explain mode of the query.
+  public ExplainMode getExplain() {
+    return _explain;
+  }
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -310,11 +318,6 @@ public class QueryContext {
 
   public void setAccurateGroupByWithoutOrderBy(boolean enable) {
     _accurateGroupByWithoutOrderBy = enable;
-  }
-
-  /// Returns the explain mode of the query.
-  public ExplainMode getExplain() {
-    return _explain;
   }
 
   /// Returns the aggregation functions for the query, or `null` if the query does not have any aggregation.
@@ -337,7 +340,8 @@ public class QueryContext {
     return _filteredAggregationsIndexMap;
   }
 
-  /// Returns the filtered aggregation expressions for the query.
+  /// Returns whether any aggregation in the query carries a FILTER clause, no matter whether it is referenced in the
+  /// SELECT list, the HAVING clause or the ORDER-BY clause.
   public boolean hasFilteredAggregations() {
     return _hasFilteredAggregations;
   }
@@ -495,6 +499,14 @@ public class QueryContext {
 
   public void setStreamingGroupByFlushThreshold(int streamingGroupByFlushThreshold) {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
+  }
+
+  public int getStreamingDistinctFlushThreshold() {
+    return _streamingDistinctFlushThreshold;
+  }
+
+  public void setStreamingDistinctFlushThreshold(int streamingDistinctFlushThreshold) {
+    _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
   }
 
   public boolean isNullHandlingEnabled() {
@@ -727,13 +739,6 @@ public class QueryContext {
       return this;
     }
 
-    /// @deprecated Use [#setExplain(ExplainMode)] instead.
-    @Deprecated
-    public Builder setExplain(boolean explain) {
-      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
-      return this;
-    }
-
     public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
@@ -806,9 +811,6 @@ public class QueryContext {
       for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
         FunctionContext aggregation = pair.getLeft();
         FilterContext filter = pair.getRight();
-        if (filter != null) {
-          queryContext._hasFilteredAggregations = true;
-        }
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
@@ -842,7 +844,15 @@ public class QueryContext {
         int numAggregations = filteredAggregationFunctions.size();
         AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
         for (int i = 0; i < numAggregations; i++) {
-          aggregationFunctions[i] = filteredAggregationFunctions.get(i).getLeft();
+          Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
+          aggregationFunctions[i] = pair.getLeft();
+          // NOTE: Compute the flag over all the collected aggregations (SELECT, HAVING and ORDER-BY) instead of only
+          //       the SELECT ones. A FILTER clause on an aggregation that is referenced only in HAVING or ORDER-BY
+          //       must still be honored, else the plan nodes pick the non-filtered operator and silently evaluate the
+          //       aggregation over the main filter alone.
+          if (pair.getRight() != null) {
+            queryContext._hasFilteredAggregations = true;
+          }
         }
         queryContext._aggregationFunctions = aggregationFunctions;
         queryContext._filteredAggregationFunctions = filteredAggregationFunctions;

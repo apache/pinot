@@ -22,6 +22,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +112,59 @@ public class TextIndexUtils {
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
+  }
+
+  /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.
+  ///
+  /// Prefer this over calling [#hasTextIndex] in a loop over a segment's columns. It lists the
+  /// directory once rather than performing `columns × extensions` existence probes. Finding
+  /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
+  /// same.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Which of `columns` still have a deprecated native text index file in `segDir`.
+  ///
+  /// Listing-based for the same reason as [#getColumnsWithTextIndex]: the caller asks this for every
+  /// column of a segment on every reload check, including the overwhelmingly common case where no
+  /// column has ever had a native text index.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithLegacyNativeTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Names of the entries directly inside `dir`, files and directories alike (a Lucene text index is
+  /// a directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 
   public static List<String> extractStopWordsInclude(String colName,

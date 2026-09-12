@@ -499,7 +499,7 @@ public class PinotAdminClientTest {
 
     _adminClient.getSegmentClient().selectSegments("tbl1", "OFFLINE", 100L, 200L, true);
 
-    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/segments/tbl1/select"),
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/segments/tbl1"),
         eq(Map.of("startTimestamp", "100", "endTimestamp", "200", "excludeReplacedSegments", "true", "type",
             "OFFLINE")), eq(HEADERS));
   }

@@ -85,6 +85,27 @@ public class PlanNodeRoutingQueryBuilder {
     return pinotQuery;
   }
 
+  /// Whether [#createPinotQueryForRouting] can fold the given leaf stage tree, i.e. whether it holds no multi-input
+  /// node. Lets a caller skip the attempt rather than pay a thrown-and-caught exception per query, which a colocated
+  /// semi-join's probe leaf -- the one holding the join -- would otherwise do on every query. It lives here so that it
+  /// walks the tree the same way [#accumulateBottomToTop] does; the two disagreeing would either bring the exception
+  /// back or, worse, silently refuse shapes that fold perfectly well.
+  ///
+  /// A `true` result is not a promise that the fold succeeds: the tree may still be missing a table scan, which only
+  /// the fold itself detects.
+  static boolean canBuildRoutingQuery(PlanNode leafStageRoot) {
+    List<PlanNode> inputs = leafStageRoot.getInputs();
+    if (inputs.size() > 1) {
+      return false;
+    }
+    for (PlanNode input : inputs) {
+      if (!canBuildRoutingQuery(input)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private static void accumulateBottomToTop(PlanNode root, List<PlanNode> parentNodes) {
     Preconditions.checkState(root.getInputs().size() <= 1,
         "Leaf stage nodes should have at most one input, found: %s", root.getInputs().size());

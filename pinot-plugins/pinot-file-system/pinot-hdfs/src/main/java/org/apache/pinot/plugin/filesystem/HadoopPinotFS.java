@@ -50,6 +50,8 @@ public class HadoopPinotFS extends BasePinotFS {
   private static final String KEYTAB = "hadoop.kerberos.keytab";
   private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
   private static final String WRITE_CHECKSUM = "hadoop.write.checksum";
+  private static final String GLOBAL_HADOOP_USER = "hadoop.user.name";
+  private static final String ALLOW_INSECURE = "hadoop.allow.insecure";
 
   private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
@@ -61,8 +63,23 @@ public class HadoopPinotFS extends BasePinotFS {
   public void init(PinotConfiguration config) {
     try {
       _hadoopConf = getConf(config.getProperty(HADOOP_CONF_PATH));
-      authenticate(_hadoopConf, config);
-      _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
+      boolean allowInsecure = Boolean.parseBoolean(config.getProperty(ALLOW_INSECURE, "false"));
+
+      if (!allowInsecure) {
+        authenticate(_hadoopConf, config);
+      } else {
+        String globalHadoopUser = config.getProperty(GLOBAL_HADOOP_USER);
+        if (Strings.isNullOrEmpty(globalHadoopUser)) {
+          throw new RuntimeException("HADOOP_USER must be provided when ALLOW_INSECURE is true");
+        }
+
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(globalHadoopUser);
+        UserGroupInformation.setLoginUser(ugi);
+        LOGGER.info("Setting HDFS login user to: {}", globalHadoopUser);
+      }
+      // Hadoop's FileSystem.get() returns a process-cached instance. HadoopPinotFS closes its filesystem, so it must
+      // own a distinct instance to avoid one PinotFS closing a client that is still in use elsewhere.
+      _hadoopFS = org.apache.hadoop.fs.FileSystem.newInstance(_hadoopConf);
       _hadoopFS.setWriteChecksum((config.getProperty(WRITE_CHECKSUM, false)));
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {

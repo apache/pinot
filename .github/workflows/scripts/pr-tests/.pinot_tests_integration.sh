@@ -52,23 +52,16 @@ print_surefire_dumps() {
 
 # Integration Tests
 cd pinot-integration-tests || exit 1
-if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test \
-      -P github-actions,codecoverage,integration-tests-set-1 || {
-    print_surefire_dumps
+case "$RUN_TEST_SET" in
+  1|2)
+    mvn test \
+        -P "github-actions,codecoverage,integration-tests-set-${RUN_TEST_SET}" || {
+      print_surefire_dumps
+      exit 1
+    }
+    ;;
+  *)
+    echo "Unsupported RUN_TEST_SET value: ${RUN_TEST_SET}"
     exit 1
-  }
-  exit 0
-fi
-if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test \
-      -DargLine="-Xms1g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml" \
-      -P github-actions,codecoverage,integration-tests-set-2 || {
-    print_surefire_dumps
-    exit 1
-  }
-  exit 0
-fi
-
-echo "Unsupported RUN_TEST_SET value: ${RUN_TEST_SET}"
-exit 1
+    ;;
+esac

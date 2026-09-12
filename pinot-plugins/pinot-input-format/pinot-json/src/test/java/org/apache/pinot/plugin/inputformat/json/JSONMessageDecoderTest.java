@@ -22,22 +22,113 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.math.BigDecimal;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
 public class JSONMessageDecoderTest {
+
+  @Test
+  public void testDirectDecodePreservesValueConversion()
+      throws Exception {
+    byte[] payload = ("{\"id\":1,\"huge\":99999999999999999999999999,"
+        + "\"nested\":{\"values\":[1,null,3]},\"tags\":[\"a\",\"b\"],"
+        + "\"flag\":true,\"off\":false,\"gone\":null}").getBytes(StandardCharsets.UTF_8);
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), null, "testTopic");
+    GenericRow row = new GenericRow();
+    // Without a field selection there is no pre-nulling pass, so an explicit JSON null must still overwrite
+    // the previous message's value in a reused row.
+    row.putValue("gone", "stale");
+
+    decoder.decode(payload, row);
+
+    assertEquals(row.getValue("id"), 1);
+    assertEquals(row.getValue("huge"), new BigDecimal("99999999999999999999999999"));
+    assertEquals((Object[]) ((Map<?, ?>) row.getValue("nested")).get("values"), new Object[]{1, null, 3});
+    assertEquals((Object[]) row.getValue("tags"), new Object[]{"a", "b"});
+    assertEquals(row.getValue("flag"), Boolean.TRUE);
+    assertEquals(row.getValue("off"), Boolean.FALSE);
+    assertEquals(row.getValue("gone"), null);
+  }
+
+  @Test
+  public void testDirectDecodeSelectedFieldsOverwritesMissingValues()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), Set.of("id", "missing"), "testTopic");
+    GenericRow row = new GenericRow();
+    row.putValue("missing", "stale");
+    row.putValue("unselected", "preserved");
+
+    decoder.decode("{\"id\":1,\"ignored\":[1,2,3]}".getBytes(StandardCharsets.UTF_8), row);
+
+    assertEquals(row.getValue("id"), 1);
+    assertEquals(row.getValue("missing"), null);
+    assertEquals(row.getValue("unselected"), "preserved");
+    assertEquals(row.getFieldToValueMap().keySet(), Set.of("id", "missing", "unselected"));
+  }
+
+  @Test
+  public void testDirectDecodeHonorsOffsetAndLength()
+      throws Exception {
+    String prefix = "invalid-prefix";
+    String record = "{\"id\":1,\"name\":\"alice\"}";
+    byte[] payload = (prefix + record + "invalid-suffix").getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.getBytes(StandardCharsets.UTF_8).length;
+    int length = record.getBytes(StandardCharsets.UTF_8).length;
+
+    JSONMessageDecoder allFieldsDecoder = new JSONMessageDecoder();
+    allFieldsDecoder.init(Map.of(), null, "testTopic");
+    GenericRow allFieldsRow = allFieldsDecoder.decode(payload, offset, length, new GenericRow());
+    assertEquals(allFieldsRow.getFieldToValueMap(), Map.of("id", 1, "name", "alice"));
+
+    JSONMessageDecoder selectedFieldsDecoder = new JSONMessageDecoder();
+    selectedFieldsDecoder.init(Map.of(), Set.of("id"), "testTopic");
+    GenericRow selectedFieldsRow = selectedFieldsDecoder.decode(payload, offset, length, new GenericRow());
+    assertEquals(selectedFieldsRow.getFieldToValueMap(), Map.of("id", 1));
+
+    // Exclude the closing brace to prove the parser honors length instead of reading the remaining array.
+    assertThrows(RuntimeException.class,
+        () -> allFieldsDecoder.decode(payload, offset, length - 1, new GenericRow()));
+  }
+
+  @Test
+  public void testCustomExtractorUsesMapFallback()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(StreamMessageDecoder.RECORD_EXTRACTOR_CONFIG_KEY, CustomJSONRecordExtractor.class.getName()),
+        Set.of("id"), "testTopic");
+
+    GenericRow row = decoder.decode("{\"id\":1}".getBytes(StandardCharsets.UTF_8), new GenericRow());
+
+    assertEquals(row.getValue("id"), 1);
+    assertEquals(row.getValue("custom"), true);
+  }
+
+  public static class CustomJSONRecordExtractor extends JSONRecordExtractor {
+    @Override
+    public GenericRow extract(Map<String, Object> from, GenericRow to) {
+      to.putValue("custom", true);
+      return super.extract(from, to);
+    }
+  }
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()

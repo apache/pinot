@@ -497,6 +497,10 @@ public class KafkaPartitionLevelConsumerTest {
     return KafkaConsumerFactory.class.getName();
   }
 
+  /// The start offset can expire while the table is behind, i.e. Kafka retention deletes records that have not been
+  /// consumed yet. Consumption must then resume from the earliest retained offset -- skipping only the deleted
+  /// records -- and report data loss. This has to hold without the table config setting the Kafka
+  /// `auto.offset.reset` property, whose own default (`latest`) would skip to the end of the log instead.
   @Test
   public void testOffsetsExpired()
       throws TimeoutException {
@@ -506,7 +510,9 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.broker.list", _kafkaBrokerAddress);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    streamConfigMap.put("auto.offset.reset", "earliest");
+    // Pinot's initial-offset criteria, as an operator would set it. Its vocabulary is not Kafka's, so it must not
+    // reach the client as the out-of-range reset policy.
+    streamConfigMap.put("stream.kafka.consumer.prop.auto.offset.reset", "smallest");
     StreamConfig streamConfig = new StreamConfig("tableName_REALTIME", streamConfigMap);
 
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
@@ -522,6 +528,7 @@ public class KafkaPartitionLevelConsumerTest {
       assertEquals(new String((byte[]) messageBatch.getStreamMessage(i).getValue()), "sample_msg_" + (200 + i));
     }
     assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "700");
+    assertTrue(messageBatch.hasDataLoss(), "Records at the requested start offset were deleted by retention");
   }
 
   @Test

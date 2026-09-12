@@ -726,6 +726,19 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return _taskGeneratorRegistry;
   }
 
+  /// Return the subset of [candidateTables] that have [taskType] enabled.
+  public Set<String> getTablesForTaskType(String taskType, Collection<String> candidateTables) {
+    Set<String> tables = new HashSet<>();
+    for (String tableNameWithType : candidateTables) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig != null && tableConfig.getTaskConfig() != null
+          && tableConfig.getTaskConfig().isTaskTypeEnabled(taskType)) {
+        tables.add(tableNameWithType);
+      }
+    }
+    return tables;
+  }
+
   /// Registers a task generator.
   ///
   /// This method can be used to plug in custom task generators.
@@ -1065,6 +1078,26 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Cleaning up all task generators");
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
+  }
+
+  /// Shuts down the cron scheduler started by [#init()], its counterpart in the controller shutdown sequence.
+  ///
+  /// Must be called before the controller tears down Helix. The scheduler's worker threads are not daemons and keep
+  /// firing jobs until it is shut down, so otherwise the cron jobs keep running against a closed `ZkClient` and the
+  /// threads outlive the controller.
+  ///
+  /// Waits for the jobs already in flight, so a task generation in progress is not cut off midway. Safe to call more
+  /// than once, and a no-op when the scheduler is disabled.
+  public void stopScheduler() {
+    if (_scheduler == null) {
+      return;
+    }
+    try {
+      LOGGER.info("Shutting down the task scheduler");
+      _scheduler.shutdown(true);
+    } catch (SchedulerException e) {
+      LOGGER.error("Caught exception while shutting down the task scheduler", e);
     }
   }
 

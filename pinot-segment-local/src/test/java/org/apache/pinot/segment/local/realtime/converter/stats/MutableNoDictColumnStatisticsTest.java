@@ -32,9 +32,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -87,6 +85,69 @@ public class MutableNoDictColumnStatisticsTest {
     assertEquals(stats.getTotalNumberOfEntries(), numDocs);
     assertEquals(stats.getMaxNumberOfMultiValues(), 0);
     assertEquals(stats.getMaxRowLengthInBytes(), type.size());
+  }
+
+  // ======== isSorted caching ========
+
+  @Test
+  public void testIsSortedScansOnce() {
+    int numDocs = 3;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    Comparable[] values = fixedWidthValues(DataType.INT);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertTrue(stats.isSorted());
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
+  }
+
+  // ======== Constant value ========
+
+  @Test
+  public void testConstantValueSkipsScan() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, 3);
+    when(metadata.getMinValue()).thenReturn(42);
+    when(metadata.getMaxValue()).thenReturn(42);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertTrue(stats.isSorted());
+    // A single distinct value is sorted by construction, so the forward index is never read
+    verify(forwardIndex, never()).getInt(anyInt());
+  }
+
+  @Test
+  public void testUntrackedMinMaxFallsBackToScan() {
+    int numDocs = 3;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    Comparable[] values = fixedWidthValues(DataType.INT);
+
+    // Min and max are left null when aggregated metrics are enabled, so sortedness must be scanned for
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
   }
 
   // ======== BigDecimal SV ========

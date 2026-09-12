@@ -60,13 +60,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (comparisonColumns == null) {
+      // Fall back to the table's time column, same as realtime upsert. Realtime always has a time column, but an
+      // offline upsert table might not, so fail fast with an actionable message instead of an NPE.
       String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-      if (timeColumnName != null) {
-        comparisonColumns = List.of(timeColumnName);
-      } else {
-        // No comparison column and no time column: use segment creation time for comparison
-        comparisonColumns = List.of();
-      }
+      Preconditions.checkState(timeColumnName != null,
+          "Upsert table: %s must have a comparison column or a time column configured", _tableNameWithType);
+      comparisonColumns = List.of(timeColumnName);
     }
 
     // PartialUpsertHandler is not thread safe, so hand each partition a factory rather than one shared instance.

@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -121,13 +122,39 @@ public class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
 
   public static final String LOCAL_HOST = "localhost";
+  // Use a random UUID rather than a timestamp so concurrent forks never share a data/temp dir
+  // (System.currentTimeMillis() collides when two forks initialize in the same millisecond).
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-data-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-local-temp-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-local-temp-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
+  public static final String TEST_PORT_BASE_PROPERTY = "pinot.test.port.base";
+  public static final String TEST_ZK_PORT_BASE_PROPERTY = "pinot.test.zk.port.base";
+
+  /// Per-fork port offset so that concurrent surefire forks (forkCount > 1, reuseForks=false)
+  /// allocate disjoint port ranges. surefire injects a 1-based `surefire.forkNumber` into each
+  /// fork (so it is 1 even at forkCount=1, 1..N under parallel forks); it is 0 only outside a
+  /// surefire fork. The stride (5000) comfortably exceeds the ~3000-port span one ControllerTest
+  /// instance uses. Ports are still probed with findOpenPort, so the offset only separates the
+  /// per-fork starting points; no test depends on a literal base port.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 5000;
+
+  private static int forkNumber() {
+    try {
+      return Integer.parseInt(System.getProperty("surefire.forkNumber", "0"));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
+
+  // Offset only when an explicit ZK port base is configured; a base of 0 means "let ZkStarter
+  // pick the port" (which is already fork-aware), so it must stay 0 for forked runs too.
+  private static final int CONFIGURED_ZK_PORT_BASE = Integer.getInteger(TEST_ZK_PORT_BASE_PROPERTY, 0);
+  private static final AtomicInteger NEXT_CONFIGURED_ZK_PORT = new AtomicInteger(
+      CONFIGURED_ZK_PORT_BASE > 0 ? CONFIGURED_ZK_PORT_BASE + FORK_PORT_OFFSET : 0);
 
   // Default ControllerTest instance settings
   public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
@@ -145,9 +172,10 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = 20000;
+  protected int _nextControllerPort = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000) + FORK_PORT_OFFSET;
   protected int _nextBrokerPort = _nextControllerPort + 1000;
   protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
+  protected int _nextBrokerQueryRunnerPort = _nextBrokerGrpcPort + 250;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
@@ -227,8 +255,20 @@ public class ControllerTest {
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      int zkPort = getNextConfiguredZkPort();
+      runWithHelixMock(() -> _zookeeperInstance = zkPort > 0 ? ZkStarter.startLocalZkServer(zkPort)
+          : ZkStarter.startLocalZkServer());
     }
+  }
+
+  private static synchronized int getNextConfiguredZkPort() {
+    int candidatePort = NEXT_CONFIGURED_ZK_PORT.get();
+    if (candidatePort <= 0) {
+      return 0;
+    }
+    int zkPort = NetUtils.findOpenPort(candidatePort);
+    NEXT_CONFIGURED_ZK_PORT.set(zkPort + 1);
+    return zkPort;
   }
 
   public void startZk(int port) {

@@ -397,6 +397,7 @@ public class FastJsonPathExtractorTest {
     assertEquals(invoke("jsonPathStringFast", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFirstMatch", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFast", json, "$.missing", "DEFAULT"), "DEFAULT");
+    assertEquals(invoke("jsonPathLongFast", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathLongFirstMatch", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathDoubleFast", json, "$.user.score", -7.5d), 9.5d);
     /// A complex path must still resolve through the function by falling back to Jayway, i.e. produce exactly
@@ -423,7 +424,8 @@ public class FastJsonPathExtractorTest {
 
   private static Object invoke(String name, Object... arguments)
       throws Exception {
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, arguments.length);
+    FunctionInfo functionInfo =
+        FunctionRegistry.lookupFunctionInfo(FunctionRegistry.canonicalize(name), arguments.length);
     assertNotNull(functionInfo, name + "/" + arguments.length + " is not registered");
     FunctionInvoker invoker = new FunctionInvoker(functionInfo);
     Object[] copy = arguments.clone();

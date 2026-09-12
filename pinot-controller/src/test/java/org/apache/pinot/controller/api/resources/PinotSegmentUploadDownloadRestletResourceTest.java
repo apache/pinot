@@ -26,19 +26,27 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentMetadataInfo;
+import org.apache.pinot.segment.local.constants.SegmentUploadConstants;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.jersey.media.multipart.BodyPart;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -216,11 +224,70 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
 
     File destFile = new File(_tempDir, "outputSegment");
 
+    Set<String> tempEntriesBefore = listTempEntries(SegmentUploadConstants.SEGMENT_METADATA_DIR_PREFIX,
+        SegmentUploadConstants.SEGMENT_METADATA_TAR_FILE_PREFIX);
+
     // test
     PinotSegmentUploadDownloadRestletResource.createSegmentFileFromSegmentMetadataInfo(metadataInfo, destFile);
 
     // verify
     Assert.assertTrue(FileUtils.getFile(destFile).exists());
+    // The staging directory and the intermediate tar file are scoped to the call and must not be left behind
+    assertEquals(listTempEntries(SegmentUploadConstants.SEGMENT_METADATA_DIR_PREFIX,
+        SegmentUploadConstants.SEGMENT_METADATA_TAR_FILE_PREFIX), tempEntriesBefore);
+  }
+
+  @Test
+  public void testCreateSegmentsMetadataInfoMapRegistersTempFilesForCleanup()
+      throws IOException {
+    // setup: an uber tar holding the metadata files of a single segment plus the download URI mapping file
+    String segmentName = "mySegmentName";
+    String downloadURI = "/path/to/segment/download/uri";
+    File allSegmentsMetadataDir = new File(_tempDir, "allSegmentsMetadata");
+    FileUtils.forceMkdir(allSegmentsMetadataDir);
+    FileUtils.touch(new File(allSegmentsMetadataDir, segmentName + ".creation.meta"));
+    FileUtils.touch(new File(allSegmentsMetadataDir, segmentName + ".metadata.properties"));
+    FileUtils.writeLines(new File(allSegmentsMetadataDir, SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME),
+        List.of(segmentName, downloadURI));
+    File uberTarFile = new File(_tempDir, "allSegments.tar.gz");
+    TarCompressionUtils.createCompressedTarFile(allSegmentsMetadataDir, uberTarFile);
+
+    FormDataBodyPart mockBodyPart = mock(FormDataBodyPart.class);
+    when(mockBodyPart.getValueAs(InputStream.class)).thenReturn(FileUtils.openInputStream(uberTarFile));
+    FormDataMultiPart mockMultiPart = mock(FormDataMultiPart.class);
+    when(mockMultiPart.getBodyParts()).thenReturn(List.of(mockBodyPart));
+
+    Set<String> tempEntriesBefore = listTempEntries(SegmentUploadConstants.ALL_SEGMENTS_METADATA_TAR_FILE_PREFIX,
+        SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX);
+    List<File> tempFiles = new ArrayList<>();
+
+    // test
+    Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap =
+        PinotSegmentUploadDownloadRestletResource.createSegmentsMetadataInfoMap(mockMultiPart, tempFiles);
+
+    // verify the map is built and its file handles are still readable, i.e. cleanup was deferred to the caller
+    assertEquals(segmentsMetadataInfoMap.size(), 1);
+    SegmentMetadataInfo metadataInfo = segmentsMetadataInfoMap.get(segmentName);
+    assertEquals(metadataInfo.getSegmentDownloadURI(), downloadURI);
+    Assert.assertTrue(metadataInfo.getSegmentCreationMetaFile().exists());
+    Assert.assertTrue(metadataInfo.getSegmentMetadataPropertiesFile().exists());
+
+    // verify both request-scoped temp files were handed to the caller, and that cleaning them leaves nothing behind
+    assertEquals(tempFiles.size(), 2);
+    tempFiles.forEach(FileUtils::deleteQuietly);
+    assertEquals(listTempEntries(SegmentUploadConstants.ALL_SEGMENTS_METADATA_TAR_FILE_PREFIX,
+        SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX), tempEntriesBefore);
+  }
+
+  /// Names of the entries directly under the JVM temp directory that start with any of the given prefixes. Used to
+  /// assert that a call leaves no residue there, without being confused by unrelated entries.
+  private static Set<String> listTempEntries(String... prefixes) {
+    String[] names = FileUtils.getTempDirectory().list();
+    if (names == null) {
+      return Set.of();
+    }
+    return Arrays.stream(names).filter(name -> Arrays.stream(prefixes).anyMatch(name::startsWith))
+        .collect(Collectors.toSet());
   }
 
   @Test
@@ -258,6 +325,62 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
 
     // validate – should not throw exception
     PinotSegmentUploadDownloadRestletResource.validateMultiPartForBatchSegmentUpload(bodyParts);
+  }
+
+  @Test
+  public void testResolveDestinationTableName() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, TABLE_NAME + "_OFFLINE", TABLE_NAME, TableType.OFFLINE, headers, true), TABLE_NAME);
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        null, null, TABLE_NAME, TableType.OFFLINE, headers, true), TABLE_NAME);
+
+    // V2 keeps its request-table override behavior because the request table is already the authorized destination.
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "source_table", TableType.OFFLINE, headers, false), TABLE_NAME);
+
+    when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("testDatabase");
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, TABLE_NAME, TABLE_NAME, TableType.OFFLINE, headers, true), "testDatabase." + TABLE_NAME);
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "sourceDatabase." + TABLE_NAME, TableType.OFFLINE, headers, false),
+        "testDatabase." + TABLE_NAME);
+  }
+
+  @Test
+  public void testRejectMissingOrMismatchedDestinationTableName() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        null, null, null, TableType.OFFLINE, headers, true), "Table name is required");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        " ", null, TABLE_NAME, TableType.OFFLINE, headers, true), "Invalid request tableName");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, "\t", TABLE_NAME, TableType.OFFLINE, headers, true),
+        "Invalid " + CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, " ", TableType.OFFLINE, headers, true), "Invalid segment metadata table name");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, "other_table", TABLE_NAME, TableType.OFFLINE, headers, true),
+        CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "other_table", TableType.OFFLINE, headers, true), "segment metadata table name");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME + "_REALTIME", null, TABLE_NAME, TableType.OFFLINE, headers, true),
+        "does not match table type");
+
+    when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("databaseA");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        "databaseB." + TABLE_NAME, null, "databaseB." + TABLE_NAME, TableType.OFFLINE, headers, true),
+        "does not match database name");
+  }
+
+  private static void assertBadRequest(Runnable runnable, String expectedMessage) {
+    ControllerApplicationException exception =
+        Assert.expectThrows(ControllerApplicationException.class, () -> runnable.run());
+    assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    Assert.assertTrue(exception.getMessage().contains(expectedMessage), exception.getMessage());
   }
 
   @Test

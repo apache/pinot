@@ -124,4 +124,28 @@ public class RealtimeInvertedIndexReaderTest {
     List<?> bitmaps = (List<?>) bitmapsField.get(realtimeInvertedIndex);
     assertEquals(bitmaps.size(), 0);
   }
+
+  @Test
+  public void testReserveNextDictIdOnEmptyIndex() {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.reserveNextDictId();
+
+    // Reserved dictId 0 has an empty bitmap until a doc is added to it.
+    MutableRoaringBitmap docIds = realtimeInvertedIndex.getDocIds(0);
+    assertNotNull(docIds);
+    assertTrue(docIds.isEmpty());
+
+    // Subsequent adds stay aligned: dictId 0 gets doc 0, dictId 1 is a fresh bitmap.
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.add(1, 1);
+    assertTrue(realtimeInvertedIndex.getDocIds(0).contains(0));
+    assertTrue(realtimeInvertedIndex.getDocIds(1).contains(1));
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testReserveNextDictIdOnNonEmptyIndexThrows() {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.reserveNextDictId();
+  }
 }

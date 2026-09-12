@@ -21,14 +21,17 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// Evaluates myMap\['foo'\]
@@ -38,6 +41,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
   private String[] _keyPath;
   private Dictionary _dictionary;
   private TransformResultMetadata _resultMetadata;
+  private boolean _perKeyNullsAvailable;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
@@ -56,9 +60,13 @@ public class ItemTransformFunction extends BaseTransformFunction {
     _keyPath = new String[]{column, key};
 
     DataSource dataSource = columnContextMap.get(column).getDataSource();
-    Preconditions.checkState(dataSource instanceof MapDataSource, "Column: %s must be a MAP column", column);
-    MapDataSource mapDataSource = (MapDataSource) dataSource;
-    DataSource valueDataSource = mapDataSource.getDataSource(key);
+    Preconditions.checkState(dataSource instanceof MapDataSource || dataSource instanceof OpenStructDataSource,
+        "Column: %s must be a MAP or OPEN_STRUCT column", column);
+    DataSource valueDataSource = dataSource instanceof MapDataSource
+        ? ((MapDataSource) dataSource).getDataSource(key) : ((OpenStructDataSource) dataSource).getDataSource(key);
+    // Per-key nulls are exact whenever the key's source tracks them: every OPEN_STRUCT key does, a MAP key only when
+    // it is absent from the segment
+    _perKeyNullsAvailable = valueDataSource.getNullValueVector() != null;
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
     // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.
@@ -83,6 +91,19 @@ public class ItemTransformFunction extends BaseTransformFunction {
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  /// Uses the per-key null bitmap when the key's data source tracks nulls, which is exact: every OPEN_STRUCT key does
+  /// (the per-key presence bitmap is materialized into a null value vector on both the mutable and sealed paths), and
+  /// so does a key absent from a MAP column, whose all-null source marks every document null. A key present in a MAP
+  /// column carries no per-key null information, so fall back to [BaseTransformFunction#getNullBitmap] which ORs the
+  /// argument bitmaps, yielding the MAP column's own null bitmap: a conservative over-estimate that downstream null
+  /// handling narrows further.
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _perKeyNullsAvailable ? valueBlock.getBlockValueSet(_keyPath).getNullBitmap()
+        : super.getNullBitmap(valueBlock);
   }
 
   @Override

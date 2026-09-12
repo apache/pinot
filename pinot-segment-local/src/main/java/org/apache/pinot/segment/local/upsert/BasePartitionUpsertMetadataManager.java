@@ -312,18 +312,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /// Creates a RecordInfoReader for the given segment. When comparison columns are configured, reads comparison values
-  /// from the columns. When comparison columns are empty, uses segment creation time as the comparison value.
-  protected UpsertUtils.RecordInfoReader createRecordInfoReader(IndexSegment segment) {
-    if (_comparisonColumns.isEmpty()) {
-      long segmentCreationTime = getAuthoritativeUpdateOrCreationTime(segment);
-      return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, segmentCreationTime, _deleteRecordColumn);
-    }
-    return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn);
-  }
-
   protected boolean isTTLEnabled() {
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
+  }
+
+  protected void updateLargestSeenComparisonValue(double comparisonValue) {
+    if (isTTLEnabled()) {
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
+    }
   }
 
   protected double getMaxComparisonValue(IndexSegment segment) {
@@ -374,24 +370,33 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
-      double maxComparisonValue = getMaxComparisonValue(segment);
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
-      if (isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
-        return;
-      }
+    // Bump watermark after rows are added, otherwise a concurrent removeExpiredPrimaryKeys can expire keys we are
+    // about to insert. Per-partition state transitions are serialized by Helix, so concurrent doAddSegment on the
+    // same partition is not possible; the only concurrency here is with the sweep. If addSegment throws, the
+    // watermark stays unchanged - the segment's rows are not in the map, so recording their max would misrepresent
+    // what we have observed and let the sweep expire other keys against a phantom watermark.
+    double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
+    if (isTTLEnabled() && isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
+      updateLargestSeenComparisonValue(maxComparisonValue);
+      return;
     }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
       deleteSnapshot(segment);
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> recordInfoIterator =
           UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       addSegment(segment, null, null, recordInfoIterator);
     } catch (Exception e) {
+      // On failure, do not bump the watermark: the segment's rows are not in the map, and bumping would let the
+      // sweep expire other keys against a phantom watermark. Helix retries the transition and re-bumps.
       throw new RuntimeException(
           String.format("Caught exception while adding segment: %s, table: %s", segmentName, _tableNameWithType), e);
+    }
+    if (isTTLEnabled()) {
+      updateLargestSeenComparisonValue(maxComparisonValue);
     }
 
     // Update metrics
@@ -451,19 +456,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), queryableDocIds);
       return;
     }
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
-      double maxComparisonValue = getMaxComparisonValue(segment);
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
-      if (isOutOfMetadataTTL(maxComparisonValue) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
-        return;
-      }
+    // Bump watermark after rows are added; see doAddSegment.
+    double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
+    if (isTTLEnabled() && isOutOfMetadataTTL(maxComparisonValue)
+        && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+      updateLargestSeenComparisonValue(maxComparisonValue);
+      return;
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s, table: %s", segmentName, _tableNameWithType),
           e);
+    }
+    if (isTTLEnabled()) {
+      updateLargestSeenComparisonValue(maxComparisonValue);
     }
 
     // Update metrics
@@ -604,13 +613,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, null, oldSegment);
       return;
     }
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
-      double maxComparisonValue = getMaxComparisonValue(segment);
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
-      // Segment might be uploaded directly to the table to replace an old segment. So update the TTL watermark but
-      // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
-    }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    // Bump watermark after replaceSegment; see doAddSegment. A segment may be uploaded directly to the table to
+    // replace an old one; the incoming validDocIds bitmap is not populated yet, so we cannot skip even if the
+    // segment is out of TTL.
+    double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       // Reload-only fast path for an upsert + TTL table. The incoming segment carries a validDocIds snapshot ONLY when
       // the reload flow placed it there (see BaseTableDataManager.reloadSegment); segment commits and uploads always
       // build a fresh segment without one and fall through to the full scan below, unaffected. Rebuilding from just the
@@ -639,6 +647,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       throw new RuntimeException(
           String.format("Caught exception while replacing segment: %s, table: %s, message: %s", segmentName,
               _tableNameWithType, e.getMessage()), e);
+    }
+    if (isTTLEnabled()) {
+      updateLargestSeenComparisonValue(maxComparisonValue);
     }
 
     // Update metrics
@@ -768,7 +779,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
-      if (!_comparisonColumns.isEmpty() && isOutOfMetadataTTL(segment)) {
+      if (isOutOfMetadataTTL(segment)) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
       } else {
         doRemoveSegment(segment);

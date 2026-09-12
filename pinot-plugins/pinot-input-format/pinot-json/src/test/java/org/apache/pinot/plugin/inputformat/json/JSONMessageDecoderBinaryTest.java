@@ -24,6 +24,7 @@ import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -97,6 +98,23 @@ public class JSONMessageDecoderBinaryTest {
   public void testUnsetFormatIsText()
       throws Exception {
     assertRich(decode(Map.of(), RICH_FIELDS, TEXT_DOC));
+  }
+
+  /// The direct streaming path materializes top-level scalars straight off the parser; guard the binary-only
+  /// scalar shapes (Float must not upcast to Double, byte[] must pass through) at the decoder level, with and
+  /// without a field selection.
+  @Test
+  public void testDirectDecodePreservesBinaryScalars()
+      throws Exception {
+    Map<String, Object> doc = Map.of("f", 1.5f, "bin", new byte[]{1, 2, 3});
+    for (byte[] payload : List.of(smile(doc), cbor(doc))) {
+      for (Set<String> fields : Arrays.asList(null, Set.of("f", "bin"))) {
+        GenericRow row = decode(AUTO, fields, payload);
+        assertTrue(row.getValue("f") instanceof Float, "expected Float, got " + row.getValue("f").getClass());
+        assertEquals(row.getValue("f"), 1.5f);
+        assertEquals((byte[]) row.getValue("bin"), new byte[]{1, 2, 3});
+      }
+    }
   }
 
   /// An unset jsonFormat must not silently auto-detect binary payloads: those streams keep failing as they did

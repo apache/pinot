@@ -30,7 +30,6 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -44,22 +43,24 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/// Implementation of [GroupKeyGenerator] interface for single group by column,
-/// in absence of dictionary for the group by column.
+/// Implementation of [GroupKeyGenerator] interface for single group by column, in absence of dictionary for the group
+/// by column.
+///
+/// With null handling enabled, a null row forms a group of its own instead of joining the group of the column's default
+/// null value, which is what a null row is physically stored as. The object-keyed maps hold the null key directly,
+/// while the primitive-keyed maps cannot, so the null group id is tracked beside them. Both the single-value and the
+/// multi-value key paths recognize nulls.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
   private final DataType _storedType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
-  // TODO(nhejazi): Most of the logic between _nullHandlingEnabled=true/false is not sharable, so consider making a
-  //  base implementation, and 2 derived classes, one for null enabled, one for disabled.
   private final boolean _nullHandlingEnabled;
-
-  private Integer _groupIdForNullValue = null;
   private final boolean _isSingleValueExpression;
 
-  private int _numGroups = 0;
+  private Integer _groupIdForNullValue;
+  private int _numGroups;
 
   public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled,
@@ -86,56 +87,53 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        generateKeysForBlockNullHandlingEnabled(valueBlock, groupKeys, nullBitmap);
-        return;
-      }
-    }
     int numDocs = valueBlock.getNumDocs();
+    RoaringBitmap nullBitmap = getNullBitmap(blockValSet);
+    // Resolved once rather than per row, and only when the block holds a null, so that reading a block without one
+    // never records a null group
+    int nullKey = nullBitmap != null ? getKeyForNull() : INVALID_ID;
 
     switch (_storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(intValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(intValues[i]);
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(longValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(floatValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(doubleValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(doubleValues[i]);
         }
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(bigDecimalValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(bigDecimalValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(stringValues[i]);
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(stringValues[i]);
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(new ByteArray(bytesValues[i]));
+          groupKeys[i] = isNull(nullBitmap, i) ? nullKey : getKeyForValue(new ByteArray(bytesValues[i]));
         }
         break;
       default:
@@ -143,86 +141,14 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-  public void generateKeysForBlockNullHandlingEnabled(ValueBlock valueBlock, int[] groupKeys,
-      RoaringBitmap nullBitmap) {
-    assert nullBitmap != null;
-    BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
-    int numDocs = valueBlock.getNumDocs();
-
-    switch (_storedType) {
-      case INT:
-        int[] intValues = blockValSet.getIntValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(intValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
-        }
-        break;
-      case LONG:
-        long[] longValues = blockValSet.getLongValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(longValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
-        }
-        break;
-      case FLOAT:
-        float[] floatValues = blockValSet.getFloatValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(floatValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
-        }
-        break;
-      case DOUBLE:
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(doubleValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
-        }
-        break;
-      case BIG_DECIMAL:
-        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : bigDecimalValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((BigDecimal) null));
-        }
-        break;
-      case STRING:
-        String[] stringValues = blockValSet.getStringValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : stringValues[i]);
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((String) null));
-        }
-        break;
-      case BYTES:
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : new ByteArray(bytesValues[i]));
-          }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((ByteArray) null));
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+  /// Returns the block's null bitmap, or `null` when null handling is disabled or no row in the block is null.
+  @Nullable
+  private RoaringBitmap getNullBitmap(BlockValSet blockValSet) {
+    if (!_nullHandlingEnabled) {
+      return null;
     }
+    RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    return nullBitmap != null && !nullBitmap.isEmpty() ? nullBitmap : null;
   }
 
   /// Helper method to create the group-key map, depending on the data type.
@@ -269,42 +195,70 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   public void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys) {
     int numDocs = valueBlock.getNumDocs();
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
+    RoaringBitmap nullBitmap = getNullBitmap(blockValSet);
+    // Resolved once rather than per row, and only when the block holds a null, so that reading a block without one
+    // never records a null group
+    int nullKey = nullBitmap != null ? getKeyForNull() : INVALID_ID;
 
     if (_isSingleValueExpression) {
       switch (_storedType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(intValues[i])};
           }
           break;
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(longValues[i])};
           }
           break;
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(floatValues[i])};
           }
           break;
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(doubleValues[i])};
           }
           break;
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(stringValues[i])};
           }
           break;
         case BYTES:
           byte[][] byteValues = blockValSet.getBytesValuesSV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             groupKeys[i] = new int[]{getKeyForValue(new ByteArray(byteValues[i]))};
           }
           break;
@@ -316,6 +270,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         case INT:
           int[][] intValues = blockValSet.getIntValuesMV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             int mvSize = intValues[i].length;
             int[] mvKeys = new int[mvSize];
             for (int j = 0; j < mvSize; j++) {
@@ -327,6 +285,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         case LONG:
           long[][] longValues = blockValSet.getLongValuesMV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             int mvSize = longValues[i].length;
             int[] mvKeys = new int[mvSize];
             for (int j = 0; j < mvSize; j++) {
@@ -338,6 +300,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         case FLOAT:
           float[][] floatValues = blockValSet.getFloatValuesMV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             int mvSize = floatValues[i].length;
             int[] mvKeys = new int[mvSize];
             for (int j = 0; j < mvSize; j++) {
@@ -349,6 +315,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         case DOUBLE:
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             int mvSize = doubleValues[i].length;
             int[] mvKeys = new int[mvSize];
             for (int j = 0; j < mvSize; j++) {
@@ -360,6 +330,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         case STRING:
           String[][] stringValues = blockValSet.getStringValuesMV();
           for (int i = 0; i < numDocs; i++) {
+            if (isNull(nullBitmap, i)) {
+              groupKeys[i] = new int[]{nullKey};
+              continue;
+            }
             int mvSize = stringValues[i].length;
             int[] mvKeys = new int[mvSize];
             for (int j = 0; j < mvSize; j++) {
@@ -374,29 +348,38 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
+  /// Returns the group id of a null value. The primitive maps cannot hold a null key so it is tracked beside them,
+  /// while the object maps hold it as a key of their own.
+  private int getKeyForNull() {
+    return switch (_storedType) {
+      case BIG_DECIMAL -> getKeyForValue((BigDecimal) null);
+      case STRING -> getKeyForValue((String) null);
+      case BYTES -> getKeyForValue((ByteArray) null);
+      default -> getKeyForNullValue();
+    };
+  }
+
+  private static boolean isNull(@Nullable RoaringBitmap nullBitmap, int row) {
+    return nullBitmap != null && nullBitmap.contains(row);
+  }
+
+  /// The group id of a null value is handed out beside [#_groupKeyMap] rather than stored in it, because the
+  /// primitive-keyed maps cannot hold a null key, so the group count has to come from the id counter itself.
   @Override
   public int getCurrentGroupKeyUpperBound() {
-    return _groupKeyMap.size();
+    return _numGroups;
   }
 
   @Override
   public Iterator<GroupKey> getGroupKeys() {
-    switch (_storedType) {
-      case INT:
-        return new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
-      case LONG:
-        return new LongGroupKeyIterator((Long2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
-      case FLOAT:
-        return new FloatGroupKeyIterator((Float2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
-      case DOUBLE:
-        return new DoubleGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
-      case BIG_DECIMAL:
-      case STRING:
-      case BYTES:
-        return new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
-      default:
-        throw new IllegalStateException();
-    }
+    return switch (_storedType) {
+      case INT -> new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
+      case LONG -> new LongGroupKeyIterator((Long2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
+      case FLOAT -> new FloatGroupKeyIterator((Float2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
+      case DOUBLE -> new DoubleGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
+      case BIG_DECIMAL, STRING, BYTES -> new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
+      default -> throw new IllegalStateException();
+    };
   }
 
   private int getKeyForNullValue() {
@@ -412,7 +395,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public int getNumKeys() {
-    return _groupKeyMap.size();
+    return _numGroups;
   }
 
   private int getKeyForValue(int value) {
@@ -503,7 +486,6 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
-      // TODO(nhejazi): revisit to avoid adding overhead to the regular case where null handling is not enabled.
       if (_groupKeyForNullValue != null) {
         _groupKey._groupId = _groupKeyForNullValue;
         _groupKey._keys = new Object[]{null};

@@ -25,7 +25,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder;
+import org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -80,9 +84,18 @@ public class BenchmarkJsonParsing {
 
   private List<byte[]> _jsonPayloads;
   private int _currentIndex = 0;
+  private JSONMessageDecoder _allFieldsDecoder;
+  private JSONMessageDecoder _selectedFieldsDecoder;
+  private JSONRecordExtractor _allFieldsExtractor;
+  private JSONRecordExtractor _selectedFieldsExtractor;
+  private GenericRow _mapAllFieldsRow;
+  private GenericRow _directAllFieldsRow;
+  private GenericRow _mapSelectedFieldsRow;
+  private GenericRow _directSelectedFieldsRow;
 
   @Setup(Level.Trial)
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     _jsonPayloads = new ArrayList<>(NUM_MESSAGES);
     Random random = new Random(42);
 
@@ -90,6 +103,20 @@ public class BenchmarkJsonParsing {
       String json = generateJsonPayload(_payloadType, random, i);
       _jsonPayloads.add(json.getBytes(StandardCharsets.UTF_8));
     }
+
+    Set<String> selectedFields = selectedFields(_payloadType);
+    _allFieldsDecoder = new JSONMessageDecoder();
+    _allFieldsDecoder.init(Map.of(), null, "benchmark");
+    _selectedFieldsDecoder = new JSONMessageDecoder();
+    _selectedFieldsDecoder.init(Map.of(), selectedFields, "benchmark");
+    _allFieldsExtractor = new JSONRecordExtractor();
+    _allFieldsExtractor.init(null, null);
+    _selectedFieldsExtractor = new JSONRecordExtractor();
+    _selectedFieldsExtractor.init(selectedFields, null);
+    _mapAllFieldsRow = new GenericRow();
+    _directAllFieldsRow = new GenericRow();
+    _mapSelectedFieldsRow = new GenericRow();
+    _directSelectedFieldsRow = new GenericRow();
   }
 
   /// Generates different types of JSON payloads to simulate real-world streaming data.
@@ -227,6 +254,55 @@ public class BenchmarkJsonParsing {
     Map<String, Object> result = JsonUtils.bytesToMap(payload, 0, payload.length);
 
     return result;
+  }
+
+  /// BASELINE DECODER: materialize the top-level map, then copy all fields into GenericRow.
+  @Benchmark
+  public GenericRow mapThenExtractAllFields()
+      throws IOException {
+    _mapAllFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _allFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapAllFieldsRow);
+  }
+
+  /// OPTIMIZED DECODER: stream all top-level values directly into GenericRow.
+  @Benchmark
+  public GenericRow directToGenericRowAllFields() {
+    _directAllFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _allFieldsDecoder.decode(payload, _directAllFieldsRow);
+  }
+
+  /// BASELINE DECODER: materialize the full top-level map, then copy selected fields into GenericRow.
+  @Benchmark
+  public GenericRow mapThenExtractSelectedFields()
+      throws IOException {
+    _mapSelectedFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _selectedFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapSelectedFieldsRow);
+  }
+
+  /// OPTIMIZED DECODER: materialize selected values only and skip unselected containers.
+  @Benchmark
+  public GenericRow directToGenericRowSelectedFields() {
+    _directSelectedFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _selectedFieldsDecoder.decode(payload, _directSelectedFieldsRow);
+  }
+
+  private static Set<String> selectedFields(String payloadType) {
+    switch (payloadType) {
+      case "small":
+        return Set.of("id", "status");
+      case "medium":
+        return Set.of("eventId", "userId", "timestamp", "country");
+      case "large":
+        return Set.of("eventId", "timestamp");
+      case "nested":
+        return Set.of("order");
+      default:
+        return Set.of("id");
+    }
   }
 
   // Helper methods for generating realistic test data

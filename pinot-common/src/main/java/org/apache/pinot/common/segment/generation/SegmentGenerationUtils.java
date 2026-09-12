@@ -113,11 +113,6 @@ public class SegmentGenerationUtils {
     }
   }
 
-  @Deprecated
-  public static TableConfig getTableConfig(String tableConfigURIStr) {
-    return getTableConfig(tableConfigURIStr, null);
-  }
-
   public static TableConfig getTableConfig(String tableConfigURIStr, String authToken) {
     return getTableConfig(tableConfigURIStr, authToken, null);
   }
@@ -279,9 +274,9 @@ public class SegmentGenerationUtils {
 
   /// @param pinotFs root directory fs
   /// @param fileUri root directory uri
-  /// @param includePattern optional glob patterns for files to include
-  /// @param excludePattern optional glob patterns for files to exclude
-  /// @param searchRecursively if ture, search files recursively from directory specified in fileUri
+  /// @param includePattern optional Java NIO PathMatcher glob or regex pattern for files to include
+  /// @param excludePattern optional Java NIO PathMatcher glob or regex pattern for files to exclude
+  /// @param searchRecursively if true, search files recursively from directory specified in fileUri
   /// @return list of matching files.
   /// @throws IOException on IO failure for list files in root directory.
   /// @throws URISyntaxException for matching file URIs

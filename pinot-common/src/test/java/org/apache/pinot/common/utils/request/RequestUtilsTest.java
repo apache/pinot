@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils.request;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -28,6 +29,9 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -86,6 +90,46 @@ public class RequestUtilsTest {
     Expression literalExpression = RequestUtils.getLiteralExpression(4500L);
     assertTrue(literalExpression.getLiteral().isSetLongValue());
     assertEquals(literalExpression.getLiteral().getLongValue(), 4500L);
+  }
+
+  @Test
+  public void testGetLiteralForUuid() {
+    UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    Literal literal = RequestUtils.getLiteral(uuid);
+
+    assertTrue(literal.isSetBinaryValue());
+    assertEquals(literal.getBinaryValue(), UuidUtils.toBytes(uuid));
+  }
+
+  @Test
+  public void testUuidCastFoldsToBinaryLiteral() {
+    UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    Expression expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT CAST('" + uuid + "' AS UUID) FROM myTable").getSelectList().get(0);
+
+    assertTrue(expression.isSetLiteral());
+    assertEquals(expression.getLiteral().getBinaryValue(), UuidUtils.toBytes(uuid));
+  }
+
+  @Test
+  public void testBytesArrayLiteralRepresentations() {
+    byte[][] expected = {{0}, {(byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef}};
+    Literal nativeLiteral = RequestUtils.getLiteral(expected);
+    assertTrue(nativeLiteral.isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(nativeLiteral), expected);
+    assertEquals(RequestUtils.getLiteralTypeAndValue(nativeLiteral).getLeft(), ColumnDataType.BYTES_ARRAY);
+    assertEquals(RequestUtils.prettyPrint(nativeLiteral), "[X'00', X'deadbeef']");
+
+    Expression expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAY[X'00', X'DEADBEEF'] FROM myTable").getSelectList().get(0);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(expression.getLiteral()), expected);
+
+    expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").getSelectList().get(0);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().getBoolValue());
   }
 
   @Test

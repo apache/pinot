@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.function.BiFunction;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -131,7 +132,8 @@ public class SortedRecordsMerger {
     int numAggregations = _aggregationFunctions.length;
     int index = _numKeyColumns;
     for (int i = 0; i < numAggregations; i++, index++) {
-      existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+      existingValues[index] =
+          AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
     }
     return existingRecord;
   }
