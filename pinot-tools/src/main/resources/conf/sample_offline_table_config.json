@@ -6,7 +6,6 @@
     "timeType": "DAYS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "365",
-    "segmentPushType": "APPEND",
     "replication": "3"
   },
   "tenants": {
@@ -21,7 +20,11 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
+    "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
   }
 }

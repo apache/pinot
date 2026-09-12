@@ -55,14 +55,16 @@
   },
   "upsertConfig": {
     "mode": "FULL",
-    "enableSnapshot": true,
-    "enablePreload": true
+    "snapshot": "ENABLE",
+    "preload": "ENABLE"
   },
   "fieldConfigList": [
     {
       "name": "location",
       "encodingType": "RAW",
-      "indexType": "H3",
+      "indexTypes": [
+        "H3"
+      ],
       "properties": {
         "resolutions": "5"
       }

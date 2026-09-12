@@ -3,7 +3,6 @@
   "tableType": "OFFLINE",
   "isDimTable": true,
   "segmentsConfig": {
-    "segmentPushType": "REFRESH",
     "replication": "1"
   },
   "tenants": {
@@ -13,6 +12,11 @@
   },
   "metadata": {
     "customConfigs": {
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH"
     }
   }
 }

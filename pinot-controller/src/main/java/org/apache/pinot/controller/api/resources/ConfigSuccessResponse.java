@@ -18,17 +18,51 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.List;
 import java.util.Map;
 
+/// Field order is fixed via [JsonPropertyOrder] so the wire shape is deterministic across Jackson versions.
+/// `unrecognizedProperties` comes first to match the pre-deprecationWarnings response layout that existing
+/// clients and integration tests assert byte-exactly.
+///
+/// `@JsonIgnoreProperties(ignoreUnknown = true)` so future controller versions can add wire fields without
+/// breaking strict-parsing older clients (rolling-upgrade direction: old client + new controller). Locked by
+/// `testStrictParserToleratesUnknownFutureField`.
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonPropertyOrder({"unrecognizedProperties", "deprecationWarnings", "status"})
 public final class ConfigSuccessResponse extends SuccessResponse {
   private final Map<String, Object> _unrecognizedProperties;
+  private final List<String> _deprecationWarnings;
 
   public ConfigSuccessResponse(String status, Map<String, Object> unrecognizedProperties) {
+    this(status, unrecognizedProperties, List.of());
+  }
+
+  /// Annotated with `@JsonCreator` so Jackson can deserialize this DTO without depending on the `-parameters`
+  /// compiler flag. Downstream clients (admin SDK, integration tests, tooling) deserialize controller
+  /// responses; pinning the constructor to named JSON properties keeps that contract explicit.
+  @JsonCreator
+  public ConfigSuccessResponse(@JsonProperty("status") String status,
+      @JsonProperty("unrecognizedProperties") Map<String, Object> unrecognizedProperties,
+      @JsonProperty("deprecationWarnings") List<String> deprecationWarnings) {
     super(status);
-    _unrecognizedProperties = unrecognizedProperties;
+    _unrecognizedProperties = unrecognizedProperties == null ? Map.of() : unrecognizedProperties;
+    _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;
   }
 
   public Map<String, Object> getUnrecognizedProperties() {
     return _unrecognizedProperties;
+  }
+
+  /// `@JsonInclude(NON_EMPTY)` is on the getter so the empty-list case is elided from the response. Older clients
+  /// that strict-parse this DTO continue to see the original (pre-deprecationWarnings) shape when no warnings fire.
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public List<String> getDeprecationWarnings() {
+    return _deprecationWarnings;
   }
 }
