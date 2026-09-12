@@ -572,7 +572,11 @@ public class QueryRunner {
   /// stream (`QueryServer.handleCancel`), so stats from opchains finishing _after_ the cancel are not
   /// delivered — error-path coverage is whatever was already reported or in flight when the cancel landed.
   public void cancel(long requestId) {
-    _opChainScheduler.cancel(requestId);
+    try {
+      _opChainScheduler.cancel(requestId);
+    } finally {
+      _mailboxService.cleanupMaterializedMailboxRequest(requestId);
+    }
   }
 
   /// Registers an opchain completion listener for the given request id. Used by the stream-mode stats reporting path

@@ -36,6 +36,7 @@ public class MailboxReceiveNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final boolean _sort;
   private final boolean _sortedOnSender;
+  private boolean _materialized;
 
   // NOTE: This is only available during query planning, and should not be serialized.
   private transient MailboxSendNode _sender;
@@ -45,6 +46,14 @@ public class MailboxReceiveNode extends BasePlanNode {
       PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
       @Nullable List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender,
       @Nullable MailboxSendNode sender) {
+    this(stageId, dataSchema, senderStageId, exchangeType, distributionType, keys, collations, sort, sortedOnSender,
+        sender, false);
+  }
+
+  public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
+      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
+      @Nullable List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender,
+      @Nullable MailboxSendNode sender, boolean materialized) {
     super(stageId, dataSchema, null, List.of());
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
@@ -54,6 +63,7 @@ public class MailboxReceiveNode extends BasePlanNode {
     _sort = sort;
     _sortedOnSender = sortedOnSender;
     _sender = sender;
+    _materialized = materialized;
   }
 
   public int getSenderStageId() {
@@ -90,6 +100,14 @@ public class MailboxReceiveNode extends BasePlanNode {
     return _sortedOnSender;
   }
 
+  public boolean isMaterialized() {
+    return _materialized;
+  }
+
+  public void setMaterialized(boolean materialized) {
+    _materialized = materialized;
+  }
+
   public MailboxSendNode getSender() {
     assert _sender != null;
     return _sender;
@@ -102,7 +120,7 @@ public class MailboxReceiveNode extends BasePlanNode {
 
   @Override
   public String explain() {
-    return "MAIL_RECEIVE(" + _distributionType + ")";
+    return "MAIL_RECEIVE(" + _distributionType + ")" + (_materialized ? "[MATERIALIZED]" : "");
   }
 
   @Override
@@ -118,7 +136,7 @@ public class MailboxReceiveNode extends BasePlanNode {
 
   public MailboxReceiveNode withSender(MailboxSendNode sender) {
     return new MailboxReceiveNode(_stageId, _dataSchema, _senderStageId, _exchangeType, _distributionType, _keys,
-        _collations, _sort, _sortedOnSender, sender);
+        _collations, _sort, _sortedOnSender, sender, _materialized);
   }
 
   @Override
@@ -135,12 +153,12 @@ public class MailboxReceiveNode extends BasePlanNode {
     MailboxReceiveNode that = (MailboxReceiveNode) o;
     return _senderStageId == that._senderStageId && _sort == that._sort && _sortedOnSender == that._sortedOnSender
         && _exchangeType == that._exchangeType && _distributionType == that._distributionType && Objects.equals(_keys,
-        that._keys) && Objects.equals(_collations, that._collations);
+        that._keys) && Objects.equals(_collations, that._collations) && _materialized == that._materialized;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _senderStageId, _exchangeType, _distributionType, _keys, _collations, _sort,
-        _sortedOnSender);
+        _sortedOnSender, _materialized);
   }
 }

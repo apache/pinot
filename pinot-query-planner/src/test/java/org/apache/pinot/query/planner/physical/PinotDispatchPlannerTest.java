@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.testng.annotations.Test;
@@ -120,6 +121,52 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
     for (Map.Entry<Integer, DispatchablePlanFragment> entry : subPlan.getQueryStageMap().entrySet()) {
       assertFalse(entry.getValue().getWorkerMetadataList().isEmpty(), "No worker for stage: " + entry.getKey());
     }
+  }
+
+  @Test
+  public void testMaterializedExchangeIsDefaultOff() {
+    DispatchableSubPlan subPlan =
+        _queryEnvironment.planQuery("SELECT col1, COUNT(*) FROM a GROUP BY col1");
+
+    assertEquals(countMaterializedNodes(subPlan), 0);
+  }
+
+  @Test
+  public void testMaterializedExchangeMarksOneHashEdge() {
+    DispatchableSubPlan subPlan =
+        _queryEnvironment.planQuery("SET materializedExchange=true; SELECT col1, COUNT(*) FROM a GROUP BY col1");
+
+    assertEquals(countMaterializedNodes(subPlan), 2);
+  }
+
+  @Test
+  public void testMaterializedExchangeMarksOneHashEdgeWithPhysicalOptimizer() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(
+        "SET usePhysicalOptimizer=true; SET materializedExchange=true; "
+            + "SELECT col1, COUNT(*) FROM a GROUP BY col1");
+
+    assertEquals(countMaterializedNodes(subPlan), 2);
+  }
+
+  private static int countMaterializedNodes(DispatchableSubPlan subPlan) {
+    int count = 0;
+    for (DispatchablePlanFragment fragment : subPlan.getQueryStages()) {
+      count += countMaterializedNodes(fragment.getPlanFragment().getFragmentRoot());
+    }
+    return count;
+  }
+
+  private static int countMaterializedNodes(PlanNode node) {
+    int count = 0;
+    if (node instanceof MailboxSendNode && ((MailboxSendNode) node).isMaterialized()) {
+      count++;
+    } else if (node instanceof MailboxReceiveNode && ((MailboxReceiveNode) node).isMaterialized()) {
+      count++;
+    }
+    for (PlanNode input : node.getInputs()) {
+      count += countMaterializedNodes(input);
+    }
+    return count;
   }
 
   private static boolean hasMultiReceiverSend(DispatchableSubPlan subPlan) {
