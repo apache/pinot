@@ -57,6 +57,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertNull;
+
 
 /// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
 /// pattern goes here.
@@ -386,6 +388,29 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
     // The RLS filter keeps only the two rows with col3 = 42.
     compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar", 1}, new Object[]{"bob", 1}), true);
+  }
+
+  @DataProvider(name = "emptyDynamicBroadcastAggregations")
+  public Object[][] emptyDynamicBroadcastAggregations() {
+    return new Object[][]{
+        {
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ COUNT(*) FROM a "
+                + "WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 0)",
+            List.<Object[]>of(new Object[]{0L})
+        },
+        {
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ COUNT(a.col3) FROM a "
+                + "WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 0)",
+            List.<Object[]>of(new Object[]{0L})
+        }
+    };
+  }
+
+  @Test(dataProvider = "emptyDynamicBroadcastAggregations")
+  public void testEmptyDynamicBroadcastAggregation(String sql, List<Object[]> expectedRows) {
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
+    assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    compareRowEquals(queryResult.getResultTable(), expectedRows, true);
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")

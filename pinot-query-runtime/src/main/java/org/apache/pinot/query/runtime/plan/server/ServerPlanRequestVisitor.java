@@ -75,6 +75,10 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (!groupByList.isEmpty()) {
         pinotQuery.setGroupByList(groupByList);
       }
+      if (node.getGroupKeys().isEmpty() || node.getGroupingSets().stream().anyMatch(List::isEmpty)) {
+        // Global aggregates and grand-total grouping sets are empty-input-sensitive; retain the normal SSE path.
+        context.requireLeafQueryExecutionForEmptyInput();
+      }
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
       /// per-set column-index lists are over groupByList (== node.getGroupKeys()), so they transfer directly. The
       /// single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
@@ -160,19 +164,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       // For dynamic broadcast SEMI join, right child should be a PIPELINE_BREAKER exchange. Visit the left child and
       // attach the dynamic filter to the query.
       if (visit(left, context)) {
-        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
-        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
-        List<Object[]> resultDataContainer = new ArrayList<>();
-        DataSchema dataSchema = right.getDataSchema();
-        for (MseBlock block : blocks) {
-          if (block.isData()) {
-            resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
-          }
-        }
-        // TODO: we should keep query stats here as well
-        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
-            resultDataContainer, dataSchema);
+        attachDynamicFilter(node, right, context);
       }
     } else {
       // For lookup join, visit the right child and set it as the leaf boundary.
@@ -200,19 +192,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       // attach the dynamic filter to the query.
       if (visit(left, context)) {
         // semi join to dynamic filter logic
-        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
-        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
-        List<Object[]> resultDataContainer = new ArrayList<>();
-        DataSchema dataSchema = right.getDataSchema();
-        for (MseBlock block : blocks) {
-          if (block.isData()) {
-            resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
-          }
-        }
-        // TODO: we should keep query stats here as well
-        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
-            resultDataContainer, dataSchema);
+        attachDynamicFilter(node, right, context);
 
         PinotQuery pinotQuery = context.getPinotQuery();
         for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
@@ -250,6 +230,25 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     }
 
     return null;
+  }
+
+  private static void attachDynamicFilter(JoinNode node, PlanNode right, ServerPlanRequestContext context) {
+    PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+    int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
+    List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, List.of());
+    List<Object[]> resultDataContainer = new ArrayList<>();
+    DataSchema dataSchema = right.getDataSchema();
+    for (MseBlock block : blocks) {
+      if (block.isData()) {
+        resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+      }
+    }
+    if (resultDataContainer.isEmpty()) {
+      context.setEmptyDynamicFilter();
+    }
+    // TODO: we should keep query stats here as well
+    ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+        resultDataContainer, dataSchema);
   }
 
   @Override
