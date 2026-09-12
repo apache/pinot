@@ -147,4 +147,15 @@ public class NoClosePinotFS implements PinotFS {
       throws IOException {
     return _delegate.open(uri);
   }
+
+  @Override
+  public InputStream openForRead(URI uri, long offset, long length)
+      throws IOException {
+    return _delegate.openForRead(uri, offset, length);
+  }
+
+  @Override
+  public boolean supportsRangedRead() {
+    return _delegate.supportsRangedRead();
+  }
 }
