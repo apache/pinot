@@ -156,6 +156,10 @@ public class PinotIngestionRestletResource {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
           String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e));
+    } finally {
+      if (fileUpload != null) {
+        fileUpload.cleanup();
+      }
     }
   }
 
