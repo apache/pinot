@@ -1014,9 +1014,7 @@ public class RealtimeSegmentDataManagerTest {
     final long leaseTime = 50000L;
 
     // The first time we invoke build, it should go ahead and build the segment.
-    RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
-        segmentDataManager.invokeBuildForCommit(leaseTime);
-    File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
+    File segmentTarFile = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFile();
     Assert.assertNotNull(segmentTarFile);
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager.invokeCommit());
@@ -1025,55 +1023,13 @@ public class RealtimeSegmentDataManagerTest {
     segmentDataManager._buildSegmentCalled = false;
 
     // This time around it should not build the segment.
-    RealtimeSegmentDataManager.SegmentBuildDescriptor retriedSegmentBuildDescriptor =
-        segmentDataManager.invokeBuildForCommit(leaseTime);
-    File segmentTarFile1 = retriedSegmentBuildDescriptor.getSegmentTarFile();
+    File segmentTarFile1 = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFile();
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
-    Assert.assertSame(retriedSegmentBuildDescriptor, segmentBuildDescriptor);
-    Assert.assertEquals(retriedSegmentBuildDescriptor.getSegmentBuildId(),
-        segmentBuildDescriptor.getSegmentBuildId());
-    RealtimeSegmentDataManager.SegmentBuildDescriptor independentSegmentBuildDescriptor =
-        segmentDataManager.new SegmentBuildDescriptor(segmentTarFile, null, segmentBuildDescriptor.getOffset(), 0, 0,
-            segmentTarFile.length());
-    Assert.assertNotEquals(independentSegmentBuildDescriptor.getSegmentBuildId(),
-        segmentBuildDescriptor.getSegmentBuildId());
     Assert.assertEquals(segmentTarFile1, segmentTarFile);
     Assert.assertTrue(segmentTarFile.exists());
     Assert.assertTrue(segmentDataManager.invokeCommit());
     Assert.assertFalse(segmentTarFile.exists());
     segmentDataManager.close();
-  }
-
-  @Test
-  public void testCommitForwardsSegmentBuildIdAndOffloadClosesCommitterFactory()
-      throws Exception {
-    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    SegmentCommitterFactory segmentCommitterFactory = mock(SegmentCommitterFactory.class);
-    SegmentCommitter segmentCommitter = mock(SegmentCommitter.class);
-    RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor = null;
-    try {
-      segmentDataManager.setSegmentCommitterFactory(segmentCommitterFactory);
-      segmentBuildDescriptor = segmentDataManager.invokeBuildForCommit(50_000L);
-      when(segmentCommitterFactory.createSegmentCommitter(any(SegmentCompletionProtocol.Request.Params.class),
-          eq("http://controller"), same(segmentBuildDescriptor.getSegmentBuildId()))).thenReturn(segmentCommitter);
-      when(segmentCommitter.commit(same(segmentBuildDescriptor)))
-          .thenReturn(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS);
-
-      Assert.assertSame(segmentDataManager.invokeCommitProtocol("http://controller"),
-          SegmentCompletionProtocol.RESP_COMMIT_SUCCESS);
-      verify(segmentCommitterFactory).createSegmentCommitter(
-          any(SegmentCompletionProtocol.Request.Params.class), eq("http://controller"),
-          same(segmentBuildDescriptor.getSegmentBuildId()));
-      verify(segmentCommitter).commit(same(segmentBuildDescriptor));
-
-      segmentDataManager.offload();
-      verify(segmentCommitterFactory).close();
-    } finally {
-      if (segmentBuildDescriptor != null) {
-        segmentBuildDescriptor.deleteSegmentFile();
-      }
-      segmentDataManager.destroy();
-    }
   }
 
   // If commit fails, and we still have the file, make sure that we remove the file when we go
@@ -1596,17 +1552,6 @@ public class RealtimeSegmentDataManagerTest {
     public boolean invokeCommit()
         throws Exception {
       return super.commitSegment("dummyUrl");
-    }
-
-    public SegmentCompletionProtocol.Response invokeCommitProtocol(String controllerVipUrl) {
-      return super.commit(controllerVipUrl);
-    }
-
-    public void setSegmentCommitterFactory(SegmentCommitterFactory segmentCommitterFactory)
-        throws ReflectiveOperationException {
-      Field field = RealtimeSegmentDataManager.class.getDeclaredField("_segmentCommitterFactory");
-      field.setAccessible(true);
-      field.set(this, segmentCommitterFactory);
     }
 
     private void terminateLoopIfNecessary() {

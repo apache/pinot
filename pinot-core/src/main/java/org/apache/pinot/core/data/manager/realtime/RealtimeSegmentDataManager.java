@@ -32,7 +32,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -187,7 +186,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     final long _waitTimeMillis;
     final long _buildTimeMillis;
     final long _segmentSizeBytes;
-    final UUID _segmentBuildId;
 
     public SegmentBuildDescriptor(@Nullable File segmentTarFile, @Nullable Map<String, File> metadataFileMap,
         StreamPartitionMsgOffset offset, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
@@ -197,7 +195,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
       _segmentSizeBytes = segmentSizeBytes;
-      _segmentBuildId = UUID.randomUUID();
     }
 
     public StreamPartitionMsgOffset getOffset() {
@@ -224,10 +221,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     public long getSegmentSizeBytes() {
       return _segmentSizeBytes;
-    }
-
-    public UUID getSegmentBuildId() {
-      return _segmentBuildId;
     }
 
     public void deleteSegmentFile() {
@@ -1390,8 +1383,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     SegmentCommitter segmentCommitter;
     try {
-      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(params, controllerVipUrl,
-          _segmentBuildDescriptor.getSegmentBuildId());
+      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(params, controllerVipUrl);
     } catch (URISyntaxException e) {
       _segmentLogger.error("Failed to create a segment committer: ", e);
       return SegmentCompletionProtocol.RESP_NOT_SENT;

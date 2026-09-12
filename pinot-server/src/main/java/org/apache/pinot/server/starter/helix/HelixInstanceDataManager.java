@@ -151,7 +151,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentOperationsThrottlerSet,
         _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
-        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
+        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics, _instanceId);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     initInstanceDataDir(instanceDataDir);
@@ -300,9 +300,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
-    if (_segmentUploader != null) {
-      _segmentUploader.close();
-    }
     // shutdown logical table metadata cache
     _logicalTableMetadataCache.shutdown();
     LOGGER.info("Helix instance data manager shut down");
