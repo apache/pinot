@@ -30,7 +30,8 @@ import org.apache.pinot.spi.data.Schema
 import org.apache.pinot.spi.ingestion.batch.spec.Constants
 import org.apache.pinot.spi.utils.DataSizeUtils
 import org.apache.spark.sql.catalyst
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.catalyst.util.ArrayData
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, ByteType, DataType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, StructType}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
@@ -79,8 +80,10 @@ class PinotDataWriter[InternalRow](
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
 
-    // Tracking startTime and endTime for segment name generation purposes
-    if (timeColumnIndex > -1 && isTimeColumnNumeric) {
+    // Tracking startTime and endTime for segment name generation purposes. Skip null values so a
+    // null time column does not silently pull `startTime` to 0 and produce a malformed segment
+    // name -- `record.getLong` returns 0 for nulls without an `isNullAt` guard.
+    if (timeColumnIndex > -1 && isTimeColumnNumeric && !record.isNullAt(timeColumnIndex)) {
       val time = record.getLong(timeColumnIndex)
       startTime = Math.min(startTime, time)
       endTime = Math.max(endTime, time)
@@ -203,57 +206,161 @@ class PinotDataWriter[InternalRow](
     logger.info("Pushed segment tar file {} to: {}", (segmentTarFile.getName, destPath))
   }
 
+  /** Converts a Spark [[catalyst.InternalRow]] to a Pinot [[GenericRow]].
+   *
+   *  Spark's DataSourceV2 write path applies an `UnsafeProjection` immediately before invoking
+   *  `DataWriter.write(...)`, so every row reaching this method is an `UnsafeRow` whose array
+   *  fields are `UnsafeArrayData`. `UnsafeArrayData.array()` throws `UnsupportedOperationException`,
+   *  so the array branch must use accessors that work on both `UnsafeArrayData` and
+   *  `GenericArrayData` -- per-element iteration over the typed `getXxx(i)` methods.
+   *
+   *  Multi-value array fields are emitted as `Object[]` (boxed primitives, `String`s, or
+   *  `byte[]`s) because Pinot's segment-generation pipeline expects this shape. Stats collectors
+   *  in `pinot-segment-local` cast every MV entry as `(Object[])`, and `GenericRow.copy()`
+   *  clones array values via `(Object[]) value` -- a primitive Spark array (`int[]`, `long[]`,
+   *  ...) returned from `ArrayData.toIntArray()` / `toLongArray()` would `ClassCastException` at
+   *  the first stats pass and never produce a segment.
+   *
+   *  Nullability is handled at the field level: a top-level `isNullAt` guard funnels every null
+   *  field through `putValue(name, null)` so the scalar `StringType` branch never NPEs on a null
+   *  `getUTF8String(...)` and primitive branches never silently substitute `0` / `false` for a
+   *  null field value. Element-level nulls within a multi-value array are rejected with
+   *  `IllegalArgumentException`: Pinot's MV stats collectors NPE on null elements, so failing
+   *  fast in the writer with a clear message is strictly better than producing a corrupt
+   *  segment or surfacing an opaque downstream crash.
+   */
   private def internalRowToGenericRow(record: catalyst.InternalRow): GenericRow = {
     val gr = new GenericRow()
 
-    writeSchema.fields.zipWithIndex foreach { case(field, idx) =>
-      field.dataType match {
-        case org.apache.spark.sql.types.StringType =>
-          gr.putValue(field.name, record.getString(idx))
-        case org.apache.spark.sql.types.IntegerType =>
-          gr.putValue(field.name, record.getInt(idx))
-        case org.apache.spark.sql.types.LongType =>
-          gr.putValue(field.name, record.getLong(idx))
-        case org.apache.spark.sql.types.FloatType =>
-          gr.putValue(field.name, record.getFloat(idx))
-        case org.apache.spark.sql.types.DoubleType =>
-          gr.putValue(field.name, record.getDouble(idx))
-        case org.apache.spark.sql.types.BooleanType =>
-          gr.putValue(field.name, record.getBoolean(idx))
-        case org.apache.spark.sql.types.ByteType =>
-          gr.putValue(field.name, record.getByte(idx))
-        case org.apache.spark.sql.types.BinaryType =>
-          gr.putValue(field.name, record.getBinary(idx))
-        case org.apache.spark.sql.types.ShortType =>
-          gr.putValue(field.name, record.getShort(idx))
-        case org.apache.spark.sql.types.ArrayType(elementType, _) =>
-          elementType match {
-            case org.apache.spark.sql.types.StringType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[String]))
-            case org.apache.spark.sql.types.IntegerType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Int]))
-            case org.apache.spark.sql.types.LongType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Long]))
-            case org.apache.spark.sql.types.FloatType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Float]))
-            case org.apache.spark.sql.types.DoubleType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Double]))
-            case org.apache.spark.sql.types.BooleanType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
-            case org.apache.spark.sql.types.ByteType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
-            case org.apache.spark.sql.types.BinaryType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Array[Byte]]))
-            case org.apache.spark.sql.types.ShortType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
-            case _ =>
-              throw new UnsupportedOperationException(s"Unsupported data type: Array[${elementType}]")
-          }
-        case _ =>
-          throw new UnsupportedOperationException("Unsupported data type: " + field.dataType)
+    writeSchema.fields.zipWithIndex foreach { case (field, idx) =>
+      if (record.isNullAt(idx)) {
+        gr.putValue(field.name, null)
+      } else {
+        field.dataType match {
+          case StringType =>
+            gr.putValue(field.name, record.getUTF8String(idx).toString)
+          case IntegerType =>
+            gr.putValue(field.name, record.getInt(idx))
+          case LongType =>
+            gr.putValue(field.name, record.getLong(idx))
+          case FloatType =>
+            gr.putValue(field.name, record.getFloat(idx))
+          case DoubleType =>
+            gr.putValue(field.name, record.getDouble(idx))
+          case BooleanType =>
+            gr.putValue(field.name, record.getBoolean(idx))
+          case ByteType =>
+            gr.putValue(field.name, record.getByte(idx))
+          case BinaryType =>
+            gr.putValue(field.name, record.getBinary(idx))
+          case ShortType =>
+            gr.putValue(field.name, record.getShort(idx))
+          case ArrayType(elementType, _) =>
+            gr.putValue(field.name, convertArrayData(record.getArray(idx), field.name, elementType))
+          case _ =>
+            throw new UnsupportedOperationException("Unsupported data type: " + field.dataType)
+        }
       }
     }
     gr
+  }
+
+  private def convertArrayData(arr: ArrayData, columnName: String, elementType: DataType): AnyRef = {
+    val n = arr.numElements()
+    elementType match {
+      case StringType =>
+        val out = new Array[String](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = arr.getUTF8String(i).toString
+          i += 1
+        }
+        out
+      case BinaryType =>
+        val out = new Array[Array[Byte]](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = arr.getBinary(i)
+          i += 1
+        }
+        out
+      case IntegerType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = Integer.valueOf(arr.getInt(i))
+          i += 1
+        }
+        out
+      case LongType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Long.valueOf(arr.getLong(i))
+          i += 1
+        }
+        out
+      case FloatType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Float.valueOf(arr.getFloat(i))
+          i += 1
+        }
+        out
+      case DoubleType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Double.valueOf(arr.getDouble(i))
+          i += 1
+        }
+        out
+      case BooleanType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Boolean.valueOf(arr.getBoolean(i))
+          i += 1
+        }
+        out
+      case ByteType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Byte.valueOf(arr.getByte(i))
+          i += 1
+        }
+        out
+      case ShortType =>
+        val out = new Array[AnyRef](n)
+        var i = 0
+        while (i < n) {
+          requireNoNullElement(arr, columnName, i)
+          out(i) = java.lang.Short.valueOf(arr.getShort(i))
+          i += 1
+        }
+        out
+      case _ =>
+        throw new UnsupportedOperationException(s"Unsupported data type: Array[$elementType]")
+    }
+  }
+
+  private def requireNoNullElement(arr: ArrayData, columnName: String, idx: Int): Unit = {
+    if (arr.isNullAt(idx)) {
+      throw new IllegalArgumentException(
+        s"Multi-value column '$columnName' contains a null element at index $idx. Pinot " +
+          "multi-value columns do not support null elements; filter or coalesce nulls in Spark " +
+          "before writing.")
+    }
   }
 
   private def tarSegmentDir(segmentName: String, segmentDir: File): File = {
