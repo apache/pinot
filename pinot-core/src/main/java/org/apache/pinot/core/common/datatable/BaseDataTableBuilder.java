@@ -23,6 +23,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -95,7 +97,14 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   @Override
   public void startRow() {
     _numRows++;
-    _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
+    if (_currentRowDataByteBuffer == null) {
+      _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
+    } else {
+      // finishRow() copies the bytes into the output stream. Reuse its scratch space while preserving the
+      // zero-initialized representation for columns that the next row does not explicitly populate.
+      Arrays.fill(_currentRowDataByteBuffer.array(), (byte) 0);
+      _currentRowDataByteBuffer.clear().order(ByteOrder.BIG_ENDIAN);
+    }
   }
 
   @Override
