@@ -542,15 +542,19 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     }
     // The Aug 15 shape always wrote the expression into TRANSFORM_FUNCTION as well. A lone
     // "true" in the backfilled field is treated as the expression itself.
-    return config.getString(Column.getKeyFor(column, Column.TRANSFORM_FUNCTION), null) != null;
+    return config.getProperty(Column.getKeyFor(column, Column.TRANSFORM_FUNCTION)) != null;
   }
 
-  /// Reads a persisted metadata string with [PropertiesConfiguration#getString(String, String)].
-  /// Recover the escaping applied by [CommonsConfigurationUtils#replaceSpecialCharacterInPropertyValue].
+  /// Reads a persisted metadata string without Commons Configuration interpolation.
+  /// [PropertiesConfiguration#getString] rewrites `${...}`, and Groovy transforms can contain `$`.
+  /// Same reason min/max values are read with [PropertiesConfiguration#getProperty].
   @Nullable
   private static String extractEscapedString(PropertiesConfiguration config, String key) {
-    String value = config.getString(key, null);
-    return value != null ? CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(value) : null;
+    Object raw = config.getProperty(key);
+    if (raw == null) {
+      return null;
+    }
+    return CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(raw.toString());
   }
 
   public static FieldSpec extractFieldSpec(String column, PropertiesConfiguration config) {

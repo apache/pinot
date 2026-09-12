@@ -288,8 +288,9 @@ public class ColumnMetadataImplTest {
     assertEquals(metadata.getTransformFunctionBackfilled(), transformFunction);
   }
 
+  /// getString() interpolates `${x}` against other keys. Expressions must survive that.
   @Test
-  public void transformFunctionWithDollarBraceRoundTripsThroughGetString() {
+  public void transformFunctionWithDollarBraceIsNotInterpolated() {
     String transformFunction = "Groovy({ '${x}' + y }, x, y)";
     String escapedTransformFunction =
         CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);

@@ -45,6 +45,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -458,12 +459,15 @@ public class DefaultColumnHandlerTest {
   private static void writeLegacyBooleanBackfillMarker(File indexDir, String column, String transformFunction)
       throws Exception {
     PropertiesConfiguration segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-    segmentProperties.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION),
-        transformFunction);
-    segmentProperties.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION_BACKFILLED),
-        "true");
+    String transformFunctionKey =
+        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION);
+    String backfilledKey = V1Constants.MetadataKeys.Column.getKeyFor(column,
+        V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION_BACKFILLED);
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    segmentProperties.setProperty(transformFunctionKey, escapedTransformFunction);
+    segmentProperties.setProperty(backfilledKey, "true");
     SegmentMetadataUtils.savePropertiesConfiguration(segmentProperties, indexDir);
   }
 }
