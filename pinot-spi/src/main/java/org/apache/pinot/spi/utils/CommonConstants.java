@@ -899,6 +899,11 @@ public class CommonConstants {
         /// other transport error) during dispatch, the broker cancels the query and surfaces the error to the
         /// client.
         public static final String STREAM_STATS = "streamStats";
+        /// Opts a query into the experimental file-backed HASH exchange. The feature is disabled by default and
+        /// implicitly uses the stream dispatch path so producer completion can report materialized output handles.
+        public static final String MATERIALIZED_EXCHANGE = "materializedExchange";
+        /// Opts a query into dependency-ordered stage dispatch. The feature is disabled by default.
+        public static final String STAGED_DISPATCH = "stagedDispatch";
         /// If set, changes the explain behavior in multi-stage engine.
         ///
         /// `true` means to ask servers for the physical plan while false means to just use logical plan.

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import io.grpc.Deadline;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,7 +27,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
@@ -40,7 +43,10 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -51,11 +57,18 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class QueryDispatcherTest extends QueryTestSet {
@@ -63,9 +76,27 @@ public class QueryDispatcherTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
+  private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
+
+  @Test
+  public void testValidateMaterializedOutputs() {
+    Worker.MaterializedPartitionHandle partition0 = materializedHandle(7L, 1, 2, 0);
+    Worker.MaterializedPartitionHandle partition1 = materializedHandle(7L, 1, 2, 1);
+
+    QueryDispatcher.validateMaterializedOutputs(7L, Set.of("1/2/0", "1/2/1"),
+        List.of(partition1, partition0));
+
+    assertThrows(IllegalStateException.class,
+        () -> QueryDispatcher.validateMaterializedOutputs(7L, Set.of("1/2/0"), List.of(partition0, partition0)));
+    assertThrows(IllegalStateException.class,
+        () -> QueryDispatcher.validateMaterializedOutputs(7L, Set.of("1/2/0", "1/2/1"), List.of(partition0)));
+    assertThrows(IllegalStateException.class,
+        () -> QueryDispatcher.validateMaterializedOutputs(7L, Set.of("1/2/0"),
+            List.of(partition0.toBuilder().setRequestId(8L).build())));
+  }
 
   @BeforeClass
   public void setUp()
@@ -73,9 +104,12 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
+      Mockito.when(queryRunner.processQuery(Mockito.any(), Mockito.any(), Mockito.any()))
+          .thenReturn(CompletableFuture.completedFuture(null));
       QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner));
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
+      _queryRunnerMap.put(availablePort, queryRunner);
     }
     List<Integer> portList = new ArrayList<>(_queryServerMap.keySet());
 
@@ -94,6 +128,71 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+  }
+
+  @Test
+  public void testStagedDispatchOption() {
+    assertFalse(QueryDispatcher.isStagedDispatch(Map.of()));
+    assertFalse(QueryDispatcher.isStagedDispatch(Map.of("stagedDispatch", "false")));
+    assertTrue(QueryDispatcher.isStagedDispatch(Map.of("stagedDispatch", "TrUe")));
+  }
+
+  @Test
+  public void testSubmitWithStreamDispatchesOnlySelectedStages()
+      throws Exception {
+    DispatchableSubPlan dispatchableSubPlan =
+        _queryEnvironment.planQuery("SELECT a.col1 FROM a JOIN b ON a.col1 = b.col1");
+    List<DispatchablePlanFragment> nonRootStages =
+        new ArrayList<>(dispatchableSubPlan.getQueryStagesWithoutRoot());
+    assertTrue(nonRootStages.size() > 1);
+    DispatchablePlanFragment selectedStage = nonRootStages.get(nonRootStages.size() - 1);
+    int selectedStageId = selectedStage.getPlanFragment().getFragmentId();
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    StreamingQuerySession session =
+        new StreamingQuerySession(requestId, selectedStage.getWorkerMetadataList().size());
+
+    for (QueryRunner queryRunner : _queryRunnerMap.values()) {
+      Mockito.clearInvocations(queryRunner);
+    }
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitWithStream(requestId, Set.of(selectedStage),
+          Deadline.after(10_000L, TimeUnit.MILLISECONDS), new HashSet<>(), Map.of(), session);
+    } finally {
+      session.fanOutCancel();
+    }
+
+    Set<Integer> actualWorkerIds = new HashSet<>();
+    int actualCalls = 0;
+    for (QueryRunner queryRunner : _queryRunnerMap.values()) {
+      ArgumentCaptor<WorkerMetadata> workerCaptor = ArgumentCaptor.forClass(WorkerMetadata.class);
+      ArgumentCaptor<StagePlan> stagePlanCaptor = ArgumentCaptor.forClass(StagePlan.class);
+      Mockito.verify(queryRunner, Mockito.atLeast(0))
+          .processQuery(workerCaptor.capture(), stagePlanCaptor.capture(), Mockito.any());
+      for (StagePlan stagePlan : stagePlanCaptor.getAllValues()) {
+        assertEquals(stagePlan.getStageMetadata().getStageId(), selectedStageId);
+      }
+      for (WorkerMetadata workerMetadata : workerCaptor.getAllValues()) {
+        actualWorkerIds.add(workerMetadata.getWorkerId());
+        actualCalls++;
+      }
+    }
+
+    Set<Integer> expectedWorkerIds = new HashSet<>();
+    for (WorkerMetadata workerMetadata : selectedStage.getWorkerMetadataList()) {
+      expectedWorkerIds.add(workerMetadata.getWorkerId());
+    }
+    assertEquals(actualCalls, selectedStage.getWorkerMetadataList().size());
+    assertEquals(actualWorkerIds, expectedWorkerIds);
+  }
+
+  private static Worker.MaterializedPartitionHandle materializedHandle(long requestId, int stageId, int workerId,
+      int partitionId) {
+    return Worker.MaterializedPartitionHandle.newBuilder()
+        .setRequestId(requestId)
+        .setProducerStageId(stageId)
+        .setProducerWorkerId(workerId)
+        .setLogicalPartitionId(partitionId)
+        .build();
   }
 
   @Test(dataProvider = "testSql")
@@ -115,9 +214,9 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(),
           Map.of());
-      Assert.fail("Method call above should have failed");
+      fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      assertTrue(e.getMessage().contains("Error dispatching query"));
     }
     Mockito.reset(failingQueryServer);
   }
@@ -138,9 +237,9 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      Assert.fail("Method call above should have failed");
+      fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      assertTrue(e.getMessage().contains("Error dispatching query"));
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
@@ -164,7 +263,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       QueryDispatcher.QueryResult queryResult =
           _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
       if (queryResult.getProcessingException() == null) {
-        Assert.fail("Method call above should have failed");
+        fail("Method call above should have failed");
       }
     } catch (NullPointerException e) {
       // Expected
@@ -190,9 +289,9 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(),
           Map.of());
-      Assert.fail("Method call above should have failed");
+      fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      assertTrue(e.getMessage().contains("Error dispatching query"));
     }
     Mockito.reset(failingQueryServer);
   }
@@ -211,10 +310,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 200L, new HashSet<>(), Map.of());
-      Assert.fail("Method call above should have failed");
+      fail("Method call above should have failed");
     } catch (Exception e) {
       String message = e.getMessage();
-      Assert.assertTrue(
+      assertTrue(
           message.contains("Timed out waiting for response") || message.contains("Error dispatching query"));
     }
     neverClosingLatch.countDown();
@@ -247,9 +346,9 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
-      Assert.fail("Should have thrown");
+      fail("Should have thrown");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      assertTrue(e.getMessage().contains("Error dispatching query"));
     }
 
     Mockito.verifyNoInteractions(statsManager);
@@ -294,7 +393,7 @@ public class QueryDispatcherTest extends QueryTestSet {
         expectedInstanceIds.add(server.getInstanceId());
       }
     }
-    Assert.assertFalse(expectedInstanceIds.isEmpty());
+    assertFalse(expectedInstanceIds.isEmpty());
 
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
@@ -312,8 +411,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       for (String instanceId : expectedInstanceIds) {
         Integer numInFlight = statsManager.fetchNumInFlightRequestsForServer(instanceId);
-        Assert.assertNotNull(numInFlight, "Expected stats entry for " + instanceId);
-        Assert.assertEquals(numInFlight.intValue(), 0,
+        assertNotNull(numInFlight, "Expected stats entry for " + instanceId);
+        assertEquals(numInFlight.intValue(), 0,
             "Expected 0 in-flight requests for " + instanceId + " after submitAndReduce returns");
       }
     }

@@ -19,11 +19,13 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -86,6 +88,7 @@ public class OpChainExecutionContext {
   /// Identity-based for the same reason as [#_operatorToPlanNodes]; lazily allocated for the same reason too.
   @Nullable
   private Map<PlanNode, Integer> _planNodeIds;
+  private final List<Worker.MaterializedPartitionHandle> _materializedOutputHandles = new ArrayList<>();
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
@@ -239,6 +242,14 @@ public class OpChainExecutionContext {
 
   public boolean isKeepPipelineBreakerStats() {
     return _keepPipelineBreakerStats;
+  }
+
+  public void recordMaterializedOutput(Worker.MaterializedPartitionHandle handle) {
+    _materializedOutputHandles.add(handle);
+  }
+
+  public List<Worker.MaterializedPartitionHandle> getMaterializedOutputHandles() {
+    return List.copyOf(_materializedOutputHandles);
   }
 
   /// Records which PlanNodes compiled down to the given MultiStageOperator. Should be called once per operator as the
