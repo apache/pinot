@@ -1195,30 +1195,34 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
     Map<ServerInstance, SegmentsToQuery> merged = new HashMap<>();
-    for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+    // Flat selection maps can traverse their arrays directly without allocating an entry object per segment.
+    selectionResult.getSegmentToInstanceMap().forEach((segment, instanceId) -> {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
       if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery =
-            merged.computeIfAbsent(serverInstance, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()));
-        segmentsToQuery.getSegments().add(entry.getKey());
+        SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
+        if (segmentsToQuery == null) {
+          segmentsToQuery = new SegmentsToQuery(new ArrayList<>(), new ArrayList<>());
+          merged.put(serverInstance, segmentsToQuery);
+        }
+        segmentsToQuery.getSegments().add(segment);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
-    }
-    for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+    });
+    selectionResult.getOptionalSegmentToInstanceMap().forEach((segment, instanceId) -> {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
       if (serverInstance != null) {
         SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
         if (segmentsToQuery != null) {
-          segmentsToQuery.getOptionalSegments().add(entry.getKey());
+          segmentsToQuery.getOptionalSegments().add(segment);
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.
-    }
+    });
     return merged;
   }
 

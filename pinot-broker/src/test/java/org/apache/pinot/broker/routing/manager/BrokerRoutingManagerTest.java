@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.manager;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.lang.reflect.Constructor;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +47,7 @@ import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
@@ -75,12 +77,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -206,6 +210,45 @@ public class BrokerRoutingManagerTest {
       assertEquals(serverSegments.get(server).getOptionalSegments(), List.of("optional"));
       assertTrue(routingTable.getUnavailableSegments().isEmpty());
     }
+  }
+
+  @Test
+  public void testGroupingPreservesOptionalServerAndMissingServerBehavior()
+      throws Exception {
+    String optionalOnlyInstanceId = "Server_optional_8000";
+    ServerInstance requiredServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    ServerInstance optionalOnlyServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
+    _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
+    _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
+    Map<String, String> required = new Object2ObjectOpenHashMap<>(Map.of(
+        "required0", SERVER_INSTANCE_ID, "required1", SERVER_INSTANCE_ID,
+        "missingRequired0", "Server_missing_8000", "missingRequired1", "Server_missing_8000"));
+    Map<String, String> optional = Map.of("optional", SERVER_INSTANCE_ID,
+        "optionalOnly", optionalOnlyInstanceId, "missingOptional", "Server_missing_optional_8000");
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
+        new InstanceSelector.InstanceMapping(required, optional), List.of(), 0));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE,
+        selectorOf("required0", "required1", "missingRequired0", "missingRequired1", "optional", "optionalOnly",
+            "missingOptional"), List.of(), instanceSelector));
+    clearInvocations(_brokerMetrics);
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
+
+    Map<ServerInstance, SegmentsToQuery> grouped = routingTable.getServerInstanceToSegmentsMap();
+    assertEquals(grouped.keySet(), Set.of(requiredServer));
+    assertEquals(new HashSet<>(grouped.get(requiredServer).getSegments()), Set.of("required0", "required1"));
+    assertEquals(grouped.get(requiredServer).getSegments().size(), 2);
+    assertEquals(grouped.get(requiredServer).getOptionalSegments(), List.of("optional"));
+    assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    // Missing required segments are metered; missing optional segments and optional-only servers are skipped.
+    ArgumentCaptor<Long> increments = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics, atLeastOnce()).addMeteredTableValue(eq(TEST_TABLE),
+        eq(BrokerMeter.SERVER_MISSING_FOR_ROUTING), increments.capture());
+    assertEquals(increments.getAllValues().stream().mapToLong(Long::longValue).sum(), 2L);
+    verifyNoMoreInteractions(_brokerMetrics);
   }
 
   @Test
