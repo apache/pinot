@@ -156,7 +156,7 @@ public class RealtimeConsumerMonitorTest {
         new ConsumingSegmentInfoReader.PartitionOffsetInfo(currentOffsetMap, latestUpstreamOffsetMap, recordsLagMap,
             availabilityLagMsMap);
     return new ConsumingSegmentInfoReader.ConsumingSegmentInfo(serverName, "CONSUMING", -1, currentOffsetMap,
-        partitionOffsetInfo);
+        partitionOffsetInfo, null);
   }
 
   Map<String, String> getStreamConfigMap() {
