@@ -90,9 +90,7 @@ class SizeBasedSegmentFlushThresholdComputer {
         calculateSizeForCalculation(usingPreCommitRows, preCommitRows, postCommitRows, postCommitSizeBytes);
 
     // Skip updating the ratio if the segment is empty, size is not available, or the segment is force-committed.
-    if (rowsForCalculation <= 0 || sizeForCalculation <= 0
-        || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
-        committingSegmentDescriptor.getStopReason())) {
+    if (rowsForCalculation <= 0 || sizeForCalculation <= 0 || isForceCommit(committingSegmentDescriptor)) {
       if (committingSegmentZKMetadata.getStatus() == Status.DONE) {
         // Do not log for COMMITTING segment, as it is expected to not have rowsConsumed and sizeInBytes set
         LOGGER.info(
@@ -220,6 +218,13 @@ class SizeBasedSegmentFlushThresholdComputer {
       return Integer.MAX_VALUE;
     }
     return Math.max((int) targetRows, MINIMUM_NUM_ROWS_THRESHOLD);
+  }
+
+  private static boolean isForceCommit(CommittingSegmentDescriptor committingSegmentDescriptor) {
+    SegmentCompletionProtocol.ReasonCode stopReasonCode = committingSegmentDescriptor.getStopReasonCode();
+    return SegmentCompletionProtocol.ReasonCode.FORCE_COMMIT_MESSAGE_RECEIVED == stopReasonCode
+        || (stopReasonCode == null && SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
+            committingSegmentDescriptor.getStopReason()));
   }
 
   /// Calculates the size to use for segment size ratio calculations.

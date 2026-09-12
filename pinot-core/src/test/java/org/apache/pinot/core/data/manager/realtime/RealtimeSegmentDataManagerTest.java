@@ -1448,7 +1448,7 @@ public class RealtimeSegmentDataManagerTest {
 
     public Field _state;
     public Field _shouldStop;
-    public Field _stopReason;
+    public Field _stopReasonCode;
     public Field _segmentBuildFailedWithDeterministicError;
     public boolean _failSegmentBuildAndReplace = false;
     // When set, buildSegmentAndReplace runs the real implementation (including the upsert CRC guard) instead of being
@@ -1499,8 +1499,8 @@ public class RealtimeSegmentDataManagerTest {
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
       _shouldStop.setAccessible(true);
-      _stopReason = RealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
-      _stopReason.setAccessible(true);
+      _stopReasonCode = RealtimeSegmentDataManager.class.getDeclaredField("_stopReasonCode");
+      _stopReasonCode.setAccessible(true);
       _segmentBuildFailedWithDeterministicError =
           RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
       _segmentBuildFailedWithDeterministicError.setAccessible(true);
@@ -1532,7 +1532,9 @@ public class RealtimeSegmentDataManagerTest {
 
     public String getStopReason() {
       try {
-        return (String) _stopReason.get(this);
+        SegmentCompletionProtocol.ReasonCode stopReasonCode =
+            (SegmentCompletionProtocol.ReasonCode) _stopReasonCode.get(this);
+        return stopReasonCode != null ? stopReasonCode.getReason() : null;
       } catch (Exception e) {
         Assert.fail();
       }

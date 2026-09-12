@@ -39,6 +39,15 @@ public class MutableIndexContext {
   private final int _avgNumMultiValues;
   private final File _consumerDir;
 
+  /// @deprecated use the constructor that accepts maxNumMultiValues instead.
+  @Deprecated
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
+      PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
+      int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
+    this(fieldSpec, fixedLengthBytes, hasDictionary, segmentName, memoryManager, capacity, offHeap, estimatedColSize,
+        estimatedCardinality, ForwardIndexConfig.DEFAULT_MAX_NUM_MULTI_VALUES, avgNumMultiValues, consumerDir);
+  }
+
   public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
       PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
       int estimatedCardinality, int maxNumMultiValues, int avgNumMultiValues, File consumerDir) {
