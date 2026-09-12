@@ -837,7 +837,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             // state of each key before it exits the TTL window. Out-of-TTL segments are skipped in
             // the doAddSegment flow, and the snapshot is used to enableUpsert on the immutable out-of-TTL segment.
             // If no snapshot is found, the entire segment is marked as valid and queryable.
-            _partitionUpsertMetadataManager.takeSnapshot();
+            _partitionUpsertMetadataManager.takeSnapshot(_llcSegmentName.getSegmentName(), _startOffset.toString());
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
           } else {
             // We should remove deleted-keys first and then take a snapshot. This is because the deletedKeysTTL
@@ -845,7 +845,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             // after this process, we save one commit cycle, ensuring that the deletion of valid doc IDs is reflected
             // immediately
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
-            _partitionUpsertMetadataManager.takeSnapshot();
+            _partitionUpsertMetadataManager.takeSnapshot(_llcSegmentName.getSegmentName(), _startOffset.toString());
           }
         }
 
