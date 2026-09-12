@@ -56,6 +56,14 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
+  @JsonPropertyDescription("When true, convert ingestion-aggregation source columns that are not in the schema "
+      + "(and not already covered by sourceFieldConfigs) before indexing. A source is converted only when every "
+      + "aggregation that reads it is numeric-safe. COUNT, HLL, sketch, and bitmap consumers leave the raw field. "
+      + "An explicit SourceFieldConfig still rewrites the shared field and is unsafe when an identity-sensitive "
+      + "aggregation shares the column. Off by default to avoid per-record conversion overhead when source values "
+      + "are already aggregator-compatible.")
+  private boolean _convertAggregationSourceTypes;
+
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
 
@@ -119,6 +127,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public List<AggregationConfig> getAggregationConfigs() {
     return _aggregationConfigs;
+  }
+
+  public boolean isConvertAggregationSourceTypes() {
+    return _convertAggregationSourceTypes;
   }
 
   public boolean isContinueOnError() {
@@ -187,6 +199,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
     _aggregationConfigs = aggregationConfigs;
+  }
+
+  public void setConvertAggregationSourceTypes(boolean convertAggregationSourceTypes) {
+    _convertAggregationSourceTypes = convertAggregationSourceTypes;
   }
 
   public void setContinueOnError(boolean continueOnError) {

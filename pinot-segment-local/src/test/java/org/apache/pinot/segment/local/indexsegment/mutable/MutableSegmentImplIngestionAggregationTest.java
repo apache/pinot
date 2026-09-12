@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -28,13 +29,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.pinot.segment.local.aggregator.DistinctCountHLLPlusValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -361,6 +369,8 @@ public class MutableSegmentImplIngestionAggregationTest {
 
   @Test
   public void testBigDecimalTooBig() {
+    // Without fail-soft (#16316), oversized SUM_PRECISION still throws during index.
+    // Type conversion (#16317) does not change this contract.
     String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
@@ -371,16 +381,269 @@ public class MutableSegmentImplIngestionAggregationTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
             List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
-    // Make a big decimal larger than 3 precision and try to index it
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
     GenericRow row = getRow(random, 1);
-
     row.putValue("metric", large);
-    assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, METADATA);
-    });
+    assertThrows(IllegalArgumentException.class, () -> mutableSegmentImpl.index(row, METADATA));
 
     mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testStringSourceNotInSchemaThroughTransformPipeline()
+      throws Exception {
+    // End-to-end: JSON-style string numbers for a source column absent from the schema are converted by the transform
+    // pipeline and correctly summed (issue #16317).
+    String m1 = "sum1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
+    List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
+        .setTimeColumnName(TIME_COLUMN1)
+        .setNoDictionaryColumns(List.of(m1))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            aggregationConfigs);
+
+    GenericRow row1 = new GenericRow();
+    row1.putValue(DIMENSION_1, 0);
+    row1.putValue(DIMENSION_2, "aa");
+    row1.putValue(TIME_COLUMN1, 1);
+    row1.putValue(TIME_COLUMN2, 1);
+    row1.putValue(METRIC, "10");
+    GenericRow transformed1 = pipeline.processRow(row1).getTransformedRows().get(0);
+    assertEquals(transformed1.getValue(METRIC), 10.0);
+    mutableSegmentImpl.index(transformed1, METADATA);
+
+    GenericRow row2 = new GenericRow();
+    row2.putValue(DIMENSION_1, 0);
+    row2.putValue(DIMENSION_2, "aa");
+    row2.putValue(TIME_COLUMN1, 1);
+    row2.putValue(TIME_COLUMN2, 1);
+    row2.putValue(METRIC, "32.5");
+    GenericRow transformed2 = pipeline.processRow(row2).getTransformedRows().get(0);
+    assertEquals(transformed2.getValue(METRIC), 32.5);
+    mutableSegmentImpl.index(transformed2, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), 42.5);
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testNullAggregationSourceThroughTransformPipeline()
+      throws Exception {
+    String m1 = "sum1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
+    List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
+        .setTimeColumnName(TIME_COLUMN1)
+        .setNoDictionaryColumns(List.of(m1))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            aggregationConfigs);
+
+    GenericRow row = new GenericRow();
+    row.putValue(DIMENSION_1, 0);
+    row.putValue(DIMENSION_2, "aa");
+    row.putValue(TIME_COLUMN1, 1);
+    row.putValue(TIME_COLUMN2, 1);
+    row.putValue(METRIC, null);
+    GenericRow transformed = pipeline.processRow(row).getTransformedRows().get(0);
+    mutableSegmentImpl.index(transformed, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), 0.0);
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testSharedSourceSumAndDistinctCountHllPreservesStringIdentity()
+      throws Exception {
+    // Jackie: SUM(metric) + DISTINCTCOUNTHLL(metric) with the flag on must not collapse "01" and "1" to Double(1.0).
+    indexSharedSourceNumericAndHll(true, "SUM(metric)", "DISTINCTCOUNTHLL(metric, 12)", List.of("01", "1"), 2.0, 2L);
+  }
+
+  @Test
+  public void testSharedSourceSumAndDistinctCountHllFlagOffPreservesStringIdentity()
+      throws Exception {
+    indexSharedSourceNumericAndHll(false, "SUM(metric)", "DISTINCTCOUNTHLL(metric, 12)", List.of("01", "1"), 2.0, 2L);
+  }
+
+  @Test
+  public void testSharedSourceMinMaxAndDistinctCountHllPreservesStringIdentity()
+      throws Exception {
+    String minCol = "minMetric";
+    String maxCol = "maxMetric";
+    String hllCol = "hllMetric";
+    Schema schema = getSchemaBuilder().addMetric(minCol, DataType.DOUBLE).addMetric(maxCol, DataType.DOUBLE)
+        .addMetric(hllCol, DataType.BYTES).build();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(minCol, "MIN(metric)"), new AggregationConfig(maxCol, "MAX(metric)"),
+            new AggregationConfig(hllCol, "DISTINCTCOUNTHLL(metric, 12)"));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, true);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(minCol, maxCol, hllCol), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, aggregationConfigs);
+    try {
+      for (String metric : List.of("01", "1")) {
+        GenericRow transformed = pipeline.processRow(sameGroupRow(metric)).getTransformedRows().get(0);
+        assertEquals(transformed.getValue(METRIC), metric);
+        mutableSegmentImpl.index(transformed, METADATA);
+      }
+      assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+      GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(minCol), 1.0);
+      assertEquals(result.getValue(maxCol), 1.0);
+      HyperLogLog hll = CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) result.getValue(hllCol));
+      assertEquals(hll.cardinality(), 2L);
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  @Test
+  public void testSharedSourceSumAndDistinctCountRawHllPreservesStringIdentity()
+      throws Exception {
+    indexSharedSourceNumericAndHll(true, "SUM(metric)", "DISTINCTCOUNTRAWHLL(metric, 12)", List.of("01", "1"), 2.0, 2L);
+  }
+
+  @Test
+  public void testSharedSourceSumAndDistinctCountHllPlusPreservesStringIdentity()
+      throws Exception {
+    // HLL++ serialized size is not stable across offers, so MutableSegmentImpl.index can throw on the
+    // fixed-byte forward index. Prove identity here through the pipeline plus the HLL++ aggregator.
+    String sumCol = "sumMetric";
+    String hllCol = "hllMetric";
+    Schema schema = getSchemaBuilder().addMetric(sumCol, DataType.DOUBLE).addMetric(hllCol, DataType.BYTES).build();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(sumCol, "SUM(metric)"),
+            new AggregationConfig(hllCol, "DISTINCTCOUNTHLLPLUS(metric)"));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, true);
+    DistinctCountHLLPlusValueAggregator aggregator = new DistinctCountHLLPlusValueAggregator(List.of());
+    HyperLogLogPlus hll = null;
+    double sum = 0.0;
+    for (String metric : List.of("01", "1")) {
+      GenericRow transformed = pipeline.processRow(sameGroupRow(metric)).getTransformedRows().get(0);
+      Object raw = transformed.getValue(METRIC);
+      assertEquals(raw, metric);
+      sum += ValueAggregatorUtils.toDouble(raw);
+      if (hll == null) {
+        hll = aggregator.getInitialAggregatedValue(raw);
+      } else {
+        aggregator.applyRawValue(hll, raw);
+      }
+    }
+    assertEquals(sum, 2.0);
+    assertEquals(hll.cardinality(), 2L);
+  }
+
+  @Test
+  public void testSharedSourceSumAndHllKeepsScientificAndDecimalStringIdentity()
+      throws Exception {
+    indexSharedSourceNumericAndHll(true, "SUM(metric)", "DISTINCTCOUNTHLL(metric, 12)", List.of("1e0", "1.0", "1"), 3.0,
+        3L);
+  }
+
+  @Test
+  public void testNumericOnlySumMinMaxStillConvertsLeadingZeroStrings()
+      throws Exception {
+    String sumCol = "sumMetric";
+    String minCol = "minMetric";
+    String maxCol = "maxMetric";
+    Schema schema = getSchemaBuilder().addMetric(sumCol, DataType.DOUBLE).addMetric(minCol, DataType.DOUBLE)
+        .addMetric(maxCol, DataType.DOUBLE).build();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(sumCol, "SUM(metric)"), new AggregationConfig(minCol, "MIN(metric)"),
+            new AggregationConfig(maxCol, "MAX(metric)"));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, true);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(sumCol, minCol, maxCol), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, aggregationConfigs);
+    try {
+      for (String metric : List.of("01", "1")) {
+        GenericRow transformed = pipeline.processRow(sameGroupRow(metric)).getTransformedRows().get(0);
+        assertEquals(transformed.getValue(METRIC), 1.0);
+        mutableSegmentImpl.index(transformed, METADATA);
+      }
+      assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+      GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(sumCol), 2.0);
+      assertEquals(result.getValue(minCol), 1.0);
+      assertEquals(result.getValue(maxCol), 1.0);
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  private void indexSharedSourceNumericAndHll(boolean convertAggregationSourceTypes, String numericFunction,
+      String hllFunction, List<String> metrics, double expectedSum, long expectedHllCardinality)
+      throws Exception {
+    String sumCol = "sumMetric";
+    String hllCol = "hllMetric";
+    Schema schema = getSchemaBuilder().addMetric(sumCol, DataType.DOUBLE).addMetric(hllCol, DataType.BYTES).build();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(sumCol, numericFunction), new AggregationConfig(hllCol, hllFunction));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, convertAggregationSourceTypes);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(sumCol, hllCol), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, aggregationConfigs);
+    try {
+      for (String metric : metrics) {
+        GenericRow transformed = pipeline.processRow(sameGroupRow(metric)).getTransformedRows().get(0);
+        assertEquals(transformed.getValue(METRIC), metric);
+        mutableSegmentImpl.index(transformed, METADATA);
+      }
+      assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+      GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(sumCol), expectedSum);
+      HyperLogLog hll = CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) result.getValue(hllCol));
+      assertEquals(hll.cardinality(), expectedHllCardinality);
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  private static TransformPipeline newPipeline(Schema schema, List<AggregationConfig> aggregationConfigs,
+      boolean convertAggregationSourceTypes) {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(convertAggregationSourceTypes);
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    List<String> destColumns = new ArrayList<>();
+    for (AggregationConfig aggregationConfig : aggregationConfigs) {
+      destColumns.add(aggregationConfig.getColumnName());
+    }
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
+        .setTimeColumnName(TIME_COLUMN1)
+        .setNoDictionaryColumns(destColumns)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    return new TransformPipeline(tableConfig, schema);
+  }
+
+  private static GenericRow sameGroupRow(Object metric) {
+    GenericRow row = new GenericRow();
+    row.putValue(DIMENSION_1, 0);
+    row.putValue(DIMENSION_2, "aa");
+    row.putValue(TIME_COLUMN1, 1);
+    row.putValue(TIME_COLUMN2, 1);
+    row.putValue(METRIC, metric);
+    return row;
   }
 
   private static BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {
