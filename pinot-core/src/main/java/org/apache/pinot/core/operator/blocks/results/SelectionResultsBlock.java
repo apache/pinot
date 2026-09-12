@@ -35,6 +35,7 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   private final Comparator<? super Object[]> _comparator;
   private final QueryContext _queryContext;
   private List<Object[]> _rows;
+  private boolean _hasMoreFilteredDocs;
 
   public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator, QueryContext queryContext) {
@@ -55,6 +56,14 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Nullable
   public Comparator<? super Object[]> getComparator() {
     return _comparator;
+  }
+
+  public boolean hasMoreFilteredDocs() {
+    return _hasMoreFilteredDocs;
+  }
+
+  public void setHasMoreFilteredDocs(boolean hasMoreFilteredDocs) {
+    _hasMoreFilteredDocs = hasMoreFilteredDocs;
   }
 
   @Override
@@ -83,14 +92,14 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
   }
 
-  // provide sorted metadata
   @Override
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = super.getResultsMetadata();
-    // All selection result blocks created by operators with orderBy
-    // come with non-null comparator
     if (_comparator != null) {
       metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
+    }
+    if (_hasMoreFilteredDocs) {
+      metadata.put(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
     }
     return metadata;
   }
