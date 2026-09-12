@@ -41,21 +41,30 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
   }
 
   /// Adds the document id to the bitmap of the given dictionary id.
+  ///
+  /// Dictionary ids are usually appended in order. A repaired row can publish a later dict id first (the original
+  /// value was dictionary-indexed, then the forward write fell back to a default). Gap-fill empty bitmaps so
+  /// [#add] stays aligned with dictionary ids instead of throwing [IndexOutOfBoundsException].
   @Override
   public void add(int dictId, int docId) {
-    if (_bitmaps.size() == dictId) {
-      // Bitmap for the dictionary id does not exist, add a new bitmap into the list
-      ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap(docId);
+    if (dictId < 0) {
+      throw new IllegalArgumentException("dictId must be non-negative: " + dictId);
+    }
+    if (dictId >= _bitmaps.size()) {
       try {
         _writeLock.lock();
-        _bitmaps.add(bitmap);
+        while (_bitmaps.size() < dictId) {
+          _bitmaps.add(new ThreadSafeMutableRoaringBitmap());
+        }
+        if (_bitmaps.size() == dictId) {
+          _bitmaps.add(new ThreadSafeMutableRoaringBitmap(docId));
+          return;
+        }
       } finally {
         _writeLock.unlock();
       }
-    } else {
-      // Bitmap for the dictionary id already exists, check and add document id into the bitmap
-      _bitmaps.get(dictId).add(docId);
     }
+    _bitmaps.get(dictId).add(docId);
   }
 
   /// Pre-creates an empty bitmap for the next dictionary id. Used by callers that reserve a

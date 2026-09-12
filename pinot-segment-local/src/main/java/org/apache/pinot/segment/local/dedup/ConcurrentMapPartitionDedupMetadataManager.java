@@ -109,6 +109,26 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
+  public boolean isRecordPresent(DedupRecordInfo dedupRecordInfo) {
+    if (!startOperation()) {
+      // Stopped managers must not accept a write that we can never claim.
+      return true;
+    }
+    try {
+      // Duplicates never reach checkRecordPresentOrUpdate. Advance the TTL watermark here so a high-duplication
+      // stream still expires stale keys (same as the old check-or-update path).
+      if (_metadataTTL > 0) {
+        _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+      }
+      Pair<IndexSegment, Double> segmentAndTime = _primaryKeyToSegmentAndTimeMap.get(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction));
+      return segmentAndTime != null && !isOutOfMetadataTTL(segmentAndTime.getRight());
+    } finally {
+      finishOperation();
+    }
+  }
+
+  @Override
   public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     if (!startOperation()) {
       _logger.info("Skip adding record to {} because metadata manager is already stopped",
