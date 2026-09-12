@@ -45,6 +45,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -63,6 +64,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
@@ -76,6 +78,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -2343,5 +2346,64 @@ public class InstanceSelectorTest {
     // The selector never touches the replica health gauges itself
     verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), any(BrokerGauge.class), anyLong());
     verify(_brokerMetrics, never()).removeTableGauge(eq(TABLE_NAME), any(BrokerGauge.class));
+  }
+
+  @DataProvider(name = "poolMetricsSelector")
+  public Object[] getPoolMetricsSelector() {
+    return new Object[]{BALANCED_INSTANCE_SELECTOR, REPLICA_GROUP_INSTANCE_SELECTOR_TYPE};
+  }
+
+  @Test(dataProvider = "poolMetricsSelector")
+  public void testSelectedPoolMetricsAndRequestIsolation(String selectorType) {
+    BaseInstanceSelector selector = selectorType.equals(BALANCED_INSTANCE_SELECTOR)
+        ? new BalancedInstanceSelector()
+        : new ReplicaGroupInstanceSelector();
+    selector._brokerMetrics = _brokerMetrics;
+    selector._config = INSTANCE_SELECTOR_CONFIG;
+    Map<String, List<SegmentInstanceCandidate>> candidates = new HashMap<>();
+    Map<String, String> expectedInstances = new HashMap<>();
+    List<String> segments = new ArrayList<>();
+    // Exercise the fallback pool, the primitive-map zero key, and IDs/counts outside the Integer cache.
+    for (int pool : new int[]{-1, 0, 128}) {
+      String instance = "instance" + pool;
+      for (int i = 0; i < 129; i++) {
+        String segment = "segment_" + pool + "_" + i;
+        candidates.put(segment, List.of(new SegmentInstanceCandidate(instance, true, pool, 0)));
+        expectedInstances.put(segment, instance);
+        // Routing matches segment names by value, even when query and metadata use different String objects.
+        segments.add(new String(segment));
+      }
+    }
+    candidates.put("optional", List.of(new SegmentInstanceCandidate("instance128", false, 128, 0)));
+    segments.addAll(List.of("optional", "unavailable", "pending"));
+    selector._segmentStates = new SegmentStates(candidates, Set.of("instance-1", "instance0", "instance128"),
+        Set.of("unavailable", "unrequestedUnavailable"));
+    Map<String, String> queryOptions = Map.of(ORDERED_PREFERRED_POOLS, "128|0");
+    when(_pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, segments, 0L);
+
+    assertEquals(first.getSegmentToInstanceMap(), expectedInstances);
+    assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of("optional", "instance128"));
+    assertEquals(first.getUnavailableSegments(), List.of("unavailable"));
+    String preferredPoolTag = BrokerMetrics.getTagForPreferredPool(queryOptions);
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 129L, preferredPoolTag, "-1");
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 129L, preferredPoolTag, "0");
+    // Optional segments count as selected; unavailable segments and metadata not yet present do not.
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 130L, preferredPoolTag, "128");
+    verifyNoMoreInteractions(_brokerMetrics);
+
+    clearInvocations(_brokerMetrics);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of());
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of("segment_0_0"), 1L);
+
+    assertEquals(second.getSegmentToInstanceMap(), Map.of("segment_0_0", "instance0"));
+    assertTrue(second.getOptionalSegmentToInstanceMap().isEmpty());
+    assertTrue(second.getUnavailableSegments().isEmpty());
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(Map.of()), "0");
+    verifyNoMoreInteractions(_brokerMetrics);
+    assertEquals(first.getSegmentToInstanceMap(), expectedInstances);
+    assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of("optional", "instance128"));
   }
 }
