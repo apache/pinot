@@ -29,11 +29,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// [org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor] can turn it into a
 /// [org.apache.pinot.spi.data.readers.GenericRow].
 ///
-/// Implementations must produce the same Java value contract Jackson produces for text JSON, so the extractor
-/// can treat every format uniformly: `Boolean`, `Integer`, `Long`, `Double`, `String`, `java.math.BigInteger`
-/// / `java.math.BigDecimal` for oversized / high-precision numbers, `java.util.List` for arrays, and nested
-/// `Map<String, Object>` for objects. Binary formats may additionally yield `Float` and `byte[]` scalars,
-/// which Pinot's downstream type conversion handles.
+/// Text-backed formats (UTF-8 JSON and PostgreSQL jsonb) parse floating literals as `BigDecimal` so decimal
+/// precision survives ingestion. Binary formats keep their native numeric types (`Double` / `Float`). Integers
+/// narrow to `Integer` / `Long` / `BigInteger` in every format. Arrays become `java.util.List` and objects
+/// become nested `Map<String, Object>`. Binary formats may additionally yield `byte[]` scalars, which Pinot's
+/// downstream type conversion handles.
 ///
 /// Implementations are stateless and must be thread-safe: a single instance is shared across all decode calls.
 public interface JsonPayloadParser {

@@ -34,11 +34,17 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 ///
 /// Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
 /// `TEXT`, `POSTGRES_JSONB`, `SQLITE_JSONB`, `SMILE` or `CBOR`. When unset the
-/// encoding is `TEXT`, the decoder's historical behavior.
+/// encoding is `TEXT`, the decoder's historical format selection.
 ///
-/// Set it to `AUTO` to instead detect the encoding per message from its leading magic / version bytes,
-/// falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text JSON
-/// document: a top-level `&#123;` or `[` (optionally after whitespace) collides with none
+/// Text JSON and PostgreSQL jsonb parse floating literals as `BigDecimal` so high-precision decimals
+/// survive ingestion. That is always on: it is the correct behavior for decimal text, not an opt-in flag.
+/// Avro and Protobuf decoders are unchanged: they already deliver typed numeric values (Avro's decimal
+/// logical type is already `BigDecimal`). Smile, CBOR, and SQLite JSONB keep their native / existing
+/// numeric types.
+///
+/// Set `jsonFormat` to `AUTO` to instead detect the encoding per message from its leading magic / version
+/// bytes, falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text
+/// JSON document: a top-level `&#123;` or `[` (optionally after whitespace) collides with none
 /// of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
 /// leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
 /// See [JsonPayloadFormat].
@@ -71,6 +77,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
+
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
     _fieldsToRead = CollectionUtils.isNotEmpty(fieldsToRead) ? Set.copyOf(fieldsToRead) : null;

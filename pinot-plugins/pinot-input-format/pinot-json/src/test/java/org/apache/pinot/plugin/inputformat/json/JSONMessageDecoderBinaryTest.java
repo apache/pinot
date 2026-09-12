@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -86,7 +87,8 @@ public class JSONMessageDecoderBinaryTest {
   private void assertRich(GenericRow row) {
     assertEquals(row.getValue("name"), "pinot");
     assertEquals(row.getValue("count"), 7);
-    assertEquals(row.getValue("ratio"), 2.5);
+    // Text JSON / PostgreSQL jsonb use BigDecimal; Smile / CBOR keep native Double.
+    assertEquals(((Number) row.getValue("ratio")).doubleValue(), 2.5);
   }
 
   private Map<String, Object> richDoc() {
@@ -97,7 +99,11 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testUnsetFormatIsText()
       throws Exception {
-    assertRich(decode(Map.of(), RICH_FIELDS, TEXT_DOC));
+    GenericRow row = decode(Map.of(), RICH_FIELDS, TEXT_DOC);
+    assertEquals(row.getValue("name"), "pinot");
+    assertEquals(row.getValue("count"), 7);
+    // The default extractor preserves decimal precision on text JSON, so the decimal parses as BigDecimal.
+    assertEquals(row.getValue("ratio"), new BigDecimal("2.5"));
   }
 
   /// The direct streaming path materializes top-level scalars straight off the parser; guard the binary-only
@@ -185,7 +191,9 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testAutoStillDecodesText()
       throws Exception {
-    assertRich(decode(AUTO, RICH_FIELDS, TEXT_DOC));
+    GenericRow row = decode(AUTO, RICH_FIELDS, TEXT_DOC);
+    assertRich(row);
+    assertEquals(row.getValue("ratio"), new BigDecimal("2.5"));
   }
 
   @Test
