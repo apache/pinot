@@ -42,7 +42,8 @@ import org.slf4j.LoggerFactory;
 /// A segment uploader which uploads to a segment store (store root configured as \_segmentStoreUriStr) using PinotFS
 /// within a configurable timeout. The temporary location is
 /// `{store}/{table}/{segment}.tmp.{instanceId}` so a same-server retry overwrites one object and two replicas stay on
-/// different keys. The controller still moves that temp object to the final segment name.
+/// different keys. The copy overwrites that key; it does not delete first. A timed-out first Future finishing last is
+/// last-writer-wins on the temp object. The controller still moves that temp object to the final segment name.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
@@ -82,10 +83,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-        // Check and delete any existing segment file.
-        if (pinotFS.exists(destUri)) {
-          pinotFS.delete(destUri, true);
-        }
+        // Overwrite the reused {segment}.tmp.{instanceId} key. Do not delete first: a timed-out
+        // first Future can finish last and would wipe a retry that already started writing.
         pinotFS.copyFromLocalFile(segmentFile, destUri);
         return destUri;
       } catch (Exception e) {

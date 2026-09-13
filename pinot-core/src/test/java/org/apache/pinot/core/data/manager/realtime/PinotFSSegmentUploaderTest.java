@@ -59,8 +59,6 @@ public class PinotFSSegmentUploaderTest {
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
     properties.put("class.timeout",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
-    properties.put("class.existing",
-        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
     properties.put("class.record",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$RecordingPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
@@ -72,6 +70,8 @@ public class PinotFSSegmentUploaderTest {
   @BeforeMethod
   public void resetRecordedUploads() {
     RecordingPinotFS.COPIED_DEST_URIS.clear();
+    RecordingPinotFS.DELETED_DEST_URIS.clear();
+    RecordingPinotFS.EXISTS = false;
   }
 
   @Test
@@ -83,11 +83,16 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
-  public void testSegmentAlreadyExist() {
+  public void testExistingTempIsOverwrittenWithoutDelete() {
+    RecordingPinotFS.EXISTS = true;
     SegmentUploader segmentUploader =
-        new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
+        new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertEquals(segmentURI.toString(), expectedTempUri("existing://root", SERVER_A));
+    String expected = expectedTempUri("record://root", SERVER_A);
+    Assert.assertEquals(segmentURI.toString(), expected);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 1);
+    Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(0).toString(), expected);
+    Assert.assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
   }
 
   @Test
@@ -122,6 +127,7 @@ public class PinotFSSegmentUploaderTest {
     Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 2);
     Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(0).toString(), expected);
     Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(1).toString(), expected);
+    Assert.assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
   }
 
   @Test
@@ -140,6 +146,7 @@ public class PinotFSSegmentUploaderTest {
     Assert.assertEquals(RecordingPinotFS.COPIED_DEST_URIS.get(1).toString(), expectedB);
     Assert.assertFalse(expectedA.contains(SERVER_B));
     Assert.assertFalse(expectedB.contains(SERVER_A));
+    Assert.assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
   }
 
   private String expectedTempUri(String storeRoot, String instanceId) {
@@ -239,16 +246,21 @@ public class PinotFSSegmentUploaderTest {
     }
   }
 
-  public static class AlwaysExistPinotFS extends AlwaysSucceedPinotFS {
-    @Override
-    public boolean exists(URI fileUri)
-        throws IOException {
-      return true;
-    }
-  }
-
   public static class RecordingPinotFS extends AlwaysSucceedPinotFS {
     static final List<URI> COPIED_DEST_URIS = new ArrayList<>();
+    static final List<URI> DELETED_DEST_URIS = new ArrayList<>();
+    static volatile boolean EXISTS = false;
+
+    @Override
+    public boolean exists(URI fileUri) {
+      return EXISTS;
+    }
+
+    @Override
+    public boolean delete(URI segmentUri, boolean forceDelete) {
+      DELETED_DEST_URIS.add(segmentUri);
+      return true;
+    }
 
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri) {

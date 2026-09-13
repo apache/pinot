@@ -271,9 +271,8 @@ public class ServerSegmentCompletionProtocolHandler {
         SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, instanceId));
     try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
       URI destUri = new URI(destUriStr);
-      if (pinotFS.exists(destUri)) {
-        pinotFS.delete(destUri, true);
-      }
+      // Overwrite the reused {segment}.tmp.{instanceId} key. Do not delete first: a late writer
+      // would wipe a retry that already started writing.
       pinotFS.copyFromLocalFile(segmentTarFile, destUri);
     }
 
