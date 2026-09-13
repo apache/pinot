@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.common.utils;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
