@@ -77,7 +77,7 @@ public class DataTableSerDeTest {
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
 
   @Test
-  public void testRowsDoNotRetainPreviousFixedWidthValues()
+  public void testRowBufferReuse()
       throws IOException {
     DataSchema schema = new DataSchema(new String[]{"int", "long", "float", "double", "string", "bytes", "array"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
@@ -93,9 +93,15 @@ public class DataTableSerDeTest {
     builder.setColumn(6, new int[]{17, -23});
     builder.finishRow();
 
-    // Omitted fields retain the zero-initialized representation, including variable-data offset/length slots.
+    // Populate every column in reverse order, overwriting both fixed values and variable-data offset/length slots.
     builder.startRow();
+    builder.setColumn(6, new int[0]);
+    builder.setColumn(5, new ByteArray(new byte[0]));
     builder.setColumn(4, "second");
+    builder.setColumn(3, 0.0d);
+    builder.setColumn(2, 0.0f);
+    builder.setColumn(1, 0L);
+    builder.setColumn(0, 0);
     builder.finishRow();
 
     builder.startRow();
