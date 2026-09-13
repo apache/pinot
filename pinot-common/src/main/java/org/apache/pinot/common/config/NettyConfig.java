@@ -24,7 +24,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// Container object for netty configuration of pinot clients and servers (netty, grizzly, etc.)
 public class NettyConfig {
   private static final String NATIVE_TRANSPORTS_ENABLED = "native.transports.enabled";
-  private boolean _nativeTransportsEnabled = false;
+  private boolean _nativeTransportsEnabled = true;
 
   private static String key(String namespace, String suffix) {
     return namespace + "." + suffix;
