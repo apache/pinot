@@ -32,6 +32,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,7 +42,6 @@ import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
@@ -65,9 +65,9 @@ public class RecordTransformerUtils {
   /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
   /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`, plus (when
   /// `IngestionConfig#isConvertAggregationSourceTypes` is true) aggregation source columns that are not in the
-  /// schema and are used only by numeric-safe aggregations (see [#addAggregationSourceDataTypes]). It precedes
-  /// the post-complex-type [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields
-  /// with the corrected types.
+  /// schema and are not also read by an identity-sensitive aggregation (see [#addAggregationSourceDataTypes]).
+  /// It precedes the post-complex-type [RecordEnricher]s and [ExpressionTransformer] so that they consume the
+  /// source fields with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before other transformations.
   /// - (Optional) [ExpressionTransformer] to evaluate expressions and fill the values.
   /// - (Optional) [FilterTransformer] to filter records based on custom predicates.
@@ -163,19 +163,27 @@ public class RecordTransformerUtils {
     }
     Map<String, PinotDataType> dataTypes = new HashMap<>();
     List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    Set<String> identitySensitiveSources = null;
     if (CollectionUtils.isNotEmpty(sourceFieldConfigs)) {
       for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
         // If pre-ComplexType transformers are requested, add only pre-ComplexType source fields. Similarly, if
         // non pre-ComplexType transformers are requested, add only non pre-ComplexType source fields.
         if (sourceFieldConfig.isPreComplexTypeTransform() == preComplexTypeTransform) {
-          dataTypes.put(sourceFieldConfig.getName(), sourceFieldConfig.getDataType());
+          if (identitySensitiveSources == null) {
+            identitySensitiveSources = getIdentitySensitiveAggregationSourceColumns(ingestionConfig);
+          }
+          String sourceFieldName = sourceFieldConfig.getName();
+          Preconditions.checkState(!identitySensitiveSources.contains(sourceFieldName),
+              "SourceFieldConfig for '%s' names a column also read by an identity-sensitive aggregation "
+                  + "(HLL, sketch, or bitmap)", sourceFieldName);
+          dataTypes.put(sourceFieldName, sourceFieldConfig.getDataType());
         }
       }
     }
     // Opt-in: convert aggregation source columns that are not in the schema (and not already covered by an explicit
     // SourceFieldConfig) so mistyped JSON/Avro string numbers are converted before MutableSegmentImpl indexes them.
     // A source shared with an identity-sensitive aggregation is left raw. Off by default; uses the stock
-    // DataTypeTransformer (no lazy compatibility short-circuit).
+    // DataTypeTransformer (no lazy compatibility short-circuit). Inferred types are aggregator input types.
     if (!preComplexTypeTransform && schema != null && ingestionConfig.isConvertAggregationSourceTypes()) {
       addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
     }
@@ -185,10 +193,11 @@ public class RecordTransformerUtils {
   }
 
   /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
-  /// covered by an explicit [SourceFieldConfig] in either phase). A source is registered only when every aggregation
-  /// that reads it is numeric-safe. One conversion-safe aggregation cannot rewrite a field that an identity-sensitive
-  /// consumer (COUNT, HLL, sketches, bitmaps) also reads. When every consumer is numeric-safe, inferred types are
-  /// merged by keeping the wider type so config order cannot drop precision.
+  /// covered by an explicit [SourceFieldConfig] in either phase). Types are aggregator input types, never the
+  /// destination stored type. A source is registered only when no identity-sensitive aggregation (HLL, sketch,
+  /// bitmap) reads it. COUNT is not identity-sensitive and does not veto a sibling numeric rewrite. When every
+  /// remaining consumer is conversion-safe, inferred types are merged by keeping the wider type so config order
+  /// cannot drop precision.
   /// [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net for raw strings.
   @VisibleForTesting
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
@@ -204,7 +213,6 @@ public class RecordTransformerUtils {
     Map<String, PinotDataType> inferredTypes = new HashMap<>();
     Set<String> identitySensitiveSources = new HashSet<>();
     for (AggregationConfig aggregationConfig : aggregationConfigs) {
-      String destColumn = aggregationConfig.getColumnName();
       String aggregationFunction = aggregationConfig.getAggregationFunction();
       ExpressionContext expressionContext;
       try {
@@ -238,19 +246,71 @@ public class RecordTransformerUtils {
         // COUNT(*) has no source value and does not veto other aggregations on a real column.
         continue;
       }
-      FieldSpec destFieldSpec = schema.getFieldSpecFor(destColumn);
-      PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
-      if (inferredType == null) {
+      if (ValueAggregatorFactory.isIdentitySensitiveRawInput(functionType)) {
         // Identity-sensitive consumer: do not rewrite this source for anyone, including earlier numeric aggregations.
         identitySensitiveSources.add(sourceColumn);
         inferredTypes.remove(sourceColumn);
-      } else if (!identitySensitiveSources.contains(sourceColumn)) {
+        continue;
+      }
+      PinotDataType inferredType = inferAggregationSourceDataType(functionType);
+      if (inferredType == null) {
+        // COUNT / COUNTMV: no conversion from this aggregation, and not a veto.
+        continue;
+      }
+      if (!identitySensitiveSources.contains(sourceColumn)) {
         PinotDataType existing = inferredTypes.get(sourceColumn);
         inferredTypes.put(sourceColumn,
             existing == null ? inferredType : mergeInferredAggregationSourceTypes(existing, inferredType));
       }
     }
     dataTypes.putAll(inferredTypes);
+  }
+
+  /// Source columns hashed or sketched by an identity-sensitive ingestion aggregation. Used to reject
+  /// an explicit [SourceFieldConfig] that would rewrite those values, and to veto inferred conversion.
+  private static Set<String> getIdentitySensitiveAggregationSourceColumns(@Nullable IngestionConfig ingestionConfig) {
+    if (ingestionConfig == null || CollectionUtils.isEmpty(ingestionConfig.getAggregationConfigs())) {
+      return Set.of();
+    }
+    Set<String> sources = new HashSet<>();
+    for (AggregationConfig aggregationConfig : ingestionConfig.getAggregationConfigs()) {
+      String aggregationFunction = aggregationConfig.getAggregationFunction();
+      if (aggregationFunction == null) {
+        continue;
+      }
+      ExpressionContext expressionContext;
+      try {
+        expressionContext = RequestContextUtils.getExpression(aggregationFunction);
+      } catch (Exception e) {
+        continue;
+      }
+      if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+        continue;
+      }
+      FunctionContext functionContext = expressionContext.getFunction();
+      AggregationFunctionType functionType;
+      try {
+        functionType = AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      } catch (Exception e) {
+        continue;
+      }
+      if (!ValueAggregatorFactory.isIdentitySensitiveRawInput(functionType)) {
+        continue;
+      }
+      List<ExpressionContext> arguments = functionContext.getArguments();
+      if (arguments.isEmpty()) {
+        continue;
+      }
+      ExpressionContext firstArgument = arguments.get(0);
+      if (firstArgument.getType() != ExpressionContext.Type.IDENTIFIER) {
+        continue;
+      }
+      String sourceColumn = firstArgument.getIdentifier();
+      if (!AggregationFunctionColumnPair.STAR.equals(sourceColumn)) {
+        sources.add(sourceColumn);
+      }
+    }
+    return sources;
   }
 
   /// Returns source field names configured in either transformer phase. Used so a pre-complex-type
@@ -303,39 +363,16 @@ public class RecordTransformerUtils {
     }
   }
 
-  /// Returns the target type for converting an aggregation source column, or `null` when the aggregation is
-  /// identity-sensitive or unknown (COUNT, HLL, sketches, bitmaps). A null result vetoes rewriting that source
-  /// for every consumer, so a sibling SUM cannot collapse `"01"` and `"1"` before HLL hashes them.
+  /// Returns the aggregator input type for converting an aggregation source column, never the destination
+  /// stored type. SUM/MIN/MAX always reduce through `toDouble`; inferring dest LONG would truncate `1.5`
+  /// and reject `"1.0"`. Returns `null` for COUNT and identity-sensitive aggregations (those veto rewrite
+  /// separately via [ValueAggregatorFactory#isIdentitySensitiveRawInput]).
   @Nullable
-  static PinotDataType inferAggregationSourceDataType(AggregationFunctionType functionType,
-      @Nullable FieldSpec destFieldSpec) {
+  static PinotDataType inferAggregationSourceDataType(AggregationFunctionType functionType) {
     switch (functionType) {
       case SUM:
       case MIN:
       case MAX:
-        if (destFieldSpec != null) {
-          switch (destFieldSpec.getDataType().getStoredType()) {
-            case INT:
-              return PinotDataType.INT;
-            case LONG:
-              return PinotDataType.LONG;
-            case FLOAT:
-              return PinotDataType.FLOAT;
-            case DOUBLE:
-              return PinotDataType.DOUBLE;
-            case BIG_DECIMAL:
-              return PinotDataType.BIG_DECIMAL;
-            default:
-              return PinotDataType.DOUBLE;
-          }
-        }
-        return PinotDataType.DOUBLE;
-      case SUMMV:
-      case AVGMV:
-        // Multi-value sources must convert to an array type: a single-value target would make
-        // DataTypeTransformerUtils.standardize throw on multi-element arrays. The MV aggregators sum/average the
-        // elements through ValueAggregatorUtils.toDouble, so Double[] matches their expectations.
-        return PinotDataType.DOUBLE_ARRAY;
       case AVG:
       case MINMAXRANGE:
       case PERCENTILEEST:
@@ -343,10 +380,16 @@ public class RecordTransformerUtils {
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
         return PinotDataType.DOUBLE;
+      case SUMMV:
+      case AVGMV:
+        // Multi-value sources must convert to an array type: a single-value target would make
+        // DataTypeTransformerUtils.standardize throw on multi-element arrays. The MV aggregators sum/average the
+        // elements through ValueAggregatorUtils.toDouble, so Double[] matches their expectations.
+        return PinotDataType.DOUBLE_ARRAY;
       case SUMPRECISION:
         return PinotDataType.BIG_DECIMAL;
       default:
-        // COUNT / HLL / sketches: do not auto-convert (preserves string hashing etc.)
+        // COUNT and identity-sensitive aggregations do not infer a conversion type.
         return null;
     }
   }

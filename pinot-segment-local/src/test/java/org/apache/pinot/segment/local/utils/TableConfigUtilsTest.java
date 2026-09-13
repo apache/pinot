@@ -883,6 +883,58 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // Expected
     }
+
+    // SourceFieldConfig on a column also read by HLL/sketch/bitmap is rejected. COUNT is not identity-sensitive.
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("hllMetric", DataType.BYTES)
+        .build();
+    ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+        new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
+    ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("metric", PinotDataType.DOUBLE, false)));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("sumMetric", "hllMetric"))
+        .build();
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      fail("Should fail when SourceFieldConfig names a column also read by HLL");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("identity-sensitive"));
+    }
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("countMetric", DataType.LONG)
+        .build();
+    ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+        new AggregationConfig("countMetric", "COUNT(metric)")));
+    ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("metric", PinotDataType.DOUBLE, false)));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("sumMetric", "countMetric"))
+        .build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    // SourceFieldConfig on a different column than the HLL source is allowed.
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addMetric("hllMetric", DataType.BYTES)
+        .build();
+    ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(other)"),
+        new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
+    ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("other", PinotDataType.DOUBLE, false)));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("sumMetric", "hllMetric"))
+        .build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
   }
 
   @Test

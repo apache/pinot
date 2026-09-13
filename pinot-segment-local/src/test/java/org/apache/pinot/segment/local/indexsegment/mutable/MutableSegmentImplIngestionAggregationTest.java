@@ -473,6 +473,59 @@ public class MutableSegmentImplIngestionAggregationTest {
   }
 
   @Test
+  public void testSumDestLongDoesNotInferLong()
+      throws Exception {
+    // Dest LONG is the stored result slot. Inferring LONG would truncate 1.5 to 1 before toDouble.
+    String m1 = "sum1";
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.LONG).build();
+    List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, true);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            aggregationConfigs);
+    try {
+      GenericRow boxed = pipeline.processRow(sameGroupRow(1.5)).getTransformedRows().get(0);
+      assertEquals(boxed.getValue(METRIC), 1.5);
+      mutableSegmentImpl.index(boxed, METADATA);
+      GenericRow stringRow = pipeline.processRow(sameGroupRow("1.5")).getTransformedRows().get(0);
+      assertEquals(stringRow.getValue(METRIC), 1.5);
+      mutableSegmentImpl.index(stringRow, METADATA);
+      assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+      GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(m1), 3L);
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  @Test
+  public void testSumAndCountMetricStillConverts()
+      throws Exception {
+    String sumCol = "sumMetric";
+    String countCol = "countMetric";
+    Schema schema = getSchemaBuilder().addMetric(sumCol, DataType.DOUBLE).addMetric(countCol, DataType.LONG).build();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(sumCol, "SUM(metric)"), new AggregationConfig(countCol, "COUNT(metric)"));
+    TransformPipeline pipeline = newPipeline(schema, aggregationConfigs, true);
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(sumCol, countCol), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, aggregationConfigs);
+    try {
+      for (String metric : List.of("10", "32.5")) {
+        GenericRow transformed = pipeline.processRow(sameGroupRow(metric)).getTransformedRows().get(0);
+        assertEquals(transformed.getValue(METRIC), metric.equals("10") ? 10.0 : 32.5);
+        mutableSegmentImpl.index(transformed, METADATA);
+      }
+      assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+      GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(sumCol), 42.5);
+      assertEquals(result.getValue(countCol), 2L);
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  @Test
   public void testSharedSourceSumAndDistinctCountHllPreservesStringIdentity()
       throws Exception {
     // Jackie: SUM(metric) + DISTINCTCOUNTHLL(metric) with the flag on must not collapse "01" and "1" to Double(1.0).

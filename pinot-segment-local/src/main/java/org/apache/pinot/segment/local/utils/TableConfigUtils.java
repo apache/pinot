@@ -789,6 +789,7 @@ public final class TableConfigUtils {
 
     Set<String> aggregationSourceColumns = new HashSet<>();
     Set<String> aggregationColumns = new HashSet<>();
+    Set<String> identitySensitiveSources = new HashSet<>();
     for (AggregationConfig aggregationConfig : aggregationConfigs) {
       String columnName = aggregationConfig.getColumnName();
       String aggregationFunction = aggregationConfig.getAggregationFunction();
@@ -887,10 +888,24 @@ public final class TableConfigUtils {
       Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
           "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
 
-      aggregationSourceColumns.add(firstArgument.getIdentifier());
+      String sourceColumn = firstArgument.getIdentifier();
+      aggregationSourceColumns.add(sourceColumn);
+      if (ValueAggregatorFactory.isIdentitySensitiveRawInput(functionType)
+          && !AggregationFunctionColumnPair.STAR.equals(sourceColumn)) {
+        identitySensitiveSources.add(sourceColumn);
+      }
     }
     Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
         "all metric columns must be aggregated");
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (CollectionUtils.isNotEmpty(sourceFieldConfigs) && !identitySensitiveSources.isEmpty()) {
+      for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+        String sourceFieldName = sourceFieldConfig.getName();
+        Preconditions.checkState(!identitySensitiveSources.contains(sourceFieldName),
+            "SourceFieldConfig for '%s' names a column also read by an identity-sensitive aggregation "
+                + "(HLL, sketch, or bitmap)", sourceFieldName);
+      }
+    }
     return aggregationSourceColumns;
   }
 

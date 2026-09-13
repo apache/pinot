@@ -149,4 +149,30 @@ public class ValueAggregatorFactory {
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
   }
+
+  /// Returns `true` when the aggregator hashes or sketches the raw offering value. Rewriting that source
+  /// (via inferred conversion or an explicit [org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig])
+  /// would change distinct-count results. COUNT is not identity-sensitive.
+  public static boolean isIdentitySensitiveRawInput(AggregationFunctionType aggregationType) {
+    switch (aggregationType) {
+      case DISTINCTCOUNTBITMAP:
+      case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
+      case DISTINCTCOUNTHLLPLUS:
+      case DISTINCTCOUNTRAWHLLPLUS:
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL:
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH:
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+      case AVGVALUEINTEGERSUMTUPLESKETCH:
+      case SUMVALUESINTEGERSUMTUPLESKETCH:
+      case DISTINCTCOUNTCPCSKETCH:
+      case DISTINCTCOUNTRAWCPCSKETCH:
+        return true;
+      default:
+        return false;
+    }
+  }
 }

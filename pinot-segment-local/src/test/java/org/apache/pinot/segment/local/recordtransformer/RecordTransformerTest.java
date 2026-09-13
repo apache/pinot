@@ -788,7 +788,7 @@ public class RecordTransformerTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)")));
-    // Destination LONG auto-infers LONG for SUM(metric). An explicit SourceFieldConfig of INT must win.
+    // SUM infers DOUBLE regardless of dest LONG. An explicit SourceFieldConfig of INT must still win.
     ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("metric", PinotDataType.INT, false)));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("aggSrcTable")
         .setTimeColumnName("ts")
@@ -1021,7 +1021,43 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testAggregationSourceMixedSumAndCountNotConverted() {
+  public void testAggregationSourceSumDestLongInfersDouble() {
+    // Dest stored type is the result slot, not the aggregator input. SUM always goes through toDouble.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumDestLongSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.LONG)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)")), "sumDestLongTable");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertEquals(dataTypes.get("metric"), PinotDataType.DOUBLE);
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    assertEquals(processMetric(pipeline, 1.5), 1.5);
+    assertEquals(processMetric(pipeline, "1.5"), 1.5);
+    assertEquals(processMetric(pipeline, "42.0"), 42.0);
+  }
+
+  @Test
+  public void testAggregationSourceMixedDestLongAndFloatInfersDouble() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("sumDestMixedSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.LONG)
+        .addMetric("minMetric", DataType.FLOAT)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    TableConfig tableConfig = newAggregationSourceTableConfig(
+        List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
+            new AggregationConfig("minMetric", "MIN(metric)")), "sumDestMixedTable");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertEquals(dataTypes.get("metric"), PinotDataType.DOUBLE);
+  }
+
+  @Test
+  public void testAggregationSourceSumAndCountStillConverts() {
+    // COUNT(metric) is not identity-sensitive. SUM+COUNT must still rewrite for SUM.
     Schema schema = new Schema.SchemaBuilder().setSchemaName("sumCountSchema")
         .addSingleValueDimension("dim", DataType.STRING)
         .addMetric("sumMetric", DataType.DOUBLE)
@@ -1031,7 +1067,10 @@ public class RecordTransformerTest {
     TableConfig tableConfig = newAggregationSourceTableConfig(
         List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
             new AggregationConfig("countMetric", "COUNT(metric)")), "sumCountTable");
-    assertAggregationSourceNotRegistered(tableConfig, schema, "metric");
+    Map<String, PinotDataType> dataTypes = new HashMap<>();
+    RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+    assertEquals(dataTypes.get("metric"), PinotDataType.DOUBLE);
+    assertEquals(processMetric(new TransformPipeline(tableConfig, schema), "01"), 1.0);
   }
 
   @Test
@@ -1123,12 +1162,11 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testAggregationSourceExplicitConfigStillConvertsSharedHllSource() {
-    // Explicit SourceFieldConfig still wins, including when HLL shares the column. That rewrite is unsafe for
-    // identity-sensitive consumers and is documented as an override, not an inferred conversion.
+  public void testAggregationSourceExplicitConfigWithHllRejected() {
+    // An explicit SourceFieldConfig on a column also read by HLL would silently collapse string identity.
     Schema schema = mixedNumericAndBytesSchema("sumMetric", "hllMetric");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setConvertAggregationSourceTypes(true);
+    // Rejection is independent of convertAggregationSourceTypes: SourceFieldConfig always rewrites.
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)"),
         new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
     ingestionConfig.setSourceFieldConfigs(List.of(new SourceFieldConfig("metric", PinotDataType.DOUBLE, false)));
@@ -1140,7 +1178,8 @@ public class RecordTransformerTest {
     Map<String, PinotDataType> dataTypes = new HashMap<>();
     RecordTransformerUtils.addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
     assertFalse(dataTypes.containsKey("metric"), "Explicit SourceFieldConfig must skip inference");
-    assertEquals(processMetric(new TransformPipeline(tableConfig, schema), "01"), 1.0);
+    assertThrows(IllegalStateException.class,
+        () -> RecordTransformerUtils.getDefaultTransformers(tableConfig, schema));
   }
 
   @Test
