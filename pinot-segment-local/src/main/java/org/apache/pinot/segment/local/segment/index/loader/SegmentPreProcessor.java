@@ -431,17 +431,21 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
     boolean shouldRemoveStarTree = false;
+    boolean transformValuesChangedOnStarTreeColumns = false;
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     if (starTreeMetadataList != null) {
       // There are existing star-trees
+      transformValuesChangedOnStarTreeColumns =
+          StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList, _columnsWithChangedTransformValues);
       if (!shouldGenerateStarTree) {
         // Newer config does not have star-trees. Delete all existing star-trees.
         shouldRemoveStarTree = true;
       } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)
-          || StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList, _columnsWithChangedTransformValues)) {
+          || transformValuesChangedOnStarTreeColumns) {
         // Existing and newer both have star-trees, but they don't match, or a star-tree column's values changed
         // (UPDATE_*_TRANSFORM_FUNCTION). BACKFILL does not populate _columnsWithChangedTransformValues.
-        LOGGER.info("Change detected in star-trees for segment: {}", segmentName);
+        LOGGER.info("Change detected in star-trees for segment: {} (transformValueChange={})", segmentName,
+            transformValuesChangedOnStarTreeColumns);
       } else {
         // Existing star-trees match the builder configs, no need to generate the star-trees
         shouldGenerateStarTree = false;
@@ -461,9 +465,11 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
-        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set
+        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set.
+        // Force rebuild when transform values changed: reuse would keep stale aggregates because star-tree
+        // config is unchanged after UPDATE_*_TRANSFORM_FUNCTION.
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig);
+            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig, transformValuesChangedOnStarTreeColumns);
         // We don't create the builder using the try-with-resources pattern because builder.close() performs
         // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
         // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an

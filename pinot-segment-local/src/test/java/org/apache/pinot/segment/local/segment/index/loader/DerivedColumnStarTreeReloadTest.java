@@ -196,18 +196,11 @@ public class DerivedColumnStarTreeReloadTest {
       assertNotNull(starTrees);
       assertEquals(starTrees.size(), 1);
       StarTreeV2 tree = starTrees.get(0);
-      ForwardIndexReader dimReader = tree.getDataSource(DIM).getForwardIndex();
       ForwardIndexReader aggReader = tree.getDataSource(SUM_DERIVED).getForwardIndex();
-      int numDocs = tree.getMetadata().getNumDocs();
-      try (ForwardIndexReaderContext dimCtx = dimReader.createContext();
-          ForwardIndexReaderContext aggCtx = aggReader.createContext()) {
-        for (int docId = 0; docId < numDocs; docId++) {
-          if (dimReader.getDictId(docId, dimCtx) == -1) {
-            return aggReader.getLong(docId, aggCtx);
-          }
-        }
+      int aggDocId = tree.getStarTree().getRoot().getAggregatedDocId();
+      try (ForwardIndexReaderContext aggCtx = aggReader.createContext()) {
+        return Math.round(aggReader.getDouble(aggDocId, aggCtx));
       }
-      throw new AssertionError("No star-tree star node found");
     } finally {
       segment.destroy();
     }
