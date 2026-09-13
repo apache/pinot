@@ -23,8 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -67,6 +65,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   protected final int _version;
   protected final int[] _columnOffsets;
   protected final int _rowSizeInBytes;
+  protected final ByteBuffer _currentRowDataByteBuffer;
   protected final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   protected final DataOutputStream _fixedSizeDataOutputStream =
       new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
@@ -83,13 +82,15 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   private int _nullRowIdsColId;
 
   protected int _numRows;
-  protected ByteBuffer _currentRowDataByteBuffer;
 
   public BaseDataTableBuilder(DataSchema dataSchema, int version) {
     _dataSchema = dataSchema;
     _version = version;
     _columnOffsets = new int[dataSchema.size()];
     _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
+    // Every column is populated for each row, and each setter positions the buffer at its column offset.
+    // finishRow() copies the bytes, so the same buffer can be reused without clearing or resetting it.
+    _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
     _storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
   }
@@ -97,14 +98,6 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   @Override
   public void startRow() {
     _numRows++;
-    if (_currentRowDataByteBuffer == null) {
-      _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
-    } else {
-      // finishRow() copies the bytes into the output stream. Reuse its scratch space while preserving the
-      // zero-initialized representation for columns that the next row does not explicitly populate.
-      Arrays.fill(_currentRowDataByteBuffer.array(), (byte) 0);
-      _currentRowDataByteBuffer.clear().order(ByteOrder.BIG_ENDIAN);
-    }
   }
 
   @Override
