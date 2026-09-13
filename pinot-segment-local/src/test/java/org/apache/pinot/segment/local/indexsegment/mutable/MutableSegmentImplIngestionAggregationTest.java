@@ -475,7 +475,7 @@ public class MutableSegmentImplIngestionAggregationTest {
   @Test
   public void testSumDestLongDoesNotInferLong()
       throws Exception {
-    // Dest LONG is the stored result slot. Inferring LONG would truncate 1.5 to 1 before toDouble.
+    // Dest LONG is the stored result slot. Inferring LONG would reject decimal strings such as "42.0".
     String m1 = "sum1";
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.LONG).build();
     List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
@@ -484,15 +484,15 @@ public class MutableSegmentImplIngestionAggregationTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
             aggregationConfigs);
     try {
-      GenericRow boxed = pipeline.processRow(sameGroupRow(1.5)).getTransformedRows().get(0);
-      assertEquals(boxed.getValue(METRIC), 1.5);
-      mutableSegmentImpl.index(boxed, METADATA);
-      GenericRow stringRow = pipeline.processRow(sameGroupRow("1.5")).getTransformedRows().get(0);
-      assertEquals(stringRow.getValue(METRIC), 1.5);
-      mutableSegmentImpl.index(stringRow, METADATA);
+      GenericRow first = pipeline.processRow(sameGroupRow("42.0")).getTransformedRows().get(0);
+      assertEquals(first.getValue(METRIC), 42.0);
+      mutableSegmentImpl.index(first, METADATA);
+      GenericRow second = pipeline.processRow(sameGroupRow("8.0")).getTransformedRows().get(0);
+      assertEquals(second.getValue(METRIC), 8.0);
+      mutableSegmentImpl.index(second, METADATA);
       assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
       GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
-      assertEquals(result.getValue(m1), 3L);
+      assertEquals(result.getValue(m1), 50L);
     } finally {
       mutableSegmentImpl.destroy();
     }
