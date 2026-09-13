@@ -68,6 +68,7 @@ import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class SegmentMetadataImplTest {
@@ -253,6 +254,17 @@ public class SegmentMetadataImplTest {
       assertSame(second.getColumnMetadataFor(column).getFieldSpec(), fieldSpec, column);
       assertSame(first.getSchema().getFieldSpecFor(column), fieldSpec, column);
       assertSame(second.getSchema().getFieldSpecFor(column), fieldSpec, column);
+      JsonNode before = fieldSpec.toJsonObject();
+      int hash = fieldSpec.hashCode();
+      expectThrows(IllegalStateException.class,
+          () -> first.getSchema().getFieldSpecFor(column).setDefaultNullValue("0"));
+      assertEquals(second.getSchema().getFieldSpecFor(column).toJsonObject(), before, column);
+      assertEquals(second.getSchema().getFieldSpecFor(column).hashCode(), hash, column);
+    }
+    SegmentMetadataImpl reloaded = new SegmentMetadataImpl(_segmentDirectory);
+    for (String column : second.getColumnMetadataMap().keySet()) {
+      assertSame(reloaded.getColumnMetadataFor(column).getFieldSpec(),
+          second.getColumnMetadataFor(column).getFieldSpec(), column);
     }
     Schema inputSchema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(_avroFile);
     for (FieldSpec inputFieldSpec : inputSchema.getAllFieldSpecs()) {

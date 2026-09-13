@@ -34,6 +34,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
 public final class TimeFieldSpec extends FieldSpec {
+  private static final long serialVersionUID = -3887809157033500600L;
+
   private TimeGranularitySpec _incomingGranularitySpec;
   private TimeGranularitySpec _outgoingGranularitySpec;
 
@@ -59,21 +61,34 @@ public final class TimeFieldSpec extends FieldSpec {
     return FieldType.TIME;
   }
 
+  @Override
+  protected void freezeChildren() {
+    TimeGranularitySpec incoming = _incomingGranularitySpec != null ? _incomingGranularitySpec.frozenCopy() : null;
+    TimeGranularitySpec outgoing = _outgoingGranularitySpec == _incomingGranularitySpec
+        ? incoming
+        : _outgoingGranularitySpec != null ? _outgoingGranularitySpec.frozenCopy() : null;
+    _incomingGranularitySpec = incoming;
+    _outgoingGranularitySpec = outgoing;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setName(String name) {
+    checkMutable();
     // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setDataType(DataType dataType) {
+    checkMutable();
     // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
+    checkMutable();
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for time field.");
   }
 
@@ -83,6 +98,7 @@ public final class TimeFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
+    checkMutable();
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
       super.setName(incomingGranularitySpec.getName());
@@ -100,6 +116,7 @@ public final class TimeFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
+    checkMutable();
     _outgoingGranularitySpec = outgoingGranularitySpec;
     super.setName(outgoingGranularitySpec.getName());
     super.setDataType(outgoingGranularitySpec.getDataType());

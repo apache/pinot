@@ -61,6 +61,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec implements Serializable {
+  private static final long serialVersionUID = 6675215343156023498L;
+
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
   private static final String COLON_SEPARATOR = ":";
@@ -70,6 +72,7 @@ public class TimeGranularitySpec implements Serializable {
   private TimeUnit _timeType;
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
   private String _timeFormat = DEFAULT_TIME_FORMAT;
+  private transient boolean _frozen;
 
   /*
   Deprecated. Use {@link DateTimeFieldSpec.TimeFormat} instead
@@ -135,8 +138,35 @@ public class TimeGranularitySpec implements Serializable {
     return _name;
   }
 
+  /// Freezes this built-in granularity spec before it is shared. Custom subclasses are not supported.
+  /// Freezing leaves equality and JSON unchanged, and a JSON round-trip produces a mutable copy.
+  public final TimeGranularitySpec freeze() {
+    Preconditions.checkState(getClass() == TimeGranularitySpec.class,
+        "Freezing is not supported for %s", getClass().getSimpleName());
+    _frozen = true;
+    return this;
+  }
+
+  /// Detaches the mutable granularity spec supplied to a TIME field before sharing that field.
+  final TimeGranularitySpec frozenCopy() {
+    Preconditions.checkState(getClass() == TimeGranularitySpec.class,
+        "Freezing is not supported for %s", getClass().getSimpleName());
+    TimeGranularitySpec copy = new TimeGranularitySpec();
+    copy._name = _name;
+    copy._dataType = _dataType;
+    copy._timeType = _timeType;
+    copy._timeUnitSize = _timeUnitSize;
+    copy._timeFormat = _timeFormat;
+    return copy.freeze();
+  }
+
+  private void checkMutable() {
+    Preconditions.checkState(!_frozen, "Cannot modify a frozen TimeGranularitySpec; make a mutable copy first");
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(String name) {
+    checkMutable();
     _name = name;
   }
 
@@ -146,6 +176,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
+    checkMutable();
     _dataType = dataType;
   }
 
@@ -155,6 +186,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setTimeType(TimeUnit timeType) {
+    checkMutable();
     _timeType = timeType;
   }
 
@@ -164,6 +196,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setTimeUnitSize(int timeUnitSize) {
+    checkMutable();
     Preconditions.checkArgument(timeUnitSize > 0);
 
     _timeUnitSize = timeUnitSize;
@@ -171,6 +204,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer (for backward compatible). DO NOT REMOVE.
   public void setTimeunitSize(int timeUnitSize) {
+    checkMutable();
     Preconditions.checkArgument(timeUnitSize > 0);
 
     _timeUnitSize = timeUnitSize;
@@ -182,6 +216,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setTimeFormat(String timeFormat) {
+    checkMutable();
     _timeFormat = timeFormat;
   }
 

@@ -31,9 +31,13 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +51,8 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
+
+import static com.google.common.base.Preconditions.checkState;
 
 
 /// The `FieldSpec` class contains all specs related to any field (column) in [Schema].
@@ -77,6 +83,8 @@ import org.apache.pinot.spi.utils.UuidUtils;
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
+  private static final long serialVersionUID = 5656869224271511556L;
+
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
@@ -197,6 +205,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   protected Object _defaultNullValue;
   private transient String _stringDefaultNullValue;
+  private transient boolean _frozen;
 
   // Transform function to generate this column, can be based on other columns
   @Deprecated // Set this in TableConfig -> IngestionConfig -> TransformConfigs
@@ -233,12 +242,87 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public abstract FieldType getFieldType();
 
+  /// Freezes a built-in DIMENSION, METRIC, TIME or DATE_TIME spec before it is shared across segments.
+  ///
+  /// Setters reject subsequent changes. Collection properties and byte-array defaults are detached from references
+  /// handed out before this call; mutable defaults (arrays, maps and lists) are copied recursively when read. TIME
+  /// granularity specs are also copied and frozen. COMPLEX/custom specs and mutable DATE_TIME sample values are not
+  /// supported. Call this before publishing the spec to other threads.
+  ///
+  /// Freezing does not affect equality, hashing or JSON. Deserializing [#toJsonObject()] produces an ordinary
+  /// mutable copy, including BYTES defaults that the schema JSON represents as hex strings.
+  public final FieldSpec freeze() {
+    checkState(getClass() == DimensionFieldSpec.class || getClass() == MetricFieldSpec.class
+        || getClass() == TimeFieldSpec.class || getClass() == DateTimeFieldSpec.class,
+        "Freezing is not supported for %s", getClass().getSimpleName());
+    if (!_frozen) {
+      Object defaultNullValue = copyDefaultNullValue(_defaultNullValue);
+      freezeChildren();
+      if (_tags != null) {
+        _tags = Collections.unmodifiableList(new ArrayList<>(_tags));
+      }
+      if (_aliases != null) {
+        _aliases = Collections.unmodifiableList(new ArrayList<>(_aliases));
+      }
+      if (_metadata != null) {
+        _metadata = Collections.unmodifiableMap(new HashMap<>(_metadata));
+      }
+      _defaultNullValue = defaultNullValue;
+      _frozen = true;
+    }
+    return this;
+  }
+
+  /// Detaches and freezes subclass state before this spec is published.
+  protected void freezeChildren() {
+  }
+
+  protected final void checkMutable() {
+    checkState(!_frozen, "Cannot modify a frozen FieldSpec; make a mutable copy first");
+  }
+
+  protected static boolean isImmutableScalar(Object value) {
+    return value instanceof String || value instanceof Boolean || value instanceof Character || value instanceof Byte
+        || value instanceof Short || value instanceof Integer || value instanceof Long || value instanceof Float
+        || value instanceof Double || value.getClass() == BigInteger.class || value.getClass() == BigDecimal.class;
+  }
+
+  @Nullable
+  private static Object copyDefaultNullValue(@Nullable Object value) {
+    if (value == null || isImmutableScalar(value)) {
+      return value;
+    }
+    if (value instanceof byte[]) {
+      byte[] bytes = (byte[]) value;
+      return bytes.length == 0 ? bytes : bytes.clone();
+    }
+    if (value instanceof List<?>) {
+      List<?> list = (List<?>) value;
+      List<Object> copy = new ArrayList<>(list.size());
+      for (Object item : list) {
+        copy.add(copyDefaultNullValue(item));
+      }
+      return copy;
+    }
+    if (value instanceof Map<?, ?>) {
+      Map<?, ?> map = (Map<?, ?>) value;
+      Map<Object, Object> copy = new LinkedHashMap<>();
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        copy.put(copyDefaultNullValue(entry.getKey()), copyDefaultNullValue(entry.getValue()));
+      }
+      return copy;
+    }
+    throw new IllegalStateException(
+        "Cannot freeze a mutable default null value of type: " + value.getClass().getName());
+  }
+
   public String getName() {
     return _name;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(String name) {
+    checkMutable();
     _name = name;
   }
 
@@ -248,6 +332,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setDescription(@Nullable String description) {
+    checkMutable();
     _description = description;
   }
 
@@ -257,6 +342,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setTags(@Nullable List<String> tags) {
+    checkMutable();
     _tags = CollectionUtils.isEmpty(tags) ? null : tags;
   }
 
@@ -266,6 +352,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setFieldId(@Nullable Integer fieldId) {
+    checkMutable();
     _fieldId = fieldId;
   }
 
@@ -275,6 +362,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setAliases(@Nullable List<String> aliases) {
+    checkMutable();
     _aliases = CollectionUtils.isEmpty(aliases) ? null : aliases;
   }
 
@@ -284,6 +372,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public void setMetadata(@Nullable Map<String, String> metadata) {
+    checkMutable();
     _metadata = MapUtils.isEmpty(metadata) ? null : metadata;
   }
 
@@ -293,6 +382,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
+    checkMutable();
     _dataType = dataType;
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
@@ -303,6 +393,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
+    checkMutable();
     _singleValueField = isSingleValueField;
   }
 
@@ -315,6 +406,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /// @see #isNullable()
   @JsonIgnore
   public void setNullable(Boolean nullable) {
+    checkMutable();
     _notNull = !nullable;
   }
 
@@ -324,6 +416,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setNotNull(boolean notNull) {
+    checkMutable();
     _notNull = notNull;
   }
 
@@ -364,6 +457,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLength(@Nullable Integer maxLength) {
+    checkMutable();
     _maxLength = maxLength;
   }
 
@@ -411,6 +505,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLengthExceedStrategy(@Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
+    checkMutable();
     _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
@@ -420,11 +515,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setAllowTrailingZeros(boolean allowTrailingZeros) {
+    checkMutable();
     _allowTrailingZeros = allowTrailingZeros;
   }
 
   public Object getDefaultNullValue() {
-    return _defaultNullValue;
+    return _frozen ? copyDefaultNullValue(_defaultNullValue) : _defaultNullValue;
   }
 
   @JsonIgnore
@@ -455,6 +551,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   @JsonProperty
   private void setDefaultNullValue(@Nullable JsonNode defaultNullValue) {
+    checkMutable();
     if (defaultNullValue != null && !defaultNullValue.isNull()) {
       if (defaultNullValue.isValueNode()) {
         _stringDefaultNullValue = defaultNullValue.asText();
@@ -470,6 +567,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   @JsonIgnore
   public void setDefaultNullValue(@Nullable Object defaultNullValue) {
+    checkMutable();
     if (defaultNullValue != null) {
       _stringDefaultNullValue = getStringValue(defaultNullValue);
     }
@@ -563,6 +661,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Deprecated
   public void setTransformFunction(@Nullable String transformFunction) {
+    checkMutable();
     _transformFunction = transformFunction;
   }
 
@@ -572,6 +671,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setVirtualColumnProvider(String virtualColumnProvider) {
+    checkMutable();
     _virtualColumnProvider = virtualColumnProvider;
   }
 

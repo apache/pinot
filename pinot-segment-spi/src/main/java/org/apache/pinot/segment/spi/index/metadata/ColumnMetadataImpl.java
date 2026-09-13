@@ -70,9 +70,9 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 /// the type default is not handed to the [FieldSpec] at all, so the spec carries the shared static
 /// `FieldSpec.DEFAULT_*` constant and never retains the literal. The [FieldSpec] itself is then interned through
 /// [#FIELD_SPEC_INTERNER], so every segment of a table (and every table with an identical column definition) shares
-/// one instance per distinct spec instead of retaining its own. Segment-derived [FieldSpec]s must therefore be treated
-/// as immutable: a setter call on one would bleed into every other segment and table that shares it, and would
-/// corrupt the interner's hash bucket (nothing ever mutated one; copy via a JSON round-trip before mutating).
+/// one instance per distinct spec instead of retaining its own. Specs are frozen before interning: setters reject
+/// mutation and mutable default values are protected, keeping other segments and the interner's keys unchanged.
+/// Deserialize [FieldSpec#toJsonObject()] to make a mutable copy before editing a shared spec.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
@@ -514,7 +514,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   /// Parses the [FieldSpec] of the given column. DIMENSION, METRIC, TIME and DATE_TIME specs are returned from
   /// [#FIELD_SPEC_INTERNER], so the instance is shared with every other segment whose column parses to an equal spec
-  /// and must not be mutated. A COMPLEX spec is not interned: [ComplexFieldSpec] does not override
+  /// and is frozen before publication. A COMPLEX spec is not interned: [ComplexFieldSpec] does not override
   /// [FieldSpec#equals], so two structs with different children would alias; its children are parsed through this
   /// method and are interned.
   public static FieldSpec extractFieldSpec(String column, PropertiesConfiguration config) {
@@ -538,19 +538,20 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     switch (fieldType) {
       case DIMENSION:
         return FIELD_SPEC_INTERNER.intern(new DimensionFieldSpec(fieldName, dataType, isSingleValue, maxLength,
-            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLengthExceedStrategy));
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLengthExceedStrategy).freeze());
       case METRIC:
         return FIELD_SPEC_INTERNER.intern(new MetricFieldSpec(fieldName, dataType,
             canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLength,
-            maxLengthExceedStrategy));
+            maxLengthExceedStrategy).freeze());
       case TIME:
         TimeUnit timeUnit = TimeUnit.valueOf(config.getString(Segment.TIME_UNIT, "DAYS").toUpperCase());
-        return FIELD_SPEC_INTERNER.intern(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName)));
+        return FIELD_SPEC_INTERNER.intern(
+            new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName)).freeze());
       case DATE_TIME:
         String format = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_FORMAT)));
         String granularity = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_GRANULARITY)));
         return FIELD_SPEC_INTERNER.intern(new DateTimeFieldSpec(fieldName, dataType, format, granularity,
-            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), null));
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), null).freeze());
       case COMPLEX:
         List<String> childFieldNames =
             config.getList(String.class, Column.getKeyFor(column, Column.COMPLEX_CHILD_FIELD_NAMES));

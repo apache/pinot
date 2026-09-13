@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
+  private static final long serialVersionUID = 8568249956014026516L;
+
   private String _format;
   private String _granularity;
   private Object _sampleValue;
@@ -117,14 +119,22 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return FieldType.DATE_TIME;
   }
 
+  @Override
+  protected void freezeChildren() {
+    Preconditions.checkState(_sampleValue == null || isImmutableScalar(_sampleValue),
+        "Cannot freeze a DateTimeFieldSpec with a mutable sample value");
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
+    checkMutable();
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for date time field.");
   }
 
   @Override
   public void setDataType(DataType dataType) {
+    checkMutable();
     super.setDataType(dataType);
     if (dataType == DataType.TIMESTAMP) {
       _format = TimeFormat.TIMESTAMP.name();
@@ -137,6 +147,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFormat(String format) {
+    checkMutable();
     if (_dataType != DataType.TIMESTAMP) {
       _format = format;
     }
@@ -159,6 +170,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setGranularity(String granularity) {
+    checkMutable();
     _granularity = granularity;
   }
 
@@ -167,6 +179,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   public void setSampleValue(String sampleValue) {
+    checkMutable();
     _sampleValue = sampleValue;
   }
 
