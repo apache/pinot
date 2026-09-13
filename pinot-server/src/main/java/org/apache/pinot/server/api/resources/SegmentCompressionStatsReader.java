@@ -80,7 +80,7 @@ final class SegmentCompressionStatsReader {
         includeColumnCompressionStats ? new HashMap<>() : null;
     IndexService indexService = includeColumnCompressionStats ? IndexService.getInstance() : null;
 
-    for (ColumnMetadata columnMetadata : segmentMetadata.getColumnMetadataMap().values()) {
+    for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
       long forwardIndexSize = getIndexSize(segmentMetadata, columnMetadata, StandardIndexes.forward());
       if (forwardIndexSize < 0) {
         continue;

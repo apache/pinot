@@ -22,7 +22,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeMap;
 import javax.ws.rs.WebApplicationException;
 import org.apache.commons.io.FileUtils;
@@ -61,7 +60,7 @@ public class SegmentCompressionStatsReaderTest {
   public void testEmptySegmentHasCompleteZeroByteStats() {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn("empty");
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(List.of());
 
     assertCompleteZeroByteStats(SegmentCompressionStatsReader.read(segmentMetadata, true));
   }
@@ -74,7 +73,7 @@ public class SegmentCompressionStatsReaderTest {
     when(segmentMetadata.getName()).thenReturn("forwardDisabled");
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put("column", columnMetadata);
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    when(segmentMetadata.getAllColumnMetadata()).thenReturn(columnMetadataMap.values());
 
     assertCompleteZeroByteStats(SegmentCompressionStatsReader.read(segmentMetadata, false));
   }
@@ -123,8 +122,7 @@ public class SegmentCompressionStatsReaderTest {
   @Test
   public void testServerRejectsOversizedColumnContributionResponse() {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of(
-        "column", mock(ColumnMetadata.class))));
+    when(segmentMetadata.getNumColumns()).thenReturn(1);
     ImmutableSegment segment = mock(ImmutableSegment.class);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 
