@@ -17,15 +17,15 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
 
 ## Procedure
 
-1. **Parse the argument.** Extract class name (required), optional run count (default 20), optional PR filter.
+1. **Parse the argument.** Extract class name (required), optional run count (default 20), optional PR filter. Use the count as a total budget across relevant workflows; cap at 50 unless the user authorized more.
 
-2. **Find relevant workflow runs.**
+2. **Find relevant workflow runs.** Select workflows from the target test's module and the current definitions under [`.github/workflows`](../../.github/workflows): `pinot_unit_tests.yml`, `pinot_integration_tests.yml`, or `pinot_quickstart_tests.yml` for the corresponding suites. Include compatibility workflows only when relevant (see Notes). Use `gh workflow list --repo apache/pinot` if the remote workflow names differ. Keep the total run budget across all selected workflows.
    ```
-   gh run list --repo apache/pinot --workflow "Pinot Tests" --status failure --limit <N> --json databaseId,displayTitle,headBranch,headSha,createdAt,url
+   gh run list --repo apache/pinot --workflow <workflow-file> --status failure --limit <remaining-budget> --json databaseId,displayTitle,headBranch,headSha,createdAt,url
    ```
-   If `--pr` is set, filter with `--branch` to the PR's head branch, or use `gh pr view <num> --json headRefName`.
+   If `--pr` is set, resolve it with `gh pr view <num> --repo apache/pinot --json headRefName,headRefOid`, filter with `--branch`, and verify the selected runs belong to that PR.
 
-3. **For each failed run, find the failing jobs.** A "Pinot Tests" run has matrix jobs (test sets 1/2 × java 21 × unit/integration). Only some fail.
+3. **For each failed run, find the failing jobs.** Unit and integration workflows have separate matrix jobs. Read the test set and JDK from each run rather than assuming the current matrix applies to older runs.
    ```
    gh run view <run-id> --repo apache/pinot --json jobs
    ```
@@ -35,7 +35,7 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
    ```
    gh run view --job <job-id> --repo apache/pinot --log
    ```
-   Each log line is prefixed by `<step-name>\tUNKNOWN STEP\t<timestamp>`. The log is large (tens of MB); pipe straight into ripgrep with these patterns — they are what Surefire/TestNG/GitHub Actions actually emit:
+   Log lines include step names and timestamps. Logs can be tens of MB; filter with ripgrep and retain enough surrounding context for the stack traces in step 5. Use these failure markers:
 
    - `\[ERROR\] Tests run: \d+, Failures: [1-9]` — the Surefire class-summary line when a test class had failures. The **fully qualified class name** is on the same line after `-- in `.
    - `\[ERROR\] Tests run: \d+, Failures: \d+, Errors: [1-9]` — same, with errors instead of failures.
@@ -45,10 +45,10 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
 
    **Do not grep for raw `ERROR` / `FAILED` / `Exception`** — Pinot's integration tests log these constantly at runtime (Helix rebalancer, consumer setup, etc.) and you'll drown in noise. The patterns above only match actual failure markers.
 
-   If none of those patterns match in a failing job's log, the test didn't fail at the test level — the job died for infrastructure reasons (timeout, OOM, runner cancel). Classify it as "infrastructure failure" and move on.
+   If none of those patterns match, inspect the job conclusion, annotations, and log availability. Classify a timeout, OOM, or runner failure only when evidence supports it; otherwise report an unknown cause or missing logs and move on within the budget.
 
 5. **Extract structured failure records.** For each hit, record:
-   - Run id, PR number (if any), commit SHA, JDK version, test set (parseable from the job name like `Pinot Integration Test Set 1 (temurin-21)`).
+   - Workflow file/name, run id, PR number (if any), head SHA, JDK version, and test set or lane, as recorded by the job and its logs. Do not infer an older run's JDK or lane from today's workflow matrix.
    - The failing class FQN from the `-- in <FQN>` suffix of the summary line.
    - The failure message (typically the line containing `<<< FAILURE!` or the `AssertionError: ...` line that follows).
    - The top ~5 frames of the stack trace, taken from the ~30 lines following the `<<< FAILURE!` marker.
@@ -59,13 +59,13 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
    - Different stack traces → either multiple bugs or environmental flakiness.
    - Setup/timeout errors with no test code in the stack → likely infrastructure.
 
-7. **Report.** Structure:
+7. **Inspect relevant source and report.** Read the failing test and directly implicated source when needed to assess the hypothesis. Use the failing run's commit when source drift matters, and identify any mismatch with the current checkout. Structure:
    ```
    ## Flaky analysis: <ClassName>
    Runs scanned: N (M with this test failing, K with unrelated failures)
 
    ### Failure cluster 1 — <exception type> at <top frame> (<count> occurrences)
-   Example (PR #<num>, JDK 21, test set 2):
+   Example (PR #<num>, JDK <version>, test set <set>):
      <short stack trace>
    Commits affected: <list of short SHAs>
 
@@ -79,18 +79,18 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
    - <specific, e.g. "reproduce locally with: /run-test ClassName", or "inspect X.java:123 which is top-of-stack">
    ```
 
-8. **Do not propose a fix.** This skill is investigation, not remediation. End with "Want me to open the source file at the top-of-stack frame?"
+8. **Finish with the evidence and remaining uncertainty.** This skill is report-only: do not change source or launch reproduction tests without remediation or reproduction being authorized. Do not add a routine confirmation question to read relevant source; that read is part of the investigation.
 
 ## Notes
 
-- `gh run view --log` can be slow (10–60s per run) and returns large payloads. Cap total runs scanned at 50 unless the user asks for more. Run these fetches in parallel where possible; `gh` is rate-limited but stays under the limit for <50 runs.
+- `gh run view --log` can be slow (10–60s per run) and returns large payloads. Cap total runs scanned at 50 unless the user asks for more. Fetch independent logs with bounded concurrency; handle rate limits within the investigation budget.
 - Don't write the raw logs to the repo. Stream them through grep and keep only the extracted records in memory.
 - `gh run view --log-failed` is not reliable here — it only returns the steps GitHub marked failed, which for Pinot's "Integration Test" step often just contains runner init lines before the actual Maven invocation. Always use `--log` + the patterns above.
 - To find failing *jobs* within a run without downloading its full log, use:
   ```
-  gh api repos/apache/pinot/actions/runs/<run-id>/jobs --jq '.jobs[] | select(.conclusion=="failure") | {name, id: .databaseId}'
+   gh api --paginate repos/apache/pinot/actions/runs/<run-id>/jobs --jq '.jobs[] | select(.conclusion=="failure") | {name, id}'
   ```
   Then pass the `id` as `--job <id>`. Avoids pulling all matrix logs.
-- If the test doesn't appear in any failure log, report that directly: either the test isn't actually flaky on CI, or the search term is wrong.
-- Results depend on log retention (GitHub keeps 90 days by default). Older flakes are invisible here — suggest checking the `surefire-reports-*` artifacts on master for long-term trends.
-- The `Pinot Tests` workflow (file: `pinot_tests.yml`) is the right default. Also worth checking `Pinot Compatibility Regression Testing` and `Pinot Multi-Stage Query Engine Compatibility Regression Testing` workflows for integration tests that only run there — ask the user before querying those since they multiply the API calls.
+- If the test does not appear in sampled failure logs, report the searched scope and lack of evidence. Check the selector and log availability; do not conclude the test is never flaky.
+- State the sampled dates and any unavailable logs. Relevant Surefire artifacts can supplement missing console output if they are still retained; absence of retained evidence does not establish that the test passed.
+- Query `pinot_compatibility_tests.yml` or `pinot_multi_stage_query_engine_compatibility_tests.yml` when relevant to the target test, within the same total run budget. Ask only before exceeding that budget.
