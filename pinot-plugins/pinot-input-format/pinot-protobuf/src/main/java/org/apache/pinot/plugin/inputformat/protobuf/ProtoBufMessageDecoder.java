@@ -48,9 +48,10 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
         "Protocol Buffer schema descriptor file must be provided");
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
-        props.get(DESCRIPTOR_FILE_PATH));
-    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
+    Descriptors.Descriptor descriptor;
+    try (InputStream fin = ProtoBufUtils.openDescriptorFile(props.get(DESCRIPTOR_FILE_PATH))) {
+      descriptor = buildProtoBufDescriptor(fin);
+    }
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
