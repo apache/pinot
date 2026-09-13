@@ -71,7 +71,7 @@ public class PinotFSSegmentUploaderTest {
   public void resetRecordedUploads() {
     RecordingPinotFS.COPIED_DEST_URIS.clear();
     RecordingPinotFS.DELETED_DEST_URIS.clear();
-    RecordingPinotFS.EXISTS = false;
+    RecordingPinotFS._exists = false;
   }
 
   @Test
@@ -84,7 +84,7 @@ public class PinotFSSegmentUploaderTest {
 
   @Test
   public void testExistingTempIsOverwrittenWithoutDelete() {
-    RecordingPinotFS.EXISTS = true;
+    RecordingPinotFS._exists = true;
     SegmentUploader segmentUploader =
         new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics, SERVER_A);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
@@ -249,11 +249,11 @@ public class PinotFSSegmentUploaderTest {
   public static class RecordingPinotFS extends AlwaysSucceedPinotFS {
     static final List<URI> COPIED_DEST_URIS = new ArrayList<>();
     static final List<URI> DELETED_DEST_URIS = new ArrayList<>();
-    static volatile boolean EXISTS = false;
+    static volatile boolean _exists = false;
 
     @Override
     public boolean exists(URI fileUri) {
-      return EXISTS;
+      return _exists;
     }
 
     @Override
