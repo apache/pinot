@@ -230,7 +230,13 @@ public class LoaderTest {
     assertTrue(indexSegment.getColumnNames().containsAll(BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS));
     for (String column : BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS) {
       assertNotNull(indexSegment.getDataSource(column), "Missing data source for virtual column: " + column);
+      assertFalse(indexSegment.getPhysicalColumnNames().contains(column), column + " is not a physical column");
     }
+    // The virtual columns are registered in the column metadata, from which the segment schema is derived on demand.
+    // A load (v1 or v3, with the preprocess check) must leave that schema unbuilt: a stray getSchema() on the load
+    // path would re-inflate the per-column schema footprint of every segment a server loads.
+    assertFalse(((SegmentMetadataImpl) indexSegment.getSegmentMetadata()).isSchemaMaterialized(),
+        "the load path must not build the segment schema");
 
     // Segment metadata that this segment carries is exposed as a real value, and is not marked null
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();

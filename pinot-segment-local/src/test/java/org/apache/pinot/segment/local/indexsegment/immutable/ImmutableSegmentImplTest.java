@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
 import org.apache.pinot.segment.local.segment.index.openstruct.ImmutableOpenStructDataSource;
+import org.apache.pinot.segment.local.segment.virtualcolumn.DocIdVirtualColumnProvider;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -47,7 +48,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -132,7 +133,7 @@ public class ImmutableSegmentImplTest {
     ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
     ColumnIndexContainer containerA = mock(ColumnIndexContainer.class);
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata(schema(a), a), Map.of("a", containerA),
+        new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata(a), Map.of("a", containerA),
             null);
 
     assertSame(segment.getDataSourceNullable("a").getIndexContainer(), containerA);
@@ -146,10 +147,10 @@ public class ImmutableSegmentImplTest {
     ColumnMetadataImpl b = columnMetadata(intColumn("b"), null);
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, schema(a, b), materializer, a, b);
+    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, materializer, a, b);
 
     verifyNoInteractions(materializer);
-    // Column listings come from the metadata schema and never materialize anything
+    // Column listings are views of the column metadata and never materialize anything
     assertEquals(segment.getColumnNames(), Set.of("a", "b"));
     assertEquals(segment.getPhysicalColumnNames(), Set.of("a", "b"));
     // Neither does asking for a column the segment does not have
@@ -174,7 +175,7 @@ public class ImmutableSegmentImplTest {
       Thread.sleep(50);
       return containerA;
     });
-    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(a), materializer, a);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, a);
 
     int numCallers = 16;
     ExecutorService executor = Executors.newFixedThreadPool(numCallers);
@@ -214,7 +215,7 @@ public class ImmutableSegmentImplTest {
     when(materializer.createIndexContainer(a)).thenReturn(containerA);
     when(materializer.createIndexContainer(b)).thenReturn(containerB);
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, schema(a, b), materializer, a, b);
+    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, materializer, a, b);
     DataSource dataSourceA = segment.getDataSourceNullable("a");
     assertNotNull(dataSourceA);
 
@@ -242,7 +243,7 @@ public class ImmutableSegmentImplTest {
     doReturn(forwardIndex).when(containerA).getIndex(StandardIndexes.forward());
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     when(materializer.createIndexContainer(a)).thenReturn(containerA);
-    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(a), materializer, a);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, a);
 
     assertSame(segment.getForwardIndex("a"), forwardIndex);
     verify(materializer, times(1)).createIndexContainer(a);
@@ -274,9 +275,8 @@ public class ImmutableSegmentImplTest {
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     when(materializer.createIndexContainer(views)).thenReturn(viewsContainer);
     when(materializer.createIndexContainer(sparse)).thenReturn(sparseContainer);
-    // Only the parent and the regular column are in the schema; the children live in the segment metadata alone
-    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(metrics, dim.getFieldSpec()),
-        materializer, parent, views, sparse, dim);
+    // The children are grouped under the parent whose column metadata declares it complex
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, parent, views, sparse, dim);
 
     DataSource parentDataSource = segment.getDataSourceNullable("metrics");
     assertTrue(parentDataSource instanceof ImmutableOpenStructDataSource);
@@ -311,7 +311,7 @@ public class ImmutableSegmentImplTest {
     doReturn(mock(ForwardIndexReader.class)).when(container).getIndex(StandardIndexes.forward());
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     when(materializer.createIndexContainer(m)).thenReturn(container);
-    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(mapSpec), materializer, m);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, m);
 
     DataSource dataSource = segment.getDataSourceNullable("m");
     assertTrue(dataSource instanceof ImmutableMapDataSource);
@@ -326,7 +326,7 @@ public class ImmutableSegmentImplTest {
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     when(materializer.createIndexContainer(a)).thenThrow(new UncheckedIOException(new IOException("boom")))
         .thenReturn(containerA);
-    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(a), materializer, a);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, a);
 
     assertThrows(UncheckedIOException.class, () -> segment.getDataSourceNullable("a"));
     DataSource dataSource = segment.getDataSourceNullable("a");
@@ -349,7 +349,7 @@ public class ImmutableSegmentImplTest {
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
     ConcurrentMap<String, ColumnIndexContainer> materialized = new ConcurrentHashMap<>(Map.of("a", containerA));
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata(schema(a, b), a, b), materializer,
+        new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata(a, b), materializer,
             materialized, null, null);
 
     verifyNoInteractions(materializer);
@@ -360,39 +360,91 @@ public class ImmutableSegmentImplTest {
     verify(containerA).close();
   }
 
-  private static ImmutableSegmentImpl lazySegment(SegmentDirectory segmentDirectory, Schema schema,
-      ColumnMaterializer materializer, ColumnMetadata... columns) {
-    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata(schema, columns), materializer,
+  /// Column listings are views of the column metadata map: every column in key order, the physical ones without the
+  /// virtual columns (whose spec names a provider), unmodifiable, and never built from the segment schema, which
+  /// SegmentMetadataImpl derives on demand and a wide segment must not retain per column. The same in both modes.
+  @Test
+  public void testColumnNamesComeFromColumnMetadata() {
+    ColumnMetadataImpl b = columnMetadata(intColumn("b"), null);
+    ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
+    DimensionFieldSpec docIdSpec = new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true);
+    docIdSpec.setVirtualColumnProvider(DocIdVirtualColumnProvider.class.getName());
+    ColumnMetadataImpl docId = columnMetadata(docIdSpec, null);
+    SegmentMetadataImpl segmentMetadata = segmentMetadata(b, a, docId);
+    Map<String, ColumnIndexContainer> containers = Map.of("a", mock(ColumnIndexContainer.class), "b",
+        mock(ColumnIndexContainer.class), BuiltInVirtualColumn.DOCID, mock(ColumnIndexContainer.class));
+    ImmutableSegmentImpl eager =
+        new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata, containers, null);
+    ImmutableSegmentImpl lazy =
+        lazySegment(mock(SegmentDirectory.class), mock(ColumnMaterializer.class), b, a, docId);
+
+    for (ImmutableSegmentImpl segment : List.of(eager, lazy)) {
+      assertEquals(new ArrayList<>(segment.getColumnNames()), List.of(BuiltInVirtualColumn.DOCID, "a", "b"));
+      assertEquals(new ArrayList<>(segment.getPhysicalColumnNames()), List.of("a", "b"));
+      assertEquals(segment.getColumnNames(), Set.of(BuiltInVirtualColumn.DOCID, "a", "b"));
+      assertEquals(segment.getPhysicalColumnNames(), Set.of("a", "b"));
+      assertEquals(segment.getPhysicalColumnNames().size(), 2);
+      assertTrue(segment.getPhysicalColumnNames().contains("a"));
+      assertFalse(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.DOCID));
+      assertFalse(segment.getPhysicalColumnNames().contains("c"));
+      assertThrows(UnsupportedOperationException.class, () -> segment.getColumnNames().remove("a"));
+      assertThrows(UnsupportedOperationException.class, () -> segment.getPhysicalColumnNames().remove("a"));
+      assertThrows(UnsupportedOperationException.class, () -> segment.getPhysicalColumnNames().add("c"));
+    }
+    verify(segmentMetadata, never()).getSchema();
+  }
+
+  /// The eager constructor finds the OPEN_STRUCT parent's ComplexFieldSpec in the column metadata rather than in the
+  /// segment schema, and groups the materialized children under it as before.
+  @Test
+  public void testEagerModeGroupsOpenStructChildrenUnderTheirParent() {
+    ComplexFieldSpec metrics = new ComplexFieldSpec("metrics", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true)));
+    String viewsColumn = OpenStructNaming.materializedColumnName("metrics", "views");
+    String sparseColumn = OpenStructNaming.sparseColumnName("metrics");
+    ColumnMetadataImpl parent = columnMetadata(metrics, null);
+    ColumnMetadataImpl views = columnMetadata(new DimensionFieldSpec(viewsColumn, FieldSpec.DataType.LONG, true),
+        "metrics");
+    ColumnMetadataImpl sparse = columnMetadata(new DimensionFieldSpec(sparseColumn, FieldSpec.DataType.STRING, true),
+        "metrics");
+    ColumnMetadataImpl dim = columnMetadata(intColumn("dim"), null);
+    ColumnIndexContainer viewsContainer = mock(ColumnIndexContainer.class);
+    SegmentMetadataImpl segmentMetadata = segmentMetadata(parent, views, sparse, dim);
+    ImmutableSegmentImpl segment = new ImmutableSegmentImpl(mock(SegmentDirectory.class), segmentMetadata,
+        Map.of(viewsColumn, viewsContainer, sparseColumn, mock(ColumnIndexContainer.class), "dim",
+            mock(ColumnIndexContainer.class)), null);
+
+    DataSource parentDataSource = segment.getDataSourceNullable("metrics");
+    assertTrue(parentDataSource instanceof ImmutableOpenStructDataSource);
+    ImmutableOpenStructDataSource openStruct = (ImmutableOpenStructDataSource) parentDataSource;
+    assertTrue(openStruct.isMaterialized("views"));
+    assertSame(openStruct.getDataSource("views").getIndexContainer(), viewsContainer);
+    // Children are reachable only through their parent
+    assertNull(segment.getDataSourceNullable(viewsColumn));
+    assertNull(segment.getDataSourceNullable(sparseColumn));
+    assertNotNull(segment.getDataSourceNullable("dim"));
+    assertEquals(segment.getPhysicalColumnNames(), Set.of("metrics", viewsColumn, sparseColumn, "dim"));
+    verify(segmentMetadata, never()).getSchema();
+  }
+
+  private static ImmutableSegmentImpl lazySegment(SegmentDirectory segmentDirectory, ColumnMaterializer materializer,
+      ColumnMetadata... columns) {
+    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata(columns), materializer,
         new ConcurrentHashMap<>(), null, null);
   }
 
-  private static SegmentMetadataImpl segmentMetadata(Schema schema, ColumnMetadata... columns) {
+  /// The segment must work from the column metadata map alone: getSchema() is left unstubbed (null) and is verified
+  /// never to be called where it matters.
+  private static SegmentMetadataImpl segmentMetadata(ColumnMetadata... columns) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("seg");
     when(segmentMetadata.getTotalDocs()).thenReturn(NUM_DOCS);
-    when(segmentMetadata.getSchema()).thenReturn(schema);
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     for (ColumnMetadata column : columns) {
       columnMetadataMap.put(column.getColumnName(), column);
     }
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
     return segmentMetadata;
-  }
-
-  private static Schema schema(FieldSpec... fieldSpecs) {
-    Schema schema = new Schema();
-    for (FieldSpec fieldSpec : fieldSpecs) {
-      schema.addField(fieldSpec);
-    }
-    return schema;
-  }
-
-  private static Schema schema(ColumnMetadata... columns) {
-    Schema schema = new Schema();
-    for (ColumnMetadata column : columns) {
-      schema.addField(column.getFieldSpec());
-    }
-    return schema;
   }
 
   private static FieldSpec intColumn(String name) {
