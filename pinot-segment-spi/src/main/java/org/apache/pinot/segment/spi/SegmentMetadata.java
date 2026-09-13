@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
@@ -33,6 +35,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -134,7 +137,8 @@ public interface SegmentMetadata {
   /// empty for a segment that holds none (a CONSUMING one, which answers [#getColumnMetadataFor(String)] with `null`
   /// for every column of its schema).
   default Collection<ColumnMetadata> getAllColumnMetadata() {
-    return getColumnMetadataMap().values();
+    TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+    return columnMetadataMap != null ? columnMetadataMap.values() : List.of();
   }
 
   /// Applies `action` to every (column name, column metadata) pair, in the natural column-name order of
@@ -159,6 +163,28 @@ public interface SegmentMetadata {
   @Nullable
   default ColumnMetadata getColumnMetadataFor(String column) {
     return getColumnMetadataMap().get(column);
+  }
+
+  /// The names of the physical (non-virtual) columns, i.e. `getSchema().getPhysicalColumnNames()` without building
+  /// the schema. Segment load runs this once per segment (the forward-index handler asks which columns exist), and on
+  /// a server holding tens of thousands of wide segments a schema built there would be cached for the segment's whole
+  /// life: one [Schema] per segment, each with a tree entry and two list slots per column. A segment that holds no
+  /// column metadata (a CONSUMING one) still answers from its schema, which it was constructed with.
+  ///
+  /// Sorted, like the [Schema#getPhysicalColumnNames()] this replaces, and the same set for both segment kinds.
+  default SortedSet<String> getPhysicalColumnNames() {
+    Collection<ColumnMetadata> columnMetadata = getAllColumnMetadata();
+    if (columnMetadata.isEmpty()) {
+      return getSchema().getPhysicalColumnNames();
+    }
+    TreeSet<String> physicalColumnNames = new TreeSet<>();
+    for (ColumnMetadata metadata : columnMetadata) {
+      FieldSpec fieldSpec = metadata.getFieldSpec();
+      if (!fieldSpec.isVirtualColumn()) {
+        physicalColumnNames.add(fieldSpec.getName());
+      }
+    }
+    return physicalColumnNames;
   }
 
   /// Registers the metadata of a column, replacing any metadata already registered under the same name. An
