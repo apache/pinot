@@ -283,6 +283,15 @@ public class ImmutableSegmentLoader {
   /// segment format, adding new indices or updating default columns.
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    return needPreprocess(segmentDirectory, indexLoadingConfig, true);
+  }
+
+  /// Same as [#needPreprocess(SegmentDirectory, IndexLoadingConfig)], with an option to ignore transform-function
+  /// BACKFILL/UPDATE. Record-replay rebuild (RefreshSegment) must not treat those as a rebuild signal; server
+  /// [SegmentPreProcessor] + DefaultColumnHandler is the apply path.
+  public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      boolean includeTransformFunctionActions)
+      throws Exception {
     if (indexLoadingConfig.isSkipSegmentPreprocess()) {
       return false;
     }
@@ -293,7 +302,8 @@ public class ImmutableSegmentLoader {
     if (indexLoadingConfig.getTableConfig() == null || indexLoadingConfig.getSchema() == null) {
       return false;
     }
-    return SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig).needProcess();
+    return SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig)
+        .needProcess(includeTransformFunctionActions);
   }
 
   private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,

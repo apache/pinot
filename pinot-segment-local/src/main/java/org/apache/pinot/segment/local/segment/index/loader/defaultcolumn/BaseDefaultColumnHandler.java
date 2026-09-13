@@ -27,9 +27,11 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
@@ -138,6 +140,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     boolean isRemoveAction() {
       return this == REMOVE_DIMENSION || this == REMOVE_METRIC || this == REMOVE_DATE_TIME || this == REMOVE_COMPLEX;
     }
+
+    /// BACKFILL (metadata only) or UPDATE_*_TRANSFORM_FUNCTION (values change). Both are applied by
+    /// DefaultColumnHandler, not by record-replay rebuild.
+    boolean isTransformFunctionAction() {
+      return this == BACKFILL_TRANSFORM_FUNCTION || isTransformFunctionValueChange();
+    }
+
+    /// UPDATE_*_TRANSFORM_FUNCTION: stored values are regenerated. BACKFILL is not this.
+    boolean isTransformFunctionValueChange() {
+      return this == UPDATE_DIMENSION_TRANSFORM_FUNCTION || this == UPDATE_METRIC_TRANSFORM_FUNCTION
+          || this == UPDATE_DATE_TIME_TRANSFORM_FUNCTION || this == UPDATE_COMPLEX_TRANSFORM_FUNCTION;
+    }
   }
 
   protected final File _indexDir;
@@ -172,6 +186,27 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       LOGGER.debug("Need to update default columns with actionMap: {}", defaultColumnActionMap);
     }
     return !defaultColumnActionMap.isEmpty();
+  }
+
+  @Override
+  public boolean needStructuralDefaultColumnUpdates() {
+    for (DefaultColumnAction action : computeDefaultColumnActionMap().values()) {
+      if (!action.isTransformFunctionAction()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public Set<String> getColumnsWithPendingTransformValueChanges() {
+    Set<String> columns = new HashSet<>();
+    for (Map.Entry<String, DefaultColumnAction> entry : computeDefaultColumnActionMap().entrySet()) {
+      if (entry.getValue().isTransformFunctionValueChange()) {
+        columns.add(entry.getKey());
+      }
+    }
+    return columns;
   }
 
   /// {@inheritDoc}

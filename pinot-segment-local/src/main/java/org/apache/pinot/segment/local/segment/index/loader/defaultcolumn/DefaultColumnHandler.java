@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
+import java.util.Set;
+
+
 public interface DefaultColumnHandler {
 
   /// Update the auto-generated default columns.
@@ -32,4 +35,12 @@ public interface DefaultColumnHandler {
   /// for the segment, according to the current table schema.
   /// @return true if there is a need to update.
   boolean needUpdateDefaultColumns();
+
+  /// True when default-column work exists that a record-replay rebuild can apply (ADD/REMOVE/data-type/default/MV).
+  /// Transform BACKFILL and UPDATE_*_TRANSFORM_FUNCTION are applied only by this handler on the server preprocess path
+  /// and must not trigger a minion RefreshSegment rebuild.
+  boolean needStructuralDefaultColumnUpdates();
+
+  /// Columns with a pending UPDATE_*_TRANSFORM_FUNCTION action. Values will change. BACKFILL is excluded.
+  Set<String> getColumnsWithPendingTransformValueChanges();
 }

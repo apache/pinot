@@ -714,15 +714,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       @Nullable String transformFunction, boolean backfilled) {
     String transformFunctionKey = getKeyFor(column, TRANSFORM_FUNCTION);
     String backfilledKey = getKeyFor(column, TRANSFORM_FUNCTION_BACKFILLED);
-    properties.clearProperty(transformFunctionKey);
-    properties.clearProperty(backfilledKey);
     if (transformFunction == null) {
+      properties.clearProperty(transformFunctionKey);
+      properties.clearProperty(backfilledKey);
       return;
     }
     String validTransformFunction = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
     if (validTransformFunction == null) {
-      return;
+      throw new IllegalArgumentException("Cannot persist transform function for column: " + column
+          + " because it contains UTF-16 surrogate characters that segment metadata cannot store");
     }
+    properties.clearProperty(transformFunctionKey);
+    properties.clearProperty(backfilledKey);
     if (backfilled) {
       properties.setProperty(backfilledKey, validTransformFunction);
     } else {
