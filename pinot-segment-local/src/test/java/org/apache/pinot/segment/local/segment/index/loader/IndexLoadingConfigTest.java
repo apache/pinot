@@ -47,6 +47,20 @@ public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
 
   @Test
+  public void testLazyColumnMaterializationIsSourcedFromInstanceConfig() {
+    assertFalse(new IndexLoadingConfig().isLazyColumnMaterialization());
+
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    when(idmCfg.isLazyColumnMaterialization()).thenReturn(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, null);
+    assertTrue(ilc.isLazyColumnMaterialization());
+    ilc.setLazyColumnMaterialization(false);
+    assertFalse(ilc.isLazyColumnMaterialization());
+  }
+
+  @Test
   public void testCalculateIndexConfigsWithoutTierOverwrites()
       throws IOException {
     InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
