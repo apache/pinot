@@ -452,7 +452,7 @@ public class QueryEnvironment {
     RexExecutor originalExecutor = planner.getExecutor();
     if (originalExecutor == null) {
       // SqlToRelConverter transforms its RelBuilder, discarding executors provided only through the builder context.
-      // Install on the per-query planner so conversion and field trimming avoid generated timestamp cast reducers.
+      // Install on the per-query planner so conversion and field trimming avoid generating code for supported casts.
       planner.setExecutor(PinotRexExecutor.INSTANCE);
     }
     try {

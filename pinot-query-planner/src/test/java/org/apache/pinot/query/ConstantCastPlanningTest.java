@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.runtime.Hook;
@@ -33,8 +35,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-/// Verifies that SQL-to-rel conversion reduces constant timestamp casts with its scoped executor without changing the
-/// resulting plan, and restores the planner's executor afterward. The expression-reduction hook is thread-local and
+/// Verifies that SQL-to-rel conversion reduces constant timestamp and BIGINT casts without changing the resulting plan,
+/// and restores the planner's executor afterward. The expression-reduction hook is thread-local and
 /// closed after each compilation.
 public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
   @DataProvider
@@ -87,6 +89,47 @@ public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
           "SQL-to-rel conversion must restore the planner's executor before optimization");
       assertEquals(reductions.get(), 0, "Constant timestamp casts must not invoke Calcite's generated-code reducer");
     }
+  }
+
+  @DataProvider
+  public Object[][] bigintQueries() {
+    List<Object[]> cases = new ArrayList<>();
+    for (String value : List.of("0", "123", "9007199254740993", "9223372036854775807", "-9223372036854775808")) {
+      for (boolean explicitCast : List.of(false, true)) {
+        for (boolean window : List.of(false, true)) {
+          cases.add(new Object[]{value, explicitCast, window});
+        }
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "bigintQueries")
+  @SuppressWarnings("try") // The resource scopes the thread-local generated-reducer hook.
+  public void testConstantBigintCastPlanning(String value, boolean explicitCast, boolean window) {
+    String quoted = explicitCast ? "CAST('" + value + "' AS BIGINT)" : "'" + value + "'";
+    String numeric = "CAST(" + value + " AS BIGINT)";
+    AtomicInteger reductions = new AtomicInteger();
+    try (QueryEnvironment.CompiledQuery literalPlan = _queryEnvironment.compile(bigintQuery(numeric, window));
+        Hook.Closeable ignored = Hook.EXPRESSION_REDUCER.addThread(v -> {
+          reductions.incrementAndGet();
+        });
+        QueryEnvironment.CompiledQuery castPlan = _queryEnvironment.compile(bigintQuery(quoted, window))) {
+      assertEquals(RelOptUtil.toString(castPlan.getRelNode()), RelOptUtil.toString(literalPlan.getRelNode()));
+      assertEquals(castPlan.getRelRoot().validatedRowType, literalPlan.getRelRoot().validatedRowType);
+      assertEquals(castPlan.getTableNames(), literalPlan.getTableNames());
+      assertNull(castPlan.getPlannerContext().getRelOptPlanner().getExecutor());
+      assertEquals(reductions.get(), 0, "Constant BIGINT casts must not invoke the generated-code reducer");
+    }
+  }
+
+  private static String bigintQuery(String value, boolean window) {
+    String filter = " FROM a WHERE col7 = " + value;
+    if (window) {
+      return "SELECT col7, col3 FROM (SELECT col7, col3, ROW_NUMBER() OVER "
+          + "(PARTITION BY col7 ORDER BY col3 DESC) AS row_num" + filter + ") WHERE row_num = 1";
+    }
+    return "SELECT col7, col3" + filter;
   }
 
   private static String query(boolean window, String accountId, String lowerBound, String upperBound) {

@@ -28,13 +28,14 @@ import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.runtime.SqlFunctions;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 
-/// Reduces string literal casts to TIMESTAMP without compiling a generated Java class for each reduction. All other
-/// expressions use Calcite's executor. The singleton is thread-safe: each reduction keeps its results local, and the
-/// default Calcite executor creates a separate executable for each invocation.
+/// Reduces string literal casts to TIMESTAMP and BIGINT without compiling a generated Java class for each reduction.
+/// All other expressions use Calcite's executor. Each reduction keeps its results local.
+/// Calcite creates a separate executable for each invocation, making the singleton thread-safe.
 public final class PinotRexExecutor implements RexExecutor {
   public static final PinotRexExecutor INSTANCE = new PinotRexExecutor(RexUtil.EXECUTOR);
 
@@ -50,7 +51,7 @@ public final class PinotRexExecutor implements RexExecutor {
     // Calcite treats reduction as all-or-nothing. Delegate the entire batch if any expression is unsupported, so a
     // failure in the fallback cannot leave the batch partially reduced.
     for (RexNode expression : constExps) {
-      if (!isStringToTimestampCast(expression)) {
+      if (!isSupportedStringCast(expression)) {
         _fallback.reduce(rexBuilder, constExps, reducedValues);
         return;
       }
@@ -61,9 +62,14 @@ public final class PinotRexExecutor implements RexExecutor {
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
         // These are the same conversion and literal construction used by Calcite's generated CAST and RexExecutable.
         // In particular, do not use Pinot's timestamp parser: its accepted inputs differ from Calcite's.
-        Long timestamp = operand.isNull() ? null
-            : DateTimeUtils.timestampStringToUnixDate(RexLiteral.stringValue(operand));
-        literals.add(rexBuilder.makeLiteral(timestamp, expression.getType(), true));
+        Long value = null;
+        if (!operand.isNull()) {
+          String text = RexLiteral.stringValue(operand);
+          value = expression.getType().getSqlTypeName() == SqlTypeName.BIGINT
+              ? SqlFunctions.toLong(text)
+              : DateTimeUtils.timestampStringToUnixDate(text);
+        }
+        literals.add(rexBuilder.makeLiteral(value, expression.getType(), true));
       }
     } catch (RuntimeException e) {
       // Calcite also leaves the entire batch unchanged when parsing or literal construction fails. Retrying the same
@@ -74,13 +80,14 @@ public final class PinotRexExecutor implements RexExecutor {
     reducedValues.addAll(literals);
   }
 
-  private static boolean isStringToTimestampCast(RexNode expression) {
+  private static boolean isSupportedStringCast(RexNode expression) {
     if (!(expression instanceof RexCall)) {
       return false;
     }
     RexCall call = (RexCall) expression;
     if (call.getOperator() != SqlStdOperatorTable.CAST || call.getOperands().size() != 1
-        || call.getType().getSqlTypeName() != SqlTypeName.TIMESTAMP) {
+        || (call.getType().getSqlTypeName() != SqlTypeName.TIMESTAMP
+            && call.getType().getSqlTypeName() != SqlTypeName.BIGINT)) {
       return false;
     }
     RexNode operand = call.getOperands().get(0);

@@ -57,12 +57,64 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
-/// Compares timestamp constant reduction with Calcite and verifies that supported casts bypass code generation.
+/// Compares timestamp and BIGINT constant reduction with Calcite.
+/// Verifies that supported casts bypass code generation.
 public class PinotRexExecutorTest {
   private static final RexExecutor CALCITE_EXECUTOR = new RexExecutorImpl(DataContexts.EMPTY);
   private static final RexExecutor FAILING_FALLBACK = (builder, expressions, results) -> {
-    throw new AssertionError("Supported timestamp casts must not use the fallback: " + expressions);
+    throw new AssertionError("Supported casts must not use the fallback: " + expressions);
   };
+
+  @DataProvider
+  public Object[][] bigintLiterals() {
+    List<Object[]> cases = new ArrayList<>();
+    for (SqlTypeName sourceType : List.of(SqlTypeName.CHAR, SqlTypeName.VARCHAR)) {
+      for (String value : new String[]{"0", "-0", "-1", "+1", "000123", " 123 ", "\t123\n", "9007199254740993",
+          "9223372036854775807", "-9223372036854775808", "9223372036854775808", "-9223372036854775809",
+          "1.0", "1e3", "", "invalid", null}) {
+        cases.add(new Object[]{sourceType, value});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "bigintLiterals")
+  public void testBigintCastsMatchCalciteWithoutFallback(SqlTypeName sourceType, String value) {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType source = builder.getTypeFactory().createSqlType(sourceType, 30);
+    RelDataType target = builder.getTypeFactory().createTypeWithNullability(
+        builder.getTypeFactory().createSqlType(SqlTypeName.BIGINT), true);
+    RexNode operand = value == null ? builder.makeNullLiteral(source) : builder.stringLiteral(value, sourceType);
+    RexNode expression = builder.makeAbstractCast(target, operand, false);
+    List<RexNode> input = List.of(expression);
+    CountingFallback fallback = new CountingFallback(CALCITE_EXECUTOR);
+    List<RexNode> expected = reduce(CALCITE_EXECUTOR, builder, input);
+    List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
+    assertEquals(actual, expected);
+    assertEquals(actual.get(0).getType(), expected.get(0).getType());
+    assertEquals(fallback._calls.get(), 0);
+    if (expected.equals(input)) {
+      assertSame(actual.get(0), expression);
+    }
+  }
+
+  @Test
+  public void testBigintMixedBatchesMatchCalcite() {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType bigint = builder.getTypeFactory().createSqlType(SqlTypeName.BIGINT);
+    RexNode valid = builder.makeAbstractCast(bigint, builder.makeLiteral("123"), false);
+    RexNode invalid = builder.makeAbstractCast(bigint, builder.makeLiteral("invalid"), false);
+    RexNode timestamp = timestampCast(builder, SqlTypeName.CHAR, "2026-04-01 00:00:00", 3);
+    RexNode unsupported = builder.makeAbstractCast(builder.getTypeFactory().createSqlType(SqlTypeName.INTEGER),
+        builder.makeLiteral("123"), false);
+    for (List<RexNode> input : List.of(List.of(valid, invalid), List.of(invalid, valid), List.of(valid, timestamp),
+        List.of(timestamp, valid), List.of(valid, unsupported))) {
+      CountingFallback fallback = new CountingFallback(CALCITE_EXECUTOR);
+      List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
+      assertEquals(actual, reduce(CALCITE_EXECUTOR, builder, input));
+      assertEquals(fallback._calls.get(), input.contains(unsupported) ? 1 : 0);
+    }
+  }
 
   @DataProvider
   public Object[][] timestampLiterals() {
