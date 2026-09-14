@@ -76,6 +76,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -603,7 +604,7 @@ public class PinotDdlRestletResource {
           _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (ControllerApplicationException e) {
       throw e;
-    } catch (IllegalArgumentException | IllegalStateException e) {
+    } catch (IllegalArgumentException | IllegalStateException | ConfigValidationException e) {
       // The Pinot validators consistently raise these for user-facing config errors
       // (upsert without primary keys, field configs referencing non-existent columns,
       // bad task configs, etc.). Surface as 400 — the caller can fix their DDL.
