@@ -64,7 +64,6 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   protected final DataSchema _dataSchema;
   protected final int _version;
   protected final int[] _columnOffsets;
-  protected final int _rowSizeInBytes;
   protected final ByteBuffer _currentRowDataByteBuffer;
   protected final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   protected final DataOutputStream _fixedSizeDataOutputStream =
@@ -87,10 +86,10 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _dataSchema = dataSchema;
     _version = version;
     _columnOffsets = new int[dataSchema.size()];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
+    int rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
     // Every column is populated for each row, and each setter positions the buffer at its column offset.
     // finishRow() copies the bytes, so the same buffer can be reused without clearing or resetting it.
-    _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
+    _currentRowDataByteBuffer = ByteBuffer.allocate(rowSizeInBytes);
     _storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
   }
