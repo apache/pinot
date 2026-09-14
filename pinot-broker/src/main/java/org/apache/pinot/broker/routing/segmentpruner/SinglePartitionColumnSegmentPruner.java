@@ -252,7 +252,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     }
   }
 
-  /// Uses all recorded constructor inputs; legacy metadata without those inputs is reusable only by instance identity.
+  /// Uses all recorded constructor inputs to identify equivalent partition functions.
   private abstract static class PartitionFunctionKey {
     abstract SegmentPartitionInfo getPartitionInfo();
 
@@ -260,12 +260,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       SegmentPartitionInfo current = getPartitionInfo();
       PartitionFunction function = current.getPartitionFunction();
       PartitionFunction otherFunction = partitionInfo.getPartitionFunction();
-      if (current.hasPartitionFunctionConfig() != partitionInfo.hasPartitionFunctionConfig()) {
-        return false;
-      }
-      if (!current.hasPartitionFunctionConfig()) {
-        return function == otherFunction;
-      }
       return function.getClass() == otherFunction.getClass() && function.getName().equals(otherFunction.getName())
           && function.getNumPartitions() == otherFunction.getNumPartitions()
           && function.getPartitionIdNormalizer() == otherFunction.getPartitionIdNormalizer()
@@ -281,9 +275,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     public final int hashCode() {
       SegmentPartitionInfo partitionInfo = getPartitionInfo();
       PartitionFunction function = partitionInfo.getPartitionFunction();
-      if (!partitionInfo.hasPartitionFunctionConfig()) {
-        return System.identityHashCode(function);
-      }
       // Unlike Objects.hash, this creates neither a varargs array nor a boxed partition count on each lookup.
       int hash = function.getClass().hashCode();
       hash = 31 * hash + function.getName().hashCode();
