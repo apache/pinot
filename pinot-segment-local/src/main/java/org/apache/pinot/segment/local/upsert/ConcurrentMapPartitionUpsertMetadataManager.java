@@ -362,6 +362,20 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
+  public boolean isOutOfOrderRecord(RecordInfo recordInfo) {
+    if (!startOperation()) {
+      return true;
+    }
+    try {
+      RecordLocation current = _primaryKeyToRecordLocationMap.get(
+          HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+      return current != null && recordInfo.getComparisonValue().compareTo(current.getComparisonValue()) < 0;
+    } finally {
+      finishOperation();
+    }
+  }
+
+  @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());

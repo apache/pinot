@@ -158,7 +158,7 @@ public class MemoryEstimator {
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
             .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory)
-            .setConsumerDir(_workingDir.getAbsolutePath());
+            .setConsumerDir(_workingDir.getAbsolutePath()).setContinueOnError(true);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);

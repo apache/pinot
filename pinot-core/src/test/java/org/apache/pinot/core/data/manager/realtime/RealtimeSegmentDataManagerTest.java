@@ -68,10 +68,14 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -746,6 +750,90 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released even when metadata removal fails");
     }
+  }
+
+  @Test
+  public void testIndexExceptionRethrownWhenSegmentCannotTakeMore()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      MutableSegmentImpl realtimeSegment = mock(MutableSegmentImpl.class);
+      when(realtimeSegment.index(any(), any())).thenThrow(new RuntimeException("unrecoverable index failure"));
+      when(realtimeSegment.canAddMore()).thenReturn(false);
+      when(realtimeSegment.canTakeMoreRows()).thenReturn(false);
+      when(realtimeSegment.getNumDocsIndexed()).thenReturn(0);
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      try {
+        segmentDataManager.invokeProcessStreamEvents(singleMessageBatch());
+        Assert.fail("Expected the terminal segment to stop consumption");
+      } catch (RuntimeException e) {
+        Assert.assertTrue(e.getMessage().contains("Caught exception while indexing the record"));
+        Assert.assertEquals(e.getCause().getMessage(), "unrecoverable index failure");
+      }
+    }
+  }
+
+  @Test
+  public void testIndexExceptionDoesNotStopConsumptionWhenSegmentCanTakeMore()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      MutableSegmentImpl realtimeSegment = mock(MutableSegmentImpl.class);
+      when(realtimeSegment.index(any(), any())).thenThrow(new RuntimeException("repaired then rethrown"));
+      when(realtimeSegment.canAddMore()).thenReturn(true);
+      when(realtimeSegment.canTakeMoreRows()).thenReturn(true);
+      when(realtimeSegment.getNumDocsIndexed()).thenReturn(0, 1);
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.invokeProcessStreamEvents(singleMessageBatch());
+      Assert.assertEquals(segmentDataManager.getNumRowsErrored(), 0,
+          "a published repair must not be counted as a dropped row");
+    }
+  }
+
+  @Test
+  public void testUnpublishedIndexExceptionIsCountedAsErroredRow()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      MutableSegmentImpl realtimeSegment = mock(MutableSegmentImpl.class);
+      when(realtimeSegment.index(any(), any())).thenThrow(new RuntimeException("failed before mutation"));
+      when(realtimeSegment.canAddMore()).thenReturn(true);
+      when(realtimeSegment.canTakeMoreRows()).thenReturn(true);
+      when(realtimeSegment.getNumDocsIndexed()).thenReturn(0);
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.invokeProcessStreamEvents(singleMessageBatch());
+      Assert.assertEquals(segmentDataManager.getNumRowsErrored(), 1);
+    }
+  }
+
+  private static MessageBatch<byte[]> singleMessageBatch() {
+    StreamMessageMetadata metadata = new StreamMessageMetadata.Builder()
+        .setOffset(new LongMsgOffset(START_OFFSET_VALUE), new LongMsgOffset(START_OFFSET_VALUE + 1))
+        .setRecordIngestionTimeMs(System.currentTimeMillis())
+        .setSerializedValueSize(1)
+        .build();
+    BytesStreamMessage message = new BytesStreamMessage(new byte[]{1}, metadata);
+    return new MessageBatch<>() {
+      @Override
+      public int getMessageCount() {
+        return 1;
+      }
+
+      @Override
+      public StreamMessage<byte[]> getStreamMessage(int index) {
+        return message;
+      }
+
+      @Override
+      public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+        return new LongMsgOffset(START_OFFSET_VALUE + 1);
+      }
+
+      @Override
+      public long getSizeInBytes() {
+        return 1;
+      }
+    };
   }
 
   @Test
@@ -1523,6 +1611,22 @@ public class RealtimeSegmentDataManagerTest {
       realtimeSegmentField.set(this, realtimeSegment);
     }
 
+    public void invokeProcessStreamEvents(MessageBatch<?> messageBatch)
+        throws Exception {
+      Method method = RealtimeSegmentDataManager.class.getDeclaredMethod("processStreamEvents", MessageBatch.class,
+          long.class);
+      method.setAccessible(true);
+      try {
+        method.invoke(this, messageBatch, 0L);
+      } catch (InvocationTargetException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof Exception exception) {
+          throw exception;
+        }
+        throw e;
+      }
+    }
+
     public boolean isStreamConsumerClosed()
         throws Exception {
       Field streamConsumerClosedField = RealtimeSegmentDataManager.class.getDeclaredField("_streamConsumerClosed");
@@ -1722,6 +1826,10 @@ public class RealtimeSegmentDataManagerTest {
       setInt(numRows, "_numRowsIndexed");
     }
 
+    public int getNumRowsErrored() {
+      return getInt("_numRowsErrored");
+    }
+
     public void setFinalOffset(long offset) {
       setOffset(offset, "_finalOffset");
     }
@@ -1808,6 +1916,19 @@ public class RealtimeSegmentDataManagerTest {
       } catch (IllegalAccessException e) {
         Assert.fail();
       }
+    }
+
+    private int getInt(String fieldName) {
+      try {
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getInt(this);
+      } catch (NoSuchFieldException e) {
+        Assert.fail();
+      } catch (IllegalAccessException e) {
+        Assert.fail();
+      }
+      throw new RuntimeException("Cannot get here");
     }
 
     @Override
