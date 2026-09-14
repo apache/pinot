@@ -378,6 +378,22 @@ public class MinionTaskUtilsTest {
     assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, -1));
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, 5000));
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, -1));
+
+    // String overload (used by Check B deepstore validation).
+    assertTrue(MinionTaskUtils.crcMatches("1000", "5000", "1000", "9999"));
+    assertTrue(MinionTaskUtils.crcMatches("1000", "5000", "2000", "5000"));
+    assertFalse(MinionTaskUtils.crcMatches("1000", "5000", "2000", "9999"));
+    assertFalse(MinionTaskUtils.crcMatches("1000", null, "2000", "5000"));
+  }
+
+  @Test
+  public void testParseCrc() {
+    assertEquals(MinionTaskUtils.parseCrc("1000"), 1000L);
+    assertEquals(MinionTaskUtils.parseCrc(null), -1L);
+    assertEquals(MinionTaskUtils.parseCrc("not-a-number"), -1L);
+    // Absent on-disk data CRC is serialized as Long.MIN_VALUE; treat as unavailable.
+    assertEquals(MinionTaskUtils.parseCrc(String.valueOf(Long.MIN_VALUE)), -1L);
+    assertEquals(MinionTaskUtils.parseCrc("-1"), -1L);
   }
 
   @Test
