@@ -1352,6 +1352,56 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   }
 
   @Test
+  public void testReplacementCountsMovedKeysForHistoryDependentTables()
+      throws IOException {
+    for (int config = 0; config < 4; config++) {
+      PartialUpsertHandler handler = mock(PartialUpsertHandler.class);
+      UpsertContext context = _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE)
+          .setPartialUpsertHandlerSupplier(config == 1 ? () -> handler : null)
+          .setDropOutOfOrderRecord(config == 2).setOutOfOrderRecordColumn(config == 3 ? "outOfOrder" : null).build();
+      ThreadSafeMutableRoaringBitmap oldValidDocIds = new ThreadSafeMutableRoaringBitmap();
+      ImmutableSegmentImpl oldSegment = mockImmutableSegment(1, oldValidDocIds, null, List.of(makePrimaryKey(10)));
+      ThreadSafeMutableRoaringBitmap replacementValidDocIds = new ThreadSafeMutableRoaringBitmap();
+      ImmutableSegmentImpl replacement = mockImmutableSegment(1, replacementValidDocIds, null, List.of());
+      MutableSegment nextSegment = mockMutableSegment(2, new ThreadSafeMutableRoaringBitmap(), null);
+      int[] inconsistentRows = new int[1];
+      try (ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes manager =
+          new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0, context) {
+            @Override
+            protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment,
+                ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
+                Iterator<RecordInfo> recordInfoIterator, @Nullable IndexSegment oldSegment,
+                @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
+              super.doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
+                  validDocIdsForOldSegment);
+              if (oldSegment != null) {
+                addRecord(nextSegment, new RecordInfo(makePrimaryKey(10), 0, 200, false));
+              }
+            }
+
+            @Override
+            protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+              inconsistentRows[0] += numKeysStillNotReplaced;
+            }
+          }) {
+        try {
+          manager.addSegment(oldSegment, oldValidDocIds, null,
+              List.of(new RecordInfo(makePrimaryKey(10), 0, 100, false)).iterator());
+          manager.replaceSegment(replacement, replacementValidDocIds, null, List.<RecordInfo>of().iterator(),
+              oldSegment);
+          assertEquals(inconsistentRows[0], config == 0 ? 0 : 1);
+          ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation location =
+              manager._primaryKeyToRecordLocationMap.get(makePrimaryKey(10));
+          assertSame(location.getSegment(), nextSegment);
+          assertEquals(location.getDistinctSegmentCount(), 1, "Cleanup must still decrement the segment count");
+        } finally {
+          manager.stop();
+        }
+      }
+    }
+  }
+
+  @Test
   public void testRemoveSegmentCountsOnlyKeysStillOwnedBySegment()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager.RecordLocation;
 import org.apache.pinot.segment.local.utils.HashUtils;
@@ -230,6 +232,91 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertSame(upsertMetadataManager._primaryKeyToRecordLocationMap.get(newerSegmentMapKey).getSegment(), newerSegment);
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testPartialUpsertReportsKeyMovedAfterMergingDivergentValue()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", DataType.INT)
+        .addMetric("timeCol", DataType.INT).addMetric("total", DataType.INT)
+        .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPartialUpsertStrategies(Map.of("total", UpsertConfig.Strategy.INCREMENT));
+    PartialUpsertHandler handler =
+        new PartialUpsertHandler(SEGMENT_TABLE_CONFIG, schema, COMPARISON_COLUMNS, upsertConfig);
+    UpsertContext context = _contextBuilder.setSchema(schema).setPartialUpsertHandlerSupplier(() -> handler)
+        .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
+    ThreadSafeMutableRoaringBitmap oldValidDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment oldSegment = mockMutableSegmentWithDataSource(1, oldValidDocIds, null, new int[]{10});
+    // The local row has total=10. The committed segment has an older comparison value and total=8.
+    DataSource totalDataSource = mock(DataSource.class);
+    ForwardIndexReader totalForwardIndex = mock(ForwardIndexReader.class);
+    when(totalForwardIndex.isSingleValue()).thenReturn(true);
+    when(totalForwardIndex.getStoredType()).thenReturn(DataType.INT);
+    when(totalForwardIndex.getInt(anyInt(), any())).thenReturn(10);
+    when(totalDataSource.getForwardIndex()).thenReturn(totalForwardIndex);
+    when(oldSegment.getDataSource("total")).thenReturn(totalDataSource);
+    when(oldSegment.getColumnNames()).thenReturn(Set.of("pk", "timeCol", "total"));
+    ThreadSafeMutableRoaringBitmap newValidDocIds = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl replacement = mockImmutableSegmentWithTimestamps(1, newValidDocIds, null,
+        List.of(makePrimaryKey(10)), new int[]{90});
+    DataSource committedTotalDataSource = mock(DataSource.class);
+    ForwardIndexReader committedTotalForwardIndex = mock(ForwardIndexReader.class);
+    when(committedTotalForwardIndex.isSingleValue()).thenReturn(true);
+    when(committedTotalForwardIndex.getStoredType()).thenReturn(DataType.INT);
+    when(committedTotalForwardIndex.getInt(anyInt(), any())).thenReturn(8);
+    when(committedTotalDataSource.getForwardIndex()).thenReturn(committedTotalForwardIndex);
+    when(replacement.getDataSource("total")).thenReturn(committedTotalDataSource);
+    when(replacement.getColumnNames()).thenReturn(Set.of("pk", "timeCol", "total"));
+    LazyRow committedRow = new LazyRow();
+    committedRow.init(replacement, 0);
+    GenericRow committedUpdate = new GenericRow();
+    committedUpdate.putValue("total", 1);
+    handler.merge(committedRow, committedUpdate, new HashMap<>());
+    assertEquals(committedUpdate.getValue("total"), 9, "The committed baseline produces a different aggregate");
+    committedRow.clear();
+    MutableSegment nextSegment = mockMutableSegment(2, new ThreadSafeMutableRoaringBitmap(), null);
+    GenericRow update = new GenericRow();
+    update.putValue("pk", 10);
+    update.putValue("timeCol", 110);
+    update.putValue("total", 1);
+    int[] inconsistentRows = new int[1];
+    try (ConcurrentMapPartitionUpsertMetadataManager manager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, context) {
+          @Override
+          protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment,
+              ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
+              Iterator<RecordInfo> recordInfoIterator, @Nullable IndexSegment oldSegment,
+              @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
+            super.doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
+                validDocIdsForOldSegment);
+            assertEquals(validDocIdsForOldSegment.getCardinality(), 1);
+            // Deterministically interleave the next segment's partial update before replacement cleanup.
+            RecordInfo nextRecord = new RecordInfo(makePrimaryKey(10), 0, 110, false);
+            updateRecord(update, nextRecord);
+            assertEquals(update.getValue("total"), 11, "The update merged the divergent local value");
+            addRecord(nextSegment, nextRecord);
+          }
+
+          @Override
+          protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+            inconsistentRows[0] += numKeysStillNotReplaced;
+          }
+        }) {
+      try {
+        manager.addRecord(oldSegment, new RecordInfo(makePrimaryKey(10), 0, 100, false));
+        ConsumingSegmentConsistencyModeListener.getInstance()
+            .setMode(ConsumingSegmentConsistencyModeListener.Mode.UNSAFE);
+        assertFalse(manager.shouldRevertMetadataOnInconsistency(oldSegment));
+        manager.replaceSegment(replacement, newValidDocIds, null,
+            List.of(new RecordInfo(makePrimaryKey(10), 0, 90, false)).iterator(), oldSegment);
+        checkRecordLocation(manager._primaryKeyToRecordLocationMap, 10, nextSegment, 0, 110, HashFunction.NONE);
+        assertEquals(inconsistentRows[0], 1, "Moving the key must not hide the divergent partial update");
+      } finally {
+        ConsumingSegmentConsistencyModeListener.getInstance().reset();
+        manager.stop();
+      }
+    }
   }
 
   @Test

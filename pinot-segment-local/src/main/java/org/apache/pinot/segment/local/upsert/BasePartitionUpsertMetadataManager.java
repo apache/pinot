@@ -685,6 +685,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
       }
+      if (_context.isTableTypeInconsistentDuringConsumption()) {
+        // Partial updates and out-of-order decisions can carry a divergent previous value into a newer segment.
+        // Preserve candidate reporting for these tables even when the current key location has already moved.
+        _logger.warn("Found {} primary keys not replaced for segment: {}",
+            validDocIdsForOldSegment.getCardinality(), segmentName);
+        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
+        removeSegment(oldSegment, validDocIdsForOldSegment);
+        return;
+      }
       int numKeysStillNotReplaced =
           removeSegmentAndGetNumKeysRemoved(oldSegment, validDocIdsForOldSegment);
       if (numKeysStillNotReplaced > 0) {
@@ -742,8 +751,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
-  /// Removes candidate keys and returns how many were still owned by the segment at removal time. Implementations
-  /// backed by concurrent metadata should override this method and count only removals that pass their authoritative
+  /// Removes candidate keys and returns how many were still owned by the segment at removal time.
+  /// This is used for replacement reporting only when updates do not depend on previous row values or out-of-order
+  /// decisions. Other table configurations retain candidate reporting even when the current key location has moved.
+  /// Implementations backed by concurrent metadata should count only removals that pass their authoritative
   /// ownership check. The default preserves compatibility with existing metadata-manager implementations.
   protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     removeSegment(segment, validDocIds);
