@@ -1,0 +1,12 @@
+[package]
+name = "pinot-native-kernels"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "pinot_native_kernels"
+crate-type = ["lib"]
+
+[dev-dependencies]
+proptest = "1.4"
