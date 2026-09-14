@@ -25,14 +25,19 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableConfigValidator;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -101,6 +106,40 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     String listResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/tables");
     assertFalse(listResponse.contains(TBL_DRY_RUN),
         "Dry-run table must not be persisted; got " + listResponse);
+  }
+
+  @DataProvider(name = "tableValidatorFailures")
+  public Object[][] tableValidatorFailures() {
+    return new Object[][]{{false, true}, {true, true}, {false, false}, {true, false}};
+  }
+
+  @Test(dataProvider = "tableValidatorFailures")
+  public void tableValidatorFailureDoesNotPersist(boolean dryRun, boolean configValidationFailure)
+      throws IOException {
+    String tableName = "ddlValidatorFailure" + dryRun + configValidationFailure;
+    String tableNameWithType = tableName + "_OFFLINE";
+    String message = "Validator rejected column id for " + tableName;
+    TableConfigValidator validator = (tableConfig, schema) -> {
+      if (tableNameWithType.equals(tableConfig.getTableName())) {
+        if (configValidationFailure) {
+          throw new ConfigValidationException(message);
+        }
+        throw new RuntimeException(message);
+      }
+    };
+    TableConfigValidatorRegistry.register(validator);
+    try {
+      String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl?dryRun=" + dryRun;
+      String sql = "CREATE TABLE " + tableName + " (id INT) TABLE_TYPE = OFFLINE";
+      Pair<Integer, String> response = postRequestWithStatusCode(url,
+          JsonUtils.objectToString(Map.of("sql", sql)));
+      assertEquals(response.getLeft().intValue(), configValidationFailure ? 400 : 500, response.getRight());
+      assertTrue(response.getRight().contains(message), response.getRight());
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getTableConfig(tableNameWithType));
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName));
+    } finally {
+      TableConfigValidatorRegistry.unregister(validator);
+    }
   }
 
   @Test
