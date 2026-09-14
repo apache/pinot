@@ -237,12 +237,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testMetadataConfigurationSnapshotDistinguishesUnknownNullAndEmpty() {
+  public void testMetadataConfigurationSnapshotPreservesNullAndEmpty() {
     PartitionFunction function = new CountingPartitionFunction(8, null);
-    SegmentPartitionInfo unknown = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
-    assertFalse(unknown.hasPartitionFunctionConfig());
+    SegmentPartitionInfo legacy = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
+    assertNull(legacy.getPartitionFunctionConfig());
     SegmentPartitionInfo knownNull = new SegmentPartitionInfo(COLUMN, function, Set.of(0), null);
-    assertTrue(knownNull.hasPartitionFunctionConfig());
     assertNull(knownNull.getPartitionFunctionConfig());
     SegmentPartitionInfo knownEmpty = new SegmentPartitionInfo(COLUMN, function, Set.of(0), Map.of());
     assertEquals(knownEmpty.getPartitionFunctionConfig(), Map.of());
