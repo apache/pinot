@@ -47,8 +47,8 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
   @Override
   public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
-    // Allocate the flat map only when a required segment is selected. It avoids one map node per segment without
-    // reserving large arrays for queries whose segments are all optional or unavailable.
+    // A query can select only optional/unavailable segments even if other table segments are online. Unlike HashMap,
+    // a flat map allocates its arrays eagerly, so wait until this query selects a required segment.
     Map<String, String> segmentToSelectedInstanceMap = null;
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();

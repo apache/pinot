@@ -416,7 +416,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       String instanceId = instanceConfigZNRecord.getId();
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
-          // Match the interned instance IDs decoded from IS/EV map keys for per-segment routing lookups.
+          // Join Jackson's JVM-interned IS/EV keys; a config-only Guava interner would use a separate pool.
           instanceId = instanceId.intern();
           enabledServers.add(instanceId);
 
@@ -1199,11 +1199,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     selectionResult.getSegmentToInstanceMap().forEach((segment, instanceId) -> {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
       if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
-        if (segmentsToQuery == null) {
-          segmentsToQuery = new SegmentsToQuery(new ArrayList<>(), new ArrayList<>());
-          merged.put(serverInstance, segmentsToQuery);
-        }
+        SegmentsToQuery segmentsToQuery =
+            merged.computeIfAbsent(serverInstance, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()));
         segmentsToQuery.getSegments().add(segment);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries

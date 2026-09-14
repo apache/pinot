@@ -172,20 +172,31 @@ public class BrokerRoutingManagerTest {
   public void testInstanceConfigIdsInternedAcrossRefreshesAndRouting()
       throws Exception {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
+    ZNRecord assignments = new ZNRecord(TEST_TABLE);
+    assignments.setMapField("required", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    assignments.setMapField("optional", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    byte[] serializedAssignments = serializer.serialize(assignments);
     InstanceSelector instanceSelector = mock(InstanceSelector.class);
-    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
-        new InstanceSelector.InstanceMapping(Map.of("required", SERVER_INSTANCE_ID),
-            Map.of("optional", SERVER_INSTANCE_ID)), List.of(), 0));
     putRoutingEntry(TEST_TABLE,
         createRoutingEntry(TEST_TABLE, selectorOf("required", "optional"), List.of(), instanceSelector));
 
     for (int grpcPort : List.of(9000, 9001)) {
+      ZNRecord decodedAssignments = (ZNRecord) serializer.deserialize(serializedAssignments);
+      String requiredInstanceId = decodedAssignments.getMapField("required").keySet().iterator().next();
+      String optionalInstanceId = decodedAssignments.getMapField("optional").keySet().iterator().next();
+      // Exercise IDs from real assignment-map decoding, including the parser's JVM interning behavior.
+      assertSame(requiredInstanceId, SERVER_INSTANCE_ID);
+      assertSame(optionalInstanceId, requiredInstanceId);
+      when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
+          new InstanceSelector.InstanceMapping(Map.of("required", requiredInstanceId),
+              Map.of("optional", optionalInstanceId)), List.of(), 0));
+
       ZNRecord config = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
       config.setIntField(Helix.Instance.GRPC_PORT_KEY, grpcPort);
       ZNRecord decodedConfig = (ZNRecord) serializer.deserialize(serializer.serialize(config));
       // Config IDs are JSON values; unlike assignment-map keys, they are not interned by the parser.
       assertEquals(decodedConfig.getId(), SERVER_INSTANCE_ID);
-      assertNotSame(decodedConfig.getId(), SERVER_INSTANCE_ID);
+      assertNotSame(decodedConfig.getId(), requiredInstanceId);
       when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
           anyInt())).thenReturn(List.of(decodedConfig));
 
@@ -193,14 +204,14 @@ public class BrokerRoutingManagerTest {
 
       Map<String, ServerInstance> enabledServers = _routingManager.getEnabledServerInstanceMap();
       assertEquals(enabledServers.size(), 1);
-      assertSame(enabledServers.keySet().iterator().next(), SERVER_INSTANCE_ID);
-      ServerInstance server = enabledServers.get(SERVER_INSTANCE_ID);
+      assertSame(enabledServers.keySet().iterator().next(), requiredInstanceId);
+      ServerInstance server = enabledServers.get(requiredInstanceId);
       assertEquals(server.getInstanceId(), SERVER_INSTANCE_ID);
       assertEquals(server.getHostname(), SERVER_HOST);
       assertEquals(server.getPort(), SERVER_PORT);
       // An equal ID on a later config refresh must still replace the server's configuration.
       assertEquals(server.getGrpcPort(), grpcPort);
-      assertSame(_routingManager.getRoutableServerInstanceMap().get(SERVER_INSTANCE_ID), server);
+      assertSame(_routingManager.getRoutableServerInstanceMap().get(requiredInstanceId), server);
 
       RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
       Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
