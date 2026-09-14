@@ -351,7 +351,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             + " for STRING_ARRAY column, expected: String[], List or JdbcArray");
         return value;
       case LONG_ARRAY:
-      case DOUBLE_ARRAY:
       case BOOLEAN_ARRAY:
       case TIMESTAMP_ARRAY:
         if (value instanceof JdbcArray) {
@@ -451,21 +450,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       case STRING_ARRAY:
         return Arrays.equals((String[]) actual, (String[]) expected);
       case LONG_ARRAY:
-      case DOUBLE_ARRAY:
       case BOOLEAN_ARRAY:
       case TIMESTAMP_ARRAY:
-        Object[] actualArray = (Object[]) actual;
-        Object[] expectedArray = (Object[]) expected;
-        if (actualArray.length != expectedArray.length) {
-          return false;
-        }
-        ColumnDataType elementType = ColumnDataType.fromDataTypeSV(columnDataType.toDataType());
-        for (int i = 0; i < actualArray.length; i++) {
-          if (!typeCompatibleFuzzyEquals(elementType, actualArray[i], expectedArray[i])) {
-            return false;
-          }
-        }
-        return true;
+        return Arrays.equals((Object[]) actual, (Object[]) expected);
       default:
         throw new UnsupportedOperationException("Unsupported ColumnDataType: " + columnDataType);
     }

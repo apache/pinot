@@ -126,75 +126,48 @@ public class PolymorphicExprMinMaxQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testLogicalProjectionTypes() {
-    ResultTable result = query("SELECT EXPR_MIN(enabled, id), EXPR_MAX(stamp, id), "
-        + "EXPR_MAX(mvValues, id), EXPR_MIN(value, id) FROM testTable");
+    ResultTable result = query("SELECT EXPR_MIN(enabled, id), EXPR_MAX(stamp, id), EXPR_MAX(mvValues, id), "
+        + "EXPR_MIN(value, id), EXPR_MIN(jsonValue, id), EXPR_MAX(jsonValue, id), "
+        + "EXPR_MIN(nullableStamp, id), EXPR_MAX(nullableStamp, id) FROM testTable");
     assertTypes(result, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG_ARRAY,
-        ColumnDataType.STRING);
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.TIMESTAMP,
+        ColumnDataType.TIMESTAMP);
     assertEquals(result.getRows().size(), 1);
-    assertEquals(result.getRows().get(0), new Object[]{false, timestamp(6), new long[]{6L, 7L}, "v1"});
+    assertEquals(result.getRows().get(0), new Object[]{false, timestamp(6), new long[]{6L, 7L}, "v1",
+        "{\"id\":1}", "{\"id\":6}", null, timestamp(6)});
   }
 
   @Test
   public void testLogicalMeasuringTypesAndGroupedResults() {
-    ResultTable result = query("SELECT grp, EXPR_MIN(enabled, stamp), EXPR_MAX(stamp, stamp) "
+    ResultTable result = query("SELECT grp, EXPR_MIN(enabled, stamp), EXPR_MAX(stamp, stamp), "
+        + "EXPR_MAX(jsonValue, id), EXPR_MIN(nullableStamp, id), EXPR_MAX(nullableStamp, id) "
         + "FROM testTable WHERE grp != 'n' GROUP BY grp ORDER BY grp");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP);
+    assertTypes(result, ColumnDataType.STRING, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP,
+        ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP);
     assertEquals(result.getRows().size(), 2);
-    assertEquals(result.getRows().get(0), new Object[]{"a", false, timestamp(4)});
-    assertEquals(result.getRows().get(1), new Object[]{"b", false, timestamp(6)});
+    assertEquals(result.getRows().get(0), new Object[]{"a", false, timestamp(4), "{\"id\":4}", null, timestamp(4)});
+    assertEquals(result.getRows().get(1),
+        new Object[]{"b", false, timestamp(6), "{\"id\":6}", timestamp(5), timestamp(6)});
   }
 
   @Test
   public void testEmptyAndUndefinedKeysPreserveProjectionTypes() {
+    String aggregates = "EXPR_MIN(enabled, id), EXPR_MAX(stamp, id), EXPR_MIN(mvValues, id), EXPR_MIN(jsonValue, id)";
+    ColumnDataType[] types = {ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG_ARRAY,
+        ColumnDataType.STRING};
     for (String predicate : List.of("grp = 'missing'", "grp = 'n'")) {
-      ResultTable result = query("SELECT EXPR_MIN(enabled, id), EXPR_MAX(stamp, id), EXPR_MIN(mvValues, id) "
-          + "FROM testTable WHERE " + predicate);
-      assertTypes(result, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG_ARRAY);
+      ResultTable result = query("SELECT " + aggregates + " FROM testTable WHERE " + predicate);
+      assertTypes(result, types);
       assertEquals(result.getRows().size(), 1);
-      assertEquals(result.getRows().get(0), new Object[]{null, null, null});
+      assertEquals(result.getRows().get(0), new Object[types.length]);
     }
-    ResultTable result = query("SELECT EXPR_MIN(enabled, id), EXPR_MAX(stamp, id), EXPR_MIN(mvValues, id) "
-        + "FROM testTable LIMIT 0");
-    assertTypes(result, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG_ARRAY);
+    ResultTable result = query("SELECT " + aggregates + " FROM testTable LIMIT 0");
+    assertTypes(result, types);
     assertTrue(result.getRows().isEmpty());
-  }
-
-  @Test
-  public void testJsonProjectionUsesBoundSqlTypeForEveryResultShape() {
-    ResultTable result = query("SELECT EXPR_MIN(jsonValue, id), EXPR_MAX(jsonValue, id) FROM testTable");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.STRING);
-    assertEquals(result.getRows().size(), 1);
-    assertEquals(result.getRows().get(0), new Object[]{"{\"id\":1}", "{\"id\":6}"});
-    for (String predicate : List.of("grp = 'missing'", "grp = 'n'")) {
-      result = query("SELECT EXPR_MIN(jsonValue, id) FROM testTable WHERE " + predicate);
-      assertTypes(result, ColumnDataType.STRING);
-      assertEquals(result.getRows().size(), 1);
-      assertEquals(result.getRows().get(0), new Object[]{null});
-    }
-    result = query("SELECT grp, EXPR_MAX(jsonValue, id) FROM testTable WHERE grp != 'n' GROUP BY grp ORDER BY grp");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.STRING);
-    assertEquals(result.getRows().get(0), new Object[]{"a", "{\"id\":4}"});
-    assertEquals(result.getRows().get(1), new Object[]{"b", "{\"id\":6}"});
-    result = query("SELECT grp, EXPR_MIN(jsonValue, id) FROM testTable WHERE grp = 'missing' GROUP BY grp");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.STRING);
+    result = query("SELECT grp, " + aggregates + " FROM testTable WHERE grp = 'missing' GROUP BY grp");
+    assertTypes(result, ColumnDataType.STRING, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP,
+        ColumnDataType.LONG_ARRAY, ColumnDataType.STRING);
     assertTrue(result.getRows().isEmpty());
-    result = query("SELECT EXPR_MIN(jsonValue, id) FROM testTable LIMIT 0");
-    assertTypes(result, ColumnDataType.STRING);
-    assertTrue(result.getRows().isEmpty());
-  }
-
-  @Test
-  public void testNullProjectionSurvivesSegmentAndBrokerSerialization() {
-    ResultTable result = query("SELECT EXPR_MIN(nullableStamp, id), EXPR_MAX(nullableStamp, id) FROM testTable");
-    assertTypes(result, ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP);
-    assertEquals(result.getRows().size(), 1);
-    assertEquals(result.getRows().get(0), new Object[]{null, timestamp(6)});
-    result = query("SELECT grp, EXPR_MIN(nullableStamp, id), EXPR_MAX(nullableStamp, id) "
-        + "FROM testTable WHERE grp != 'n' GROUP BY grp ORDER BY grp");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP);
-    assertEquals(result.getRows().size(), 2);
-    assertEquals(result.getRows().get(0), new Object[]{"a", null, timestamp(4)});
-    assertEquals(result.getRows().get(1), new Object[]{"b", timestamp(5), timestamp(6)});
   }
 
   private ResultTable query(String sql) {

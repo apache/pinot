@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -53,8 +55,6 @@ import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
@@ -145,21 +145,7 @@ public class AnyValueBindingTest {
       ColumnDataType logicalType, Object expected)
       throws Exception {
     AnyValueAggregationFunction function = bound(logicalType, true);
-    BlockValSet raw = spy(raw(physicalType, null, physicalValue));
-    switch (logicalType) {
-      case LONG:
-        doReturn(new long[]{(long) expected, (long) expected, (long) expected}).when(raw).getLongValuesSV();
-        break;
-      case DOUBLE:
-        doReturn(new double[]{(double) expected, (double) expected, (double) expected}).when(raw).getDoubleValuesSV();
-        break;
-      case BIG_DECIMAL:
-        doReturn(new BigDecimal[]{(BigDecimal) expected, (BigDecimal) expected, (BigDecimal) expected})
-            .when(raw).getBigDecimalValuesSV();
-        break;
-      default:
-        throw new IllegalArgumentException(logicalType.toString());
-    }
+    BlockValSet raw = raw(physicalType, null, physicalValue);
     Object rawResult = aggregate(function, raw);
     assertEquals(rawResult, expected);
     try (MutableDictionary dictionary = dictionary(physicalType)) {
@@ -246,25 +232,9 @@ public class AnyValueBindingTest {
   }
 
   private static BlockValSet raw(ColumnDataType type, RoaringBitmap nulls, Object value) {
-    switch (type.getStoredType()) {
-      case INT:
-        return SyntheticBlockValSets.Int.create(nulls, new int[]{(int) value, (int) value, (int) value});
-      case LONG:
-        return SyntheticBlockValSets.Long.create(nulls, new long[]{(long) value, (long) value, (long) value});
-      case FLOAT:
-        return SyntheticBlockValSets.Float.create(nulls, new float[]{(float) value, (float) value, (float) value});
-      case DOUBLE:
-        return SyntheticBlockValSets.Double.create(nulls, new double[]{(double) value, (double) value, (double) value});
-      case BIG_DECIMAL:
-        return SyntheticBlockValSets.BigDec.create(nulls,
-            new BigDecimal[]{(BigDecimal) value, (BigDecimal) value, (BigDecimal) value});
-      case STRING:
-        return SyntheticBlockValSets.Str.create(nulls, new String[]{(String) value, (String) value, (String) value});
-      case BYTES:
-        return SyntheticBlockValSets.Bytes.create(nulls, new byte[][]{(byte[]) value, (byte[]) value, (byte[]) value});
-      default:
-        throw new IllegalArgumentException(type.toString());
-    }
+    List<Object[]> rows = IntStream.range(0, 3)
+        .mapToObj(i -> new Object[]{nulls != null && nulls.contains(i) ? null : comparableValue(value)}).toList();
+    return new RowBasedBlockValSet(type, rows, 0, true);
   }
 
   private static MutableDictionary dictionary(ColumnDataType type) {

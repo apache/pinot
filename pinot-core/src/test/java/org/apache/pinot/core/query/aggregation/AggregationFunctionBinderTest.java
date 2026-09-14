@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.function.AggregationFunctionTypeResolver.TypeInferenceUnavailableException;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -70,10 +72,13 @@ public class AggregationFunctionBinderTest {
   public void testOptionsAndTransformInputTypes() {
     PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT MODE(add(intValue, longValue)), "
         + "MODE(intValue, 'AVG'), MODE(CAST(stringValue AS TIMESTAMP)), "
-        + "FIRST_WITH_TIME(CASE WHEN flag THEN 'a' ELSE stringValue END, longValue) FROM testTable");
+        + "FIRST_WITH_TIME(CASE WHEN flag THEN 'a' ELSE stringValue END, longValue), "
+        + "ANY_VALUE(timestampValue), ARRAY_AGG(timestampValue), ARRAY_AGG(flag, true), ARRAY_AGG(mvValues) "
+        + "FROM testTable");
     AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA);
     assertEquals(aggregations(query).stream().map(call -> call.getAggregationBinding().getResultType()).toList(),
-        List.of("DOUBLE", "DOUBLE", "TIMESTAMP", "STRING"));
+        List.of("DOUBLE", "DOUBLE", "TIMESTAMP", "STRING", "TIMESTAMP", "TIMESTAMP_ARRAY", "BOOLEAN_ARRAY",
+            "INT_ARRAY"));
   }
 
   @Test
@@ -89,7 +94,8 @@ public class AggregationFunctionBinderTest {
 
     PinotQuery legacy = CalciteSqlParser.compileToPinotQuery(
         "SELECT FIRST_WITH_TIME(stringValue, longValue, 'STRING'), "
-            + "LAST_WITH_TIME(intValue, longValue, 'INT'), count(*) FROM testTable");
+            + "LAST_WITH_TIME(intValue, longValue, 'INT'), ARRAY_AGG(notRegistered(missing), 'STRING'), "
+            + "ARRAY_AGG(timestampValue, 'LONG', true), count(*) FROM testTable");
     PinotQuery original = legacy.deepCopy();
     AggregationFunctionBinder.bind(legacy, ExpressionTypeResolverTest.SCHEMA);
     assertEquals(legacy, original);
@@ -98,10 +104,53 @@ public class AggregationFunctionBinderTest {
   @Test
   public void testUnsupportedInputDoesNotFallBack() {
     for (String expression : List.of("MODE(mvValues)", "MODE(missingColumn)", "MODE(notRegistered(stringValue))",
-        "MODE(stringValue, 'AVG')")) {
+        "MODE(stringValue, 'AVG')", "ARRAY_AGG(timestampValue, flag)")) {
       PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT " + expression + " FROM testTable");
       expectThrows(IllegalArgumentException.class,
           () -> AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA));
+    }
+  }
+
+  @Test
+  public void testLegacyNativeInputsRemainUnbound() {
+    for (String input : List.of("GROOVY('{\"returnType\":\"INT\",\"isSingleValue\":true}', '1')",
+        "LOOKUP('dimension', 'amount', 'id', timestampValue)")) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery(
+          "SELECT MODE(" + input + "), ANY_VALUE(" + input + ") FROM events");
+      PinotQuery original = query.deepCopy();
+      AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA);
+      assertEquals(query, original);
+    }
+  }
+
+  @Test
+  public void testLegacyExprNativeInputsRemainUnbound() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
+        "SELECT EXPR_MIN(LOOKUP('dimension', 'amount', 'id', timestampValue), timestampValue) FROM events");
+    new ExprMinMaxRewriter().rewrite(query);
+    PinotQuery original = query.deepCopy();
+    AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA);
+    assertEquals(query, original);
+  }
+
+  @Test
+  public void testNewInferredOverloadsRequireNativeMetadata() {
+    String input = "LOOKUP('dimension', 'amount', 'id', timestampValue)";
+    for (String expression : List.of("FIRST_WITH_TIME(" + input + ", timestampValue)", "ARRAY_AGG(" + input + ")")) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT " + expression + " FROM events");
+      expectThrows(TypeInferenceUnavailableException.class,
+          () -> AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA));
+    }
+  }
+
+  @Test
+  public void testInvalidExpressionsDoNotUseLegacyFallback() {
+    for (String input : List.of("notRegistered(timestampValue)", "LOOKUP('dimension', 'amount', 'id', missing)")) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT ANY_VALUE(" + input + ") FROM events");
+      IllegalArgumentException error =
+          expectThrows(IllegalArgumentException.class,
+              () -> AggregationFunctionBinder.bind(query, ExpressionTypeResolverTest.SCHEMA));
+      assertEquals(error.getClass(), IllegalArgumentException.class);
     }
   }
 
