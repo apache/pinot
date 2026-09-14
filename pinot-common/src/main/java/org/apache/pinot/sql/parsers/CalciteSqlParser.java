@@ -625,6 +625,16 @@ public class CalciteSqlParser {
     if (havingNode != null) {
       pinotQuery.setHavingExpression(toExpression(havingNode));
     }
+    // QUALIFY
+    // QUALIFY filters rows after the window functions of the SELECT list are evaluated, the way HAVING filters them
+    // after aggregation. The single-stage engine has no window functions, and PinotQuery has no field to carry the
+    // predicate, so it must be rejected rather than left unread: an unread QUALIFY is a silently wrong answer.
+    if (selectNode.getQualify() != null) {
+      throw new SqlCompilationException("QUALIFY is not supported by the single-stage query engine. Use the "
+          + "multi-stage query engine to filter on the result of a window function. If the predicate does not "
+          + "reference a window function, rewrite it as a WHERE clause (to filter on columns) or as a HAVING clause "
+          + "(to filter on aggregates of a GROUP BY query).");
+    }
     // ORDER-BY
     SqlNodeList orderByNodeList = selectNode.getOrderList();
     if (orderByNodeList != null) {
