@@ -134,15 +134,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
                 if (comparisonResult >= 0) {
-                  if (validDocIdsForOldSegment == null && oldSegment != null && oldSegment.getValidDocIds() != null) {
-                    // Update the old segment's bitmap in place if a copy of the bitmap was not provided.
-                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, newDocId, recordInfo);
-                  } else {
-                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                    if (validDocIdsForOldSegment != null) {
-                      validDocIdsForOldSegment.remove(currentDocId);
-                    }
-                  }
+                  replaceDocIdForSegmentReplacement(segment, validDocIds, queryableDocIds, oldSegment,
+                      currentDocId, newDocId, recordInfo, validDocIdsForOldSegment);
                   if (_context.isTableTypeInconsistentDuringConsumption()
                       && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
@@ -238,23 +231,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void doRemoveSegment(IndexSegment segment) {
-    doRemoveSegmentAndGetNumKeysRemoved(segment);
-  }
-
-  protected int doRemoveSegmentAndGetNumKeysRemoved(IndexSegment segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Removing {} segment: {}, current primary key count: {}",
         segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
     // For ConsistentDeletes, we need to iterate over ALL docs in the segment (not just valid ones)
     // to properly decrement distinctSegmentCount for every key that was ever in the segment
-    int numKeysRemoved = 0;
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       if (shouldRevertMetadataOnInconsistency(segment)) {
         revertAndRemoveSegment(segment,
             UpsertUtils.getRecordIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
       } else {
-        numKeysRemoved = removeSegmentAndGetNumKeysRemoved(segment,
+        removeSegment(segment,
             UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
       }
     } catch (Exception e) {
@@ -267,7 +255,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     updatePrimaryKeyGauge(numPrimaryKeys);
     _logger.info("Finished removing segment: {} in {}ms, current primary key count: {}", segmentName,
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
-    return numKeysRemoved;
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
@@ -307,30 +294,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
             oldSegment, validDocIdsForOldSegment);
       }
-      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()
-          && shouldRevertMetadataOnInconsistency(oldSegment)) {
-        revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-        return;
-      }
-      if (_context.isTableTypeInconsistentDuringConsumption()) {
-        // A moved key can still carry a divergent partial update or out-of-order decision. Preserve the original
-        // candidate count, while still scanning all old docs to decrement distinctSegmentCount during removal.
-        if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-          _logger.warn("Found {} primary keys not replaced for segment: {}",
-              validDocIdsForOldSegment.getCardinality(), segmentName);
-          updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
+      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
+        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+          return;
         }
-        doRemoveSegment(oldSegment);
-        return;
+        reportKeysNotReplaced(oldSegment, segmentName,
+            findUnreplacedDocIds(oldSegment, segment, validDocIdsForOldSegment));
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
       // distinctSegmentCount by 1
-      int numKeysStillNotReplaced = doRemoveSegmentAndGetNumKeysRemoved(oldSegment);
-      if (numKeysStillNotReplaced > 0) {
-        _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
-        updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
-      }
+      doRemoveSegment(oldSegment);
     } finally {
       segmentLock.unlock();
     }
@@ -338,11 +313,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    removeSegmentAndGetNumKeysRemoved(segment, primaryKeyIterator);
-  }
-
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
-    AtomicInteger numKeysRemoved = new AtomicInteger();
     // We need to decrease the distinctSegmentCount for each unique primary key in this deleting segment by 1
     // as the occurrence of the key in this segment is being removed. We are taking a set of unique primary keys
     // to avoid double counting the same key in the same segment.
@@ -352,7 +322,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
-              numKeysRemoved.getAndIncrement();
               if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
@@ -366,7 +335,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 RecordLocation.decrementSegmentCount(recordLocation.getDistinctSegmentCount()));
           });
     }
-    return numKeysRemoved.get();
   }
 
   @Override

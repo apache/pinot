@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.io.Closer;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -654,12 +656,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     //       (1) skip loading segments without any invalid docs.
     //       (2) assign the invalid docs from the replaced segment to the new segment.
     String segmentName = segment.getSegmentName();
-    MutableRoaringBitmap validDocIdsForOldSegment = null;
-    if (_upsertViewManager == null) {
-      // When not using consistency mode, we use a copy of the validDocIds bitmap of the old segment to keep the old
-      // segment intact during segment replacement and queries access the old segment during segment replacement.
-      validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
-    }
+    // Keep replacement evidence separate from live query bitmaps in every consistency mode. Concurrent ingestion
+    // may invalidate a live doc after using its value, which must not erase an unresolved replacement candidate.
+    MutableRoaringBitmap validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     if (recordInfoIterator != null) {
       Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
           "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
@@ -673,9 +672,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
           oldSegment, validDocIdsForOldSegment);
     }
-    if (_upsertViewManager != null) {
-      // When using consistency mode, the old segment's bitmap is updated in place, so we get the validDocIds after
-      // segment replacement is done.
+    if (_upsertViewManager != null && shouldRevertMetadataOnInconsistency(oldSegment)) {
+      // Preserve the existing protected-mode revert inputs; independent candidates are for non-revert reporting.
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
@@ -685,21 +683,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
       }
-      if (_context.isTableTypeInconsistentDuringConsumption()) {
-        // Partial updates and out-of-order decisions can carry a divergent previous value into a newer segment.
-        // Preserve candidate reporting for these tables even when the current key location has already moved.
-        _logger.warn("Found {} primary keys not replaced for segment: {}",
-            validDocIdsForOldSegment.getCardinality(), segmentName);
-        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
-        removeSegment(oldSegment, validDocIdsForOldSegment);
-        return;
-      }
-      int numKeysStillNotReplaced =
-          removeSegmentAndGetNumKeysRemoved(oldSegment, validDocIdsForOldSegment);
-      if (numKeysStillNotReplaced > 0) {
-        _logger.warn("Found {} primary keys not replaced for segment: {}", numKeysStillNotReplaced, segmentName);
-        updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
-      }
+      reportKeysNotReplaced(oldSegment, segmentName,
+          findUnreplacedDocIds(oldSegment, segment, validDocIdsForOldSegment));
+      removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
 
@@ -751,14 +737,105 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
-  /// Removes candidate keys and returns how many were still owned by the segment at removal time.
-  /// This is used for replacement reporting only when updates do not depend on previous row values or out-of-order
-  /// decisions. Other table configurations retain candidate reporting even when the current key location has moved.
-  /// Implementations backed by concurrent metadata should count only removals that pass their authoritative
-  /// ownership check. The default preserves compatibility with existing metadata-manager implementations.
-  protected int removeSegmentAndGetNumKeysRemoved(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    removeSegment(segment, validDocIds);
-    return validDocIds.getCardinality();
+  /// Reconciles leftover candidates with the committed segment, independent of their current metadata owner.
+  /// Only an equivalent committed row proves that moving a candidate did not carry a divergent previous value.
+  /// The extra key/comparison scan and row reads run only when replacement left candidates; temporary state is
+  /// proportional to those candidates. Unreadable rows retain the existing inconsistency signal.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected MutableRoaringBitmap findUnreplacedDocIds(IndexSegment oldSegment, ImmutableSegment segment,
+      MutableRoaringBitmap candidates) {
+    MutableRoaringBitmap unreplaced = candidates.clone();
+    Set<String> columns = oldSegment.getPhysicalColumnNames();
+    if (columns.isEmpty() || !columns.equals(segment.getPhysicalColumnNames())) {
+      return unreplaced;
+    }
+    try (Closer closer = Closer.create()) {
+      UpsertUtils.RecordInfoReader oldReader = closer.register(
+          new UpsertUtils.RecordInfoReader(oldSegment, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn));
+      UpsertUtils.RecordInfoReader newReader = closer.register(
+          new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn));
+      Map<PrimaryKey, RecordInfo> oldRows = new HashMap<>();
+      PeekableIntIterator docIds = candidates.getIntIterator();
+      while (docIds.hasNext()) {
+        RecordInfo record = oldReader.getRecordInfo(docIds.next());
+        oldRows.put(record.getPrimaryKey(), record);
+      }
+      Map<PrimaryKey, RecordInfo> newRows = new HashMap<>();
+      for (int docId = 0; docId < segment.getSegmentMetadata().getTotalDocs(); docId++) {
+        RecordInfo record = newReader.getRecordInfo(docId);
+        PrimaryKey key = record.getPrimaryKey();
+        if (oldRows.containsKey(key)) {
+          RecordInfo previous = newRows.get(key);
+          // Match the winning row, including the last doc on a comparison tie. An earlier duplicate is not proof.
+          if (previous == null || record.getComparisonValue().compareTo(previous.getComparisonValue()) >= 0) {
+            newRows.put(key, record);
+          }
+        }
+      }
+      Map<String, PinotSegmentColumnReader[]> columnReaders = new HashMap<>();
+      for (Map.Entry<PrimaryKey, RecordInfo> entry : oldRows.entrySet()) {
+        RecordInfo oldRow = entry.getValue();
+        RecordInfo newRow = newRows.get(entry.getKey());
+        if (newRow != null && oldRow.getComparisonValue().compareTo(newRow.getComparisonValue()) == 0
+            && oldRow.isDeleteRecord() == newRow.isDeleteRecord()
+            && equivalentRows(oldSegment, oldRow.getDocId(), segment, newRow.getDocId(), columns, columnReaders,
+            closer)) {
+          unreplaced.remove(oldRow.getDocId());
+        }
+      }
+      return unreplaced;
+    } catch (Exception e) {
+      _logger.warn("Unable to validate replacement candidates for segment: {}, retaining the candidate count",
+          segment.getSegmentName(), e);
+      return candidates.clone();
+    }
+  }
+
+  private static boolean equivalentRows(IndexSegment oldSegment, int oldDocId, IndexSegment newSegment, int newDocId,
+      Set<String> columns, Map<String, PinotSegmentColumnReader[]> columnReaders, Closer closer) {
+    for (String column : columns) {
+      PinotSegmentColumnReader[] readers = columnReaders.get(column);
+      if (readers == null) {
+        if (oldSegment.getDataSource(column).getForwardIndex() == null
+            || newSegment.getDataSource(column).getForwardIndex() == null) {
+          return false;
+        }
+        readers = new PinotSegmentColumnReader[]{closer.register(new PinotSegmentColumnReader(oldSegment, column)),
+            closer.register(new PinotSegmentColumnReader(newSegment, column))};
+        columnReaders.put(column, readers);
+      }
+      boolean oldNull = readers[0].isNull(oldDocId);
+      boolean newNull = readers[1].isNull(newDocId);
+      if (oldNull != newNull || (!oldNull
+          && !Objects.deepEquals(readers[0].getValue(oldDocId), readers[1].getValue(newDocId)))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Reports verified replacement leftovers before cleanup, which may be asynchronous or observe a newer owner.
+  protected void reportKeysNotReplaced(IndexSegment oldSegment, String segmentName, MutableRoaringBitmap unreplaced) {
+    if (!unreplaced.isEmpty()) {
+      int count = unreplaced.getCardinality();
+      _logger.warn("Found {} primary keys not replaced for segment: {}", count, segmentName);
+      updateInconsistentRowsMetric(segmentName, count);
+    }
+  }
+
+  /// Transfers a row while maintaining both the live query view and the independent replacement candidates.
+  protected void replaceDocIdForSegmentReplacement(ImmutableSegmentImpl segment,
+      ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
+      IndexSegment oldSegment, int oldDocId, int newDocId, RecordInfo recordInfo,
+      @Nullable MutableRoaringBitmap candidates) {
+    if ((candidates == null || _upsertViewManager != null) && oldSegment.getValidDocIds() != null) {
+      replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, oldDocId, newDocId, recordInfo);
+    } else {
+      addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+    }
+    if (candidates != null) {
+      candidates.remove(oldDocId);
+    }
   }
 
   protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);
