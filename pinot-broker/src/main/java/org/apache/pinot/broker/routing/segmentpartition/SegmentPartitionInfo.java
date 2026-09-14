@@ -30,27 +30,20 @@ public class SegmentPartitionInfo {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final Set<Integer> _partitions;
-  private final boolean _hasPartitionFunctionConfig;
   @Nullable
   private final Map<String, String> _partitionFunctionConfig;
 
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
       Set<Integer> partitions) {
-    this(partitionColumn, partitionFunction, partitions, false, null);
+    this(partitionColumn, partitionFunction, partitions, null);
   }
 
   /// Retains the constructor configuration even when a partition-function plugin does not expose it through its getter.
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction, Set<Integer> partitions,
       @Nullable Map<String, String> partitionFunctionConfig) {
-    this(partitionColumn, partitionFunction, partitions, true, partitionFunctionConfig);
-  }
-
-  private SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction, Set<Integer> partitions,
-      boolean hasPartitionFunctionConfig, @Nullable Map<String, String> partitionFunctionConfig) {
     _partitionColumn = partitionColumn;
     _partitionFunction = partitionFunction;
     _partitions = partitions;
-    _hasPartitionFunctionConfig = hasPartitionFunctionConfig;
     // Preserve null versus empty configuration, and allow null entries accepted by the metadata representation.
     _partitionFunctionConfig = partitionFunctionConfig == null
         ? null
@@ -67,10 +60,6 @@ public class SegmentPartitionInfo {
 
   public Set<Integer> getPartitions() {
     return _partitions;
-  }
-
-  public boolean hasPartitionFunctionConfig() {
-    return _hasPartitionFunctionConfig;
   }
 
   @Nullable
