@@ -25,6 +25,25 @@ Pinot perf package contains a set of performance benchmark for Pinot components.
 
 Note: this package will pull `org.openjdk.jmh:jmh-core`, which is based on `GPL 2 license`.
 
+# Choosing a benchmark
+
+Prefer benchmarks that exercise current Pinot implementations with reproducible inputs and consume their results.
+Keep an explicit comparison baseline when it answers a current engineering question. Retired implementation copies,
+duplicate workloads, and unfinished local experiments belong in their original change history.
+
+| Workload | Entry points |
+| --- | --- |
+| Single-stage and multi-stage queries | `BenchmarkQueriesSSQE`, `BenchmarkQueriesMSQE` |
+| Integer SUM and null handling | `aggregation.SumIntAggregationFunctionBenchmark` |
+| Immutable string dictionary lookup and reads | `BenchmarkDictionaryLookup`, `BenchmarkStringVarLengthDictionary` |
+| Mutable dictionary capacity and overflow | `BenchmarkDictionary`, `BenchmarkStringDictionary` |
+| Raw forward-index reads and writes | `BenchmarkRawForwardIndexReader`, `BenchmarkRawForwardIndexWriter` |
+| JSON index queries and scalar extraction | `BenchmarkJsonIndexDistinct`, `BenchmarkJsonExtractScalarQuery` |
+| Vector search | `BenchmarkVectorIndex` and the vector suite described below |
+
+For query workloads against supplied segments, use the configurable `PerfBenchmarkDriver` in `pinot-tools` with
+`pinot-tools/src/main/resources/conf/sample_perf_benchmark.yaml` as a starting point.
+
 # Steps for running benchmark
 
 1. Build the source
