@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.Cache;
@@ -51,9 +52,13 @@ public class JsonPathCache implements Cache {
   public JsonPath getOrCompute(String key) {
     try {
       return _jsonPathCache.get(key);
-    } catch (ExecutionException e) {
-      // the cast is safe because JsonPath.compile only throws RuntimeExceptions
-      throw (RuntimeException) e.getCause();
+    } catch (ExecutionException | UncheckedExecutionException e) {
+      // JsonPath.compile throws RuntimeException. Guava wraps those in UncheckedExecutionException.
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      throw new RuntimeException(cause);
     }
   }
 

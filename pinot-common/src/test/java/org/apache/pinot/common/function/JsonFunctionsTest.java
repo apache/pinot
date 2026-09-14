@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
+import com.jayway.jsonpath.InvalidPathException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -1035,6 +1036,42 @@ public class JsonFunctionsTest {
         () -> JsonFunctions.jsonExtractScalar("{\"x\":[\"9223372036854775808\"]}", "$.x", "LONG_ARRAY"));
     assertEquals((long[]) JsonFunctions.jsonExtractScalar("{\"x\":[\"1.9\",\"1E1\"]}", "$.x", "LONG_ARRAY"),
         new long[]{1L, 10L});
+    // Quoted and unquoted values above 2^53 and at both long edges must stay exact.
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":9007199254740993}", "$.x", "LONG"), 9007199254740993L);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":9007199254740993.0}", "$.x", "LONG"), 9007199254740993L);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":\"9007199254740993\"}", "$.x", "LONG"), 9007199254740993L);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":\"9007199254740993.0E0\"}", "$.x", "LONG"),
+        9007199254740993L);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":9.223372036854775807E18}", "$.x", "LONG"), Long.MAX_VALUE);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":\"9.223372036854775807E18\"}", "$.x", "LONG"),
+        Long.MAX_VALUE);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":-9.223372036854775808E18}", "$.x", "LONG"), Long.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"x\":\"-9.223372036854775808E18\"}", "$.x", "LONG"),
+        Long.MIN_VALUE);
+  }
+
+  @Test
+  public void testJsonExtractScalarRejectsIllegalJsonPath() {
+    String json = "{\"v\":1}";
+    expectThrows(InvalidPathException.class, () -> JsonFunctions.jsonExtractScalar(json, "$[", "INT"));
+    expectThrows(InvalidPathException.class, () -> JsonFunctions.jsonExtractScalar(json, "$[", "INT", 7));
+    expectThrows(InvalidPathException.class, () -> JsonFunctions.jsonExtractScalar(json, "$[", "INT_ARRAY"));
+    expectThrows(InvalidPathException.class, () -> JsonFunctions.jsonExtractScalar(json, "$[", "INT_ARRAY", 7));
+    // Path compile happens before document parse, so a bad path still throws on a bad document.
+    expectThrows(InvalidPathException.class, () -> JsonFunctions.jsonExtractScalar("not json", "$[", "INT", 7));
+    // A bad document with a legal path is still unresolved.
+    assertEquals(JsonFunctions.jsonExtractScalar("not json", "$.v", "INT", 7), 7);
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("not json", "$.v", "INT_ARRAY"), new int[0]);
+  }
+
+  @Test
+  public void testJsonExtractScalarArrayTypeRequiresJsonArray() {
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":42}", "$.v", "INT_ARRAY"), new int[0]);
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":{\"a\":1}}", "$.v", "INT_ARRAY"), new int[0]);
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":42}", "$.v", "INT_ARRAY", 7), new int[0]);
+    assertEquals((long[]) JsonFunctions.jsonExtractScalar("{\"v\":42}", "$.v", "LONG_ARRAY"), new long[0]);
+    assertEquals((String[]) JsonFunctions.jsonExtractScalar("{\"v\":{\"a\":1}}", "$.v", "STRING_ARRAY"),
+        new String[0]);
   }
 
   @Test

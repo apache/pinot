@@ -49,6 +49,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
@@ -230,17 +231,10 @@ public class PinotEvaluateLiteralRule {
     }
     try {
       if (rexNodeType instanceof ArraySqlType) {
+        RelDataType componentType = rexNodeType.getComponentType();
         List<Object> resultValues = new ArrayList<>();
-
-        // SQL FLOAT and DOUBLE literals are represented as Java double
-        if (resultValue instanceof double[]) {
-          for (double value: (double[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
-        } else {
-          for (Object value : (Object[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
+        for (Object value : toLiteralList(resultValue)) {
+          resultValues.add(convertResultValue(value, componentType));
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -292,6 +286,10 @@ public class PinotEvaluateLiteralRule {
     if (resultValue == null) {
       return null;
     }
+    if (relDataType.getSqlTypeName() == SqlTypeName.BOOLEAN) {
+      // Scalar BOOLEAN is stored as Integer 0/1. Calcite literals need a Boolean.
+      return BooleanUtils.toBoolean(resultValue);
+    }
     if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
       // Return millis since epoch for TIMESTAMP
       if (resultValue instanceof Timestamp) {
@@ -321,5 +319,39 @@ public class PinotEvaluateLiteralRule {
     }
     // TODO: Add more type handling
     return resultValue;
+  }
+
+  /// Boxes a Java array so the folder can build a Calcite array literal. `jsonExtractScalar`
+  /// returns primitive arrays (`int[]`, `long[]`, `float[]`) and `double[]`; only `double[]` was
+  /// special-cased before, and the `Object[]` cast failed compilation for the rest.
+  private static List<Object> toLiteralList(Object resultValue) {
+    List<Object> values = new ArrayList<>();
+    if (resultValue instanceof Object[]) {
+      values.addAll(Arrays.asList((Object[]) resultValue));
+    } else if (resultValue instanceof int[]) {
+      for (int value : (int[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof long[]) {
+      for (long value : (long[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof float[]) {
+      for (float value : (float[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof double[]) {
+      for (double value : (double[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof boolean[]) {
+      // BOOLEAN_ARRAY is stored as int[] but may already be converted to boolean[] at the fold boundary.
+      for (boolean value : (boolean[]) resultValue) {
+        values.add(value);
+      }
+    } else {
+      throw new IllegalArgumentException("Unsupported array result type: " + resultValue.getClass().getName());
+    }
+    return values;
   }
 }

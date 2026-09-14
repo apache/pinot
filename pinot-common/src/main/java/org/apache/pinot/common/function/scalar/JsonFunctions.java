@@ -86,8 +86,8 @@ public class JsonFunctions {
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
           .build());
 
-  /// BigDecimal-preserving Jayway context for `BIG_DECIMAL` / `STRING` / `JSON` extraction, so JSON floats
-  /// are not rounded through `Double`. Shared with `JsonExtractScalarTransformFunction`.
+  /// BigDecimal-preserving Jayway context for `BIG_DECIMAL` / `STRING` / `JSON` / `LONG` extraction, so JSON
+  /// floats are not rounded through `Double`. Shared with `JsonExtractScalarTransformFunction`.
   public static final ParseContext PARSE_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
               new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
@@ -644,11 +644,12 @@ public class JsonFunctions {
   ///
   /// The document may be a `String`, a UTF-8 encoded `byte[]` (BYTES columns) or an already-parsed container.
   /// Coercion mirrors the transform exactly: `BOOLEAN` is returned as its stored `INT` (0/1), `TIMESTAMP` as
-  /// epoch millis (numeric values as-is, strings via ISO-8601), `BIG_DECIMAL` / `STRING` / `JSON` use a
-  /// BigDecimal-preserving parser. The 3-argument form throws on an unresolved single-value path. The
+  /// epoch millis (numeric values as-is, strings via ISO-8601), `BIG_DECIMAL` / `STRING` / `JSON` / `LONG`
+  /// use a BigDecimal-preserving parser. The 3-argument form throws on an unresolved single-value path. The
   /// 4-argument form returns `defaultValue` (including SQL `NULL`). A multi-value path yields an empty
-  /// array when unresolved, but a `null` element inside a resolved array still throws unless a default is
-  /// supplied. A malformed JSON document is treated as unresolved.
+  /// array when unresolved or when the resolved value is not a JSON array, but a `null` element inside a
+  /// resolved array still throws unless a default is supplied. A malformed JSON document is treated as
+  /// unresolved. An illegal JSONPath (for example `$[`) is rejected, matching transform init.
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String resultsType) {
     return jsonExtractScalarInternal(jsonInput, jsonPath, resultsType, null, false);
@@ -674,11 +675,14 @@ public class JsonFunctions {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(unsupportedResultsTypeMessage(resultsType));
     }
-    // BIG_DECIMAL / STRING / JSON must read floats as BigDecimal to preserve precision, matching the transform.
-    boolean useBigDecimal =
-        dataType == DataType.BIG_DECIMAL || dataType == DataType.STRING || dataType == DataType.JSON;
+    // BIG_DECIMAL / STRING / JSON / LONG must read floats as BigDecimal so values above 2^53 stay exact.
+    boolean useBigDecimal = dataType == DataType.BIG_DECIMAL || dataType == DataType.STRING
+        || dataType == DataType.JSON || dataType == DataType.LONG;
+    // Compile the path before touching the document. `$[` must fail the query, not become a default,
+    // matching JsonExtractScalarTransformFunction#init.
+    JsonPath compiledPath = JsonPathCache.INSTANCE.getOrCompute(jsonPath);
     if (isSingleValue) {
-      Object value = readJsonPathValue(jsonInput, jsonPath, useBigDecimal);
+      Object value = readJsonPathValue(jsonInput, compiledPath, useBigDecimal);
       if (value == null) {
         if (!hasDefault) {
           throw new IllegalArgumentException(
@@ -691,16 +695,8 @@ public class JsonFunctions {
       }
       return coerceScalar(value, dataType, false);
     }
-    return coerceScalarArray(readJsonPathArray(jsonInput, jsonPath, useBigDecimal), dataType, defaultValue, hasDefault);
-  }
-
-  /// Reads `jsonPath` from a JSON `String`, UTF-8 `byte[]`, or already-parsed document.
-  /// A missing path returns `null` (`Option.SUPPRESS_EXCEPTIONS`). Malformed input throws.
-  /// Callers that already know the input type (the transform hot path) should call
-  /// `parseUtf8` / `parse` themselves instead of going through this dispatch.
-  @Nullable
-  private static <T> T readJsonPathInternal(Object jsonInput, String jsonPath, ParseContext parseContext) {
-    return parseJsonDocument(jsonInput, parseContext).read(jsonPath, NO_PREDICATES);
+    return coerceScalarArray(readJsonPathArray(jsonInput, compiledPath, useBigDecimal), dataType, defaultValue,
+        hasDefault);
   }
 
   private static DocumentContext parseJsonDocument(Object jsonInput, ParseContext parseContext) {
@@ -715,31 +711,47 @@ public class JsonFunctions {
   }
 
   @Nullable
-  private static Object readJsonPathValue(@Nullable Object jsonInput, String jsonPath, boolean useBigDecimal) {
+  private static Object readJsonPathValue(@Nullable Object jsonInput, JsonPath jsonPath, boolean useBigDecimal) {
+    DocumentContext document = parseJsonDocumentOrNull(jsonInput, useBigDecimal);
+    if (document == null) {
+      return null;
+    }
+    return document.read(jsonPath);
+  }
+
+  @Nullable
+  private static Object[] readJsonPathArray(@Nullable Object jsonInput, JsonPath jsonPath, boolean useBigDecimal) {
+    DocumentContext document = parseJsonDocumentOrNull(jsonInput, useBigDecimal);
+    if (document == null) {
+      return null;
+    }
+    return jsonArrayOrUnresolved(document.read(jsonPath));
+  }
+
+  /// Parses the document only. A bad document is unresolved (null). Path compile already happened
+  /// in [jsonExtractScalarInternal], so a bad path is not swallowed here.
+  @Nullable
+  private static DocumentContext parseJsonDocumentOrNull(@Nullable Object jsonInput, boolean useBigDecimal) {
     if (jsonInput == null) {
       return null;
     }
     try {
-      return readJsonPathInternal(jsonInput, jsonPath,
-          useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT);
+      return parseJsonDocument(jsonInput, useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT);
     } catch (Exception e) {
       // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
-      // per-row extraction errors; the caller then applies the default or throws.
+      // per-row parse errors; the caller then applies the default or throws.
       return null;
     }
   }
 
+  /// Transform casts the JsonPath result to `List`. A scalar or object is therefore unresolved and
+  /// becomes an empty array. Do not wrap a non-list in a one-element array.
   @Nullable
-  private static Object[] readJsonPathArray(@Nullable Object jsonInput, String jsonPath, boolean useBigDecimal) {
-    if (jsonInput == null) {
-      return null;
+  private static Object[] jsonArrayOrUnresolved(@Nullable Object value) {
+    if (value instanceof List) {
+      return ((List<?>) value).toArray();
     }
-    try {
-      return convertObjectToArray(readJsonPathInternal(jsonInput, jsonPath,
-          useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT));
-    } catch (Exception e) {
-      return null;
-    }
+    return null;
   }
 
   private static Object coerceScalar(Object value, DataType dataType, boolean isDefault) {
@@ -918,8 +930,9 @@ public class JsonFunctions {
 
   /// Coerces a JsonPath result to stored `LONG`. When `isTimestamp` is true, numeric values are
   /// epoch millis and strings go through [TimestampUtils#toMillisSinceEpoch]. Otherwise string
-  /// numbers use [JsonNumberUtils#parseJsonLong] (truncate toward zero, reject overflow). Unquoted
-  /// JSON numbers arrive as [Number] and use the same overflow check (`2.0E19` must not saturate).
+  /// numbers use [JsonNumberUtils#parseJsonLong] (exact decimal, truncate toward zero, reject
+  /// overflow). Unquoted JSON numbers arrive as [Number]; floats should already be [BigDecimal]
+  /// from the LONG parse context so values above `2^53` stay exact.
   public static long coerceToLong(Object value, boolean isTimestamp) {
     if (value instanceof Number) {
       return longFromJsonNumber((Number) value);
@@ -955,11 +968,11 @@ public class JsonFunctions {
       }
     }
     if (number instanceof Double || number instanceof Float) {
-      double parsed = number.doubleValue();
-      if (!Double.isFinite(parsed) || parsed < Long.MIN_VALUE || parsed >= 0x1p63) {
+      try {
+        return BigDecimal.valueOf(number.doubleValue()).setScale(0, RoundingMode.DOWN).longValueExact();
+      } catch (ArithmeticException e) {
         throw new NumberFormatException("For input string: \"" + number + "\"");
       }
-      return (long) parsed;
     }
     return number.longValue();
   }

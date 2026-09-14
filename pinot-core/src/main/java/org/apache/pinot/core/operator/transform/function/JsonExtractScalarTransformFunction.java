@@ -323,7 +323,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesSV(valueBlock);
     }
     initLongValuesSV(valueBlock.getNumDocs());
-    IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
+    // LONG needs the BigDecimal parser so unquoted values above 2^53 stay exact. TIMESTAMP stays on
+    // the default extractor so Fory is not disabled for epoch-millis extracts.
+    IntFunction<Object> resultExtractor =
+        _dataType == DataType.LONG ? getResultExtractorWithBigDecimal(valueBlock) : getResultExtractor(valueBlock);
     long defaultValue = _defaultValue != null ? (Long) _defaultValue : 0L;
     boolean isTimestamp = _dataType == DataType.TIMESTAMP;
     int numDocs = valueBlock.getNumDocs();
@@ -532,7 +535,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesMV(valueBlock);
     }
     initLongValuesMV(valueBlock.getNumDocs());
-    IntFunction<List<Object>> resultExtractor = getResultExtractor(valueBlock);
+    IntFunction<List<Object>> resultExtractor =
+        _dataType == DataType.LONG ? getResultExtractorWithBigDecimal(valueBlock) : getResultExtractor(valueBlock);
     long defaultValue = _defaultValue != null ? (Long) _defaultValue : 0L;
     boolean isTimestamp = _dataType == DataType.TIMESTAMP;
     int numDocs = valueBlock.getNumDocs();

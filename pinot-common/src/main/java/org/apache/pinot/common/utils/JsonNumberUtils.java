@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 
 /// Shared JSON-number parser used by `jsonExtractScalar` (scalar and transform).
 ///
 /// Accepts regular long syntax plus JSON numeric forms: `1E1` → `10`, `1.9` → `1` (truncate toward
-/// zero), `1.123E1` → `11`. Throws [NumberFormatException] with `For input string: "<value>"` on
-/// overflow (`9223372036854775808`, `2.0E19`), illegal exponent (`2E20`, `2E-1`), and other malformed input.
+/// zero), `1.123E1` → `11`. Dotted-exponent values are parsed as an exact decimal ([BigDecimal]),
+/// truncated toward zero, then range-checked, so `9.223372036854775807E18` is [Long#MAX_VALUE] and
+/// `9007199254740993.0E0` keeps the bit that a `double` would drop. Throws [NumberFormatException]
+/// with `For input string: "<value>"` on overflow (`9223372036854775808`, `2.0E19`), illegal
+/// exponent (`2E20`, `2E-1`), and other malformed input.
 ///
 /// Thread-safe: no mutable state.
 public final class JsonNumberUtils {
@@ -130,18 +136,9 @@ public final class JsonNumberUtils {
 
     if (exponentFound) {
       if (dotFound) {
-        double parsed;
-        try {
-          parsed = Double.parseDouble(cs.toString());
-        } catch (NumberFormatException ne) {
-          throw formatException(cs);
-        }
-        // Casting a finite double to long saturates at the long bounds. Reject values
-        // outside [Long.MIN_VALUE, 2^63) so 2.0E19 fails the same way 2E19 does.
-        if (!Double.isFinite(parsed) || parsed < Long.MIN_VALUE || parsed >= 0x1p63) {
-          throw formatException(cs);
-        }
-        return (long) parsed;
+        // Do not go through double: 9.223372036854775807E18 is Long.MAX_VALUE, but
+        // Double.parseDouble rounds it to 2^63, which is out of range.
+        return parseExactLong(cs);
       }
 
       long exp;
@@ -163,6 +160,15 @@ public final class JsonNumberUtils {
     }
 
     return negative ? result : -result;
+  }
+
+  /// Parses a JSON numeric string as an exact decimal, truncates toward zero, then requires a long.
+  private static long parseExactLong(CharSequence cs) {
+    try {
+      return new BigDecimal(cs.toString()).setScale(0, RoundingMode.DOWN).longValueExact();
+    } catch (ArithmeticException | NumberFormatException e) {
+      throw formatException(cs);
+    }
   }
 
   /// Parses `cs[start, end)` as a whole long (sign allowed). Used for the exponent field.

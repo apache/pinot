@@ -166,6 +166,36 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// All-literal `jsonExtractScalar` is deterministic, so `PinotEvaluateLiteralRule` folds it. The
+  /// folder must accept INTEGER-as-BOOLEAN and primitive arrays (`int[]`, `long[]`, `float[]`).
+  /// Column-input queries do not exercise this path.
+  @Test
+  public void testJsonExtractScalarAllLiteralFolds() {
+    List<String> queries = List.of(
+        "SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'LONG_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'DOUBLE_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a"
+    );
+    for (String query : queries) {
+      assertNotNull(_queryEnvironment.planQuery(query), query);
+      String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + query, RANDOM_REQUEST_ID_GEN.nextLong());
+      assertFalse(explain.toUpperCase().contains("JSONEXTRACTSCALAR"),
+          "all-literal call must fold away the function, but plan still has it: " + explain);
+    }
+    String booleanExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(booleanExplain.contains("true"), booleanExplain);
+    String arrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(arrayExplain.contains("1") && arrayExplain.contains("2"), arrayExplain);
+  }
+
   @Test
   public void testPolymorphicArithmeticScalarFunctionsPlanQuery() {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
