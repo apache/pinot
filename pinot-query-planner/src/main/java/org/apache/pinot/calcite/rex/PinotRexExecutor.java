@@ -19,31 +19,48 @@
 package org.apache.pinot.calcite.rex;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.calcite.avatica.util.DateTimeUtils;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import org.apache.calcite.DataContext;
+import org.apache.calcite.DataContexts;
+import org.apache.calcite.linq4j.function.Function1;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexExecutor;
+import org.apache.calcite.rex.RexExecutorImpl;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
-import org.apache.calcite.runtime.SqlFunctions;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 
 
-/// Reduces string literal casts to TIMESTAMP and BIGINT without compiling a generated Java class for each reduction.
-/// All other expressions use Calcite's executor. Each reduction keeps its results local.
-/// Calcite creates a separate executable for each invocation, making the singleton thread-safe.
+/// Reduces string literal casts using bounded, reusable Calcite executables. Each source/target type pair is compiled
+/// with an input reference instead of a literal, so different values share Calcite's conversion code. Other expressions
+/// use the fallback executor. Cached functions are immutable; input values and results stay local to each call, making
+/// this executor thread-safe without sharing RexExecutable's mutable data context.
 public final class PinotRexExecutor implements RexExecutor {
   public static final PinotRexExecutor INSTANCE = new PinotRexExecutor(RexUtil.EXECUTOR);
 
   private final RexExecutor _fallback;
+  private final Cache<CastSignature, Function1<DataContext, Object[]>> _casts;
 
   @VisibleForTesting
   PinotRexExecutor(RexExecutor fallback) {
+    this(fallback, 256);
+  }
+
+  @VisibleForTesting
+  PinotRexExecutor(RexExecutor fallback, int cacheSize) {
     _fallback = fallback;
+    _casts = CacheBuilder.newBuilder().maximumSize(cacheSize).build();
   }
 
   @Override
@@ -60,24 +77,32 @@ public final class PinotRexExecutor implements RexExecutor {
     try {
       for (RexNode expression : constExps) {
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
-        // These are the same conversion and literal construction used by Calcite's generated CAST and RexExecutable.
-        // In particular, do not use Pinot's timestamp parser: its accepted inputs differ from Calcite's.
-        Long value = null;
+        Object value = null;
         if (!operand.isNull()) {
-          String text = RexLiteral.stringValue(operand);
-          value = expression.getType().getSqlTypeName() == SqlTypeName.BIGINT
-              ? SqlFunctions.toLong(text)
-              : DateTimeUtils.timestampStringToUnixDate(text);
+          Function1<DataContext, Object[]> cast = getCast(rexBuilder, operand.getType(), expression.getType());
+          DataContext context = DataContexts.of(Map.of("inputRecord", new Object[]{RexLiteral.stringValue(operand)}));
+          value = cast.apply(context)[0];
         }
         literals.add(rexBuilder.makeLiteral(value, expression.getType(), true));
       }
-    } catch (RuntimeException e) {
-      // Calcite also leaves the entire batch unchanged when parsing or literal construction fails. Retrying the same
-      // conversion through generated code cannot reduce it; leave error handling to the later planning/execution path.
+    } catch (RuntimeException | ExecutionException e) {
+      // Like Calcite, retain the entire batch if conversion, compilation or literal construction fails. In particular,
+      // invalid epoch strings must remain available for Pinot's later timestamp conversion.
       reducedValues.addAll(constExps);
       return;
     }
     reducedValues.addAll(literals);
+  }
+
+  @VisibleForTesting
+  Function1<DataContext, Object[]> getCast(RexBuilder builder, RelDataType source, RelDataType target)
+      throws ExecutionException {
+    CastSignature signature = new CastSignature(source, target, builder.getTypeFactory().getTypeSystem());
+    return _casts.get(signature, () -> {
+      RelDataType rowType = builder.getTypeFactory().builder().add("value", source).build();
+      RexNode cast = builder.makeAbstractCast(target, builder.makeInputRef(source, 0), false);
+      return RexExecutorImpl.getExecutable(builder, List.of(cast), rowType).getFunction();
+    });
   }
 
   private static boolean isSupportedStringCast(RexNode expression) {
@@ -85,13 +110,21 @@ public final class PinotRexExecutor implements RexExecutor {
       return false;
     }
     RexCall call = (RexCall) expression;
-    if (call.getOperator() != SqlStdOperatorTable.CAST || call.getOperands().size() != 1
-        || (call.getType().getSqlTypeName() != SqlTypeName.TIMESTAMP
-            && call.getType().getSqlTypeName() != SqlTypeName.BIGINT)) {
+    if (call.getOperator() != SqlStdOperatorTable.CAST || call.getOperands().size() != 1) {
+      return false;
+    }
+    // Keep timezone-dependent and structured conversions in the fallback's own data context.
+    RelDataType target = call.getType();
+    if (!SqlTypeUtil.isAtomic(target) || SqlTypeName.TZ_TYPES.contains(target.getSqlTypeName())
+        || target.getSqlTypeName() == SqlTypeName.VARIANT) {
       return false;
     }
     RexNode operand = call.getOperands().get(0);
-    SqlTypeName sourceType = operand.getType().getSqlTypeName();
-    return operand instanceof RexLiteral && (sourceType == SqlTypeName.CHAR || sourceType == SqlTypeName.VARCHAR);
+    return operand instanceof RexLiteral && SqlTypeUtil.isCharacter(operand.getType());
+  }
+
+  /// Full types retain precision, scale, nullability, charset and collation; the type system supplies rounding rules.
+  /// Literal values never enter the key or the generated code.
+  private record CastSignature(RelDataType source, RelDataType target, RelDataTypeSystem typeSystem) {
   }
 }

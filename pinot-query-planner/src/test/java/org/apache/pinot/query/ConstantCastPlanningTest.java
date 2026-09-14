@@ -25,6 +25,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -32,10 +33,11 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-/// Verifies that SQL-to-rel conversion reduces constant timestamp and BIGINT casts without changing the resulting plan,
+/// Verifies that SQL-to-rel conversion reduces constant string casts without changing the resulting plan,
 /// and restores the planner's executor afterward. The expression-reduction hook is thread-local and
 /// closed after each compilation.
 public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
@@ -87,7 +89,7 @@ public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
       assertEquals(castPlan.getTableNames(), literalPlan.getTableNames());
       assertNull(castPlan.getPlannerContext().getRelOptPlanner().getExecutor(),
           "SQL-to-rel conversion must restore the planner's executor before optimization");
-      assertEquals(reductions.get(), 0, "Constant timestamp casts must not invoke Calcite's generated-code reducer");
+      assertEquals(reductions.get(), 0, "Timestamp casts must use cached templates instead of the fallback reducer");
     }
   }
 
@@ -105,7 +107,7 @@ public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
   }
 
   @Test(dataProvider = "bigintQueries")
-  @SuppressWarnings("try") // The resource scopes the thread-local generated-reducer hook.
+  @SuppressWarnings("try") // The resource scopes the thread-local fallback-reducer hook.
   public void testConstantBigintCastPlanning(String value, boolean explicitCast, boolean window) {
     String quoted = explicitCast ? "CAST('" + value + "' AS BIGINT)" : "'" + value + "'";
     String numeric = "CAST(" + value + " AS BIGINT)";
@@ -119,7 +121,46 @@ public class ConstantCastPlanningTest extends QueryEnvironmentTestBase {
       assertEquals(castPlan.getRelRoot().validatedRowType, literalPlan.getRelRoot().validatedRowType);
       assertEquals(castPlan.getTableNames(), literalPlan.getTableNames());
       assertNull(castPlan.getPlannerContext().getRelOptPlanner().getExecutor());
-      assertEquals(reductions.get(), 0, "Constant BIGINT casts must not invoke the generated-code reducer");
+      assertEquals(reductions.get(), 0, "BIGINT casts must use cached templates instead of the fallback reducer");
+    }
+  }
+
+  @DataProvider
+  public Object[][] scalarCastQueries() {
+    return new Object[][]{
+        {"INTEGER", "2147483647", "CAST(2147483647 AS INTEGER)", SqlTypeName.INTEGER},
+        {"SMALLINT", "32767", "CAST(32767 AS SMALLINT)", SqlTypeName.SMALLINT},
+        {"TINYINT", "127", "CAST(127 AS TINYINT)", SqlTypeName.TINYINT},
+        {"REAL", "1.25", "CAST(1.25 AS REAL)", SqlTypeName.REAL},
+        {"FLOAT", "1.25", "CAST(1.25 AS FLOAT)", SqlTypeName.FLOAT},
+        {"DOUBLE", "1.25", "CAST(1.25 AS DOUBLE)", SqlTypeName.DOUBLE},
+        {"DECIMAL(6, 2)", "1234.50", "CAST(1234.50 AS DECIMAL(6, 2))", SqlTypeName.DECIMAL},
+        {"DECIMAL(20, 4)", "9007199254740993.1250", "CAST(9007199254740993.1250 AS DECIMAL(20, 4))",
+            SqlTypeName.DECIMAL},
+        {"BOOLEAN", "true", "TRUE", SqlTypeName.BOOLEAN},
+        {"BOOLEAN", "false", "FALSE", SqlTypeName.BOOLEAN},
+        {"DATE", "2024-02-29", "DATE '2024-02-29'", SqlTypeName.DATE},
+        {"TIME", "12:34:56", "TIME '12:34:56'", SqlTypeName.TIME},
+        {"CHAR(3)", "abcdef", "'abc'", SqlTypeName.CHAR}
+    };
+  }
+
+  @Test(dataProvider = "scalarCastQueries")
+  public void testConstantScalarCastPlanning(String targetType, String value, String literal,
+      SqlTypeName expectedType) {
+    String castQuery = "SELECT CAST('" + value + "' AS " + targetType + ") AS cast_value, col3 FROM a WHERE col3 > 0";
+    String literalQuery = "SELECT " + literal + " AS cast_value, col3 FROM a WHERE col3 > 0";
+    try (QueryEnvironment.CompiledQuery literalPlan = _queryEnvironment.compile(literalQuery);
+        QueryEnvironment.CompiledQuery castPlan = _queryEnvironment.compile(castQuery)) {
+      assertEquals(RelOptUtil.toString(castPlan.getRelNode()), RelOptUtil.toString(literalPlan.getRelNode()));
+      assertEquals(castPlan.getRelRoot().validatedRowType, literalPlan.getRelRoot().validatedRowType);
+      assertEquals(castPlan.getRelRoot().validatedRowType.getFieldList().get(0).getType().getSqlTypeName(),
+          expectedType);
+      assertEquals(castPlan.getTableNames(), literalPlan.getTableNames());
+      assertNull(castPlan.getPlannerContext().getRelOptPlanner().getExecutor());
+      // Exercise conversion to dispatchable stages as well as SQL-to-rel conversion and optimization.
+      assertNotNull(literalPlan.planQuery(0).getQueryPlan());
+      assertNotNull(castPlan.planQuery(0).getQueryPlan());
     }
   }
 
