@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.IntOnHeapMutableD
 import org.apache.pinot.segment.local.realtime.impl.dictionary.LongOnHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.StringOnHeapMutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -194,6 +196,68 @@ public class BoundAggregationFunctionTest {
     }
   }
 
+  @DataProvider
+  public Object[][] conversions() {
+    return new Object[][]{
+        {ColumnDataType.INT, ColumnDataType.TIMESTAMP, 1, 2, 1L, 2L},
+        {ColumnDataType.LONG, ColumnDataType.BOOLEAN, 0L, 1L, 0, 1},
+        {ColumnDataType.INT, ColumnDataType.STRING, 1, 2, "1", "2"}
+    };
+  }
+
+  @Test(dataProvider = "conversions")
+  public void testPhysicalInputConversion(ColumnDataType physicalType, ColumnDataType resultType, Object smaller,
+      Object larger, Object convertedSmaller, Object convertedLarger)
+      throws Exception {
+    ModeAggregationFunction function = mode(resultType, "MIN", true);
+    BlockValSet raw = raw(physicalType, RoaringBitmap.bitmapOf(3), smaller, larger, larger, smaller);
+    try (MutableDictionary dictionary = physicalType == ColumnDataType.INT
+        ? new IntOnHeapMutableDictionary()
+        : new LongOnHeapMutableDictionary()) {
+      int[] ids = dictionary.index(new Object[]{smaller, larger, larger, smaller});
+      BlockValSet encoded = SyntheticBlockValSets.DictIds.create(RoaringBitmap.bitmapOf(3), ids, dictionary,
+          physicalType.toDataType());
+      for (BlockValSet block : List.of(raw, encoded)) {
+        Map<?, Long> counts = aggregate(function, block, 4);
+        assertEquals(counts, Map.of(convertedSmaller, 1L, convertedLarger, 2L));
+        assertEquals(roundTrip(function, counts), counts);
+        assertEquals(function.extractFinalResult(counts), convertedLarger);
+
+        Map<ExpressionContext, BlockValSet> blocks = Map.of(VALUE, block);
+        GroupByResultHolder single = function.createGroupByResultHolder(2, 2);
+        function.aggregateGroupBySV(4, new int[]{0, 0, 1, 1}, single, blocks);
+        assertEquals(roundTrip(function, function.extractGroupByResult(single, 0)),
+            Map.of(convertedSmaller, 1L, convertedLarger, 1L));
+        assertEquals(roundTrip(function, function.extractGroupByResult(single, 1)), Map.of(convertedLarger, 1L));
+        GroupByResultHolder multi = function.createGroupByResultHolder(2, 2);
+        function.aggregateGroupByMV(4, new int[][]{{0, 1}, {0}, {1}, {0, 1}}, multi, blocks);
+        for (int group = 0; group < 2; group++) {
+          assertEquals(roundTrip(function, function.extractGroupByResult(multi, group)),
+              Map.of(convertedSmaller, 1L, convertedLarger, 1L));
+        }
+
+        // Another segment already has the bound physical representation. Its count must merge into the same key.
+        BlockValSet current = raw(resultType, null, convertedSmaller, convertedSmaller);
+        Map<?, Long> merged = function.merge(roundTrip(function, counts), aggregate(function, current, 2));
+        assertEquals(merged, Map.of(convertedSmaller, 3L, convertedLarger, 2L));
+        assertEquals(function.extractFinalResult(merged), convertedSmaller);
+      }
+    }
+  }
+
+  @Test
+  public void testDictionaryValuesCoalescedByConversionKeepAllCounts()
+      throws Exception {
+    ModeAggregationFunction function = mode(ColumnDataType.TIMESTAMP, "MIN", true);
+    try (MutableDictionary dictionary = new StringOnHeapMutableDictionary()) {
+      int[] ids = dictionary.index(new Object[]{"1", "01", "2"});
+      BlockValSet block = SyntheticBlockValSets.DictIds.create(null, ids, dictionary, DataType.STRING);
+      Map<?, Long> counts = roundTrip(function, aggregate(function, block, 3));
+      assertEquals(counts, Map.of(1L, 2L, 2L, 1L));
+      assertEquals(function.extractFinalResult(counts), Long.valueOf(1L));
+    }
+  }
+
   private static ModeAggregationFunction mode(ColumnDataType type, String reducer, boolean nullHandlingEnabled) {
     FunctionContext function = new FunctionContext(FunctionContext.Type.AGGREGATION, "mode", modeArguments(reducer),
         new AggregateCallBinding(List.of(type, ColumnDataType.STRING), type));
@@ -223,16 +287,11 @@ public class BoundAggregationFunctionTest {
   }
 
   private static BlockValSet raw(ColumnDataType type, RoaringBitmap nulls, Object... values) {
-    switch (type) {
-      case STRING:
-        return SyntheticBlockValSets.Str.create(nulls, Arrays.copyOf(values, values.length, String[].class));
-      case TIMESTAMP:
-        return SyntheticBlockValSets.Long.create(nulls, Arrays.stream(values).mapToLong(v -> (Long) v).toArray());
-      case BOOLEAN:
-        return SyntheticBlockValSets.Int.create(nulls, Arrays.stream(values).mapToInt(v -> (Integer) v).toArray());
-      default:
-        throw new IllegalArgumentException(type.toString());
+    Object[][] rows = Arrays.stream(values).map(value -> new Object[]{value}).toArray(Object[][]::new);
+    if (nulls != null) {
+      nulls.forEach((int i) -> rows[i][0] = null);
     }
+    return new RowBasedBlockValSet(type, Arrays.asList(rows), 0, true);
   }
 
   private static MutableDictionary dictionary(ColumnDataType type) {

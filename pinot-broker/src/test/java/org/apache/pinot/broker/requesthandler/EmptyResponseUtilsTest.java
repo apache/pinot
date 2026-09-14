@@ -50,33 +50,28 @@ public class EmptyResponseUtilsTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("name", DataType.STRING)
         .addSingleValueDimension("ts", DataType.TIMESTAMP).addSingleValueDimension("flag", DataType.BOOLEAN)
         .addSingleValueDimension("id", DataType.LONG).build();
-    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SET enableNullHandling=true; "
-        + "SELECT mode(ts) AS eventTime, firstWithTime(name,ts) AS firstName, "
-        + "lastWithTime(flag,ts) AS lastFlag, anyValue(flag) AS anyFlag, anyValue(ts) AS anyTime, "
-        + "anyValue(id) AS anyId, arrayAgg(ts) AS eventTimes, arrayAgg(flag) AS flags "
-        + "FROM testTable WHERE 1=0");
-    AggregationFunctionBinder.bind(query, schema);
-    ResultTable result = EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(query));
-    assertEquals(result.getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.STRING, ColumnDataType.BOOLEAN,
-            ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG,
-            ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.BOOLEAN_ARRAY});
-    assertEquals(result.getDataSchema().getColumnNames(),
-        new String[]{"eventTime", "firstName", "lastFlag", "anyFlag", "anyTime", "anyId", "eventTimes", "flags"});
-    assertEquals(result.getRows().size(), 1);
-    assertEquals(result.getRows().get(0), new Object[]{null, null, null, null, null, null,
-        new String[0], new boolean[0]});
-
-    PinotQuery grouped = CalciteSqlParser.compileToPinotQuery(
-        "SELECT mode(ts), firstWithTime(name,ts), anyValue(ts), anyValue(flag), anyValue(id), "
-            + "arrayAgg(ts), arrayAgg(flag) FROM testTable WHERE 1=0 GROUP BY flag");
-    AggregationFunctionBinder.bind(grouped, schema);
-    ResultTable groupedResult =
-        EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(grouped));
-    assertTrue(groupedResult.getRows().isEmpty());
-    assertEquals(groupedResult.getDataSchema().getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.STRING, ColumnDataType.TIMESTAMP,
-            ColumnDataType.BOOLEAN, ColumnDataType.LONG, ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.BOOLEAN_ARRAY});
+    for (String suffix : List.of("", " GROUP BY flag", " LIMIT 0")) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery("SET enableNullHandling=true; "
+          + "SELECT mode(ts) AS eventTime, firstWithTime(name,ts) AS firstName, "
+          + "lastWithTime(flag,ts) AS lastFlag, anyValue(flag) AS anyFlag, anyValue(ts) AS anyTime, "
+          + "anyValue(id) AS anyId, arrayAgg(ts) AS eventTimes, arrayAgg(flag) AS flags "
+          + "FROM testTable WHERE 1=0" + suffix);
+      AggregationFunctionBinder.bind(query, schema);
+      ResultTable result = EmptyResponseUtils.buildEmptyResultTable(QueryContextConverterUtils.getQueryContext(query));
+      assertEquals(result.getDataSchema().getColumnDataTypes(),
+          new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.STRING, ColumnDataType.BOOLEAN,
+              ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG,
+              ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.BOOLEAN_ARRAY});
+      assertEquals(result.getDataSchema().getColumnNames(),
+          new String[]{"eventTime", "firstName", "lastFlag", "anyFlag", "anyTime", "anyId", "eventTimes", "flags"});
+      if (suffix.isEmpty()) {
+        assertEquals(result.getRows().size(), 1);
+        assertEquals(result.getRows().get(0), new Object[]{null, null, null, null, null, null,
+            new String[0], new boolean[0]});
+      } else {
+        assertTrue(result.getRows().isEmpty());
+      }
+    }
   }
 
   @Test

@@ -25,7 +25,6 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -38,7 +37,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -163,9 +161,7 @@ public class ArrayAggInferredTypeTest {
     } else {
       builder.addSingleValueDimension("value", type);
     }
-    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT " + expression + " FROM testTable");
-    AggregationFunctionBinder.bind(query, builder.build());
-    return RequestContextUtils.getFunction(query.getSelectList().get(0).getFunctionCall());
+    return AggregationFunctionBinder.bind(RequestContextUtils.getExpression(expression).getFunction(), builder.build());
   }
 
   private static Object roundTrip(AggregationFunction function, Object state) {

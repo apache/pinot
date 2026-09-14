@@ -156,21 +156,6 @@ public class PolymorphicAggregationQueriesTest extends BaseQueriesTest {
     assertEquals(result.getRows().get(0), new Object[]{"beta", timestamp(200), true});
   }
 
-  @Test
-  public void testNoMatchesAndAllNullPreserveTypes() {
-    for (String predicate : List.of("grp = 'missing'", "grp = 'n'")) {
-      ResultTable result = query("SELECT MODE(value), MODE(stamp), MODE(enabled), "
-          + "FIRST_WITH_TIME(stamp, eventTime), LAST_WITH_TIME(value, eventTime) FROM testTable WHERE " + predicate);
-      assertTypes(result, ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.BOOLEAN,
-          ColumnDataType.TIMESTAMP, ColumnDataType.STRING);
-      assertEquals(result.getRows().size(), 1);
-      assertEquals(result.getRows().get(0), new Object[]{null, null, null, null, null});
-    }
-    ResultTable result = query("SELECT MODE(value), MODE(stamp), MODE(enabled) FROM testTable LIMIT 0");
-    assertTypes(result, ColumnDataType.STRING, ColumnDataType.TIMESTAMP, ColumnDataType.BOOLEAN);
-    assertTrue(result.getRows().isEmpty());
-  }
-
   @DataProvider
   public Object[][] nullHandlingOptions() {
     return new Object[][]{
@@ -221,6 +206,9 @@ public class PolymorphicAggregationQueriesTest extends BaseQueriesTest {
     assertEquals(result.getRows().size(), 1);
     assertEquals(result.getRows().get(0), new Object[6]);
     result = query("SELECT " + aggregates + " FROM testTable WHERE grp = 'missing' GROUP BY grp", options);
+    assertTypes(result, types);
+    assertTrue(result.getRows().isEmpty());
+    result = query("SELECT " + aggregates + " FROM testTable LIMIT 0", options);
     assertTypes(result, types);
     assertTrue(result.getRows().isEmpty());
   }

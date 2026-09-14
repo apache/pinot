@@ -116,15 +116,13 @@ public class AnyValueInferredQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testDistributedLogicalTypes() {
-    ResultTable result = query("SELECT " + SELECT + " FROM testTable");
-    assertTypes(result, RESULT_TYPES);
-    assertEquals(result.getRows().size(), 1);
-    assertEquals(result.getRows().get(0), RESULT);
-    assertEquals(result.getDataSchema().getColumnName(0), "anyvalue(label)");
-
-    result = query("SELECT " + SELECT + " FROM testTable WHERE grp = 'a'");
-    assertTypes(result, RESULT_TYPES);
-    assertEquals(result.getRows().get(0), RESULT);
+    for (String filter : List.of("", " WHERE grp = 'a'")) {
+      ResultTable result = query("SELECT " + SELECT + " FROM testTable" + filter);
+      assertTypes(result, RESULT_TYPES);
+      assertEquals(result.getRows().size(), 1);
+      assertEquals(result.getRows().get(0), RESULT);
+      assertEquals(result.getDataSchema().getColumnName(0), "anyvalue(label)");
+    }
   }
 
   @Test

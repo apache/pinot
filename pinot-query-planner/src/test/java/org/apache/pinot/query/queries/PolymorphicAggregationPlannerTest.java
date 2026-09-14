@@ -123,13 +123,16 @@ public class PolymorphicAggregationPlannerTest extends QueryEnvironmentTestBase 
   }
 
   @Test(dataProvider = "physicalOptimizers")
-  public void testLegacyOverloadRemainsUnbound(boolean usePhysicalOptimizer) {
+  public void testLegacyExplicitTypeFormsRemainUnbound(boolean usePhysicalOptimizer) {
     DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + usePhysicalOptimizer
-        + "; SELECT FIRST_WITH_TIME(col1, ts, 'STRING') FROM a");
-    for (AggregateNode aggregate : findAggregates(plan)) {
-      RexExpression.FunctionCall call = aggregate.getAggCalls().get(0);
-      assertEquals(call.getFunctionOperands().size(), 3);
-      assertNull(call.getAggregationBinding());
+        + "; SELECT ARRAY_AGG(col1, 'STRING'), ARRAY_AGG(col7, 'LONG', true), "
+        + "FIRST_WITH_TIME(col1, ts, 'STRING') FROM a");
+    List<AggregateNode> aggregates = findAggregates(plan);
+    assertFalse(aggregates.isEmpty());
+    for (AggregateNode aggregate : aggregates) {
+      for (RexExpression.FunctionCall call : aggregate.getAggCalls()) {
+        assertNull(call.getAggregationBinding());
+      }
     }
   }
 
@@ -161,6 +164,48 @@ public class PolymorphicAggregationPlannerTest extends QueryEnvironmentTestBase 
         }
       }
       assertTrue(sawIntermediateOutput);
+    }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testInferredArrayAndScalarSchemas(boolean physicalOptimizer) {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + physicalOptimizer
+        + "; SELECT ARRAY_AGG(col3), ARRAY_AGG(col1, true), "
+        + "ARRAY_AGG(col5), ARRAY_AGG(ts_timestamp, true), ARRAY_AGG(col7), ANY_VALUE(col5), "
+        + "ANY_VALUE(ts_timestamp), ANY_VALUE(col7) FROM a");
+    ColumnDataType[] resultTypes = {ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY,
+        ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.LONG_ARRAY,
+        ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.LONG};
+    assertEquals(plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema()
+        .getColumnDataTypes(), resultTypes);
+    List<AggregateNode> aggregates = findAggregates(plan);
+    assertFalse(aggregates.isEmpty());
+    for (AggregateNode aggregate : aggregates) {
+      assertEquals(aggregate.getAggCalls().size(), resultTypes.length);
+      for (int i = 0; i < resultTypes.length; i++) {
+        assertBinding(aggregate.getAggCalls().get(i), i == 1 || i == 3 ? 2 : 1, resultTypes[i]);
+      }
+      assertEquals(aggregate.getAggCalls().get(1).getAggregationBinding().getArgumentTypes(),
+          List.of(ColumnDataType.STRING, ColumnDataType.BOOLEAN));
+    }
+  }
+
+  @Test(dataProvider = "physicalOptimizers")
+  public void testMultiValueAndDirectBindings(boolean physicalOptimizer) {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery("SET usePhysicalOptimizer=" + physicalOptimizer
+        + "; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ col1, ARRAY_AGG(mcol2), "
+        + "ARRAY_AGG(mcol1, true) FROM e GROUP BY col1");
+    assertEquals(plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema()
+        .getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG_ARRAY,
+            ColumnDataType.STRING_ARRAY});
+    List<AggregateNode> aggregates = findAggregates(plan);
+    assertFalse(aggregates.isEmpty());
+    for (AggregateNode aggregate : aggregates) {
+      assertEquals(aggregate.getAggCalls().get(0).getAggregationBinding().getArgumentTypes(),
+          List.of(ColumnDataType.LONG_ARRAY));
+      assertEquals(aggregate.getAggCalls().get(0).getAggregationBinding().getResultType(), ColumnDataType.LONG_ARRAY);
+      assertEquals(aggregate.getAggCalls().get(1).getAggregationBinding().getArgumentTypes(),
+          List.of(ColumnDataType.STRING_ARRAY, ColumnDataType.BOOLEAN));
     }
   }
 

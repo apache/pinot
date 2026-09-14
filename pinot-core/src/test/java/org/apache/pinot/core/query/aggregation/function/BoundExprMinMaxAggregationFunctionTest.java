@@ -18,21 +18,24 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
-import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjectionValSetWrapper;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -56,46 +59,33 @@ public class BoundExprMinMaxAggregationFunctionTest {
     ExprMinMaxObject empty = function.extractAggregationResult(function.createAggregationResultHolder());
     assertEquals(empty.getSchema().getColumnDataType(0), ColumnDataType.BOOLEAN);
     assertEquals(ExprMinMaxObject.fromBytes(empty.toBytes()).getSchema().getColumnDataType(0), ColumnDataType.BOOLEAN);
-    ExprMinMaxObject result = aggregate(function, false);
+    ExprMinMaxObject result = aggregate(function, 0);
     assertEquals(result.getNumberOfRows(), 1);
     assertEquals(result.getField(0, 0), 0);
   }
 
-  @Test
-  public void testLogicalSchemasAndTiedRowsSurviveSerializedMerge()
+  @DataProvider
+  public Object[][] projections() {
+    return new Object[][]{{0}, {null}};
+  }
+
+  @Test(dataProvider = "projections")
+  public void testLogicalSchemasAndTiedRowsSurviveSerializedMerge(@Nullable Integer value)
       throws Exception {
     ParentExprMinMaxAggregationFunction function = new ParentExprMinMaxAggregationFunction(ARGUMENTS, false, true,
         BINDING);
-    ExprMinMaxObject first = ExprMinMaxObject.fromBytes(aggregate(function, false).toBytes());
-    ExprMinMaxObject second = ExprMinMaxObject.fromBytes(aggregate(function, true).toBytes());
+    ExprMinMaxObject first = ExprMinMaxObject.fromBytes(aggregate(function, value).toBytes());
+    assertEquals(first.getField(0, 0), value);
+    ExprMinMaxObject second = ExprMinMaxObject.fromBytes(aggregate(function, 1).toBytes());
     ExprMinMaxObject merged = first.merge(second, false);
     assertEquals(merged.getNumberOfRows(), 2);
     assertEquals(merged.getSchema().getColumnDataType(0), ColumnDataType.BOOLEAN);
-    assertEquals(merged.getField(0, 0), 0);
+    assertEquals(merged.getField(0, 0), value);
     assertEquals(merged.getField(1, 0), 1);
     ExprMinMaxObject roundTrip = ExprMinMaxObject.fromBytes(merged.toBytes());
     assertEquals(roundTrip.getExtremumKey(), new Comparable[]{1_700_000_000_000L});
     assertEquals(roundTrip.getNumberOfRows(), 2);
-    assertEquals(roundTrip.getField(0, 0), 0);
-    assertEquals(roundTrip.getField(1, 0), 1);
-  }
-
-  @Test
-  public void testSerializedNullProjectionStaysNullAfterMerge()
-      throws Exception {
-    ParentExprMinMaxAggregationFunction function = new ParentExprMinMaxAggregationFunction(ARGUMENTS, false, true,
-        BINDING);
-    ExprMinMaxObject result = aggregate(function, false);
-    ExprMinMaxProjectionValSetWrapper nullProjection = mock(ExprMinMaxProjectionValSetWrapper.class);
-    result.setToNewVal(List.of(nullProjection), 0);
-    ExprMinMaxObject serialized = ExprMinMaxObject.fromBytes(result.toBytes());
-    assertEquals(serialized.getSchema().getColumnDataType(0), ColumnDataType.BOOLEAN);
-    assertNull(serialized.getField(0, 0));
-    ExprMinMaxObject merged = serialized.merge(ExprMinMaxObject.fromBytes(aggregate(function, true).toBytes()), false);
-    assertNull(merged.getField(0, 0));
-    assertEquals(merged.getField(1, 0), 1);
-    ExprMinMaxObject roundTrip = ExprMinMaxObject.fromBytes(merged.toBytes());
-    assertNull(roundTrip.getField(0, 0));
+    assertEquals(roundTrip.getField(0, 0), value);
     assertEquals(roundTrip.getField(1, 0), 1);
   }
 
@@ -126,21 +116,78 @@ public class BoundExprMinMaxAggregationFunctionTest {
         ColumnDataType.OBJECT), "projection column type: OBJECT");
   }
 
+  @Test
+  public void testBoundLongUsesPhysicalConversionGetters()
+      throws Exception {
+    ParentExprMinMaxAggregationFunction function = widenedFunction(true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(2, holder, Map.of(KEY, physicalInts(null, 2, 1), VALUE, physicalInts(null, 20, 10)));
+    ExprMinMaxObject result = function.extractAggregationResult(holder);
+    assertEquals(result.getExtremumKey()[0], Long.valueOf(1));
+    assertEquals(result.getField(0, 0), Long.valueOf(10));
+    assertEquals(result.getSchema().getColumnDataType(0), ColumnDataType.LONG);
+    ExprMinMaxObject serialized = ExprMinMaxObject.fromBytes(result.toBytes());
+    assertEquals(serialized.getExtremumKey()[0], Long.valueOf(1));
+    assertEquals(serialized.getField(0, 0), Long.valueOf(10));
+
+    // The same bound wrappers must also read later segments already stored as LONG.
+    function.aggregate(1, holder, Map.of(KEY, SyntheticBlockValSets.Long.create(null, new long[]{0}),
+        VALUE, SyntheticBlockValSets.Long.create(null, new long[]{30})));
+    result = function.extractAggregationResult(holder);
+    assertEquals(result.getExtremumKey()[0], Long.valueOf(0));
+    assertEquals(result.getField(0, 0), Long.valueOf(30));
+  }
+
+  @Test
+  public void testBoundProjectionNullSurvivesAccumulationAndSerialization()
+      throws Exception {
+    ParentExprMinMaxAggregationFunction function = widenedFunction(true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(2, holder, Map.of(KEY, physicalInts(null, 1, 2),
+        VALUE, physicalInts(RoaringBitmap.bitmapOf(0), 10, 20)));
+    ExprMinMaxObject result = function.extractAggregationResult(holder);
+    assertEquals(result.getNumberOfRows(), 1);
+    assertNull(result.getField(0, 0));
+    assertNull(ExprMinMaxObject.fromBytes(result.toBytes()).getField(0, 0));
+
+    // A subsequent block has its own null bitmap; the previous block's bit zero must not carry over.
+    function.aggregate(1, holder, Map.of(KEY, physicalInts(null, 0), VALUE, physicalInts(null, 30)));
+    assertEquals(function.extractAggregationResult(holder).getField(0, 0), Long.valueOf(30));
+  }
+
+  @Test
+  public void testDisabledNullHandlingKeepsStoredProjection() {
+    ParentExprMinMaxAggregationFunction function = widenedFunction(false);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, Map.of(KEY, physicalInts(null, 1),
+        VALUE, SyntheticBlockValSets.Long.create(RoaringBitmap.bitmapOf(0), new long[]{10})));
+    assertEquals(function.extractAggregationResult(holder).getField(0, 0), Long.valueOf(10));
+  }
+
+  private static ParentExprMinMaxAggregationFunction widenedFunction(boolean nullHandlingEnabled) {
+    AggregateCallBinding binding = new AggregateCallBinding(List.of(
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG), ColumnDataType.OBJECT);
+    return new ParentExprMinMaxAggregationFunction(ARGUMENTS, false, nullHandlingEnabled, binding);
+  }
+
+  private static BlockValSet physicalInts(RoaringBitmap nulls, int... values) {
+    Object[][] rows = Arrays.stream(values).mapToObj(value -> new Object[]{value}).toArray(Object[][]::new);
+    if (nulls != null) {
+      nulls.forEach((int i) -> rows[i][0] = null);
+    }
+    return new RowBasedBlockValSet(ColumnDataType.INT, Arrays.asList(rows), 0, true);
+  }
+
   private static void assertInvalidBinding(AggregateCallBinding binding, String message) {
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
         () -> new ParentExprMinMaxAggregationFunction(ARGUMENTS, false, true, binding));
     assertTrue(exception.getMessage().contains(message), exception.getMessage());
   }
 
-  private static ExprMinMaxObject aggregate(ParentExprMinMaxAggregationFunction function, boolean value) {
-    BlockValSet keys = mock(BlockValSet.class);
-    when(keys.isSingleValue()).thenReturn(true);
-    when(keys.getValueType()).thenReturn(DataType.TIMESTAMP);
-    when(keys.getLongValuesSV()).thenReturn(new long[]{1_700_000_000_000L});
-    BlockValSet values = mock(BlockValSet.class);
-    when(values.isSingleValue()).thenReturn(true);
-    when(values.getValueType()).thenReturn(DataType.BOOLEAN);
-    when(values.getIntValuesSV()).thenReturn(new int[]{value ? 1 : 0});
+  private static ExprMinMaxObject aggregate(ParentExprMinMaxAggregationFunction function, @Nullable Integer value) {
+    BlockValSet keys = SyntheticBlockValSets.Long.create(null, new long[]{1_700_000_000_000L});
+    BlockValSet values =
+        new RowBasedBlockValSet(ColumnDataType.BOOLEAN, List.<Object[]>of(new Object[]{value}), 0, true);
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(1, holder, Map.of(KEY, keys, VALUE, values));
     return function.extractAggregationResult(holder);
