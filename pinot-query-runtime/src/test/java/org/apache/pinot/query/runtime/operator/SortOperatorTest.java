@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
@@ -39,6 +40,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
@@ -123,6 +125,7 @@ public class SortOperatorTest {
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxReceiveOperator) _input).getCollations()).thenReturn(collations);
     SortOperator operator = getOperator(schema, collations);
 
     // When:
@@ -220,6 +223,7 @@ public class SortOperatorTest {
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxReceiveOperator) _input).getCollations()).thenReturn(collations);
     SortOperator operator = getOperator(schema, collations, 10, 1);
 
     // When:
@@ -259,6 +263,7 @@ public class SortOperatorTest {
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxReceiveOperator) _input).getCollations()).thenReturn(collations);
     SortOperator operator = getOperator(schema, collations, 1, 1);
 
     // When:
@@ -309,6 +314,68 @@ public class SortOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
+  @Test(timeOut = 10_000)
+  public void shouldEmitFullSortInIndependentBoundedBlocks() {
+    // Given:
+    int numRows = 20_001;
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
+    List<Object[]> inputRows = new ArrayList<>(numRows);
+    for (int i = numRows - 1; i >= 0; i--) {
+      inputRows.add(new Object[]{i});
+    }
+    when(_input.nextBlock()).thenReturn(new RowHeapDataBlock(inputRows, schema)).thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> collations = List.of(
+        new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = SortOperator.createFullSort(OperatorTestUtil.getTracingContext(), _input,
+        new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, Integer.MAX_VALUE, -1));
+
+    // When:
+    List<Object[]> firstRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    List<Object[]> secondRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    List<Object[]> thirdRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    MseBlock eosBlock = operator.nextBlock();
+
+    // Then:
+    assertEquals(firstRows.size(), 10_000);
+    assertEquals(firstRows.get(0), new Object[]{0});
+    assertEquals(firstRows.get(9_999), new Object[]{9_999});
+    assertEquals(secondRows.size(), 10_000);
+    assertEquals(secondRows.get(0), new Object[]{10_000});
+    assertEquals(secondRows.get(9_999), new Object[]{19_999});
+    assertEquals(thirdRows.size(), 1);
+    assertEquals(thirdRows.get(0), new Object[]{20_000});
+    assertTrue(eosBlock.isSuccess(), "expected EOS after all sorted rows");
+    assertEquals(firstRows.get(0), new Object[]{0}, "emitted blocks must not share the mutable output buffer");
+    assertEquals(operator.copyStatMaps().getLong(SortOperator.StatKey.EMITTED_ROWS), numRows);
+    assertTrue(operator.copyStatMaps().getBoolean(SortOperator.StatKey.REQUIRE_SORT));
+  }
+
+  @Test
+  public void shouldPropagateCancellationAndReleaseFullSortRows() {
+    // Given:
+    int numRows = 10_001;
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
+    List<Object[]> inputRows = new ArrayList<>(numRows);
+    for (int i = numRows - 1; i >= 0; i--) {
+      inputRows.add(new Object[]{i});
+    }
+    when(_input.nextBlock()).thenReturn(new RowHeapDataBlock(inputRows, schema)).thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = SortOperator.createFullSort(OperatorTestUtil.getTracingContext(), _input,
+        new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, Integer.MAX_VALUE, -1));
+    assertEquals(((MseBlock.Data) operator.nextBlock()).getNumRows(), 10_000);
+    assertTrue(operator.getRetainedRowCount() > 0);
+
+    // When:
+    RuntimeException cancellation = new RuntimeException("cancel test");
+    operator.cancel(cancellation);
+
+    // Then:
+    verify(_input).cancel(cancellation);
+    assertEquals(operator.getRetainedRowCount(), 0);
+  }
+
   @Test
   public void shouldConsumeAndSortTwoInputBlocksWithOneRowEach() {
     // Given:
@@ -332,11 +399,12 @@ public class SortOperatorTest {
   public void shouldConsumeAndSortTwoInputBlocksWithOneRowEachInputSorted() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    _input = mock(SortedMailboxReceiveOperator.class);
+    _input = mock(SortedMailboxMergeReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1})).thenReturn(block(schema, new Object[]{2}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxMergeReceiveOperator) _input).getCollations()).thenReturn(collations);
     SortOperator operator = getOperator(schema, collations);
 
     // When:
@@ -346,6 +414,31 @@ public class SortOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
+  }
+
+  @Test
+  public void shouldSortWhenInputCollationDiffers() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
+    _input = mock(SortedMailboxMergeReceiveOperator.class);
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> inputCollations =
+        List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(((SortedMailboxMergeReceiveOperator) _input).getCollations()).thenReturn(inputCollations);
+    List<RelFieldCollation> requestedCollations =
+        List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.FIRST));
+    SortOperator operator = getOperator(schema, requestedCollations);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{1});
+    assertTrue(operator.copyStatMaps().getBoolean(SortOperator.StatKey.REQUIRE_SORT));
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 

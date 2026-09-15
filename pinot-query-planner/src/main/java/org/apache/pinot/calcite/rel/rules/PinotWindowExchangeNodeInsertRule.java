@@ -103,13 +103,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(List.of()));
       } else {
         // Only ORDER BY
-        // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key
-        // TODO: ORDER BY only type queries need to be sorted on both sender and receiver side for better performance.
-        //       Sorted input data can use a k-way merge instead of a PriorityQueue for sorting. For now support to
-        //       sort on the sender side is not available thus setting this up to only sort on the receiver.
+        // Ask the fragmenter to add an explicit SortNode to the sending op-chain, then merge those sorted streams on
+        // the receiver. MailboxSendOperator only transports the SortOperator output and stays agnostic to ordering.
         // TODO: Revisit whether we should use hash distribution
         exchange =
-            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, false,
+            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, true,
                 true);
       }
     } else {
@@ -125,13 +123,10 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
-        // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
-        // TODO: ORDER BY only type queries need to be sorted only on the receiver side unless a hint is set indicating
-        //       that the data is already partitioned and sorting can be done on the sender side instead. This way
-        //       sorting on the receiver side can be a no-op. Add support for this hint and pass it on. Until sender
-        //       side sorting is implemented, setting this hint will throw an error on execution.
+        // The fragmenter adds an explicit SortNode to the sending op-chain. Hashing on the partition keys sends every
+        // row of a partition to the same receiver, so merging sender streams leaves each partition ordered.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, false, true, prePartitioned);
+            windowGroup.orderKeys, true, true, prePartitioned);
       }
     }
     // NOTE: Need to create a new LogicalWindow to use the modified window group.

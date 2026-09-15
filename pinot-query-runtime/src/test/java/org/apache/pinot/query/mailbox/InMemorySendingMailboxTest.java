@@ -34,6 +34,25 @@ import org.testng.annotations.Test;
 public class InMemorySendingMailboxTest {
 
   @Test
+  public void sortedDataCarriesSenderConfirmation() {
+    MailboxService mailboxService = Mockito.mock(MailboxService.class);
+    ReceivingMailbox receivingMailbox = Mockito.mock(ReceivingMailbox.class);
+    Mockito.when(mailboxService.getReceivingMailbox("test-mailbox")).thenReturn(receivingMailbox);
+    Mockito.when(receivingMailbox.offer(Mockito.any(), Mockito.anyList(), Mockito.anyLong(), Mockito.eq(true)))
+        .thenReturn(ReceivingMailbox.ReceivingMailboxStatus.SUCCESS);
+    InMemorySendingMailbox mailbox = new InMemorySendingMailbox("test-mailbox", mailboxService, Long.MAX_VALUE,
+        new StatMap<>(MailboxSendOperator.StatKey.class));
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      mailbox.send(block, true);
+    }
+
+    Mockito.verify(receivingMailbox).offer(Mockito.same(block), Mockito.anyList(), Mockito.anyLong(), Mockito.eq(true));
+  }
+
+  @Test
   public void sendDataThrowsWhenQueryTerminated() {
     MailboxService mailboxService = Mockito.mock(MailboxService.class);
     InMemorySendingMailbox mailbox = new InMemorySendingMailbox("test-mailbox", mailboxService, Long.MAX_VALUE,

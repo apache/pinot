@@ -42,7 +42,12 @@ class HashExchange extends BlockExchange {
 
   HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
-    super(sendingMailboxes, splitter, statsIndexChooser);
+    this(sendingMailboxes, keySelector, splitter, statsIndexChooser, false);
+  }
+
+  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, boolean sortedOnSender) {
+    super(sendingMailboxes, splitter, statsIndexChooser, sortedOnSender);
     _keySelector = keySelector;
   }
 
