@@ -30,7 +30,7 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   public FixedSegmentNameGenerator(String segmentName) {
     Preconditions.checkArgument(segmentName != null, "Missing segmentName for FixedSegmentNameGenerator");
     SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
-    _segmentName = segmentName;
+    _segmentName = segmentName.replaceAll("\\s+", "_");
   }
 
   @Override

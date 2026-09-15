@@ -37,6 +37,8 @@ public class InputFileSegmentNameGeneratorTest {
   public void testWithHDFSPath() {
     validateCSVFileName("hdfs:///my/path/to/segmentname.csv", "segmentname");
     validateCSVFileName("hdfs:/server:9000//my/path/to/segmentname.csv", "segmentname");
+    validateCSVFileName("hdfs:/server:9000//my/path/to/segment%20name.csv", "segment_name");
+    validateCSVFileName("hdfs:/server:9000//my/path/to/segment%20%20name.csv", "segment_name");
   }
 
   @Test
