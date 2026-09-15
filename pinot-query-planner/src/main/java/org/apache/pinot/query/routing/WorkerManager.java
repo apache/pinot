@@ -60,6 +60,7 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -891,7 +892,10 @@ public class WorkerManager {
     if (routingTableMap == null) {
       routingTableMap = getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
     }
-    Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
+    if (routingTableMap.isEmpty()) {
+      throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException(
+          "Unable to find routing entries for table: " + tableName);
+    }
 
     // acquire time boundary info if it is a hybrid table.
     if (routingTableMap.size() > 1) {
@@ -1785,8 +1789,10 @@ public class WorkerManager {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       boolean offlineRoutingExists = _routingManager.routingExists(offlineTableName);
       boolean realtimeRoutingExists = _routingManager.routingExists(realtimeTableName);
-      Preconditions.checkState(offlineRoutingExists || realtimeRoutingExists, "Routing doesn't exist for table: %s",
-          tableName);
+      if (!offlineRoutingExists && !realtimeRoutingExists) {
+        throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException(
+            "Routing doesn't exist for table: " + tableName);
+      }
 
       if (offlineRoutingExists && realtimeRoutingExists) {
         TablePartitionReplicatedServersInfo offlineTpi = _routingManager.getTablePartitionReplicatedServersInfo(

@@ -45,6 +45,8 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1002,6 +1004,81 @@ public class WorkerManagerTest {
       // Nothing was pruned, only skipped for holding nothing, so nothing is reported as pruned either.
       assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
     }
+  }
+
+  /// A table with no routing entry must be reported as `BROKER_RESOURCE_MISSING`, not as a generic
+  /// internal error.
+  ///
+  /// This is the non-partitioned leaf path. An empty routing map means [RoutingManager] returned
+  /// null for every table type, and `BaseBrokerRoutingManager` returns null only when the routing
+  /// entry is absent — a table whose segments all prune away still yields a non-null routing table
+  /// with an empty server map. So the condition is exactly the one the single-stage engine reports
+  /// as `BROKER_RESOURCE_MISSING`.
+  @Test
+  public void testLeafAssignmentReportsBrokerResourceMissingWhenRoutingIsAbsent() {
+    QueryEnvironment queryEnvironment = newNoRoutingQueryEnvironment();
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT * FROM emptyTable")) {
+      // Propagates as a QueryException rather than being wrapped: it is a PinotRuntimeException, so
+      // the planner passes it through with its error code intact — which is the whole point.
+      QueryException e = expectThrows(QueryException.class, () -> compiledQuery.planQuery(0));
+      assertEquals(e.getErrorCode(), QueryErrorCode.BROKER_RESOURCE_MISSING);
+      assertTrue(e.getMessage().contains("emptyTable"), e.getMessage());
+    }
+  }
+
+  /// The partitioned path reaches the same conclusion through a different check, and must report the
+  /// same code: a caller cannot be expected to know which planning path its query took.
+  @Test
+  public void testPartitionedAssignmentReportsBrokerResourceMissingWhenRoutingIsAbsent() {
+    // No partition info for any table, so routingExists() is false for both the offline and the
+    // realtime name — the condition calculatePartitionTableInfo checks.
+    PartitionedRoutingManager routingManager =
+        new PartitionedRoutingManager(Map.of(), Map.of(), Map.of(), false);
+    QueryEnvironment queryEnvironment = newPartitionedTableQueryEnvironment(routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      QueryException e = expectThrows(QueryException.class, () -> compiledQuery.planQuery(0));
+      assertEquals(e.getErrorCode(), QueryErrorCode.BROKER_RESOURCE_MISSING);
+      assertTrue(e.getMessage().contains(PARTITIONED_TABLE), e.getMessage());
+    }
+  }
+
+  /// A QueryEnvironment over "emptyTable" whose RoutingManager has no routing entry at all: every
+  /// getRoutingTable call returns null.
+  private static QueryEnvironment newNoRoutingQueryEnvironment() {
+    ServerInstance server = getServerInstance("localhost", 1);
+    RoutingManager routingManager =
+        new EmptyTableRoutingManager(Map.of(server.getInstanceId(), server), null);
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("emptyTable_OFFLINE", "emptyTable_OFFLINE");
+    tableNameMap.put("emptyTable", "emptyTable");
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(getSchemaBuilder("emptyTable").build());
+    when(tableCache.getTableConfig("emptyTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  /// A QueryEnvironment over the partitioned "testTable" backed by the supplied RoutingManager.
+  private static QueryEnvironment newPartitionedTableQueryEnvironment(RoutingManager routingManager) {
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put(PARTITIONED_TABLE_OFFLINE, PARTITIONED_TABLE_OFFLINE);
+    tableNameMap.put(PARTITIONED_TABLE, PARTITIONED_TABLE);
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(getSchemaBuilder(PARTITIONED_TABLE).build());
+    when(tableCache.getTableConfig(PARTITIONED_TABLE_OFFLINE)).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
   }
 
   @Test
