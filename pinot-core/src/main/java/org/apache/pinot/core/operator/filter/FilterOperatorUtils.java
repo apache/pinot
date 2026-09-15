@@ -148,7 +148,7 @@ public class FilterOperatorUtils {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
         return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled());
+            queryContext.isNullHandlingEnabled(), queryContext.isAndRestrictionPushdownEnabled());
       }
     }
 

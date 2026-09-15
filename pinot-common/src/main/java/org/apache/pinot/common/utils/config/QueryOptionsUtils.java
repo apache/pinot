@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -298,6 +300,25 @@ public class QueryOptionsUtils {
 
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
+  }
+
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE);
+    return mode != null ? parseAndRestrictionPushdownMode(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode) : null;
+  }
+
+  /// Parses an [AndRestrictionPushdownMode], naming the offending key and the legal values on failure. The option
+  /// reads like a toggle, so `true`/`false` is a likely mistake and the message has to say so.
+  public static AndRestrictionPushdownMode parseAndRestrictionPushdownMode(String key, String value) {
+    try {
+      return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value for %s: '%s'. Expected one of: ALWAYS, NEVER, AUTO", key, value));
+    }
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {

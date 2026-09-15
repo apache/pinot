@@ -41,12 +41,19 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
+  private final boolean _restrictionPushdownEnabled;
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled, false);
+  }
+
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override
@@ -69,7 +76,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new AndDocIdSet(blockDocIdSets, _queryOptions);
+    return new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdownEnabled);
   }
 
   @Override
@@ -98,7 +105,8 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (blockDocIdSets.size() == 1) {
       return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
     }
-    return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
+    return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdownEnabled),
+        _numDocs);
   }
 
   @Override

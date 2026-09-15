@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// Singleton class which extends [BlockDocIdSet] that is empty, i.e. does not contain any document.
@@ -41,5 +43,10 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    return new MutableRoaringBitmap();
   }
 }

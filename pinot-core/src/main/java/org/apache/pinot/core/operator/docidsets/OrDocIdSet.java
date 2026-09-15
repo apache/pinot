@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +29,7 @@ import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -55,6 +57,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
+    Preconditions.checkState(_docIdSets != null, "iterator() called on an already consumed OrDocIdSet");
     int numDocIdSets = _docIdSets.size();
     BlockDocIdIterator[] allDocIdIterators = new BlockDocIdIterator[numDocIdSets];
     List<SortedDocIdIterator> sortedDocIdIterators = new ArrayList<>();
@@ -79,10 +82,12 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
 
-    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
-    _docIdSets = null;
+    // Publish the stats state before dropping the branches, so that a concurrent reader of
+    // getNumEntriesScannedInFilter() never sees it disappear, then set _docIdSets to null so that the underlying
+    // BlockDocIdSets can be garbage collected
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
+    _docIdSets = null;
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
@@ -131,6 +136,68 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
+  }
+
+  @Override
+  public boolean isApplyAndDeferrable() {
+    return true;
+  }
+
+  /// Unions the branches, each restricted to the candidate document ids.
+  ///
+  /// A branch only has to look at the candidates no earlier branch has matched yet, because
+  /// `(A OR B) AND S == (A AND S) OR (B AND (S MINUS (A AND S)))`. That matters because the cost of a scan-based
+  /// branch is linear in the size of the candidate set it is given, so handing every branch the full candidate set
+  /// would scan it once per branch.
+  @Override
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    Preconditions.checkState(docIdSets != null, "applyAnd() called on an already consumed OrDocIdSet");
+    // Publish the stats state before dropping the branches, so that a concurrent reader of
+    // getNumEntriesScannedInFilter() never sees it disappear. Branches left unevaluated by the short-circuit below
+    // report zero.
+    _scanBasedDocIdSets.set(docIdSets);
+    _docIdSets = null;
+    MutableRoaringBitmap docIdsToReturn = new MutableRoaringBitmap();
+    if (docIds.isEmpty()) {
+      return docIdsToReturn;
+    }
+    int numCandidates = docIds.getCardinality();
+    int numDocIdSets = docIdSets.size();
+    ImmutableRoaringBitmap remainingDocIds = docIds;
+    for (int i = 0; i < numDocIdSets; i++) {
+      ImmutableRoaringBitmap matchingDocIds = docIdSets.get(i).applyAnd(remainingDocIds);
+      if (matchingDocIds.isEmpty()) {
+        continue;
+      }
+      docIdsToReturn.or(matchingDocIds);
+      if (docIdsToReturn.getCardinality() == numCandidates) {
+        // Every candidate is already matched, so the remaining branches cannot add anything. They still have to be
+        // released: their iterators were built eagerly and hold forward-index reader contexts.
+        releaseFrom(docIdSets, i + 1);
+        break;
+      }
+      if (i < numDocIdSets - 1) {
+        remainingDocIds = ImmutableRoaringBitmap.andNot(remainingDocIds, matchingDocIds);
+      }
+    }
+    return docIdsToReturn;
+  }
+
+  private static void releaseFrom(List<BlockDocIdSet> docIdSets, int fromIndex) {
+    for (int i = fromIndex; i < docIdSets.size(); i++) {
+      docIdSets.get(i).release();
+    }
+  }
+
+  @Override
+  public void release() {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    if (docIdSets != null) {
+      for (BlockDocIdSet docIdSet : docIdSets) {
+        docIdSet.release();
+      }
+    }
   }
 
   @Override

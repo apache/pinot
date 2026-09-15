@@ -19,16 +19,20 @@
 package org.apache.pinot.core.common;
 
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.RangelessBitmapDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -50,6 +54,74 @@ public interface BlockDocIdSet {
   /// when appropriate, following the same pattern as filter operators.
   default BlockDocIdSet getOptimizedDocIdSet() {
     return this;
+  }
+
+  /// Returns whether a parent AND may defer calling [#iterator] on this DocIdSet and reach it through [#applyAnd]
+  /// instead.
+  ///
+  /// Composite DocIdSets (AND, OR, NOT) return `true`: forwarding a candidate set to their own children is how a
+  /// restriction from an enclosing AND reaches a scan-based predicate nested inside an OR, which would otherwise be
+  /// evaluated against every document that OR branch matches. Leaf DocIdSets return `false`: their index lookup has
+  /// already happened by the time the DocIdSet exists, so deferring them buys nothing.
+  ///
+  /// This says nothing about whether [#applyAnd] may be called -- every DocIdSet supports it.
+  default boolean isApplyAndDeferrable() {
+    return false;
+  }
+
+  /// Returns the document ids matching this DocIdSet that are also in `docIds`, i.e. the intersection of this
+  /// DocIdSet with the given candidate set.
+  ///
+  /// `docIds` is never modified, so the same candidate set may be handed to several DocIdSets. The returned bitmap
+  /// must not be modified by the caller either: it may be a view of a bitmap the DocIdSet still owns.
+  ///
+  /// Like [ScanBasedDocIdIterator#applyAnd], this method consumes the DocIdSet: call it at most once, and never
+  /// together with [#iterator]. [#getNumEntriesScannedInFilter] stays valid afterwards.
+  default ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    if (docIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
+    BlockDocIdIterator docIdIterator = iterator();
+    if (docIdIterator instanceof ScanBasedDocIdIterator) {
+      // The scan only visits the candidate documents, which is the whole point of the push-down
+      return ((ScanBasedDocIdIterator) docIdIterator).applyAnd(docIds);
+    }
+    if (docIdIterator instanceof BitmapBasedDocIdIterator) {
+      return ImmutableRoaringBitmap.and(((BitmapBasedDocIdIterator) docIdIterator).getDocIds(), docIds);
+    }
+    if (docIdIterator instanceof SortedDocIdIterator) {
+      MutableRoaringBitmap docIdsFromRanges = new MutableRoaringBitmap();
+      for (IntPair docIdRange : ((SortedDocIdIterator) docIdIterator).getDocIdRanges()) {
+        // NOTE: docIdRange has inclusive start and end.
+        docIdsFromRanges.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
+      }
+      docIdsFromRanges.and(docIds);
+      return docIdsFromRanges;
+    }
+    // Generic fallback: drive the iterator from the candidate set so that it is only asked about candidate documents
+    return collect(new AndDocIdIterator(
+        new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator}));
+  }
+
+  /// Releases a DocIdSet that will not be evaluated, e.g. an OR branch a short-circuit skipped past.
+  ///
+  /// Scan-based DocIdSets build their iterator in the constructor, and that iterator holds a
+  /// `ForwardIndexReaderContext` -- a direct ByteBuffer for a chunk-compressed column. Evaluation normally releases it
+  /// because the iterator closes itself on reaching EOF, so a DocIdSet that is never evaluated has to be released
+  /// explicitly. Calling this instead of evaluating never reads any data.
+  default void release() {
+    iterator().close();
+  }
+
+  /// Materializes the document ids remaining in the given iterator.
+  static MutableRoaringBitmap collect(BlockDocIdIterator docIdIterator) {
+    RoaringBitmapWriter<MutableRoaringBitmap> bitmapWriter =
+        RoaringBitmapWriter.bufferWriter().runCompress(false).get();
+    int docId;
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+      bitmapWriter.add(docId);
+    }
+    return bitmapWriter.get();
   }
 
   /// For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
