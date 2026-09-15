@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -64,6 +66,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class OpenStructColumnSplitterTest {
@@ -94,6 +97,16 @@ public class OpenStructColumnSplitterTest {
       boolean perKeyMetricsEnabled) {
     return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null,
         perKeyMetricsEnabled);
+  }
+
+  @DataProvider(name = "codecSpecOpenStructConfigs")
+  public Object[][] codecSpecOpenStructConfigs() {
+    FieldConfig valueFieldConfig = rawCodecSpecFieldConfig("clicks");
+    FieldConfig defaultValueFieldConfig = rawCodecSpecFieldConfig("default");
+    return new Object[][]{
+        {new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(valueFieldConfig), null)},
+        {new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5, null, null)}
+    };
   }
 
   @Test
@@ -395,6 +408,31 @@ public class OpenStructColumnSplitterTest {
     assertFalse(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
     assertTrue(new File(_tempDir,
         denseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION).exists());
+  }
+
+  @Test(dataProvider = "codecSpecOpenStructConfigs")
+  public void testSealRejectsCodecSpecBeforeReplacingChildForwardConfig(OpenStructIndexConfig openStructConfig)
+      throws Exception {
+    OpenStructColumnSplitter splitter = new OpenStructColumnSplitter(
+        _tempDir, "metrics", "testTable_OFFLINE", spec(), openStructConfig);
+    for (int docId = 0; docId < 10; docId++) {
+      splitter.add(Map.of("clicks", docId), docId);
+    }
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class, splitter::seal);
+    assertEquals(exception.getMessage(), "codecSpec is not supported for OPEN_STRUCT key: clicks");
+  }
+
+  private static FieldConfig rawCodecSpecFieldConfig(String name) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
+    forward.put("codecSpec", "LZ4");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(name)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 
   @Test
