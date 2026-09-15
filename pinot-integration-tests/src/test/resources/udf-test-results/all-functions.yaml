@@ -774,20 +774,28 @@ gcd:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.gcd}"
   transform: null
   udf: null
+generatearray:
+  scalar: "org.apache.pinot.common.function.scalar.array.GenerateArrayScalarFunction"
+  transform: null
+  udf: null
 generatedoublearray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray]}"
   transform: null
   udf: null
 generatefloatarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray]}"
   transform: null
   udf: null
 generateintarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray]}"
   transform: null
   udf: null
 generatelongarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray]}"
   transform: null
   udf: null
 geotoh3:
