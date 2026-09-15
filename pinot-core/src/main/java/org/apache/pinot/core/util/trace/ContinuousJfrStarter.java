@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.management.MBeanServer;
@@ -52,8 +53,52 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Starts and manages a continuous JFR recording driven by the `pinot.jfr.*` cluster configs.
+///
+/// @deprecated Configure JFR with JVM arguments instead, and let the JVM own the recording:
+///
+/// ```
+/// -XX:FlightRecorderOptions=repository=/var/pinot/jfr,preserve-repository=true,maxchunksize=12M
+/// -XX:StartFlightRecording=name=pinot,settings=default,disk=true,maxsize=2147483648,dumponexit=false
+/// ```
+///
+/// The Helm chart renders exactly these flags: set `<role>.jfr.enabled` and tune the shared
+/// `jfr` block. Starting the recording from outside the JVM is strictly better than starting it
+/// from here:
+///
+///   - It records from the first instruction. This class cannot start before the component has
+///     connected to Helix and read cluster config, so everything up to that point — class
+///     loading, plugin init, segment preload, the ZooKeeper connect itself — is never captured.
+///   - It does not depend on ZooKeeper being reachable, which is not a safe assumption in exactly
+///     the incidents a profile would help with.
+///   - It cannot lose history. `JFR.stop` without a filename deletes the whole repository, so any
+///     change to a `pinot.jfr.*` key here silently discards every recorded chunk.
+///
+/// Note that JFR bounds the repository of the *running* JVM but never reclaims the repository of a
+/// JVM that already exited, so on a persistent volume something outside the JVM has to delete
+/// them. The Helm chart runs an init container for that; it can do so safely because init
+/// containers finish before the Pinot process starts, which means every directory it sees belongs
+/// to a run that is already over.
+///
+/// A recording started by `-XX:StartFlightRecording` remains fully controllable at runtime through
+/// `jcmd` (`JFR.dump`, `JFR.check`) and through the `jdk.jfr` API, so nothing is given up by
+/// moving the flags out of cluster config.
+///
+/// Thread safety: every mutation goes through `GLOBAL_RECORDING_LOCK`, but the state is split.
+/// `GLOBAL_RECORDINGS` is static, because JFR recordings belong to the JVM rather than to any one
+/// instance; `_running`, `_recordingName` and `_currentConfig` are per-instance, which is what makes
+/// the reference counting in `GLOBAL_RECORDINGS` meaningful. The one exception to the lock is the
+/// `_currentConfig` short-circuit at the top of [#onChange], which is an intentionally racy fast
+/// path - it is re-checked under the lock before anything is acted on. In production [#INSTANCE] is
+/// the only instance: every component registers that same object as a config listener.
+@Deprecated(since = "1.6.0", forRemoval = true)
+// Suppresses warnings for this class's own use of the deprecated CommonConstants.JFR prefix. Call sites outside
+// this deprecated subsystem are deliberately left warning, so they surface when the removal happens.
+@SuppressWarnings("removal")
 public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ContinuousJfrStarter.class);
+  private static final AtomicBoolean DEPRECATION_WARNING_LOGGED = new AtomicBoolean();
+  private static final AtomicBoolean JVM_ARGUMENT_WARNING_LOGGED = new AtomicBoolean();
   private static final String JFR_CONFIGURE_COMMAND = "jfrConfigure";
   private static final String JFR_START_COMMAND = "jfrStart";
   private static final String JFR_STOP_COMMAND = "jfrStop";
@@ -217,12 +262,40 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   protected static void resetGlobalStateForTesting() {
     synchronized (GLOBAL_RECORDING_LOCK) {
       GLOBAL_RECORDINGS.clear();
+      DEPRECATION_WARNING_LOGGED.set(false);
+      JVM_ARGUMENT_WARNING_LOGGED.set(false);
     }
   }
 
   @GuardedBy("GLOBAL_RECORDING_LOCK")
   private boolean applyConfig(PinotConfiguration subset, Map<String, Object> newSubsetMap) {
     boolean enabled = subset.getProperty(ENABLED, DEFAULT_ENABLED);
+    if (enabled && DEPRECATION_WARNING_LOGGED.compareAndSet(false, true)) {
+      LOGGER.warn("The '{}.*' cluster configs are deprecated and will be removed. Start JFR with JVM arguments "
+              + "instead, e.g. -XX:FlightRecorderOptions=repository=<dir>,preserve-repository=true and "
+              + "-XX:StartFlightRecording=name={},settings=default,disk=true,maxsize=<bytes>,dumponexit=false. "
+              + "The Helm chart renders these from the 'jfr' values block. Note that JFR does not reclaim "
+              + "repositories left by previous JVM runs, so schedule cleanup outside the JVM",
+          CommonConstants.JFR, subset.getProperty(NAME, DEFAULT_NAME));
+    }
+    if (enabled && isRecordingConfiguredByJvmArgument()) {
+      // Both mechanisms drive the same per-JVM recorder, and this one would win destructively:
+      // applyRuntimeOptions issues `JFR.configure repositorypath=...`, which is JVM-global and
+      // relocates the recording the JVM already started - typically off the volume it was meant to
+      // be written to. Stand down and leave the JVM's own recording alone.
+      if (JVM_ARGUMENT_WARNING_LOGGED.compareAndSet(false, true)) {
+        LOGGER.warn("Ignoring the deprecated '{}.*' cluster configs because this JVM was started with "
+                + "-XX:StartFlightRecording or -XX:FlightRecorderOptions, which already own the flight recorder. "
+                + "Remove the '{}.*' cluster configs to silence this message",
+            CommonConstants.JFR, CommonConstants.JFR);
+      } else {
+        // The warning is latched, so say something per ignored change rather than going silent.
+        LOGGER.info("Ignoring a change to the deprecated '{}.*' cluster configs; the flight recorder is owned by "
+            + "JVM arguments", CommonConstants.JFR);
+      }
+      _currentConfig = newSubsetMap;
+      return true;
+    }
     if (!enabled) {
       if (!releaseRecordingReference()) {
         return false;
@@ -561,6 +634,32 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     } catch (Exception e) {
       throw new RuntimeException("Failed to delete path '" + path + "'", e);
     }
+  }
+
+  /// Whether the flight recorder is configured by JVM arguments, in which case the JVM owns it and
+  /// this class must not touch it.
+  ///
+  /// Deliberately reads the JVM's input arguments rather than asking [jdk.jfr.FlightRecorder] which
+  /// recordings exist: recordings this class started itself would also show up there, and the two
+  /// cases need different handling.
+  @VisibleForTesting
+  protected boolean isRecordingConfiguredByJvmArgument() {
+    return isRecordingConfiguredByJvmArgument(ManagementFactory.getRuntimeMXBean().getInputArguments());
+  }
+
+  /// Both flags matter, not just the one that starts a recording. `-XX:FlightRecorderOptions` is
+  /// what sets `repositorypath`, so a JVM carrying only that flag is still one whose repository
+  /// would be relocated by [#applyRuntimeOptions] - the very thing the caller is guarding against.
+  ///
+  /// Matched by prefix because both flags accept `=` and `:` separators.
+  @VisibleForTesting
+  static boolean isRecordingConfiguredByJvmArgument(List<String> jvmArguments) {
+    for (String argument : jvmArguments) {
+      if (argument.startsWith("-XX:StartFlightRecording") || argument.startsWith("-XX:FlightRecorderOptions")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @VisibleForTesting
