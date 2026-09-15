@@ -38,12 +38,19 @@ public class SegmentStates {
   private final Map<String, List<SegmentInstanceCandidate>> _instanceCandidatesMap;
   private final Set<String> _servingInstances;
   private final Set<String> _unavailableSegments;
+  private final Set<String> _segmentsWithoutCandidates;
 
   public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
       Set<String> unavailableSegments) {
+    this(instanceCandidatesMap, servingInstances, unavailableSegments, unavailableSegments);
+  }
+
+  SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
+      Set<String> unavailableSegments, Set<String> segmentsWithoutCandidates) {
     _instanceCandidatesMap = instanceCandidatesMap;
     _servingInstances = servingInstances;
     _unavailableSegments = unavailableSegments;
+    _segmentsWithoutCandidates = segmentsWithoutCandidates;
   }
 
   @Nullable
@@ -57,5 +64,9 @@ public class SegmentStates {
 
   public Set<String> getUnavailableSegments() {
     return _unavailableSegments;
+  }
+
+  Set<String> getSegmentsWithoutCandidates() {
+    return _segmentsWithoutCandidates;
   }
 }
