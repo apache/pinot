@@ -236,6 +236,7 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     boolean hasGroupByClause = pinotQuery.getGroupByList() != null;
     Set<Expression> groupByExprs = hasGroupByClause ? new HashSet<>(pinotQuery.getGroupByList()) : null;
+    validateHavingClause(pinotQuery, hasGroupByClause, groupByExprs);
     int aggregateExprCount = 0;
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (isAggregateExpression(selectExpression)) {
@@ -288,6 +289,71 @@ public class CalciteSqlParser {
         }
       }
     }
+  }
+
+  /// Rejects a HAVING clause that the single-stage engine would otherwise drop.
+  ///
+  /// HAVING is evaluated only while reducing a GROUP BY aggregation. Applied to any other shape the predicate used to
+  /// be discarded silently, so the query answered as if the clause were absent.
+  ///
+  /// A HAVING clause imposes grouping semantics: without a GROUP BY the whole table becomes a single group. Every
+  /// expression in HAVING, and in the SELECT list of a query with no GROUP BY, must therefore be an aggregation, a
+  /// literal, or functionally dependent on the GROUP BY columns -- the rule the multi-stage engine applies through
+  /// Calcite ("Expression 'x' is not being grouped").
+  ///
+  /// A GROUP BY carrying no aggregation anywhere is rejected on top of that rule. The engine has no grouping operator
+  /// for such a query: [org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter] turns it
+  /// into a DISTINCT, which has no reduce step that can evaluate a HAVING filter. Moving the predicate into WHERE
+  /// would be equivalent for a single-valued grouping column, but not for a multi-valued one -- GROUP BY builds one
+  /// group per value while WHERE keeps whole rows -- and the rewriter has no schema to tell them apart. The
+  /// multi-stage engine does support this shape.
+  private static void validateHavingClause(PinotQuery pinotQuery, boolean hasGroupByClause,
+      @Nullable Set<Expression> groupByExprs)
+      throws SqlCompilationException {
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression == null) {
+      return;
+    }
+    Set<Expression> groupedExprs = hasGroupByClause ? groupByExprs : Set.of();
+    if (expressionOutsideGroupByList(havingExpression, groupedExprs)) {
+      throw new SqlCompilationException("'" + RequestUtils.prettyPrint(havingExpression) + "' in HAVING clause must "
+          + (hasGroupByClause ? "be an aggregate or functionally dependent on the columns used in GROUP BY clause."
+              : "be an aggregate: with no GROUP BY clause the whole table is a single group."));
+    }
+    if (!hasGroupByClause) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        if (expressionOutsideGroupByList(selectExpression, groupedExprs)) {
+          throw new SqlCompilationException("'" + RequestUtils.prettyPrint(selectExpression) + "' must be an aggregate:"
+              + " with a HAVING clause and no GROUP BY clause the whole table is a single group.");
+        }
+      }
+      return;
+    }
+    if (!hasAggregation(pinotQuery)) {
+      throw new SqlCompilationException("HAVING is not supported on a GROUP BY query without an aggregation in the "
+          + "single-stage query engine. Move the predicate to the WHERE clause, or use the multi-stage query engine.");
+    }
+  }
+
+  /// Returns `true` if an aggregation appears anywhere the engine would compute one: the SELECT list, the HAVING
+  /// clause or the ORDER-BY list.
+  private static boolean hasAggregation(PinotQuery pinotQuery) {
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      if (isAggregateExpression(selectExpression)) {
+        return true;
+      }
+    }
+    if (pinotQuery.getHavingExpression() != null && isAggregateExpression(pinotQuery.getHavingExpression())) {
+      return true;
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression orderByExpression : pinotQuery.getOrderByList()) {
+        if (isAggregateExpression(orderByExpression)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
