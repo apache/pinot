@@ -99,12 +99,16 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
+    // multiStageLeafLimit tightening: cap survived visitor AND query is truncation-sensitive
+    if ("LITE_CAP".equals(_queryContext.getQueryOptions().get("leafLimitTruncationRisk"))
+        && baseResultsBlock.getNumDocsScanned() > _queryContext.getLimit()) {
+      instanceResponseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
+    // Lite-mode implicit limit (PR #18725): planner inserted a limit the user didn't ask for
     Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
         _queryContext.getQueryOptions());
-    // false-positive when table has exactly implicitLimit rows
     if (implicitLimit != null && baseResultsBlock.getNumRows() >= implicitLimit) {
-      instanceResponseBlock.addMetadata(
-          MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+      instanceResponseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
     }
     return instanceResponseBlock;
   }
