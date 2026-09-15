@@ -55,6 +55,7 @@ public final class MetricFieldSpec extends FieldSpec {
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
+    checkMutable();
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
   }
 
