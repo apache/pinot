@@ -175,6 +175,10 @@ public class PinotQueryRuleSets {
       PinotAggregateFunctionRewriteRule
           .instanceWithDescription(PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE),
 
+      // Must stay ahead of PinotAggregateExchangeNodeInsertRule (POST_LOGICAL), which fixes the leaf-to-final
+      // intermediate result format from the function name.
+      PinotApproximateAggregateRewriteRule.INSTANCE,
+
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
       AggregateCaseToFilterRule.Config.DEFAULT

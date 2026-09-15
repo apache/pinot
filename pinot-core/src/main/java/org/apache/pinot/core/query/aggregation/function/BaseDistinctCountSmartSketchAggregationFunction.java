@@ -61,6 +61,10 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
   protected abstract Object convertSetToSketch(Set valueSet, DataType storedType);
 
+  /// Adds every value of the set into a sketch that [#convertSetToSketch] already created. Used to fold the values
+  /// that arrive after a group has been converted, without building a second sketch.
+  protected abstract void addSetToSketch(Object sketch, Set valueSet, DataType storedType);
+
   protected abstract Object convertToSketch(DictIdsWrapper dictIdsWrapper);
 
   protected abstract IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue);
@@ -383,6 +387,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
           throw getIllegalDataTypeException(valueType, false);
       }
     }
+    checkAndConvertValueSetsForGroups(groupByResultHolder, groupKeyArray, length, storedType);
   }
 
   @Override
@@ -556,6 +561,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
           throw getIllegalDataTypeException(valueType, false);
       }
     }
+    checkAndConvertValueSetsForGroups(groupByResultHolder, groupKeysArray, length, storedType);
   }
 
   @Override
@@ -586,9 +592,16 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
     if (result instanceof DictIdsWrapper) {
       return convertToValueSet((DictIdsWrapper) result);
-    } else {
-      return result;
     }
+    if (result instanceof SketchWithPendingValues) {
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (!converted._pendingValues.isEmpty()) {
+        addSetToSketch(converted._sketch, converted._pendingValues, converted._storedType);
+        converted._pendingValues.clear();
+      }
+      return converted._sketch;
+    }
+    return result;
   }
 
   /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
@@ -643,14 +656,19 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /// Returns the value set for the given group key or creates a new one if it does not exist.
+  /// Returns the value set for the given group key or creates a new one if it does not exist. A group that already
+  /// converted to a sketch returns the pending set instead, which the next threshold check folds into the sketch.
   protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
-    Set valueSet = groupByResultHolder.getResult(groupKey);
-    if (valueSet == null) {
-      valueSet = getValueSet(valueType);
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      Set valueSet = getValueSet(valueType);
       groupByResultHolder.setValueForKey(groupKey, valueSet);
+      return valueSet;
     }
-    return valueSet;
+    if (result instanceof SketchWithPendingValues) {
+      return ((SketchWithPendingValues) result)._pendingValues;
+    }
+    return (Set) result;
   }
 
   /// Helper method to set dictionary id for the given group keys into the result holder.
@@ -792,6 +810,52 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
+  /// Converts the value set of every group touched by this batch into a sketch once it exceeds the threshold, and
+  /// folds later values into the sketch of an already converted group. Without this the per-group value sets of a
+  /// non-dictionary column grow without bound for the whole segment, because the only other check runs at merge time.
+  /// Runs as a second pass over the batch rather than inline, because the values land in the typed sets through the
+  /// static [#getValueSet], which has no access to the threshold.
+  private void checkAndConvertValueSetsForGroups(GroupByResultHolder groupByResultHolder, int[] groupKeyArray,
+      int length, DataType storedType) {
+    int threshold = getThreshold();
+    if (threshold == Integer.MAX_VALUE) {
+      return;
+    }
+    for (int i = 0; i < length; i++) {
+      checkAndConvertValueSetForGroup(groupByResultHolder, groupKeyArray[i], storedType, threshold);
+    }
+  }
+
+  private void checkAndConvertValueSetsForGroups(GroupByResultHolder groupByResultHolder, int[][] groupKeysArray,
+      int length, DataType storedType) {
+    int threshold = getThreshold();
+    if (threshold == Integer.MAX_VALUE) {
+      return;
+    }
+    for (int i = 0; i < length; i++) {
+      for (int groupKey : groupKeysArray[i]) {
+        checkAndConvertValueSetForGroup(groupByResultHolder, groupKey, storedType, threshold);
+      }
+    }
+  }
+
+  private void checkAndConvertValueSetForGroup(GroupByResultHolder groupByResultHolder, int groupKey,
+      DataType storedType, int threshold) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof SketchWithPendingValues) {
+      // Draining on every batch keeps the pending set bounded by the distinct values of a single batch.
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (!converted._pendingValues.isEmpty()) {
+        addSetToSketch(converted._sketch, converted._pendingValues, storedType);
+        converted._pendingValues.clear();
+      }
+    } else if (result instanceof Set && ((Set) result).size() > threshold) {
+      groupByResultHolder.setValueForKey(groupKey,
+          new SketchWithPendingValues(convertSetToSketch((Set) result, storedType), getValueSet(storedType),
+              storedType));
+    }
+  }
+
   /// Check and convert to sketch if cardinality threshold exceeded for group-by aggregation.
   private void checkAndConvertToSketchForGroups(GroupByResultHolder groupByResultHolder, IntSet modifiedGroups) {
     int threshold = getDictIdCardinalityThreshold();
@@ -807,6 +871,20 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
           groupByResultHolder.setValueForKey(groupKey, convertToSketch(dictIdsWrapper));
         }
       }
+    }
+  }
+
+  /// Per-group state after a group converted to a sketch. New values keep landing in a plain set, which the next
+  /// threshold check folds into the sketch, so the typed aggregation loops never see a sketch.
+  private static final class SketchWithPendingValues {
+    final Object _sketch;
+    final DataType _storedType;
+    final Set _pendingValues;
+
+    SketchWithPendingValues(Object sketch, Set pendingValues, DataType storedType) {
+      _sketch = sketch;
+      _pendingValues = pendingValues;
+      _storedType = storedType;
     }
   }
 

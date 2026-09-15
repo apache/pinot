@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -168,6 +170,83 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
 
     int cardinality = function.extractFinalResult(extracted);
     assertTrue(cardinality >= 90 && cardinality <= 110, "Cardinality out of range: " + cardinality);
+  }
+
+  @Test
+  public void testRawValueGroupBySvStaysExactBelowThreshold() {
+    DistinctCountSmartHLLAggregationFunction function = newFunctionWithThreshold(100);
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+    function.aggregateGroupBySV(3, new int[]{0, 0, 1}, holder,
+        Map.of(ExpressionContext.forIdentifier("col"), SyntheticBlockValSets.Int.create(null, new int[]{1, 2, 3})));
+
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof Set);
+    assertTrue(function.extractGroupByResult(holder, 1) instanceof Set);
+  }
+
+  /// Values that arrive after a group converted must reach that group's sketch, not a fresh value set.
+  @Test
+  public void testRawValueGroupBySvKeepsFeedingTheSketchAfterConversion() {
+    DistinctCountSmartHLLAggregationFunction function = newFunctionWithThreshold(4);
+    int[] groupKeys = {0, 0, 0};
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+    ExpressionContext column = ExpressionContext.forIdentifier("col");
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(column, SyntheticBlockValSets.Int.create(null, new int[]{1, 2, 3})));
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof Set);
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(column, SyntheticBlockValSets.Int.create(null, new int[]{4, 5, 6})));
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof HyperLogLog);
+
+    function.aggregateGroupBySV(3, groupKeys, holder,
+        Map.of(column, SyntheticBlockValSets.Int.create(null, new int[]{7, 8, 9})));
+    Object result = function.extractGroupByResult(holder, 0);
+    assertTrue(result instanceof HyperLogLog);
+    assertEquals(function.extractFinalResult(result), 9);
+  }
+
+  @Test
+  public void testRawValueGroupByMvConvertsEveryGroupTheRowBelongsTo() {
+    DistinctCountSmartHLLAggregationFunction function = newFunctionWithThreshold(3);
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+    int[][] groupKeysArray = {{0, 1}, {0, 1}, {0, 1}, {0, 1}};
+
+    function.aggregateGroupByMV(4, groupKeysArray, holder,
+        Map.of(ExpressionContext.forIdentifier("col"), SyntheticBlockValSets.Int.create(null, new int[]{1, 2, 3, 4})));
+
+    for (int groupKey = 0; groupKey < 2; groupKey++) {
+      Object result = function.extractGroupByResult(holder, groupKey);
+      assertTrue(result instanceof HyperLogLog, "Group " + groupKey + " was not converted: " + result);
+      assertEquals(function.extractFinalResult(result), 4);
+    }
+  }
+
+  /// BYTES values are the one branch of `addSetToSketch` that unwraps a [org.apache.pinot.spi.utils.ByteArray] before
+  /// hashing, so it has to fold post-conversion values into the sketch the same way the initial conversion did.
+  @Test
+  public void testRawValueGroupByConvertsBytesColumn() {
+    DistinctCountSmartHLLAggregationFunction function = newFunctionWithThreshold(2);
+    int[] groupKeys = {0, 0, 0};
+    ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+    ExpressionContext column = ExpressionContext.forIdentifier("col");
+
+    function.aggregateGroupBySV(3, groupKeys, holder, Map.of(column,
+        SyntheticBlockValSets.Bytes.create(null, new byte[][]{{1}, {2}, {3}})));
+    assertTrue(function.extractGroupByResult(holder, 0) instanceof HyperLogLog);
+
+    // Values that arrive after the conversion must reach the same sketch, and must be hashed the same way.
+    function.aggregateGroupBySV(3, groupKeys, holder, Map.of(column,
+        SyntheticBlockValSets.Bytes.create(null, new byte[][]{{3}, {4}, {5}})));
+    Object result = function.extractGroupByResult(holder, 0);
+    assertTrue(result instanceof HyperLogLog);
+    assertEquals(function.extractFinalResult(result), 5);
+  }
+
+  private static DistinctCountSmartHLLAggregationFunction newFunctionWithThreshold(int threshold) {
+    return new DistinctCountSmartHLLAggregationFunction(
+        List.of(ExpressionContext.forIdentifier("col"),
+            ExpressionContext.forLiteral(DataType.STRING, "threshold=" + threshold)), false);
   }
 
   @Test

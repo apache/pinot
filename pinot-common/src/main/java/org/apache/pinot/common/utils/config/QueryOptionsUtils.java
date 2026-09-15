@@ -437,6 +437,14 @@ public class QueryOptionsUtils {
     return new HashSet<>(List.of(useRules));
   }
 
+  /// Returns the per-query override of the approximate-function rewrite, or `null` if the query does not set one, in
+  /// which case the table config and then the cluster/broker default decide.
+  @Nullable
+  public static Boolean isUseApproximateFunction(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.USE_APPROXIMATE_FUNCTION,
+        queryOptions.get(QueryOptionKey.USE_APPROXIMATE_FUNCTION));
+  }
+
   @Nullable
   public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
     String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);

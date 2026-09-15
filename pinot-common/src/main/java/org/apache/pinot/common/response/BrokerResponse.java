@@ -311,6 +311,15 @@ public interface BrokerResponse {
   /// @return true if RLS filters were applied, false otherwise
   boolean getRLSFiltersApplied();
 
+  /// Set whether the broker rewrote an exact aggregation into its approximate counterpart, for example
+  /// `DISTINCT_COUNT` into `DISTINCT_COUNT_SMART_HLL`. The result is then approximate, not exact.
+  /// @param approximateFunctionApplied true if at least one function was rewritten
+  void setApproximateFunctionApplied(boolean approximateFunctionApplied);
+
+  /// Get whether the broker rewrote an exact aggregation into its approximate counterpart.
+  /// @return true if at least one function was rewritten, false otherwise
+  boolean isApproximateFunctionApplied();
+
   /// Get the materialized view table name that was hit (used) for this query, or `null`
   /// if no materialized view was used.  The default returns `null` so impls that do not track MV
   /// rewrite (e.g. MSE response paths) need no explicit override; the matching *setter* is
