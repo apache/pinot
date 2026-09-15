@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -199,6 +200,71 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
       assertEquals(segmentMetadata.getStartOffset(), "1");
       assertEquals(segmentMetadata.getEndOffset(), "100");
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  /// The decoderClass constructor overload must persist the decoder under custom.decoder.class in segment metadata,
+  /// and the delegating (no-decoder) constructor must leave the key absent.
+  @Test
+  public void testDecoderClassWrittenToSegmentMetadata()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension(STRING_COLUMN1, DataType.STRING)
+        .addSingleValueDimension(LONG_COLUMN2, DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    String tableNameWithType = tableConfig.getTableName();
+    String decoderClass = "org.apache.pinot.plugin.inputformat.clplog.CLPLogMessageDecoder";
+
+    SegmentMetadataImpl withDecoder =
+        buildAndReadMetadata(tmpDir, "withDecoder", tableConfig, schema, tableNameWithType, decoderClass);
+    assertEquals(withDecoder.getCustomMap().get(V1Constants.MetadataKeys.Segment.DECODER_CLASS), decoderClass);
+
+    SegmentMetadataImpl withoutDecoder =
+        buildAndReadMetadata(tmpDir, "withoutDecoder", tableConfig, schema, tableNameWithType, null);
+    assertFalse(withoutDecoder.getCustomMap().containsKey(V1Constants.MetadataKeys.Segment.DECODER_CLASS));
+  }
+
+  private SegmentMetadataImpl buildAndReadMetadata(File tmpDir, String suffix, TableConfig tableConfig, Schema schema,
+      String tableNameWithType, String decoderClass)
+      throws Exception {
+    String segmentName = "testTable__0__0__" + suffix;
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(segmentName)
+        .setStreamName(tableNameWithType)
+        .setSchema(schema)
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(1000)
+        .setAvgNumMultiValues(3)
+        .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+        .setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats_" + suffix)))
+        .setConsumerDir(new File(tmpDir, "consumerDir_" + suffix).getAbsolutePath())
+        .build();
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    try {
+      File outputDir = new File(tmpDir, "outputDir_" + suffix);
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false, decoderClass);
+      converter.build(SegmentVersion.v3);
+      return new SegmentMetadataImpl(new File(outputDir, segmentName));
     } finally {
       mutableSegmentImpl.destroy();
     }

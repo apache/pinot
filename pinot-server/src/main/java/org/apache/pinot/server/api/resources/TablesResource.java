@@ -1145,7 +1145,8 @@ public class TablesResource {
               new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionIdToStateMap.entrySet()
                   .stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
-                  recordsLagMap, availabilityLagMsMap)));
+                  recordsLagMap, availabilityLagMsMap),
+              realtimeSegmentDataManager.getDecoderClassName()));
         }
       }
     } catch (Exception e) {
