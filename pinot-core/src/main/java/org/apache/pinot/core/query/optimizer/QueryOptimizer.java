@@ -22,6 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -63,6 +64,9 @@ public class QueryOptimizer {
     // Run statement optimizer after filter has already been optimized.
     for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
       statementOptimizer.optimize(pinotQuery, schema);
+    }
+    if (schema != null) {
+      AggregationFunctionBinder.bind(pinotQuery, schema);
     }
   }
 }

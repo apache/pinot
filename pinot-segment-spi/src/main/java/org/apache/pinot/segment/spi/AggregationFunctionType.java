@@ -20,12 +20,16 @@ package org.apache.pinot.segment.spi;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.ExplicitOperatorBinding;
+import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
@@ -38,15 +42,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 
 /// NOTES:
 /// - No underscore is allowed in the enum name.
 /// - '$' is allowed in the name field but not in the enum name.
 ///
 /// This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
-/// The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
-/// to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
-/// the v1 and multistage engines.
+/// Both engines use the registered return type inference to bind polymorphic aggregation calls. The remaining
+/// SQL metadata registers aggregation functions with Calcite in the multistage engine.
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -63,12 +68,47 @@ public enum AggregationFunctionType {
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  MODE("mode", new ModeReturnTypeInference(), OperandTypes.or(
+      OperandTypes.NUMERIC, OperandTypes.CHARACTER, OperandTypes.TIMESTAMP, OperandTypes.BOOLEAN,
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+      ReturnTypes.explicit(SqlTypeName.OTHER), null, SqlKind.MODE) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount == 1 || argumentCount == 2;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
+  ANYVALUE("anyValue", new AnyValueReturnTypeInference(), OperandTypes.ANY, SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount == 1;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
+  FIRSTWITHTIME("firstWithTime", new FirstLastReturnTypeInference(), OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount == 2;
+    }
+  },
+  LASTWITHTIME("lastWithTime", new FirstLastReturnTypeInference(), OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount == 2;
+    }
+  },
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /// for all distinct count family functions:
@@ -174,16 +214,66 @@ public enum AggregationFunctionType {
   EXPRMIN("exprMin", ReturnTypes.ARG0, OperandTypes.VARIADIC, SqlTypeName.OTHER),
   EXPRMAX("exprMax", ReturnTypes.ARG0, OperandTypes.VARIADIC, SqlTypeName.OTHER),
   PINOTPARENTAGGEXPRMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
-      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER),
+      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount >= 4;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
   PINOTPARENTAGGEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
-      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER),
+      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount >= 4;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
   PINOTCHILDAGGEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
-      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount >= 2;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
   PINOTCHILDAGGEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
-      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount >= 2;
+    }
+
+    @Override
+    public boolean supportsLegacyUnboundCalls() {
+      return true;
+    }
+  },
 
   // Array aggregate functions
-  ARRAYAGG("arrayAgg", new ArrayOfComponentReturnTypeInference(), OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  ARRAYAGG("arrayAgg", new ArrayOfComponentReturnTypeInference(), OperandTypes.VARIADIC, SqlTypeName.OTHER) {
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount) {
+      return argumentCount == 1 || argumentCount == 2;
+    }
+
+    @Override
+    public boolean isTypeBindingRequired(int argumentCount, IntPredicate isStringLiteral) {
+      return argumentCount == 1 || argumentCount == 2 && !isStringLiteral.test(1);
+    }
+  },
   LISTAGG("listAgg", SqlTypeName.OTHER, SqlTypeName.VARCHAR),
 
   SUMARRAYLONG("sumArrayLong", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.ARRAY, SqlTypeName.OTHER),
@@ -345,6 +435,24 @@ public enum AggregationFunctionType {
     return _sqlKind;
   }
 
+  /// Whether this overload requires schema-derived operand and result types before execution.
+  /// Both query engines use the registered return type inference to bind these calls.
+  public boolean isTypeBindingRequired(int argumentCount) {
+    return false;
+  }
+
+  /// Whether existing calls can keep their original unbound execution when a native input lacks schema metadata.
+  /// This does not permit fallback for invalid expressions, unsupported input types, or new inferred overloads.
+  public boolean supportsLegacyUnboundCalls() {
+    return false;
+  }
+
+  /// Distinguishes inferred overloads from legacy overloads with explicit string type arguments. The callback is
+  /// queried only for operands relevant to overload selection, so legacy calls need no schema-based resolution.
+  public boolean isTypeBindingRequired(int argumentCount, IntPredicate isStringLiteral) {
+    return isTypeBindingRequired(argumentCount);
+  }
+
   public static boolean isAggregationFunction(String functionName) {
     if (NAMES.contains(functionName)) {
       return true;
@@ -413,6 +521,68 @@ public enum AggregationFunctionType {
     }
   }
 
+  /// ANY_VALUE keeps a supported scalar input's logical SQL type, even when no row supplies a value.
+  private static class AnyValueReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      SqlTypeName type = opBinding.getOperandType(0).getSqlTypeName();
+      checkArgument(isSupportedScalarType(type), "Unsupported ANY_VALUE input type: %s", type);
+      return ReturnTypes.ARG0_NULLABLE_IF_EMPTY.inferReturnType(opBinding);
+    }
+  }
+
+  private static boolean isSupportedScalarType(SqlTypeName type) {
+    return SqlTypeName.INT_TYPES.contains(type) || type == SqlTypeName.FLOAT || type == SqlTypeName.REAL
+        || type == SqlTypeName.DOUBLE || type == SqlTypeName.DECIMAL || type == SqlTypeName.BOOLEAN
+        || type == SqlTypeName.TIMESTAMP || SqlTypeName.STRING_TYPES.contains(type)
+        || SqlTypeName.BINARY_TYPES.contains(type) || type == SqlTypeName.UUID;
+  }
+
+  /// MODE preserves logical non-numeric types and the legacy DOUBLE result for numeric inputs.
+  private static class ModeReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataType operandType = opBinding.getOperandType(0);
+      SqlTypeName typeName = operandType.getSqlTypeName();
+      boolean numeric = SqlTypeName.INT_TYPES.contains(typeName) || typeName == SqlTypeName.FLOAT
+          || typeName == SqlTypeName.REAL || typeName == SqlTypeName.DOUBLE;
+      checkArgument(numeric || SqlTypeName.STRING_TYPES.contains(typeName) || typeName == SqlTypeName.TIMESTAMP
+          || typeName == SqlTypeName.BOOLEAN, "Unsupported MODE input type: %s", typeName);
+      if (opBinding.getOperandCount() == 2
+          && (opBinding instanceof SqlCallBinding || opBinding instanceof ExplicitOperatorBinding)) {
+        checkArgument(opBinding.isOperandLiteral(1, false), "MODE tie reducer must be a literal");
+        String reducer = opBinding.getOperandLiteralValue(1, String.class);
+        reducer = reducer != null ? reducer.toUpperCase(Locale.ROOT) : null;
+        checkArgument("MIN".equals(reducer) || "MAX".equals(reducer) || numeric && "AVG".equals(reducer),
+            "MODE for %s supports %s tie reducers, got: %s", typeName, numeric ? "MIN, MAX or AVG" : "MIN or MAX",
+            reducer);
+      }
+      return numeric
+          ? opBinding.getTypeFactory().createTypeWithNullability(
+              opBinding.getTypeFactory().createSqlType(SqlTypeName.DOUBLE), true)
+          : ReturnTypes.ARG0_NULLABLE_IF_EMPTY.inferReturnType(opBinding);
+    }
+  }
+
+  /// The two-argument first/last overload retains the logical value type, independent of its stored representation.
+  private static class FirstLastReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      if (opBinding.getOperandCount() == 3) {
+        return ReturnTypes.ARG0.inferReturnType(opBinding);
+      }
+      SqlTypeName typeName = opBinding.getOperandType(0).getSqlTypeName();
+      checkArgument(SqlTypeName.INT_TYPES.contains(typeName) || typeName == SqlTypeName.FLOAT
+          || typeName == SqlTypeName.REAL || typeName == SqlTypeName.DOUBLE
+          || SqlTypeName.STRING_TYPES.contains(typeName) || typeName == SqlTypeName.TIMESTAMP
+          || typeName == SqlTypeName.BOOLEAN, "Unsupported first/last input type: %s", typeName);
+      SqlTypeName timeType = opBinding.getOperandType(1).getSqlTypeName();
+      checkArgument(SqlTypeName.INT_TYPES.contains(timeType) || timeType == SqlTypeName.TIMESTAMP,
+          "Unsupported first/last time type: %s; expected INT, LONG or TIMESTAMP", timeType);
+      return ReturnTypes.ARG0_NULLABLE_IF_EMPTY.inferReturnType(opBinding);
+    }
+  }
+
   private static class ArrayReturnTypeInference implements SqlReturnTypeInference {
     final SqlTypeName _sqlTypeName;
 
@@ -436,10 +606,27 @@ public enum AggregationFunctionType {
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
       RelDataType operandType = opBinding.getOperandType(0);
       RelDataType componentType = operandType.getComponentType();
-      if (componentType != null) {
-        return typeFactory.createArrayType(componentType, -1);
+      RelDataType elementType = componentType != null ? componentType : operandType;
+      boolean explicitType = opBinding.getOperandCount() >= 2
+          && SqlTypeName.STRING_TYPES.contains(opBinding.getOperandType(1).getSqlTypeName());
+      if (explicitType && (opBinding instanceof SqlCallBinding || opBinding instanceof ExplicitOperatorBinding)) {
+        checkArgument(opBinding.isOperandLiteral(1, false), "ARRAY_AGG explicit type must be a string literal");
       }
-      return typeFactory.createArrayType(operandType, -1);
+      if (!explicitType) {
+        checkArgument(opBinding.getOperandCount() == 1 || opBinding.getOperandCount() == 2,
+            "Inferred ARRAY_AGG requires an expression and an optional boolean distinct literal");
+        checkArgument(isSupportedScalarType(elementType.getSqlTypeName()),
+            "Unsupported ARRAY_AGG input type: %s", operandType);
+        if (opBinding.getOperandCount() == 2) {
+          checkArgument(opBinding.getOperandType(1).getSqlTypeName() == SqlTypeName.BOOLEAN,
+              "ARRAY_AGG distinct option must be a boolean literal");
+          if (opBinding instanceof SqlCallBinding || opBinding instanceof ExplicitOperatorBinding) {
+            checkArgument(opBinding.isOperandLiteral(1, false) && !opBinding.isOperandNull(1, false),
+                "ARRAY_AGG distinct option must be a non-null boolean literal");
+          }
+        }
+      }
+      return typeFactory.createArrayType(elementType, -1);
     }
   }
 

@@ -42,7 +42,12 @@ public class FirstStringValueWithTimeAggregationFunction extends FirstWithTimeAg
 
   public FirstStringValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.STRING_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    this(dataCol, timeCol, nullHandlingEnabled, false);
+  }
+
+  public FirstStringValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, boolean typeInferred) {
+    super(dataCol, timeCol, ObjectSerDeUtils.STRING_LONG_PAIR_SER_DE, nullHandlingEnabled, typeInferred);
   }
 
   @Override
@@ -90,11 +95,6 @@ public class FirstStringValueWithTimeAggregationFunction extends FirstWithTimeAg
         }
       }
     });
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'STRING')";
   }
 
   @Override

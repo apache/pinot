@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -44,8 +45,11 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -94,9 +98,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
+  private static final Schema BINDING_SCHEMA = new Schema.SchemaBuilder()
+      .addSingleValueDimension("name", DataType.STRING)
+      .addSingleValueDimension("event_time", DataType.TIMESTAMP)
+      .addSingleValueDimension("stored_time", DataType.LONG)
+      .build();
+
 
   @AfterMethod
   public void cleanupMdc() {
@@ -1750,5 +1762,37 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
   private static Set<String> extractLookupTableNames(String sql) {
     return BaseSingleStageBrokerRequestHandler.extractLookupTableNames(CalciteSqlParser.compileToPinotQuery(sql));
+  }
+
+  @Test
+  public void testOverrideIgnoresBindingAndBindsReplacement() {
+    for (boolean sorted : new boolean[]{false, true}) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT trim(MODE(name)) FROM testTable");
+      AggregationFunctionBinder.bind(query, BINDING_SCHEMA);
+      Expression replacement = CalciteSqlParser.compileToExpression("FIRST_WITH_TIME(name,event_time)");
+      Map<Expression, Expression> overrides = Map.of(
+          CalciteSqlParser.compileToExpression("trim(MODE(name))"), replacement);
+      if (sorted) {
+        overrides = new TreeMap<>(overrides);
+      }
+      BaseSingleStageBrokerRequestHandler.handleExpressionOverride(query, overrides, BINDING_SCHEMA);
+      Expression selected = query.getSelectList().get(0);
+      assertEquals(RequestContextUtils.getExpression(selected).toString(), "firstwithtime(name,event_time)");
+      assertEquals(selected.getFunctionCall().getAggregationBinding().getResultType(), "STRING");
+      assertFalse(replacement.getFunctionCall().isSetAggregationBinding());
+    }
+  }
+
+  @Test
+  public void testMaterializedStorageTypePreservesLogicalBinding() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT MODE(event_time) FROM testTable");
+    AggregationFunctionBinder.bind(query, BINDING_SCHEMA);
+    BaseSingleStageBrokerRequestHandler.handleExpressionOverride(query, Map.of(
+        CalciteSqlParser.compileToExpression("event_time"), CalciteSqlParser.compileToExpression("stored_time")),
+        BINDING_SCHEMA);
+    Expression selected = query.getSelectList().get(0);
+    assertEquals(RequestContextUtils.getExpression(selected).toString(), "mode(stored_time)");
+    assertEquals(RequestContextUtils.getExpression(selected).getFunction().getAggregationBinding().getResultType(),
+        ColumnDataType.TIMESTAMP);
   }
 }

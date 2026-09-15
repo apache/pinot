@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /// Helper class to reduce and set gap fill results into the BrokerResponseNative
@@ -156,6 +157,13 @@ public class GapfillProcessor extends BaseGapfillProcessor {
           List<Object[]> aggregatedRows = aggregateGapfilledData(timeCol, bucketedResult, dataSchema);
           for (Object[] aggregatedRow : aggregatedRows) {
             if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
+              // HAVING consumes logical values (for example, Timestamp); format them only for the final response.
+              for (int i = 0; i < aggregatedRow.length; i++) {
+                if (_queryContext.getSelectExpressions().get(i).getType() == ExpressionContext.Type.FUNCTION
+                    && aggregatedRow[i] != null) {
+                  aggregatedRow[i] = dataSchemaForAggregatedResult.getColumnDataType(i).format(aggregatedRow[i]);
+                }
+              }
               result.add(aggregatedRow);
             }
             if (result.size() >= _limitForAggregatedResult) {
@@ -178,10 +186,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     if (rawRowsForBucket != null) {
       for (Object[] resultRow : rawRowsForBucket) {
-        for (int i = 0; i < resultColumnDataTypes.length; i++) {
-          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
-        }
-
+        // The inner ResultTable already contains formatted values, including timestamp strings and nulls.
         long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[_timeBucketColumnIndex]));
         if (timeCol > bucketTime) {
           break;
@@ -276,9 +281,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
 
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    List<Object[]> aggregationRows = toInternalAggregationRows(bucketedRows, dataSchema);
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
-          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i,
+          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), aggregationRows, i,
               _queryContext.isNullHandlingEnabled()));
     }
 
@@ -300,11 +306,44 @@ public class GapfillProcessor extends BaseGapfillProcessor {
         for (int j = 0; j < groupKeyIndexes.size(); j++) {
           Object[] row = aggregatedResult.get(j);
           row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
-          row[i] = aggregationFunction.extractFinalResult(row[i]);
+          Object finalResult = aggregationFunction.extractFinalResult(row[i]);
+          row[i] = finalResult != null ? aggregationFunction.getFinalResultColumnType().convert(finalResult) : null;
         }
       }
     }
     return aggregatedResult;
+  }
+
+  /// The reducer has already formatted inner-query results. RowBasedBlockValSet consumes stored values, so restore
+  /// logical BOOLEAN/TIMESTAMP columns in a private copy before running the outer aggregates.
+  private static List<Object[]> toInternalAggregationRows(List<Object[]> rows, DataSchema schema) {
+    List<Integer> logicalColumns = new ArrayList<>();
+    for (int i = 0; i < schema.size(); i++) {
+      ColumnDataType type = schema.getColumnDataType(i);
+      if (type == ColumnDataType.BOOLEAN || type == ColumnDataType.TIMESTAMP) {
+        logicalColumns.add(i);
+      }
+    }
+    if (logicalColumns.isEmpty()) {
+      return rows;
+    }
+    List<Object[]> converted = new ArrayList<>(rows.size());
+    for (Object[] row : rows) {
+      Object[] copy = row.clone();
+      for (int column : logicalColumns) {
+        Object value = copy[column];
+        if (value == null || value instanceof Number) {
+          continue;
+        }
+        if (schema.getColumnDataType(column) == ColumnDataType.BOOLEAN) {
+          copy[column] = (boolean) value ? 1 : 0;
+        } else {
+          copy[column] = TimestampUtils.toMillisSinceEpoch(value.toString());
+        }
+      }
+      converted.add(copy);
+    }
+    return converted;
   }
 
   private Object getFillValue(int columnIndex, String columnName, Object key, ColumnDataType dataType) {

@@ -44,6 +44,8 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
@@ -190,7 +192,12 @@ public class RexExpressionUtils {
     if (aggFunctions.size() > 1) {
       LOGGER.info("Multiple agg operators found for function: {}, using the first one", functionName);
     }
-    return aggFunctions.get(0);
+    SqlAggFunction function = aggFunctions.get(0);
+    return functionCall.getAggregationBinding() == null
+        ? function
+        : new BoundAggregationFunction(function.getName(), function.getKind(),
+            ReturnTypes.explicit(functionCall.getDataType().toType(cluster.getTypeFactory())), OperandTypes.VARIADIC,
+            function.getFunctionType(), functionCall.getAggregationBinding());
   }
 
   public static RexExpression fromRexNode(RexNode rexNode) {
@@ -526,7 +533,9 @@ public class RexExpressionUtils {
   public static RexExpression.FunctionCall fromAggregateCall(AggregateCall aggregateCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
         getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
-        aggregateCall.isDistinct(), false);
+        aggregateCall.isDistinct(), false, aggregateCall.getAggregation() instanceof BoundAggregationFunction
+            ? ((BoundAggregationFunction) aggregateCall.getAggregation()).getBinding()
+            : null);
   }
 
   public static RexExpression.FunctionCall fromWindowAggregateCall(Window.RexWinAggCall winAggCall) {

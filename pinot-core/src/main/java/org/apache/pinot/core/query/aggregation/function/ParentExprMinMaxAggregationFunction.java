@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
@@ -40,7 +42,10 @@ import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjec
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 
+import static com.google.common.base.Preconditions.checkArgument;
 
+
+/// Collects ExprMin/Max projections with immutable logical schemas when bound. Per-thread wrappers hold block state.
 public class ParentExprMinMaxAggregationFunction extends ParentAggregationFunction<ExprMinMaxObject, ExprMinMaxObject> {
 
   // list of columns that we do min/max on
@@ -57,6 +62,10 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   private final int _numMeasuringColumns;
   // number of columns that we project based on the min/max value
   private final int _numProjectionColumns;
+  @Nullable
+  private final DataSchema _boundMeasuringColumnSchema;
+  @Nullable
+  private final DataSchema _boundProjectionColumnSchema;
 
   // The following variable need to be initialized
 
@@ -73,17 +82,82 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
 
   public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax,
       boolean nullHandlingEnabled) {
+    this(arguments, isMax, nullHandlingEnabled, null);
+  }
 
+  public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax,
+      boolean nullHandlingEnabled, @Nullable AggregateCallBinding binding) {
     super(arguments, nullHandlingEnabled);
+    if (binding != null) {
+      checkArgument(binding.getResultType() == ColumnDataType.OBJECT,
+          "ExprMinMax parent binding must have result type OBJECT");
+      checkArgument(arguments.size() >= 4 && binding.getArgumentTypes().size() == arguments.size(),
+          "ExprMinMax parent binding must match all %s arguments, including a measuring and a projection column",
+          arguments.size());
+      checkArgument(arguments.get(1).getType() == ExpressionContext.Type.LITERAL,
+          "ExprMinMax parent measuring column count must be a literal");
+    }
     _isMax = isMax;
     _functionIdContext = arguments.get(0);
 
     _numMeasuringColumnContext = arguments.get(1);
     _numMeasuringColumns = _numMeasuringColumnContext.getLiteral().getIntValue();
+    if (binding != null) {
+      checkArgument(_numMeasuringColumns > 0 && _numMeasuringColumns <= arguments.size() - 3,
+          "ExprMinMax parent requires at least one measuring and one projection column");
+      for (int i = 2; i < arguments.size(); i++) {
+        ColumnDataType type = binding.getArgumentTypes().get(i);
+        boolean measuring = i < 2 + _numMeasuringColumns;
+        checkArgument(isSupportedBoundType(type, !measuring),
+            "Unsupported ExprMinMax %s column type: %s", measuring ? "measuring" : "projection", type);
+      }
+    }
 
     _measuringColumns = arguments.subList(2, 2 + _numMeasuringColumns);
     _projectionColumns = arguments.subList(2 + _numMeasuringColumns, arguments.size());
     _numProjectionColumns = _projectionColumns.size();
+    if (binding != null) {
+      _boundMeasuringColumnSchema = createBoundSchema(_measuringColumns, binding.getArgumentTypes(), 2);
+      _boundProjectionColumnSchema =
+          createBoundSchema(_projectionColumns, binding.getArgumentTypes(), 2 + _numMeasuringColumns);
+    } else {
+      _boundMeasuringColumnSchema = null;
+      _boundProjectionColumnSchema = null;
+    }
+  }
+
+  private static DataSchema createBoundSchema(List<ExpressionContext> expressions, List<ColumnDataType> argumentTypes,
+      int offset) {
+    String[] names = new String[expressions.size()];
+    ColumnDataType[] types = new ColumnDataType[expressions.size()];
+    for (int i = 0; i < expressions.size(); i++) {
+      names[i] = expressions.get(i).toString();
+      types[i] = argumentTypes.get(offset + i);
+    }
+    return new DataSchema(names, types);
+  }
+
+  private static boolean isSupportedBoundType(ColumnDataType type, boolean allowArray) {
+    switch (type.getStoredType()) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+      case STRING:
+      case BYTES:
+        return true;
+      case INT_ARRAY:
+      case LONG_ARRAY:
+      case FLOAT_ARRAY:
+      case DOUBLE_ARRAY:
+      case BIG_DECIMAL_ARRAY:
+      case STRING_ARRAY:
+      case BYTES_ARRAY:
+        return allowArray;
+      default:
+        return false;
+    }
   }
 
   @Override
@@ -227,13 +301,17 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
     for (int i = 0; i < _projectionColumns.size(); i++) {
       projectionColNames[i] = _projectionColumns.get(i).toString();
       BlockValSet blockValSet = blockValSetMap.get(_projectionColumns.get(i));
-      ExprMinMaxProjectionValSetWrapper wrapper = new ExprMinMaxProjectionValSetWrapper(blockValSet);
+      ExprMinMaxProjectionValSetWrapper wrapper = _boundProjectionColumnSchema != null
+          ? new ExprMinMaxProjectionValSetWrapper(blockValSet, _boundProjectionColumnSchema.getColumnDataType(i),
+              _nullHandlingEnabled) : new ExprMinMaxProjectionValSetWrapper(blockValSet);
       exprMinMaxWrapperProjectionColumnSets.add(wrapper);
       // TODO: Revisit if we should put actual type instead of stored type
       projectionColTypes[i] = wrapper.getStoredType();
     }
     // setup projection column schema
-    _projectionColumnSchema.set(new DataSchema(projectionColNames, projectionColTypes));
+    _projectionColumnSchema.set(_boundProjectionColumnSchema != null
+        ? _boundProjectionColumnSchema
+        : new DataSchema(projectionColNames, projectionColTypes));
   }
 
   private void initializeMeasuringColumnValSet(Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -244,17 +322,27 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
     for (int i = 0; i < _numMeasuringColumns; i++) {
       measuringColNames[i] = _measuringColumns.get(i).toString();
       BlockValSet blockValSet = blockValSetMap.get(_measuringColumns.get(i));
-      ExprMinMaxMeasuringValSetWrapper wrapper = new ExprMinMaxMeasuringValSetWrapper(blockValSet);
+      ExprMinMaxMeasuringValSetWrapper wrapper = _boundMeasuringColumnSchema != null
+          ? new ExprMinMaxMeasuringValSetWrapper(blockValSet, _boundMeasuringColumnSchema.getColumnDataType(i))
+          : new ExprMinMaxMeasuringValSetWrapper(blockValSet);
       exprMinMaxWrapperMeasuringColumnSets.add(wrapper);
       // TODO: Revisit if we should put actual type instead of stored type
       measuringColTypes[i] = wrapper.getStoredType();
     }
     // setup measuring column schema
-    _measuringColumnSchema.set(new DataSchema(measuringColNames, measuringColTypes));
+    _measuringColumnSchema.set(_boundMeasuringColumnSchema != null
+        ? _boundMeasuringColumnSchema
+        : new DataSchema(measuringColNames, measuringColTypes));
   }
 
   // This method is called when the docIdSet is empty meaning that there are no rows that match the filter.
   private void initializeForEmptyDocSet() {
+    if (_boundMeasuringColumnSchema != null) {
+      _measuringColumnSchema.set(_boundMeasuringColumnSchema);
+      _projectionColumnSchema.set(_boundProjectionColumnSchema);
+      // No block wrappers were initialized. A later non-empty segment on this thread must still create them.
+      return;
+    }
     if (_schemaInitialized.get()) {
       return;
     }
@@ -356,5 +444,33 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   @Override
   public ExprMinMaxObject extractFinalResult(@Nullable ExprMinMaxObject exprMinMaxObject) {
     return exprMinMaxObject;
+  }
+
+  /// Constructs ExprMin collectors from the original operand schemas.
+  public static final class MinProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTPARENTAGGEXPRMIN;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ParentExprMinMaxAggregationFunction(function.getArguments(), false, nullHandlingEnabled,
+          function.getAggregationBinding());
+    }
+  }
+
+  /// Constructs ExprMax collectors from the original operand schemas.
+  public static final class MaxProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTPARENTAGGEXPRMAX;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ParentExprMinMaxAggregationFunction(function.getArguments(), true, nullHandlingEnabled,
+          function.getAggregationBinding());
+    }
   }
 }
