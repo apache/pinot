@@ -38,6 +38,11 @@ public final class DropwizardMetricName implements PinotMetricName {
     return _metricName;
   }
 
+  @Override
+  public String getName() {
+    return _metricName;
+  }
+
   /// Overrides equals method by calling the equals from the actual metric name.
   @Override
   public boolean equals(Object obj) {
