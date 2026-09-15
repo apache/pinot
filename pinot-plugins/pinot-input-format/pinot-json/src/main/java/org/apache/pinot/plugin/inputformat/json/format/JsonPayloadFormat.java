@@ -25,10 +25,12 @@ import javax.annotation.Nullable;
 /// The payload encodings the JSON stream decoder understands, selected through the `jsonFormat` decoder
 /// property.
 ///
-/// An unset property means [#TEXT], preserving the decoder's historical behavior exactly. [#AUTO] is opt-in:
-/// detection is a heuristic over a few leading bytes, and while it never mis-routes a well-formed text JSON
-/// document, it can claim a corrupt message that text decoding would have rejected outright. Turning that on
-/// for every existing stream would be a silent correctness change, so operators ask for it explicitly.
+/// An unset property means [#TEXT], preserving the decoder's historical format selection. Floating JSON
+/// literals in text-backed formats ([#TEXT], [#POSTGRES_JSONB]) are `BigDecimal` rather than `Double`, so
+/// high-precision decimals survive ingestion. [#AUTO] is opt-in: detection is a heuristic over a few leading
+/// bytes, and while it never mis-routes a well-formed text JSON document, it can claim a corrupt message that
+/// text decoding would have rejected outright. Turning that on for every existing stream would be a silent
+/// correctness change, so operators ask for it explicitly.
 public enum JsonPayloadFormat {
   /// Detect the encoding per message from its leading magic / version bytes, falling back to text JSON.
   /// Opt-in; see the note on this enum.

@@ -32,8 +32,11 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -43,6 +46,7 @@ import static org.testng.Assert.fail;
 
 
 public class JSONMessageDecoderTest {
+  private static final String PRECISE_DECIMAL = "12345678901234567890.12345678901234567890";
 
   @Test
   public void testDirectDecodePreservesValueConversion()
@@ -165,6 +169,103 @@ public class JSONMessageDecoderTest {
     testJsonDecoder(sourceFields);
   }
 
+  @Test
+  public void testJsonDecoderPreservesBigDecimalPrecision()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), Set.of("decimalMetric", "doubleMetric"), "testTopic");
+
+    byte[] payload = ("{\"decimalMetric\":" + PRECISE_DECIMAL + ",\"doubleMetric\":1.25}").getBytes(
+        StandardCharsets.UTF_8);
+    GenericRow row = decoder.decode(payload, new GenericRow());
+
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
+    assertEquals(((BigDecimal) row.getValue("doubleMetric")).doubleValue(), 1.25d);
+    assertSchemaConversion(row.getValue("decimalMetric"), PRECISE_DECIMAL);
+  }
+
+  @Test
+  public void testJsonDecoderPreservesScientificNotation()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), Set.of("large", "tiny"), "testTopic");
+
+    GenericRow row = decoder.decode("{\"large\":1.23e10,\"tiny\":1.23e-10}".getBytes(StandardCharsets.UTF_8),
+        new GenericRow());
+
+    assertEquals(((BigDecimal) row.getValue("large")).toPlainString(), "12300000000");
+    assertEquals(((BigDecimal) row.getValue("tiny")).toPlainString(), "0.000000000123");
+    assertEquals(PinotDataType.DOUBLE.convert(row.getValue("large"), PinotDataType.BIG_DECIMAL), 1.23e10);
+    assertEquals(PinotDataType.STRING.convert(row.getValue("large"), PinotDataType.BIG_DECIMAL), "12300000000");
+  }
+
+  @Test
+  public void testCustomRecordExtractorAlsoPreservesBigDecimal()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(StreamMessageDecoder.RECORD_EXTRACTOR_CONFIG_KEY, DecimalTypeRecordExtractor.class.getName()),
+        Set.of("decimalMetric"), "testTopic");
+
+    GenericRow row = decoder.decode("{\"decimalMetric\":1.25}".getBytes(StandardCharsets.UTF_8), new GenericRow());
+
+    assertEquals(row.getValue("decimalMetricType"), BigDecimal.class.getName());
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal("1.25"));
+  }
+
+  @Test
+  public void testAutoDetectedTextPreservesBigDecimalPrecision()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "AUTO"), Set.of("decimalMetric"), "testTopic");
+
+    byte[] payload = ("{\"decimalMetric\":" + PRECISE_DECIMAL + "}").getBytes(StandardCharsets.UTF_8);
+    GenericRow row = decoder.decode(payload, new GenericRow());
+
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
+  }
+
+  @Test
+  public void testPostgresJsonbPreservesBigDecimalPrecision()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "POSTGRES_JSONB"), Set.of("decimalMetric"),
+        "testTopic");
+
+    byte[] body = ("{\"decimalMetric\":" + PRECISE_DECIMAL + "}").getBytes(StandardCharsets.UTF_8);
+    byte[] payload = new byte[body.length + 1];
+    payload[0] = 1;
+    System.arraycopy(body, 0, payload, 1, body.length);
+    GenericRow row = decoder.decode(payload, new GenericRow());
+
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
+  }
+
+  public static class DecimalTypeRecordExtractor implements RecordExtractor<Map<String, Object>> {
+    @Override
+    public void init(Set<String> fields, RecordExtractorConfig config) {
+    }
+
+    @Override
+    public GenericRow extract(Map<String, Object> from, GenericRow to) {
+      Object value = from.get("decimalMetric");
+      to.putValue("decimalMetric", value);
+      to.putValue("decimalMetricType", value.getClass().getName());
+      return to;
+    }
+  }
+
+  /// Schema conversion uses the decoded Java type, not the JSON token. Floating literals are BigDecimal
+  /// until PinotDataType maps them onto the target column.
+  private static void assertSchemaConversion(Object decoded, String expectedPlain) {
+    assertEquals(PinotDataType.getSingleValueType(decoded), PinotDataType.BIG_DECIMAL);
+    assertEquals(PinotDataType.BIG_DECIMAL.convert(decoded, PinotDataType.BIG_DECIMAL), new BigDecimal(expectedPlain));
+    assertEquals(PinotDataType.DOUBLE.convert(decoded, PinotDataType.BIG_DECIMAL),
+        new BigDecimal(expectedPlain).doubleValue());
+    assertEquals(PinotDataType.FLOAT.convert(decoded, PinotDataType.BIG_DECIMAL),
+        new BigDecimal(expectedPlain).floatValue());
+    assertEquals(PinotDataType.STRING.convert(decoded, PinotDataType.BIG_DECIMAL), expectedPlain);
+  }
+
   private Schema loadSchema(String resourcePath)
       throws Exception {
     URL resource = getClass().getClassLoader().getResource(resourcePath);
@@ -198,10 +299,10 @@ public class JSONMessageDecoderTest {
               assertEquals(actualValue, expectedValue.asLong());
               break;
             case FLOAT:
-              assertEquals(actualValue, (float) expectedValue.asDouble());
+              assertEquals(((Number) actualValue).floatValue(), (float) expectedValue.asDouble());
               break;
             case DOUBLE:
-              assertEquals(actualValue, expectedValue.asDouble());
+              assertEquals(((Number) actualValue).doubleValue(), expectedValue.asDouble());
               break;
             default:
               fail("Shouldn't arrive here.");
