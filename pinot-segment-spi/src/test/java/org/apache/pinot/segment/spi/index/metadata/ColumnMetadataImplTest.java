@@ -27,12 +27,14 @@ import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -47,6 +49,10 @@ import static org.testng.Assert.expectThrows;
 /// `RAW`. The new "shared dictionary on RAW forward" segment shape is only representable when the key is
 /// explicitly written by the new segment creator.
 public class ColumnMetadataImplTest {
+  // The index-size API works on numeric index ids so this module's tests need no index plugins registered.
+  private static final short FORWARD_ID = 2;
+  private static final short DICTIONARY_ID = 0;
+  private static final short JSON_ID = 5;
 
   /// Old-segment fallback path: no FORWARD_INDEX_ENCODING in metadata, dict present → encoding inferred as DICTIONARY.
   @Test
@@ -205,10 +211,98 @@ public class ColumnMetadataImplTest {
     assertFalse(json.has("dictionaryUncompressedValueSizeInBytes"));
   }
 
-  // The index-size API works on numeric index ids so this module's tests need no index plugins registered.
-  private static final short FORWARD_ID = 2;
-  private static final short DICTIONARY_ID = 0;
-  private static final short JSON_ID = 5;
+  @Test
+  public void transformFunctionRoundtrip() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true))
+        .setTransformFunction(transformFunction)
+        .build();
+
+    assertEquals(meta.getTransformFunction(), transformFunction);
+  }
+
+  @Test
+  public void transformFunctionReadFromPropertiesConfig() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+  }
+
+  @Test
+  public void missingTransformFunctionIsBackwardCompatible() {
+    PropertiesConfiguration config = baseConfig("col");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertNull(metadata.getTransformFunctionBackfilled());
+  }
+
+  @Test
+  public void storedTransformFunctionIsNotBackfilled() {
+    String transformFunction = "plus(col, 1)";
+    ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setTransformFunction(transformFunction)
+        .build();
+
+    assertEquals(meta.getTransformFunction(), transformFunction);
+    assertNull(meta.getTransformFunctionBackfilled());
+  }
+
+  @Test
+  public void backfilledTransformFunctionIsNotAStoredTransform() {
+    String transformFunction = "plus(col, 1)";
+    PropertiesConfiguration config = baseConfig("col");
+    String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escaped);
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BACKFILLED), escaped);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getTransformFunctionBackfilled(), transformFunction);
+  }
+
+  @Test
+  public void legacyBooleanBackfillMarkerReadsExpressionFromTransformFunction() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BACKFILLED), "true");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getTransformFunctionBackfilled(), transformFunction);
+  }
+
+  /// getString() interpolates `${x}` against other keys. Expressions must survive that.
+  @Test
+  public void transformFunctionWithDollarBraceIsNotInterpolated() {
+    String transformFunction = "Groovy({ '${x}' + y }, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty("x", "interpolated");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+  }
 
   @Test
   public void indexSizesAbsentByDefault()

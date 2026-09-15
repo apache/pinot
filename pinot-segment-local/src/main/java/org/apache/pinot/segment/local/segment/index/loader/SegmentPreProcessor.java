@@ -111,6 +111,8 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final IndexLoadingConfig _indexLoadingConfig;
   private final TableConfig _tableConfig;
   private final Schema _schema;
+  // Captured during updateDefaultColumns() so processStarTrees can force a rebuild when derived values change.
+  private Set<String> _columnsWithChangedTransformValues = Set.of();
 
   public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     _segmentDirectory = segmentDirectory;
@@ -159,6 +161,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
               segmentWriter);
+      // Capture before apply: UPDATE_*_TRANSFORM_FUNCTION changes values; BACKFILL does not.
+      _columnsWithChangedTransformValues = defaultColumnHandler.getColumnsWithPendingTransformValueChanges();
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
 
@@ -240,6 +244,13 @@ public class SegmentPreProcessor implements AutoCloseable {
   /// all types of indices and column min/max values are checked against what's set in table config and schema.
   public boolean needProcess()
       throws Exception {
+    return needProcess(true);
+  }
+
+  /// Same as [#needProcess()], with an option to ignore transform-function BACKFILL/UPDATE.
+  /// Record-replay rebuild must not treat those as a rebuild signal.
+  public boolean needProcess(boolean includeTransformFunctionActions)
+      throws Exception {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {
       return false;
@@ -249,8 +260,13 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Check if there is need to update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(null, segmentMetadata, _indexLoadingConfig, null);
-      if (defaultColumnHandler.needUpdateDefaultColumns()) {
-        LOGGER.info("Found default columns need updates in segment: {}", segmentName);
+      if (includeTransformFunctionActions) {
+        if (defaultColumnHandler.needUpdateDefaultColumns()) {
+          LOGGER.info("Found default columns need updates in segment: {}", segmentName);
+          return true;
+        }
+      } else if (defaultColumnHandler.needStructuralDefaultColumnUpdates()) {
+        LOGGER.info("Found structural default columns need updates in segment: {}", segmentName);
         return true;
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
@@ -261,7 +277,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
       // Check if there is need to create/modify/remove star-trees.
-      if (needProcessStarTrees()) {
+      if (needProcessStarTrees(includeTransformFunctionActions, defaultColumnHandler)) {
         LOGGER.info("Found startree index needs updates in segment: {}", segmentName);
         return true;
       }
@@ -294,7 +310,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     return columnMinMaxValueGenerator.columnMinMaxValueUpdates();
   }
 
-  private boolean needProcessStarTrees() {
+  private boolean needProcessStarTrees(boolean includeTransformFunctionValueChanges,
+      DefaultColumnHandler defaultColumnHandler) {
     // Check if there is need to create/modify/remove star-trees.
     if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
       return false;
@@ -310,7 +327,12 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // We need reprocessing if existing configs are to be removed, or new configs have been added
     if (starTreeMetadataList != null) {
-      return StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
+      if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+        return true;
+      }
+      // Config matches, but a star-tree column's stored values are about to change.
+      return includeTransformFunctionValueChanges && StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList,
+          defaultColumnHandler.getColumnsWithPendingTransformValueChanges());
     }
     return !starTreeBuilderConfigs.isEmpty();
   }
@@ -409,15 +431,21 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
     boolean shouldRemoveStarTree = false;
+    boolean transformValuesChangedOnStarTreeColumns = false;
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     if (starTreeMetadataList != null) {
       // There are existing star-trees
+      transformValuesChangedOnStarTreeColumns =
+          StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList, _columnsWithChangedTransformValues);
       if (!shouldGenerateStarTree) {
         // Newer config does not have star-trees. Delete all existing star-trees.
         shouldRemoveStarTree = true;
-      } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-        // Existing and newer both have star-trees, but they don't match. Rebuild the star-trees.
-        LOGGER.info("Change detected in star-trees for segment: {}", segmentName);
+      } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)
+          || transformValuesChangedOnStarTreeColumns) {
+        // Existing and newer both have star-trees, but they don't match, or a star-tree column's values changed
+        // (UPDATE_*_TRANSFORM_FUNCTION). BACKFILL does not populate _columnsWithChangedTransformValues.
+        LOGGER.info("Change detected in star-trees for segment: {} (transformValueChange={})", segmentName,
+            transformValuesChangedOnStarTreeColumns);
       } else {
         // Existing star-trees match the builder configs, no need to generate the star-trees
         shouldGenerateStarTree = false;
@@ -437,9 +465,11 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
-        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set
+        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set.
+        // Force rebuild when transform values changed: reuse would keep stale aggregates because star-tree
+        // config is unchanged after UPDATE_*_TRANSFORM_FUNCTION.
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig);
+            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig, transformValuesChangedOnStarTreeColumns);
         // We don't create the builder using the try-with-resources pattern because builder.close() performs
         // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
         // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an

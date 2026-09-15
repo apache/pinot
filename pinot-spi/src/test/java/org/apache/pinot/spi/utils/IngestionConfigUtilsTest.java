@@ -31,6 +31,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -226,5 +230,34 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(2)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
+  }
+
+  @Test
+  public void testGetTransformFunctionByColumnPrefersIngestionConfigOverSchema() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("derived", DataType.INT, true));
+    schema.getFieldSpecFor("derived").setTransformFunction("plus(col, 1)");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("derived", "plus(col, 2)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    Map<String, String> transformFunctionByColumn =
+        IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, schema);
+    Assert.assertEquals(transformFunctionByColumn, Map.of("derived", "plus(col, 2)"));
+  }
+
+  @Test
+  public void testGetTransformFunctionByColumnFallsBackToSchema() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("derived", DataType.INT, true));
+    schema.getFieldSpecFor("derived").setTransformFunction("plus(col, 1)");
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    Map<String, String> transformFunctionByColumn =
+        IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, schema);
+    Assert.assertEquals(transformFunctionByColumn, Map.of("derived", "plus(col, 1)"));
   }
 }
