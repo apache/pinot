@@ -19,11 +19,13 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.api.gax.paging.Page;
+import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.List;
@@ -33,14 +35,18 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
 /// Unit tests verifying null-safety fixes in GcsPinotFS:
 /// - open() throws FileNotFoundException (not NPE) when the blob does not exist
+/// - openForRead() throws FileNotFoundException (not NPE) when the blob does not exist
 /// - copy() throws FileNotFoundException (not NPE) when the source blob does not exist
 public class GcsPinotFSNullSafetyTest {
 
@@ -79,6 +85,30 @@ public class GcsPinotFSNullSafetyTest {
 
     // Must throw FileNotFoundException, not NullPointerException
     assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.open(uri));
+  }
+
+  @Test
+  public void testOpenForReadThrowsFileNotFoundExceptionWhenBlobDoesNotExist()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/missing-file");
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
+
+    try {
+      _gcsPinotFS.openForRead(uri, 0, 128);
+      fail("Expected FileNotFoundException");
+    } catch (FileNotFoundException ex) {
+      assertEquals(ex.getMessage(), "File '" + uri + "' does not exist");
+    }
+  }
+
+  @Test
+  public void testOpenForReadDoesNotThrowNullPointerException()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/missing-file");
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
+
+    // A ranged read against a missing object must throw FileNotFoundException, not NullPointerException
+    assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.openForRead(uri, 0, 128));
   }
 
   @SuppressWarnings("unchecked")
@@ -132,5 +162,50 @@ public class GcsPinotFSNullSafetyTest {
 
     // Must throw FileNotFoundException, not NullPointerException
     assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.copyDir(srcUri, dstUri));
+  }
+
+  @Test
+  public void testOpenForReadZeroLengthReturnsEmptyStreamWithoutRangedGet()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/file");
+    Blob blob = mock(Blob.class);
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(blob);
+
+    try (InputStream in = _gcsPinotFS.openForRead(uri, 30, 0)) {
+      assertNotNull(in);
+      assertEquals(in.readAllBytes().length, 0);
+    }
+    // A zero-length range must not open a channel; limit == offset formats as an invalid HTTP range header
+    verifyNoInteractions(blob);
+  }
+
+  @Test
+  public void testOpenForReadLimitIsAbsoluteExclusiveEnd()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/file");
+    Blob blob = mock(Blob.class);
+    ReadChannel channel = mock(ReadChannel.class);
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(blob);
+    when(blob.reader()).thenReturn(channel);
+
+    _gcsPinotFS.openForRead(uri, 10, 20);
+
+    verify(channel).seek(10L);
+    verify(channel).limit(30L);
+  }
+
+  @Test
+  public void testOpenForReadSaturatesInsteadOfOverflowing()
+      throws IOException {
+    URI uri = URI.create("gs://test-bucket/file");
+    Blob blob = mock(Blob.class);
+    ReadChannel channel = mock(ReadChannel.class);
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(blob);
+    when(blob.reader()).thenReturn(channel);
+
+    _gcsPinotFS.openForRead(uri, 1, Long.MAX_VALUE);
+
+    // offset + length would wrap negative and trip ReadChannel.limit's own precondition
+    verify(channel).limit(Long.MAX_VALUE);
   }
 }
