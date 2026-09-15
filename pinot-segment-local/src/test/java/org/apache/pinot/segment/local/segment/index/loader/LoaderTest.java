@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -180,6 +181,44 @@ public class LoaderTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
       assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig));
     }
+  }
+
+  /// The segment format conversion is guarded by the all-index preprocess throttler, and so is the index building
+  /// step inside SegmentPreProcessor. Each step takes and releases its own permit, and a segment needing no
+  /// conversion never takes a permit for it.
+  @Test
+  public void testConvertAndPreprocessAcquireAllIndexPreprocessThrottler()
+      throws Exception {
+    constructV1Segment();
+    assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v1);
+
+    AtomicInteger acquireCount = new AtomicInteger();
+    SegmentOperationsThrottler allIndexThrottler = new SegmentOperationsThrottler(1, 2, true) {
+      @Override
+      public void acquire()
+          throws InterruptedException {
+        acquireCount.incrementAndGet();
+        super.acquire();
+      }
+    };
+    SegmentOperationsThrottlerSet throttlerSet =
+        new SegmentOperationsThrottlerSet(allIndexThrottler, new SegmentOperationsThrottler(1, 2, true),
+            new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(1, 2, true));
+
+    // Loading a v1 segment with a v3 config both converts the format and runs the index handlers, taking the permit
+    // once for each step
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, throttlerSet);
+    assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
+    indexSegment.destroy();
+
+    assertEquals(acquireCount.get(), 2);
+    assertEquals(allIndexThrottler.availablePermits(), 1);
+
+    // A load with no conversion to do takes the permit only inside SegmentPreProcessor
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, throttlerSet);
+    indexSegment.destroy();
+    assertEquals(acquireCount.get(), 3);
+    assertEquals(allIndexThrottler.availablePermits(), 1);
   }
 
   private void testConversion()
