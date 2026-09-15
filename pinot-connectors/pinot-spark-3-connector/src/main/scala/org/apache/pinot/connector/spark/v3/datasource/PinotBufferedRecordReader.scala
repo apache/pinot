@@ -53,6 +53,14 @@ class PinotBufferedRecordReader extends RecordReader {
   }
 
   def next(reuse: GenericRow): GenericRow = {
+    // Defensive deep copy: SegmentIndexCreationDriverImpl reads each record across two
+    // passes (statistics and segment build) and runs each row through TransformPipeline.
+    // The pipeline's mainline transformers replace values via putValue (no in-place
+    // mutation), but the RecordReader#next(reuse) SPI does not document a "must not mutate
+    // shared values" precondition, so any future Pinot transformer change that mutates an
+    // Object[] / byte[] / List in place would silently corrupt the second pass via the
+    // shared reference into recordBuffer. The deep copy isolates the two passes from
+    // each other at the cost of 2N transient GenericRow allocations during segment build.
     readCursor += 1
     reuse.clear()
     reuse.init(recordBuffer.get(readCursor - 1).copy())
