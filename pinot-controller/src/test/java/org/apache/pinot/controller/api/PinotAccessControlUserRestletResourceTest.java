@@ -19,7 +19,13 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.swagger.annotations.ApiParam;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.BcryptUtils;
+import org.apache.pinot.controller.api.resources.PinotAccessControlUserRestletResource;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
@@ -30,6 +36,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -53,6 +61,47 @@ public class PinotAccessControlUserRestletResourceTest {
     String usernameWithType = username + "_" + componentType;
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(userConfigString).get(usernameWithType),
         UserConfig.class);
+  }
+
+  private static ApiParam getApiParam(Method method, int parameterIndex) {
+    for (Annotation annotation : method.getParameterAnnotations()[parameterIndex]) {
+      if (annotation instanceof ApiParam) {
+        return (ApiParam) annotation;
+      }
+    }
+    return null;
+  }
+
+  @Test
+  public void testGetUserWithoutComponentReturnsClearBadRequest()
+      throws Exception {
+    Pair<Integer, String> response = ControllerTest.sendGetRequestWithStatusCode(
+        TEST_INSTANCE.getControllerBaseApiUrl() + "/users/testUser", null);
+    assertEquals(response.getLeft().intValue(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(response.getRight().contains("Component type is required"));
+    assertFalse(response.getRight().contains("Cannot invoke"));
+  }
+
+  @Test
+  public void testUserComponentQueryParamIsRequiredInSwagger()
+      throws Exception {
+    Method getUser = PinotAccessControlUserRestletResource.class.getDeclaredMethod("getUser", String.class,
+        String.class);
+    Method deleteUser = PinotAccessControlUserRestletResource.class.getDeclaredMethod("deleteUser", String.class,
+        String.class);
+    Method updateUserConfig = PinotAccessControlUserRestletResource.class.getDeclaredMethod("updateUserConfig",
+        String.class, String.class, boolean.class, String.class);
+
+    ApiParam getUserComponent = getApiParam(getUser, 1);
+    ApiParam deleteUserComponent = getApiParam(deleteUser, 1);
+    ApiParam updateUserComponent = getApiParam(updateUserConfig, 1);
+
+    assertNotNull(getUserComponent);
+    assertNotNull(deleteUserComponent);
+    assertNotNull(updateUserComponent);
+    assertTrue(getUserComponent.required());
+    assertTrue(deleteUserComponent.required());
+    assertTrue(updateUserComponent.required());
   }
 
   @Test
