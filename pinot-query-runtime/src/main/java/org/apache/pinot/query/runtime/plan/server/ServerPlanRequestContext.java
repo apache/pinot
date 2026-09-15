@@ -44,6 +44,8 @@ public class ServerPlanRequestContext {
   private final PinotQuery _pinotQuery;
   private PlanNode _leafStageBoundaryNode;
   private List<ServerQueryRequest> _serverQueryRequests;
+  private boolean _emptyDynamicFilter;
+  private boolean _leafQueryExecutionRequiredForEmptyInput;
 
   public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
       ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult) {
@@ -89,5 +91,20 @@ public class ServerPlanRequestContext {
 
   public void setServerQueryRequests(List<ServerQueryRequest> serverQueryRequests) {
     _serverQueryRequests = serverQueryRequests;
+  }
+
+  /// Returns whether the completed dynamic filter proves that SSE leaf execution can be skipped safely.
+  public boolean shouldSkipLeafQueryExecution() {
+    return _emptyDynamicFilter && !_leafQueryExecutionRequiredForEmptyInput && !_pinotQuery.isExplain();
+  }
+
+  /// Records that the materialized dynamic-filter build side produced no rows.
+  public void setEmptyDynamicFilter() {
+    _emptyDynamicFilter = true;
+  }
+
+  /// Records that the leaf plan must execute because an operator above the dynamic filter is sensitive to empty input.
+  public void requireLeafQueryExecutionForEmptyInput() {
+    _leafQueryExecutionRequiredForEmptyInput = true;
   }
 }
