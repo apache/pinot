@@ -108,6 +108,7 @@ import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
+import org.apache.pinot.controller.helix.core.periodictask.ConfigMigrationManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
@@ -149,6 +150,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.migration.DefaultConfigMigrationRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -226,6 +228,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected LeadControllerManager _leadControllerManager;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
+  protected ConfigMigrationManager _configMigrationManager;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
@@ -1094,6 +1097,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _staleInstancesCleanupTask =
         new StaleInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     periodicTasks.add(_staleInstancesCleanupTask);
+    if (_config.isConfigMigrationEnabled()) {
+      _configMigrationManager =
+          new ConfigMigrationManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+              DefaultConfigMigrationRegistry.create());
+      periodicTasks.add(_configMigrationManager);
+    }
     _taskMetricsEmitter =
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
