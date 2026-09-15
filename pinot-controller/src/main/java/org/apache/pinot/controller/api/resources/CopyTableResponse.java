@@ -22,6 +22,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,16 +45,30 @@ public class CopyTableResponse {
   @JsonProperty("watermarkInductionResult")
   private WatermarkInductionResult _watermarkInductionResult;
 
+  @JsonProperty("deprecationWarnings")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<String> _deprecationWarnings;
+
+  /// `status` and `msg` are `@Nullable` here to match the historical wire contract: the class is
+  /// `@JsonInclude(NON_NULL)`, so both fields have always been omittable from the JSON, and existing setters allow
+  /// either to be null. Older deserializers (admin SDK, integration tests) must continue to parse responses that
+  /// elide one or both fields.
   @JsonCreator
-  public CopyTableResponse(@JsonProperty("status") String status, @JsonProperty("msg") String msg,
-      @JsonProperty("schema") @Nullable Schema schema,
+  public CopyTableResponse(@JsonProperty("status") @Nullable String status,
+      @JsonProperty("msg") @Nullable String msg, @JsonProperty("schema") @Nullable Schema schema,
       @JsonProperty("realtimeTableConfig") @Nullable TableConfig tableConfig,
       @JsonProperty("watermarkInductionResult") @Nullable WatermarkInductionResult watermarkInductionResult) {
+    this(status, msg, schema, tableConfig, watermarkInductionResult, null);
+  }
+
+  public CopyTableResponse(String status, String msg, @Nullable Schema schema, @Nullable TableConfig tableConfig,
+      @Nullable WatermarkInductionResult watermarkInductionResult, @Nullable List<String> deprecationWarnings) {
     _status = status;
     _msg = msg;
     _schema = schema;
     _tableConfig = tableConfig;
     _watermarkInductionResult = watermarkInductionResult;
+    _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;
   }
 
   public String getMsg() {
@@ -95,5 +110,11 @@ public class CopyTableResponse {
   public void setWatermarkInductionResult(
       WatermarkInductionResult watermarkInductionResult) {
     _watermarkInductionResult = watermarkInductionResult;
+  }
+
+  /// Read-only: callers must populate deprecation warnings via the all-args constructor. No setter is exposed so
+  /// the field cannot drift after the response is constructed by the REST handler.
+  public List<String> getDeprecationWarnings() {
+    return _deprecationWarnings;
   }
 }
