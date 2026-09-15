@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.query.service.dispatch.streaming;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -71,6 +73,8 @@ public class StreamingQuerySession {
   private final Map<Integer, Integer> _respondedByStage = new HashMap<>();
   /// Per-stage count of opchains that responded but the broker couldn't merge their payload.
   private final Map<Integer, Integer> _mergeFailedByStage = new HashMap<>();
+  /// Materialized outputs reported by successful producer opchains. Mutated under [#_lock].
+  private final List<Worker.MaterializedPartitionHandle> _materializedOutputs = new ArrayList<>();
   /// Stages whose accumulator hit a shape mismatch. A mismatch means the workers of this stage disagree on the tree
   /// shape (typically version skew), so no merged result for the stage can be trusted: the partially-merged tree is
   /// dropped, and every subsequent report for the stage is counted as `mergeFailed` rather than being allowed
@@ -165,6 +169,8 @@ public class StreamingQuerySession {
           _peerErrorObserved = true;
           shouldFanOutCancel = true;
         }
+      } else {
+        _materializedOutputs.addAll(message.getMaterializedOutputList());
       }
       if (decodeError != null) {
         LOGGER.warn("Decode failed for opchain stage={} worker={} on request {}: {}",
@@ -311,6 +317,16 @@ public class StreamingQuerySession {
   public boolean awaitCompletion(long timeout, TimeUnit unit)
       throws InterruptedException {
     return _completionLatch.await(timeout, unit);
+  }
+
+  /// Returns an immutable snapshot of materialized output descriptors received so far.
+  public List<Worker.MaterializedPartitionHandle> getMaterializedOutputs() {
+    _lock.lock();
+    try {
+      return List.copyOf(_materializedOutputs);
+    } finally {
+      _lock.unlock();
+    }
   }
 
   /// Returns a snapshot of the per-stage coverage. Stage ids that received any responses (successful or
