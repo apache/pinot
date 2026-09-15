@@ -31,7 +31,10 @@ public class CommittingSegmentDescriptor {
 
   private String _segmentLocation;
   private SegmentMetadataImpl _segmentMetadata;
+  @Nullable
   private String _stopReason;
+  @Nullable
+  private SegmentCompletionProtocol.ReasonCode _stopReasonCode;
   private int _preCommitRowCount;
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
@@ -41,6 +44,7 @@ public class CommittingSegmentDescriptor {
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
     committingSegmentDescriptor.setStopReason(reqParams.getReason());
+    committingSegmentDescriptor.setStopReasonCode(reqParams.getReasonCode());
     // Capture pre-commit row count from the request (for commit time compaction awareness)
     committingSegmentDescriptor.setPreCommitRowCount(reqParams.getNumRows());
 
@@ -101,8 +105,17 @@ public class CommittingSegmentDescriptor {
     return _stopReason;
   }
 
-  public void setStopReason(String stopReason) {
+  public void setStopReason(@Nullable String stopReason) {
     _stopReason = stopReason;
+  }
+
+  @Nullable
+  public SegmentCompletionProtocol.ReasonCode getStopReasonCode() {
+    return _stopReasonCode;
+  }
+
+  public void setStopReasonCode(@Nullable SegmentCompletionProtocol.ReasonCode stopReasonCode) {
+    _stopReasonCode = stopReasonCode;
   }
 
   public int getPreCommitRowCount() {

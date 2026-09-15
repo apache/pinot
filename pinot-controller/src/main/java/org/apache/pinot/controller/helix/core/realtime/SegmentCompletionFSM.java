@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -68,10 +69,10 @@ public interface SegmentCompletionFSM {
   ///
   /// @param instanceId The ID of the server instance reporting consumption.
   /// @param offset The offset up to which the server has consumed.
-  /// @param stopReason The reason the server stopped consuming (e.g., row limit or end of partition).
+  /// @param stopReason The reason the server stopped consuming with (e.g., row limit or end of partition).
   /// @return A response indicating the next action for the server (e.g., HOLD, CATCHUP, or COMMIT).
   SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
-      String stopReason);
+      @Nullable String stopReason);
 
   /// Processes the start of a segment commit from a server.
   ///
