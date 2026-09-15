@@ -48,8 +48,8 @@ public class ThreadResourceUsageProvider {
   private static final Method SUN_GET_THREAD_ALLOCATED_BYTES_METHOD;
   private static final Method SUN_GET_CURRENT_THREAD_ALLOCATED_BYTES_METHOD;
 
-  private static boolean _isThreadCpuTimeMeasurementEnabled;
-  private static boolean _isThreadMemoryMeasurementEnabled;
+  private static volatile boolean _isThreadCpuTimeMeasurementEnabled;
+  private static volatile boolean _isThreadMemoryMeasurementEnabled;
 
   // Initialize the com.sun.management.ThreadMXBean related variables using reflection
   static {
@@ -94,6 +94,14 @@ public class ThreadResourceUsageProvider {
             isThreadAllocatedMemorySupported = false;
           }
         }
+      }
+    }
+
+    if (isThreadAllocatedMemorySupported && getThreadAllocatedBytes == null) {
+      try {
+        getThreadAllocatedBytes = sunThreadMXBeanClass.getMethod(SUN_GET_THREAD_ALLOCATED_BYTES_NAME, long.class);
+      } catch (ReflectiveOperationException e) {
+        LOGGER.info("Cross-thread allocated-byte sampling is unavailable", e);
       }
     }
 
@@ -197,6 +205,35 @@ public class ThreadResourceUsageProvider {
         LOGGER.error("Caught exception invoking method: {}", SUN_GET_THREAD_ALLOCATED_BYTES_NAME, e);
         return 0;
       }
+    }
+  }
+
+  /// Whether CPU accounting can sample a different live platform thread.
+  public static boolean isCrossThreadCpuTimeMeasurementEnabled() {
+    return _isThreadCpuTimeMeasurementEnabled && MX_BEAN.isThreadCpuTimeSupported();
+  }
+
+  /// Whether heap-allocation accounting can sample a different live platform thread.
+  public static boolean isCrossThreadMemoryMeasurementEnabled() {
+    return _isThreadMemoryMeasurementEnabled && SUN_GET_THREAD_ALLOCATED_BYTES_METHOD != null;
+  }
+
+  /// Returns cumulative CPU time for the specified platform thread, or -1 if unavailable. This includes synchronous
+  /// native execution on that thread. It does not include work dispatched to a native worker pool.
+  public static long getThreadCpuTime(long threadId) {
+    return isCrossThreadCpuTimeMeasurementEnabled() ? MX_BEAN.getThreadCpuTime(threadId) : -1;
+  }
+
+  /// Returns cumulative Java heap allocation for the specified platform thread, or -1 if unavailable. Native
+  /// allocations must be reserved and reported separately by their owner.
+  public static long getThreadAllocatedBytes(long threadId) {
+    if (!isCrossThreadMemoryMeasurementEnabled()) {
+      return -1;
+    }
+    try {
+      return (long) SUN_GET_THREAD_ALLOCATED_BYTES_METHOD.invoke(MX_BEAN, threadId);
+    } catch (Exception e) {
+      throw new IllegalStateException("Cross-thread heap-allocation sampling failed", e);
     }
   }
 
