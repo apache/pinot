@@ -1250,12 +1250,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String otherSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
     String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
     String extraSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String extraInstanceIdFileName =
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, "Server_host-a_8098");
     String otherSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(otherSegmentName);
     File segmentFile = new File(tableDir, segmentFileName);
     File extraSegmentFile = new File(tableDir, extraSegmentFileName);
+    File extraInstanceIdFile = new File(tableDir, extraInstanceIdFileName);
     File otherSegmentFile = new File(tableDir, otherSegmentFileName);
     FileUtils.write(segmentFile, "temporary file contents");
     FileUtils.write(extraSegmentFile, "temporary file contents");
+    FileUtils.write(extraInstanceIdFile, "temporary file contents");
     FileUtils.write(otherSegmentFile, "temporary file contents");
 
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
@@ -1267,6 +1271,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
+    assertFalse(extraInstanceIdFile.exists());
     assertTrue(otherSegmentFile.exists());
   }
 
@@ -1945,6 +1950,38 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // case 2: download url is empty, indicating the tmp segment is absolutely orphan. Delete the file
     when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
     numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
+    assertFalse(segmentFile.exists());
+    assertEquals(numDeletedTmpSegments, 1);
+  }
+
+  @Test
+  public void testDeleteInstanceIdTmpSegmentFiles()
+      throws Exception {
+    ControllerConf config = new ControllerConf();
+    config.setDataDir(TEMP_DIR.toString());
+    config.setProperty(TMP_SEGMENT_RETENTION_IN_SECONDS, Integer.MIN_VALUE);
+    config.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
+
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    FileUtils.deleteDirectory(tableDir);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, "Server_host-a_8098");
+    File segmentFile = new File(tableDir, segmentFileName);
+    FileUtils.write(segmentFile, "temporary file contents", Charset.defaultCharset());
+
+    SegmentZKMetadata segZKMeta = mock(SegmentZKMetadata.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build());
+    PinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(helixResourceManager, config);
+
+    when(segZKMeta.getStatus()).thenReturn(Status.DONE);
+    when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
+    int numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
     assertFalse(segmentFile.exists());
     assertEquals(numDeletedTmpSegments, 1);
   }
