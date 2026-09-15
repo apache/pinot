@@ -721,6 +721,16 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /// Returns whether the query opts into the experimental file-backed HASH exchange.
+  public static boolean isMaterializedExchange(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.MATERIALIZED_EXCHANGE));
+  }
+
+  /// Returns whether the query opts into dependency-ordered stage dispatch.
+  public static boolean isStagedDispatch(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.STAGED_DISPATCH));
+  }
+
   public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;

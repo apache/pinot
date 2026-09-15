@@ -150,6 +150,21 @@ message OpChainComplete {
   bool success = 3;
   string error_msg = 4;            // populated when success = false
   MultiStageStatsTree stats = 5;   // structured, tree-shaped stats payload
+  repeated MaterializedPartitionHandle materialized_output = 6;
+}
+
+// Producer-local materialized HASH partition. Its identity deliberately excludes
+// consumer stage and worker ids so a later phase can bind consumers after production.
+message MaterializedPartitionHandle {
+  int64 request_id = 1;
+  int32 producer_stage_id = 2;
+  int32 producer_worker_id = 3;
+  int32 logical_partition_id = 4;
+  string host = 5;
+  int32 transfer_port = 6;
+  string opaque_file_id = 7;
+  int64 row_count = 8;
+  int64 byte_count = 9;
 }
 
 // Final marker on the server-to-broker stream.
