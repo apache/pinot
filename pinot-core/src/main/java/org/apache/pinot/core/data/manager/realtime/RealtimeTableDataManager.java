@@ -81,7 +81,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -159,11 +158,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         ServerIngestionOomProtectionManager.createServerThrottleState(null, ServerMetrics.get()));
   }
 
-  /**
-   * @param isServerReadyToConsumeData returns {@code false} when consuming-segment ingestion should be held off
-   *     (e.g. while the server is still draining startup-time work). Each consuming segment checks this gate at the
-   *     entry of its consumer thread; once the gate clears, it is not consulted again for that segment.
-   */
+  /// @param isServerReadyToConsumeData returns `false` when consuming-segment ingestion should be held off
+  ///     (e.g. while the server is still draining startup-time work). Each consuming segment checks this gate at the
+  ///     entry of its consumer thread; once the gate clears, it is not consulted again for that segment.
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToConsumeData,
       BooleanSupplier isServerReadyToServeQueries,
       ServerIngestionOomProtectionManager.ServerThrottleState serverIngestionOomProtectionThrottleState) {
@@ -328,69 +325,58 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  /**
-   * Updates the ingestion metrics for the given partition.
-   *
-   * @param segmentName                      name of the consuming segment
-   * @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
-   *                                         the segment name)
-   * @param ingestionTimeMs                  ingestion time of the last consumed message (from
-   *                                         {@link StreamMessageMetadata})
-   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   * {@link StreamMessageMetadata})
-   * @param currentOffset                    offset of the last consumed message (from {@link StreamMessageMetadata})
-   */
+  /// Updates the ingestion metrics for the given partition.
+  ///
+  /// @param segmentName                      name of the consuming segment
+  /// @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
+  ///                                         the segment name)
+  /// @param ingestionTimeMs                  ingestion time of the last consumed message (from
+  ///                                         [org.apache.pinot.spi.stream.StreamMessageMetadata])
+  /// @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
+  /// [org.apache.pinot.spi.stream.StreamMessageMetadata])
+  /// @param currentOffset                    offset of the last consumed message (from
+  ///                                         [org.apache.pinot.spi.stream.StreamMessageMetadata])
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
         currentOffset);
   }
 
-  /**
-   * Returns the ingestion time of the last consumed message for the partition of the given segment. Returns
-   * {@code Long.MIN_VALUE} when it is not available.
-   */
+  /// Returns the ingestion time of the last consumed message for the partition of the given segment. Returns
+  /// `Long.MIN_VALUE` when it is not available.
   public long getPartitionIngestionTimeMs(String segmentName) {
     return _ingestionDelayTracker.getPartitionIngestionTimeMs(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /**
-   * Removes the ingestion metrics for the partition of the given segment, and also ignores the updates from the given
-   * segment. This is useful when we want to stop tracking the ingestion delay for a partition when the segment might
-   * still be consuming, e.g. when the new consuming segment is created on a different server.
-   */
+  /// Removes the ingestion metrics for the partition of the given segment, and also ignores the updates from the given
+  /// segment. This is useful when we want to stop tracking the ingestion delay for a partition when the segment might
+  /// still be consuming, e.g. when the new consuming segment is created on a different server.
   public void removeIngestionMetrics(String segmentName) {
     _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
-  /**
-   * Method to handle CONSUMING -> DROPPED segment state transitions:
-   * We stop tracking partitions whose segments are dropped.
-   *
-   * @param segmentName name of segment which is transitioning state.
-   */
+  /// Method to handle CONSUMING -> DROPPED segment state transitions:
+  /// We stop tracking partitions whose segments are dropped.
+  ///
+  /// @param segmentName name of segment which is transitioning state.
   @Override
   public void onConsumingToDropped(String segmentName) {
     // NOTE: No need to mark segment ignored here because it should have already been dropped.
     _ingestionDelayTracker.stopTrackingPartition(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /**
-   * Method to handle CONSUMING -> OFFLINE segment state transitions:
-   * We stop tracking partitions whose segments are going OFFLINE. The reason is that offline segments are not queried.
-   * So ingestion delay for the offline replicas are not relevant. If there are more replicas with offline state,
-   * replica up metric will determine the severity of the issue.
-   *
-   * @param segmentName name of segment for which the state change is being handled
-   */
+  /// Method to handle CONSUMING -> OFFLINE segment state transitions:
+  /// We stop tracking partitions whose segments are going OFFLINE. The reason is that offline segments are not queried.
+  /// So ingestion delay for the offline replicas are not relevant. If there are more replicas with offline state,
+  /// replica up metric will determine the severity of the issue.
+  ///
+  /// @param segmentName name of segment for which the state change is being handled
   @Override
   public void onConsumingToOffline(String segmentName) {
     _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
-  /**
-   *  Returns thread safe StreamMetadataProvider which is shared across different callers.
-   */
+  /// Returns thread safe StreamMetadataProvider which is shared across different callers.
   public StreamMetadataProvider getStreamMetadataProvider(RealtimeSegmentDataManager realtimeSegmentDataManager) {
     String tableStreamName = realtimeSegmentDataManager.getTableStreamName();
     StreamConsumerFactory streamConsumerFactory = realtimeSegmentDataManager.getStreamConsumerFactory();
@@ -403,10 +389,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  /**
-   * Returns all partitionGroupIds for the partitions hosted by this server for current table.
-   * @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
-   */
+  /// Returns all partitionGroupIds for the partitions hosted by this server for current table.
+  /// @apiNote this involves Zookeeper read and should not be used frequently due to efficiency concerns.
   public Set<Integer> getHostedPartitionsGroupIds() {
     Set<Integer> partitionsHostedByThisServer = new HashSet<>();
     List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
@@ -469,23 +453,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     handleDedupPreload(zkMetadata, indexLoadingConfig);
   }
 
-  /**
-   * Handles upsert preload if the upsert preload is enabled.
-   */
-  private void handleUpsertPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    if (_tableUpsertMetadataManager == null || !_tableUpsertMetadataManager.getContext().isPreloadEnabled()) {
-      return;
-    }
-    Integer partitionId = SegmentUtils.getSegmentPartitionId(zkMetadata, null);
-    Preconditions.checkState(partitionId != null,
-        "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
-        _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
-  }
-
-  /**
-   * Handles dedup preload if the dedup preload is enabled.
-   */
+  /// Handles dedup preload if the dedup preload is enabled.
   private void handleDedupPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
     if (_tableDedupMetadataManager == null || !_tableDedupMetadataManager.getContext().isPreloadEnabled()) {
       return;
@@ -703,10 +671,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
-  /**
-   * Sets the default time value in the schema as the segment creation time if it is invalid. Time column is used to
-   * manage the segments, so its values have to be within the valid range.
-   */
+  /// Sets the default time value in the schema as the segment creation time if it is invalid. Time column is used to
+  /// manage the segments, so its values have to be within the valid range.
   @VisibleForTesting
   static void setDefaultTimeValueIfInvalid(TableConfig tableConfig, Schema schema, SegmentZKMetadata zkMetadata) {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -780,9 +746,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  /**
-   * Replaces the CONSUMING segment with a downloaded committed one.
-   */
+  /// Replaces the CONSUMING segment with a downloaded committed one.
   public void downloadAndReplaceConsumingSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
@@ -797,19 +761,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
 
-  /**
-   * Replaces the CONSUMING segment with the one sealed locally.
-   */
+  /// Replaces the CONSUMING segment with the one sealed locally.
   @Deprecated
   public void replaceConsumingSegment(String segmentName)
       throws Exception {
     replaceConsumingSegment(segmentName, null);
   }
 
-  /**
-   * Replaces the CONSUMING segment with the one sealed locally.
-   * This overloaded method avoids extra ZK call when the caller already has SegmentZKMetadata.
-   */
+  /// Replaces the CONSUMING segment with the one sealed locally.
+  /// This overloaded method avoids extra ZK call when the caller already has SegmentZKMetadata.
   public void replaceConsumingSegment(String segmentName, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
@@ -872,22 +832,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _serverIngestionOomProtectionManager;
   }
 
-  /**
-   * Validate a schema against the table config for real-time record consumption.
-   * Ideally, we should validate these things when schema is added or table is created, but either of these
-   * may be changed while the table is already provisioned. For the change to take effect, we need to restart the
-   * servers, so  validation at this place is fine.
-   *
-   * As of now, the following validations are done:
-   * 1. Make sure that the sorted column, if specified, is not multi-valued.
-   * 2. Validate the schema itself
-   *
-   * We allow the user to specify multiple sorted columns, but only consider the first one for now.
-   * (secondary sort is not yet implemented).
-   *
-   * If we add more validations, it may make sense to split this method into multiple validation methods.
-   * But then, we are trying to figure out all the invalid cases before we return from this method...
-   */
+  /// Validate a schema against the table config for real-time record consumption.
+  /// Ideally, we should validate these things when schema is added or table is created, but either of these
+  /// may be changed while the table is already provisioned. For the change to take effect, we need to restart the
+  /// servers, so  validation at this place is fine.
+  ///
+  /// As of now, the following validations are done:
+  /// 1. Make sure that the sorted column, if specified, is not multi-valued.
+  /// 2. Validate the schema itself
+  ///
+  /// We allow the user to specify multiple sorted columns, but only consider the first one for now.
+  /// (secondary sort is not yet implemented).
+  ///
+  /// If we add more validations, it may make sense to split this method into multiple validation methods.
+  /// But then, we are trying to figure out all the invalid cases before we return from this method...
   private void validate(TableConfig tableConfig, Schema schema) {
     // 1. Make sure that the sorted column is not a multi-value field.
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();

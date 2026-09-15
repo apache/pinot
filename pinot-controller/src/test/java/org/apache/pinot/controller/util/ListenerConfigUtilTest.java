@@ -28,15 +28,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Asserts that {@link ListenerConfigUtil} will generated expected {@link ListenerConfig} based on the properties
- * provided in {@link ControllerConf}
- */
+/// Asserts that [ListenerConfigUtil] will generated expected [ListenerConfig] based on the properties
+/// provided in [ControllerConf]
 public class ListenerConfigUtilTest {
-  /**
-   * Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
-   * used.
-   */
+  /// Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
+  /// used.
   @Test(expectedExceptions = IllegalStateException.class)
   public void testControllerPortConfig() {
     ControllerConf controllerConf = new ControllerConf();
@@ -112,10 +108,8 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(150, listenerConfigs.get(0).getMaxRequestHeaders());
   }
 
-  /**
-   * Asserts that enabling https generates the existing legacy listener as well as the another one configured with
-   * TLS settings.
-   */
+  /// Asserts that enabling https generates the existing legacy listener as well as the another one configured with
+  /// TLS settings.
   @Test
   public void testLegacyAndHttps() {
     ControllerConf controllerConf = new ControllerConf();
@@ -136,9 +130,7 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(httpsListener, "10.0.0.10", 9443);
   }
 
-  /**
-   * Asserts that controller.port can be opt-out and both http and https can be configured with separate ports.
-   */
+  /// Asserts that controller.port can be opt-out and both http and https can be configured with separate ports.
   @Test
   public void testHttpAndHttpsConfigs() {
     ControllerConf controllerConf = new ControllerConf();
@@ -162,9 +154,7 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(httpsListener, "0.0.0.0", 9443);
   }
 
-  /**
-   * Asserts that a single listener configuration is generated with a secured TLS port.
-   */
+  /// Asserts that a single listener configuration is generated with a secured TLS port.
   @Test
   public void testHttpsOnly() {
     ControllerConf controllerConf = new ControllerConf();
@@ -180,9 +170,7 @@ public class ListenerConfigUtilTest {
     assertHttpsListener(listenerConfigs.get(0), "0.0.0.0", 9443);
   }
 
-  /**
-   * Tests behavior when an invalid host is provided.
-   */
+  /// Tests behavior when an invalid host is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidHost() {
     ControllerConf controllerConf = new ControllerConf();
@@ -194,9 +182,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an invalid port is provided
-   */
+  /// Tests behavior when an invalid port is provided
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidPort() {
     ControllerConf controllerConf = new ControllerConf();
@@ -209,9 +195,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an empty http port is provided.
-   */
+  /// Tests behavior when an empty http port is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEmptyHttpPort() {
     ControllerConf controllerConf = new ControllerConf();
@@ -222,9 +206,7 @@ public class ListenerConfigUtilTest {
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
   }
 
-  /**
-   * Tests behavior when an empty https port is provided.
-   */
+  /// Tests behavior when an empty https port is provided.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEmptyHttpsPort() {
     ControllerConf controllerConf = new ControllerConf();

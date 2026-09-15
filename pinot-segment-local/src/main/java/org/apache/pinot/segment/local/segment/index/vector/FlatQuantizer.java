@@ -26,26 +26,22 @@ import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 
 
-/**
- * Identity (no-op) quantizer that stores raw float32 vectors without any compression.
- *
- * <p>This is the trivial quantizer: {@link #encode} serializes each float as 4 bytes in
- * little-endian order, and {@link #decode} deserializes them back. Distance computation
- * decodes first and then applies the quantizer distance semantics used across the ANN stack.</p>
- *
- * <p>This class is thread-safe and immutable after construction.</p>
- */
+/// Identity (no-op) quantizer that stores raw float32 vectors without any compression.
+///
+/// This is the trivial quantizer: [#encode] serializes each float as 4 bytes in
+/// little-endian order, and [#decode] deserializes them back. Distance computation
+/// decodes first and then applies the quantizer distance semantics used across the ANN stack.
+///
+/// This class is thread-safe and immutable after construction.
 public final class FlatQuantizer implements VectorQuantizer {
 
   private final int _dimension;
   private final int _encodedBytesPerVector;
 
-  /**
-   * Creates a FlatQuantizer for vectors of the given dimension.
-   *
-   * @param dimension the vector dimension (must be positive)
-   * @throws IllegalArgumentException if dimension is not positive
-   */
+  /// Creates a FlatQuantizer for vectors of the given dimension.
+  ///
+  /// @param dimension the vector dimension (must be positive)
+  /// @throws IllegalArgumentException if dimension is not positive
   public FlatQuantizer(int dimension) {
     Preconditions.checkArgument(dimension > 0, "dimension must be positive, got: %s", dimension);
     _dimension = dimension;

@@ -263,11 +263,9 @@ public class LeafStageToPinotQueryTest {
     assertPrunerTraversableOperatorsAreFilterKinds(result);
   }
 
-  /**
-   * Mirrors how segment pruners walk a filter: on each node they visit they dereference the function call and
-   * resolve its operator via {@code FilterKind.valueOf}, then recurse only into the operands of AND/OR/NOT.
-   * A non-FUNCTION node would NPE the pruners and an unknown operator would throw, so both are asserted here.
-   */
+  /// Mirrors how segment pruners walk a filter: on each node they visit they dereference the function call and
+  /// resolve its operator via `FilterKind.valueOf`, then recurse only into the operands of AND/OR/NOT.
+  /// A non-FUNCTION node would NPE the pruners and an unknown operator would throw, so both are asserted here.
   private static void assertPrunerTraversableOperatorsAreFilterKinds(Expression expression) {
     // Pruners dereference getFunctionCall() unconditionally, so a non-FUNCTION node here would NPE them.
     Function function = expression.getFunctionCall();

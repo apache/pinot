@@ -24,9 +24,7 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-/**
- * A {@link MessageBatch} for collecting records from the Kinesis stream
- */
+/// A [MessageBatch] for collecting records from the Kinesis stream
 public class KinesisMessageBatch implements MessageBatch<byte[]> {
   private final List<BytesStreamMessage> _messages;
   private final KinesisPartitionGroupOffset _offsetOfNextBatch;

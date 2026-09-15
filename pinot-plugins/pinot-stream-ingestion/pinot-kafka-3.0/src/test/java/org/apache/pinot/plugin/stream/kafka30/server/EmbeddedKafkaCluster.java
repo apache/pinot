@@ -35,10 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * In-process embedded Kafka cluster using KRaft mode for integration tests.
- * Eliminates Docker dependency and provides fast, reliable Kafka for testing.
- */
+/// In-process embedded Kafka cluster using KRaft mode for integration tests.
+/// Eliminates Docker dependency and provides fast, reliable Kafka for testing.
 public class EmbeddedKafkaCluster implements StreamDataServerStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmbeddedKafkaCluster.class);
 
@@ -116,9 +114,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
     }
   }
 
-  /**
-   * Returns the full bootstrap servers string (e.g. "localhost:12345,localhost:12346").
-   */
+  /// Returns the full bootstrap servers string (e.g. "localhost:12345,localhost:12346").
   public String bootstrapServers() {
     return _bootstrapServers;
   }

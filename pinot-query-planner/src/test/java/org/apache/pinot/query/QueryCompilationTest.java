@@ -22,6 +22,8 @@ import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -68,6 +71,100 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryPlanWithoutException(String query) {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testFastJsonExtractScalarTypeInference() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT JSON_EXTRACT_SCALAR_FAST(hexToBytes(col1), '$.foo', 'BIG_DECIMAL'), "
+                + "JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG', -1), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'BOOLEAN', FALSE), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'LONG', -1), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'DOUBLE_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'BIG_DECIMAL_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'BOOLEAN_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'TIMESTAMP_ARRAY'), "
+                + "JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'JSON') FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.DECIMAL);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    assertEquals(rowType.getFieldList().get(2).getType().getSqlTypeName(), SqlTypeName.BOOLEAN);
+    assertEquals(rowType.getFieldList().get(3).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    RelDataType arrayType = rowType.getFieldList().get(4).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.DOUBLE);
+    arrayType = rowType.getFieldList().get(5).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.DECIMAL);
+    arrayType = rowType.getFieldList().get(6).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.BOOLEAN);
+    arrayType = rowType.getFieldList().get(7).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.TIMESTAMP);
+    assertEquals(rowType.getFieldList().get(8).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+
+    // A non-literal resultsType or defaultValue is rejected during validation. jsonPath is deliberately not in this
+    // list -- see testJsonExtractScalarAcceptsFoldableJsonPath.
+    List<String> invalidQueries = List.of(
+        "SELECT JSON_EXTRACT_SCALAR_FAST(col1, '$.foo', 'LONG', col3) FROM a",
+        "SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', col2, -1) FROM a");
+    for (String invalidQuery : invalidQueries) {
+      Throwable invalidOperand = expectThrows(RuntimeException.class, () -> _queryEnvironment.compile(invalidQuery));
+      assertTrue(Throwables.getStackTraceAsString(invalidOperand).contains("Cannot apply 'JSONEXTRACTSCALAR"),
+          "Unexpected failure for " + invalidQuery + ": " + Throwables.getStackTraceAsString(invalidOperand));
+    }
+  }
+
+  @Test
+  public void testUuidPolymorphicInputTypeInference() {
+    String[] functions =
+        {"IS_UUID", "TO_UUID", "UUID_TO_STRING", "UUID_TO_BYTES", "UUID_VERSION", "UUID_TIMESTAMP"};
+    SqlTypeName[] returnTypes = {
+        SqlTypeName.BOOLEAN, SqlTypeName.UUID, SqlTypeName.VARCHAR, SqlTypeName.VARBINARY, SqlTypeName.INTEGER,
+        SqlTypeName.BIGINT
+    };
+    String[] inputs = {"col1", "UUID_TO_BYTES(col1)", "TO_UUID(col1)"};
+    List<String> projections = new ArrayList<>();
+    for (String function : functions) {
+      for (String input : inputs) {
+        projections.add(function + "(" + input + ")");
+      }
+    }
+
+    RelDataType rowType = _queryEnvironment.compile("SELECT " + String.join(", ", projections) + " FROM a")
+        .getRelRoot().validatedRowType;
+    for (int functionIndex = 0; functionIndex < functions.length; functionIndex++) {
+      for (int inputIndex = 0; inputIndex < inputs.length; inputIndex++) {
+        int fieldIndex = functionIndex * inputs.length + inputIndex;
+        assertEquals(rowType.getFieldList().get(fieldIndex).getType().getSqlTypeName(), returnTypes[functionIndex],
+            functions[functionIndex] + " should accept " + inputs[inputIndex]);
+      }
+    }
+  }
+
+  /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
+  /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
+  /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
+  /// correctly. Requiring [org.apache.calcite.sql.type.OperandTypes#LITERAL] there would reject these queries,
+  /// which plan and execute successfully on master. Regression guard for all JSON scalar transforms, which
+  /// share one operand checker; `QueryRunnerTest#provideTestSqlWithExecutionException` covers the end-to-end half,
+  /// asserting that a folded path is actually applied on the leaf stage.
+  ///
+  /// `resultsType` is checked separately in [#testFastJsonExtractScalarTypeInference], since it must stay a literal
+  /// for return-type inference to see it.
+  @Test
+  public void testJsonExtractScalarAcceptsFoldableJsonPath() {
+    List<String> functions = List.of("JSON_EXTRACT_SCALAR", "JSON_EXTRACT_SCALAR_FAST",
+        "JSON_EXTRACT_SCALAR_FIRST_MATCH", "JSON_EXTRACT_SCALAR_FORY");
+    for (String function : functions) {
+      for (String path : List.of("CONCAT('$.', 'foo')", "CAST('$.foo' AS VARCHAR)", "UPPER('$.foo')")) {
+        String query = "SELECT " + function + "(col1, " + path + ", 'INT') FROM a";
+        // The return type must still come from the literal resultsType rather than falling back to VARCHAR.
+        assertEquals(_queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+            .getSqlTypeName(), SqlTypeName.INTEGER, query);
+      }
+    }
   }
 
   @Test
@@ -141,6 +238,78 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       assertTrue(Throwables.getStackTraceAsString(thrown).contains("unsigned 64-bit range"),
           "expected the UBIGINT-rejection error for: " + sql + ", but got: " + thrown);
     }
+  }
+
+  @Test
+  public void testGroupingSetsSupportedInMultiStage() {
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE plan successfully in the multi-stage engine: the per-set expansion is
+    /// pushed down to the single-stage leaf. They must not throw, nor silently collapse to a plain GROUP BY (which
+    /// would drop the subtotal/grand-total rows). GROUPING() / GROUPING_ID() and the explicit GROUPING SETS tuple
+    /// syntax are included.
+    List<String> queries = List.of(
+        "SELECT col1, SUM(col3) FROM a GROUP BY ROLLUP(col1)",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY CUBE(col1, col2)",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY GROUPING SETS ((col1), (col2))",
+        "SELECT col1, col2, SUM(col3) FROM a GROUP BY GROUPING SETS ((col1, col2), (col1), ())",
+        "SELECT col1, GROUPING(col1), GROUPING_ID(col1, col2), SUM(col3) FROM a GROUP BY ROLLUP(col1, col2)");
+    for (String sql : queries) {
+      assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for: " + sql);
+    }
+  }
+
+  @Test
+  public void testGroupingSetsRejectionsInMultiStage() {
+    /// Combinations the multi-stage planners reject explicitly (instead of producing broken plans or silently
+    /// wrong results): too many expanded sets (CUBE blow-up past the 4096 cap), WITHIN GROUP ordered aggregates
+    /// under a grouping set, aggregate hints with grouping sets, aggregation-free grouping sets (GROUPING() is
+    /// not an aggregation), and GROUPING() with a plain GROUP BY.
+    StringBuilder cubeColumns = new StringBuilder("col1, col2");
+    for (int i = 0; i < 11; i++) {
+      cubeColumns.append(", col3 + ").append(i);
+    }
+    /// Each query must be rejected for its OWN reason, so assert on the error message (not just that some
+    /// RuntimeException is thrown) — otherwise an unrelated failure would pass vacuously.
+    Map<String, String> queryToExpectedMessage = new LinkedHashMap<>();
+    /// CUBE over 13 grouping expressions expands to 2^13 = 8192 grouping sets, exceeding the 4096 cap.
+    queryToExpectedMessage.put("SELECT COUNT(*) FROM a GROUP BY CUBE(" + cubeColumns + ")", "4096");
+    queryToExpectedMessage.put(
+        "SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col2) FROM a GROUP BY ROLLUP(col1)", "WITHIN GROUP");
+    queryToExpectedMessage.put(
+        "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)",
+        "Aggregate hints are not supported");
+    queryToExpectedMessage.put("SELECT col1 FROM a GROUP BY ROLLUP(col1)", "at least one aggregation function");
+    queryToExpectedMessage.put(
+        "SELECT col1, GROUPING(col1) FROM a GROUP BY ROLLUP(col1)", "at least one aggregation function");
+    queryToExpectedMessage.put(
+        "SELECT col1, GROUPING(col1), COUNT(*) FROM a GROUP BY col1", "GROUPING() / GROUPING_ID() requires");
+    for (Map.Entry<String, String> entry : queryToExpectedMessage.entrySet()) {
+      String sql = entry.getKey();
+      try {
+        _queryEnvironment.planQuery(sql);
+        fail("expected rejection for: " + sql);
+      } catch (RuntimeException e) {
+        StringBuilder messages = new StringBuilder();
+        for (Throwable t = e; t != null; t = t.getCause()) {
+          messages.append(t.getMessage()).append('\n');
+        }
+        assertTrue(messages.toString().contains(entry.getValue()),
+            "expected rejection of [" + sql + "] to mention \"" + entry.getValue() + "\" but got: " + messages);
+      }
+    }
+  }
+
+  @Test
+  public void testGroupingSetsUnlimitedColumnsInMultiStage() {
+    /// The number of distinct grouping columns is unlimited (each grouping set is carried as a member-index
+    /// list and the discriminator is the set ordinal, mirroring Calcite's per-set column bitset). 40 distinct
+    /// grouping expressions — past the retired 31-column bitmask cap — must plan successfully, including with a
+    /// GROUPING() call.
+    StringBuilder columns = new StringBuilder("col1, col2");
+    for (int i = 0; i < 38; i++) {
+      columns.append(", col3 + ").append(i);
+    }
+    String sql = "SELECT col1, GROUPING(col1), SUM(col3) FROM a GROUP BY ROLLUP(" + columns + ")";
+    assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for a 40-column ROLLUP");
   }
 
   @Test
@@ -266,6 +435,34 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// [org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule] refuses to push a volatile filter below a join. `now()`
+  /// is volatile, but [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule] folds it to a literal first, so
+  /// the common time-filter-over-a-join pattern must still reach the leaf scan.
+  ///
+  /// Asserted here rather than in JoinPlans.json because the folded epoch literal differs on every run.
+  @Test
+  public void testVolatileNowFilterIsStillPushedBelowJoin() {
+    String query =
+        "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts > now() - 86400000";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    // now() folds to the current epoch millis, so mask the literal before comparing.
+    String normalized = explain.replaceAll("(?<=\\$7, )\\d+", "<EPOCH>");
+    //@formatter:off
+    assertEquals(normalized,
+        "Execution Plan\n"
+        + "LogicalProject(col1=[$0], col2=[$2])\n"
+        + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0])\n"
+        + "        LogicalFilter(condition=[>($7, <EPOCH>)])\n"
+        + "          PinotLogicalTableScan(table=[[default, a]])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0], col2=[$1])\n"
+        + "        PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
   @Test
   public void testAggregateCaseToFilter() {
     // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
@@ -371,9 +568,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testJoinPushTransitivePredicateLookupJoin() {
     // PinotJoinPushTransitivePredicatesRule
     // should not push to the right under lookup join hint
+    // NOTE: Selects explicit columns because `*` leaves no Project at all over the right table scan, which a lookup
+    // join requires (see RelToPlanNodeConverter#convertLogicalJoin). That case is covered in JoinPlans.json.
     String query = "EXPLAIN PLAN FOR\n"
         + "SELECT /*+ joinOptions(join_strategy='lookup') */ \n"
-        + "* FROM a\n"
+        + "a.col1, b.col2 FROM a\n"
         + "JOIN b\n"
         + "ON a.col1 = b.col1\n"
         + "WHERE a.col1 = 1;\n";
@@ -382,11 +581,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
-            + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
-            + "  PinotLogicalExchange(distribution=[single])\n"
-            + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
-            + "      PinotLogicalTableScan(table=[[default, a]])\n"
-            + "  PinotLogicalTableScan(table=[[default, b]])\n");
+            + "LogicalProject(col1=[$0], col2=[$2])\n"
+            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "    PinotLogicalExchange(distribution=[single])\n"
+            + "      LogicalProject(col1=[$0])\n"
+            + "        LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
+            + "          PinotLogicalTableScan(table=[[default, a]])\n"
+            + "    LogicalProject(col1=[$0], col2=[$1])\n"
+            + "      PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
   }
 
@@ -574,6 +776,55 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         assertTrue(plan.equals(plans.get(0)));
       }
     }
+  }
+
+  /// `ProjectAggregateMergeRule` rebuilds the aggregate with a `RelBuilder`, and Calcite's automatic hint
+  /// propagation only restores the hints of the node the rule matched on -- the `Project`, which never carries
+  /// `aggOptions`. Without [org.apache.pinot.calcite.rel.rules.PinotProjectAggregateMergeRule] the aggregate's
+  /// hints are dropped and the aggregate is split into LEAF + exchange + FINAL despite the colocation hint.
+  ///
+  /// A `Project` lands directly above the aggregate here because the `SUM` argument is nullable:
+  /// `PinotAggregateReduceFunctionsRule` rewrites `SUM(x)` into `$SUM0(x) + COUNT(x)` plus a
+  /// `CASE(COUNT(x) = 0, NULL, $SUM0(x))` project. With a non-nullable argument the reduction collapses to a
+  /// bare `$SUM0` with no project, the rule does not match, and the hint survives either way.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+    assertFalse(explain.contains("PinotLogicalExchange"),
+        "A colocated aggregate must not have an exchange below it, but got:\n" + explain);
+  }
+
+  /// Same defect reached through a window function, which is how it shows up in practice: `LAG` is nullable, so
+  /// any expression derived from it is nullable, so the `SUM` over it takes the reduction path above. The window
+  /// itself is colocated by `windowOptions`; only the aggregate above it used to lose its hint.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMergeAboveWindow() {
+    String query = "EXPLAIN PLAN FOR WITH w AS ("
+        + "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ col1, col3, ts, "
+        + "LAG(col3, 1) OVER (PARTITION BY col1 ORDER BY ts) AS prev FROM b) "
+        + "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN prev IS NULL THEN 0 ELSE col3 - prev END) FROM w GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+  }
+
+  /// The other `aggOptions` options travel on the same hint and were lost the same way.
+  /// `is_skip_leaf_stage_group_by` must still push the aggregate above the exchange.
+  @Test
+  public void testSkipLeafStageGroupByHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_skip_leaf_stage_group_by should produce a single DIRECT aggregate above the exchange, but got:\n"
+            + explain);
+    assertFalse(explain.contains("aggType=[LEAF]"),
+        "is_skip_leaf_stage_group_by must not leave a LEAF aggregate, but got:\n" + explain);
   }
 
   @Test
@@ -872,9 +1123,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     _queryEnvironment.planQuery(query);
   }
 
-  /**
-   * Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
-   */
+  /// Tests that queries with ORDER BY / LIMIT use singleton worker for the intermediate sort stage.
   @Test
   public void testSingletonWorkerForLimitAndOrderByQueries() {
     String[] queries =
@@ -897,9 +1146,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /**
-   * Helper method to find an intermediate stage (non-leaf, non-root).
-   */
+  /// Helper method to find an intermediate stage (non-leaf, non-root).
   private DispatchablePlanFragment findIntermediateStage(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       int stageId = fragment.getPlanFragment().getFragmentId();
@@ -911,11 +1158,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
-  /**
-   * Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
-   * correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
-   * but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
-   */
+  /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
+  /// correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
+  /// but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
   @Test
   public void testFullOuterNonEquiJoinUsesSingletonWorker() {
     String query = "SELECT * FROM a FULL OUTER JOIN b ON a.col3 > b.col3";
@@ -929,11 +1174,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "FULL OUTER non-equi join should use singleton worker for join stage");
   }
 
-  /**
-   * Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
-   * side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
-   * has the complete left table so it can correctly determine unmatched right rows for its local right partition.
-   */
+  /// Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
+  /// side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
+  /// has the complete left table so it can correctly determine unmatched right rows for its local right partition.
   @Test
   public void testRightNonEquiJoinUsesBroadcastLeftRandomRight() {
     String query = "SELECT * FROM a RIGHT JOIN b ON a.col3 > b.col3";
@@ -950,12 +1193,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "RIGHT side of RIGHT non-equi join should be RANDOM");
   }
 
-  /**
-   * The {@code windowOptions(is_partitioned_by_window_keys='true')} hint forces a pre-partitioned (direct) exchange
-   * below the window, avoiding a data shuffle. Here the window partitions by {@code col1}, which is NOT table a's
-   * partition column ({@code col2}), so without the hint the planner would shuffle. This exercises the
-   * {@link org.apache.pinot.calcite.rel.logical.PinotLogicalExchange} path (PARTITION BY only).
-   */
+  /// The `windowOptions(is_partitioned_by_window_keys='true')` hint forces a pre-partitioned (direct) exchange
+  /// below the window, avoiding a data shuffle. Here the window partitions by `col1`, which is NOT table a's
+  /// partition column (`col2`), so without the hint the planner would shuffle. This exercises the
+  /// [org.apache.pinot.calcite.rel.logical.PinotLogicalExchange] path (PARTITION BY only).
   @Test
   public void testWindowPartitionByKeysHintForcesPrePartitionedExchange() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
@@ -966,10 +1207,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions(is_partitioned_by_window_keys='true') should force a pre-partitioned exchange");
   }
 
-  /**
-   * Without the hint and with a window partition key that does not match the table's partitioning, the exchange below
-   * the window must be a regular (shuffled) exchange.
-   */
+  /// Without the hint and with a window partition key that does not match the table's partitioning, the exchange below
+  /// the window must be a regular (shuffled) exchange.
   @Test
   public void testWindowWithoutHintIsNotPrePartitioned() {
     String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1) FROM a";
@@ -978,11 +1217,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Without the hint and matching partitioning, the window exchange should be a full shuffle");
   }
 
-  /**
-   * The hint must also flow through the {@link org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange} path,
-   * used when PARTITION BY and ORDER BY are on different keys. This is the path the PR fixes: previously
-   * {@code RelToPlanNodeConverter} hardcoded {@code prePartitioned = null} for sort exchanges, dropping the hint.
-   */
+  /// The hint must also flow through the [org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange] path,
+  /// used when PARTITION BY and ORDER BY are on different keys. This is the path the PR fixes: previously
+  /// `RelToPlanNodeConverter` hardcoded `prePartitioned = null` for sort exchanges, dropping the hint.
   @Test
   public void testWindowPartitionByKeysHintForcesPrePartitionedSortExchange() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ "
@@ -993,11 +1230,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions hint should force a pre-partitioned sort exchange (PARTITION BY + ORDER BY on different keys)");
   }
 
-  /**
-   * Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning. Here table a
-   * is declared partitioned by {@code col2} (via tableOptions) and the window also partitions by {@code col2}, so the
-   * planner would otherwise auto-detect a pre-partitioned exchange; the hint disables it.
-   */
+  /// Setting the hint to `'false'` overrides the planner's automatic detection of pre-partitioning. Here table a
+  /// is declared partitioned by `col2` (via tableOptions) and the window also partitions by `col2`, so the
+  /// planner would otherwise auto-detect a pre-partitioned exchange; the hint disables it.
   @Test
   public void testWindowPartitionByKeysHintFalseDisablesAutoDetectedPrePartitioning() {
     String query = "SELECT /*+ windowOptions(is_partitioned_by_window_keys='false') */ "
@@ -1008,11 +1243,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "windowOptions(is_partitioned_by_window_keys='false') should disable auto-detected pre-partitioning");
   }
 
-  /**
-   * With matching tableOptions partitioning and no window hint, the planner auto-detects pre-partitioning. This must
-   * hold for both window exchange paths: PinotLogicalExchange (PARTITION BY only) and PinotLogicalSortExchange
-   * (PARTITION BY + ORDER BY). The latter verifies the PR preserves the {@code null -> auto-detect} behavior.
-   */
+  /// With matching tableOptions partitioning and no window hint, the planner auto-detects pre-partitioning. This must
+  /// hold for both window exchange paths: PinotLogicalExchange (PARTITION BY only) and PinotLogicalSortExchange
+  /// (PARTITION BY + ORDER BY). The latter verifies the PR preserves the `null -> auto-detect` behavior.
   @Test
   public void testWindowAutoDetectsPrePartitioningWithoutHint() {
     String partitionOnly = "SELECT col1, SUM(col3) OVER (PARTITION BY col2) "
@@ -1026,10 +1259,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
   }
 
-  /**
-   * Finds the {@link MailboxSendNode} that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
-   * the exchange inserted directly below the window. The {@code prePartitioned} flag lives on this send node.
-   */
+  /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
+  /// the exchange inserted directly below the window. The `prePartitioned` flag lives on this send node.
   private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
     WindowNode window = null;
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
@@ -1047,10 +1278,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return (MailboxSendNode) senderRoot;
   }
 
-  /// The {@code setOpOptions(is_colocated_by_set_op_keys='true')} hint forces a pre-partitioned (direct) exchange on
-  /// every input of a set operation, avoiding the shuffle. Here the inputs project {@code col3}, which is neither
-  /// table's partition column, so without the hint the planner would shuffle. Covers UNION ALL, INTERSECT and EXCEPT,
-  /// which all share {@link org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule}.
+  /// The `setOpOptions(is_colocated_by_set_op_keys='true')` hint forces a pre-partitioned (direct) exchange on
+  /// every input of a set operation, avoiding the shuffle. Here the inputs project `col3`, which is neither
+  /// table's partition column, so without the hint the planner would shuffle. UNION ALL is not covered here: it
+  /// gets a local exchange with or without the hint (see [#testUnionAllUsesLocalExchange]).
   @Test(dataProvider = "setOpColocationHintQueries")
   public void testSetOpColocationHintForcesPrePartitionedExchange(String query) {
     List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
@@ -1065,18 +1296,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] setOpColocationHintQueries() {
     String hint = "/*+ setOpOptions(is_colocated_by_set_op_keys='true') */";
     return new Object[][]{
-        {"SELECT " + hint + " col3 FROM a UNION ALL SELECT col3 FROM b"},
         {"SELECT " + hint + " col3 FROM a INTERSECT SELECT col3 FROM b"},
         {"SELECT " + hint + " col3 FROM a EXCEPT SELECT col3 FROM b"},
     };
   }
 
-  /// The hint also lands on the set operation when it is wrapped in an outer {@code SELECT} that carries the hint (the
+  /// The hint also lands on the set operation when it is wrapped in an outer `SELECT` that carries the hint (the
   /// hint then attaches to the set operation directly rather than to a branch).
   @Test
   public void testSetOpColocationHintViaOuterSelectWrap() {
     String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM "
-        + "(SELECT col3 FROM a UNION ALL SELECT col3 FROM b)";
+        + "(SELECT col3 FROM a INTERSECT SELECT col3 FROM b)";
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertTrue(sendNode.isPrePartitioned(), "Hint on the wrapping SELECT should force a pre-partitioned exchange");
     }
@@ -1084,31 +1314,147 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   /// When branches carry conflicting hints, the first input that specifies the hint wins and its value is applied to
   /// all inputs (the documented precedence of the rule). Here the first branch forces it on, so both branches are
-  /// pre-partitioned even though the second branch sets it to {@code 'false'}.
+  /// pre-partitioned even though the second branch sets it to `'false'`.
   @Test
   public void testSetOpColocationHintFirstInputWins() {
     String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col3 FROM a "
-        + "UNION ALL SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a";
+        + "INTERSECT SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a";
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertTrue(sendNode.isPrePartitioned(),
           "The first input's hint value should win and apply to all inputs when branches conflict");
     }
   }
 
-  /// Without the hint and with inputs that are not partitioned by the projected column, the exchanges below the set
-  /// operation must be regular (shuffled) exchanges.
-  @Test
-  public void testSetOpWithoutHintIsNotPrePartitioned() {
-    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+  /// Without the hint and with inputs that are not partitioned by the projected column, the exchanges below a
+  /// distinct set operation must be regular (shuffled) exchanges. UNION ALL is exempt: it only concatenates, so it
+  /// gets a local exchange instead (see [#testUnionAllUsesLocalExchange]).
+  @Test(dataProvider = "shuffledSetOpQueries")
+  public void testDistinctSetOpWithoutHintIsNotPrePartitioned(String query) {
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertFalse(sendNode.isPrePartitioned(),
           "Without the hint and matching partitioning, the set op exchanges should be a full shuffle");
     }
   }
 
+  @DataProvider(name = "shuffledSetOpQueries")
+  private Object[][] shuffledSetOpQueries() {
+    return new Object[][]{
+        {"SELECT col3 FROM a INTERSECT SELECT col3 FROM b"},
+        {"SELECT col3 FROM a EXCEPT SELECT col3 FROM b"},
+    };
+  }
+
+  /// UNION ALL only concatenates, so any row-to-worker mapping is correct and no redistribution is required. Its
+  /// input exchanges are local (SINGLETON) exchanges: the union stage inherits its inputs' workers and the rows are
+  /// handed over in place. Note SINGLETON is Pinot's marker for a local exchange, not a gather to one node.
+  /// The projected columns ride along as keys -- unused while the exchange stays local, but they let the mailbox
+  /// layer promote it to a real hash shuffle when the branches cannot share a worker assignment.
+  @Test
+  public void testUnionAllUsesLocalExchange() {
+    // Both branches read table a, so they resolve to the same workers and the local exchange survives to the plan.
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM a";
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
+    assertFalse(sendNodes.isEmpty());
+    for (MailboxSendNode sendNode : sendNodes) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.SINGLETON);
+      assertEquals(sendNode.getKeys(), List.of(0),
+          "A local UNION ALL exchange should carry the projected columns as keys");
+    }
+  }
+
+  /// When the branches do not resolve to the same workers -- table a lives on two servers and table b on one -- the
+  /// union stage cannot inherit both. It takes the two-worker layout, so branch a is still wired 1-to-1 and stays
+  /// SINGLETON, while branch b is promoted to a real hash shuffle on the projected columns. Correct either way for
+  /// a concatenation, and the aligned branch still pays nothing.
+  @Test
+  public void testUnionAllWithMisalignedBranchesShufflesOnlyTheMisalignedOne() {
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
+    assertEquals(sendNodes.size(), 2);
+    Set<RelDistribution.Type> types = new HashSet<>();
+    for (MailboxSendNode sendNode : sendNodes) {
+      types.add(sendNode.getDistributionType());
+    }
+    assertEquals(types, Set.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.HASH_DISTRIBUTED),
+        "The aligned branch should stay local and the misaligned one should be promoted to a hash shuffle");
+  }
+
+  /// Branches of the SAME WIDTH on DIFFERENT servers still stay local. The union stage adopts one branch's layout,
+  /// and the other sends 1-to-1 by worker id -- correct for a concatenation whichever server each worker sits on,
+  /// costing a network hop rather than a shuffle. Requiring identical worker maps here would push this into a full
+  /// shuffle, which is worse than what it replaces.
+  @Test
+  public void testUnionAllWithEqualWidthBranchesOnDifferentServersStaysLocal() {
+    // Table a lives only on server 1 and table b only on server 2, so both resolve to one worker on disjoint servers.
+    QueryEnvironment queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS,
+        Map.of("a_REALTIME", List.of("a1")), Map.of("b_REALTIME", List.of("b1")), null);
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(queryEnvironment.planQuery(query));
+    assertEquals(sendNodes.size(), 2);
+    for (MailboxSendNode sendNode : sendNodes) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.SINGLETON,
+          "Equal-width branches should stay local even when their workers sit on different servers");
+    }
+  }
+
+  /// `setOpOptions(is_colocated_by_set_op_keys='false')` opts UNION ALL out of the local exchange and restores the
+  /// full-row hash shuffle.
+  @Test
+  public void testUnionAllHintFalseRestoresShuffle() {
+    String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a "
+        + "UNION ALL SELECT col3 FROM b";
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+      assertFalse(sendNode.isPrePartitioned(),
+          "setOpOptions(is_colocated_by_set_op_keys='false') should restore the shuffle for UNION ALL");
+    }
+  }
+
+  /// A non-UNION-ALL set operation's input exchanges shuffle on the full row, so its output is hash distributed on
+  /// all of its columns and a downstream exchange keyed on those columns is auto-detected as pre-partitioned.
+  /// INTERSECT ALL is used (rather than INTERSECT) so the aggregate above survives planning: a distinct set op's
+  /// output is unique on the group keys, which lets Calcite remove the aggregate and its exchange entirely.
+  @Test
+  public void testSetOpOutputIsHashDistributedOnAllColumns() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT col1, col2 FROM a INTERSECT ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "An exchange keyed on all columns of a shuffled set op should auto-detect pre-partitioning");
+  }
+
+  /// UNION ALL's output carries no distribution guarantee: a local exchange does not redistribute anything, so it
+  /// promises nothing about where equal rows land. A downstream exchange keyed on all of its columns must NOT be
+  /// auto-detected as pre-partitioned -- the deduplicating aggregate above it needs a real shuffle to be correct.
+  @Test
+  public void testUnionAllOutputIsNotTreatedAsHashDistributed() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertFalse(sendNode.isPrePartitioned(),
+        "UNION ALL output must not be treated as hash distributed: its inputs are not shuffled");
+  }
+
+  /// `is_colocated_by_set_op_keys='true'` asserts that rows equal across all projected columns already share a
+  /// worker, which is exactly the all-column hash distribution. The set op's output is therefore claimed as hash
+  /// distributed just as it is for genuinely shuffled inputs, so a downstream exchange keyed on those columns is
+  /// auto-detected as pre-partitioned too and the colocation carries all the way up. Same query as
+  /// [#testSetOpOutputIsHashDistributedOnAllColumns] plus the hint.
+  @Test
+  public void testHintedColocatedSetOpOutputIsHashDistributed() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col1, col2 FROM a "
+        + "INTERSECT ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "A hint-forced colocated set op's output should be treated as hash distributed on all columns");
+  }
+
   /// When each input is declared partitioned by the projected column, the single-column set-op exchange matches the
   /// input partitioning, so the planner auto-detects a pre-partitioned exchange even without the hint. This is the
-  /// baseline that {@link #testSetOpColocationHintFalseDisablesAutoDetected} overrides.
+  /// baseline that [#testSetOpColocationHintFalseDisablesAutoDetected] overrides.
   @Test
   public void testSetOpAutoDetectsPrePartitioningWithoutHint() {
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(AUTO_DETECTED_SET_OP))) {
@@ -1117,8 +1463,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /// Setting the hint to {@code 'false'} overrides the planner's automatic detection of pre-partitioning (see
-  /// {@link #testSetOpAutoDetectsPrePartitioningWithoutHint} for the same query without the hint).
+  /// Setting the hint to `'false'` overrides the planner's automatic detection of pre-partitioning (see
+  /// [#testSetOpAutoDetectsPrePartitioningWithoutHint] for the same query without the hint).
   @Test
   public void testSetOpColocationHintFalseDisablesAutoDetected() {
     String query = AUTO_DETECTED_SET_OP.replaceFirst("SELECT",
@@ -1133,12 +1479,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   // op matches the input partitioning and the planner auto-detects pre-partitioning.
   private static final String AUTO_DETECTED_SET_OP =
       "SELECT col2 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ "
-          + "UNION ALL "
+          + "INTERSECT "
           + "SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
           + "partition_size='4') */";
 
-  /// Finds the {@link MailboxSendNode}s feeding each input exchange of the (single) set-op stage. A set operation has
-  /// one mailbox exchange per branch, and the {@code prePartitioned} flag lives on each branch's send node.
+  /// Finds the [MailboxSendNode]s feeding each input exchange of the (single) set-op stage. A set operation has
+  /// one mailbox exchange per branch, and the `prePartitioned` flag lives on each branch's send node.
   private List<MailboxSendNode> findSetOpInputSendNodes(DispatchableSubPlan dispatchableSubPlan) {
     SetOpNode setOpNode = null;
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
@@ -1161,10 +1507,22 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return sendNodes;
   }
 
+  /// Finds the [MailboxSendNode] at the root of the fragment containing the (single) set-op node, i.e. the exchange
+  /// that ships the set operation's output to its consumer stage.
+  private MailboxSendNode findSendNodeAboveSetOp(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && findNodeOfType(root, SetOpNode.class) != null) {
+        return (MailboxSendNode) root;
+      }
+    }
+    throw new AssertionError("Expected a fragment rooted at a MailboxSendNode containing a SetOp node");
+  }
+
   /// When colocation hints are applied to a chain of operations that are all keyed on the same (partition) column, the
   /// whole chain executes without a data shuffle: every hash-distributed exchange in the plan is pre-partitioned. This
-  /// covers combinations of colocated joins, window functions and set operations (see {@link #colocatedChains}). The
-  /// join key is {@code a.col2}/{@code b.col1} (each table's partition column), so the join is colocated, and the
+  /// covers combinations of colocated joins, window functions and set operations (see [#colocatedChains]). The
+  /// join key is `a.col2`/`b.col1` (each table's partition column), so the join is colocated, and the
   /// window and set op keep that same key.
   @Test(dataProvider = "colocatedChains")
   public void testColocatedOperationsChainWithoutShuffle(String description, String query) {
@@ -1199,7 +1557,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
   }
 
-  /// Baseline for {@link #testColocatedOperationsChainWithoutShuffle}: without the colocation hints the same
+  /// Baseline for [#testColocatedOperationsChainWithoutShuffle]: without the colocation hints the same
   /// join -> window chain still shuffles (at least one hash exchange is not pre-partitioned), proving the hints are
   /// what eliminate the shuffles.
   @Test
@@ -1211,7 +1569,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   /// Set-op-specific baseline for the "set op of colocated joins" chain: with
-  /// {@code is_colocated_by_set_op_keys='false'} the set-op exchange is forced back to a shuffle (while the per-branch
+  /// `is_colocated_by_set_op_keys='false'` the set-op exchange is forced back to a shuffle (while the per-branch
   /// joins stay colocated), proving the set-op hint is what keeps the set-op level of the chain colocated.
   @Test
   public void testSetOpChainWithoutSetOpHintShuffles() {
@@ -1224,7 +1582,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "With is_colocated_by_set_op_keys='false', the set-op level of the chain should shuffle");
   }
 
-  /// Collects the {@link MailboxSendNode} at the root of every hash-distributed stage in the plan (i.e. every
+  /// Collects the [MailboxSendNode] at the root of every hash-distributed stage in the plan (i.e. every
   /// inter-stage hash exchange). A pre-partitioned send is a direct, no-shuffle exchange; a non-pre-partitioned one is
   /// a full shuffle.
   private List<MailboxSendNode> findHashSendNodes(DispatchableSubPlan dispatchableSubPlan) {
@@ -1239,9 +1597,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return sendNodes;
   }
 
-  /**
-   * Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
-   */
+  /// Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
   private DispatchablePlanFragment findJoinStage(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       int stageId = fragment.getPlanFragment().getFragmentId();
@@ -1255,9 +1611,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
-  /**
-   * Finds the JoinNode in the plan.
-   */
+  /// Finds the JoinNode in the plan.
   private JoinNode findJoinNode(DispatchableSubPlan dispatchableSubPlan) {
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
       JoinNode joinNode = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), JoinNode.class);
@@ -1382,5 +1736,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         },
     };
     //@formatter:on
+  }
+
+  @Test
+  public void testEnrichedJoinRuleIsNoOp() {
+    // Enriched joins were removed. A query still requesting the JoinToEnrichedJoin rule via usePlannerRules must
+    // plan successfully (no failure for the unknown/disabled rule) and must NOT produce an enriched join — the
+    // project stays above an ordinary join. See QueryEnvironment where the rule is intentionally not registered.
+    String query = "SET usePlannerRules='JoinToEnrichedJoin'; "
+        + "EXPLAIN PLAN FOR SELECT a.col1 + b.col1 FROM a JOIN b ON a.col1 = b.col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(explain.contains("EnrichedJoin"),
+        "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
+    assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
   }
 }

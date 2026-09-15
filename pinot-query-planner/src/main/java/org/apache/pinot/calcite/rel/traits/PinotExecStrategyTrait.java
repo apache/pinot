@@ -24,33 +24,24 @@ import org.apache.calcite.plan.RelTraitDef;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 
 
-/**
- * Execution strategy defines how a sub-tree of the plan will be executed by Pinot. There are three strategies:
- * <ol>
- *   <li>Streaming: This is the default strategy that indicates the operator will emit data in chunks until EOS.</li>
- *   <li>
- *     Pipeline Breaker: This indicates that Pinot Server will consume the entire output of this operator, before
- *     it compiles the plan for the rest of the Plan Fragment.
- *   </li>
- *   <li>
- *     Sub Plan: This indicates that Pinot Broker should execute the entire plan under this operator first, and then
- *     continue with planning the rest of the plan tree. Usually, you would get a constant out of the Sub-Plan, which
- *     can be put back in the original plan tree.
- *   </li>
- * </ol>
- */
+/// Execution strategy defines how a sub-tree of the plan will be executed by Pinot. There are three strategies:
+///
+/// 1. Streaming: This is the default strategy that indicates the operator will emit data in chunks until EOS.
+/// 2. Pipeline Breaker: This indicates that Pinot Server will consume the entire output of this operator, before
+///    it compiles the plan for the rest of the Plan Fragment.
+/// 3. Sub Plan: This indicates that Pinot Broker should execute the entire plan under this operator first, and then
+///    continue with planning the rest of the plan tree. Usually, you would get a constant out of the Sub-Plan, which
+///    can be put back in the original plan tree.
 public class PinotExecStrategyTrait implements RelTrait {
   public static final PinotExecStrategyTrait STREAMING = new PinotExecStrategyTrait(PinotRelExchangeType.STREAMING);
   public static final PinotExecStrategyTrait PIPELINE_BREAKER = new PinotExecStrategyTrait(
       PinotRelExchangeType.PIPELINE_BREAKER);
   public static final PinotExecStrategyTrait SUB_PLAN = new PinotExecStrategyTrait(PinotRelExchangeType.SUB_PLAN);
 
-  /**
-   * <b>Implementation Note:</b> We use {@link PinotRelExchangeType} in this trait because Pinot Runtime uses that
-   * enum to determine the execution strategy in the dispatched plan to the server, and we can't change it now due to
-   * b/w compatibility. Ideally we would have liked to introduce a new Enum in this trait, similar to
-   * {@link org.apache.calcite.rel.RelDistribution}.
-   */
+  /// **Implementation Note:** We use [PinotRelExchangeType] in this trait because Pinot Runtime uses that
+  /// enum to determine the execution strategy in the dispatched plan to the server, and we can't change it now due to
+  /// b/w compatibility. Ideally we would have liked to introduce a new Enum in this trait, similar to
+  /// [org.apache.calcite.rel.RelDistribution].
   private final PinotRelExchangeType _type;
 
   PinotExecStrategyTrait(PinotRelExchangeType type) {

@@ -32,11 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * ImplicitHybridTable represents the default definition of a hybrid table - If a table name does not have a type,
- * then it represents a OFFLINE and REALTIME table with the same raw table name.
- * If the table name has a type, then it represents the table with the given type.
- */
+/// ImplicitHybridTable represents the default definition of a hybrid table - If a table name does not have a type,
+/// then it represents a OFFLINE and REALTIME table with the same raw table name.
+/// If the table name has a type, then it represents the table with the given type.
 public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitHybridTableRouteProvider.class);
 

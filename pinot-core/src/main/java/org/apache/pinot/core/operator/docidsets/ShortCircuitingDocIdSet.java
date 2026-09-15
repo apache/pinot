@@ -23,11 +23,9 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 
 
-/**
- * A DocIdSet used for early short-circuiting that behaves like an empty set
- * while preserving the number of entries scanned in filters up to the
- * short-circuit point.
- */
+/// A DocIdSet used for early short-circuiting that behaves like an empty set
+/// while preserving the number of entries scanned in filters up to the
+/// short-circuit point.
 public final class ShortCircuitingDocIdSet implements BlockDocIdSet {
   private final long _numEntriesScannedInFilter;
 

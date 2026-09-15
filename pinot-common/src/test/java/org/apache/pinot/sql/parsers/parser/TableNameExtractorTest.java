@@ -30,9 +30,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the TableNameExtractor class.
- */
+/// Tests for the TableNameExtractor class.
 public class TableNameExtractorTest {
 
   @Test
@@ -291,21 +289,19 @@ public class TableNameExtractorTest {
     TableNameExtractor.resolveTableName("");
   }
 
-  /**
-   * Data provider for SQL queries and their expected table names.
-   * This makes it easy to add new test cases by simply adding entries to this array.
-   *
-   * @return Object[][] where each Object[] contains: [testName (String), sqlQuery (String),
-   * expectedTableNames (String[] or null)]
-   * Each entry in the returned array is an Object[] of length 3, structured as follows:
-   * <ul>
-   * <li><b>testName</b> (String): A descriptive name for the test case.</li>
-   * <li><b>sqlQuery</b> (String): The SQL query to be tested.</li>
-   * <li><b>expectedTableNames</b> (String[]): The expected table names to be extracted from the query,
-   * or {@code null} if no table names are expected (e.g., for invalid or empty queries).</li>
-   * </ul>
-   * This makes it easy to add new test cases by simply adding entries to this array.
-   */
+  /// Data provider for SQL queries and their expected table names.
+  /// This makes it easy to add new test cases by simply adding entries to this array.
+  ///
+  /// @return Object\[\]\[\] where each Object\[\] contains: \[testName (String), sqlQuery (String),
+  /// expectedTableNames (String\[\] or null)\]
+  /// Each entry in the returned array is an Object\[\] of length 3, structured as follows:
+  ///
+  /// - **testName** (String): A descriptive name for the test case.
+  /// - **sqlQuery** (String): The SQL query to be tested.
+  /// - **expectedTableNames** (String\[\]): The expected table names to be extracted from the query,
+  ///   or `null` if no table names are expected (e.g., for invalid or empty queries).
+  ///
+  /// This makes it easy to add new test cases by simply adding entries to this array.
   @DataProvider(name = "sqlQueries")
   public Object[][] sqlQueriesDataProvider() {
     return new Object[][]{
@@ -773,14 +769,12 @@ public class TableNameExtractorTest {
     };
   }
 
-  /**
-   * Test method that uses the DataProvider to test multiple SQL queries.
-   * This makes it easy to add new test cases by simply adding entries to the data provider.
-   *
-   * @param testName The name of the test case for better reporting
-   * @param sqlQuery The SQL query to test
-   * @param expectedTableNames The expected table names that should be extracted
-   */
+  /// Test method that uses the DataProvider to test multiple SQL queries.
+  /// This makes it easy to add new test cases by simply adding entries to the data provider.
+  ///
+  /// @param testName The name of the test case for better reporting
+  /// @param sqlQuery The SQL query to test
+  /// @param expectedTableNames The expected table names that should be extracted
   @Test(dataProvider = "sqlQueries")
   public void testResolveTableNameWithDataProvider(String testName, String sqlQuery, String[] expectedTableNames,
       boolean throwException) {

@@ -32,10 +32,8 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Enriches the record with custom functions.
- * TODO: Merge this and ExpressionTransformer
- */
+/// Enriches the record with custom functions.
+/// TODO: Merge this and ExpressionTransformer
 public class CustomFunctionEnricher implements RecordEnricher {
   private final LinkedHashMap<String, FunctionEvaluator> _fieldToFunctionEvaluator;
   private final List<String> _fieldsToExtract;

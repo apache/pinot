@@ -71,9 +71,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
     FileUtils.forceMkdir(new File(_outputDir));
   }
 
-  /**
-   * Clean up after test
-   */
+  /// Clean up after test
   @AfterClass
   public void cleanup() {
     FileUtils.deleteQuietly(new File(_outputDir));

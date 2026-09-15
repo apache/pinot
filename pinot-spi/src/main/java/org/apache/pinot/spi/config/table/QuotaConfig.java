@@ -28,9 +28,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
-/**
- * Class representing table quota configuration
- */
+/// Class representing table quota configuration
 public class QuotaConfig extends BaseJsonConfig {
   private static final long INVALID_STORAGE_IN_BYTES = -1L;
   private static final double INVALID_MAX_QPS = -1.0;
@@ -52,7 +50,7 @@ public class QuotaConfig extends BaseJsonConfig {
       try {
         _storageInBytes = DataSizeUtils.toBytes(storage);
       } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid 'storage': " + storage);
+        throw new IllegalArgumentException("Invalid 'storage': " + storage, e);
       }
       _storage = DataSizeUtils.fromBytes(_storageInBytes);
     } else {
@@ -62,9 +60,10 @@ public class QuotaConfig extends BaseJsonConfig {
     if (maxQueriesPerSecond != null) {
       try {
         _maxQPS = Double.parseDouble(maxQueriesPerSecond);
-        Preconditions.checkArgument(_maxQPS > 0);
+        Preconditions.checkArgument(Double.isFinite(_maxQPS) && _maxQPS > 0,
+            "'maxQueriesPerSecond' must be a positive finite number, got: %s", _maxQPS);
       } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid 'maxQueriesPerSecond': " + storage);
+        throw new IllegalArgumentException("Invalid 'maxQueriesPerSecond': " + maxQueriesPerSecond, e);
       }
       _maxQueriesPerSecond = Double.toString(_maxQPS);
     } else {

@@ -40,9 +40,7 @@ public class ProjectionOperatorUtils {
   }
 
   public interface Implementation {
-    /**
-     * Returns the projection operator
-     */
+    /// Returns the projection operator
     ProjectionOperator getProjectionOperator(Map<String, DataSource> dataSourceMap,
         @Nullable BaseDocIdSetOperator docIdSetOperator, QueryContext queryContext);
   }

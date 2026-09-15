@@ -24,14 +24,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation class for {@link SegmentDirectoryLoader} implementations. The corresponding classes
- * are auto-registered during startup.
- *
- * NOTE:
- * 1. The annotated class must be under the package of name 'org.apache.pinot.segment.*.loader'
- * to be auto-registered.
- */
+/// Annotation class for [SegmentDirectoryLoader] implementations. The corresponding classes
+/// are auto-registered during startup.
+///
+/// NOTE:
+/// 1. The annotated class must be under the package of name 'org.apache.pinot.segment.\*.loader'
+/// to be auto-registered.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface SegmentLoader {

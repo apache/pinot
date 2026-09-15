@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.common.exception;
 
-/**
- * Exception thrown when a rebalance operation is attempted while another rebalance is already in progress for the same
- * table. This helps to prevent concurrent table rebalances.
- */
+/// Exception thrown when a rebalance operation is attempted while another rebalance is already in progress for the same
+/// table. This helps to prevent concurrent table rebalances.
 public class RebalanceInProgressException extends Exception {
   public RebalanceInProgressException(String message) {
     super(message);

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -283,8 +289,19 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testCancelQuery() {
+  public void testCancelQuery()
+      throws Exception {
     String tableName = "myTable_OFFLINE";
+    String serviceToken = "server-admin-token";
+    AtomicReference<String> receivedAuthorization = new AtomicReference<>();
+    HttpServer adminServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    adminServer.createContext("/", exchange -> {
+      receivedAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+      exchange.sendResponseHeaders(200, -1);
+      exchange.close();
+    });
+    adminServer.start();
+
     // Mock pretty much everything until the query can be submitted.
     TableCache tableCache = mock(TableCache.class);
     TableConfig tableCfg = mock(TableConfig.class);
@@ -296,7 +313,12 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.routingExists(tableName)).thenReturn(true);
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
-    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+    int adminPort = adminServer.getAddress().getPort();
+    InstanceConfig serverConfig = new InstanceConfig("Server_localhost_9000");
+    serverConfig.setHostName("localhost");
+    serverConfig.setPort("9000");
+    serverConfig.getRecord().setIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(serverConfig),
         new SegmentsToQuery(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
@@ -307,6 +329,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     long[] testRequestId = {-1};
     BrokerMetrics.register(mock(BrokerMetrics.class));
     PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Broker.SERVER_ADMIN_AUTH_PREFIX + ".token", serviceToken);
+    config.setProperty(Broker.SERVER_ADMIN_AUTH_PREFIX + ".prefix", "Bearer");
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
@@ -327,7 +351,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               throws Exception {
             testRequestId[0] = requestId;
             latch.await();
-            return null;
+            return BrokerResponseNative.empty();
           }
 
           @Override
@@ -339,25 +363,46 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             throw new UnsupportedOperationException("Not implemented in test");
           }
         };
-    CompletableFuture.runAsync(() -> {
+    CompletableFuture<Void> queryFuture = CompletableFuture.runAsync(() -> {
       try {
         requestHandler.handleRequest(String.format("select * from %s limit 10", tableName));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     });
-    TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(testRequestId[0]).size() == 1, 500, 5000,
-        "Failed to submit query");
-    Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
-    Assert.assertEquals(entry.getKey().longValue(), testRequestId[0]);
-    Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
-    Set<ServerInstance> servers = requestHandler.getRunningServers(testRequestId[0]);
-    Assert.assertEquals(servers.size(), 1);
-    Assert.assertEquals(servers.iterator().next().getHostname(), "server01");
-    Assert.assertEquals(servers.iterator().next().getPort(), 9000);
-    Assert.assertEquals(servers.iterator().next().getInstanceId(), "server01_9000");
-    Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://server01:8097");
-    latch.countDown();
+    ExecutorService cancellationExecutor = Executors.newSingleThreadExecutor();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(testRequestId[0]).size() == 1, 500, 5000,
+          "Failed to submit query");
+      Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
+      Assert.assertEquals(entry.getKey().longValue(), testRequestId[0]);
+      Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
+      Set<ServerInstance> servers = requestHandler.getRunningServers(testRequestId[0]);
+      Assert.assertEquals(servers.size(), 1);
+      Assert.assertEquals(servers.iterator().next().getHostname(), "localhost");
+      Assert.assertEquals(servers.iterator().next().getPort(), 9000);
+      Assert.assertEquals(servers.iterator().next().getInstanceId(), "Server_localhost_9000");
+      Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://localhost:" + adminPort);
+
+      Map<String, Integer> serverResponses = new HashMap<>();
+      Assert.assertTrue(requestHandler.cancelQuery(testRequestId[0], 3000, cancellationExecutor, connectionManager,
+          serverResponses));
+      Assert.assertEquals(receivedAuthorization.get(), "Bearer " + serviceToken);
+      Assert.assertEquals(serverResponses, Map.of("localhost:" + adminPort, 200));
+    } finally {
+      latch.countDown();
+      try {
+        queryFuture.get(5, TimeUnit.SECONDS);
+      } finally {
+        cancellationExecutor.shutdownNow();
+        try {
+          connectionManager.close();
+        } finally {
+          adminServer.stop(0);
+        }
+      }
+    }
   }
 
   @Test
@@ -579,17 +624,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "(1772109900000" + Range.DELIMITER + "1772113500000]", "Realtime mixed");
   }
 
-  /**
-   * Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-   * _queryQuotaManager.acquire(tableName) charges quota against the MV
-   * instead of the base table. A throttled base table is effectively
-   * bypassed when its quota allows no traffic but the MV has no quota entry.
-   *
-   * <p>Before fix: acquire("baseTable_OFFLINE") is never called; the MV
-   * table passes because the mock only denies the base table name.
-   * <p>After fix: the base table name is used for quota accounting and the
-   * request is correctly rate-limited.
-   */
+  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
+  /// \_queryQuotaManager.acquire(tableName) charges quota against the MV
+  /// instead of the base table. A throttled base table is effectively
+  /// bypassed when its quota allows no traffic but the MV has no quota entry.
+  ///
+  /// Before fix: acquire("baseTable_OFFLINE") is never called; the MV
+  /// table passes because the mock only denies the base table name.
+  ///
+  /// After fix: the base table name is used for quota accounting and the
+  /// request is correctly rate-limited.
   @Test
   public void testMaterializedViewFullRewriteQuotaAccountedAgainstBaseTable()
       throws Exception {
@@ -701,16 +745,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Expected TOO_MANY_REQUESTS error code");
   }
 
-  /**
-   * Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-   * accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
-   * policy for the materialized view table instead of the base table.
-   *
-   * <p>Before fix: getRowColFilters is called with the materialized view table name
-   * "mv_baseTable_OFFLINE".
-   * <p>After fix: getRowColFilters is called with the original base table
-   * name "baseTable_OFFLINE".
-   */
+  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
+  /// accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
+  /// policy for the materialized view table instead of the base table.
+  ///
+  /// Before fix: getRowColFilters is called with the materialized view table name
+  /// "mv_baseTable_OFFLINE".
+  ///
+  /// After fix: getRowColFilters is called with the original base table
+  /// name "baseTable_OFFLINE".
   @Test
   public void testMaterializedViewFullRewriteRlsLookupUsesBaseTable()
       throws Exception {
@@ -1001,13 +1044,11 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "combined filter must retain the original WHERE clause, got literals: " + literalValues);
   }
 
-  /**
-   * Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
-   * option (e.g. via `SET materializedViewRewrite='true'`) is stripped at the broker entry
-   * before any compile work. Without the strip, a hostile client could stamp the
-   * broker-internal marker themselves and bypass `BrokerReduceService`'s "Nested query is not
-   * supported without gapfill" safety net on any path where `brokerRequest != serverBrokerRequest`.
-   */
+  /// Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
+  /// option (e.g. via `SET materializedViewRewrite='true'`) is stripped at the broker entry
+  /// before any compile work. Without the strip, a hostile client could stamp the
+  /// broker-internal marker themselves and bypass `BrokerReduceService`'s "Nested query is not
+  /// supported without gapfill" safety net on any path where `brokerRequest != serverBrokerRequest`.
   @Test
   public void testMaterializedViewMarkerStrippedFromUserSuppliedOptions()
       throws Exception {
@@ -1093,12 +1134,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             + serverOptions);
   }
 
-  /**
-   * Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a
-   * REALTIME sibling, because a batch MV cannot cover newly-streamed rows. Without this guard
-   * the MV swap would silently drop all rows ingested via the realtime stream since the MV last
-   * refreshed — an invisible data-loss path.
-   */
+  /// Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a
+  /// REALTIME sibling, because a batch MV cannot cover newly-streamed rows. Without this guard
+  /// the MV swap would silently drop all rows ingested via the realtime stream since the MV last
+  /// refreshed — an invisible data-loss path.
   @Test
   public void testMaterializedViewFullRewriteSkippedForHybridBaseTable()
       throws Exception {
@@ -1217,16 +1256,14 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "FULL_REWRITE marker must not be stamped when rewrite is skipped; options: " + serverOptions);
   }
 
-  /**
-   * Pins the F1 fix: when the rewrite engine returns a FULL_REWRITE plan and no skip condition
-   * trips (base table is OFFLINE-only, schema present, etc.), the server-side query MUST actually
-   * be swapped to target the MV — not the base table.  The earlier `watermarkMs <= 0` guard in
-   * `DefaultMaterializedViewHandler.compile` was over-broad and silently dropped every
-   * FULL_REWRITE attempt while `annotateResponse` continued to stamp `materializedViewQueried`,
-   * producing a false-positive on every operator-facing metric.  This test asserts the actual
-   * dataSource table name on the server query equals the MV name AND the response's
-   * `materializedViewQueried` matches.
-   */
+  /// Pins the F1 fix: when the rewrite engine returns a FULL_REWRITE plan and no skip condition
+  /// trips (base table is OFFLINE-only, schema present, etc.), the server-side query MUST actually
+  /// be swapped to target the MV — not the base table.  The earlier `watermarkMs <= 0` guard in
+  /// `DefaultMaterializedViewHandler.compile` was over-broad and silently dropped every
+  /// FULL_REWRITE attempt while `annotateResponse` continued to stamp `materializedViewQueried`,
+  /// producing a false-positive on every operator-facing metric.  This test asserts the actual
+  /// dataSource table name on the server query equals the MV name AND the response's
+  /// `materializedViewQueried` matches.
   @Test
   public void testMaterializedViewFullRewriteActuallySwapsServerQuery()
       throws Exception {
@@ -1343,17 +1380,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Response must report the MV name when the swap was committed");
   }
 
-  /**
-   * Per-query opt-out: a query carrying {@code enableMaterializedViewRewrite=false} (the option the
-   * MV minion executor injects onto its materialization query) MUST bypass the rewrite path
-   * entirely.  This is the regression guard for the circular-rewrite hazard: a materialization
-   * query reads the base table, and with broker-wide MV rewrite enabled it would otherwise be
-   * eligible to be rewritten back onto an MV over the same base table (its own MV, or a sibling).
-   * Using the identical setup to {@link #testMaterializedViewFullRewriteActuallySwapsServerQuery}
-   * (which DOES swap), this asserts the gate prevents the swap: the rewrite engine is never
-   * consulted, the server query targets the base table, no MV marker is stamped, and the response
-   * reports no MV.
-   */
+  /// Per-query opt-out: a query carrying `enableMaterializedViewRewrite=false` (the option the
+  /// MV minion executor injects onto its materialization query) MUST bypass the rewrite path
+  /// entirely.  This is the regression guard for the circular-rewrite hazard: a materialization
+  /// query reads the base table, and with broker-wide MV rewrite enabled it would otherwise be
+  /// eligible to be rewritten back onto an MV over the same base table (its own MV, or a sibling).
+  /// Using the identical setup to [#testMaterializedViewFullRewriteActuallySwapsServerQuery]
+  /// (which DOES swap), this asserts the gate prevents the swap: the rewrite engine is never
+  /// consulted, the server query targets the base table, no MV marker is stamped, and the response
+  /// reports no MV.
   @Test
   public void testMaterializedViewRewriteSkippedWhenDisabledByQueryOption()
       throws Exception {
@@ -1462,12 +1497,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Response must not report a materializedViewQueried when rewrite is disabled by the query option");
   }
 
-  /**
-   * Pins the cascade-prevention guard: when the user's query already targets an MV table
-   * directly ({@code TableConfig.isMaterializedView()} is {@code true}), the broker must skip
-   * MV rewrite entirely.  Cascading MV-to-MV rewrites are not supported, and the explicit
-   * guard uses the new flag from PR #18564 as the single source of truth for MV identity.
-   */
+  /// Pins the cascade-prevention guard: when the user's query already targets an MV table
+  /// directly (`TableConfig.isMaterializedView()` is `true`), the broker must skip
+  /// MV rewrite entirely.  Cascading MV-to-MV rewrites are not supported, and the explicit
+  /// guard uses the new flag from PR #18564 as the single source of truth for MV identity.
   @Test
   public void testMaterializedViewRewriteSkippedWhenUserQueryTargetsMaterializedView()
       throws Exception {
@@ -1680,5 +1713,42 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     String serverTableName = serverBrokerRequest.getPinotQuery().getDataSource().getTableName();
     Assert.assertEquals(serverTableName, baseOfflineTable,
         "EXPLAIN must route to the base table, not the MV; SPLIT must not have swapped routing");
+  }
+
+  @Test
+  public void testExtractLookupTableNames() {
+    // No lookup at all
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE col > 1"), Set.of());
+
+    // Select list, filter, group-by, order-by and having
+    Assert.assertEquals(extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE lookup('dimA', 'c', 'pk', col) = 'x'"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY lookup('dimA', 'c', 'pk', col)"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl ORDER BY lookup('dimA', 'c', 'pk', col)"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY col HAVING COUNT(*) > 1 AND MAX(col) > 0"),
+        Set.of());
+
+    // Wrapped in another function, aliased, and nested inside another lookup's join value
+    Assert.assertEquals(extractLookupTableNames("SELECT UPPER(lookup('dimA', 'c', 'pk', col)) AS a FROM tbl"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', lookup('dimB', 'c', 'pk', col)) FROM tbl"),
+        Set.of("dimA", "dimB"));
+
+    // The function name is canonicalized, so casing in the query must not hide the table
+    Assert.assertEquals(extractLookupTableNames("SELECT LOOKUP('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+
+    // Multiple distinct dimension tables
+    Assert.assertEquals(extractLookupTableNames(
+            "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
+        Set.of("dimA", "dimB"));
+  }
+
+  private static Set<String> extractLookupTableNames(String sql) {
+    return BaseSingleStageBrokerRequestHandler.extractLookupTableNames(CalciteSqlParser.compileToPinotQuery(sql));
   }
 }

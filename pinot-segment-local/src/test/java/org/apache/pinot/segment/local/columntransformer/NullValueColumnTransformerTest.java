@@ -31,10 +31,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Comprehensive tests for NullValueColumnTransformer.
- * Tests null value handling and default value substitution for all data types.
- */
+/// Comprehensive tests for NullValueColumnTransformer.
+/// Tests null value handling and default value substitution for all data types.
 public class NullValueColumnTransformerTest {
 
   private static final TableConfig TABLE_CONFIG =

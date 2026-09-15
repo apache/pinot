@@ -28,44 +28,34 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 
 public interface ImmutableSegment extends IndexSegment {
 
-  /**
-   * Returns the dictionary for the given column.
-   *
-   * @param column Column name
-   * @return Dictionary for the given column, or null if the given column does not have one
-   */
+  /// Returns the dictionary for the given column.
+  ///
+  /// @param column Column name
+  /// @return Dictionary for the given column, or null if the given column does not have one
   Dictionary getDictionary(String column);
 
   <I extends IndexReader> I getIndex(String column, IndexType<?, I, ?> type);
 
-  /**
-   * Returns the forward index for the given column.
-   *
-   * @param column Column name
-   * @return Forward index for the given column
-   */
+  /// Returns the forward index for the given column.
+  ///
+  /// @param column Column name
+  /// @return Forward index for the given column
   ForwardIndexReader getForwardIndex(String column);
 
-  /**
-   * Returns the inverted index for the given column.
-   *
-   * @param column Column name
-   * @return Inverted index for the given column, or null if the given column does not have one
-   */
+  /// Returns the inverted index for the given column.
+  ///
+  /// @param column Column name
+  /// @return Inverted index for the given column, or null if the given column does not have one
   InvertedIndexReader getInvertedIndex(String column);
 
-  /**
-   * Returns the total size of the segment in bytes.
-   *
-   * @return Size of the segment in bytes
-   */
+  /// Returns the total size of the segment in bytes.
+  ///
+  /// @return Size of the segment in bytes
   long getSegmentSizeBytes();
 
-  /**
-   * Get the storage tier of the immutable segment.
-   *
-   * @return storage tier, null by default.
-   */
+  /// Get the storage tier of the immutable segment.
+  ///
+  /// @return storage tier, null by default.
   @Nullable
   String getTier();
 }

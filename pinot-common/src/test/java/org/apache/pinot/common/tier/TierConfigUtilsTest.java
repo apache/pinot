@@ -33,9 +33,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the utility methods for TierConfig
- */
+/// Tests the utility methods for TierConfig
 public class TierConfigUtilsTest {
 
   @Test
@@ -90,9 +88,7 @@ public class TierConfigUtilsTest {
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
   }
 
-  /**
-   * Tests conversion from {@code TierConfig} to {@code Tier} in the {@code TierFactory}
-   */
+  /// Tests conversion from `TierConfig` to `Tier` in the `TierFactory`
   @Test
   public void testGetTier() {
     TierConfig tierConfig = new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
@@ -162,9 +158,7 @@ public class TierConfigUtilsTest {
     }
   }
 
-  /**
-   * Tests the custom comparator for tiers
-   */
+  /// Tests the custom comparator for tiers
   @Test
   public void testTierComparator() {
     Comparator<Tier> tierComparator = TierConfigUtils.getTierComparator();

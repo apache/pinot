@@ -36,13 +36,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
-/**
- * Used by the time-series engine to convert a time expression to an index in the {@link TimeBuckets}.
- * <pre>
- *   args: (timeExpression, timeUnit, first_time_bucket_value, bucket_window_seconds, offset)
- *   timeSeriesBucketIndex(secondsSinceEpoch, 'MILLISECONDS', 123, 10, 0)
- * </pre>
- */
+/// Used by the time-series engine to convert a time expression to an index in the [TimeBuckets].
+///
+/// ```
+/// args: (timeExpression, timeUnit, first_time_bucket_value, bucket_window_seconds, offset)
+/// timeSeriesBucketIndex(secondsSinceEpoch, 'MILLISECONDS', 123, 10, 0)
+/// ```
 public class TimeSeriesBucketTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = TransformFunctionType.TIME_SERIES_BUCKET.getName();
   private TimeUnit _timeUnit;

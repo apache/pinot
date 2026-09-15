@@ -21,11 +21,9 @@ package org.apache.pinot.client.admin;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 
-/**
- * Client for query-level administration operations.
- * Instances are lightweight views over the shared admin transport and are thread-safe as long as the parent
- * {@link PinotAdminClient} remains open.
- */
+/// Client for query-level administration operations.
+/// Instances are lightweight views over the shared admin transport and are thread-safe as long as the parent
+/// [PinotAdminClient] remains open.
 public class QueryAdminClient extends BaseServiceAdminClient {
 
   public QueryAdminClient(PinotAdminTransport transport, String controllerAddress,
@@ -33,9 +31,7 @@ public class QueryAdminClient extends BaseServiceAdminClient {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Cancels a query by client id.
-   */
+  /// Cancels a query by client id.
   public String cancelQueryByClientId(String clientQueryId)
       throws PinotAdminException {
     JsonNode response = _transport.executeDelete(_controllerAddress, "/clientQuery/" + clientQueryId, null,

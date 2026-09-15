@@ -18,31 +18,23 @@
  */
 package org.apache.pinot.calcite.rel.logical;
 
-/**
- * Type of exchange.
- */
+/// Type of exchange.
 public enum PinotRelExchangeType {
 
-  /**
-   * A streaming exchange is one that data will be sent and received in a streaming fashion.
-   */
+  /// A streaming exchange is one that data will be sent and received in a streaming fashion.
   STREAMING,
 
-  /**
-   * A sub-plan exchange is one that multi-stage query plan will execute the sub-tree below the exchange first; then
-   * treat the result as a {@link org.apache.calcite.rex.RexLiteral}; and put back into the logical plan for further
-   * optimization from the {@link org.apache.calcite.plan.RelOptPlanner}.
-   *
-   * <p>This is useful when plan can be further optimized if a sub plan is executed first from the broker.</p>
-   */
+  /// A sub-plan exchange is one that multi-stage query plan will execute the sub-tree below the exchange first; then
+  /// treat the result as a [org.apache.calcite.rex.RexLiteral]; and put back into the logical plan for further
+  /// optimization from the [org.apache.calcite.plan.RelOptPlanner].
+  ///
+  /// This is useful when plan can be further optimized if a sub plan is executed first from the broker.
   SUB_PLAN,
 
-  /**
-   * A pipeline-breaker is one that data will be sent streamingly from sender, but receiver will not start execution
-   * until all data has been received successfully.
-   *
-   * <p>This is useful when logical plan is fixed, but physical plan can be further optimized on the server.</p>
-   */
+  /// A pipeline-breaker is one that data will be sent streamingly from sender, but receiver will not start execution
+  /// until all data has been received successfully.
+  ///
+  /// This is useful when logical plan is fixed, but physical plan can be further optimized on the server.
   PIPELINE_BREAKER;
 
   public static PinotRelExchangeType getDefaultExchangeType() {

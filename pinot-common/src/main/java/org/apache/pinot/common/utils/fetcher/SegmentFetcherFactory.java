@@ -50,9 +50,7 @@ public class SegmentFetcherFactory {
   private static final SegmentFetcher HTTPS_SEGMENT_FETCHER = new HttpsSegmentFetcher();
   private static final SegmentFetcher PINOT_FS_SEGMENT_FETCHER = new PinotFSSegmentFetcher();
 
-  /**
-   * Initializes the segment fetcher factory. This method should only be called once.
-   */
+  /// Initializes the segment fetcher factory. This method should only be called once.
   public static void init(PinotConfiguration config)
       throws Exception {
     HTTP_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
@@ -97,11 +95,9 @@ public class SegmentFetcherFactory {
     }
   }
 
-  /**
-   * Returns the segment fetcher associated with the given protocol, or the default segment fetcher
-   * ({@link HttpSegmentFetcher} for "http", {@link HttpsSegmentFetcher} for "https",
-   * {@link PinotFSSegmentFetcher} for other protocols).
-   */
+  /// Returns the segment fetcher associated with the given protocol, or the default segment fetcher
+  /// ([HttpSegmentFetcher] for "http", [HttpsSegmentFetcher] for "https",
+  /// [PinotFSSegmentFetcher] for other protocols).
   public static SegmentFetcher getSegmentFetcher(String protocol) {
     SegmentFetcher segmentFetcher = SEGMENT_FETCHER_MAP.get(protocol);
     if (segmentFetcher != null) {
@@ -122,31 +118,25 @@ public class SegmentFetcherFactory {
     }
   }
 
-  /**
-   * Fetches a segment from URI location to local.
-   */
+  /// Fetches a segment from URI location to local.
   public static void fetchSegmentToLocal(URI uri, File dest)
       throws Exception {
     getSegmentFetcher(uri.getScheme()).fetchSegmentToLocal(uri, dest);
   }
 
-  /**
-   * Fetches a segment from URI location to local.
-   */
+  /// Fetches a segment from URI location to local.
   public static void fetchSegmentToLocal(String uri, File dest)
       throws Exception {
     fetchSegmentToLocal(new URI(uri), dest);
   }
 
-  /**
-   * Fetches a segment from URI location to local and untar it in a streamed manner.
-   * @param uri URI
-   * @param tempRootDir Tmp dir to download
-   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
-   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-   * @return the untared directory
-   * @throws Exception
-   */
+  /// Fetches a segment from URI location to local and untar it in a streamed manner.
+  /// @param uri URI
+  /// @param tempRootDir Tmp dir to download
+  /// @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+  ///                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  /// @return the untared directory
+  /// @throws Exception
   public static File fetchAndStreamUntarToLocal(URI uri, File tempRootDir, long maxStreamRateInByte,
       AtomicInteger attempts)
       throws Exception {
@@ -160,11 +150,9 @@ public class SegmentFetcherFactory {
     return fetchAndStreamUntarToLocal(new URI(uri), tempRootDir, maxStreamRateInByte, attempts);
   }
 
-  /**
-   * Fetches a segment from a URI location to a local file and decrypts it if needed
-   * @param uri remote segment location
-   * @param dest local file
-   */
+  /// Fetches a segment from a URI location to a local file and decrypts it if needed
+  /// @param uri remote segment location
+  /// @param dest local file
   public static void fetchAndDecryptSegmentToLocal(String uri, File dest, @Nullable String crypterName)
       throws Exception {
     if (crypterName == null) {
@@ -197,9 +185,7 @@ public class SegmentFetcherFactory {
     }
   }
 
-  /**
-   * Fetches a segment from any uri in the given supplier's list, and untars it to local in a streamed manner.
-   */
+  /// Fetches a segment from any uri in the given supplier's list, and untars it to local in a streamed manner.
   public static File fetchAndStreamUntarToLocal(String segmentName, String scheme, Supplier<List<URI>> uriSupplier,
       File dest, long maxStreamRateInByte)
       throws Exception {

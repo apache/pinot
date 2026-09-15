@@ -160,7 +160,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
         .build();
   }
 
-  /** Verify result column type of a simple select query against JSON column */
+  /// Verify result column type of a simple select query against JSON column
   @Test
   public void testSimpleSelectOnJsonColumn() {
     try {
@@ -174,7 +174,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Test filtering on string value associated with  JSON key*/
+  /// Test filtering on string value associated with  JSON key
   @Test
   public void testExtractScalarWithStringFilter() {
     Operator<SelectionResultsBlock> operator = getOperator(
@@ -191,7 +191,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(row[1], "duck");
   }
 
-  /** Test filtering on number value associated with  JSON key*/
+  /// Test filtering on number value associated with  JSON key
   @Test
   public void testExtractScalarWithNumericIntFilter() {
     Operator<SelectionResultsBlock> operator = getOperator(
@@ -206,7 +206,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(iterator.next()[0], "dwag");
   }
 
-  /** Test filtering on float value associated with  JSON key*/
+  /// Test filtering on float value associated with  JSON key
   @Test
   public void testExtractScalarWithNumericFloatFilter() {
 
@@ -235,7 +235,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(iterator2.next()[0], 161.5d);
   }
 
-  /** Retrieve JSON array after filtering on string value associated with  JSON key*/
+  /// Retrieve JSON array after filtering on string value associated with  JSON key
   @Test
   public void testExtractScalarArrayWithStringFilter() {
     Operator<SelectionResultsBlock> operator = getOperator(
@@ -250,7 +250,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(iterator.next()[0], "[\"a\",\"b\",\"c\",\"d\"]");
   }
 
-  /** Test filtering on string value within a JSON array*/
+  /// Test filtering on string value within a JSON array
   @Test
   public void testExtractScalarWithArrayFilter() {
     Operator<SelectionResultsBlock> operator = getOperator(

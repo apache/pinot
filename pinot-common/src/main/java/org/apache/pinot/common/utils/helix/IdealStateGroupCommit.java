@@ -42,18 +42,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * IdealStateGroupCommit is a utility class to commit group updates to IdealState.
- * It is designed to be used in a multi-threaded environment where multiple threads
- * may try to update the same IdealState concurrently.
- * The implementation is shamelessly borrowed from (<a href=
- * "https://github.com/apache/helix/blob/helix-1.4.1/helix-core/src/main/java/org/apache/helix/GroupCommit.java"
- * >HelixGroupCommit</a>).
- * This is especially useful for updating large IdealState, which each update may
- * take a long time, e.g. to update one IdealState with 100k segments may take
- * ~4 seconds, then 15 updates will take 1 minute and cause other requests
- * (e.g. Segment upload, realtime segment commit, segment deletion, etc) timeout.
- */
+/// IdealStateGroupCommit is a utility class to commit group updates to IdealState.
+/// It is designed to be used in a multi-threaded environment where multiple threads
+/// may try to update the same IdealState concurrently.
+/// The implementation is shamelessly borrowed from ([HelixGroupCommit][ref1].
+/// This is especially useful for updating large IdealState, which each update may
+/// take a long time, e.g. to update one IdealState with 100k segments may take
+/// ~4 seconds, then 15 updates will take 1 minute and cause other requests
+/// (e.g. Segment upload, realtime segment commit, segment deletion, etc) timeout.
+///
+/// [ref1]: https://github.com/apache/helix/blob/helix-1.4.1/helix-core/src/main/java/org/apache/helix/GroupCommit.java)
 public class IdealStateGroupCommit {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommit.class);
 
@@ -87,9 +85,7 @@ public class IdealStateGroupCommit {
 
   private final Queue[] _queues = new Queue[100];
 
-  /**
-   * Set up a group committer and its associated queues
-   */
+  /// Set up a group committer and its associated queues
   public IdealStateGroupCommit() {
     // Don't use Arrays.fill();
     for (int i = 0; i < _queues.length; i++) {
@@ -105,14 +101,12 @@ public class IdealStateGroupCommit {
     _minNumCharsInISToTurnOnCompression = minNumChars;
   }
 
-  /**
-   * Do a group update for idealState associated with a given resource key
-   * @param helixManager helixManager with the ability to pull from the current data\
-   * @param resourceName the resource name to be updated
-   * @param updater the idealState updater to be applied
-   * @return IdealState if the update is successful, exception if the update fails and null if interrupted while
-   * committing change
-   */
+  /// Do a group update for idealState associated with a given resource key
+  /// @param helixManager helixManager with the ability to pull from the current data\
+  /// @param resourceName the resource name to be updated
+  /// @param updater the idealState updater to be applied
+  /// @return IdealState if the update is successful, exception if the update fails and null if interrupted while
+  /// committing change
   public IdealState commit(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater,
       RetryPolicy retryPolicy, boolean noChangeOk) {
     Queue queue = getQueue(resourceName);
@@ -210,14 +204,12 @@ public class IdealStateGroupCommit {
     IdealState _idealState;
   }
 
-  /**
-   * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
-   *
-   * @param helixManager The HelixManager used to interact with the Helix cluster
-   * @param resourceName The resource for which to update the ideal state
-   * @param updater A function that returns an updated ideal state given an input ideal state
-   * @return updated ideal state if successful, null if not
-   */
+  /// Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
+  ///
+  /// @param helixManager The HelixManager used to interact with the Helix cluster
+  /// @param resourceName The resource for which to update the ideal state
+  /// @param updater A function that returns an updated ideal state given an input ideal state
+  /// @return updated ideal state if successful, null if not
   private static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy policy, boolean noChangeOk) {
     // NOTE: ControllerMetrics could be null because this method might be invoked by Broker.

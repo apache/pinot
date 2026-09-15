@@ -26,17 +26,13 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 
-/**
- * Context for the chunk-based forward index readers.
- * <p>Information saved in the context can be used by subsequent reads as cache:
- * <ul>
- *   <li>
- *     Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
- *     chunk decompression.
- *   </li>
- *   <li>Id for the chunk</li>
- * </ul>
- */
+/// Context for the chunk-based forward index readers.
+///
+/// Information saved in the context can be used by subsequent reads as cache:
+///
+/// - Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
+///   chunk decompression.
+/// - Id for the chunk
 public class ChunkReaderContext implements ForwardIndexReaderContext {
   private final ByteBuffer _chunkBuffer;
 

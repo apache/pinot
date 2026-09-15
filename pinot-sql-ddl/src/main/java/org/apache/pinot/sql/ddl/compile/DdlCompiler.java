@@ -142,12 +142,12 @@ public final class DdlCompiler {
     return _createTableWithOptionsHandler;
   }
 
-  /// Parses and compiles a DDL statement using a stateless {@link DdlCompileContext}.
+  /// Parses and compiles a DDL statement using a stateless [DdlCompileContext].
   ///
-  /// @deprecated Use {@link #compile(String, DdlCompileContext)} and supply a real context.
+  /// @deprecated Use [#compile(String, DdlCompileContext)] and supply a real context.
   ///   The stateless overload is preserved as a thin shim so existing call sites keep
   ///   compiling, but DDL forms that need cluster-side metadata (e.g.
-  ///   {@code CREATE MATERIALIZED VIEW} with an inferred column list, when that feature
+  ///   `CREATE MATERIALIZED VIEW` with an inferred column list, when that feature
   ///   ships in the follow-up commit) will fail with a clear "no source catalog resolver
   ///   configured" error. Production callers should migrate; the shim will be removed in
   ///   a future release.
@@ -167,9 +167,9 @@ public final class DdlCompiler {
   ///
   /// @param sql the raw SQL string (single statement)
   /// @param ctx side-channel collaborators (source-catalog lookup, etc.). Use
-  ///            {@link DdlCompileContext#STATELESS} when no cluster state is available;
+  ///            [DdlCompileContext#STATELESS] when no cluster state is available;
   ///            DDL forms that require it (currently only future MV schema inference) will
-  ///            surface a clear error. Must not be {@code null}.
+  ///            surface a clear error. Must not be `null`.
   /// @return a [CompiledDdl] subclass appropriate for the operation
   /// @throws DdlCompilationException for parse failures or semantic errors
   public static CompiledDdl compile(String sql, DdlCompileContext ctx) {

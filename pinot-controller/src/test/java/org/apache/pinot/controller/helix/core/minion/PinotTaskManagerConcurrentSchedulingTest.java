@@ -34,13 +34,11 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for the concurrent-scheduling dispatch helpers in {@link PinotTaskManager}:
- * {@code shouldUseConcurrentPath(TaskSchedulingContext)} and
- * {@code resolveConcurrentScheduling(TableConfig)}. The tests spy on a {@link PinotTaskManager}
- * mock and inject the cluster-default flag / resource-manager collaborator via reflection,
- * avoiding a full controller boot.
- */
+/// Unit tests for the concurrent-scheduling dispatch helpers in [PinotTaskManager]:
+/// `shouldUseConcurrentPath(TaskSchedulingContext)` and
+/// `resolveConcurrentScheduling(TableConfig)`. The tests spy on a [PinotTaskManager]
+/// mock and inject the cluster-default flag / resource-manager collaborator via reflection,
+/// avoiding a full controller boot.
 public class PinotTaskManagerConcurrentSchedulingTest {
 
   private static final String TABLE_A = "tableA_OFFLINE";

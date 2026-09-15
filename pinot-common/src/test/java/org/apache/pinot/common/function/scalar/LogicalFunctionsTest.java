@@ -26,9 +26,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for Logical functions with Trino-compatible NULL handling
- */
+/// Tests for Logical functions with Trino-compatible NULL handling
 public class LogicalFunctionsTest {
 
   // ==================== Tests for and ====================

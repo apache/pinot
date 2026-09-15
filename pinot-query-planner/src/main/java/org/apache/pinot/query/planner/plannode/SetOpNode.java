@@ -27,9 +27,7 @@ import org.apache.calcite.rel.core.Union;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * Set operation node is used to represent UNION, INTERSECT, EXCEPT.
- */
+/// Set operation node is used to represent UNION, INTERSECT, EXCEPT.
 public class SetOpNode extends BasePlanNode {
   private final SetOpType _setOpType;
   private final boolean _all;

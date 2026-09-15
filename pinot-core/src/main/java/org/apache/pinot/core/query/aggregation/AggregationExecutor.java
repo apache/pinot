@@ -22,22 +22,18 @@ import java.util.List;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-/**
- * Interface for Aggregation executor, that executes all aggregation functions (without group-bys).
- * <p>Aggregations are performed within a segment, i.e. does not merge aggregation results across different segments.
- */
+/// Interface for Aggregation executor, that executes all aggregation functions (without group-bys).
+///
+/// Aggregations are performed within a segment, i.e. does not merge aggregation results across different segments.
 public interface AggregationExecutor {
 
-  /**
-   * Performs aggregation on the given value block.
-   */
+  /// Performs aggregation on the given value block.
   void aggregate(ValueBlock valueBlock);
 
-  /**
-   * Returns the result of aggregation.
-   * <p>Should be called after all transform blocks has been aggregated.
-   *
-   * @return Result of aggregation
-   */
+  /// Returns the result of aggregation.
+  ///
+  /// Should be called after all transform blocks has been aggregated.
+  ///
+  /// @return Result of aggregation
   List<Object> getResult();
 }

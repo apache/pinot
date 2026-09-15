@@ -25,49 +25,39 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface TextIndexReader extends IndexReader {
-  /**
-   * Returns the matching dictionary ids for the given search query (optional).
-   */
+  /// Returns the matching dictionary ids for the given search query (optional).
   ImmutableRoaringBitmap getDictIds(String searchQuery);
 
-  /**
-   * Returns the matching document ids for the given search query.
-   * This is the legacy entry point retained for backward compatibility.
-   */
+  /// Returns the matching document ids for the given search query.
+  /// This is the legacy entry point retained for backward compatibility.
   MutableRoaringBitmap getDocIds(String searchQuery);
 
-  /**
-   * Returns the matching document ids for the given search query with options string.
-   * This method allows passing options as a string parameter that will be parsed internally.
-   * Lucene-based text index readers should implement this method.
-   * @param searchQuery The search query string
-   * @param optionsString Options string in format "key1=value1,key2=value2", can be null
-   * @return Matching document ids
-   */
+  /// Returns the matching document ids for the given search query with options string.
+  /// This method allows passing options as a string parameter that will be parsed internally.
+  /// Lucene-based text index readers should implement this method.
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return Matching document ids
   default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
     // Default implementation falls back to the legacy method for backward compatibility.
     return getDocIds(searchQuery);
   }
 
-  /**
-   * Marker method that allows to differentiate between single-column and multi-column text index reader .
-   */
+  /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
     return false;
   }
 
-  /**
-   * Returns the number of documents that are searchable in the index. For near-realtime indexes
-   * (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
-   * recently ingested documents may not yet be visible to the index searcher. For offline/completed
-   * segments, this returns -1 (meaning all docs are searchable).
-   *
-   * <p>This is used to implement the "searchable doc fence" for NOT filters: when inverting a
-   * text match result, only docs within [0, searchableDocCount) are considered, preventing
-   * unindexed documents from appearing as false positives.</p>
-   *
-   * @return the number of searchable documents, or -1 if all documents are searchable
-   */
+  /// Returns the number of documents that are searchable in the index. For near-realtime indexes
+  /// (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
+  /// recently ingested documents may not yet be visible to the index searcher. For offline/completed
+  /// segments, this returns -1 (meaning all docs are searchable).
+  ///
+  /// This is used to implement the "searchable doc fence" for NOT filters: when inverting a
+  /// text match result, only docs within \[0, searchableDocCount) are considered, preventing
+  /// unindexed documents from appearing as false positives.
+  ///
+  /// @return the number of searchable documents, or -1 if all documents are searchable
   default int getSearchableDocCount() {
     return -1;
   }

@@ -38,13 +38,11 @@ public class PluginClassLoader extends URLClassLoader {
     super(urls, parent);
     _classLoader = PluginClassLoader.class.getClassLoader();
 
-    /**
-     * ClassLoader in java9+ does not extend URLClassLoader.
-     * If the class is not found in the parent classloader,
-     * it will be found in this classloader via findClass().
-     *
-     * @see https://bit.ly/2WROm1s
-     */
+    /// ClassLoader in java9+ does not extend URLClassLoader.
+    /// If the class is not found in the parent classloader,
+    /// it will be found in this classloader via findClass().
+    ///
+    /// @see https://bit.ly/2WROm1s
 
     if (_classLoader instanceof URLClassLoader) {
       try {

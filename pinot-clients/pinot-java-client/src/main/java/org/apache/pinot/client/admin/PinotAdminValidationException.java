@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
-/**
- * Exception thrown when validation fails for admin operations.
- */
+/// Exception thrown when validation fails for admin operations.
 public class PinotAdminValidationException extends PinotAdminException {
 
   public PinotAdminValidationException(String message) {

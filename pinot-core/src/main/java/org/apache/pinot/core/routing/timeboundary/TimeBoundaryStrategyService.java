@@ -43,20 +43,16 @@ public class TimeBoundaryStrategyService {
     return new TimeBoundaryStrategyService(strategyMap);
   }
 
-  /**
-   * Returns the singleton instance of the TimeBoundaryStrategyService.
-   *
-   * @return The singleton instance of the TimeBoundaryStrategyService.
-   */
+  /// Returns the singleton instance of the TimeBoundaryStrategyService.
+  ///
+  /// @return The singleton instance of the TimeBoundaryStrategyService.
   public static TimeBoundaryStrategyService getInstance() {
     return _instance;
   }
 
-  /**
-   * Sets the singleton instance of the TimeBoundaryStrategyService.
-   *
-   * @param service The new instance to set.
-   */
+  /// Sets the singleton instance of the TimeBoundaryStrategyService.
+  ///
+  /// @param service The new instance to set.
   public static void setInstance(TimeBoundaryStrategyService service) {
     _instance = service;
   }

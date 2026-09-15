@@ -35,10 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>SegmentPrunerService</code> class contains multiple segment pruners and provides service to prune segments
- * against all pruners.
- */
+/// The `SegmentPrunerService` class contains multiple segment pruners and provides service to prune segments
+/// against all pruners.
 public class SegmentPrunerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPrunerService.class);
 
@@ -80,25 +78,10 @@ public class SegmentPrunerService {
         .findAny().orElseThrow(IllegalStateException::new);
   }
 
-  /**
-   * Prunes the segments based on the query request, returns the segments that are not pruned.
-   *
-   * @deprecated this method is here for compatibility reasons and may be removed soon.
-   * Call {@link #prune(List, QueryContext, SegmentPrunerStatistics)} instead
-   * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
-   *                 undefined way. Therefore, this list should not be used after calling this method.
-   */
-  @Deprecated
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    return prune(segments, query, new SegmentPrunerStatistics());
-  }
-
-  /**
-   * Prunes the segments based on the query request, returns the segments that are not pruned.
-   *
-   * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
-   *                 undefined way. Therefore, this list should not be used after calling this method.
-   */
+  /// Prunes the segments based on the query request, returns the segments that are not pruned.
+  ///
+  /// @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
+  ///                 undefined way. Therefore, this list should not be used after calling this method.
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats) {
     return prune(segments, query, stats, null);
   }
@@ -124,38 +107,39 @@ public class SegmentPrunerService {
     return segments;
   }
 
-  /**
-   * Filters the given list, returning a list that only contains the non-empty segments, modifying the list received as
-   * argument.
-   *
-   * <p>
-   * This is a destructive operation. The list received as arguments may be modified, so only the returned list should
-   * be used.
-   * </p>
-   *
-   * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
-   *                 undefined way. Therefore, this list should not be used after calling this method.
-   * @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
-   *                 treated as empty (they contribute replaced rows to the result). When queryable doc ids exist,
-   *                 emptiness is determined from them; otherwise {@link IndexSegment#getValidDocIds()} is used.
-   * @return the new list with filtered elements. This is the list that have to be used.
-   */
+  /// Filters the given list, returning a list that only contains the non-empty segments, modifying the list received as
+  /// argument.
+  ///
+  /// This is a destructive operation. The list received as arguments may be modified, so only the returned list should
+  /// be used.
+  ///
+  /// @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
+  ///                 undefined way. Therefore, this list should not be used after calling this method.
+  /// @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
+  ///                 treated as empty (they contribute replaced rows to the result). When skipUpsertDelete=true,
+  ///                 emptiness is determined from valid docs (tombstones count as non-empty); otherwise from
+  ///                 queryable docs.
+  /// @return the new list with filtered elements. This is the list that have to be used.
   private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, QueryContext query) {
     int selected = 0;
-    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(query.getQueryOptions());
+    Map<String, String> queryOptions = query.getQueryOptions();
+    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(queryOptions);
+    boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment, skipUpsert)) {
+      if (!isEmptySegment(segment, skipUpsert, skipUpsertDelete)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert) {
+  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert, boolean skipUpsertDelete) {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
-    // Check if the segment has 0 queryable docIds while skipUpsert=false
-    return !skipUpsert && segment.hasNoQueryableDocs();
+    if (skipUpsert) {
+      return false;
+    }
+    return skipUpsertDelete ? segment.hasNoValidDocs() : segment.hasNoQueryableDocs();
   }
 }

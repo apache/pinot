@@ -24,14 +24,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation for Minion task executor factories.
- *
- * NOTE:
- *   - The annotated class must implement the PinotTaskExecutorFactory interface
- *   - The annotated class must be under the package of name 'org.apache.pinot.*.plugin.minion.tasks.*' to be
- *   auto-registered.
- */
+/// Annotation for Minion task executor factories.
+///
+/// NOTE:
+///   - The annotated class must implement the PinotTaskExecutorFactory interface
+///   - The annotated class must be under the package of name 'org.apache.pinot.\*.plugin.minion.tasks.\*' to be
+///   auto-registered.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface TaskExecutorFactory {

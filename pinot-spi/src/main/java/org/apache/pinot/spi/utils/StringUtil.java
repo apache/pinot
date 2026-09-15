@@ -31,17 +31,13 @@ public class StringUtil {
   // prefer string to character because String.indexOf(String) is a fast intrinsic on all JDK versions
   private static final String NULL_CHARACTER = "\0";
 
-  /**
-   * Joins the given keys with the separator.
-   */
+  /// Joins the given keys with the separator.
   public static String join(String separator, String... keys) {
     return StringUtils.join(keys, separator);
   }
 
-  /**
-   * Splits the given string with the separator, returns an array with the given max length. When max <= 0, no limit is
-   * applied.
-   */
+  /// Splits the given string with the separator, returns an array with the given max length. When max <= 0, no limit is
+  /// applied.
   public static String[] split(String str, char separator, int max) {
     int length = str.length();
     if (length == 0) {
@@ -67,17 +63,14 @@ public class StringUtil {
     return list.toArray(new String[0]);
   }
 
-  /**
-   * Sanitizes a string value.
-   * <ul>
-   *   <li>Truncate characters after the first {@code null} character as it is reserved as the padding character</li>
-   *   <li>Limit the length of the string</li>
-   * </ul>
-   *
-   * @param value String value to sanitize
-   * @param maxLength Max number of characters allowed
-   * @return Modified value, or value itself if not modified
-   */
+  /// Sanitizes a string value.
+  ///
+  /// - Truncate characters after the first `null` character as it is reserved as the padding character
+  /// - Limit the length of the string
+  ///
+  /// @param value String value to sanitize
+  /// @param maxLength Max number of characters allowed
+  /// @return Modified value, or value itself if not modified
   public static String sanitizeStringValue(String value, int maxLength) {
     int index = value.indexOf(NULL_CHARACTER);
     if (index < 0) {

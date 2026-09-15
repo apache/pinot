@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -30,19 +31,14 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.ConstantScoreWeight;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
@@ -69,10 +65,8 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
 
-  /**
-   * File-backed constructor: opens a {@link FSDirectory} from the Lucene HNSW index directory
-   * found under {@code indexDir}.
-   */
+  /// File-backed constructor: opens a [FSDirectory] from the Lucene HNSW index directory
+  /// found under `indexDir`.
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
     try {
@@ -91,19 +85,17 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     }
   }
 
-  /**
-   * Buffer-backed constructor: reads the HNSW index from a combined {@link PinotDataBuffer}
-   * (the {@code LUCENE_V2} packed form produced by {@code HnswVectorIndexCombined}).
-   *
-   * <p>The buffer is <em>not</em> owned by this reader — closing this reader does not close the
-   * buffer. The buffer's lifetime must exceed this reader's lifetime; the segment directory is
-   * responsible for closing it.</p>
-   *
-   * @param column      column name
-   * @param indexBuffer combined buffer in LUCENE_V2 format; not owned by this reader
-   * @param numDocs     number of documents in the segment
-   * @param config      vector index configuration
-   */
+  /// Buffer-backed constructor: reads the HNSW index from a combined [PinotDataBuffer]
+  /// (the `LUCENE_V2` packed form produced by `HnswVectorIndexCombined`).
+  ///
+  /// The buffer is _not_ owned by this reader — closing this reader does not close the
+  /// buffer. The buffer's lifetime must exceed this reader's lifetime; the segment directory is
+  /// responsible for closing it.
+  ///
+  /// @param column      column name
+  /// @param indexBuffer combined buffer in LUCENE_V2 format; not owned by this reader
+  /// @param numDocs     number of documents in the segment
+  /// @param config      vector index configuration
   public HnswVectorIndexReader(String column, PinotDataBuffer indexBuffer, int numDocs, VectorIndexConfig config) {
     _column = column;
     try {
@@ -120,19 +112,17 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     }
   }
 
-  /**
-   * CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then
-   * the on-disk version of the segment, then {@link ImmutableSegmentLoader}
-   * will take care of up-converting the on-disk segment to v3 before load. The converter
-   * already has support for converting v1 vector index to v3. So the vector index can be
-   * loaded from segmentIndexDir/v3/ since v3 sub-directory would have already been created
-   *
-   * CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
-   * version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
-   * whatever the version of segment is on disk.
-   * @param segmentIndexDir top-level segment index directory
-   * @return vector index file
-   */
+  /// CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then the on-disk version
+  /// of the segment, then [org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader] will
+  /// take care of up-converting the on-disk segment to v3 before load. The converter already has support for converting
+  /// v1 vector index to v3. So the vector index can be loaded from segmentIndexDir/v3/ since v3 sub-directory would
+  /// have already been created
+  ///
+  /// CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
+  /// version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
+  /// whatever the version of segment is on disk.
+  /// @param segmentIndexDir top-level segment index directory
+  /// @return vector index file
   private File getVectorIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
     File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column, VectorBackendType.HNSW);
@@ -175,9 +165,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     _useBoundedQueueOverride.remove();
   }
 
-  /**
-   * Returns the efSearch value for debug/explain output, or 0 if not set.
-   */
+  /// Returns the efSearch value for debug/explain output, or 0 if not set.
   int getEffectiveEfSearch() {
     Integer efSearch = _efSearchOverride.get();
     return efSearch != null ? efSearch : 0;
@@ -208,8 +196,16 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    // Without this the null reaches BaseFilterQuery's iterator and surfaces as an unmessaged NullPointerException
+    // from inside Lucene's traversal, where the cause is far harder to read than the contract it violated.
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
+    if (preFilterBitmap.isEmpty()) {
+      // Nothing is admitted, so skip the Lucene search entirely -- its filter clause would otherwise walk every doc
+      // in every leaf, translating ids and testing membership, to build an accept set guaranteed to be empty.
+      return new MutableRoaringBitmap();
+    }
     try {
-      Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator, _indexReader.numDocs());
+      Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator);
       return translateTopDocs(search(searchQuery, topK, filterQuery));
     } catch (RuntimeException e) {
       throw e;
@@ -220,12 +216,10 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     }
   }
 
-  /**
-   * When we destroy the loaded ImmutableSegment, all the indexes
-   * (for each column) are destroyed and as part of that
-   * we release the vector index
-   * @throws IOException
-   */
+  /// When we destroy the loaded ImmutableSegment, all the indexes
+  /// (for each column) are destroyed and as part of that
+  /// we release the vector index
+  /// @throws IOException
   @Override
   public Map<String, Object> getIndexDebugInfo() {
     Map<String, Object> info = new LinkedHashMap<>();
@@ -237,7 +231,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     info.put("effectiveEfSearch", getEffectiveEfSearch());
     info.put("effectiveHnswUseRelativeDistance", getEffectiveUseRelativeDistance());
     info.put("effectiveHnswUseBoundedQueue", getEffectiveUseBoundedQueue());
-    info.put("supportsPreFilter", true);
+    info.put("supportsPreFilter", supportsPreFilter());
     return info;
   }
 
@@ -264,26 +258,23 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     return docIds;
   }
 
-  /**
-   * Lucene docIDs are not same as pinot docIDs. The internal implementation
-   * of Lucene can change the docIds and they are not guaranteed to be the
-   * same as how we expect -- strictly increasing docIDs as the documents
-   * are ingested during segment/index creation.
-   * This class is used to map the luceneDocId (returned by the search query
-   * to the collector) to corresponding pinotDocId.
-   *
-   * <p>Supports two modes:</p>
-   * <ul>
-   *   <li><b>File-backed:</b> the mapping is read from (or written to) a memory-mapped file on
-   *       disk. The buffer is owned by this translator and closed on {@link #close()}.</li>
-   *   <li><b>Buffer-backed:</b> the mapping is a view into a combined index buffer owned by the
-   *       segment directory. The translator does <em>not</em> close it on {@link #close()}, since
-   *       the caller must not close a buffer it does not own.</li>
-   *   <li><b>Heap-backed:</b> when the mapping is absent from a combined buffer, it is built in
-   *       heap memory by scanning the Lucene index. No file is created, and {@link #close()} is
-   *       a no-op for the mapping portion.</li>
-   * </ul>
-   */
+  /// Lucene docIDs are not same as pinot docIDs. The internal implementation
+  /// of Lucene can change the docIds and they are not guaranteed to be the
+  /// same as how we expect -- strictly increasing docIDs as the documents
+  /// are ingested during segment/index creation.
+  /// This class is used to map the luceneDocId (returned by the search query
+  /// to the collector) to corresponding pinotDocId.
+  ///
+  /// Supports two modes:
+  ///
+  /// - **File-backed:** the mapping is read from (or written to) a memory-mapped file on
+  ///      disk. The buffer is owned by this translator and closed on [#close()].
+  /// - **Buffer-backed:** the mapping is a view into a combined index buffer owned by the
+  ///      segment directory. The translator does _not_ close it on [#close()], since
+  ///      the caller must not close a buffer it does not own.
+  /// - **Heap-backed:** when the mapping is absent from a combined buffer, it is built in
+  ///      heap memory by scanning the Lucene index. No file is created, and [#close()] is
+  ///      a no-op for the mapping portion.
   static class DocIdTranslator implements Closeable {
     // Non-null for file-backed mode (owned); non-null for buffer-backed mode (borrowed, not closed).
     private final PinotDataBuffer _buffer;
@@ -293,7 +284,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     // True when _buffer is borrowed (from a combined index buffer); must not be closed by us.
     private final boolean _borrowedBuffer;
 
-    /** File-backed: mapping is read from (or created at) a file beside the HNSW directory. */
+    /// File-backed: mapping is read from (or created at) a file beside the HNSW directory.
     DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher)
         throws Exception {
       _heapMapping = null;
@@ -327,15 +318,13 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       }
     }
 
-    /**
-     * Buffer-backed: the mapping is either a view into the combined index buffer, or built in heap
-     * memory by scanning the Lucene index (when the mapping was not packed into the combined file).
-     *
-     * @param mappingBuffer sub-buffer view covering the packed mapping, or {@code null} to build
-     *                      in heap by scanning the Lucene index
-     * @param numDocs       number of documents
-     * @param indexSearcher searcher over the already-opened Lucene index
-     */
+    /// Buffer-backed: the mapping is either a view into the combined index buffer, or built in heap
+    /// memory by scanning the Lucene index (when the mapping was not packed into the combined file).
+    ///
+    /// @param mappingBuffer sub-buffer view covering the packed mapping, or `null` to build
+    ///                      in heap by scanning the Lucene index
+    /// @param numDocs       number of documents
+    /// @param indexSearcher searcher over the already-opened Lucene index
     DocIdTranslator(@Nullable PinotDataBuffer mappingBuffer, int numDocs,
         IndexSearcher indexSearcher)
         throws Exception {
@@ -381,95 +370,33 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     }
   }
 
-  /**
-   * A Lucene {@link Query} that accepts only documents whose Pinot doc IDs are present
-   * in a {@link ImmutableRoaringBitmap}. Used to implement pre-filter ANN search by
-   * restricting HNSW graph traversal to the pre-filtered document set.
-   *
-   * <p>Because Lucene uses its own internal doc IDs (which differ from Pinot doc IDs),
-   * this query translates Lucene doc IDs to Pinot doc IDs using the {@link DocIdTranslator}
-   * before checking membership in the bitmap.</p>
-   */
-  static class RoaringBitmapFilterQuery extends Query {
-    private final ImmutableRoaringBitmap _bitmap;
+  /// A Lucene [Query] that accepts only documents whose Pinot doc IDs are present
+  /// in a [ImmutableRoaringBitmap]. Used to implement pre-filter ANN search by
+  /// restricting HNSW graph traversal to the pre-filtered document set.
+  ///
+  /// Because Lucene uses its own internal doc IDs (which differ from Pinot doc IDs),
+  /// this query translates Lucene doc IDs to Pinot doc IDs using the [DocIdTranslator]
+  /// before checking membership in the bitmap.
+  static class RoaringBitmapFilterQuery extends BaseFilterQuery {
     private final DocIdTranslator _docIdTranslator;
-    private final int _maxDoc;
 
-    RoaringBitmapFilterQuery(ImmutableRoaringBitmap bitmap, DocIdTranslator docIdTranslator, int maxDoc) {
-      _bitmap = bitmap;
+    @Override
+    protected boolean equalsDocIdSource(BaseFilterQuery other) {
+      // Same bitmap but a different translator accepts different documents.
+      return _docIdTranslator == ((RoaringBitmapFilterQuery) other)._docIdTranslator;
+    }
+
+    RoaringBitmapFilterQuery(ImmutableRoaringBitmap bitmap, DocIdTranslator docIdTranslator) {
+      super(bitmap);
       _docIdTranslator = docIdTranslator;
-      _maxDoc = maxDoc;
     }
 
     @Override
-    public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) {
-      return new ConstantScoreWeight(this, boost) {
-        @Override
-        public Scorer scorer(LeafReaderContext context) {
-          int docBase = context.docBase;
-          int maxDocInLeaf = context.reader().maxDoc();
-          DocIdSetIterator iterator = new BitmapDocIdSetIterator(docBase, maxDocInLeaf);
-          float constScore = score();
-          return new Scorer(this) {
-            @Override
-            public DocIdSetIterator iterator() {
-              return iterator;
-            }
-
-            @Override
-            public float getMaxScore(int upTo) {
-              return constScore;
-            }
-
-            @Override
-            public float score() {
-              return constScore;
-            }
-
-            @Override
-            public int docID() {
-              return iterator.docID();
-            }
-          };
-        }
-
-        @Override
-        public boolean isCacheable(LeafReaderContext ctx) {
-          return false;
-        }
-      };
+    protected DocIdSetIterator createLeafIterator(LeafReaderContext context) {
+      return new BitmapDocIdSetIterator(context.docBase, context.reader().maxDoc());
     }
 
-    @Override
-    public String toString(String field) {
-      return "RoaringBitmapFilterQuery(cardinality=" + _bitmap.getCardinality() + ")";
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof RoaringBitmapFilterQuery)) {
-        return false;
-      }
-      RoaringBitmapFilterQuery that = (RoaringBitmapFilterQuery) other;
-      return _bitmap == that._bitmap && _docIdTranslator == that._docIdTranslator;
-    }
-
-    @Override
-    public int hashCode() {
-      return System.identityHashCode(_bitmap) * 31 + System.identityHashCode(_docIdTranslator);
-    }
-
-    @Override
-    public void visit(org.apache.lucene.search.QueryVisitor visitor) {
-      visitor.visitLeaf(this);
-    }
-
-    /**
-     * Iterates over Lucene doc IDs whose corresponding Pinot doc IDs are in the bitmap.
-     */
+    /// Iterates over Lucene doc IDs whose corresponding Pinot doc IDs are in the bitmap.
     private class BitmapDocIdSetIterator extends DocIdSetIterator {
       private final int _docBase;
       private final int _maxDocInLeaf;
@@ -490,7 +417,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _doc++;
         while (_doc < _maxDocInLeaf) {
           int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
-          if (_bitmap.contains(pinotDocId)) {
+          if (_docIds.contains(pinotDocId)) {
             return _doc;
           }
           _doc++;
@@ -504,7 +431,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _doc = target;
         while (_doc < _maxDocInLeaf) {
           int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
-          if (_bitmap.contains(pinotDocId)) {
+          if (_docIds.contains(pinotDocId)) {
             return _doc;
           }
           _doc++;
@@ -515,7 +442,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
       @Override
       public long cost() {
-        return _bitmap.getLongCardinality();
+        return _docIds.getLongCardinality();
       }
     }
   }

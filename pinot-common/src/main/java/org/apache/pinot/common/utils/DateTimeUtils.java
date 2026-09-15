@@ -32,12 +32,10 @@ public class DateTimeUtils {
   private static final DateTimeFormatter SIMPLE_DATE_FORMAT =
       DateTimeFormatter.ofPattern(DATE_FORMAT, Locale.getDefault()).withZone(TimeZone.getDefault().toZoneId());
 
-  /**
-   * Utility function to convert epoch in millis to SDF of form "yyyy-MM-dd HH:mm:ss z".
-   *
-   * @param millisSinceEpoch Time in millis to convert
-   * @return SDF equivalent
-   */
+  /// Utility function to convert epoch in millis to SDF of form "yyyy-MM-dd HH:mm:ss z".
+  ///
+  /// @param millisSinceEpoch Time in millis to convert
+  /// @return SDF equivalent
   public static String epochToDefaultDateFormat(long millisSinceEpoch) {
     return SIMPLE_DATE_FORMAT.format(Instant.ofEpochMilli(millisSinceEpoch));
   }

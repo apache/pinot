@@ -43,24 +43,20 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * A utility class used to sort the plan nodes in a deterministic order.
- *
- * Any comparator can be passed to the sort method to sort the plan nodes, although the default comparator
- * is used to sort the plan nodes based on the type and the attributes of the node.
- *
- * Only nodes that are simplifiable will be sorted. See {@link ExplainNodeSimplifier} for more information.
- */
+/// A utility class used to sort the plan nodes in a deterministic order.
+///
+/// Any comparator can be passed to the sort method to sort the plan nodes, although the default comparator
+/// is used to sort the plan nodes based on the type and the attributes of the node.
+///
+/// Only nodes that are simplifiable will be sorted. See [ExplainNodeSimplifier] for more information.
 public class PlanNodeSorter {
 
   private PlanNodeSorter() {
   }
 
-  /**
-   * Applies a default comparator to sort the plan nodes.
-   *
-   * The result may be the same as the input if the plan nodes are already sorted.
-   */
+  /// Applies a default comparator to sort the plan nodes.
+  ///
+  /// The result may be the same as the input if the plan nodes are already sorted.
   public static PlanNode sort(PlanNode planNode) {
     return planNode.visit(new Sorter(), DefaultComparator.INSTANCE);
   }
@@ -93,6 +89,7 @@ public class PlanNodeSorter {
       return defaultNode(node, comparator);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) {
       return visitJoin(node, comparator);

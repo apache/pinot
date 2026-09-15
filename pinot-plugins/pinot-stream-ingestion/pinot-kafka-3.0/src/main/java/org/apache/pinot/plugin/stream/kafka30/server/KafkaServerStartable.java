@@ -39,12 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Kafka 3.x implementation of {@link StreamDataServerStartable}.
- *
- * This class can either connect to an external broker or start a managed single-node KRaft
- * container for local quickstart usage. It is not thread-safe.
- */
+/// Kafka 3.x implementation of [StreamDataServerStartable].
+///
+/// This class can either connect to an external broker or start a managed single-node KRaft
+/// container for local quickstart usage. It is not thread-safe.
 public class KafkaServerStartable implements StreamDataServerStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaServerStartable.class);
 

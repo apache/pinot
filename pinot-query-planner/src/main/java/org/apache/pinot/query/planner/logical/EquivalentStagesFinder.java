@@ -42,12 +42,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This utility class can be used to find equivalent stages in the query plan.
- *
- * Equivalent stages are stages that represent the same job to be done. These stages can be potentially optimized to
- * execute that job only once in a special stage that broadcast the results to all the equivalent stages.
- */
+/// This utility class can be used to find equivalent stages in the query plan.
+///
+/// Equivalent stages are stages that represent the same job to be done. These stages can be potentially optimized to
+/// execute that job only once in a special stage that broadcast the results to all the equivalent stages.
 public class EquivalentStagesFinder {
   public static final Logger LOGGER = LoggerFactory.getLogger(EquivalentStagesFinder.class);
 
@@ -61,15 +59,13 @@ public class EquivalentStagesFinder {
     return visitor._equivalentStages;
   }
 
-  /**
-   * A visitor that iterates the plan tree and finds equivalent stages.
-   *
-   * It may be a bit confusing that this class, which ends up being a visitor, calls another visitor to compare nodes.
-   * The reason is that this object implements visitor to iterate the plan tree in pre-order. Then for each
-   * mailbox send node (which are always the root of a stage), it calls
-   * {@link NodeEquivalence#areEquivalent(MailboxSendNode, MailboxSendNode)}. NodeEquivalence is another class that
-   * implements visitor, but this time to compare two nodes.
-   */
+  /// A visitor that iterates the plan tree and finds equivalent stages.
+  ///
+  /// It may be a bit confusing that this class, which ends up being a visitor, calls another visitor to compare nodes.
+  /// The reason is that this object implements visitor to iterate the plan tree in pre-order. Then for each
+  /// mailbox send node (which are always the root of a stage), it calls
+  /// [NodeEquivalence#areEquivalent(MailboxSendNode, MailboxSendNode)]. NodeEquivalence is another class that
+  /// implements visitor, but this time to compare two nodes.
   private static class Visitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
     private final GroupedStages.Mutable _equivalentStages = new GroupedStages.Mutable();
     private final NodeEquivalence _nodeEquivalence = new NodeEquivalence();
@@ -93,24 +89,20 @@ public class EquivalentStagesFinder {
       return null;
     }
 
-    /**
-     * A visitor that compares two nodes to see if they are equivalent.
-     *
-     * The implementation uses the already visited stages (stored in {@link #_equivalentStages}) to avoid comparing the
-     * same nodes multiple times. The side effect of this is that the second argument for {@link #areEquivalent} must be
-     * a node that was already visited.
-     */
+    /// A visitor that compares two nodes to see if they are equivalent.
+    ///
+    /// The implementation uses the already visited stages (stored in [#_equivalentStages]) to avoid comparing
+    /// the same nodes multiple times. The side effect of this is that the second argument for [#areEquivalent]
+    /// must be a node that was already visited.
     private class NodeEquivalence implements PlanNodeVisitor<Boolean, PlanNode> {
 
-      /**
-       * Returns whether the given stage is equivalent to the visited stage.
-       * <p>
-       * This method assumes that all sub-stages of an already visited stage are also already visited.
-       *
-       * @param stage        the stage we want to know if it is equivalent to the visited stage. This stage may or may
-       *                     not be already visited.
-       * @param visitedStage the stage we want to compare the given stage with. This stage must be already visited.
-       */
+      /// Returns whether the given stage is equivalent to the visited stage.
+      ///
+      /// This method assumes that all sub-stages of an already visited stage are also already visited.
+      ///
+      /// @param stage        the stage we want to know if it is equivalent to the visited stage. This stage may or may
+      ///                     not be already visited.
+      /// @param visitedStage the stage we want to compare the given stage with. This stage must be already visited.
       public boolean areEquivalent(MailboxSendNode stage, MailboxSendNode visitedStage) {
         Preconditions.checkState(
             _equivalentStages.containsStage(visitedStage), "Node {} was not visited yet", visitedStage);
@@ -140,12 +132,10 @@ public class EquivalentStagesFinder {
             && Objects.equals(stage.getCollations(), visitedStage.getCollations());
       }
 
-      /**
-       * This method apply the common equivalence checks that apply for all nodes.
-       *
-       * @return true if the nodes are equivalent taking into account the common equivalence checks (ie inputs, hints,
-       * data schema, etc).
-       */
+      /// This method apply the common equivalence checks that apply for all nodes.
+      ///
+      /// @return true if the nodes are equivalent taking into account the common equivalence checks (ie inputs, hints,
+      /// data schema, etc).
       private boolean areBaseNodesEquivalent(PlanNode node1, PlanNode node2) {
         // TODO: DataSchema equality checks enforce order between columns. This is probably not needed for equivalence
         //  checks, but may require some permutations. We are not changing this for now.
@@ -168,12 +158,10 @@ public class EquivalentStagesFinder {
         return true;
       }
 
-      /**
-       * This method is called when the node1 is a mailbox send node.
-       * By construction, both nodes should have been already visited.
-       * This means that the check is simple and not recursive:
-       * These nodes can only be equivalent if they are in the same equivalence group.
-       */
+      /// This method is called when the node1 is a mailbox send node.
+      /// By construction, both nodes should have been already visited.
+      /// This means that the check is simple and not recursive:
+      /// These nodes can only be equivalent if they are in the same equivalence group.
       @Override
       public Boolean visitMailboxSend(MailboxSendNode node1, PlanNode alreadyVisited) {
         if (!(alreadyVisited instanceof MailboxSendNode)) {
@@ -196,6 +184,9 @@ public class EquivalentStagesFinder {
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
+            // Group keys only hold the union of the grouping columns, so two different sets of grouping sets over the
+            // same columns are indistinguishable without this check (and produce the same data schema).
+            && Objects.equals(node1.getGroupingSets(), that.getGroupingSets())
             && node1.getAggType() == that.getAggType()
             && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
             && Objects.equals(node1.getCollations(), that.getCollations())
@@ -257,9 +248,13 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            // ASOF joins keep their whole comparison here rather than in the non-equi conditions, so without this
+            // check two ASOF joins differing only on the match condition look equivalent.
+            && Objects.equals(node1.getMatchCondition(), that.getMatchCondition())
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 
+      @Deprecated(forRemoval = true, since = "1.6.0")
       @Override
       public Boolean visitEnrichedJoin(EnrichedJoinNode node1, PlanNode node2) {
         if (!(node2 instanceof EnrichedJoinNode)) {
@@ -329,6 +324,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getKeys(), that.getKeys())
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getWindowFrameType() == that.getWindowFrameType()
+            // The frame exclusion changes which rows feed the window function, so two windows that only differ on it
+            // compute different values and must not be spooled together.
+            && node1.getExclude() == that.getExclude()
             && Objects.equals(node1.getConstants(), that.getConstants());
       }
 

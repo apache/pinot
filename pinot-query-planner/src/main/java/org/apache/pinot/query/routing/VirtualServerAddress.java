@@ -22,10 +22,8 @@ package org.apache.pinot.query.routing;
 import java.util.Objects;
 
 
-/**
- * Represents the address of a {@link QueryServerInstance} containing both the ID of the specific worker and the
- * physical host/port info from {@link QueryServerInstance}.
- */
+/// Represents the address of a [QueryServerInstance] containing both the ID of the specific worker and the
+/// physical host/port info from [QueryServerInstance].
 public class VirtualServerAddress {
 
   private final String _hostname;
@@ -42,29 +40,23 @@ public class VirtualServerAddress {
     this(server.getHostname(), server.getQueryMailboxPort(), workerId);
   }
 
-  /**
-   * Parses the standard hostname:port pattern into
-   * a {@code ServerAddress}
-   *
-   * @param address the serialized string
-   * @return the deserialized form
-   */
+  /// Parses the standard hostname:port pattern into
+  /// a `ServerAddress`
+  ///
+  /// @param address the serialized string
+  /// @return the deserialized form
   public static VirtualServerAddress parse(String address) {
     String[] split = address.split("@");
     String[] hostSplit = split[1].split(":");
     return new VirtualServerAddress(hostSplit[0], Integer.parseInt(hostSplit[1]), Integer.parseInt(split[0]));
   }
 
-  /**
-   * @return the server's hostname
-   */
+  /// @return the server's hostname
   public String hostname() {
     return _hostname;
   }
 
-  /**
-   * @return the server's port
-   */
+  /// @return the server's port
   public int port() {
     return _port;
   }

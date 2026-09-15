@@ -18,23 +18,17 @@
  */
 package org.apache.pinot.integration.tests.multicluster;
 
-/**
- * Integration tests for multi-cluster routing when the SAME physical table name exists in both clusters.
- * This class extends {@link MultiClusterIntegrationTest} and inherits all its tests, but configures
- * both clusters to use identical physical table names (unlike the parent which uses different names).
- */
+/// Integration tests for multi-cluster routing when the SAME physical table name exists in both clusters.
+/// This class extends [MultiClusterIntegrationTest] and inherits all its tests, but configures
+/// both clusters to use identical physical table names (unlike the parent which uses different names).
 public class SameTableNameMultiClusterIntegrationTest extends MultiClusterIntegrationTest {
-  /**
-   * Override to use cluster1's table name in cluster2 as well (same physical table name).
-   */
+  /// Override to use cluster1's table name in cluster2 as well (same physical table name).
   @Override
   protected String getPhysicalTable1InCluster2() {
     return getPhysicalTable1InCluster1();
   }
 
-  /**
-   * Override to use cluster1's table name in cluster2 as well (same physical table name).
-   */
+  /// Override to use cluster1's table name in cluster2 as well (same physical table name).
   @Override
   protected String getPhysicalTable2InCluster2() {
     return getPhysicalTable2InCluster1();

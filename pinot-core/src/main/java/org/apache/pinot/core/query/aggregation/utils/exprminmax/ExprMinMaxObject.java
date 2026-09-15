@@ -160,13 +160,11 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     return bytes;
   }
 
-  /**
-   * Used during segment processing
-   * Compare the current key with the new key, and return the comparison result.
-   * > 0: the key is replaced because the new key is the new extremum
-   * = 0: new key is the same as the current extremum
-   * < 0: current key is still the extremum
-   */
+  /// Used during segment processing
+  /// Compare the current key with the new key, and return the comparison result.
+  /// > 0: the key is replaced because the new key is the new extremum
+  /// = 0: new key is the same as the current extremum
+  /// < 0: current key is still the extremum
   public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> exprMinMaxWrapperValSets, int offset,
       boolean isMax) {
     Preconditions.checkState(_mutable, "Cannot compare and set key after the object is serialized");
@@ -194,19 +192,15 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     return 0;
   }
 
-  /**
-   * Used during segment processing with compareAndSetKey
-   * Set the vals to the new vals if the key is replaced.
-   */
+  /// Used during segment processing with compareAndSetKey
+  /// Set the vals to the new vals if the key is replaced.
   public void setToNewVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
     _extremumProjectionValues.clear();
     addVal(exprMinMaxProjectionValSetWrappers, offset);
   }
 
-  /**
-   * Used during segment processing with compareAndSetKey
-   * Add the vals to the list of vals if the key is the same.
-   */
+  /// Used during segment processing with compareAndSetKey
+  /// Add the vals to the list of vals if the key is the same.
   public void addVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
     Object[] val = new Object[_projectionSchema.size()];
     for (int i = 0; i < _projectionSchema.size(); i++) {
@@ -291,9 +285,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     }
   }
 
-  /**
-   * Merge two exprminMaxObjects
-   */
+  /// Merge two exprminMaxObjects
   public ExprMinMaxObject merge(ExprMinMaxObject other, boolean isMax) {
     if (_isNull && other._isNull) {
       return this;
@@ -339,9 +331,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     }
   }
 
-  /**
-   * get the number of rows in the projection data
-   */
+  /// get the number of rows in the projection data
   @Override
   public int getNumberOfRows() {
     if (_mutable) {
@@ -351,9 +341,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     }
   }
 
-  /**
-   * return the schema of the projection data
-   */
+  /// return the schema of the projection data
   @Override
   public DataSchema getSchema() {
     // the final parent aggregation result only cares about the projection columns

@@ -37,10 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * PinotServiceManager is a user entry point to start Pinot instances in one process.
- *
- */
+/// PinotServiceManager is a user entry point to start Pinot instances in one process.
 public class PinotServiceManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotServiceManager.class);

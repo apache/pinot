@@ -31,11 +31,10 @@ import org.joda.time.chrono.ISOChronology;
 import org.joda.time.format.DateTimeFormatter;
 
 
-/**
- * Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
- * date format.
- * <p>NOTE: time size and time unit do not apply to simple date format.
- */
+/// Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
+/// date format.
+///
+/// NOTE: time size and time unit do not apply to simple date format.
 public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I, O> {
   private final int _inputTimeSize;
   private final TimeUnit _inputTimeUnit;

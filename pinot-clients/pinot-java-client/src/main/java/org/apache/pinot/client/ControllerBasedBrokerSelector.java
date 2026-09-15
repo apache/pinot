@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.Properties;
 
 
-/**
- * Maintains broker cache using controller APIs
- */
+/// Maintains broker cache using controller APIs
 public class ControllerBasedBrokerSelector implements BrokerSelector {
   private static final String SCHEME = "scheme";
 

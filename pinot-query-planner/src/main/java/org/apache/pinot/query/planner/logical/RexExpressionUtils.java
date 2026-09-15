@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptCluster;
@@ -53,6 +54,7 @@ import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,6 +151,9 @@ public class RexExpressionUtils {
         ByteString byteString = new ByteString(bytes);
         return rexBuilder.makeBinaryLiteral(byteString);
       }
+      case UUID:
+        assert value != null;
+        return rexBuilder.makeUuidLiteral(UuidUtils.toUUID((ByteArray) value));
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + literal.getDataType());
     }
@@ -264,6 +269,9 @@ public class RexExpressionUtils {
       case BYTES:
         value = new ByteArray(((ByteString) value).getBytes());
         break;
+      case UUID:
+        value = new ByteArray(UuidUtils.toBytes((UUID) value));
+        break;
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
     }
@@ -332,9 +340,7 @@ public class RexExpressionUtils {
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
 
-  /**
-   * Reinterpret is a pass-through function that does not change the type of the input.
-   */
+  /// Reinterpret is a pass-through function that does not change the type of the input.
   private static RexExpression handleReinterpret(RexCall rexCall) {
     assert rexCall.operands.size() == 1;
     return fromRexNode(rexCall.operands.get(0));
@@ -506,9 +512,7 @@ public class RexExpressionUtils {
         List.of(leftOperand, fromRexLiteralValue(dataType, range.upperEndpoint())));
   }
 
-  /**
-   * Transforms a set of <b>point based</b> ranges into a list of expressions.
-   */
+  /// Transforms a set of **point based** ranges into a list of expressions.
   private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Set<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> operands = new ArrayList<>(1 + ranges.size());

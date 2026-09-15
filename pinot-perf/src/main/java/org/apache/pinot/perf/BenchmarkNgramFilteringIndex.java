@@ -39,9 +39,7 @@ import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * This benchmark is a benchmark for testing the performance of N-gram filtering index vs a pure regex matcher
- */
+/// This benchmark is a benchmark for testing the performance of N-gram filtering index vs a pure regex matcher
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
 @Warmup(iterations = 1)

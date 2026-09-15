@@ -527,6 +527,45 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testFoldedStringArrayLiteralWithIngestedColumn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Selecting an ingested column sends the single-stage query to the servers, where the folded STRING_ARRAY literal
+    // is rendered. The returned column also verifies the Avro multi-value STRING data was ingested correctly.
+    String query = String.format("SELECT %s, %s, ARRAY['query-a','query-b'] FROM %s "
+            + "WHERE %s = 0 AND ARRAYS_OVERLAP(%s, ARRAY['/home','/not-present']) LIMIT 1",
+        INT_COLUMN, STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN, STRING_ARRAY_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode columnDataTypes = result.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.get(0).textValue(), "INT");
+    assertEquals(columnDataTypes.get(1).textValue(), "STRING_ARRAY");
+    assertEquals(columnDataTypes.get(2).textValue(), "STRING_ARRAY");
+
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 3);
+    assertEquals(row.get(0).intValue(), 0);
+
+    JsonNode ingestedValues = row.get(1);
+    assertEquals(ingestedValues.size(), 4);
+    assertEquals(ingestedValues.get(0).textValue(), "/api/v1");
+    assertEquals(ingestedValues.get(1).textValue(), "/home");
+    assertEquals(ingestedValues.get(2).textValue(), "/api/v2");
+    assertEquals(ingestedValues.get(3).textValue(), "/metrics");
+
+    JsonNode literalValues = row.get(2);
+    assertEquals(literalValues.size(), 2);
+    assertEquals(literalValues.get(0).textValue(), "query-a");
+    assertEquals(literalValues.get(1).textValue(), "query-b");
+
+    String nonMatchingQuery = String.format(
+        "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY['/not-present','/also-not-present'])",
+        getTableName(), STRING_ARRAY_COLUMN);
+    assertEquals(postQuery(nonMatchingQuery).get("resultTable").get("rows").get(0).get(0).longValue(), 0L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testIntArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

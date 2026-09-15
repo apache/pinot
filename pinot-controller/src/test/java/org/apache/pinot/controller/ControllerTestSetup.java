@@ -23,29 +23,23 @@ import org.testng.annotations.AfterGroups;
 import org.testng.annotations.BeforeGroups;
 
 
-/**
- * All test cases in {@link org.apache.pinot.controller} package are run as part a TestNG group (see testng_*.xml).
- * This helps to setup (see {@link #setUpGroup()} and tear down (see {@link #tearDownGroup()} the shared state before
- * and after all tests are run. Each test case class should implement a @BeforeClass method, which would call
- * @link ControllerTest.getInstance()#validate()} method to validate shared state. Each test case class should also
- * implement @AfterClass method where {@link ControllerTest#cleanup()} would be called to cleanup shared state.
- * Additional cleanup may be needed depending upon test functionality.
- */
+/// All test cases in [org.apache.pinot.controller] package are run as part a TestNG group (see testng\_\*.xml).
+/// This helps to setup (see [#setUpGroup()] and tear down (see [#tearDownGroup()] the shared state before
+/// and after all tests are run. Each test case class should implement a @BeforeClass method, which would call
+/// @link ControllerTest.getInstance()#validate()} method to validate shared state. Each test case class should also
+/// implement @AfterClass method where [ControllerTest#cleanup()] would be called to cleanup shared state.
+/// Additional cleanup may be needed depending upon test functionality.
 public class ControllerTestSetup {
-  /**
-   * TestNG will run this method once before all the test cases are run. We use this method to initialize
-   * common state for all the test cases.
-   */
+  /// TestNG will run this method once before all the test cases are run. We use this method to initialize
+  /// common state for all the test cases.
   @BeforeGroups
   public void setUpGroup()
       throws Exception {
     ControllerTest.getInstance().startSharedTestSetup();
   }
 
-  /**
-   * TestNG will run this method once after all the test cases have run. We use this method to de-initialize
-   * common state used by all the test cases.
-   */
+  /// TestNG will run this method once after all the test cases have run. We use this method to de-initialize
+  /// common state used by all the test cases.
   @AfterGroups
   public void tearDownGroup() {
     ControllerTest.getInstance().stopSharedTestSetup();

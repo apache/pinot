@@ -24,9 +24,7 @@ import java.util.Map;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-/**
- * Client for query workload administration operations.
- */
+/// Client for query workload administration operations.
 public class QueryWorkloadAdminClient extends BaseServiceAdminClient {
 
   public QueryWorkloadAdminClient(PinotAdminTransport transport, String controllerAddress,
@@ -48,18 +46,14 @@ public class QueryWorkloadAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets a query workload config as a JSON string.
-   */
+  /// Gets a query workload config as a JSON string.
   public String getQueryWorkloadConfig(String config)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/queryWorkloadConfigs/" + config, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Gets a query workload config as a typed object.
-   */
+  /// Gets a query workload config as a typed object.
   public QueryWorkloadConfig getQueryWorkloadConfigObject(String config)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/queryWorkloadConfigs/" + config, null, _headers);

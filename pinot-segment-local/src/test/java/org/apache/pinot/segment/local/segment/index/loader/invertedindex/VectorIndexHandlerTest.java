@@ -59,9 +59,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Unit tests for {@link VectorIndexHandler} backend-drift handling.
- */
+/// Unit tests for [VectorIndexHandler] backend-drift handling.
 public class VectorIndexHandlerTest {
   private static final String COLUMN = "embedding";
 
@@ -147,10 +145,8 @@ public class VectorIndexHandlerTest {
   // storeInSegmentFile / consolidation
   // ---------------------------------------------------------------------------
 
-  /**
-   * When the segment was built with the legacy combined layout and the table now requests
-   * {@code storeInSegmentFile=true}, the handler should detect the mismatch on the first load.
-   */
+  /// When the segment was built with the legacy combined layout and the table now requests
+  /// `storeInSegmentFile=true`, the handler should detect the mismatch on the first load.
   @Test
   public void testNeedUpdateIndicesReturnsTrueWhenCombinedExistsButFlagWantsConsolidated()
       throws Exception {
@@ -170,10 +166,8 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * When the segment is in the legacy combined layout and the table also keeps the flag off,
-   * there is nothing to do — the segment is already in its target layout.
-   */
+  /// When the segment is in the legacy combined layout and the table also keeps the flag off,
+  /// there is nothing to do — the segment is already in its target layout.
   @Test
   public void testNeedUpdateIndicesReturnsFalseWhenCombinedExistsAndFlagIsOff()
       throws Exception {
@@ -193,11 +187,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Reverse migration: segment has the vector index consolidated inside {@code columns.psf} and
-   * the table now wants the legacy combined layout ({@code storeInSegmentFile=false}). The
-   * handler must detect the mismatch on load and extract the bytes back into a sidecar file.
-   */
+  /// Reverse migration: segment has the vector index consolidated inside `columns.psf` and
+  /// the table now wants the legacy combined layout (`storeInSegmentFile=false`). The
+  /// handler must detect the mismatch on load and extract the bytes back into a sidecar file.
   @Test
   public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedExistsButFlagWantsCombined()
       throws Exception {
@@ -220,11 +212,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Full extract path: the consolidated bytes inside {@code columns.psf} are streamed back to
-   * a combined file, the consolidated entry is dropped, and the resulting combined exists on disk
-   * with the expected extension and byte content.
-   */
+  /// Full extract path: the consolidated bytes inside `columns.psf` are streamed back to
+  /// a combined file, the consolidated entry is dropped, and the resulting combined exists on disk
+  /// with the expected extension and byte content.
   @Test
   public void testUpdateIndicesExtractsConsolidatedBytesIntoCombined()
       throws Exception {
@@ -265,15 +255,13 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Regression: the HNSW extract path (columns.psf → Lucene directory, on {@code storeInSegmentFile}
-   * flip to {@code false}) must leave a usable Lucene directory behind. {@code removeIndex} for
-   * vector runs {@code VectorIndexUtils.cleanupVectorIndex} as a side effect, which recursively
-   * deletes any sibling matching a recognised vector extension — including the legacy
-   * {@code .vector.v912.hnsw.index} directory. If the unpack lands straight in that final directory,
-   * {@code removeIndex} wipes it and the migration finishes with no HNSW artifact. The handler must
-   * unpack into a temp directory and move it into place only after cleanup.
-   */
+  /// Regression: the HNSW extract path (columns.psf → Lucene directory, on `storeInSegmentFile`
+  /// flip to `false`) must leave a usable Lucene directory behind. `removeIndex` for
+  /// vector runs `VectorIndexUtils.cleanupVectorIndex` as a side effect, which recursively
+  /// deletes any sibling matching a recognised vector extension — including the legacy
+  /// `.vector.v912.hnsw.index` directory. If the unpack lands straight in that final directory,
+  /// `removeIndex` wipes it and the migration finishes with no HNSW artifact. The handler must
+  /// unpack into a temp directory and move it into place only after cleanup.
   @Test
   public void testUpdateIndicesExtractHnswPreservesDirectoryAfterCleanup()
       throws Exception {
@@ -331,13 +319,11 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Backend drift on a consolidated-only column: the payload lives solely in {@code columns.psf},
-   * so {@code detectVectorIndexBackend} (sidecar files only) returns null and the plain drift check
-   * cannot fire. The handler must sniff the typed entry's magic and report an update need when the
-   * configured backend differs. Uses {@code storeInSegmentFile=true} so no other branch (absorb:
-   * needs a combined file; extract: needs flag=false) can mask a regression here.
-   */
+  /// Backend drift on a consolidated-only column: the payload lives solely in `columns.psf`,
+  /// so `detectVectorIndexBackend` (sidecar files only) returns null and the plain drift check
+  /// cannot fire. The handler must sniff the typed entry's magic and report an update need when the
+  /// configured backend differs. Uses `storeInSegmentFile=true` so no other branch (absorb:
+  /// needs a combined file; extract: needs flag=false) can mask a regression here.
   @Test
   public void testNeedUpdateIndicesReturnsTrueWhenConsolidatedBackendDiffers()
       throws Exception {
@@ -366,13 +352,11 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Regression for the consolidated backend-drift bug: with the payload only in {@code columns.psf}
-   * ({@code existingBackend == null}) and the flag flipped off, the extract branch used to treat a
-   * backend flip as a plain columns.psf → sidecar migration and stream the OLD backend's bytes out
-   * under the NEW backend's extension (e.g. HNSW pack bytes as {@code .vector.ivfpq.index}), which
-   * the next load would parse with the wrong reader. The handler must rebuild instead.
-   */
+  /// Regression for the consolidated backend-drift bug: with the payload only in `columns.psf`
+  /// (`existingBackend == null`) and the flag flipped off, the extract branch used to treat a
+  /// backend flip as a plain columns.psf → sidecar migration and stream the OLD backend's bytes out
+  /// under the NEW backend's extension (e.g. HNSW pack bytes as `.vector.ivfpq.index`), which
+  /// the next load would parse with the wrong reader. The handler must rebuild instead.
   @Test
   public void testUpdateIndicesRebuildsInsteadOfExtractingWhenConsolidatedBackendDiffers()
       throws Exception {
@@ -410,13 +394,11 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * IVF_ON_DISK shares the IVF_FLAT file format, so a consolidated IVF_ON_DISK payload sniffs as
-   * IVF_FLAT ({@code IVFF} magic). The drift check must compare storage formats — a raw enum
-   * comparison would flag a healthy IVF_ON_DISK column as drifted on EVERY load and destroy and
-   * rebuild the index forever (the rebuilt payload again carries the IVFF magic, so the check
-   * would never converge).
-   */
+  /// IVF_ON_DISK shares the IVF_FLAT file format, so a consolidated IVF_ON_DISK payload sniffs as
+  /// IVF_FLAT (`IVFF` magic). The drift check must compare storage formats — a raw enum
+  /// comparison would flag a healthy IVF_ON_DISK column as drifted on EVERY load and destroy and
+  /// rebuild the index forever (the rebuilt payload again carries the IVFF magic, so the check
+  /// would never converge).
   @Test
   public void testNeedUpdateIndicesReturnsFalseForConsolidatedIvfOnDiskColumn()
       throws Exception {
@@ -444,7 +426,7 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /** Mirror of the needUpdateIndices IVF_ON_DISK test for the act side: no destroy-and-rebuild. */
+  /// Mirror of the needUpdateIndices IVF_ON_DISK test for the act side: no destroy-and-rebuild.
   @Test
   public void testUpdateIndicesDoesNotRebuildConsolidatedIvfOnDiskColumn()
       throws Exception {
@@ -473,10 +455,8 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Sidecar flavor of the IVF_ON_DISK aliasing: an on-disk {@code .vector.ivfflat.index} sidecar
-   * detects as IVF_FLAT, which must not count as drift from a configured IVF_ON_DISK backend.
-   */
+  /// Sidecar flavor of the IVF_ON_DISK aliasing: an on-disk `.vector.ivfflat.index` sidecar
+  /// detects as IVF_FLAT, which must not count as drift from a configured IVF_ON_DISK backend.
   @Test
   public void testNeedUpdateIndicesReturnsFalseForIvfOnDiskSidecarColumn()
       throws Exception {
@@ -495,11 +475,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Complement to the drift-rebuild test: when the consolidated payload's magic MATCHES the
-   * configured backend, the flag-off extract must still run (no false-positive rebuild from the
-   * magic sniff).
-   */
+  /// Complement to the drift-rebuild test: when the consolidated payload's magic MATCHES the
+  /// configured backend, the flag-off extract must still run (no false-positive rebuild from the
+  /// magic sniff).
   @Test
   public void testUpdateIndicesExtractsWhenConsolidatedBackendMatches()
       throws Exception {
@@ -533,13 +511,11 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Crash-recovery: if a previous absorb run committed bytes into {@code columns.psf} but then
-   * died before deleting the sidecar, the next load should detect the duplicate via
-   * {@code hasIndexFor} + size check and clean up the orphan sidecar instead of re-running the
-   * absorb (which would otherwise hit a duplicate-key error from
-   * {@code SingleFileIndexDirectory.checkKeyNotPresent}).
-   */
+  /// Crash-recovery: if a previous absorb run committed bytes into `columns.psf` but then
+  /// died before deleting the sidecar, the next load should detect the duplicate via
+  /// `hasIndexFor` + size check and clean up the orphan sidecar instead of re-running the
+  /// absorb (which would otherwise hit a duplicate-key error from
+  /// `SingleFileIndexDirectory.checkKeyNotPresent`).
   @Test
   public void testUpdateIndicesRecoversFromCrashedAbsorb()
       throws Exception {
@@ -575,12 +551,10 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Defensive: when {@code hasIndexFor} is true but the typed-entry size disagrees with the
-   * on-disk sidecar's length, the bytes are from different builds. Rather than guess which copy
-   * is authoritative and silently destroy the other, the handler must refuse and surface an
-   * {@link IOException} so an operator reconciles manually.
-   */
+  /// Defensive: when `hasIndexFor` is true but the typed-entry size disagrees with the
+  /// on-disk sidecar's length, the bytes are from different builds. Rather than guess which copy
+  /// is authoritative and silently destroy the other, the handler must refuse and surface an
+  /// [IOException] so an operator reconciles manually.
   @Test
   public void testUpdateIndicesRefusesAbsorbWhenSizesMismatch()
       throws Exception {
@@ -619,12 +593,10 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Defensive: extract path (columns.psf → sidecar) must refuse if a sidecar already exists on
-   * disk for either the legacy or combined extension. {@code removeIndex} runs
-   * {@code cleanupVectorIndex} as a side effect, which would silently destroy the pre-existing
-   * file. Operator must reconcile.
-   */
+  /// Defensive: extract path (columns.psf → sidecar) must refuse if a sidecar already exists on
+  /// disk for either the legacy or combined extension. `removeIndex` runs
+  /// `cleanupVectorIndex` as a side effect, which would silently destroy the pre-existing
+  /// file. Operator must reconcile.
   @Test
   public void testExtractRefusesWhenLegacySidecarExists()
       throws Exception {
@@ -663,12 +635,10 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Crash + flag-toggle cleanup contract: a crash with {@code storeInSegmentFile=true} leaves an
-   * orphan {@code .combined.index} + {@code .inprogress} marker. A subsequent build with
-   * {@code flag=false} must clean those orphans before starting — otherwise a later flag flip
-   * back could pick the partial file up as a complete index. Exercised via the extracted helper.
-   */
+  /// Crash + flag-toggle cleanup contract: a crash with `storeInSegmentFile=true` leaves an
+  /// orphan `.combined.index` + `.inprogress` marker. A subsequent build with
+  /// `flag=false` must clean those orphans before starting — otherwise a later flag flip
+  /// back could pick the partial file up as a complete index. Exercised via the extracted helper.
   @Test
   public void testCleanOrphansFromOtherExtensionRemovesCombinedRemnants()
       throws Exception {
@@ -696,10 +666,8 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Symmetry: crash with {@code flag=false} leaving a legacy orphan must be cleaned when a build
-   * with {@code flag=true} retries. Same helper, opposite direction.
-   */
+  /// Symmetry: crash with `flag=false` leaving a legacy orphan must be cleaned when a build
+  /// with `flag=true` retries. Same helper, opposite direction.
   @Test
   public void testCleanOrphansFromOtherExtensionRemovesLegacyRemnants()
       throws Exception {
@@ -725,11 +693,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * HNSW now supports a combined form, so the orphan sweep must clean the combined-form file when
-   * the current build targets the legacy directory extension (writeCombined=false). Previously
-   * this method was a no-op for HNSW; it is now active.
-   */
+  /// HNSW now supports a combined form, so the orphan sweep must clean the combined-form file when
+  /// the current build targets the legacy directory extension (writeCombined=false). Previously
+  /// this method was a no-op for HNSW; it is now active.
   @Test
   public void testCleanOrphansFromOtherExtensionCleansHnswCombinedOrphan()
       throws Exception {
@@ -757,11 +723,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * Symmetry: crash with writeCombined=false leaves a legacy orphan Lucene directory; a retry with
-   * writeCombined=true must recursively delete it (a Lucene HNSW directory is non-empty, so
-   * deleteQuietly alone would silently fail).
-   */
+  /// Symmetry: crash with writeCombined=false leaves a legacy orphan Lucene directory; a retry with
+  /// writeCombined=true must recursively delete it (a Lucene HNSW directory is non-empty, so
+  /// deleteQuietly alone would silently fail).
   @Test
   public void testCleanOrphansFromOtherExtensionCleansHnswLegacyOrphan()
       throws Exception {
@@ -794,11 +758,9 @@ public class VectorIndexHandlerTest {
     }
   }
 
-  /**
-   * The "absorb combined into columns.psf" step must not remove the column's vector entry first;
-   * doing so would discard the bytes we are about to consolidate. Verify that {@code removeIndex}
-   * is never called along the consolidation path when the backend matches.
-   */
+  /// The "absorb combined into columns.psf" step must not remove the column's vector entry first;
+  /// doing so would discard the bytes we are about to consolidate. Verify that `removeIndex`
+  /// is never called along the consolidation path when the backend matches.
   @Test
   public void testUpdateIndicesDoesNotRemoveVectorWhenAbsorbingCombined()
       throws Exception {
@@ -823,12 +785,12 @@ public class VectorIndexHandlerTest {
   }
 
   /// Regression: the normal "operator flips storeInSegmentFile on for an existing legacy segment"
-  /// absorb must succeed. The real {@code SingleFileIndexDirectory.hasIndexFor} reports a vector
+  /// absorb must succeed. The real `SingleFileIndexDirectory.hasIndexFor` reports a vector
   /// index whenever the legacy sidecar is on disk (so the generic load path can build a reader),
-  /// even though no typed {@code columns.psf} entry exists yet — in which case {@code getIndexFor}
-  /// throws. If the crash-recovery branch trusted {@code hasIndexFor} it would mis-read this first
-  /// absorb as "already absorbed" and blow up on {@code getIndexFor().size()}. Detecting the typed
-  /// entry directly (via {@code getConsolidatedVectorEntry}) must let the absorb proceed.
+  /// even though no typed `columns.psf` entry exists yet — in which case `getIndexFor`
+  /// throws. If the crash-recovery branch trusted `hasIndexFor` it would mis-read this first
+  /// absorb as "already absorbed" and blow up on `getIndexFor().size()`. Detecting the typed
+  /// entry directly (via `getConsolidatedVectorEntry`) must let the absorb proceed.
   @Test
   public void testUpdateIndicesAbsorbsLegacySidecarWhenNoTypedEntryYet()
       throws Exception {
@@ -870,10 +832,8 @@ public class VectorIndexHandlerTest {
     return indexDir;
   }
 
-  /**
-   * V3 segment directory with no combined file. Used to simulate a segment whose vector payload
-   * is only present as a typed entry inside {@code columns.psf} (the consolidated form).
-   */
+  /// V3 segment directory with no combined file. Used to simulate a segment whose vector payload
+  /// is only present as a typed entry inside `columns.psf` (the consolidated form).
   private static File createEmptyV3SegmentDir()
       throws Exception {
     File indexDir = new File(FileUtils.getTempDirectory(), "vector-index-handler-test-" + System.nanoTime());

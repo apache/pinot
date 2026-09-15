@@ -34,11 +34,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Extend the lease for build time. Keep a map of segments for which lease needs to be extended.
- * Repeat lease extension periodically as often as necessary until the segment name is removed
- * from the map.
- */
+/// Extend the lease for build time. Keep a map of segments for which lease needs to be extended.
+/// Repeat lease extension periodically as often as necessary until the segment name is removed
+/// from the map.
 public class SegmentBuildTimeLeaseExtender {
   private static final int MAX_NUM_ATTEMPTS = 3;
   // Always request 120s of extra build time
@@ -109,14 +107,12 @@ public class SegmentBuildTimeLeaseExtender {
     TABLE_TO_LEASE_EXTENDER.remove(_tableNameWithType);
   }
 
-  /**
-   * Adds a segment for periodic lease request.
-   * The first lease request is sent before {@param initialBuildTimeMs} exipres. Subsequent lease requests are sent
-   * within two minutes.
-   * @param segmentId is the name of he segment that is being built
-   * @param initialBuildTimeMs is the initial time budget that SegmentCompletionManager has allocated.
-   * @param offset The offset at which this segment is being built.
-   */
+  /// Adds a segment for periodic lease request.
+  /// The first lease request is sent before {@param initialBuildTimeMs} exipres. Subsequent lease requests are sent
+  /// within two minutes.
+  /// @param segmentId is the name of he segment that is being built
+  /// @param initialBuildTimeMs is the initial time budget that SegmentCompletionManager has allocated.
+  /// @param offset The offset at which this segment is being built.
   public void addSegment(String segmentId, long initialBuildTimeMs, StreamPartitionMsgOffset offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();

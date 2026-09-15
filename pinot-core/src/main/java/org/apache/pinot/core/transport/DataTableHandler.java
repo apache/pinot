@@ -34,10 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code DataTableHandler} is the Netty inbound handler on Pinot Broker side to handle the serialized data table
- * responses sent from Pinot Server.
- */
+/// The `DataTableHandler` is the Netty inbound handler on Pinot Broker side to handle the serialized data table
+/// responses sent from Pinot Server.
 public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
@@ -56,12 +54,16 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   @Override
   public void channelActive(ChannelHandlerContext ctx) {
     LOGGER.info("Channel for server: {} is now active", _serverRoutingInstance);
+    _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_ACTIVE, 1,
+        _serverRoutingInstance.getShortName());
   }
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) {
-    LOGGER.error("Channel for server: {} is now inactive, marking server down", _serverRoutingInstance);
-    _queryRouter.markServerDown(_serverRoutingInstance,
+    LOGGER.error("Channel for server: {} is now inactive, marking server unavailable", _serverRoutingInstance);
+    _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_INACTIVE, 1,
+        _serverRoutingInstance.getShortName());
+    _queryRouter.markServerUnavailable(_serverRoutingInstance,
         new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)));
   }
 

@@ -25,9 +25,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
-/**
- * Implementation of {@link ChunkCompressor} using GZIP compression algorithm.
- */
+/// Implementation of [ChunkCompressor] using GZIP compression algorithm.
 class GzipCompressor implements ChunkCompressor {
 
   private final Deflater _compressor;

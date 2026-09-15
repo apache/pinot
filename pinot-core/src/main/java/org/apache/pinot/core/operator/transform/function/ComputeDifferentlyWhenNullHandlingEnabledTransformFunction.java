@@ -25,10 +25,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base class for transform functions that compute differently (using value and NULL together) when NULL handling is
- * enabled.
- */
+/// Base class for transform functions that compute differently (using value and NULL together) when NULL handling is
+/// enabled.
 public abstract class ComputeDifferentlyWhenNullHandlingEnabledTransformFunction extends BaseTransformFunction {
 
   @Override

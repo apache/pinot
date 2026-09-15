@@ -72,16 +72,14 @@ public class TimestampUtils {
       .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
       .toFormatter();
 
-  /**
-   * Parses the given timestamp string into {@link Timestamp}.
-   * <p>Below formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
-   *   <li>Millis since epoch</li>
-   *   <li>ISO8601 format</li>
-   * </ul>
-   */
+  /// Parses the given timestamp string into [Timestamp].
+  ///
+  /// Below formats of timestamp are supported:
+  ///
+  /// - 'yyyy-mm-dd hh:mm:ss\[.fffffffff\]'
+  /// - 'yyyy-MM-dd\[ HH:mm\[:ss\]\]'
+  /// - Millis since epoch
+  /// - ISO8601 format
   public static Timestamp toTimestamp(String timestampString) {
     try {
       return Timestamp.valueOf(timestampString);
@@ -106,16 +104,14 @@ public class TimestampUtils {
     }
   }
 
-  /**
-   * Parses the given timestamp string into millis since epoch.
-   * <p>Below formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
-   *   <li>Millis since epoch</li>
-   *   <li>ISO8601 format</li>
-   * </ul>
-   */
+  /// Parses the given timestamp string into millis since epoch.
+  ///
+  /// Below formats of timestamp are supported:
+  ///
+  /// - 'yyyy-mm-dd hh:mm:ss\[.fffffffff\]'
+  /// - 'yyyy-MM-dd\[ HH:mm\[:ss\]\]'
+  /// - Millis since epoch
+  /// - ISO8601 format
   public static long toMillisSinceEpoch(String timestampString) {
     try {
       return Timestamp.valueOf(timestampString).getTime();

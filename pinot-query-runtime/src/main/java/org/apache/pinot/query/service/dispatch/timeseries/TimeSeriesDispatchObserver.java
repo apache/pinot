@@ -29,17 +29,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Response observer for a time-series query request.
- * TODO: This shouldn't exist and we should re-use DispatchObserver. TBD as part of multi-stage
- *   engine integration.
- */
+/// Response observer for a time-series query request.
+/// TODO: This shouldn't exist and we should re-use DispatchObserver. TBD as part of multi-stage
+///   engine integration.
 public class TimeSeriesDispatchObserver implements StreamObserver<Worker.TimeSeriesResponse> {
-  /**
-   * Each server should send data for each leaf node once. This capacity controls the size of the queue we use to
-   * buffer the data sent by the sender. This is set large enough that we should never hit this for any practical
-   * use-case, while guarding us against bugs.
-   */
+  /// Each server should send data for each leaf node once. This capacity controls the size of the queue we use to
+  /// buffer the data sent by the sender. This is set large enough that we should never hit this for any practical
+  /// use-case, while guarding us against bugs.
   public static final int MAX_QUEUE_CAPACITY = 4096;
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesDispatchObserver.class);
   private final Map<String, BlockingQueue<Object>> _exchangeReceiversByPlanId;

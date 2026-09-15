@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.WindowNode.WindowExclusion;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -151,6 +154,137 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     );
     GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
     assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
+  public void sameWindowKeepEquivalence() {
+    when(
+        join(
+            exchange(1, window(tableScan("T1"), lastValueRespectingNulls())),
+            exchange(2, window(tableScan("T1"), lastValueRespectingNulls()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  /// Two windows that both ignore nulls are still equivalent: the check must compare the flag, not reject it.
+  @Test
+  public void sameIgnoreNullsKeepEquivalence() {
+    when(
+        join(
+            exchange(1, window(tableScan("T1"), lastValueIgnoringNulls())),
+            exchange(2, window(tableScan("T1"), lastValueIgnoringNulls()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  /// Same for a non-default frame exclusion.
+  @Test
+  public void sameWindowExclusionKeepEquivalence() {
+    when(
+        join(
+            exchange(1, window(tableScan("T1"), lastValueRespectingNulls(), WindowExclusion.CURRENT_ROW)),
+            exchange(2, window(tableScan("T1"), lastValueRespectingNulls(), WindowExclusion.CURRENT_ROW))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  /// A window that ignores nulls computes different values than one that respects them, so the two stages must not be
+  /// treated as equivalent.
+  @Test
+  public void differentIgnoreNullsBreakEquivalence() {
+    when(
+        join(
+            exchange(1, window(tableScan("T1"), lastValueIgnoringNulls())),
+            exchange(2, window(tableScan("T1"), lastValueRespectingNulls()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  /// The frame exclusion changes which rows feed the window function, so it must break equivalence too.
+  @Test
+  public void differentWindowExclusionBreakEquivalence() {
+    when(
+        join(
+            exchange(1, window(tableScan("T1"), lastValueRespectingNulls(), WindowExclusion.CURRENT_ROW)),
+            exchange(2, window(tableScan("T1"), lastValueRespectingNulls(), WindowExclusion.NO_OTHERS))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  /// The group keys only hold the union of the grouping columns, so `ROLLUP(col1, col2)` and `CUBE(col1, col2)` agree
+  /// on every other field (including the data schema) and are only told apart by the grouping sets themselves.
+  @Test
+  public void differentGroupingSetsBreakEquivalence() {
+    when(
+        join(
+            exchange(1, aggregate(tableScan("T1"), List.of(List.of(0, 1), List.of(0), List.of()))),
+            exchange(2, aggregate(tableScan("T1"), List.of(List.of(0, 1), List.of(0), List.of(1), List.of())))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
+  public void sameGroupingSetsKeepEquivalence() {
+    List<List<Integer>> rollup = List.of(List.of(0, 1), List.of(0), List.of());
+    when(
+        join(
+            exchange(1, aggregate(tableScan("T1"), rollup)),
+            exchange(2, aggregate(tableScan("T1"), rollup))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  /// ASOF joins carry their comparison in the match condition rather than in the non-equi conditions, so two joins
+  /// that only differ there must not be spooled together.
+  @Test
+  public void differentAsofMatchConditionBreakEquivalence() {
+    when(
+        join(
+            exchange(1, asofJoin(tableScan("T1"), tableScan("T2"), greaterThan())),
+            exchange(2, asofJoin(tableScan("T1"), tableScan("T2"), greaterThanOrEqual()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
+  public void sameAsofMatchConditionKeepEquivalence() {
+    when(
+        join(
+            exchange(1, asofJoin(tableScan("T1"), tableScan("T2"), greaterThan())),
+            exchange(2, asofJoin(tableScan("T1"), tableScan("T2"), greaterThan()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  private static RexExpression greaterThan() {
+    return comparison(SqlKind.GREATER_THAN);
+  }
+
+  private static RexExpression greaterThanOrEqual() {
+    return comparison(SqlKind.GREATER_THAN_OR_EQUAL);
+  }
+
+  private static RexExpression comparison(SqlKind kind) {
+    return new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, kind.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
   }
 
   @Test

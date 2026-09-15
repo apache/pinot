@@ -27,10 +27,8 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-/**
- * Unit tests for AuditConfigManager to verify correct config injection
- * when onClusterConfigChange is called.
- */
+/// Unit tests for AuditConfigManager to verify correct config injection
+/// when onClusterConfigChange is called.
 public class AuditConfigManagerTest {
 
   @Test

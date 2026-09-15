@@ -32,11 +32,9 @@ import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Distributes blocks based on the hash of a key, selected by the specified
- * {@code keySelector}. This will redistribute rows from input blocks (breaking
- * them up if necessary).
- */
+/// Distributes blocks based on the hash of a key, selected by the specified
+/// `keySelector`. This will redistribute rows from input blocks (breaking
+/// them up if necessary).
 class HashExchange extends BlockExchange {
   private static final String ROUTE_SCOPE = "HashExchange";
 

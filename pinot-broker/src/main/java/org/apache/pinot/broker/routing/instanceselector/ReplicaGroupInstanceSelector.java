@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
@@ -39,40 +37,47 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Instance selector for replica-group routing strategy.
- * <p>The selection algorithm will always evenly distribute the traffic to all replicas of each segment, and will select
- * the same index of the enabled instances for all segments with the same number of replicas. The algorithm is very
- * light-weight and will do best effort to select the least servers for the request.
- * <p>The algorithm relies on the mirror segment assignment from replica-group segment assignment strategy. With mirror
- * segment assignment, any server in one replica-group will always have a corresponding server in other replica-groups
- * that have the same segments assigned. For an example, if S1 is a server in replica-group 1, and it has mirror server
- * S2 in replica-group 2 and S3 in replica-group 3. All segments assigned to S1 will also be assigned to S2 and S3. In
- * stable scenario (external view matches ideal state), all segments assigned to S1 will have the same enabled instances
- * of [S1, S2, S3] sorted (in alphabetical order). If we pick the same index of enabled instances for all segments for a
- * request, only one of S1, S2, S3 will be picked, so it is guaranteed that we pick the least server instances for the
- * request (there is no guarantee on choosing servers from the same replica-group though). In transitioning/error
- * scenario (external view does not match ideal state), there is no guarantee on picking the least server instances, but
- * the traffic is guaranteed to be evenly distributed to all available instances to avoid overwhelming hotspot servers.
- *<p> If the query option NUM_REPLICA_GROUPS_TO_QUERY is provided, the servers to be picked will be from different
- * replica groups such that segments are evenly distributed amongst the provided value of NUM_REPLICA_GROUPS_TO_QUERY.
- * Thus in case of [S1, S2, S3] if NUM_REPLICA_GROUPS_TO_QUERY = 2, the ReplicaGroup S1 and ReplicaGroup S2 will be
- * selected such that half the segments will come from S1 and other half from S2. If NUM_REPLICA_GROUPS_TO_QUERY value
- * is much greater than available servers, then ReplicaGroupInstanceSelector will behave similar to
- * BalancedInstanceSelector.
- * <p>If AdaptiveServerSelection is enabled, a single snapshot of the server ranking is fetched. This ranking is
- * referenced to pick the best available server for each segment. The algorithm ends up picking the minimum number of
- * servers required to process a query because it references a single snapshot of the server rankings. Currently,
- * NUM_REPLICA_GROUPS_TO_QUERY is not supported if AdaptiveServerSelection is enabled.
- */
+/// Instance selector for replica-group routing strategy.
+///
+/// The selection algorithm will always evenly distribute the traffic to all replicas of each segment, and will select
+/// the same index of the enabled instances for all segments with the same number of replicas. The algorithm is very
+/// light-weight and will do best effort to select the least servers for the request.
+///
+/// The algorithm relies on the mirror segment assignment from replica-group segment assignment strategy. With mirror
+/// segment assignment, any server in one replica-group will always have a corresponding server in other replica-groups
+/// that have the same segments assigned. For an example, if S1 is a server in replica-group 1, and it has mirror server
+/// S2 in replica-group 2 and S3 in replica-group 3. All segments assigned to S1 will also be assigned to S2 and S3. In
+/// stable scenario (external view matches ideal state), all segments assigned to S1 will have the same enabled
+/// instances of \[S1, S2, S3\] sorted (in alphabetical order). If we pick the same index of enabled instances for all
+/// segments for a request, only one of S1, S2, S3 will be picked, so it is guaranteed that we pick the least server
+/// instances for the request (there is no guarantee on choosing servers from the same replica-group though). In
+/// transitioning/error scenario (external view does not match ideal state), there is no guarantee on picking the least
+/// server instances, but the traffic is guaranteed to be evenly distributed to all available instances to avoid
+/// overwhelming hotspot servers.
+///
+/// If the query option NUM_REPLICA_GROUPS_TO_QUERY is provided, the servers to be picked will be from different
+/// replica groups such that segments are evenly distributed amongst the provided value of NUM_REPLICA_GROUPS_TO_QUERY.
+/// Thus in case of \[S1, S2, S3\] if NUM_REPLICA_GROUPS_TO_QUERY = 2, the ReplicaGroup S1 and ReplicaGroup S2 will be
+/// selected such that half the segments will come from S1 and other half from S2. If NUM_REPLICA_GROUPS_TO_QUERY value
+/// is much greater than available servers, then ReplicaGroupInstanceSelector will behave similar to
+/// BalancedInstanceSelector.
+///
+/// If AdaptiveServerSelection is enabled, a single snapshot of the server ranking is fetched. This ranking is
+/// referenced to pick the best available server for each segment. The algorithm ends up picking the minimum number of
+/// servers required to process a query because it references a single snapshot of the server rankings. Currently,
+/// NUM_REPLICA_GROUPS_TO_QUERY is not supported if AdaptiveServerSelection is enabled.
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
-    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    return selectWithContext(segments, requestId, segmentStates, new ServerSelectionContext(queryOptions, _config));
+  }
+
+  protected InstanceMapping selectWithContext(List<String> segments, int requestId,
+      SegmentStates segmentStates, ServerSelectionContext ctx) {
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<SegmentInstanceCandidate> candidateServers = fetchCandidateServersForQuery(segments, segmentStates);
@@ -91,7 +96,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  private Pair<Map<String, String>, Map<String, String>> selectServers(List<String> segments, int requestId,
+  protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
 
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
@@ -112,7 +117,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Round-robin selection (default behavior)
       int numCandidates = candidates.size();
-      int instanceIdx = (requestId + replicaOffset) % numCandidates;
+      int instanceIdx = Math.floorMod(requestId + replicaOffset, numCandidates);
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       if (useFixedReplica) {
         // Adaptive Server Selection cannot be used with fixed replica routing.
@@ -121,13 +126,19 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       } else if (MapUtils.isNotEmpty(serverRankMap)) {
         // Adaptive Server Selection is enabled.
         // Use the instance with the best rank if all servers have stats populated, else use the round-robin selected
-        // instance
-        selectedInstance = candidates.stream()
-            .anyMatch(candidate -> !serverRankMap.containsKey(candidate.getInstance()))
-            ? selectedInstance
-            : candidates.stream()
-                .min(Comparator.comparingInt(candidate -> serverRankMap.get(candidate.getInstance())))
-                .orElse(selectedInstance);
+        // instance. As of 8 July 2026, this fallback is unreachable, but new implementations could require it.
+        int bestRank = Integer.MAX_VALUE;
+        for (SegmentInstanceCandidate candidate : candidates) {
+          Integer rank = serverRankMap.get(candidate.getInstance());
+          if (rank == null) {
+            selectedInstance = candidates.get(instanceIdx);
+            break;
+          }
+          if (rank < bestRank) {
+            bestRank = rank;
+            selectedInstance = candidate;
+          }
+        }
       }
 
       poolToSegmentCount.merge(selectedInstance.getPool(), 1, Integer::sum);
@@ -147,7 +158,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
           BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
     }
-    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private List<SegmentInstanceCandidate> fetchCandidateServersForQuery(List<String> segments,
@@ -175,25 +186,22 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  /**
-   *
-   * <pre>
-   * Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
-   * segments with the same instances in ideal state.
-   *
-   * The maps are calculated in the following steps to meet the strict replica-group guarantee:
-   *   1. Compute the online instances for both old and new segments
-   *   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
-   *   for each set of instances
-   *   3. Exclude the unavailable instances from the online instances map for both old and new segment map
-   * </pre>
-   */
+  /// ```
+  /// Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
+  /// segments with the same instances in ideal state.
+  ///
+  /// The maps are calculated in the following steps to meet the strict replica-group guarantee:
+  ///   1. Compute the online instances for both old and new segments
+  ///   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
+  ///   for each set of instances
+  ///   3. Exclude the unavailable instances from the online instances map for both old and new segment map
+  /// ```
   void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
+    _oldSegmentExpectedReplicasMap.clear();
     int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
-
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
 
@@ -246,7 +254,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-
       Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       int idealStateReplicaId = 0;
@@ -256,7 +263,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
         idealStateReplicaId++;
       }
-      _oldSegmentCandidatesMap.put(segment, candidates);
+      // Instances taken out of service for the whole replica group are excluded above, so measuring against
+      // the ideal state count is what makes the replica health metrics reflect a group-wide knockout.
+      putOldSegment(segment, candidates, idealStateInstanceStateMap);
     }
 
     for (Map.Entry<String, Set<String>> entry : newSegmentToOnlineInstancesMap.entrySet()) {
@@ -264,7 +273,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
-
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Set.of());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());

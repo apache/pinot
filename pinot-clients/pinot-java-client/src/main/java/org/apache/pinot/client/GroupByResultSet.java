@@ -21,10 +21,8 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 
 
-/**
- * A Pinot query result set for group by results, of which there is one of per aggregation function
- * in the query.
- */
+/// A Pinot query result set for group by results, of which there is one of per aggregation function
+/// in the query.
 class GroupByResultSet extends AbstractResultSet {
   private final JsonNode _groupByResults;
   private final JsonNode _groupByColumns;
@@ -36,10 +34,8 @@ class GroupByResultSet extends AbstractResultSet {
     _functionName = jsonObject.get("function").asText();
   }
 
-  /**
-   * Returns the number of rows in this result group.
-   * @return The number of rows in this result group
-   */
+  /// Returns the number of rows in this result group.
+  /// @return The number of rows in this result group
   @Override
   public int getRowCount() {
     return _groupByResults.size();

@@ -34,10 +34,11 @@ import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/// {@link GroupKeyGenerator} for GROUP BY GROUPING SETS / ROLLUP / CUBE queries in the single-stage engine.
+/// [GroupKeyGenerator] for GROUP BY GROUPING SETS / ROLLUP / CUBE queries in the single-stage engine.
 ///
 /// Given the union of all grouping columns `[c_0, ..., c_{k-1}]` and a list of grouping sets (each a subset
 /// of the union), this generator expands every input row into one group per grouping set in a single scan.
@@ -48,14 +49,15 @@ import org.roaringbitmap.RoaringBitmap;
 /// ```
 ///
 /// where a column `c_i` that does NOT participate in `S` (rolled up) is pinned to the NULL sentinel, and the
-/// trailing `groupingId` is a bitmask over the union with bit `i` set iff column `i` is rolled up in `S`
-/// (PostgreSQL `GROUPING` semantics: 1 = aggregated away). The `groupingId` is appended as a synthetic key
-/// column so that rows from different grouping sets never collide -- e.g. set `{a}` with `b` rolled up to
-/// NULL stays distinct from set `{a, b}` where `b` is genuinely NULL, even though both render `(a, NULL)`.
+/// trailing `groupingId` is the ordinal of `S` (its index in the query's grouping-set list). The ordinal is
+/// appended as a synthetic key column so that rows from different grouping sets never collide -- e.g. set
+/// `{a}` with `b` rolled up to NULL stays distinct from set `{a, b}` where `b` is genuinely NULL, even though
+/// both render `(a, NULL)` -- and it identifies the producing set for GROUPING() / GROUPING_ID(). Because the
+/// ordinal is not a per-column bitmask, the number of grouping columns is unlimited.
 ///
 /// This generator always emits multiple keys per row, so it is only used via the multi-value
-/// ({@code int[][]}) executor path. The union columns are resolved through per-column on-the-fly
-/// dictionaries (like {@link NoDictionaryMultiColumnGroupKeyGenerator}) so that NULL keys -- which grouping
+/// (`int[][]`) executor path. The union columns are resolved through per-column on-the-fly
+/// dictionaries (like [NoDictionaryMultiColumnGroupKeyGenerator]) so that NULL keys -- which grouping
 /// sets produce regardless of the query's null-handling option -- are representable and reconstructable.
 ///
 /// A multi-value union column participating in a grouping set expands the row over its values (Cartesian
@@ -75,17 +77,18 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   private final boolean _nullHandlingEnabled;
   private final int _numGroupsLimit;
 
-  /// Per grouping set: membership over the union columns, and the grouping-id bitmask (bit i set iff column i
-  /// is rolled up / excluded from the set). The bitmask is also the value stored in the synthetic
-  /// $groupingId key column and consumed by GROUPING() / GROUPING_ID().
+  /// Per grouping set: membership over the union columns. The set's ordinal (its index in the query's
+  /// grouping-set list) is the value stored in the synthetic $groupingId key column, keeping rows from
+  /// different sets distinct and identifying the set for GROUPING() / GROUPING_ID().
   private final boolean[][] _setContains;
-  private final int[] _setBitmasks;
   private final int _numSets;
 
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
   /// Reusable single-element id list for a rolled-up (non-participating) column on the MV path. Per-instance
   /// (segment-confined, never shared across query threads) and treated as read-only: expandGroupIds copies its
   /// element into the composite key and never mutates it.
+  /// Stands for a NULL key component, whether because the grouping set excludes the column or because the row's
+  /// value is NULL. Shared by every row and set: the key expansion reads it and never writes to it.
   private final int[] _nullComponent = {ID_FOR_NULL};
 
   public GroupingSetsGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
@@ -110,18 +113,10 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
 
     _numSets = groupingSets.size();
     _setContains = new boolean[_numSets][_numGroupByExpressions];
-    _setBitmasks = new int[_numSets];
     for (int s = 0; s < _numSets; s++) {
       for (int columnIndex : groupingSets.get(s)) {
         _setContains[s][columnIndex] = true;
       }
-      int bitmask = 0;
-      for (int i = 0; i < _numGroupByExpressions; i++) {
-        if (!_setContains[s][i]) {
-          bitmask |= 1 << i;
-        }
-      }
-      _setBitmasks[s] = bitmask;
     }
 
     _groupKeyMap = new Object2IntOpenHashMap<>();
@@ -164,7 +159,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
         for (int col = 0; col < _numGroupByExpressions; col++) {
           keyValues[col] = _setContains[s][col] ? columnIds[col][row] : ID_FOR_NULL;
         }
-        keyValues[_numGroupByExpressions] = _setBitmasks[s];
+        keyValues[_numGroupByExpressions] = s;
         int groupId = getGroupIdForKey(flyweightKey);
         if (groupId == numGroups) {
           /// A new group was inserted, so the map now retains this buffer; allocate a fresh one to reuse.
@@ -188,15 +183,15 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
       columnValueIds[col] = resolveColumnValueIds(valueBlock, col, numDocs);
     }
     int[][] keyComponents = new int[_numGroupByExpressions + 1][];
-    int[] bitmaskComponent = new int[1];
-    keyComponents[_numGroupByExpressions] = bitmaskComponent;
+    int[] ordinalComponent = new int[1];
+    keyComponents[_numGroupByExpressions] = ordinalComponent;
     for (int row = 0; row < numDocs; row++) {
       IntArrayList rowGroupIds = new IntArrayList(_numSets);
       for (int s = 0; s < _numSets; s++) {
         for (int col = 0; col < _numGroupByExpressions; col++) {
           keyComponents[col] = _setContains[s][col] ? columnValueIds[col][row] : _nullComponent;
         }
-        bitmaskComponent[0] = _setBitmasks[s];
+        ordinalComponent[0] = s;
         expandGroupIds(keyComponents, new int[_numGroupByExpressions + 1], 0, rowGroupIds);
       }
       groupKeys[row] = rowGroupIds.toIntArray();
@@ -204,7 +199,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// Recursively builds composite keys from the per-column id lists (Cartesian product) and resolves each to
-  /// a group id appended to {@code out}.
+  /// a group id appended to `out`.
   private void expandGroupIds(int[][] keyComponents, int[] keyValues, int level, IntArrayList out) {
     if (level == keyComponents.length) {
       out.add(getGroupIdForKey(new FixedIntArray(keyValues.clone())));
@@ -289,16 +284,30 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
         throw new IllegalArgumentException(
             "Illegal multi-value data type for grouping-sets group key generator: " + _storedTypes[col]);
     }
+    if (_nullHandlingEnabled) {
+      // A null row's values were resolved above and are discarded here. Only the composed key decides a group, so the
+      // ids they took in the on-the-fly dictionary go unused rather than becoming groups of their own.
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        PeekableIntIterator nullIterator = nullBitmap.getIntIterator();
+        while (nullIterator.hasNext()) {
+          ids[nullIterator.next()] = _nullComponent;
+        }
+      }
+    }
     return ids;
   }
 
   /// Resolves the on-the-fly dictionary id for the given union column across all rows in the block, mapping
-  /// null values (when null handling is enabled) to {@link #ID_FOR_NULL}.
+  /// null values (when null handling is enabled) to [#ID_FOR_NULL].
   private int[] resolveColumnIds(ValueBlock valueBlock, int col, int numDocs) {
     int[] ids = new int[numDocs];
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpressions[col]);
     ValueToIdMap dictionary = _onTheFlyDictionaries[col];
     RoaringBitmap nullBitmap = _nullHandlingEnabled ? blockValSet.getNullBitmap() : null;
+    if (nullBitmap != null && nullBitmap.isEmpty()) {
+      nullBitmap = null;
+    }
     switch (_storedTypes[col]) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -355,7 +364,7 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
 
   /// Returns the group id for the given composite key, creating a new group while the per-segment group
   /// limit has not been reached. Once the limit is reached, only existing groups are returned and brand-new
-  /// keys map to {@link #INVALID_ID} (the aggregation result holders skip {@code INVALID_ID}).
+  /// keys map to [#INVALID_ID] (the aggregation result holders skip `INVALID_ID`).
   private int getGroupIdForKey(FixedIntArray keyList) {
     int numGroups = _groupKeyMap.size();
     if (numGroups < _numGroupsLimit) {
@@ -381,14 +390,14 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// Reconstructs the output row for a composite key: the union column values (NULL where rolled up) followed
-  /// by the integer grouping-id discriminator.
+  /// by the integer grouping-set-ordinal discriminator.
   private Object[] buildKeysFromIds(FixedIntArray keyList) {
     int[] ids = keyList.elements();
     Object[] keys = new Object[_numGroupByExpressions + 1];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       keys[i] = ids[i] == ID_FOR_NULL ? null : _onTheFlyDictionaries[i].get(ids[i]);
     }
-    /// The trailing slot stores the grouping-id bitmask directly (not a dictionary id).
+    /// The trailing slot stores the grouping-set ordinal directly (not a dictionary id).
     keys[_numGroupByExpressions] = ids[_numGroupByExpressions];
     return keys;
   }

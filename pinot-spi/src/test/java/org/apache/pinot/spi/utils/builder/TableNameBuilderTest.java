@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class TableNameBuilderTest {
@@ -38,5 +39,45 @@ public class TableNameBuilderTest {
 
     assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_OFFLINE"),
         ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
+  }
+
+  @Test
+  public void testQuoteTableNameWithType() {
+    assertEquals(TableNameBuilder.quoteTableNameWithType("events_OFFLINE"), "\"events_OFFLINE\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("events_REALTIME"), "\"events_REALTIME\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("analytics.events_OFFLINE"),
+        "\"analytics\".\"events_OFFLINE\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("analytics.my-table$1_REALTIME"),
+        "\"analytics\".\"my-table$1_REALTIME\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("\u6570\u636E\u5E93.\u4E8B\u4EF6_REALTIME"),
+        "\"\u6570\u636E\u5E93\".\"\u4E8B\u4EF6_REALTIME\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("_OFFLINE"), "\"_OFFLINE\"");
+    assertEquals(TableNameBuilder.quoteTableNameWithType("analytics._REALTIME"),
+        "\"analytics\".\"_REALTIME\"");
+  }
+
+  @Test
+  public void testQuoteTableNameWithTypeEscapesEmbeddedQuotes() {
+    assertEquals(TableNameBuilder.quoteTableNameWithType("db\"name.events\";DROP_TABLE--_OFFLINE"),
+        "\"db\"\"name\".\"events\"\";DROP_TABLE--_OFFLINE\"");
+  }
+
+  @Test
+  public void testQuoteTableNameWithTypeRejectsInvalidNames() {
+    String[] invalidTableNames = {
+        null,
+        "",
+        "events",
+        "events_offline",
+        ".events_OFFLINE",
+        "analytics.",
+        "analytics.events_OFFLINE.extra",
+        "analytics..events_REALTIME",
+        "events name_OFFLINE",
+        "events_OFFLINE;SELECT"
+    };
+    for (String invalidTableName : invalidTableNames) {
+      assertThrows(IllegalArgumentException.class, () -> TableNameBuilder.quoteTableNameWithType(invalidTableName));
+    }
   }
 }

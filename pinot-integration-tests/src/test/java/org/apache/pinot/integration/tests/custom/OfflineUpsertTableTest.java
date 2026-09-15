@@ -46,20 +46,18 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Integration test for offline table upsert support.
- *
- * Tests that OFFLINE tables with upsert enabled correctly deduplicate records by primary key,
- * keeping the latest record based on the comparison column (time column).
- *
- * Test data layout:
- *   Segment 1: playerId=100 (score=2000, ts=1671036400000), playerId=101 (score=3000, ts=1671036400000)
- *   Segment 2: playerId=100 (score=2500, ts=1681036400000), playerId=102 (score=4000, ts=1671036400000)
- *   Segment 3: playerId=101 (score=3500, ts=1681036400000), playerId=102 (score=4500, ts=1681036400000)
- *
- * After upsert dedup (latest by timestampInEpoch):
- *   playerId=100 -> score=2500, playerId=101 -> score=3500, playerId=102 -> score=4500
- */
+/// Integration test for offline table upsert support.
+///
+/// Tests that OFFLINE tables with upsert enabled correctly deduplicate records by primary key,
+/// keeping the latest record based on the comparison column (time column).
+///
+/// Test data layout:
+///   Segment 1: playerId=100 (score=2000, ts=1671036400000), playerId=101 (score=3000, ts=1671036400000)
+///   Segment 2: playerId=100 (score=2500, ts=1681036400000), playerId=102 (score=4000, ts=1671036400000)
+///   Segment 3: playerId=101 (score=3500, ts=1681036400000), playerId=102 (score=4500, ts=1681036400000)
+///
+/// After upsert dedup (latest by timestampInEpoch):
+///   playerId=100 -> score=2500, playerId=101 -> score=3500, playerId=102 -> score=4500
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTest {
 

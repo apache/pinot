@@ -138,9 +138,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     ensureCompletedBackfillJobsCleanedUp(tableConfig);
   }
 
-  /**
-   * Get the list of tables & topics being backfilled and ensure the backfill jobs are running.
-   */
+  /// Get the list of tables & topics being backfilled and ensure the backfill jobs are running.
   private void ensureBackfillJobsRunning(String tableNameWithType) {
     // Recover state from ephemeral multi-topics ingestion
     // TODO: refactor or add other recover methods when other backfill approaches are ready

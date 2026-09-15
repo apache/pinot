@@ -49,9 +49,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests creating segments via the {@link SegmentWriter} implementations
- */
+/// Tests creating segments via the [SegmentWriter] implementations
 public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
@@ -92,11 +90,9 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     return ingestionConfig;
   }
 
-  /**
-   * Write the records from 3 avro files into the Pinot table using the {@link FileBasedSegmentWriter}
-   * Calls {@link SegmentWriter#flush()} after writing records from each avro file
-   * Checks the number of segments created and total docs from the query
-   */
+  /// Write the records from 3 avro files into the Pinot table using the [FileBasedSegmentWriter]
+  /// Calls [SegmentWriter#flush()] after writing records from each avro file
+  /// Checks the number of segments created and total docs from the query
   @Test
   public void testFileBasedSegmentWriterAndDefaultUploader()
       throws Exception {

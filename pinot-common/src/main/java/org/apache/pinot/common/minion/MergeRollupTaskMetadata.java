@@ -23,13 +23,12 @@ import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * Metadata for the minion task of type <code>MergeRollupTask</code>.
- * The <code>watermarkMap</code> denotes the time (exclusive) upto which tasks have been executed for the bucket
- * granularity.
- *
- * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/${tableNameWithType}/MergeRollupTask
- */
+/// Metadata for the minion task of type `MergeRollupTask`.
+/// The `watermarkMap` denotes the time (exclusive) upto which tasks have been executed for the bucket
+/// granularity.
+///
+/// This gets serialized and stored in zookeeper under the path
+/// MINION_TASK_METADATA/${tableNameWithType}/MergeRollupTask
 public class MergeRollupTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY_PREFIX = "watermarkMs_";
@@ -48,9 +47,7 @@ public class MergeRollupTaskMetadata extends BaseTaskMetadata {
     return _tableNameWithType;
   }
 
-  /**
-   * Get the watermarkMap in millis
-   */
+  /// Get the watermarkMap in millis
   public Map<String, Long> getWatermarkMap() {
     return _watermarkMap;
   }

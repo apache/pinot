@@ -21,41 +21,32 @@ package org.apache.pinot.spi.query;
 import java.util.concurrent.atomic.LongAdder;
 
 
-/**
- * Lightweight, thread-safe accumulator for query scan cost metrics.
- *
- * <p>One instance is created per query when scan-based killing is enabled.
- * Attached to {@link QueryExecutionContext} and shared across all segment
- * worker threads executing that query.</p>
- *
- */
+/// Lightweight, thread-safe accumulator for query scan cost metrics.
+///
+/// One instance is created per query when scan-based killing is enabled.
+/// Attached to [QueryExecutionContext] and shared across all segment
+/// worker threads executing that query.
 public final class QueryScanCostContext {
   private final LongAdder _numEntriesScannedInFilter = new LongAdder();
   private final LongAdder _numDocsScanned = new LongAdder();
   private final LongAdder _numEntriesScannedPostFilter = new LongAdder();
   private final long _startTimeMs = System.currentTimeMillis();
 
-  /**
-   * Increment entries scanned during filter evaluation.
-   * Called from {@code DocIdSetOperator} after each block.
-   */
+  /// Increment entries scanned during filter evaluation.
+  /// Called from `DocIdSetOperator` after each block.
   public void addEntriesScannedInFilter(long count) {
     _numEntriesScannedInFilter.add(count);
   }
 
-  /**
-   * Increment documents scanned (passed filter, processed by query operator).
-   * Called from {@code AggregationOperator}, {@code SelectionOnlyOperator},
-   * {@code GroupByOperator} after each value block.
-   */
+  /// Increment documents scanned (passed filter, processed by query operator).
+  /// Called from `AggregationOperator`, `SelectionOnlyOperator`,
+  /// `GroupByOperator` after each value block.
   public void addDocsScanned(long count) {
     _numDocsScanned.add(count);
   }
 
-  /**
-   * Increment entries scanned post-filter (docs * projected columns).
-   * Called from query operators after projection.
-   */
+  /// Increment entries scanned post-filter (docs \* projected columns).
+  /// Called from query operators after projection.
   public void addEntriesScannedPostFilter(long count) {
     _numEntriesScannedPostFilter.add(count);
   }
@@ -72,9 +63,7 @@ public final class QueryScanCostContext {
     return _numEntriesScannedPostFilter.sum();
   }
 
-  /**
-   * Returns wall-clock time elapsed since this context was created.
-   */
+  /// Returns wall-clock time elapsed since this context was created.
   public long getElapsedTimeMs() {
     return System.currentTimeMillis() - _startTimeMs;
   }

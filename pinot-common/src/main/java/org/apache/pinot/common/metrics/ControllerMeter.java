@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Meters for the controller.
- */
+/// Meters for the controller.
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
@@ -82,6 +80,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   AUDIT_REQUEST_FAILURES("failures", true),
   AUDIT_RESPONSE_FAILURES("failures", true),
   AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
+  // Page cache warmup metrics
+  PAGE_CACHE_WARMUP_REQUESTS("pageCacheWarmupRequests", true),
+  PAGE_CACHE_WARMUP_REQUEST_ERRORS("pageCacheWarmupRequestErrors", true),
   // Upsert compact merge task metrics
   UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
   // Query workload propagation metrics
@@ -117,11 +118,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

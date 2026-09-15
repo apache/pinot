@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
- */
+/// An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
 public class HardLimitExecutor extends DecoratorExecutorService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HardLimitExecutor.class);
@@ -50,11 +48,9 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     this(max, executorService, QueryThreadExceedStrategy.ERROR);
   }
 
-  /**
-   * Returns the hard limit of the number of threads that can be used by the multi-stage executor.
-   * @param serverConf Pinot configuration
-   * @return hard limit of the number of threads that can be used by the multi-stage executor (no hard limit if <= 0)
-   */
+  /// Returns the hard limit of the number of threads that can be used by the multi-stage executor.
+  /// @param serverConf Pinot configuration
+  /// @return hard limit of the number of threads that can be used by the multi-stage executor (no hard limit if <= 0)
   public static int getMultiStageExecutorHardLimit(PinotConfiguration serverConf) {
     try {
       int fixedLimit = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,

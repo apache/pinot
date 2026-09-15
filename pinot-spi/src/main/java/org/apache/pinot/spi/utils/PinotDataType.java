@@ -34,38 +34,35 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- *  The <code>PinotDataType</code> enum represents the data type of a value in a row from recordReader and provides
- *  utility methods to convert value across types if applicable.
- *  <p>We don't use <code>PinotDataType</code> to maintain type information, but use it to help organize the data and
- *  use {@link DataType} to maintain type information separately across various readers.
- *  <p>NOTE:
- *  <ul>
- *    <li>We will silently lose information if a conversion causes us to do so (e.g. DOUBLE to INT)</li>
- *    <li>We will throw exception if a conversion is not possible (e.g. BOOLEAN to INT).</li>
- *    <li>We will throw exception if the conversion throws exception (e.g. "foo" -> INT)</li>
- *  </ul>
- */
+///  The `PinotDataType` enum represents the data type of a value in a row from recordReader and provides
+///  utility methods to convert value across types if applicable.
+///
+/// We don't use `PinotDataType` to maintain type information, but use it to help organize the data and
+///  use [DataType] to maintain type information separately across various readers.
+///
+/// NOTE:
+///
+/// - We will silently lose information if a conversion causes us to do so (e.g. DOUBLE to INT)
+/// - We will throw exception if a conversion is not possible (e.g. BOOLEAN to INT).
+/// - We will throw exception if the conversion throws exception (e.g. "foo" -> INT)
 public enum PinotDataType {
 
-  /**
-   * When converting from BOOLEAN to other types:
-   * - Numeric types:
-   *   - true -> 1
-   *   - false -> 0
-   * - String:
-   *   - true -> "true"
-   *   - false -> "false"
-   *
-   * When converting to BOOLEAN from other types:
-   * - Numeric types:
-   *   - 0 -> false
-   *   - Others -> true
-   * - String:
-   *   - "true" (case-insensitive) -> true
-   *   - "1" -> true (for backward-compatibility where we used to use integer 1 to represent true)
-   *   - Others ->  false
-   */
+  /// When converting from BOOLEAN to other types:
+  /// - Numeric types:
+  ///   - true -> 1
+  ///   - false -> 0
+  /// - String:
+  ///   - true -> "true"
+  ///   - false -> "false"
+  ///
+  /// When converting to BOOLEAN from other types:
+  /// - Numeric types:
+  ///   - 0 -> false
+  ///   - Others -> true
+  /// - String:
+  ///   - "true" (case-insensitive) -> true
+  ///   - "1" -> true (for backward-compatibility where we used to use integer 1 to represent true)
+  ///   - Others ->  false
   BOOLEAN {
     @Override
     public int toInt(Object value) {
@@ -576,17 +573,15 @@ public enum PinotDataType {
     }
   },
 
-  /**
-   * When converting from TIMESTAMP to other types:
-   * - LONG/DOUBLE: millis since epoch value
-   * - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
-   *
-   * When converting to TIMESTAMP from other types:
-   * - LONG/DOUBLE: read long value as millis since epoch
-   * - String:
-   *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
-   *   - Millis since epoch value (e.g. "1609491661001")
-   */
+  /// When converting from TIMESTAMP to other types:
+  /// - LONG/DOUBLE: millis since epoch value
+  /// - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+  ///
+  /// When converting to TIMESTAMP from other types:
+  /// - LONG/DOUBLE: read long value as millis since epoch
+  /// - String:
+  ///   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+  ///   - Millis since epoch value (e.g. "1609491661001")
   TIMESTAMP {
     @Override
     public int toInt(Object value) {
@@ -1033,7 +1028,6 @@ public enum PinotDataType {
   /// When converting to UUID from other types:
   /// - String / JSON: parsed via [UUID#fromString]
   /// - BYTES (length 16): decoded big-endian
-  ///
   UUID {
     @Override
     public int toInt(Object value) {
@@ -1408,10 +1402,8 @@ public enum PinotDataType {
 
   OBJECT_ARRAY;
 
-  /**
-   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
-   * toBytes() for single-value types.
-   */
+  /// NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
+  /// toBytes() for single-value types.
 
   public int toInt(Object value) {
     return getSingleValueType().toInt(toObjectArray(value)[0]);
@@ -2026,10 +2018,8 @@ public enum PinotDataType {
     return getSingleValueType(val).toDouble(val);
   }
 
-  /**
-   * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
-   * type for multi-valued types.
-   */
+  /// Returns the [PinotDataType] for the given [FieldSpec] for data ingestion purpose. Returns object array
+  /// type for multi-valued types.
   public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
     switch (dataType) {

@@ -48,25 +48,23 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * The <code>ForwardIndexHandlerReloadQueriesTest</code> class sets up the index segment for the
- * no forward index multi-value queries test with reload.
- * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, HasDictionary, RangeIndex
- *   <li>column1, METRIC, INT, 51594, F, F, F, F, F</li>
- *   <li>column2, METRIC, INT, 42242, F, F, F, F, F</li>
- *   <li>column3, DIMENSION, STRING, 5, F, F, F, F, F</li>
- *   <li>column5, DIMENSION, STRING, 9, F, F, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 18499, F, F, T, T, F</li>
- *   <li>column7, DIMENSION, INT, 359, F, F, T, F, F</li>
- *   <li>column8, DIMENSION, INT, 850, F, T, F, T, F</li>
- *   <li>column9, METRIC, INT, 146, F, T, F, T, T</li>
- *   <li>column10, METRIC, INT, 3960, F, F, F, F, T</li>
- *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F, T, F</li>
- * </ul>
- */
+/// The `ForwardIndexHandlerReloadQueriesTest` class sets up the index segment for the
+/// no forward index multi-value queries test with reload.
+///
+/// There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, HasDictionary, RangeIndex
+/// - column1, METRIC, INT, 51594, F, F, F, F, F
+/// - column2, METRIC, INT, 42242, F, F, F, F, F
+/// - column3, DIMENSION, STRING, 5, F, F, F, F, F
+/// - column5, DIMENSION, STRING, 9, F, F, F, F, F
+/// - column6, DIMENSION, INT, 18499, F, F, T, T, F
+/// - column7, DIMENSION, INT, 359, F, F, T, F, F
+/// - column8, DIMENSION, INT, 850, F, T, F, T, F
+/// - column9, METRIC, INT, 146, F, T, F, T, T
+/// - column10, METRIC, INT, 3960, F, F, F, F, T
+/// - daysSinceEpoch, TIME, INT, 1, T, F, F, T, F
 public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), ForwardIndexHandlerReloadQueriesTest.class.getSimpleName());
@@ -714,17 +712,15 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(((Number) rawRows.get(0)[0]).longValue(), baselineCount);
   }
 
-  /**
-   * As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
-   *
-   * column1 -> change compression (SNAPPY -> ZSTANDARD).
-   * column6 -> disable dictionary.
-   * column9 -> disable dictionary. Add range index.
-   * column3 -> enable dictionary.
-   * column2 -> enable dictionary. Add inverted index.
-   * column7 -> enable dictionary. Add inverted index.
-   * column10 -> enable dictionary. Add range index.
-   */
+  /// As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
+  ///
+  /// column1 -> change compression (SNAPPY -> ZSTANDARD).
+  /// column6 -> disable dictionary.
+  /// column9 -> disable dictionary. Add range index.
+  /// column3 -> enable dictionary.
+  /// column2 -> enable dictionary. Add inverted index.
+  /// column7 -> enable dictionary. Add inverted index.
+  /// column10 -> enable dictionary. Add range index.
   private void changePropertiesAndReloadSegment()
       throws Exception {
     List<String> noDictionaryColumns = List.of("column1", "column5", "column6", "column9");

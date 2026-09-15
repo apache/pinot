@@ -41,17 +41,14 @@ import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
-/**
- * Class that represents various configs for a pinot component:
- * <ul>
- *   <li>System Configs</li>
- *   <li>JVM Configs</li>
- *   <li>Runtime Configs</li>
- *   <li>PinotConfiguration</li>
- * </ul>
- *
- * This class is JSON serializable and de-serializable.
- */
+/// Class that represents various configs for a pinot component:
+///
+/// - System Configs
+/// - JVM Configs
+/// - Runtime Configs
+/// - PinotConfiguration
+///
+/// This class is JSON serializable and de-serializable.
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonPropertyOrder({"systemConfig", "runtimeConfig", "pinotConfig", "jvmConfig"})
 public class PinotAppConfigs {

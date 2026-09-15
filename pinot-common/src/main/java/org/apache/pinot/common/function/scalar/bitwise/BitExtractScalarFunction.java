@@ -26,11 +26,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic bit extraction scalar function.
- *
- * <p>This implementation is stateless and thread-safe.
- */
+/// Polymorphic bit extraction scalar function.
+///
+/// This implementation is stateless and thread-safe.
 @ScalarFunction(names = {"bitExtract", "extractBit"})
 public class BitExtractScalarFunction implements PinotScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;

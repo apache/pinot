@@ -23,27 +23,21 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
 
 
-/**
- * Listener interface for workload-related changes that may require propagation.
- * Implementations can react to instance partition updates, broker resource changes, etc.
- *
- * <p>This interface allows components in pinot-common to notify the controller about
- * changes without creating circular dependencies.</p>
- */
+/// Listener interface for workload-related changes that may require propagation.
+/// Implementations can react to instance partition updates, broker resource changes, etc.
+///
+/// This interface allows components in pinot-common to notify the controller about
+/// changes without creating circular dependencies.
 public interface WorkloadChangeListener {
 
-  /**
-   * Called when instance partitions are persisted/updated.
-   *
-   * @param instancePartitions The instance partitions that changed
-   */
+  /// Called when instance partitions are persisted/updated.
+  ///
+  /// @param instancePartitions The instance partitions that changed
   void onInstancePartitionsChanged(InstancePartitions instancePartitions);
 
-  /**
-   * Called when broker resource (ideal state) is updated.
-   *
-   * @param tablesAdded Tables added to the broker resource
-   * @param tablesRemoved Tables removed from the broker resource
-   */
+  /// Called when broker resource (ideal state) is updated.
+  ///
+  /// @param tablesAdded Tables added to the broker resource
+  /// @param tablesRemoved Tables removed from the broker resource
   void onBrokerResourceChanged(@Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved);
 }

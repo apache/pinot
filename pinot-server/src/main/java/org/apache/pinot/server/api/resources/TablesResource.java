@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Utf8;
@@ -42,10 +43,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
@@ -109,7 +113,9 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.ServerDataAccess;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -154,6 +160,8 @@ public class TablesResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
+
+  private final Set<String> _tablesWithWarmupInProgress = ConcurrentHashMap.newKeySet();
 
   @GET
   @Path("/tables")
@@ -562,6 +570,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @ServerDataAccess
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
@@ -618,6 +627,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ServerDataAccess
   @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
       "Download validDocIds for " + "an immutable segment in bitmap format.")
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
@@ -670,87 +680,6 @@ public class TablesResource {
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
-  }
-
-  /**
-   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
-   * peer to avoid recompute when reload segments.
-   */
-  @Deprecated
-  @GET
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
-  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
-      + "an immutable segment in bitmap format.")
-  public Response downloadValidDocIds(
-      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") @Nullable String validDocIdsType,
-      @Context HttpHeaders httpHeaders) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
-    segmentName = URIUtils.decode(segmentName);
-    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
-    // Validate data access
-    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
-
-    TableDataManager tableDataManager =
-        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-    if (segmentDataManager == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
-    try {
-      IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
-      }
-
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
-          getValidDocIds(indexSegment, validDocIdsType);
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
-      if (validDocIdSnapshot == null) {
-        String msg = String.format(
-            "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
-        LOGGER.warn(msg);
-        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
-      }
-
-      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
-      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
-      return builder.build();
-    } finally {
-      tableDataManager.releaseSegment(segmentDataManager);
-    }
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tables/{tableNameWithType}/validDocIdMetadata")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
-  })
-  public String getValidDocIdsMetadata(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   @POST
@@ -905,21 +834,19 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
-   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
-   * when segment store copy is unavailable for committed low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableName table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
+  /// Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
+  /// when segment store copy is unavailable for committed low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded
+  /// @throws Exception if an error occurred during the segment upload.
   @Deprecated
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
@@ -978,21 +905,19 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Upload a low level consumer segment to segment store and return the segment download url, crc and
-   * other segment metadata. This endpoint is used when segment store copy is unavailable for committed
-   * low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableNameWithType table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Upload a low level consumer segment to segment store and return the segment download url, crc and
+  /// other segment metadata. This endpoint is used when segment store copy is unavailable for committed
+  /// low level consumer segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+  /// to upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableNameWithType table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
+  /// @throws Exception if an error occurred during the segment upload.
   @Deprecated
   @POST
   @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
@@ -1057,20 +982,18 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
-   * This endpoint is used when segment store copy is unavailable for real-time committed segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
-   * upload it.
-   *
-   * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableName table name with type.
-   * @param segmentName name of the segment to be uploaded
-   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
-   *                  would be used.
-   * @return segment ZK metadata in json format.
-   * @throws Exception if an error occurred during the segment upload.
-   */
+  /// Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
+  /// This endpoint is used when segment store copy is unavailable for real-time committed segments.
+  /// Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
+  /// upload it.
+  ///
+  /// @see <a href="https://tinyurl.com/f63ru4sb></a>
+  /// @param realtimeTableName table name with type.
+  /// @param segmentName name of the segment to be uploaded
+  /// @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+  ///                  would be used.
+  /// @return segment ZK metadata in json format.
+  /// @throws Exception if an error occurred during the segment upload.
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/uploadCommittedSegment")
   @Produces(MediaType.APPLICATION_JSON)
@@ -1142,9 +1065,7 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-   */
+  /// Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
   private File createSegmentTarFile(TableDataManager tableDataManager, String segmentName)
       throws IOException {
     File segmentTarUploadDir =
@@ -1159,9 +1080,7 @@ public class TablesResource {
     return segmentTarFile;
   }
 
-  /**
-   * Uploads a segment tar file to the segment store and returns the segment download url.
-   */
+  /// Uploads a segment tar file to the segment store and returns the segment download url.
   private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName, int timeoutMs) {
     SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
     URI segmentDownloadUrl;
@@ -1386,6 +1305,76 @@ public class TablesResource {
       }
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /// Initiates an on‑demand page‑cache warm‑up for the given table.
+  ///
+  /// <p><b>Request body</b> — JSON object containing:</p>
+  /// <pre>{@code
+  /// {
+  ///   "queries":  ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"],
+  ///   "segments": ["myTable_0_99_OFFLINE", "myTable_100_199_OFFLINE"]
+  /// }
+  /// }</pre>
+  ///
+  /// <ul>
+  ///   <li><code>queries</code> – List of queries execute. Each is prefixed with
+  ///       <code>SET isSecondaryWorkload=true;</code> on the server so it runs on the secondary
+  ///       workload queue, if that is configured</li>
+  ///   <li><code>segments</code> – List of segment names to warm up. An empty list means all segments.</li>
+  /// </ul>
+  ///
+  /// <h4>Concurrency</h4>
+  /// Only <em>one</em> warm‑up per table can run at a time. If another warm‑up is already in progress,
+  /// the endpoint returns <strong>409 CONFLICT</strong>.
+  ///
+  /// @param tableNameWithType Fully‑qualified table name (e.g. {@code myTable_OFFLINE})
+  /// @param requestString     Raw JSON payload described above
+  /// @return {@link Response} – 200 OK on success; 400 BAD REQUEST for malformed payload; 409 CONFLICT if
+  ///         a warm‑up is already running; 500 INTERNAL_SERVER_ERROR for unexpected failures.
+  @POST
+  @Path("/tables/{tableNameWithType}/triggerWarmup")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Trigger page cache warmup",
+      notes = "Initiates page cache warmup process for provided table and segments by executing the provided queries.")
+  public Response triggerPageCacheWarmup(
+      @ApiParam(required = true) @PathParam("tableNameWithType") String tableNameWithType, String requestString
+  ) {
+    LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
+    // Atomically claim the table to prevent concurrent warmup requests; add() returns false if already claimed.
+    if (!_tablesWithWarmupInProgress.add(tableNameWithType)) {
+      String message = String.format("Page cache warmup is already in progress for table: %s. ", tableNameWithType);
+      LOGGER.warn(message);
+      return Response.status(Response.Status.CONFLICT).entity(message).build();
+    }
+    try {
+      PageCacheWarmupRequest warmupRequest = JsonUtils.stringToObject(requestString, PageCacheWarmupRequest.class);
+      // Validate the parsed request
+      if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
+        throw new BadRequestException("Queries cannot be null or empty.");
+      } else if (warmupRequest.getSegments() == null || warmupRequest.getSegments().isEmpty()) {
+        throw new BadRequestException("Segments cannot be null or empty.");
+      }
+      // Trigger the warmup
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRefresh(tableNameWithType,
+          warmupRequest.getQueries(), warmupRequest.getSegments());
+      String responseString = String.format("Successfully triggered page cache warmup for table: %s",
+          tableNameWithType);
+      LOGGER.info(responseString);
+      return Response.ok(responseString).build();
+    } catch (BadRequestException | JsonProcessingException e) {
+      String errorMessage = String.format("Invalid request: %s, error: %s", requestString, e.getMessage());
+      LOGGER.error(errorMessage, e);
+      return Response.status(Response.Status.BAD_REQUEST).entity(errorMessage).build();
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to trigger page cache error on refresh: %s", e);
+      LOGGER.error(errorMessage, e);
+      return Response.serverError().entity(errorMessage).build();
+    } finally {
+      // Only the request that claimed the table clears the flag.
+      _tablesWithWarmupInProgress.remove(tableNameWithType);
     }
   }
 }

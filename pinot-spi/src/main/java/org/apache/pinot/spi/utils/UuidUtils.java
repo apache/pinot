@@ -28,6 +28,8 @@ import java.util.concurrent.ThreadLocalRandom;
 /// fixed-width 16-byte values. Methods here are invoked on a per-value basis on hot paths, so callers must not pass
 /// `null` values (there are no defensive null checks).
 public class UuidUtils {
+  private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+
   private UuidUtils() {
   }
 
@@ -142,7 +144,19 @@ public class UuidUtils {
   }
 
   public static String toString(byte[] uuidBytes) {
-    return toUUID(uuidBytes).toString();
+    validateLength(uuidBytes);
+    char[] chars = new char[36];
+    int byteIndex = 0;
+    int charIndex = 0;
+    while (byteIndex < UUID_NUM_BYTES) {
+      if (byteIndex == 4 || byteIndex == 6 || byteIndex == 8 || byteIndex == 10) {
+        chars[charIndex++] = '-';
+      }
+      int value = uuidBytes[byteIndex++] & 0xFF;
+      chars[charIndex++] = HEX_DIGITS[value >>> 4];
+      chars[charIndex++] = HEX_DIGITS[value & 0x0F];
+    }
+    return new String(chars);
   }
 
   public static String toString(ByteArray uuidBytes) {

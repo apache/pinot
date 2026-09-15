@@ -25,9 +25,7 @@ import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * The record transformer which takes {@link GenericRow}s and transform them based on some custom rules.
- */
+/// The record transformer which takes [GenericRow]s and transform them based on some custom rules.
 public interface RecordTransformer extends Serializable {
 
   /// Returns `true` if the transformer is no-op (can be skipped), `false` otherwise.
@@ -41,13 +39,11 @@ public interface RecordTransformer extends Serializable {
     return List.of();
   }
 
-  /**
-   * Provides a hint to the transformer about which columns are required as input across all downstream transformers
-   * in the TransformPipeline. This can be used for optimization or to ensure necessary fields are available.
-   *
-   * @param inputColumns Set of column names that are required by all downstream transformers as their input columns.
-   *                     This set is mutable, implementations should make a copy if they need to preserve the set.
-   */
+  /// Provides a hint to the transformer about which columns are required as input across all downstream transformers
+  /// in the TransformPipeline. This can be used for optimization or to ensure necessary fields are available.
+  ///
+  /// @param inputColumns Set of column names that are required by all downstream transformers as their input columns.
+  ///                     This set is mutable, implementations should make a copy if they need to preserve the set.
   default void withInputColumnsForDownstreamTransformers(Set<String> inputColumns) {
   }
 

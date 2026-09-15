@@ -174,9 +174,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for controller startables
- */
+/// Base class for controller startables
 public abstract class BaseControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseControllerStarter.class);
 
@@ -400,15 +398,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _utilizationCheckers.add(utilizationChecker);
   }
 
-  /**
-   * Creates an instance of PinotHelixResourceManager.
-   * <p>
-   * This method can be overridden by subclasses to instantiate the object
-   * with subclasses of PinotHelixResourceManager.
-   * By default, it returns a new PinotHelixResourceManager using the current configuration.
-   *
-   * @return A new instance of PinotHelixResourceManager.
-   */
+  /// Creates an instance of PinotHelixResourceManager.
+  ///
+  /// This method can be overridden by subclasses to instantiate the object
+  /// with subclasses of PinotHelixResourceManager.
+  /// By default, it returns a new PinotHelixResourceManager using the current configuration.
+  ///
+  /// @return A new instance of PinotHelixResourceManager.
   protected PinotHelixResourceManager createHelixResourceManager() {
     return new PinotHelixResourceManager(_config);
   }
@@ -417,9 +413,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _helixResourceManager;
   }
 
-  /**
-   * Gets the Helix Manager connected as Helix controller.
-   */
+  /// Gets the Helix Manager connected as Helix controller.
   public HelixManager getHelixControllerManager() {
     return _helixControllerManager;
   }
@@ -832,10 +826,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
   }
 
-  /**
-   * Scan all table resources in the cluster and ensure table config and schema exist for each table.
-   * TODO: Cleanup orphan table config and schema
-   */
+  /// Scan all table resources in the cluster and ensure table config and schema exist for each table.
+  /// TODO: Cleanup orphan table config and schema
   private void enforceTableConfigAndSchema() {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     List<String> tablesWithoutTableConfig = new ArrayList<>();
@@ -908,9 +900,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     };
   }
 
-  /**
-   * Service status callback that waits for the resource utilization checker to fetch servers' resource information.
-   */
+  /// Service status callback that waits for the resource utilization checker to fetch servers' resource information.
   private ServiceStatus.ServiceStatusCallback generateResourceUtilizationCheckerStatusCallback() {
     return new ServiceStatus.ServiceStatusCallback() {
       private volatile String _statusDescription =
@@ -982,9 +972,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * Registers, connects to Helix cluster as PARTICIPANT role, and adds listeners.
-   */
+  /// Registers, connects to Helix cluster as PARTICIPANT role, and adds listeners.
   private void registerAndConnectAsHelixParticipant() {
     // Registers customized Master-Slave state model to state machine engine, which is for calculating participant
     // assignment in lead controller resource.
@@ -1131,20 +1119,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(_realtimeOffsetAutoResetManager);
   }
 
-  /**
-   * Factory hook for the controller's {@link RetentionManager}. Subclasses override to install a
-   * deployment-specific retention manager (e.g. to extend the untracked-segment sweep with names
-   * tracked outside the standard per-segment ZK znodes). The default constructs the stock
-   * {@link RetentionManager}.
-   */
+  /// Factory hook for the controller's [RetentionManager]. Subclasses override to install a
+  /// deployment-specific retention manager (e.g. to extend the untracked-segment sweep with names
+  /// tracked outside the standard per-segment ZK znodes). The default constructs the stock
+  /// [RetentionManager].
   protected RetentionManager createRetentionManager(BrokerServiceHelper brokerServiceHelper) {
     return new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         brokerServiceHelper);
   }
 
-  /**
-   * Creates a TaskManager instance  as specified in the configuration.
-   */
+  /// Creates a TaskManager instance  as specified in the configuration.
   protected PinotTaskManager createTaskManager() {
     String taskManagerClass = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TASK_MANAGER_CLASS,
         CommonConstants.Controller.DEFAULT_TASK_MANAGER_CLASS);
@@ -1207,6 +1191,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Stopping controller periodic tasks");
       _periodicTaskScheduler.stop();
 
+      // Also has to be done before stopping HelixResourceManager: the task manager runs its cron jobs on a
+      // scheduler of its own, which is separate from the periodic task scheduler stopped above.
+      LOGGER.info("Stopping task scheduler");
+      _taskManager.stopScheduler();
+
       LOGGER.info("Stopping lead controller manager");
       _leadControllerManager.stop();
 
@@ -1257,10 +1246,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return new ControllerAdminApiApplication(_config);
   }
 
-  /**
-   * Return the PeriodicTaskScheduler instance so that the periodic tasks can be tested.
-   * @return PeriodicTaskScheduler.
-   */
+  /// Return the PeriodicTaskScheduler instance so that the periodic tasks can be tested.
+  /// @return PeriodicTaskScheduler.
   @VisibleForTesting
   public PeriodicTaskScheduler getPeriodicTaskScheduler() {
     return _periodicTaskScheduler;

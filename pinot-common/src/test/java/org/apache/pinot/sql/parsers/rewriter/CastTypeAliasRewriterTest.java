@@ -32,9 +32,7 @@ public class CastTypeAliasRewriterTest {
 
   private final CastTypeAliasRewriter _rewriter = new CastTypeAliasRewriter();
 
-  /**
-   * Calcite / SQL standard uses BIGINT; rewriter maps it to Pinot LONG for server compatibility.
-   */
+  /// Calcite / SQL standard uses BIGINT; rewriter maps it to Pinot LONG for server compatibility.
   @Test
   public void testTopLevelCastBigintRewritesToLong() {
     Expression cast = RequestUtils.getFunctionExpression("cast",
@@ -49,9 +47,7 @@ public class CastTypeAliasRewriterTest {
         "LONG");
   }
 
-  /**
-   * Type literal matching is case-insensitive (switch uses {@code toUpperCase()}).
-   */
+  /// Type literal matching is case-insensitive (switch uses `toUpperCase()`).
   @Test
   public void testBigintTypeLiteralCaseInsensitiveRewritesToLong() {
     Expression cast = RequestUtils.getFunctionExpression("cast",
@@ -66,9 +62,7 @@ public class CastTypeAliasRewriterTest {
         "LONG");
   }
 
-  /**
-   * Compiled SQL with explicit {@code AS BIGINT} must rewrite the cast target to LONG.
-   */
+  /// Compiled SQL with explicit `AS BIGINT` must rewrite the cast target to LONG.
   @Test
   public void testCompiledSimpleCastAsBigintRewritesToLong() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
@@ -79,9 +73,7 @@ public class CastTypeAliasRewriterTest {
         "LONG");
   }
 
-  /**
-   * Nested {@code CAST(CAST(x AS BIGINT) AS BIGINT)} — both CAST type operands must become LONG.
-   */
+  /// Nested `CAST(CAST(x AS BIGINT) AS BIGINT)` — both CAST type operands must become LONG.
   @Test
   public void testCompiledNestedBothBigintRewritesBothToLong() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
@@ -93,10 +85,8 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(inner.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * Nested CAST(... AS DOUBLE) around CAST(col AS BIGINT) must rewrite the inner BIGINT alias so
-   * older servers receive LONG (see CastTypeAliasRewriter).
-   */
+  /// Nested CAST(... AS DOUBLE) around CAST(col AS BIGINT) must rewrite the inner BIGINT alias so
+  /// older servers receive LONG (see CastTypeAliasRewriter).
   @Test
   public void testNestedCastRewritesInnerBigintToLong() {
     Expression innerCast = RequestUtils.getFunctionExpression("cast",
@@ -113,9 +103,7 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(inner.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * Deeply nested CASTs must all be visited (e.g. outer LONG, middle VARCHAR, inner BIGINT).
-   */
+  /// Deeply nested CASTs must all be visited (e.g. outer LONG, middle VARCHAR, inner BIGINT).
   @Test
   public void testTripleNestedCastRewritesAllAliases() {
     Expression innerCast = RequestUtils.getFunctionExpression("cast",
@@ -140,10 +128,8 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(in.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * CAST around divide(CAST(... AS BIGINT), literal) — inner CAST is not a direct sibling in the tree;
-   * it must still be rewritten when reached from the outer CAST's first operand.
-   */
+  /// CAST around divide(CAST(... AS BIGINT), literal) — inner CAST is not a direct sibling in the tree;
+  /// it must still be rewritten when reached from the outer CAST's first operand.
   @Test
   public void testCastOverDivideRewritesInnerBigint() {
     Expression innerCast = RequestUtils.getFunctionExpression("cast",
@@ -163,9 +149,7 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(innerAfter.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * End-to-end: SQL that Calcite compiles to nested CASTs must rewrite inner BIGINT when present.
-   */
+  /// End-to-end: SQL that Calcite compiles to nested CASTs must rewrite inner BIGINT when present.
   @Test
   public void testCompiledNestedLongInsideDoubleCast() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
@@ -176,9 +160,7 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(inner.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * Nested CAST in WHERE must rewrite inner BIGINT — rewriter walks filterExpression the same as select list.
-   */
+  /// Nested CAST in WHERE must rewrite inner BIGINT — rewriter walks filterExpression the same as select list.
   @Test
   public void testCompiledNestedLongInsideDoubleCastInWhere() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
@@ -191,9 +173,7 @@ public class CastTypeAliasRewriterTest {
     Assert.assertEquals(inner.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
   }
 
-  /**
-   * Nested CAST in GROUP BY must rewrite inner BIGINT.
-   */
+  /// Nested CAST in GROUP BY must rewrite inner BIGINT.
   @Test
   public void testCompiledNestedLongInsideDoubleCastInGroupBy() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(

@@ -26,11 +26,10 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
 
-/**
- * Function that measures the distance between the two geo-spatial objects. For geometry type, returns the 2-dimensional
- * cartesian minimum distance (based on spatial ref) between two geometries in projected units. For geography, returns
- * the great-circle distance in meters between two SphericalGeography points. Note that g1, g2 shall have the same type.
- */
+/// Function that measures the distance between the two geo-spatial objects. For geometry type, returns the
+/// 2-dimensional cartesian minimum distance (based on spatial ref) between two geometries in projected units. For
+/// geography, returns the great-circle distance in meters between two SphericalGeography points. Note that g1, g2 shall
+/// have the same type.
 public class StDistanceFunction extends BaseBinaryGeoTransformFunction {
   private static final float MIN_LATITUDE = -90;
   private static final float MAX_LATITUDE = 90;
@@ -84,12 +83,10 @@ public class StDistanceFunction extends BaseBinaryGeoTransformFunction {
     return greatCircleDistance(leftPoint.getX(), leftPoint.getY(), rightPoint.getX(), rightPoint.getY());
   }
 
-  /**
-   * Calculate the distance between two points on Earth.
-   * <p>
-   * This assumes a spherical Earth, and uses the Vincenty formula. (https://en.wikipedia
-   * .org/wiki/Great-circle_distance)
-   */
+  /// Calculate the distance between two points on Earth.
+  ///
+  /// This assumes a spherical Earth, and uses the Vincenty formula. (https://en.wikipedia
+  /// .org/wiki/Great-circle_distance)
   private static double greatCircleDistance(double longitude1, double latitude1, double longitude2, double latitude2) {
     checkLatitude(latitude1);
     checkLongitude(longitude1);

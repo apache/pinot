@@ -57,6 +57,36 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
+  /// Unlike [#getQueryableDocIdsSnapshotFromSegment], never falls back to preferring queryable docs.
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getValidDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  /// Shared by `ImmutableSegmentImpl`/`MutableSegmentImpl`'s `hasNoValidDocs()`. Mirrors
+  /// `hasNoQueryableDocs()`'s consistency-mode-aware/live-fallback split, against the valid-docs cache instead.
+  public static boolean hasNoValidDocs(@Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      IndexSegment segment) {
+    if (partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap validDocIdsSnapshot = viewManager.getValidDocIdsSnapshot(segment);
+      return validDocIdsSnapshot != null && validDocIdsSnapshot.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
+  }
+
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
     validDocIds.replace(oldDocId, newDocId);
@@ -86,9 +116,7 @@ public class UpsertUtils {
     }
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for all the documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for all the documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader, int numDocs) {
     return new Iterator<RecordInfo>() {
       private int _docId = 0;
@@ -105,9 +133,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for the valid documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<RecordInfo>() {
@@ -125,9 +151,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for the valid documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
@@ -144,9 +168,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for all the documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
@@ -183,9 +205,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of docId and {@link PrimaryKey} for all the documents from the segment.
-   */
+  /// Returns an iterator of docId and [PrimaryKey] for all the documents from the segment.
   public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
@@ -217,21 +237,6 @@ public class UpsertUtils {
       } else {
         _comparisonColumnReader = new MultiComparisonColumnReader(segment, comparisonColumns);
       }
-      if (deleteRecordColumn != null) {
-        _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
-      } else {
-        _deleteRecordColumnReader = null;
-      }
-    }
-
-    /**
-     * Constructor that uses a constant comparison value for all records.
-     * Used when no comparison columns are configured and segment creation time is used as the comparison value.
-     */
-    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns,
-        Comparable constantComparisonValue, @Nullable String deleteRecordColumn) {
-      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new ConstantComparisonColumnReader(constantComparisonValue);
       if (deleteRecordColumn != null) {
         _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
       } else {
@@ -318,27 +323,6 @@ public class UpsertUtils {
       for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders) {
         comparisonColumnReader.close();
       }
-    }
-  }
-
-  /**
-   * A comparison column reader that returns a constant value for all records.
-   * Used when no comparison columns are configured and segment creation time is used as the comparison value.
-   */
-  public static class ConstantComparisonColumnReader implements ComparisonColumnReader {
-    private final Comparable _constantValue;
-
-    public ConstantComparisonColumnReader(Comparable constantValue) {
-      _constantValue = constantValue;
-    }
-
-    @Override
-    public Comparable getComparisonValue(int docId) {
-      return _constantValue;
-    }
-
-    @Override
-    public void close() {
     }
   }
 }

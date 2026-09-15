@@ -49,7 +49,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
-import org.apache.pinot.queries.StatisticalQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -304,10 +303,9 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     return List.of(getIndexSegments());
   }
 
-  /**
-   * Run query on single index segment.
-   * <p>Use this to test a single operator.
-   */
+  /// Run query on single index segment.
+  ///
+  /// Use this to test a single operator.
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected <T extends Operator> T getOperator(@Language("sql") String query) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
@@ -316,82 +314,81 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     return (T) PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(getIndexSegment()), queryContext).run();
   }
 
-  /**
-   * Run query with hard-coded filter on single index segment.
-   * <p>Use this to test a single operator.
-   */
+  /// Run query with hard-coded filter on single index segment.
+  ///
+  /// Use this to test a single operator.
   @SuppressWarnings("rawtypes")
   protected <T extends Operator> T getOperatorWithFilter(@Language("sql") String query) {
     return getOperator(query + getFilter());
   }
 
-  /**
-   * Run query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   protected BrokerResponseNative getBrokerResponse(@Language("sql") String query) {
     return getBrokerResponse(query, PLAN_MAKER);
   }
 
-  /**
-   * Run query with hard-coded filter on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query with hard-coded filter on multiple index segments.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   protected BrokerResponseNative getBrokerResponseWithFilter(@Language("sql") String query) {
     return getBrokerResponse(query + getFilter());
   }
 
-  /**
-   * Run query on multiple index segments with custom plan maker.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments with custom plan maker.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   protected BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker) {
     return getBrokerResponse(query, planMaker, null);
   }
 
-  /**
-   * Run query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   protected BrokerResponseNative getBrokerResponse(
       @Language("sql") String query, @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
   }
 
-  /**
-   * Run query on multiple index segments with custom plan maker and queryOptions.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments with custom plan maker and queryOptions.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   private BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
@@ -406,16 +403,16 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     return getBrokerResponse(pinotQuery, planMaker);
   }
 
-  /**
-   * Run query on multiple index segments with custom plan maker.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments with custom plan maker.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
@@ -477,16 +474,16 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     return brokerResponse;
   }
 
-  /**
-   * Run optimized query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments.
-   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
-   * different index segments in the test and overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run optimized query on multiple index segments.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+  /// should be equivalent to querying 4 identical index segments.
+  /// In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+  /// different index segments in the test and overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(@Language("sql") String query,
       @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
@@ -494,16 +491,16 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 
-  /**
-   * Run query on multiple index segments with custom plan maker.
-   * This test is particularly useful for testing statistical aggregation functions such as COVAR_POP, COVAR_SAMP, etc.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>The result will be equivalent to querying 2 distinct instances.
-   * The caller of this function should handle initializing 2 instances with different index segments in the test and
-   * overriding getDistinctInstances.
-   * This can be particularly useful to test statistical aggregation functions.
-   * @see StatisticalQueriesTest for an example use case.
-   */
+  /// Run query on multiple index segments with custom plan maker.
+  /// This test is particularly useful for testing statistical aggregation functions such as COVAR_POP, COVAR_SAMP, etc.
+  ///
+  /// Use this to test the whole flow from server to broker.
+  ///
+  /// The result will be equivalent to querying 2 distinct instances.
+  /// The caller of this function should handle initializing 2 instances with different index segments in the test and
+  /// overriding getDistinctInstances.
+  /// This can be particularly useful to test statistical aggregation functions.
+  /// @see org.apache.pinot.queries.StatisticalQueriesTest for an example use case.
   private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);

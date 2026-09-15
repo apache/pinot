@@ -35,9 +35,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
 
 
-/**
- * A helper class to convert TPC-H .tbl files to Avro format.
- */
+/// A helper class to convert TPC-H .tbl files to Avro format.
 public final class TblToAvro {
   private static final String LONG_TYPE = "long";
   private static final String DOUBLE_TYPE = "double";

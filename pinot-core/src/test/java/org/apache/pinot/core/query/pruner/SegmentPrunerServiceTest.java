@@ -149,10 +149,8 @@ public class SegmentPrunerServiceTest {
     Assert.assertEquals(actual, segments);
   }
 
-  /**
-   * When queryable doc ids exist, a segment with no queryable rows is pruned even if valid doc ids still hold
-   * replaced rows (matches normal upsert query semantics).
-   */
+  /// When queryable doc ids exist, a segment with no queryable rows is pruned even if valid doc ids still hold
+  /// replaced rows (matches normal upsert query semantics).
   @Test
   public void emptyQueryablePruned() {
     SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
@@ -187,6 +185,40 @@ public class SegmentPrunerServiceTest {
   }
 
   @Test
+  public void emptyQueryableRetainedWithSkipUpsertDelete() {
+    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
+    ThreadSafeMutableRoaringBitmap valid = new ThreadSafeMutableRoaringBitmap(0);
+    ThreadSafeMutableRoaringBitmap queryable = new ThreadSafeMutableRoaringBitmap();
+    IndexSegment segment = mockUpsertIndexSegment(10, valid, queryable);
+
+    List<IndexSegment> segments = new ArrayList<>();
+    segments.add(segment);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select col1 from t1 option(skipUpsertDelete=true)");
+
+    List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
+
+    Assert.assertEquals(actual, segments);
+  }
+
+  /// skipUpsertDelete checks valid-docs emptiness specifically, not skipUpsert's blanket bypass: a segment fully
+  /// superseded elsewhere (0 valid docs) is still pruned.
+  @Test
+  public void emptyValidPrunedWithSkipUpsertDelete() {
+    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
+    IndexSegment segment = mockUpsertIndexSegment(10, new ThreadSafeMutableRoaringBitmap(), null);
+
+    List<IndexSegment> segments = new ArrayList<>();
+    segments.add(segment);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("select col1 from t1 option(skipUpsertDelete=true)");
+
+    List<IndexSegment> actual = service.prune(segments, queryContext, new SegmentPrunerStatistics());
+
+    Assert.assertEquals(actual, List.of());
+  }
+
+  @Test
   public void nonEmptyQueryableNotPruned() {
     SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
     ThreadSafeMutableRoaringBitmap valid = new ThreadSafeMutableRoaringBitmap(0);
@@ -202,9 +234,7 @@ public class SegmentPrunerServiceTest {
     Assert.assertEquals(actual, indexes);
   }
 
-  /**
-   * Queryable bitmap takes precedence over valid when both are present.
-   */
+  /// Queryable bitmap takes precedence over valid when both are present.
   @Test
   public void nonEmptyQueryableOverridesEmptyValid() {
     SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);

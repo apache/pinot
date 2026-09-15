@@ -38,41 +38,33 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * Simple Catalog that only contains list of tables. Backed by {@link TableCache}.
- *
- * <p>Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
- * entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
- */
+/// Simple Catalog that only contains list of tables. Backed by [TableCache].
+///
+/// Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
+/// entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
 public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
   private final String _databaseName;
   private boolean _excludeVirtualColumns = false;
 
-  /**
-   * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
-   * table available for query and processes table/segment metadata updates when cluster status changes.
-   */
+  /// PinotCatalog needs have access to the actual [TableCache] object because TableCache hosts the actual
+  /// table available for query and processes table/segment metadata updates when cluster status changes.
   public PinotCatalog(TableCache tableCache, String databaseName) {
     _tableCache = tableCache;
     _databaseName = databaseName;
   }
 
-  /**
-   * Configures whether virtual columns should be excluded from table schemas.
-   * This is typically used for NATURAL JOIN operations where virtual columns
-   * should not participate in join condition matching.
-   */
+  /// Configures whether virtual columns should be excluded from table schemas.
+  /// This is typically used for NATURAL JOIN operations where virtual columns
+  /// should not participate in join condition matching.
   public void configureVirtualColumnExclusion(boolean excludeVirtualColumns) {
     _excludeVirtualColumns = excludeVirtualColumns;
   }
 
-  /**
-   * Acquire a table by its name.
-   * @param name name of the table.
-   * @return table object used by calcite planner.
-   */
+  /// Acquire a table by its name.
+  /// @param name name of the table.
+  /// @return table object used by calcite planner.
   @Nullable
   @Override
   public Table getTable(String name) {
@@ -95,10 +87,8 @@ public class PinotCatalog implements Schema {
     return new PinotTable(schema, _excludeVirtualColumns);
   }
 
-  /**
-   * acquire a set of available table names.
-   * @return the set of table names at the time of query planning.
-   */
+  /// acquire a set of available table names.
+  /// @return the set of table names at the time of query planning.
   @Override
   public Set<String> getTableNames() {
     return Stream.concat(_tableCache.getTableNameMap().keySet().stream(),

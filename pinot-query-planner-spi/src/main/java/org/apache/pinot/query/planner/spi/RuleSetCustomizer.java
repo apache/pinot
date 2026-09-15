@@ -35,7 +35,6 @@ import org.apache.calcite.plan.RelOptRule;
 /// before [org.apache.pinot.query.planner.rules.PinotRuleSet#defaultInstance()] is first called;
 /// the singleton is initialized once and not refreshed.
 ///
-///
 /// [org.apache.pinot.query.planner.rules.PinotRuleSet] invokes every discovered customizer once
 /// per [Phase] at broker startup. The customizer receives the mutable per-phase rule list
 /// and can append, remove, replace, or reorder rules using standard `List`

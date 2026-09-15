@@ -36,25 +36,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is the entry point of the Index SPI, containing all index types that can be used.
- *
- * A caller can get a specific index type by calling {@link #get(String)} with their id or list all indexes by invoking
- * {@link IndexService#getAllIndexes()}.
- *
- * In production, there should be a single instance of this class and that instance should be returned by
- * {@link #getInstance()}. By default, this instance will be created by calling {@link #fromServiceLoader()}, which
- * reads all ServiceLoader SPI services that implement {@link IndexPlugin}, adding all the {@link IndexType} that can be
- * found in that way. In case we need to change the default behavior, the static instance can be changed with
- * {@link #setInstance(IndexService)}.
- *
- * Thread safety: All methods in this class, including static ones, are thread safe.
- *
- * Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in their
- * constructor and use that instance instead of using the static {@link #getInstance()} method directly. This is
- * specially important when callers want to test the behavior when dealing with different index type sets.
- *
- */
+/// This is the entry point of the Index SPI, containing all index types that can be used.
+///
+/// A caller can get a specific index type by calling [#get(String)] with their id or list all indexes by invoking
+/// [IndexService#getAllIndexes()].
+///
+/// In production, there should be a single instance of this class and that instance should be returned by
+/// [#getInstance()]. By default, this instance will be created by calling [#fromServiceLoader()], which
+/// reads all ServiceLoader SPI services that implement [IndexPlugin], adding all the [IndexType] that can
+/// be found in that way. In case we need to change the default behavior, the static instance can be changed with
+/// [#setInstance(IndexService)].
+///
+/// Thread safety: All methods in this class, including static ones, are thread safe.
+///
+/// Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in
+/// their constructor and use that instance instead of using the static [#getInstance()] method directly. This is
+/// specially important when callers want to test the behavior when dealing with different index type sets.
 @ThreadSafe
 public class IndexService {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexService.class);
@@ -108,28 +105,22 @@ public class IndexService {
     }
   }
 
-  /**
-   * Get the static IndexService instance that Pinot should use.
-   */
+  /// Get the static IndexService instance that Pinot should use.
   public static IndexService getInstance() {
     return _instance;
   }
 
-  /**
-   * Sets the static IndexService.
-   *
-   * This is the instance that will be used by most of the code.
-   */
+  /// Sets the static IndexService.
+  ///
+  /// This is the instance that will be used by most of the code.
   public static void setInstance(IndexService other) {
     _instance = other;
   }
 
-  /**
-   * Creates an IndexService by looking for all {@link IndexPlugin} defined as services by {@link ServiceLoader}.
-   *
-   * This is the default way to create an IndexService. In case more tuning is needed,
-   * {@link IndexService#IndexService(Set)}} can be used.
-   */
+  /// Creates an IndexService by looking for all [IndexPlugin] defined as services by [ServiceLoader].
+  ///
+  /// This is the default way to create an IndexService. In case more tuning is needed,
+  /// [IndexService#IndexService(Set)]} can be used.
   public static IndexService fromServiceLoader() {
     Set<IndexPlugin<?>> pluginList = new HashSet<>();
     for (IndexPlugin indexPlugin : ServiceLoader.load(IndexPlugin.class)) {
@@ -138,46 +129,40 @@ public class IndexService {
     return new IndexService(pluginList);
   }
 
-  /**
-   * Returns a set with all the index types stored by this index service.
-   *
-   * @return an immutable list with all index types known by this instance.
-   */
+  /// Returns a set with all the index types stored by this index service.
+  ///
+  /// @return an immutable list with all index types known by this instance.
   public List<IndexType<?, ?, ?>> getAllIndexes() {
     return _allIndexes;
   }
 
-  /**
-   * Get the IndexType that is identified by the given index id.
-   *
-   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
-   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
-   * using index overriding.
-   *
-   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
-   * it is possible.
-   *
-   * @param indexId the index id, as defined in {@link IndexType#getId()}.
-   * @return An optional which will be empty in case there is no index identified by that id.
-   */
+  /// Get the IndexType that is identified by the given index id.
+  ///
+  /// All IndexType references must be obtained using the [IndexService] class (directly or indirectly). Even
+  /// if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+  /// using index overriding.
+  ///
+  /// In order to have a typesafe access to standard indexes, it is recommended to use [StandardIndexes] whenever
+  /// it is possible.
+  ///
+  /// @param indexId the index id, as defined in [IndexType#getId()].
+  /// @return An optional which will be empty in case there is no index identified by that id.
   public Optional<IndexType<?, ?, ?>> getOptional(String indexId) {
     return Optional.ofNullable(_allIndexesById.get(indexId.toLowerCase(Locale.US)));
   }
 
-  /**
-   * Get the IndexType that is identified by the given index id.
-   *
-   * All IndexType references must be obtained using the {@link IndexService} class (directly or indirectly). Even
-   * if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
-   * using index overriding.
-   *
-   * In order to have a typesafe access to standard indexes, it is recommended to use {@link StandardIndexes} whenever
-   * it is possible.
-   *
-   * @param indexId the index id, as defined in {@link IndexType#getId()}.
-   * @return The index type that is identified by the given id.
-   * @throws IllegalArgumentException in case there is not index type identified by the given id.
-   */
+  /// Get the IndexType that is identified by the given index id.
+  ///
+  /// All IndexType references must be obtained using the [IndexService] class (directly or indirectly). Even
+  /// if the callers have a compile time dependency to the actual IndexType class. Otherwise problems may arise when
+  /// using index overriding.
+  ///
+  /// In order to have a typesafe access to standard indexes, it is recommended to use [StandardIndexes] whenever
+  /// it is possible.
+  ///
+  /// @param indexId the index id, as defined in [IndexType#getId()].
+  /// @return The index type that is identified by the given id.
+  /// @throws IllegalArgumentException in case there is not index type identified by the given id.
   public IndexType<?, ?, ?> get(String indexId) {
     IndexType<?, ?, ?> indexType = _allIndexesById.get(indexId.toLowerCase(Locale.US));
     if (indexType == null) {

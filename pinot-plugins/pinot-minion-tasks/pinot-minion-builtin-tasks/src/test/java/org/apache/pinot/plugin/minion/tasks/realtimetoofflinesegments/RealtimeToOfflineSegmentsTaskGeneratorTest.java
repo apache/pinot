@@ -51,9 +51,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link RealtimeToOfflineSegmentsTaskGenerator}
- */
+/// Tests for [RealtimeToOfflineSegmentsTaskGenerator]
 public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
   private static final String RAW_TABLE_NAME = "testTable";
@@ -77,9 +75,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .setStreamConfigs(_streamConfigs).setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
   }
 
-  /**
-   * Tests for some config checks
-   */
+  /// Tests for some config checks
   @Test
   public void testGenerateTasksCheckConfigs() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -120,9 +116,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     }
   }
 
-  /**
-   * Tests for some constraints on simultaneous tasks scheduled
-   */
+  /// Tests for some constraints on simultaneous tasks scheduled
   @Test
   public void testGenerateTasksSimultaneousConstraints() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -170,9 +164,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 1);
   }
 
-  /**
-   * Tests for realtime table with no segments
-   */
+  /// Tests for realtime table with no segments
   @Test
   public void testGenerateTasksNoSegments() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -221,9 +213,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
   }
 
-  /**
-   * Test cold start. No minion metadata exists. Watermark is calculated based on config or existing segments
-   */
+  /// Test cold start. No minion metadata exists. Watermark is calculated based on config or existing segments
   @Test
   public void testGenerateTasksNoMinionMetadata() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -281,9 +271,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000");  // 22 May 2020 UTC
   }
 
-  /**
-   * Tests for subsequent runs after cold start
-   */
+  /// Tests for subsequent runs after cold start
   @Test
   public void testGenerateTasksWithMinionMetadata() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -376,9 +364,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get("m1" + RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX), "MAX");
   }
 
-  /**
-   * Tests for skipping task generation due to CONSUMING segments overlap with window
-   */
+  /// Tests for skipping task generation due to CONSUMING segments overlap with window
   @Test
   public void testOverflowIntoConsuming() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -431,9 +417,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 1);
   }
 
-  /**
-   * Tests for task generation when there is time gap between segments.
-   */
+  /// Tests for task generation when there is time gap between segments.
   @Test
   public void testTimeGap() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();

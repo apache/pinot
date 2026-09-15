@@ -145,9 +145,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     return ingestionConfig;
   }
 
-  /**
-   * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
-   */
+  /// Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
   protected TableConfig createDedupTableWithReplicas(File sampleAvroFile, String primaryKeyColumn,
       int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;

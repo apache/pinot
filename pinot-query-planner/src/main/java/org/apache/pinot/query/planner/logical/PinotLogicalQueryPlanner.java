@@ -49,16 +49,12 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * PinotLogicalQueryPlanner walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
- */
+/// PinotLogicalQueryPlanner walks top-down from [RelRoot] and construct a forest of trees with [PlanNode].
 public class PinotLogicalQueryPlanner {
   private PinotLogicalQueryPlanner() {
   }
 
-  /**
-   * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
-   */
+  /// Converts a Calcite [RelRoot] into a Pinot [SubPlan].
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       String hashFunction, boolean pruneUnnestColumns) {

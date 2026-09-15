@@ -21,23 +21,20 @@ package org.apache.pinot.core.operator.transform.function;
 import org.apache.pinot.common.function.TransformFunctionType;
 
 
-/**
- * The <code>EqualsTransformFunction</code> extends <code>BinaryOperatorTransformFunction</code> to implement the
- * binary operator(=).
- *
- * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
- *
- * SQL Syntax:
- *    columnA = 12
- *    columnA = 12.0
- *    columnA = 'fooBar'
- *
- * Sample Usage:
- *    EQUALS(columnA, 12)
- *    EQUALS(columnA, 12.0)
- *    EQUALS(columnA, 'fooBar')
- *
- */
+/// The `EqualsTransformFunction` extends `BinaryOperatorTransformFunction` to implement the
+/// binary operator(=).
+///
+/// The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
+///
+/// SQL Syntax:
+///    columnA = 12
+///    columnA = 12.0
+///    columnA = 'fooBar'
+///
+/// Sample Usage:
+///    EQUALS(columnA, 12)
+///    EQUALS(columnA, 12.0)
+///    EQUALS(columnA, 'fooBar')
 public class EqualsTransformFunction extends BinaryOperatorTransformFunction {
 
   public EqualsTransformFunction() {

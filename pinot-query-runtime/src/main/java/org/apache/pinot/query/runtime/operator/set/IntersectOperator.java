@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Intersect operator.
- */
+/// Intersect operator.
 public class IntersectOperator extends BinarySetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
   private static final String EXPLAIN_NAME = "INTERSECT";

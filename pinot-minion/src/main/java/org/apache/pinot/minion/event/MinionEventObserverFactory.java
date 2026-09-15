@@ -22,29 +22,19 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
-/**
- * Factory for {@link MinionEventObserver}.
- */
+/// Factory for [MinionEventObserver].
 public interface MinionEventObserverFactory {
 
-  /**
-   * Initializes the task executor factory.
-   */
+  /// Initializes the task executor factory.
   void init(MinionTaskZkMetadataManager zkMetadataManager);
 
-  /**
-   * Initializes the task executor factory with the specified {@link MinionTaskObserverStorageManager}
-   * to manage the storage of stats recorded by the {@link MinionEventObserver}.
-   */
+  /// Initializes the task executor factory with the specified [MinionTaskObserverStorageManager]
+  /// to manage the storage of stats recorded by the [MinionEventObserver].
   void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskObserverStorageManager taskProgressManager);
 
-  /**
-   * Returns the task type of the event observer.
-   */
+  /// Returns the task type of the event observer.
   String getTaskType();
 
-  /**
-   * Creates a new task event observer.
-   */
+  /// Creates a new task event observer.
   MinionEventObserver create();
 }

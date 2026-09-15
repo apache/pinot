@@ -26,9 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
-/**
- * Fake HTTP Server that encapsulates one fake handler.
- */
+/// Fake HTTP Server that encapsulates one fake handler.
 public class FakeHttpServer {
   public String _endpoint;
   public InetSocketAddress _socket = new InetSocketAddress(0);

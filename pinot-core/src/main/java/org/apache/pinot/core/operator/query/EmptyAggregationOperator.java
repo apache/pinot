@@ -26,10 +26,8 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * The <code>EmptyAggregationOperator</code> provides a way to short circuit aggregation only queries (no group by)
- * with a LIMIT of zero.
- */
+/// The `EmptyAggregationOperator` provides a way to short circuit aggregation only queries (no group by)
+/// with a LIMIT of zero.
 public class EmptyAggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   private static final String EXPLAIN_NAME = "AGGREGATE_EMPTY";

@@ -22,11 +22,9 @@ import java.util.Base64;
 import org.apache.datasketches.cpc.CpcSketch;
 
 
-/**
- * Serialized and comparable version of CPC Sketch.
- * Ordering is defined by the cardinality estimate and not the size
- * of the underlying sketch.
- */
+/// Serialized and comparable version of CPC Sketch.
+/// Ordering is defined by the cardinality estimate and not the size
+/// of the underlying sketch.
 public class SerializedCPCSketch implements Comparable<SerializedCPCSketch> {
   private final CpcSketch _sketch;
 

@@ -20,10 +20,8 @@ package org.apache.pinot.segment.local.aggregator;
 
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-/**
- * Value aggregator for SUMMV aggregation function.
- * This aggregator handles multi-value columns by summing all values in all arrays.
- */
+/// Value aggregator for SUMMV aggregation function.
+/// This aggregator handles multi-value columns by summing all values in all arrays.
 public class SumMVValueAggregator extends SumValueAggregator {
 
   @Override

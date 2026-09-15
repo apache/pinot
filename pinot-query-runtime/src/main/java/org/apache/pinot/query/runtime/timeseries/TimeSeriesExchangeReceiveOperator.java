@@ -39,18 +39,19 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 
 
-/**
- * <h2>Overview</h2>
- * Receives and optionally aggregates the response from all servers for the corresponding plan node.
- *
- * <h3>Aggregate Receive</h3>
- * When a non-null {@link AggInfo} is passed, this operator will aggregate the received data using the corresponding
- * series builder created via {@link TimeSeriesBuilderFactory}.
- *
- * <h3>Non-Aggregate Receive</h3>
- * When a null AggInfo is passed, then we don't perform any aggregation. If we receive series with the same ID from
- * different servers, we will simply append them to the list, creating a union.
- */
+/// # Overview
+///
+/// Receives and optionally aggregates the response from all servers for the corresponding plan node.
+///
+/// ## Aggregate Receive
+///
+/// When a non-null [AggInfo] is passed, this operator will aggregate the received data using the corresponding
+/// series builder created via [TimeSeriesBuilderFactory].
+///
+/// ## Non-Aggregate Receive
+///
+/// When a null AggInfo is passed, then we don't perform any aggregation. If we receive series with the same ID from
+/// different servers, we will simply append them to the list, creating a union.
 public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
 
   private static final List<DataTable.MetadataKey> ADDITIVE_STATS_KEYS = List.of(
@@ -74,10 +75,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS
   );
 
-  /**
-   * Receiver will receive either TimeSeriesBlock or Throwable. And will have at most _numServersQueried objects that
-   * can be polled.
-   */
+  /// Receiver will receive either TimeSeriesBlock or Throwable. And will have at most \_numServersQueried objects that
+  /// can be polled.
   private final BlockingQueue<Object> _receiver;
   private final long _deadlineMs;
   private final int _numServersQueried;
@@ -198,10 +197,8 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     return resultBlock;
   }
 
-  /**
-   * TODO: Consider consolidating stats merging logic with
-   * {@link org.apache.pinot.core.query.reduce.ExecutionStatsAggregator}
-   **/
+  /// TODO: Consider consolidating stats merging logic with
+  /// [org.apache.pinot.core.query.reduce.ExecutionStatsAggregator]
   private void mergeStats(Map<String, String> aggregatedStats, Map<String, String> metadata) {
     for (DataTable.MetadataKey statKey : ADDITIVE_STATS_KEYS) {
       String key = statKey.getName();

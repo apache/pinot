@@ -24,9 +24,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
-/**
- * Context for {@link SegmentDirectoryLoader}
- */
+/// Context for [SegmentDirectoryLoader]
 public class SegmentDirectoryLoaderContext {
   private final ReadMode _readMode;
   private final TableConfig _tableConfig;

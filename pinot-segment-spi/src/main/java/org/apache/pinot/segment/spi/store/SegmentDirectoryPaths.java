@@ -73,12 +73,10 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, V1Constants.SEGMENT_CREATION_META);
   }
 
-  /**
-   * Find text index file in top-level segment index directory
-   * @param indexDir top-level segment index directory
-   * @param column text column name
-   * @return text index directory (if exists in V3, V1 or V2 format), null if index file does not exit
-   */
+  /// Find text index file in top-level segment index directory
+  /// @param indexDir top-level segment index directory
+  /// @param column text column name
+  /// @return text index directory (if exists in V3, V1 or V2 format), null if index file does not exit
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
@@ -179,12 +177,10 @@ public class SegmentDirectoryPaths {
     }
   }
 
-  /**
-   * Probes for an IVF vector index file under either the legacy extension (sidecar layout) or
-   * the combined extension (transient single-file form left on disk when a build with
-   * {@code storeInSegmentFile=true} has not yet been absorbed into {@code columns.psf}). Legacy
-   * wins if both are present so the caller's behaviour is stable for unchanged segments.
-   */
+  /// Probes for an IVF vector index file under either the legacy extension (sidecar layout) or
+  /// the combined extension (transient single-file form left on disk when a build with
+  /// `storeInSegmentFile=true` has not yet been absorbed into `columns.psf`). Legacy
+  /// wins if both are present so the caller's behaviour is stable for unchanged segments.
   @Nullable
   private static File findIvfVectorIndexFile(File segmentIndexDir, String column, String legacyExtension,
       String combinedExtension) {
@@ -192,11 +188,11 @@ public class SegmentDirectoryPaths {
     return legacy != null ? legacy : findFlatVectorIndexFile(segmentIndexDir, column, combinedExtension);
   }
 
-  /**
-   * Find a file in any segment version.
-   * <p>Index directory passed in should be top level segment directory.
-   * <p>If file exists in multiple segment version, return the one in highest segment version.
-   */
+  /// Find a file in any segment version.
+  ///
+  /// Index directory passed in should be top level segment directory.
+  ///
+  /// If file exists in multiple segment version, return the one in highest segment version.
   @Nullable
   private static File findFormatFile(File indexDir, String fileName) {
     Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);

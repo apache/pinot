@@ -34,22 +34,18 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
-/**
- * Factory for REGEXP_LIKE predicate evaluators.
- */
+/// Factory for REGEXP_LIKE predicate evaluators.
 public class RegexpLikePredicateEvaluatorFactory {
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
-   *
-   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param dictionary          Dictionary for the column
-   * @param dataType            Data type for the column
-   * @param queryContext
-   * @return Dictionary based REGEXP_LIKE predicate evaluator
-   */
+  /// Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
+  ///
+  /// @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+  /// @param dictionary          Dictionary for the column
+  /// @param dataType            Data type for the column
+  /// @param queryContext
+  /// @return Dictionary based REGEXP_LIKE predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
       RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType,
       @Nullable QueryContext queryContext) {
@@ -68,13 +64,11 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
   }
 
-  /**
-   * Create a new instance of raw value based REGEXP_LIKE predicate evaluator.
-   *
-   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based REGEXP_LIKE predicate evaluator
-   */
+  /// Create a new instance of raw value based REGEXP_LIKE predicate evaluator.
+  ///
+  /// @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based REGEXP_LIKE predicate evaluator
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
       DataType dataType) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);

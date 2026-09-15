@@ -24,12 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Singleton holder for {@link LogicalTableConfigSerDe}, loaded via {@link ServiceLoader}.
- *
- * <p>When multiple implementations are discovered, the one with the highest
- * {@link LogicalTableConfigSerDe#getPriority()} is selected</p>
- */
+/// Singleton holder for [LogicalTableConfigSerDe], loaded via [ServiceLoader].
+///
+/// When multiple implementations are discovered, the one with the highest
+/// [LogicalTableConfigSerDe#getPriority()] is selected
 public class LogicalTableConfigSerDeProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableConfigSerDeProvider.class);
 
@@ -42,9 +40,7 @@ public class LogicalTableConfigSerDeProvider {
     return _instance;
   }
 
-  /**
-   * Overrides the singleton instance. Useful for testing.
-   */
+  /// Overrides the singleton instance. Useful for testing.
   @VisibleForTesting
   public static void setInstance(LogicalTableConfigSerDe serDe) {
     _instance = serDe;

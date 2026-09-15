@@ -26,24 +26,23 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * AdhocTaskConfig configuration.
- * <pre>
- * Example:
- * {
- *   "taskType": "SegmentGenerationAndPushTask",
- *   "tableName": "myTable",
- *   "taskName": "myTask-0",
- *   "taskConfigs": {
- *     "inputDirURI": "s3://my-bucket/my-file.json",
- *     "input.fs.className": "org.apache.pinot.plugin.filesystem.S3PinotFS",
- *     "input.fs.prop.accessKey": "<aws-access-key>",
- *     "input.fs.prop.secretKey": "<aws-secret-key>",
- *     "input.fs.prop.region": "us-west-2"
- *   }
- * }
- * </pre>
- */
+/// AdhocTaskConfig configuration.
+///
+/// ```
+/// Example:
+/// {
+///   "taskType": "SegmentGenerationAndPushTask",
+///   "tableName": "myTable",
+///   "taskName": "myTask-0",
+///   "taskConfigs": {
+///     "inputDirURI": "s3://my-bucket/my-file.json",
+///     "input.fs.className": "org.apache.pinot.plugin.filesystem.S3PinotFS",
+///     "input.fs.prop.accessKey": "<aws-access-key>",
+///     "input.fs.prop.secretKey": "<aws-secret-key>",
+///     "input.fs.prop.region": "us-west-2"
+///   }
+/// }
+/// ```
 public class AdhocTaskConfig extends BaseJsonConfig {
   private String _taskType;
   private String _tableName;

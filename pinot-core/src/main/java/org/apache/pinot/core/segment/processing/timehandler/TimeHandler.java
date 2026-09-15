@@ -22,12 +22,10 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Handler for time values within the records:
- * - Filter records based on the start/end time range
- * - Round time values
- * - Partition records based on time values
- */
+/// Handler for time values within the records:
+/// - Filter records based on the start/end time range
+/// - Round time values
+/// - Partition records based on time values
 public interface TimeHandler {
   enum Type {
     NO_OP, EPOCH
@@ -42,36 +40,28 @@ public interface TimeHandler {
   /// stripped before the output segments are created.
   String ORIGINAL_TIME_MS_COLUMN = "$originalTimeMs$";
 
-  /**
-   * Filters/rounds the time value for the given row and returns the time partition, or {@code null} if the row is
-   * filtered out. The time value is modified in-place.
-   */
+  /// Filters/rounds the time value for the given row and returns the time partition, or `null` if the row is
+  /// filtered out. The time value is modified in-place.
   @Nullable
   String handleTime(GenericRow row);
 
-  /**
-   * Returns the time column name, or null if no time column is configured.
-   * This enables efficient columnar processing by reading only the time column.
-   */
+  /// Returns the time column name, or null if no time column is configured.
+  /// This enables efficient columnar processing by reading only the time column.
   @Nullable
   String getTimeColumn();
 
-  /**
-   * Handles time value from a column and returns the time partition, or {@code null} if the value is filtered out.
-   *
-   * @param columnValue The time column value
-   * @return The time partition string, or null if the row is filtered based on time
-   */
+  /// Handles time value from a column and returns the time partition, or `null` if the value is filtered out.
+  ///
+  /// @param columnValue The time column value
+  /// @return The time partition string, or null if the row is filtered based on time
   @Nullable
   String handleTimeColumn(Object columnValue);
 
-  /**
-   * Returns the modified time value (eg: rounding) from the original column value.
-   * It assumes that the column value has already passed the filtering criteria.
-   *
-   * @param columnValue The original time column value
-   * @return The modified time value
-   */
+  /// Returns the modified time value (eg: rounding) from the original column value.
+  /// It assumes that the column value has already passed the filtering criteria.
+  ///
+  /// @param columnValue The original time column value
+  /// @return The modified time value
   @Nullable
   Object getModifiedTimeValue(Object columnValue);
 }

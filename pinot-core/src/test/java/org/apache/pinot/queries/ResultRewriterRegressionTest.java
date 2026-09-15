@@ -25,9 +25,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Regression test for queries with result rewriter.
- */
+/// Regression test for queries with result rewriter.
 public class ResultRewriterRegressionTest {
 
   @Test

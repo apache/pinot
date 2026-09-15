@@ -21,31 +21,26 @@ package org.apache.pinot.spi.audit;
 import javax.annotation.Nullable;
 
 
-/**
- * Service Provider Interface for resolving user identity from authentication tokens
- * for audit logging purposes.
- * <p>
- * Implementations can handle custom token formats (e.g., proprietary tokens, API keys)
- * that are not standard JWTs. The resolver receives the full Authorization header value
- * and returns the principal if it can handle the token format.
- * <p>
- * If the resolver cannot handle the token format, it should return null to allow
- * fallback to the default JWT-based resolution.
- */
+/// Service Provider Interface for resolving user identity from authentication tokens
+/// for audit logging purposes.
+///
+/// Implementations can handle custom token formats (e.g., proprietary tokens, API keys)
+/// that are not standard JWTs. The resolver receives the full Authorization header value
+/// and returns the principal if it can handle the token format.
+///
+/// If the resolver cannot handle the token format, it should return null to allow
+/// fallback to the default JWT-based resolution.
 public interface AuditTokenResolver {
 
-  /**
-   * Resolves the user identity from an authorization header value.
-   * <p>
-   * The implementation should:
-   * <ul>
-   *   <li>Return an {@link AuditUserIdentity} if it can handle the token format</li>
-   *   <li>Return null if it cannot handle the token format (to allow fallback)</li>
-   * </ul>
-   *
-   * @param authHeaderValue the full Authorization header value (e.g., "Bearer &lt;token&gt;")
-   * @return the resolved identity, or null if this resolver cannot handle the token
-   */
+  /// Resolves the user identity from an authorization header value.
+  ///
+  /// The implementation should:
+  ///
+  /// - Return an [AuditUserIdentity] if it can handle the token format
+  /// - Return null if it cannot handle the token format (to allow fallback)
+  ///
+  /// @param authHeaderValue the full Authorization header value (e.g., "Bearer &lt;token&gt;")
+  /// @return the resolved identity, or null if this resolver cannot handle the token
   @Nullable
   AuditUserIdentity resolve(String authHeaderValue);
 }

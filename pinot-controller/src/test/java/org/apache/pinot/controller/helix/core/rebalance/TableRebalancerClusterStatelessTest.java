@@ -277,31 +277,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
       Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
       assertNotNull(preCheckResult);
-      assertEquals(preCheckResult.size(), 6);
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+      assertEquals(preCheckResult.size(), 4);
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
-      // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
-      // manual check is needed
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.ERROR);
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-          "Could not determine needReload status, run needReload API manually");
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
           "Instance assignment not allowed, no need for minimizeDataMovement");
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-          .getMessage()
-          .startsWith("Within threshold"));
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
           .getMessage()
           .startsWith("Within threshold"));
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
@@ -1172,16 +1159,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-        .getMessage()
-        .startsWith("Within threshold"));
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
         .getMessage()
         .startsWith("Within threshold"));
 
@@ -1199,11 +1180,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
+        .getMessage()
+        .startsWith("UNSAFE. Servers with unsafe disk utilization AFTER rebalance"));
+
+    // The servers are over the threshold no matter how the rebalance is run, so lowDiskMode does not help
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setLowDiskMode(true);
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
@@ -1316,6 +1310,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
+    // trigger the warning about lowDiskMode being inert with downtime, which replaces the IdealState in one go
+    rebalanceConfig.setLowDiskMode(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "lowDiskMode has no effect when downtime is enabled, disable downtime for segments to be deleted before the "
+            + "new ones are added.");
+    rebalanceConfig.setLowDiskMode(false);
 
     // trigger peer-download enabled table rebalance warning
     newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
@@ -2424,14 +2429,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tgt3.put("server2", "ONLINE");
     targetAssignment.put("segment3", tgt3);
 
-    // Segment 4: one instance is ONLINE, should not be considered
+    // Segment 4: OFFLINE (no CONSUMING replica), should not be considered
     Map<String, String> cur4 = new HashMap<>();
-    cur4.put("server1", "ONLINE");
-    cur4.put("server2", "CONSUMING");
+    cur4.put("server1", "OFFLINE");
+    cur4.put("server2", "OFFLINE");
     currentAssignment.put("segment4", cur4);
     Map<String, String> tgt4 = new HashMap<>();
-    tgt4.put("server1", "ONLINE");
-    tgt4.put("server2", "CONSUMING");
+    tgt4.put("server3", "OFFLINE");
+    tgt4.put("server4", "OFFLINE");
     targetAssignment.put("segment4", tgt4);
 
     // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving

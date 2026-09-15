@@ -56,6 +56,35 @@ public class ConfigUtilsTest {
     System.clearProperty("AWS_SECRET_KEY");
   }
 
+  @Test
+  public void testEscapedConfigReferenceIsPreserved() {
+    IndexingConfig indexingConfig = new IndexingConfig();
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("ssl.keystore.password", "$${file:/vault/secrets/kafka.properties:keystore.password}");
+    streamConfigMap.put("ssl.truststore.password", "${PINOT_KAFKA_TRUSTSTORE_PASSWORD:fallback}");
+    indexingConfig.setStreamConfigs(streamConfigMap);
+
+    IndexingConfig resolvedConfig =
+        ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(Map.of(), indexingConfig);
+
+    assertEquals(resolvedConfig.getStreamConfigs().get("ssl.keystore.password"),
+        "${file:/vault/secrets/kafka.properties:keystore.password}");
+    assertEquals(resolvedConfig.getStreamConfigs().get("ssl.truststore.password"), "fallback");
+  }
+
+  @Test
+  public void testEscapedAndUnescapedConfigReferences() {
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setStreamConfigs(
+        Map.of("escaped", "$${file:fallback}", "unescaped", "${file:fallback}"));
+
+    IndexingConfig resolvedConfig =
+        ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(Map.of(), indexingConfig);
+
+    assertEquals(resolvedConfig.getStreamConfigs().get("escaped"), "${file:fallback}");
+    assertEquals(resolvedConfig.getStreamConfigs().get("unescaped"), "fallback");
+  }
+
   private void testIndexingWithConfig(Map<String, String> configOverride) {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setLoadMode("${LOAD_MODE}");

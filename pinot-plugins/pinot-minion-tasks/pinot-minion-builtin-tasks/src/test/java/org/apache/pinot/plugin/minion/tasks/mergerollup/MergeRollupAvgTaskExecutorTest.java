@@ -56,14 +56,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests MergeRollup task executor with AVG aggregation on a {@code BYTES} column holding serialized
- * {@link AvgPair} (sum + count) values.
- * <p>
- * AVG is correct across rollups only because the (sum, count) pair is preserved and merged additively;
- * averaging already-averaged scalars would be wrong whenever groups have unequal counts. The tests below
- * deliberately use unequal counts so an average-of-averages implementation would fail them.
- */
+/// Tests MergeRollup task executor with AVG aggregation on a `BYTES` column holding serialized
+/// [AvgPair] (sum + count) values.
+///
+/// AVG is correct across rollups only because the (sum, count) pair is preserved and merged additively;
+/// averaging already-averaged scalars would be wrong whenever groups have unequal counts. The tests below
+/// deliberately use unequal counts so an average-of-averages implementation would fail them.
 public class MergeRollupAvgTaskExecutorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MergeRollupAvgTaskExecutorTest");
   private static final File ORIGINAL_SEGMENT_DIR = new File(TEMP_DIR, "originalSegment");
@@ -105,10 +103,8 @@ public class MergeRollupAvgTaskExecutorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /**
-   * Three distinct dimension groups across four segments are merged independently, each preserving the
-   * total sum and count (and therefore the correct average).
-   */
+  /// Three distinct dimension groups across four segments are merged independently, each preserving the
+  /// total sum and count (and therefore the correct average).
   @Test
   public void testMultipleDimensionGroupsIndependentMerge()
       throws Exception {
@@ -132,9 +128,7 @@ public class MergeRollupAvgTaskExecutorTest {
     assertAvg(avgPairs.get(GROUP_3), 20100.0, 200L, 100.5);
   }
 
-  /**
-   * The same dimension key appearing in multiple segments has all its AvgPairs merged.
-   */
+  /// The same dimension key appearing in multiple segments has all its AvgPairs merged.
   @Test
   public void testCrossSegmentMerging()
       throws Exception {
@@ -149,11 +143,9 @@ public class MergeRollupAvgTaskExecutorTest {
     Assert.assertEquals(avgPairs.get(GROUP_3).getCount(), 200L);
   }
 
-  /**
-   * Groups with unequal counts must merge by adding sums and counts, not by averaging the per-segment
-   * averages. With counts 10 and 100, an average-of-averages implementation would yield 77.5 instead of
-   * the correct 136.409...
-   */
+  /// Groups with unequal counts must merge by adding sums and counts, not by averaging the per-segment
+  /// averages. With counts 10 and 100, an average-of-averages implementation would yield 77.5 instead of
+  /// the correct 136.409...
   @Test
   public void testUnequalCountsAvoidsAverageOfAverages()
       throws Exception {
@@ -170,13 +162,11 @@ public class MergeRollupAvgTaskExecutorTest {
     Assert.assertEquals(merged.getSum() / merged.getCount(), 15005.0 / 110.0, 1e-9);
   }
 
-  /**
-   * A second rollup pass over already-rolled-up (pre-aggregated) AvgPair segments still yields the correct
-   * overall average. Uses unequal counts so average-of-averages would diverge from the true value.
-   * <p>
-   * Level 1 merges [1..10] (count 10) and [11..30] (count 20) -> sum 465, count 30.
-   * Level 2 merges that with [31..100] (count 70) -> sum 5050, count 100, avg 50.5 (the true avg of [1..100]).
-   */
+  /// A second rollup pass over already-rolled-up (pre-aggregated) AvgPair segments still yields the correct
+  /// overall average. Uses unequal counts so average-of-averages would diverge from the true value.
+  ///
+  /// Level 1 merges \[1..10\] (count 10) and \[11..30\] (count 20) -> sum 465, count 30.
+  /// Level 2 merges that with \[31..100\] (count 70) -> sum 5050, count 100, avg 50.5 (the true avg of \[1..100\]).
   @Test
   public void testTwoLevelRollupPreservesAverage()
       throws Exception {
@@ -198,10 +188,8 @@ public class MergeRollupAvgTaskExecutorTest {
     assertAvg(finalPair, 5050.0, 100L, 50.5);
   }
 
-  /**
-   * An empty AvgPair byte array (the default null value for BYTES columns) is treated as missing; the merge
-   * reflects only the non-empty input.
-   */
+  /// An empty AvgPair byte array (the default null value for BYTES columns) is treated as missing; the merge
+  /// reflects only the non-empty input.
   @Test
   public void testEmptyAvgPairHandling()
       throws Exception {
@@ -221,9 +209,7 @@ public class MergeRollupAvgTaskExecutorTest {
     assertAvg(readMergedAvgPairs(results.get(0).getFile()).get(GROUP_1), 5050.0, 100L, 50.5);
   }
 
-  /**
-   * After rollup, the total doc count must equal the number of distinct dimension keys.
-   */
+  /// After rollup, the total doc count must equal the number of distinct dimension keys.
   @Test
   public void testSegmentDocCountEqualsDistinctKeys()
       throws Exception {
@@ -242,9 +228,7 @@ public class MergeRollupAvgTaskExecutorTest {
     Assert.assertEquals(avgPair.getSum() / avgPair.getCount(), expectedAvg, 1e-9);
   }
 
-  /**
-   * Creates an AvgPair accumulating the integer values in {@code [start, end)}.
-   */
+  /// Creates an AvgPair accumulating the integer values in `[start, end)`.
   private static AvgPair createAvgPair(int start, int end) {
     AvgPair avgPair = new AvgPair();
     for (int v = start; v < end; v++) {

@@ -49,9 +49,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for minion status query functionality in PinotHelixTaskResourceManager
- */
+/// Unit tests for minion status query functionality in PinotHelixTaskResourceManager
 public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
@@ -82,11 +80,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     }
   }
 
-  /**
-   * Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions
-   * @param taskAssignments Map of minion instance ID to number of RUNNING tasks
-   * @return Mocked TaskDriver
-   */
+  /// Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions
+  /// @param taskAssignments Map of minion instance ID to number of RUNNING tasks
+  /// @return Mocked TaskDriver
   private TaskDriver createMockTaskDriverWithRunningTasks(Map<String, Integer> taskAssignments) {
     TaskDriver mockTaskDriver = mock(TaskDriver.class);
 

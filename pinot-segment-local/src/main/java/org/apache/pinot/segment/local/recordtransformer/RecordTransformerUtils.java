@@ -104,14 +104,12 @@ public class RecordTransformerUtils {
     return getTransformers(tableConfig, schema, false, false, false, false);
   }
 
-  /**
-   * Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
-   * re-running ingestion-time transforms. Derived columns must exist in the schema to be queryable.
-   *
-   * @param tableConfig The table configuration containing post-partial-upsert transform configs
-   * @param schema The table schema used for validation and type conversion
-   * @return List of transformers to apply after merge, or {@code null} if none configured
-   */
+  /// Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
+  /// re-running ingestion-time transforms. Derived columns must exist in the schema to be queryable.
+  ///
+  /// @param tableConfig The table configuration containing post-partial-upsert transform configs
+  /// @param schema The table schema used for validation and type conversion
+  /// @return List of transformers to apply after merge, or `null` if none configured
   @Nullable
   public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();

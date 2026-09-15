@@ -52,43 +52,41 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  /**
-   * Fetches the list of {@link StreamMetadata} for all streams of the table,
-   * with the help of the {@link PartitionGroupConsumptionStatus} of the current partitionGroups.
-   * In particular, this method can also be used to fetch from multiple stream topics.
-   *
-   * Reasons why <code>partitionGroupConsumptionStatusList</code> is needed:
-   *
-   * 1)
-   * The current {@link PartitionGroupConsumptionStatus} is used to determine the offsets that have been consumed for
-   * a partition group.
-   * An example of where the offsets would be used:
-   * e.g. If partition group 1 contains shardId 1, with status DONE and endOffset 150. There's 2 possibilities:
-   * 1) the stream indicates that shardId's last offset is 200.
-   * This tells Pinot that partition group 1 still has messages which haven't been consumed, and must be included in
-   * the response.
-   * 2) the stream indicates that shardId's last offset is 150,
-   * This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the
-   * response.
-   * Thus, this call will skip a partition group when it has reached end of life and all messages from that partition
-   * group have been consumed.
-   *
-   * The current {@link PartitionGroupConsumptionStatus} is also used to know about existing groupings of partitions,
-   * and accordingly make the new partition groups.
-   * e.g. Assume that partition group 1 has status IN_PROGRESS and contains shards 0,1,2
-   * and partition group 2 has status DONE and contains shards 3,4.
-   * In the above example, the <code>partitionGroupConsumptionStatusList</code> indicates that
-   * the collection of shards in partition group 1, should remain unchanged in the response,
-   * whereas shards 3,4 can be added to new partition groups if needed.
-   *
-   * @param streamConfigs the List of streamConfig from the tableConfig
-   * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current
-   *                                            partition groups.
-   *                                          The size of this list is equal to the number of partition groups,
-   *                                          and is created using the latest segment zk metadata.
-   * @param pausedTopicIndices List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
-   * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
-   */
+  /// Fetches the list of [StreamMetadata] for all streams of the table,
+  /// with the help of the [PartitionGroupConsumptionStatus] of the current partitionGroups.
+  /// In particular, this method can also be used to fetch from multiple stream topics.
+  ///
+  /// Reasons why `partitionGroupConsumptionStatusList` is needed:
+  ///
+  /// 1)
+  /// The current [PartitionGroupConsumptionStatus] is used to determine the offsets that have been consumed for
+  /// a partition group.
+  /// An example of where the offsets would be used:
+  /// e.g. If partition group 1 contains shardId 1, with status DONE and endOffset 150. There's 2 possibilities:
+  /// 1) the stream indicates that shardId's last offset is 200.
+  /// This tells Pinot that partition group 1 still has messages which haven't been consumed, and must be included in
+  /// the response.
+  /// 2) the stream indicates that shardId's last offset is 150,
+  /// This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the
+  /// response.
+  /// Thus, this call will skip a partition group when it has reached end of life and all messages from that partition
+  /// group have been consumed.
+  ///
+  /// The current [PartitionGroupConsumptionStatus] is also used to know about existing groupings of partitions,
+  /// and accordingly make the new partition groups.
+  /// e.g. Assume that partition group 1 has status IN_PROGRESS and contains shards 0,1,2
+  /// and partition group 2 has status DONE and contains shards 3,4.
+  /// In the above example, the `partitionGroupConsumptionStatusList` indicates that
+  /// the collection of shards in partition group 1, should remain unchanged in the response,
+  /// whereas shards 3,4 can be added to new partition groups if needed.
+  ///
+  /// @param streamConfigs the List of streamConfig from the tableConfig
+  /// @param partitionGroupConsumptionStatusList List of [PartitionGroupConsumptionStatus] for the current
+  ///                                            partition groups.
+  ///                                          The size of this list is equal to the number of partition groups,
+  ///                                          and is created using the latest segment zk metadata.
+  /// @param pausedTopicIndices List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
+  /// @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
   public static List<StreamMetadata> getStreamMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
       boolean forceGetOffsetFromStream) {

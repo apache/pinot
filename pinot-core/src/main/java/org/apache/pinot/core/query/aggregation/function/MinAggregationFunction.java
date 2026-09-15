@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -34,7 +35,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MinAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
+public class MinAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   protected static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
   public MinAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -333,6 +334,7 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  @Nullable
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -341,6 +343,7 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
     return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nullable
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -351,15 +354,6 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
 
   @Override
   public Double merge(Double intermediateMinResult1, Double intermediateMinResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateMinResult1 == null) {
-        return intermediateMinResult2;
-      }
-      if (intermediateMinResult2 == null) {
-        return intermediateMinResult1;
-      }
-    }
-
     if (intermediateMinResult1 < intermediateMinResult2) {
       return intermediateMinResult1;
     }
@@ -376,8 +370,9 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Double intermediateResult) {
+  public Double extractFinalResult(@Nullable Double intermediateResult) {
     return intermediateResult;
   }
 

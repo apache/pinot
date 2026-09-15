@@ -41,11 +41,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to upload data into Pinot.
- *
- *
- */
+/// Class for command to upload data into Pinot.
 @CommandLine.Command(name = "UploadSegment", mixinStandardHelpOptions = true)
 public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
@@ -75,7 +71,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload")
+  @CommandLine.Option(names = {"-tableName"}, required = false,
+      description = "Table name to upload into. Overrides segment.table.name baked into the segment metadata "
+          + "(build once, push to staging or prod). When omitted, falls back to the name in segment metadata.")
   private String _tableName = null;
 
   @CommandLine.Option(names = {"-tableType"}, required = false,

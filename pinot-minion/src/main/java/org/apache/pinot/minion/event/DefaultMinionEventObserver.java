@@ -23,9 +23,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
-/**
- * Default no-op minion event observer which can be extended.
- */
+/// Default no-op minion event observer which can be extended.
 public class DefaultMinionEventObserver implements MinionEventObserver {
 
   protected MinionTaskObserverStorageManager _observerStorageManager;

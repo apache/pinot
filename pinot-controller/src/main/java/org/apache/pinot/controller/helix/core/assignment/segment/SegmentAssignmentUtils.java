@@ -44,16 +44,12 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.Pairs;
 
 
-/**
- * Utility class for segment assignment.
- */
+/// Utility class for segment assignment.
 public class SegmentAssignmentUtils {
   private SegmentAssignmentUtils() {
   }
 
-  /**
-   * Returns the number of segments assigned to each instance.
-   */
+  /// Returns the number of segments assigned to each instance.
   public static int[] getNumSegmentsAssignedPerInstance(Map<String, Map<String, String>> segmentAssignment,
       List<String> instances) {
     int[] numSegmentsPerInstance = new int[instances.size()];
@@ -78,9 +74,7 @@ public class SegmentAssignmentUtils {
     return instanceNameToIdMap;
   }
 
-  /**
-   * Returns instances for non-replica-group based assignment.
-   */
+  /// Returns instances for non-replica-group based assignment.
   public static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
     Preconditions.checkState(
@@ -95,9 +89,8 @@ public class SegmentAssignmentUtils {
     return instances;
   }
 
-  /**
-   * Assigns the segment for the non-replica-group based segment assignment strategy and returns the assigned instances.
-   */
+  /// Assigns the segment for the non-replica-group based segment assignment strategy and returns the assigned
+  /// instances.
   public static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int replication) {
     List<String> instances = getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
@@ -114,9 +107,7 @@ public class SegmentAssignmentUtils {
     return instancesAssigned;
   }
 
-  /**
-   * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
-   */
+  /// Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
   public static List<String> assignSegmentWithReplicaGroup(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int partitionId) {
     // First assign the segment to replica-group 0
@@ -222,10 +213,8 @@ public class SegmentAssignmentUtils {
     return newAssignment;
   }
 
-  /**
-   * Rebalances the table for the replica-group based segment assignment strategy by uniformly spraying group of
-   * segments belonging to each instancePartitionId to the instances of that instance partition.
-   */
+  /// Rebalances the table for the replica-group based segment assignment strategy by uniformly spraying group of
+  /// segments belonging to each instancePartitionId to the instances of that instance partition.
   public static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
       Map<Integer, List<String>> instancePartitionIdToSegmentsMap) {
@@ -240,25 +229,14 @@ public class SegmentAssignmentUtils {
     return newAssignment;
   }
 
-  /**
-   * Rebalances one partition of the table for the replica-group based segment assignment strategy.
-   * <ul>
-   *   <li>
-   *     1. Calculate the target number of segments on each instance
-   *   </li>
-   *   <li>
-   *     2. Loop over all the segments and keep the assignment if target number of segments for the instance has not
-   *     been reached and track the not assigned segments
-   *   </li>
-   *   <li>
-   *     3. Assign the left-over segments to the instances with the least segments, or the smallest index if there is a
-   *     tie
-   *   </li>
-   *   <li>
-   *     4. Mirror the assignment to other replica-groups
-   *   </li>
-   * </ul>
-   */
+  /// Rebalances one partition of the table for the replica-group based segment assignment strategy.
+  ///
+  /// - 1. Calculate the target number of segments on each instance
+  /// - 2. Loop over all the segments and keep the assignment if target number of segments for the instance has not
+  ///   been reached and track the not assigned segments
+  /// - 3. Assign the left-over segments to the instances with the least segments, or the smallest index if there is a
+  ///   tie
+  /// - 4. Mirror the assignment to other replica-groups
   public static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int partitionId, List<String> segments,
       Map<String, Map<String, String>> newAssignment) {
@@ -306,11 +284,9 @@ public class SegmentAssignmentUtils {
     }
   }
 
-  /**
-   * Returns the map from instance name to Helix partition state for the replica-group based segment assignment
-   * strategy, which can be put into the segment assignment. The instances are picked from the instance partitions by
-   * the given partition id and instance id.
-   */
+  /// Returns the map from instance name to Helix partition state for the replica-group based segment assignment
+  /// strategy, which can be put into the segment assignment. The instances are picked from the instance partitions by
+  /// the given partition id and instance id.
   private static Map<String, String> getReplicaGroupBasedInstanceStateMap(InstancePartitions instancePartitions,
       int partitionId, int instanceId) {
     Map<String, String> instanceStateMap = new TreeMap<>();
@@ -322,9 +298,7 @@ public class SegmentAssignmentUtils {
     return instanceStateMap;
   }
 
-  /**
-   * Returns the map from instance name to Helix partition state, which can be put into the segment assignment.
-   */
+  /// Returns the map from instance name to Helix partition state, which can be put into the segment assignment.
   public static Map<String, String> getInstanceStateMap(Collection<String> instances, String state) {
     Map<String, String> instanceStateMap = new TreeMap<>();
     for (String instanceName : instances) {
@@ -333,30 +307,7 @@ public class SegmentAssignmentUtils {
     return instanceStateMap;
   }
 
-  /**
-   * Returns a map from instance name to number of segments to be moved to it.
-   */
-  @Deprecated
-  public static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
-      Map<String, Map<String, String>> newAssignment) {
-    Map<String, Integer> numSegmentsToBeMovedPerInstance = new TreeMap<>();
-    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Set<String> newInstancesAssigned = entry.getValue().keySet();
-      Set<String> oldInstancesAssigned = oldAssignment.get(segmentName).keySet();
-      // For each new assigned instance, check if the segment needs to be moved to it
-      for (String instanceName : newInstancesAssigned) {
-        if (!oldInstancesAssigned.contains(instanceName)) {
-          numSegmentsToBeMovedPerInstance.merge(instanceName, 1, Integer::sum);
-        }
-      }
-    }
-    return numSegmentsToBeMovedPerInstance;
-  }
-
-  /**
-   * Returns a map from instance name to number of segments to be added/removed.
-   */
+  /// Returns a map from instance name to number of segments to be added/removed.
   public static Map<String, IntIntPair> getNumSegmentsToMovePerInstance(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {
     Map<String, IntIntPair> numSegmentsToMovePerInstance = new TreeMap<>();
@@ -394,9 +345,7 @@ public class SegmentAssignmentUtils {
     return segmentsToMove;
   }
 
-  /**
-   * Class that splits segment assignment into COMPLETED, CONSUMING and OFFLINE segments.
-   */
+  /// Class that splits segment assignment into COMPLETED, CONSUMING and OFFLINE segments.
   static class CompletedConsumingOfflineSegmentAssignment {
     private final Map<String, Map<String, String>> _completedSegmentAssignment = new TreeMap<>();
     private final Map<String, Map<String, String>> _consumingSegmentAssignment = new TreeMap<>();
@@ -452,55 +401,77 @@ public class SegmentAssignmentUtils {
     }
   }
 
-  /**
-   * Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers
-   * ONLINE segments.
-   * Tiers are selected according to the order provided in the tiers list.
-   */
+  /// Resolves, for each segment of the table, the name of the first tier (in `sortedTiers` order) that the
+  /// segment is eligible for. The value is the tier name, or `null` if the segment (including COMMITTING
+  /// segments) is not eligible for any tier. This performs a single bulk ZK read for all segment ZK metadata, so it is
+  /// meant to be computed once per rebalance and reused across the multiple `rebalanceTable()` invocations of
+  /// that rebalance rather than reading each segment's ZK metadata every time. Segments that appear only after this map
+  /// is computed (e.g. segments that commit during a long rebalance) are absent from the map and treated as not
+  /// eligible for any tier.
+  static Map<String, String> getSegmentToTierNameMap(HelixManager helixManager, String tableNameWithType,
+      List<Tier> sortedTiers) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    List<SegmentZKMetadata> segmentsZKMetadata = ZKMetadataProvider.getSegmentsZKMetadata(propertyStore,
+        tableNameWithType);
+    Map<String, String> segmentToTierName = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      segmentToTierName.put(segmentZKMetadata.getSegmentName(), getTierName(tableNameWithType, sortedTiers,
+          segmentZKMetadata));
+    }
+    return segmentToTierName;
+  }
+
+  /// Returns the name of the first tier (in `sortedTiers` order) the given segment is eligible for, or
+  /// `null` if the segment is COMMITTING or not eligible for any tier.
+  @Nullable
+  private static String getTierName(String tableNameWithType, List<Tier> sortedTiers,
+      SegmentZKMetadata segmentZKMetadata) {
+    // Skip COMMITTING segments
+    if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
+      return null;
+    }
+    // Find an eligible tier for the segment, from the ordered list of tiers
+    for (Tier tier : sortedTiers) {
+      if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
+        return tier.getName();
+      }
+    }
+    return null;
+  }
+
+  /// Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers
+  /// ONLINE segments.
+  /// Tiers are selected according to the order provided in the tiers list.
   static class TierSegmentAssignment {
 
     private final Map<String, Map<String, Map<String, String>>> _tierNameToSegmentAssignmentMap = new TreeMap<>();
     private final Map<String, Map<String, String>> _nonTierSegmentAssignment = new TreeMap<>();
 
-    /**
-     * Creates a TierSegmentAssignment from the given segmentAssignment
-     * @param tableNameWithType table to which the segment assignment belongs
-     * @param sortedTiers list of tiers, pre-sorted as per desired order by caller
-     * @param segmentAssignment segment assignment of the table
-     */
-    TierSegmentAssignment(HelixManager helixManager, String tableNameWithType, List<Tier> sortedTiers,
-        Map<String, Map<String, String>> segmentAssignment) {
+    /// Creates a TierSegmentAssignment from the given segmentAssignment.
+    /// @param sortedTiers list of tiers, pre-sorted as per desired order by caller
+    /// @param segmentAssignment segment assignment of the table
+    /// @param segmentToTierName map from segment name to the name of the tier it is eligible for (see
+    ///                          [#getSegmentToTierNameMap]); segments absent from this map are not eligible for
+    ///                          any tier
+    TierSegmentAssignment(List<Tier> sortedTiers, Map<String, Map<String, String>> segmentAssignment,
+        Map<String, String> segmentToTierName) {
 
       // initialize tier to segmentAssignment map
       sortedTiers.forEach(t -> _tierNameToSegmentAssignmentMap.put(t.getName(), new TreeMap<>()));
 
       // iterate over all segments
-      // TODO: Reduce ZK access
-      ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
-        boolean selected = false;
 
-        // only consider ONLINE segments for tiers
-        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-          // find an eligible tier for the segment, from the ordered list of tiers
-          SegmentZKMetadata segmentZKMetadata =
-              ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-          // Skip COMMITTING segments
-          if (segmentZKMetadata != null && segmentZKMetadata.getStatus() != Status.COMMITTING) {
-            for (Tier tier : sortedTiers) {
-              if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
-                _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
-                selected = true;
-                break;
-              }
-            }
-          }
-        }
-
-        // if segment not eligible for any tier, put in ordinary segments map
-        if (!selected) {
+        // Only consider ONLINE segments for tiers. The eligible tier for each segment is resolved once via
+        // segmentToTierName, avoiding a per-segment ZK read on every rebalanceTable() invocation.
+        String tierName = instanceStateMap.containsValue(SegmentStateModel.ONLINE)
+            ? segmentToTierName.get(segmentName) : null;
+        if (tierName != null) {
+          _tierNameToSegmentAssignmentMap.get(tierName).put(segmentName, instanceStateMap);
+        } else {
+          // if segment not eligible for any tier, put in ordinary segments map
           _nonTierSegmentAssignment.put(segmentName, instanceStateMap);
         }
       }
@@ -509,16 +480,12 @@ public class SegmentAssignmentUtils {
       _tierNameToSegmentAssignmentMap.entrySet().removeIf(e -> e.getValue().isEmpty());
     }
 
-    /**
-     * Returns a map from tier name to segment assignments for segments which are eligible for that tier
-     */
+    /// Returns a map from tier name to segment assignments for segments which are eligible for that tier
     public Map<String, Map<String, Map<String, String>>> getTierNameToSegmentAssignmentMap() {
       return _tierNameToSegmentAssignmentMap;
     }
 
-    /**
-     * Returns segment assignments of segments which were not eligible for any tier
-     */
+    /// Returns segment assignments of segments which were not eligible for any tier
     public Map<String, Map<String, String>> getNonTierSegmentAssignment() {
       return _nonTierSegmentAssignment;
     }

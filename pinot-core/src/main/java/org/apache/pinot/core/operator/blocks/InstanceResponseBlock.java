@@ -32,9 +32,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
-/**
- * The {@code InstanceResponseBlock} is the holder of the server side results.
- */
+/// The `InstanceResponseBlock` is the holder of the server side results.
 public class InstanceResponseBlock implements Block {
   private final BaseResultsBlock _resultsBlock;
   private final Map<Integer, String> _exceptions;
@@ -52,9 +50,7 @@ public class InstanceResponseBlock implements Block {
     _metadata = resultsBlock.getResultsMetadata();
   }
 
-  /**
-   * Metadata only instance response.
-   */
+  /// Metadata only instance response.
   public InstanceResponseBlock() {
     _resultsBlock = null;
     _exceptions = new HashMap<>();

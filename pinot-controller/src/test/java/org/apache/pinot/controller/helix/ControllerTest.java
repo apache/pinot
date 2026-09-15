@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -121,13 +122,39 @@ public class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
 
   public static final String LOCAL_HOST = "localhost";
+  // Use a random UUID rather than a timestamp so concurrent forks never share a data/temp dir
+  // (System.currentTimeMillis() collides when two forks initialize in the same millisecond).
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-data-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-local-temp-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-local-temp-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
+  public static final String TEST_PORT_BASE_PROPERTY = "pinot.test.port.base";
+  public static final String TEST_ZK_PORT_BASE_PROPERTY = "pinot.test.zk.port.base";
+
+  /// Per-fork port offset so that concurrent surefire forks (forkCount > 1, reuseForks=false)
+  /// allocate disjoint port ranges. surefire injects a 1-based `surefire.forkNumber` into each
+  /// fork (so it is 1 even at forkCount=1, 1..N under parallel forks); it is 0 only outside a
+  /// surefire fork. The stride (5000) comfortably exceeds the ~3000-port span one ControllerTest
+  /// instance uses. Ports are still probed with findOpenPort, so the offset only separates the
+  /// per-fork starting points; no test depends on a literal base port.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 5000;
+
+  private static int forkNumber() {
+    try {
+      return Integer.parseInt(System.getProperty("surefire.forkNumber", "0"));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
+
+  // Offset only when an explicit ZK port base is configured; a base of 0 means "let ZkStarter
+  // pick the port" (which is already fork-aware), so it must stay 0 for forked runs too.
+  private static final int CONFIGURED_ZK_PORT_BASE = Integer.getInteger(TEST_ZK_PORT_BASE_PROPERTY, 0);
+  private static final AtomicInteger NEXT_CONFIGURED_ZK_PORT = new AtomicInteger(
+      CONFIGURED_ZK_PORT_BASE > 0 ? CONFIGURED_ZK_PORT_BASE + FORK_PORT_OFFSET : 0);
 
   // Default ControllerTest instance settings
   public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
@@ -137,9 +164,7 @@ public class ControllerTest {
 
   public static final long TIMEOUT_MS = 10_000L;
 
-  /**
-   * default static instance used to access all wrapped static instances.
-   */
+  /// default static instance used to access all wrapped static instances.
   public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
   protected static HttpClient _httpClient;
@@ -147,9 +172,10 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = 20000;
+  protected int _nextControllerPort = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000) + FORK_PORT_OFFSET;
   protected int _nextBrokerPort = _nextControllerPort + 1000;
   protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
+  protected int _nextBrokerQueryRunnerPort = _nextBrokerGrpcPort + 250;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
@@ -173,11 +199,9 @@ public class ControllerTest {
   protected TableRebalanceManager _tableRebalanceManager;
   protected TableSizeReader _tableSizeReader;
 
-  /**
-   * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
-   *
-   * @return the default instance.
-   */
+  /// Acquire the [ControllerTest] default instance that can be shared across different test cases.
+  ///
+  /// @return the default instance.
   public static ControllerTest getInstance() {
     return DEFAULT_INSTANCE;
   }
@@ -201,13 +225,11 @@ public class ControllerTest {
     return _clusterName;
   }
 
-  /**
-   * HttpClient is lazy evaluated, static object, only instantiate when first use.
-   *
-   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
-   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
-   * it is not possible to create normal member variable, thus the workaround.
-   */
+  /// HttpClient is lazy evaluated, static object, only instantiate when first use.
+  ///
+  /// This is because `ControllerTest` has HTTP utils that depends on the TLSUtils to install the security
+  /// context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+  /// it is not possible to create normal member variable, thus the workaround.
   public static HttpClient getHttpClient() {
     if (_httpClient == null) {
       _httpClient = HttpClient.getInstance();
@@ -225,9 +247,7 @@ public class ControllerTest {
     return Map.of();
   }
 
-  /**
-   * Optionally provide an SSL context for controller admin transport and HTTP utilities.
-   */
+  /// Optionally provide an SSL context for controller admin transport and HTTP utilities.
   @Nullable
   protected SSLContext getControllerTransportSslContext() {
     return null;
@@ -235,8 +255,20 @@ public class ControllerTest {
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      int zkPort = getNextConfiguredZkPort();
+      runWithHelixMock(() -> _zookeeperInstance = zkPort > 0 ? ZkStarter.startLocalZkServer(zkPort)
+          : ZkStarter.startLocalZkServer());
     }
+  }
+
+  private static synchronized int getNextConfiguredZkPort() {
+    int candidatePort = NEXT_CONFIGURED_ZK_PORT.get();
+    if (candidatePort <= 0) {
+      return 0;
+    }
+    int zkPort = NetUtils.findOpenPort(candidatePort);
+    NEXT_CONFIGURED_ZK_PORT.set(zkPort + 1);
+    return zkPort;
   }
 
   public void startZk(int port) {
@@ -273,6 +305,7 @@ public class ControllerTest {
     _nextControllerPort = controllerPort + 1;
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
+    properties.put(ControllerConf.CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_DATA_DIR);
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
@@ -282,15 +315,11 @@ public class ControllerTest {
     return properties;
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideControllerConf(Map<String, Object> properties) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   public BaseControllerStarter createControllerStarter() {
     return new ControllerStarter();
   }
@@ -387,9 +416,7 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Adds fake broker instances until total number of broker instances equals maxCount.
-   */
+  /// Adds fake broker instances until total number of broker instances equals maxCount.
   public void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     HelixManager helixManager =
@@ -540,7 +567,7 @@ public class ControllerTest {
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
-  /** Add fake server instances until total number of server instances reaches maxCount */
+  /// Add fake server instances until total number of server instances reaches maxCount
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
     // get current instance count
@@ -763,9 +790,7 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Exposes the admin client for callers that cannot access protected helpers.
-   */
+  /// Exposes the admin client for callers that cannot access protected helpers.
   public PinotAdminClient getAdminClient()
       throws IOException {
     return getOrCreateAdminClient();
@@ -795,9 +820,7 @@ public class ControllerTest {
     addSchema(createDummySchema(tableName));
   }
 
-  /**
-   * Add a schema to the controller.
-   */
+  /// Add a schema to the controller.
   public void addSchema(Schema schema)
       throws IOException {
     try {
@@ -1224,9 +1247,7 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Trigger a task on a table and wait for completion
-   */
+  /// Trigger a task on a table and wait for completion
   protected String triggerMinionTask(String taskType, String tableNameWithType) {
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
 
@@ -1347,12 +1368,10 @@ public class ControllerTest {
     return IOUtils.toString(new URL(urlString).openStream(), StandardCharsets.UTF_8);
   }
 
-  /**
-   * Sends a GET request to the specified URL and returns the status code along with the stringified response.
-   * @param urlString the URL to send the GET request
-   * @param headers the headers to include in the GET request
-   * @return a Pair containing the status code and the stringified response
-   */
+  /// Sends a GET request to the specified URL and returns the status code along with the stringified response.
+  /// @param urlString the URL to send the GET request
+  /// @param headers the headers to include in the GET request
+  /// @return a Pair containing the status code and the stringified response
   public static Pair<Integer, String> sendGetRequestWithStatusCode(String urlString, Map<String, String> headers)
       throws IOException {
     try {
@@ -1385,13 +1404,11 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
-   * stringified response.
-   * @param urlString the URL to send the POST request to
-   * @param payload the payload to send in the POST request
-   * @return a Pair containing the status code and the stringified response
-   */
+  /// Sends a POST request to the specified URL with the given payload and returns the status code along with the
+  /// stringified response.
+  /// @param urlString the URL to send the POST request to
+  /// @param payload the payload to send in the POST request
+  /// @return a Pair containing the status code and the stringified response
   public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
       throws IOException {
     try {
@@ -1477,9 +1494,7 @@ public class ControllerTest {
     return getHttpClient().sendMultipartPutRequest(url, body, headers);
   }
 
-  /**
-   * @return Number of instances used by all the broker tenants
-   */
+  /// @return Number of instances used by all the broker tenants
   public int getTaggedBrokerCount() {
     int count = 0;
     Set<String> brokerTenants = _helixResourceManager.getAllBrokerTenantNames();
@@ -1490,9 +1505,7 @@ public class ControllerTest {
     return count;
   }
 
-  /**
-   * @return Number of instances used by all the server tenants
-   */
+  /// @return Number of instances used by all the server tenants
   public int getTaggedServerCount() {
     int count = 0;
     Set<String> serverTenants = _helixResourceManager.getAllServerTenantNames();
@@ -1540,9 +1553,7 @@ public class ControllerTest {
     return _controllerConfig;
   }
 
-  /**
-   * Do not override this method as the configuration is shared across all default TestNG group.
-   */
+  /// Do not override this method as the configuration is shared across all default TestNG group.
   public final Map<String, Object> getSharedControllerConfiguration() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
@@ -1559,9 +1570,7 @@ public class ControllerTest {
     return properties;
   }
 
-  /**
-   * Initialize shared state for the TestNG default test group.
-   */
+  /// Initialize shared state for the TestNG default test group.
   public void startSharedTestSetup()
       throws Exception {
     startZk();
@@ -1572,9 +1581,7 @@ public class ControllerTest {
     addFakeMinionInstancesToAutoJoinHelixCluster(DEFAULT_NUM_MINION_INSTANCES);
   }
 
-  /**
-   * Cleanup shared state used in the TestNG default test group.
-   */
+  /// Cleanup shared state used in the TestNG default test group.
   public void stopSharedTestSetup() {
     cleanup();
 
@@ -1583,9 +1590,7 @@ public class ControllerTest {
     stopZk();
   }
 
-  /**
-   * Checks if the number of online instances for a given resource matches the expected num of instances or not.
-   */
+  /// Checks if the number of online instances for a given resource matches the expected num of instances or not.
   public void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
       throws InterruptedException {
     long endTime = System.currentTimeMillis() + TIMEOUT_MS;
@@ -1601,9 +1606,7 @@ public class ControllerTest {
     fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
   }
 
-  /**
-   * Make sure shared state is setup and valid before each test case class is run.
-   */
+  /// Make sure shared state is setup and valid before each test case class is run.
   public void setupSharedStateAndValidate()
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
@@ -1659,10 +1662,8 @@ public class ControllerTest {
     };
   }
 
-  /**
-   * Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
-   * test functionality.
-   */
+  /// Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
+  /// test functionality.
   public void cleanup() {
     // Delete logical tables
     List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();

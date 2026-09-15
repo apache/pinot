@@ -40,13 +40,11 @@ public class SegmentPartitionUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
 
-  /**
-   * Returns the partition info for a given segment with single partition column.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
-   *       in which case we won't retry later.
-   */
+  /// Returns the partition info for a given segment with single partition column.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  ///       [#INVALID_PARTITION_INFO] when the segment does not have valid partition metadata in its ZK metadata,
+  ///       in which case we won't retry later.
   @Nullable
   public static SegmentPartitionInfo extractPartitionInfo(String tableNameWithType, String partitionColumn,
       String segment, @Nullable ZNRecord znRecord) {
@@ -83,13 +81,11 @@ public class SegmentPartitionUtils {
         columnPartitionMetadata.getPartitions());
   }
 
-  /**
-   * Returns a map from partition column name to partition info for a given segment with multiple partition columns.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_COLUMN_PARTITION_INFO_MAP} when the segment does not have valid partition metadata in its ZK
-   *       metadata, in which case we won't retry later.
-   */
+  /// Returns a map from partition column name to partition info for a given segment with multiple partition columns.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  ///       [#INVALID_COLUMN_PARTITION_INFO_MAP] when the segment does not have valid partition metadata in its ZK
+  ///       metadata, in which case we won't retry later.
   @Nullable
   public static Map<String, SegmentPartitionInfo> extractPartitionInfoMap(String tableNameWithType,
       Set<String> partitionColumns, String segment, @Nullable ZNRecord znRecord) {

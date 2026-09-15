@@ -26,9 +26,7 @@ import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
- */
+/// Pinot client transport factory for JSON encoded BrokerResults through HTTP.
 public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
 
   private static final String DEFAULT_BROKER_READ_TIMEOUT_MS = "60000";

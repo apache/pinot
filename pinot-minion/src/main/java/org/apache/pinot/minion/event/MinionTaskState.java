@@ -18,28 +18,16 @@
  */
 package org.apache.pinot.minion.event;
 
-/**
- * MinionTaskState represent a minion task state
- */
+/// MinionTaskState represent a minion task state
 public enum MinionTaskState {
-  /**
-   * No state is reported / unknown
-   */
+  /// No state is reported / unknown
   UNKNOWN,
-  /**
-   * The minion task is in progress
-   */
+  /// The minion task is in progress
   IN_PROGRESS,
-  /**
-   * The minion task succeeded
-   */
+  /// The minion task succeeded
   SUCCEEDED,
-  /**
-   * The minion task is cancelled
-   */
+  /// The minion task is cancelled
   CANCELLED,
-  /**
-   * The minion task encounters error
-   */
+  /// The minion task encounters error
   ERROR
 }

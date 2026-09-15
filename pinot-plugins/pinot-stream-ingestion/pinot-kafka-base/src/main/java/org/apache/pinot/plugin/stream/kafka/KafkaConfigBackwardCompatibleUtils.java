@@ -39,9 +39,7 @@ public class KafkaConfigBackwardCompatibleUtils {
   public static final String AWS_PROPS_PREFIX = "software.amazon";
   public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
-  /**
-   * Handle the stream config to replace the Kafka common package with the shaded version if needed.
-   */
+  /// Handle the stream config to replace the Kafka common package with the shaded version if needed.
   public static void handleStreamConfig(StreamConfig streamConfig) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     //FIXME: This needs to be done because maven shade plugin also overwrites the constants in the classes

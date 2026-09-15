@@ -54,10 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The class <code>ClusterInfoProvider</code> is an abstraction on top of {@link PinotHelixResourceManager} and
- * {@link PinotHelixTaskResourceManager} which provides cluster information for PinotTaskGenerator.
- */
+/// The class `ClusterInfoProvider` is an abstraction on top of [PinotHelixResourceManager] and
+/// [PinotHelixTaskResourceManager] which provides cluster information for PinotTaskGenerator.
 public class ClusterInfoAccessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterInfoAccessor.class);
 
@@ -82,34 +80,28 @@ public class ClusterInfoAccessor {
     _connectionManager = connectionManager;
   }
 
-  /**
-   * Get the table config for the given table name with type suffix.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Table config
-   */
+  /// Get the table config for the given table name with type suffix.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Table config
   @Nullable
   public TableConfig getTableConfig(String tableNameWithType) {
     return _pinotHelixResourceManager.getTableConfig(tableNameWithType);
   }
 
-  /**
-   * Get the table schema for the given table name with or without type suffix.
-   *
-   * @param tableName Table name with or without type suffix
-   * @return Table schema
-   */
+  /// Get the table schema for the given table name with or without type suffix.
+  ///
+  /// @param tableName Table name with or without type suffix
+  /// @return Table schema
   @Nullable
   public Schema getTableSchema(String tableName) {
     return _pinotHelixResourceManager.getTableSchema(tableName);
   }
 
-  /**
-   * Get all segments' ZK metadata for the given table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return List of segments' ZK metadata
-   */
+  /// Get all segments' ZK metadata for the given table.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @return List of segments' ZK metadata
   public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
@@ -118,93 +110,75 @@ public class ClusterInfoAccessor {
     return _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
   }
 
-  /**
-   * Get shared executor
-   */
+  /// Get shared executor
   public Executor getExecutor() {
     return _executor;
   }
 
-  /**
-   * Get shared connection manager
-   */
+  /// Get shared connection manager
   public PoolingHttpClientConnectionManager getConnectionManager() {
     return _connectionManager;
   }
 
-  /**
-   * Fetches the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for the given
-   * taskType and tableNameWithType
-   *
-   * @param taskType The type of the minion task
-   * @param tableNameWithType Table name with type
-   */
+  /// Fetches the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for the given
+  /// taskType and tableNameWithType
+  ///
+  /// @param taskType The type of the minion task
+  /// @param tableNameWithType Table name with type
   public ZNRecord getMinionTaskMetadataZNRecord(String taskType, String tableNameWithType) {
     return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType,
         tableNameWithType);
   }
 
-  /**
-   * Get the segment lineage for the given table name with type suffix.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Segment lineage
-   */
+  /// Get the segment lineage for the given table name with type suffix.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Segment lineage
   @Nullable
   public SegmentLineage getSegmentLineage(String tableNameWithType) {
     return SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
         tableNameWithType);
   }
 
-  /**
-   * Sets a minion task metadata into MINION_TASK_METADATA
-   * This call will override any previous metadata node
-   *
-   * @param taskMetadata The task metadata to persist
-   * @param taskType The type of the minion task
-   * @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
-   */
+  /// Sets a minion task metadata into MINION_TASK_METADATA
+  /// This call will override any previous metadata node
+  ///
+  /// @param taskMetadata The task metadata to persist
+  /// @param taskType The type of the minion task
+  /// @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
   public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
     MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata,
         expectedVersion);
   }
 
-  /**
-   * Get all tasks' state for the given task type.
-   *
-   * @param taskType Task type
-   * @return Map from task name to task state
-   */
+  /// Get all tasks' state for the given task type.
+  ///
+  /// @param taskType Task type
+  /// @return Map from task name to task state
   public Map<String, TaskState> getTaskStates(String taskType) {
     return _pinotHelixTaskResourceManager.getTaskStates(taskType);
   }
 
-  /**
-   * Get the child task configs for the given task name.
-   *
-   * @param taskName Task name
-   * @return List of child task configs
-   */
+  /// Get the child task configs for the given task name.
+  ///
+  /// @param taskName Task name
+  /// @return List of child task configs
   public List<PinotTaskConfig> getTaskConfigs(String taskName) {
     return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
   }
 
-  /**
-   * Get the VIP URL for the controllers.
-   *
-   * @return VIP URL
-   */
+  /// Get the VIP URL for the controllers.
+  ///
+  /// @return VIP URL
   public String getVipUrl() {
     return _controllerConf.generateVipUrl();
   }
 
-  /**
-   * Get the VIP URL of the lead controller for the given table.
-   * Falls back to the current controller's VIP URL if lead controller cannot be determined for some reason
-   *
-   * @param tableNameWithType table name with type
-   * @return VIP URL of the lead controller of the table
-   */
+  /// Get the VIP URL of the lead controller for the given table.
+  /// Falls back to the current controller's VIP URL if lead controller cannot be determined for some reason
+  ///
+  /// @param tableNameWithType table name with type
+  /// @return VIP URL of the lead controller of the table
   public String getVipUrlForLeadController(String tableNameWithType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_leadControllerManager.isLeaderForTable(rawTableName)) {
@@ -283,20 +257,16 @@ public class ClusterInfoAccessor {
     }
   }
 
-  /**
-   * Get the data dir.
-   *
-   * @return the data dir.
-   */
+  /// Get the data dir.
+  ///
+  /// @return the data dir.
   public String getDataDir() {
     return _controllerConf.getDataDir();
   }
 
-  /**
-   * Get the cluster config for a given config name, return null if not found.
-   *
-   * @return cluster config
-   */
+  /// Get the cluster config for a given config name, return null if not found.
+  ///
+  /// @return cluster config
   public String getClusterConfig(String configName) {
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
@@ -306,40 +276,32 @@ public class ClusterInfoAccessor {
     return configMap != null ? configMap.get(configName) : null;
   }
 
-  /**
-   * Get the controller metrics.
-   *
-   * @return controller metrics
-   */
+  /// Get the controller metrics.
+  ///
+  /// @return controller metrics
   public ControllerMetrics getControllerMetrics() {
     return _controllerMetrics;
   }
 
-  /**
-   * Get the leader controller manager.
-   *
-   * @return leader controller manager
-   */
+  /// Get the leader controller manager.
+  ///
+  /// @return leader controller manager
   public LeadControllerManager getLeaderControllerManager() {
     return _leadControllerManager;
   }
 
-  /**
-   * Get the helix resource manager for minion task generator to
-   * access the info of tables, segments, instances, etc.
-   *
-   * @return helix resource manager
-   */
+  /// Get the helix resource manager for minion task generator to
+  /// access the info of tables, segments, instances, etc.
+  ///
+  /// @return helix resource manager
   public PinotHelixResourceManager getPinotHelixResourceManager() {
     return _pinotHelixResourceManager;
   }
 
-  /**
-   * Get the helix task resource manager for minion task generator to
-   * access the info of minion tasks.
-   *
-   * @return helix task resource manager
-   */
+  /// Get the helix task resource manager for minion task generator to
+  /// access the info of minion tasks.
+  ///
+  /// @return helix task resource manager
   public PinotHelixTaskResourceManager getPinotHelixTaskResourceManager() {
     return _pinotHelixTaskResourceManager;
   }

@@ -23,9 +23,7 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 
-/**
- * Auth provider for static client tokens, typically used for job specs or when mimicking legacy behavior.
- */
+/// Auth provider for static client tokens, typically used for job specs or when mimicking legacy behavior.
 public class StaticTokenAuthProvider implements AuthProvider {
   public static final String HEADER = "header";
   public static final String PREFIX = "prefix";

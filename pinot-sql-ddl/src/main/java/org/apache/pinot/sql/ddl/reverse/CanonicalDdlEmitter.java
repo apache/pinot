@@ -366,8 +366,8 @@ public final class CanonicalDdlEmitter {
     }
   }
 
-  /// Reverse-DDL analogue of {@link MaterializedViewPropertyRouter} for the MV's
-  /// `PROPERTIES (...)` block. Starts from the shared {@link PropertyExtractor} output and
+  /// Reverse-DDL analogue of [MaterializedViewPropertyRouter] for the MV's
+  /// `PROPERTIES (...)` block. Starts from the shared [PropertyExtractor] output and
   /// applies three MV-specific transforms:
   ///
   /// 1. **Drop synthetic clause keys.** `task.MaterializedViewTask.definedSQL` is rendered
@@ -376,7 +376,7 @@ public final class CanonicalDdlEmitter {
   ///    "reserved for the corresponding DDL clause".
   /// 1. **Flatten canonical task knobs.** `task.MaterializedViewTask.<bucketTimePeriod>`
   ///    and the other entries recognized by
-  ///    {@link MaterializedViewPropertyRouter#canonicalKnobName} are flattened back to the
+  ///    [MaterializedViewPropertyRouter#canonicalKnobName] are flattened back to the
   ///    bare DDL form the forward router accepts. Preserves the user's preferred input
   ///    shape across `emit → parse → emit`.
   /// 1. **Keep arbitrary task entries verbatim.** Any other `task.MaterializedViewTask.<key>`

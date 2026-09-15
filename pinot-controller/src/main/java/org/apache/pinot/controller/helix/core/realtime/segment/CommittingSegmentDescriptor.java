@@ -23,9 +23,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 
 
-/**
- * Class to hold properties of the committing segment
- */
+/// Class to hold properties of the committing segment
 public class CommittingSegmentDescriptor {
   private final String _segmentName;
   private final String _nextOffset;

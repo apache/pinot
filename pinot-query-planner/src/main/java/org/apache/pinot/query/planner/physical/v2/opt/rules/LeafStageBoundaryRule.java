@@ -27,16 +27,13 @@ import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRule;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRuleCall;
 
 
-/**
- * The leaf stage consists of a table-scan and an optional project and/or filter. The filter and project nodes
- * may be in any order. We don't include sort or aggregate in the leaf stage in this rule, because they will made part
- * of Leaf stage (if appropriate) as part of the Aggregate and Sort pushdown rules.
- * <p>
- *  The idea is that you can and should always make filter and project part of the leaf stage and compute them locally
- *  on the server where the table-scan is computed. Whether it makes sense to run the aggregate or sort in the leaf
- *  stage depends on a few conditions, and hence it is handled as part of their respective pushdown rules.
- * </p>
- */
+/// The leaf stage consists of a table-scan and an optional project and/or filter. The filter and project nodes
+/// may be in any order. We don't include sort or aggregate in the leaf stage in this rule, because they will made part
+/// of Leaf stage (if appropriate) as part of the Aggregate and Sort pushdown rules.
+///
+///  The idea is that you can and should always make filter and project part of the leaf stage and compute them locally
+///  on the server where the table-scan is computed. Whether it makes sense to run the aggregate or sort in the leaf
+///  stage depends on a few conditions, and hence it is handled as part of their respective pushdown rules.
 public class LeafStageBoundaryRule extends PRelOptRule {
   public static final LeafStageBoundaryRule INSTANCE = new LeafStageBoundaryRule();
 

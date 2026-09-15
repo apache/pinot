@@ -72,4 +72,18 @@ public class MinionConfTest {
     Assert.assertEquals(subcfg.subset("class").getProperty("nooppinotcrypter"),
         "org.apache.pinot.core.crypt.NoOpPinotCrypter");
   }
+
+  @Test
+  public void testReplaceSegmentsTimeoutDefaultsAndOverrides() {
+    MinionConf conf = new MinionConf();
+    Assert.assertEquals(conf.getStartReplaceSegmentsTimeoutMs(),
+        MinionConf.DEFAULT_START_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
+    Assert.assertEquals(conf.getEndReplaceSegmentsTimeoutMs(),
+        MinionConf.DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
+
+    conf.setProperty(MinionConf.START_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, 30 * 60 * 1000);
+    conf.setProperty(MinionConf.END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, 45 * 60 * 1000);
+    Assert.assertEquals(conf.getStartReplaceSegmentsTimeoutMs(), 30 * 60 * 1000);
+    Assert.assertEquals(conf.getEndReplaceSegmentsTimeoutMs(), 45 * 60 * 1000);
+  }
 }

@@ -28,14 +28,12 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/**
- * Tests for {@link DateTimePatternHandler}, with particular focus on DST spring-forward gaps where the
- * requested local wall-clock time does not exist in the target zone.
- *
- * <p>Gap dates chosen here are all historical facts already frozen in the tzdata database (Cairo 2010-04-30,
- * Santiago 2024-09-08, Lord_Howe 2010-10-03) so these tests are not fragile against future tzdata releases
- * that might, for example, drop DST from a country that currently observes it.
- */
+/// Tests for [DateTimePatternHandler], with particular focus on DST spring-forward gaps where the
+/// requested local wall-clock time does not exist in the target zone.
+///
+/// Gap dates chosen here are all historical facts already frozen in the tzdata database (Cairo 2010-04-30,
+/// Santiago 2024-09-08, Lord_Howe 2010-10-03) so these tests are not fragile against future tzdata releases
+/// that might, for example, drop DST from a country that currently observes it.
 public class DateTimePatternHandlerTest {
 
   // Cairo sprang forward at 00:00 local on 2010-04-30 (last Friday of April), so 00:00 did not exist that

@@ -27,9 +27,7 @@ import org.apache.pinot.core.operator.combine.merger.SelectionOnlyResultsBlockMe
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Combine operator for selection queries with streaming response.
- */
+/// Combine operator for selection queries with streaming response.
 @SuppressWarnings("rawtypes")
 public class StreamingSelectionOnlyCombineOperator extends BaseStreamingCombineOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "STREAMING_COMBINE_SELECT";

@@ -38,51 +38,59 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
-/**
- * Query rewriter to rewrite CLP-related functions: clpDecode and clpMatch.
- * <ul>
- *   <li>clpDecode rewrites the query so users can pass in the name of a CLP-encoded column group instead of the names
- *   of all the columns in the group.</li>
- *   <li>clpMatch rewrites a wildcard query into a SQL boolean expression that implement's CLP's query processing
- *   logic.</li>
- * </ul>
- * <p>
- * clpDecode usage:
- * <pre>
- *   clpDecode("columnGroupName"[, defaultValue])
- * </pre>
- * will be rewritten to:
- * <pre>
- *   clpDecode("columnGroupName_logtype", "columnGroupName_dictionaryVars", "columnGroupName_encodedVars"[,
- *   defaultValue])
- * </pre>
- * The "defaultValue" is optional. See
- * {@link org.apache.pinot.core.operator.transform.function.CLPDecodeTransformFunction} for its description.
- * <p>
- * Sample queries:
- * <pre>
- *   SELECT clpDecode("message") FROM table
- *   SELECT clpDecode("message", 'null') FROM table
- * </pre>
- * See {@link org.apache.pinot.core.operator.transform.function.CLPDecodeTransformFunction} for details about the
- * underlying clpDecode transformer.
- * <p>
- * clpMatch usage:
- * <pre>
- *   clpMatch("columnGroupName", 'wildcardQuery')
- * </pre>
- * OR
- * <pre>
- *   clpMatch("columnGroupName_logtype", "columnGroupName_dictionaryVars", "columnGroupName_encodedVars",
- *            'wildcardQuery')
- * </pre>
- * <p>
- * Sample queries:
- * <pre>
- *   SELECT * FROM table WHERE clpMatch(message, '* job1 failed *')
- *   SELECT * FROM table WHERE clpMatch(message_logtype, message_dictionaryVars, message_encodedVars, '* job1 failed *')
- * </pre>
- */
+/// Query rewriter to rewrite CLP-related functions: clpDecode and clpMatch.
+///
+/// - clpDecode rewrites the query so users can pass in the name of a CLP-encoded column group instead of the names
+///   of all the columns in the group.
+/// - clpMatch rewrites a wildcard query into a SQL boolean expression that implement's CLP's query processing
+///   logic.
+///
+/// clpDecode usage:
+///
+/// ```
+/// clpDecode("columnGroupName"[, defaultValue])
+/// ```
+///
+/// will be rewritten to:
+///
+/// ```
+/// clpDecode("columnGroupName_logtype", "columnGroupName_dictionaryVars", "columnGroupName_encodedVars"[,
+/// defaultValue])
+/// ```
+///
+/// The "defaultValue" is optional. See
+/// [org.apache.pinot.core.operator.transform.function.CLPDecodeTransformFunction] for its description.
+///
+/// Sample queries:
+///
+/// ```
+/// SELECT clpDecode("message") FROM table
+/// SELECT clpDecode("message", 'null') FROM table
+/// ```
+///
+/// See [org.apache.pinot.core.operator.transform.function.CLPDecodeTransformFunction] for details about the
+/// underlying clpDecode transformer.
+///
+/// clpMatch usage:
+///
+/// ```
+/// clpMatch("columnGroupName", 'wildcardQuery')
+/// ```
+///
+/// OR
+///
+/// ```
+/// clpMatch("columnGroupName_logtype", "columnGroupName_dictionaryVars", "columnGroupName_encodedVars",
+///          'wildcardQuery')
+/// ```
+///
+/// Sample queries:
+///
+/// ```
+/// SELECT * FROM table WHERE clpMatch(message, '* job1 failed *')
+/// SELECT * FROM table WHERE clpMatch(message_logtype, message_dictionaryVars, message_encodedVars,
+///                                    '* job1 failed *')
+/// ```
 public class ClpRewriter implements QueryRewriter {
   public static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
   public static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
@@ -120,12 +128,10 @@ public class ClpRewriter implements QueryRewriter {
     return pinotQuery;
   }
 
-  /**
-   * Rewrites any instances of clpDecode or clpMatch in the given expression
-   * @param expression Expression which may contain instances of clpDecode
-   * @param isFilterExpression Whether the root-level expression (not an expression from a recursive step) is a
-   *                           filter expression.
-   */
+  /// Rewrites any instances of clpDecode or clpMatch in the given expression
+  /// @param expression Expression which may contain instances of clpDecode
+  /// @param isFilterExpression Whether the root-level expression (not an expression from a recursive step) is a
+  ///                           filter expression.
   private void tryRewritingExpression(Expression expression, boolean isFilterExpression) {
     if (null == expression) {
       return;
@@ -175,10 +181,8 @@ public class ClpRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * @param function
-   * @return Whether the function call is `NOT clpMatch(...) = true`
-   */
+  /// @param function
+  /// @return Whether the function call is `NOT clpMatch(...) = true`
   private boolean isInvertedClpMatchEqualsFunctionCall(Function function) {
     // Validate this is a "NOT" function call
     if (!function.getOperator().equals(SqlKind.NOT.name())) {
@@ -195,10 +199,8 @@ public class ClpRewriter implements QueryRewriter {
     return isClpMatchEqualsFunctionCall(op0.getFunctionCall());
   }
 
-  /**
-   * @param function
-   * @return Whether the function call is `clpMatch(...) = true`
-   */
+  /// @param function
+  /// @return Whether the function call is `clpMatch(...) = true`
   private boolean isClpMatchEqualsFunctionCall(Function function) {
     // Validate this is an equals function call
     if (!function.getOperator().equals(SqlKind.EQUALS.name())) {
@@ -219,11 +221,9 @@ public class ClpRewriter implements QueryRewriter {
     return f.getOperator().equals(_CLPMATCH_LOWERCASE_FUNCTION_NAME) && l.isSetBoolValue() && l.getBoolValue();
   }
 
-  /**
-   * Replaces `clpMatch(...) = true` with the boolean expression equivalent to `clpMatch(...)`
-   * @param expression
-   * @param function
-   */
+  /// Replaces `clpMatch(...) = true` with the boolean expression equivalent to `clpMatch(...)`
+  /// @param expression
+  /// @param function
   private void replaceClpMatchEquals(Expression expression, Function function) {
     // Replace clpMatch with the equivalent boolean expression and then replace
     // `clpMatch(...) = true` with this boolean expression
@@ -233,10 +233,8 @@ public class ClpRewriter implements QueryRewriter {
     expression.setFunctionCall(op0.getFunctionCall());
   }
 
-  /**
-   * Rewrites `clpMatch(...)` using CLP's query translation logic
-   * @param expression
-   */
+  /// Rewrites `clpMatch(...)` using CLP's query translation logic
+  /// @param expression
   private void rewriteClpMatchFunction(Expression expression) {
     Function currentFunction = expression.getFunctionCall();
     List<Expression> operands = currentFunction.getOperands();
@@ -286,14 +284,12 @@ public class ClpRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * Rewrites `clpMatch(...)` using CLP's query translation logic
-   * @param expression
-   * @param logtypeColumnName
-   * @param dictionaryVarsColumnName
-   * @param encodedVarsColumnName
-   * @param wildcardQuery
-   */
+  /// Rewrites `clpMatch(...)` using CLP's query translation logic
+  /// @param expression
+  /// @param logtypeColumnName
+  /// @param dictionaryVarsColumnName
+  /// @param encodedVarsColumnName
+  /// @param wildcardQuery
   private void rewriteClpMatchFunction(Expression expression, String logtypeColumnName, String dictionaryVarsColumnName,
       String encodedVarsColumnName, String wildcardQuery) {
     if (wildcardQuery.isEmpty()) {
@@ -366,10 +362,8 @@ public class ClpRewriter implements QueryRewriter {
     expression.setFunctionCall(newFunc);
   }
 
-  /**
-   * Rewrites the given instance of clpDecode as described in the class' Javadoc
-   * @param expression clpDecode function expression
-   */
+  /// Rewrites the given instance of clpDecode as described in the class' Javadoc
+  /// @param expression clpDecode function expression
   private void rewriteCLPDecodeFunction(Expression expression) {
     Function function = expression.getFunctionCall();
     List<Expression> arguments = function.getOperands();
@@ -498,26 +492,22 @@ public class ClpRewriter implements QueryRewriter {
         RequestUtils.getLiteralExpression(query));
   }
 
-  /**
-   * Converts a CLP-encoded column group into physical column names and adds them to the CLPDecode transform function's
-   * operands.
-   * @param columnGroupName Name of the CLP-encoded column group
-   * @param defaultValueLiteral Optional default value to pass through to the transform function
-   * @param clpDecode The function to add the operands to
-   */
+  /// Converts a CLP-encoded column group into physical column names and adds them to the CLPDecode transform function's
+  /// operands.
+  /// @param columnGroupName Name of the CLP-encoded column group
+  /// @param defaultValueLiteral Optional default value to pass through to the transform function
+  /// @param clpDecode The function to add the operands to
   private void addCLPDecodeOperands(String columnGroupName, @Nullable Literal defaultValueLiteral, Function clpDecode) {
     addCLPDecodeOperands(columnGroupName + LOGTYPE_COLUMN_SUFFIX, columnGroupName + DICTIONARY_VARS_COLUMN_SUFFIX,
         columnGroupName + ENCODED_VARS_COLUMN_SUFFIX, defaultValueLiteral, clpDecode);
   }
 
-  /**
-   * Adds the given operands to the given CLPDecode transform function.
-   * @param logtypeColumnName
-   * @param dictionaryVarsColumnName
-   * @param encodedVarsColumnName
-   * @param defaultValueLiteral
-   * @param clpDecode
-   */
+  /// Adds the given operands to the given CLPDecode transform function.
+  /// @param logtypeColumnName
+  /// @param dictionaryVarsColumnName
+  /// @param encodedVarsColumnName
+  /// @param defaultValueLiteral
+  /// @param clpDecode
   private void addCLPDecodeOperands(String logtypeColumnName, String dictionaryVarsColumnName,
       String encodedVarsColumnName, @Nullable Literal defaultValueLiteral, Function clpDecode) {
     clpDecode.addToOperands(RequestUtils.getIdentifierExpression(logtypeColumnName));
@@ -530,14 +520,12 @@ public class ClpRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * Converts a wildcard query into a regular expression. The wildcard query is a string which may contain two possible
-   * wildcards:
-   * 1. '*' that matches zero or more characters.
-   * 2. '?' that matches any single character.
-   * @param wildcardQuery
-   * @return The regular expression which matches the same values as the wildcard query.
-   */
+  /// Converts a wildcard query into a regular expression. The wildcard query is a string which may contain two possible
+  /// wildcards:
+  /// 1. '\*' that matches zero or more characters.
+  /// 2. '?' that matches any single character.
+  /// @param wildcardQuery
+  /// @return The regular expression which matches the same values as the wildcard query.
   private static String wildcardQueryToRegex(String wildcardQuery) {
     boolean isEscaped = false;
     StringBuilder queryWithSqlWildcards = new StringBuilder();
@@ -583,17 +571,13 @@ public class ClpRewriter implements QueryRewriter {
     return queryWithSqlWildcards.toString();
   }
 
-  /**
-   * @param c
-   * @return Whether the given character is a wildcard.
-   */
+  /// @param c
+  /// @return Whether the given character is a wildcard.
   private static boolean isWildcard(char c) {
     return '*' == c || '?' == c;
   }
 
-  /**
-   * Simple class to hold the result of turning a CLP subquery into SQL.
-   */
+  /// Simple class to hold the result of turning a CLP subquery into SQL.
   private static class ClpSqlSubqueryGenerationResult {
     private final boolean _requiresDecompAndMatch;
     private final Function _sqlFunc;

@@ -21,10 +21,8 @@ package org.apache.pinot.common.collections;
 import java.util.AbstractList;
 
 
-/**
- * An immutable list like the one returned by {@link java.util.Collections#nCopies(int, Object)}, but with two values
- * (that are not interleaved) instead of a single one. Useful for avoiding unnecessary allocations.
- */
+/// An immutable list like the one returned by [java.util.Collections#nCopies(int, Object)], but with two values
+/// (that are not interleaved) instead of a single one. Useful for avoiding unnecessary allocations.
 public class DualValueList<E> extends AbstractList<E> {
 
   private final E _firstValue;

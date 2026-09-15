@@ -39,14 +39,12 @@ import org.slf4j.LoggerFactory;
 
 /// Orchestrates materialized view query rewriting in two phases:
 ///
-///
 ///   - **Static matching** — strategies produce [MaterializedViewRewritePlan]
 ///       fragments (rewritten MV query + match type + cost) without considering
 ///       runtime state.
 ///   - **Runtime gating and plan resolution** — freshness is checked
 ///       before matching; after matching, execution mode is determined and
 ///       split-compatibility is verified.
-///
 ///
 /// For each candidate MV, strategies are tried in registration order (highest
 /// precision first). Once a strategy produces a plan that also passes runtime
@@ -181,7 +179,7 @@ public class MaterializedViewQueryRewriteEngine {
   /// partition map is permitted — V1 routing uses `watermarkMs` as the split point, so the
   /// partition map is only consulted for V2 N-way routing.
   ///
-  /// <p><b>Known V1 limitation (tracked for V2 per-bucket routing):</b> because the split is a
+  /// **Known V1 limitation (tracked for V2 per-bucket routing):** because the split is a
   /// single `watermarkMs` cutoff and does NOT consult per-bucket state, a bucket strictly below
   /// `watermarkMs` that is STALE, absent (VACANT), or VALID-empty — e.g. a historical base-table
   /// change the consistency manager marked STALE, a backfill into a previously-empty window, or a
@@ -228,7 +226,6 @@ public class MaterializedViewQueryRewriteEngine {
   ///       data. `watermarkMs` must be &gt; 0 (i.e. at least one APPEND
   ///       has successfully completed) for the MV to be queryable. If coverage is
   ///       not yet confirmed, returns `null` to skip this MV.
-  ///
   ///
   /// In split mode, EXACT match is rejected when the user query has GROUP BY
   /// because it replaces aggregation functions with plain MV column references,

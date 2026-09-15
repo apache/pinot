@@ -54,12 +54,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will
- * currently
- * also perform the data move. In the future when we introduce versioning, we will decouple these two steps.
- * TODO: Merge it into PinotHelixResourceManager
- */
+/// The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will
+/// currently
+/// also perform the data move. In the future when we introduce versioning, we will decouple these two steps.
+/// TODO: Merge it into PinotHelixResourceManager
 public class ZKOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKOperator.class);
 
@@ -218,12 +216,11 @@ public class ZKOperator {
     _pinotHelixResourceManager.resetSegment(realtimeTableName, segmentName, null);
   }
 
-  /**
-   * Returns {@code true} when the segment should be processed as new segment.
-   * <p>When segment ZK metadata exists, check if segment exists in the ideal state. If the previous upload failed after
-   * segment ZK metadata is created but before assigning the segment to the ideal state, we want to remove the existing
-   * segment ZK metadata and treat it as a new segment.
-   */
+  /// Returns `true` when the segment should be processed as new segment.
+  ///
+  /// When segment ZK metadata exists, check if segment exists in the ideal state. If the previous upload failed after
+  /// segment ZK metadata is created but before assigning the segment to the ideal state, we want to remove the existing
+  /// segment ZK metadata and treat it as a new segment.
   private boolean shouldProcessAsNewSegment(String tableNameWithType, String segmentName,
       ZNRecord existingSegmentMetadataZNRecord, boolean enableParallelPushProtection) {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
@@ -593,11 +590,9 @@ public class ZKOperator {
     }
   }
 
-  /**
-   * Deletes the segment to be uploaded if either one of the criteria is qualified:
-   * 1) the uploadStartTime matches with the one persisted in ZK metadata.
-   * 2) enableParallelPushProtection is not enabled.
-   */
+  /// Deletes the segment to be uploaded if either one of the criteria is qualified:
+  /// 1) the uploadStartTime matches with the one persisted in ZK metadata.
+  /// 2) enableParallelPushProtection is not enabled.
   private void deleteSegmentIfNeeded(String tableNameWithType, String segmentName, long currentSegmentUploadStartTime,
       boolean enableParallelPushProtection) {
     ZNRecord existingSegmentMetadataZNRecord =
@@ -616,11 +611,9 @@ public class ZKOperator {
     }
   }
 
-  /**
-   * Deletes the segments to be uploaded if either one of the criteria is qualified:
-   * 1) the uploadStartTime matches with the one persisted in ZK metadata.
-   * 2) enableParallelPushProtection is not enabled.
-   */
+  /// Deletes the segments to be uploaded if either one of the criteria is qualified:
+  /// 1) the uploadStartTime matches with the one persisted in ZK metadata.
+  /// 2) enableParallelPushProtection is not enabled.
   private void deleteSegmentsIfNeeded(String tableNameWithType, Collection<String> segmentNames,
       long currentSegmentUploadStartTime, boolean enableParallelPushProtection) {
     List<String> segmentsToDelete = new ArrayList<>();

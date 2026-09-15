@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -53,13 +54,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Special rule for Pinot, this rule populates {@link RelDistribution} across the entire relational tree.
- *
- * we implement this rule as a workaround b/c {@link org.apache.calcite.plan.RelTraitPropagationVisitor}, which is
- * deprecated. The idea is to associate every node with a RelDistribution derived from {@link RelNode#getInputs()}
- * or from the node itself (via hints, or special handling of the type of node in question).
- */
+/// Special rule for Pinot, this rule populates [RelDistribution] across the entire relational tree.
+///
+/// we implement this rule as a workaround b/c [org.apache.calcite.plan.RelTraitPropagationVisitor], which is
+/// deprecated. The idea is to associate every node with a RelDistribution derived from [RelNode#getInputs()]
+/// or from the node itself (via hints, or special handling of the type of node in question).
 public class PinotRelDistributionTraitRule extends RelOptRule {
   public static final PinotRelDistributionTraitRule INSTANCE =
       new PinotRelDistributionTraitRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -83,10 +82,8 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
     call.transformTo(attachTrait(current, relDistribution));
   }
 
-  /**
-   * currently, Pinot has {@link RelTraitSet} default set to empty and thus we directly pull the cluster trait set,
-   * then plus the {@link RelDistribution} trait.
-   */
+  /// currently, Pinot has [RelTraitSet] default set to empty and thus we directly pull the cluster trait set,
+  /// then plus the [RelDistribution] trait.
   private static RelNode attachTrait(RelNode relNode, RelTrait trait) {
     RelTraitSet clusterTraitSet = relNode.getCluster().traitSet();
     if (relNode instanceof LogicalJoin) {
@@ -165,6 +162,26 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       if (inputRelDistribution != null) {
         return inputRelDistribution;
       }
+    } else if (node instanceof SetOp) {
+      // A set operation sits above the exchanges inserted by PinotSetOpExchangeNodeInsertRule, and an exchange that
+      // genuinely redistributes describes the output: hash on the projected columns leaves the output hash
+      // distributed on them, broadcast leaves every worker holding all rows of every branch. That holds for a
+      // pre-partitioned hash exchange too, because is_colocated_by_set_op_keys asserts that rows equal across all
+      // projected columns already share a worker -- exactly the claimed distribution. We take the hint at its word
+      // here, just as the exchange itself does.
+      // A local (SINGLETON) exchange, which is what UNION ALL gets, is the exception: it redistributes nothing, so
+      // the output keeps whatever placement the inputs happened to have and SINGLETON ("everything on one worker")
+      // is not true of it. Claiming anything there would let a deduplicating consumer above it -- for example the
+      // aggregate UnionToDistinctRule puts over a distinct UNION -- skip a shuffle it needs.
+      // All inputs are checked so a future per-branch decision cannot silently invalidate this.
+      for (RelNode setOpInput : inputs) {
+        RelNode unboxedInput = PinotRuleUtils.unboxRel(setOpInput);
+        if (!(unboxedInput instanceof PinotLogicalExchange)
+            || ((PinotLogicalExchange) unboxedInput).getDistribution().getType() == RelDistribution.Type.SINGLETON) {
+          return RelDistributions.of(RelDistribution.Type.RANDOM_DISTRIBUTED, RelDistributions.EMPTY);
+        }
+      }
+      return ((PinotLogicalExchange) input).getDistribution();
     }
     // TODO: add the rest of the nodes.
     return computeCurrentDistribution(node);

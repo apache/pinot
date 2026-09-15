@@ -34,9 +34,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Integration test for floating point data type (float & double) filter queries.
- */
+/// Integration test for floating point data type (float & double) filter queries.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "FloatingPointDataTypeTest";

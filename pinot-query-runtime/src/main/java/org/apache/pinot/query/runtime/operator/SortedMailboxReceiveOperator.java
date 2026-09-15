@@ -21,10 +21,10 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -34,13 +34,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This {@code SortedMailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link #nextBlock()} API in a sorted manner.
- *
- *  TODO: Once sorting on the {@code MailboxSendOperator} is available, modify this to use a k-way merge instead of
- *        resorting via the PriorityQueue.
- */
+/// This `SortedMailboxReceiveOperator` receives data from a
+/// [org.apache.pinot.query.mailbox.ReceivingMailbox] and serve it out from the [#nextBlock()] API in a
+/// sorted manner.
+///
+///  TODO: Once sorting on the `MailboxSendOperator` is available, modify this to use a k-way merge instead of
+///        resorting via the PriorityQueue.
 public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
 
@@ -48,7 +47,11 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   private final DataSchema _dataSchema;
   private final List<RelFieldCollation> _collations;
-  private final List<Object[]> _rows = new ArrayList<>();
+  /// The rows collected from the mailboxes. Sorted in place and handed downstream as-is, so [#releaseBuffers()]
+  /// drops the reference instead of clearing it: a local mailbox may still be holding the block that wraps this very
+  /// list, and emptying it would silently drop those rows.
+  @Nullable
+  private List<Object[]> _rows = new ArrayList<>();
 
   private MseBlock _eosBlock;
 
@@ -79,20 +82,24 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     while (true) {
       MseBlock block = _multiConsumer.readMseBlockBlocking();
       if (block.isData()) {
+        assert _rows != null : "Rows should not be null while collecting mailbox blocks";
         _rows.addAll(((MseBlock.Data) block).asRowHeap().getRows());
         continue;
       }
       MseBlock.Eos eosBlock = (MseBlock.Eos) block;
       onEos();
       _eosBlock = eosBlock;
+      List<Object[]> rows = _rows;
+      assert rows != null : "Rows should not be null when the end of stream is reached";
+      releaseBuffers();
       if (eosBlock.isError()) {
         return eosBlock;
       } else {
-        if (!_rows.isEmpty()) {
+        if (!rows.isEmpty()) {
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
-          _rows.sort(new SortUtils.SortComparator(_collations, false));
-          return new RowHeapDataBlock(_rows, _dataSchema);
+          rows.sort(new SortUtils.SortComparator(_collations, false));
+          return new RowHeapDataBlock(rows, _dataSchema);
         } else {
           return block;
         }
@@ -101,14 +108,12 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   }
 
   @Override
-  public void close() {
-    super.close();
-    _rows.clear();
+  protected void releaseBuffers() {
+    _rows = null;
   }
 
   @Override
-  public void cancel(Throwable t) {
-    super.cancel(t);
-    _rows.clear();
+  protected boolean hasBufferedState() {
+    return _rows != null;
   }
 }

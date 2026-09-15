@@ -18,15 +18,13 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
- * This class is a container for the metadata regarding a partition group, that is needed by a consumer to start
- * consumption.
- * It consists of:
- * 1. A unique partition group id for this partition group
- * 2. The start offset to begin consumption for this partition group
- * 3. The sequence number for the consuming segment (used when creating segments with designated offsets/sequences)
- */
+/// A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
+/// This class is a container for the metadata regarding a partition group, that is needed by a consumer to start
+/// consumption.
+/// It consists of:
+/// 1. A unique partition group id for this partition group
+/// 2. The start offset to begin consumption for this partition group
+/// 3. The sequence number for the consuming segment (used when creating segments with designated offsets/sequences)
 public class PartitionGroupMetadata {
 
   private static final int DEFAULT_SEQUENCE_NUMBER = -1;

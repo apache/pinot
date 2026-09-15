@@ -23,9 +23,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.utils.Pairs;
 
 
-/**
- * Sorted index reader for single-value column with constant values.
- */
+/// Sorted index reader for single-value column with constant values.
 public final class ConstantSortedIndexReader implements SortedIndexReader<ForwardIndexReaderContext> {
   private final int _numDocs;
 

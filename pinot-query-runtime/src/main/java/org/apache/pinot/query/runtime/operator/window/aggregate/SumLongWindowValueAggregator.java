@@ -21,10 +21,8 @@ package org.apache.pinot.query.runtime.operator.window.aggregate;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for SUM window function over integer types (INT, LONG).
- * Accumulates as {@code long} to avoid precision loss that occurs when converting large long values to double.
- */
+/// Window value aggregator for SUM window function over integer types (INT, LONG).
+/// Accumulates as `long` to avoid precision loss that occurs when converting large long values to double.
 public class SumLongWindowValueAggregator implements WindowValueAggregator<Object> {
   private long _sum = 0L;
   private int _count = 0;

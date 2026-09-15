@@ -25,9 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 
-/**
- * The {@code LongLookupTable} is a lookup table for long keys.
- */
+/// The `LongLookupTable` is a lookup table for long keys.
 @SuppressWarnings("unchecked")
 public class LongLookupTable extends PrimitiveLookupTable {
   private final Long2ObjectOpenHashMap<Object> _lookupTable = new Long2ObjectOpenHashMap<>(INITIAL_CAPACITY);

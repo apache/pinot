@@ -40,16 +40,14 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 
 
-/**
- * Package-private helper shared by {@link ArrowColumnReaderFactory} and
- * {@link ArrowFileColumnReaderFactory}: walks every record batch in an {@link ArrowReader},
- * concatenates each wanted column's values into a per-column accumulator {@link FieldVector} via
- * Arrow's {@link VectorAppender}, and produces one {@link ArrowColumnReader} per accumulator.
- *
- * <p>Accumulator vectors are allocated against the caller-supplied {@link BufferAllocator}. The
- * caller (factory) owns and closes them via {@link Result#getAccumulators()}; this helper does
- * not retain references.
- */
+/// Package-private helper shared by [ArrowColumnReaderFactory] and
+/// [ArrowFileColumnReaderFactory]: walks every record batch in an [ArrowReader],
+/// concatenates each wanted column's values into a per-column accumulator [FieldVector] via
+/// Arrow's [VectorAppender], and produces one [ArrowColumnReader] per accumulator.
+///
+/// Accumulator vectors are allocated against the caller-supplied [BufferAllocator]. The
+/// caller (factory) owns and closes them via [Result#getAccumulators()]; this helper does
+/// not retain references.
 final class ArrowAccumulators {
 
   private ArrowAccumulators() {
@@ -148,11 +146,9 @@ final class ArrowAccumulators {
     }
   }
 
-  /**
-   * Resolve the set of columns to read: an explicit non-empty {@code colsToRead}, otherwise every
-   * non-virtual column in {@code targetSchema}. Shared by both columnar factories (materialized and
-   * file-backed) so the selection rule lives in one place.
-   */
+  /// Resolve the set of columns to read: an explicit non-empty `colsToRead`, otherwise every
+  /// non-virtual column in `targetSchema`. Shared by both columnar factories (materialized and
+  /// file-backed) so the selection rule lives in one place.
   static Set<String> computeWantedColumns(Schema targetSchema, @Nullable Set<String> colsToRead) {
     if (colsToRead != null && !colsToRead.isEmpty()) {
       return new HashSet<>(colsToRead);
@@ -174,13 +170,11 @@ final class ArrowAccumulators {
     return names;
   }
 
-  /**
-   * Close each accumulator vector, accumulating the first failure as an {@link IOException}.
-   * Used by both factory {@code close()} paths so the per-vector close loop lives once.
-   *
-   * @param accumulators per-column accumulator vectors to close; may be {@code null}
-   * @return the first close failure encountered, or {@code null} if all closes succeeded
-   */
+  /// Close each accumulator vector, accumulating the first failure as an [IOException].
+  /// Used by both factory `close()` paths so the per-vector close loop lives once.
+  ///
+  /// @param accumulators per-column accumulator vectors to close; may be `null`
+  /// @return the first close failure encountered, or `null` if all closes succeeded
   @Nullable
   static IOException closeAll(@Nullable Map<String, FieldVector> accumulators) {
     if (accumulators == null) {

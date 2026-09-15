@@ -22,10 +22,8 @@ import java.util.List;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 
 
-/**
- * Generic plan node for time series queries. This allows each time-series query language to define their own plan
- * nodes, which in turn generate the language specific {@link BaseTimeSeriesOperator}.
- */
+/// Generic plan node for time series queries. This allows each time-series query language to define their own plan
+/// nodes, which in turn generate the language specific [BaseTimeSeriesOperator].
 public abstract class BaseTimeSeriesPlanNode {
   protected final String _id;
   protected final List<BaseTimeSeriesPlanNode> _inputs;

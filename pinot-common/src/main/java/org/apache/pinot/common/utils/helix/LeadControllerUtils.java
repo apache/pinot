@@ -38,46 +38,36 @@ public class LeadControllerUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
-  /**
-   * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
-   * Uses murmurHash2 function to get hashcode for table, ignores the most significant bit.
-   * Note: This method CANNOT be changed when lead controller resource is enabled.
-   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic
-   * tasks and realtime segment completion.
-   * @param rawTableName raw table name
-   * @return partition id in lead controller resource.
-   */
+  /// Given a raw table name and number of partitions, returns the partition id in lead controller resource.
+  /// Uses murmurHash2 function to get hashcode for table, ignores the most significant bit.
+  /// Note: This method CANNOT be changed when lead controller resource is enabled.
+  /// Otherwise it will assign different controller for the same table, which will mess up the controller periodic
+  /// tasks and realtime segment completion.
+  /// @param rawTableName raw table name
+  /// @return partition id in lead controller resource.
   public static int getPartitionIdForTable(String rawTableName) {
     return (HashFunctions.murmurHash2(rawTableName.getBytes(UTF_8)) & Integer.MAX_VALUE)
         % Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
   }
 
-  /**
-   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000
-   * as port.
-   */
+  /// Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000
+  /// as port.
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
   }
 
-  /**
-   * Generates partition name, e.g. returns leadControllerResource_0 given 0 as partition index.
-   */
+  /// Generates partition name, e.g. returns leadControllerResource_0 given 0 as partition index.
   public static String generatePartitionName(int partitionId) {
     return Helix.LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionId;
   }
 
-  /**
-   * Extracts partition index from partition name, e.g. returns 0 given leadControllerResource_0 as partition name.
-   */
+  /// Extracts partition index from partition name, e.g. returns 0 given leadControllerResource_0 as partition name.
   public static int extractPartitionId(String partitionName) {
     return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf('_') + 1));
   }
 
-  /**
-   * Checks from ZK if resource config of leadControllerResource is enabled.
-   * @param helixManager helix manager
-   */
+  /// Checks from ZK if resource config of leadControllerResource is enabled.
+  /// @param helixManager helix manager
   public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
     ConfigAccessor configAccessor = helixManager.getConfigAccessor();
     ResourceConfig resourceConfig =
@@ -86,11 +76,9 @@ public class LeadControllerUtils {
     return Boolean.parseBoolean(resourceEnabled);
   }
 
-  /**
-   * Gets Helix leader in the cluster. Null if there is no leader.
-   * @param helixManager helix manager
-   * @return instance id of Helix cluster leader, e.g. localhost_9000.
-   */
+  /// Gets Helix leader in the cluster. Null if there is no leader.
+  /// @param helixManager helix manager
+  /// @return instance id of Helix cluster leader, e.g. localhost_9000.
   public static String getHelixClusterLeader(HelixManager helixManager) {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();

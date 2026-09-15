@@ -22,17 +22,16 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils;
 import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils.TimeValidationConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * The {@code TimeValidationTransformer} class will validate the time column value.
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
- * {@link FieldSpec}, and before the {@link NullValueTransformer} so that the invalidated value can be filled.
- */
+/// The `TimeValidationTransformer` class will validate the time column value.
+///
+/// NOTE: should put this after the [DataTypeTransformer] so that all values follow the data types in
+/// [org.apache.pinot.spi.data.FieldSpec], and before the [NullValueTransformer] so that the invalidated
+/// value can be filled.
 public class TimeValidationTransformer implements RecordTransformer {
 
   private final String _timeColumnName;

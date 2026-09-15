@@ -40,11 +40,9 @@ public class PinotHelixResourceManagerLastLLCSegmentsTest {
   private static final String TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
 
-  /**
-   * A realtime table can contain non-LLC-named segments (e.g. uploaded via batch ingestion) sitting in DONE state
-   * alongside the LLC-named consuming/committed segments. {@code getLastLLCCompletedSegments} must skip those
-   * uploaded segments rather than NPE when {@code LLCSegmentName.of(name)} returns {@code null}.
-   */
+  /// A realtime table can contain non-LLC-named segments (e.g. uploaded via batch ingestion) sitting in DONE state
+  /// alongside the LLC-named consuming/committed segments. `getLastLLCCompletedSegments` must skip those
+  /// uploaded segments rather than NPE when `LLCSegmentName.of(name)` returns `null`.
   @Test
   public void testGetLastLLCCompletedSegmentsSkipsNonLLCNamedSegments() {
     long now = System.currentTimeMillis();

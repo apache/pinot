@@ -23,27 +23,23 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * This (Helix) message is sent from the controller to servers and brokers when a request is received to refresh
- * an existing segment. When server gets this message, it will check the crc of the local segment and the segment ZK
- * metadata and download the refreshed segment if necessary. When broker gets this message, it will update the routing
- * properties (time boundary, partition info etc.) based on the refreshed segment ZK metadata.
- *
- * NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
- * and coded in such a way that either controller, broker or server may be upgraded first.
- *
- * TODO: "tableName" and "segmentName" are new added fields. Change SegmentMessageHandlerFactory to use these 2 fields
- *       in the next release for backward-compatibility
- */
+/// This (Helix) message is sent from the controller to servers and brokers when a request is received to refresh
+/// an existing segment. When server gets this message, it will check the crc of the local segment and the segment ZK
+/// metadata and download the refreshed segment if necessary. When broker gets this message, it will update the routing
+/// properties (time boundary, partition info etc.) based on the refreshed segment ZK metadata.
+///
+/// NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made
+/// optional, and coded in such a way that either controller, broker or server may be upgraded first.
+///
+/// TODO: "tableName" and "segmentName" are new added fields. Change SegmentMessageHandlerFactory to use these 2 fields
+///       in the next release for backward-compatibility
 public class SegmentRefreshMessage extends Message {
   public static final String REFRESH_SEGMENT_MSG_SUB_TYPE = "REFRESH_SEGMENT";
 
   private static final String TABLE_NAME_KEY = "tableName";
   private static final String SEGMENT_NAME_KEY = "segmentName";
 
-  /**
-   * Constructor for the sender.
-   */
+  /// Constructor for the sender.
   public SegmentRefreshMessage(String tableNameWithType, String segmentName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_SEGMENT_MSG_SUB_TYPE);
@@ -57,12 +53,10 @@ public class SegmentRefreshMessage extends Message {
     znRecord.setSimpleField(SEGMENT_NAME_KEY, segmentName);
   }
 
-  /**
-   * Constructor for the receiver.
-   *
-   * @param message The incoming message that has been received from helix.
-   * @throws IllegalArgumentException if the message is not of right sub-type
-   */
+  /// Constructor for the receiver.
+  ///
+  /// @param message The incoming message that has been received from helix.
+  /// @throws IllegalArgumentException if the message is not of right sub-type
   public SegmentRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_SEGMENT_MSG_SUB_TYPE)) {

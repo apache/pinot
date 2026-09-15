@@ -5720,6 +5720,116 @@
         ]
       },
       {
+        "description": "LEAD with IGNORE NULLS and default offset",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LEAD(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 5],
+          ["a", 50.5, null, 5],
+          ["a", 75.0, 5, 1],
+          ["a", 300.0, 1, null],
+          ["a", 400.0, null, null],
+          ["b", 1.0, 1, null],
+          ["b", 100.0, null, null],
+          ["c", 1.01, 7, 6],
+          ["c", 1.5, 6, 3],
+          ["c", 100.0, 3, null],
+          ["c", 400.0, null, null],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, 2],
+          ["e", 50.5, 2, null],
+          ["g", 100.0, 10, null],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "LAG with IGNORE NULLS and default offset",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LAG(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, null],
+          ["a", 50.5, null, 4],
+          ["a", 75.0, 5, 4],
+          ["a", 300.0, 1, 5],
+          ["a", 400.0, null, 1],
+          ["b", 1.0, 1, null],
+          ["b", 100.0, null, 1],
+          ["c", 1.01, 7, null],
+          ["c", 1.5, 6, 7],
+          ["c", 100.0, 3, 6],
+          ["c", 400.0, null, 3],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, null],
+          ["e", 50.5, 2, null],
+          ["g", 100.0, 10, null],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "LEAD with IGNORE NULLS, offset 2, and default value 0",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LEAD(nullable_int_col, 2, 0) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 1],
+          ["a", 50.5, null, 1],
+          ["a", 75.0, 5, 0],
+          ["a", 300.0, 1, 0],
+          ["a", 400.0, null, 0],
+          ["b", 1.0, 1, 0],
+          ["b", 100.0, null, 0],
+          ["c", 1.01, 7, 3],
+          ["c", 1.5, 6, 0],
+          ["c", 100.0, 3, 0],
+          ["c", 400.0, null, 0],
+          ["d", 42.0, null, 0],
+          ["e", 42.0, null, 0],
+          ["e", 50.5, 2, 0],
+          ["g", 100.0, 10, 0],
+          ["h", -1.53, null, 0]
+        ]
+      },
+      {
+        "description": "LAG with IGNORE NULLS, offset 2, and default value -1",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LAG(nullable_int_col, 2, -1) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, -1],
+          ["a", 50.5, null, -1],
+          ["a", 75.0, 5, -1],
+          ["a", 300.0, 1, 4],
+          ["a", 400.0, null, 5],
+          ["b", 1.0, 1, -1],
+          ["b", 100.0, null, -1],
+          ["c", 1.01, 7, -1],
+          ["c", 1.5, 6, -1],
+          ["c", 100.0, 3, 7],
+          ["c", 400.0, null, 6],
+          ["d", 42.0, null, -1],
+          ["e", 42.0, null, -1],
+          ["e", 50.5, 2, -1],
+          ["g", 100.0, 10, -1],
+          ["h", -1.53, null, -1]
+        ]
+      },
+      {
+        "description": "LEAD with RESPECT NULLS (explicit, same as default behavior)",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LEAD(nullable_int_col) RESPECT NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, null],
+          ["a", 50.5, null, 5],
+          ["a", 75.0, 5, 1],
+          ["a", 300.0, 1, null],
+          ["a", 400.0, null, null],
+          ["b", 1.0, 1, null],
+          ["b", 100.0, null, null],
+          ["c", 1.01, 7, 6],
+          ["c", 1.5, 6, 3],
+          ["c", 100.0, 3, null],
+          ["c", 400.0, null, null],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, 2],
+          ["e", 50.5, 2, null],
+          ["g", 100.0, 10, null],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
         "description": "NTILE with 2 buckets",
         "sql": "SELECT string_col, int_col, NTILE(2) OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col",
         "outputs": [

@@ -22,14 +22,12 @@ public class FPOrdering {
   private FPOrdering() {
   }
 
-  /**
-   * Maps doubles to longs with the same total (unsigned) order.
-   * POSITIVE_INFINITY is considered greater than or equal to all values.
-   * NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
-   *
-   * @param value a double value
-   * @return an ordinal
-   */
+  /// Maps doubles to longs with the same total (unsigned) order.
+  /// POSITIVE_INFINITY is considered greater than or equal to all values.
+  /// NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
+  ///
+  /// @param value a double value
+  /// @return an ordinal
   public static long ordinalOf(double value) {
     if (value == Double.POSITIVE_INFINITY) {
       return 0xFFFFFFFFFFFFFFFFL;
@@ -49,14 +47,12 @@ public class FPOrdering {
     return bits;
   }
 
-  /**
-   * Maps floats to longs with the same total (unsigned) order.
-   * POSITIVE_INFINITY is considered greater than or equal to all values.
-   * NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
-   *
-   * @param value a float value
-   * @return an ordinal
-   */
+  /// Maps floats to longs with the same total (unsigned) order.
+  /// POSITIVE_INFINITY is considered greater than or equal to all values.
+  /// NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
+  ///
+  /// @param value a float value
+  /// @return an ordinal
   public static long ordinalOf(float value) {
     if (value == Float.POSITIVE_INFINITY) {
       return 0xFFFFFFFFL;

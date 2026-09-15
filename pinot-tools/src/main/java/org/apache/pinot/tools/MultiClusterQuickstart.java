@@ -57,10 +57,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-Cluster Quickstart demonstrating cross-cluster querying via logical tables.
- * Usage: QuickStart -type MULTI_CLUSTER
- */
+/// Multi-Cluster Quickstart demonstrating cross-cluster querying via logical tables.
+/// Usage: QuickStart -type MULTI_CLUSTER
 public class MultiClusterQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterQuickstart.class);
   private static final int NUM_CLUSTERS = 2;
@@ -245,10 +243,8 @@ public class MultiClusterQuickstart extends QuickStartBase {
     waitForTablesReady();
   }
 
-  /**
-   * Wait for all tables to be ready by checking table size stabilizes.
-   * This replaces the fixed-time sleep with condition-based waiting.
-   */
+  /// Wait for all tables to be ready by checking table size stabilizes.
+  /// This replaces the fixed-time sleep with condition-based waiting.
   private void waitForTablesReady() throws Exception {
     printStatus(Quickstart.Color.CYAN, "Waiting for physical tables to be ready...");
 
@@ -274,13 +270,11 @@ public class MultiClusterQuickstart extends QuickStartBase {
         "  Logical table ready: " + logicalCount + " rows (sum of all " + _clusters.size() + " clusters)");
   }
 
-  /**
-   * Wait for a table's count to stabilize (remain constant for STABILIZATION_PERIOD_MS).
-   * @param cluster the cluster to query
-   * @param sql the SQL to execute for counting rows
-   * @param expectedCount if not null, wait for count to match this value before stabilizing
-   * @return the stable row count
-   */
+  /// Wait for a table's count to stabilize (remain constant for STABILIZATION_PERIOD_MS).
+  /// @param cluster the cluster to query
+  /// @param sql the SQL to execute for counting rows
+  /// @param expectedCount if not null, wait for count to match this value before stabilizing
+  /// @return the stable row count
   private long waitForStableCount(Cluster cluster, String sql, Long expectedCount) throws Exception {
     Long lastCount = null;
     long stableStart = 0;

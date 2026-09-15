@@ -37,10 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * PeerServerSegmentFinder discovers all the servers having the input segment in an ONLINE state through external view
- * of a Pinot table. It performs retries during the discovery to minimize the chance of Helix state propagation delay.
- */
+/// PeerServerSegmentFinder discovers all the servers having the input segment in an ONLINE state through external view
+/// of a Pinot table. It performs retries during the discovery to minimize the chance of Helix state propagation delay.
 public class PeerServerSegmentFinder {
   private PeerServerSegmentFinder() {
   }
@@ -50,10 +48,9 @@ public class PeerServerSegmentFinder {
   private static final int INITIAL_DELAY_MS = 500;
   private static final double DELAY_SCALE_FACTOR = 2;
 
-  /**
-   * Returns a list of URIs of the form 'http(s)://hostname:port/segments/tableNameWithType/segmentName' for the servers
-   * hosting ONLINE segments; empty list if no such server found. The download scheme can be either 'http' or 'https'.
-   */
+  /// Returns a list of URIs of the form 'http(s)://hostname:port/segments/tableNameWithType/segmentName' for the
+  /// servers hosting ONLINE segments; empty list if no such server found. The download scheme can be either 'http'
+  /// or 'https'.
   public static List<URI> getPeerServerURIs(HelixManager helixManager, String tableNameWithType, String segmentName,
       String downloadScheme) {
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();

@@ -22,10 +22,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 
 
-/**
- * Wrapper class for projection block value set for exprmin/max aggregation function.
- * Used to get the value from val set of different data types.
- */
+/// Wrapper class for projection block value set for exprmin/max aggregation function.
+/// Used to get the value from val set of different data types.
 public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {
 
   public ExprMinMaxProjectionValSetWrapper(BlockValSet blockValSet) {

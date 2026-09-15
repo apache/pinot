@@ -39,11 +39,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Virtual column provider that returns the partition information of the segment.
- * Returns a multi-value string column with entries in the format "columnName_partitionId"
- * for all partitioned columns in the segment. Returns empty array for segments without partition information.
- */
+/// Virtual column provider that returns the partition information of the segment.
+/// Returns a multi-value string column with entries in the format "columnName_partitionId"
+/// for all partitioned columns in the segment. Returns empty array for segments without partition information.
 public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
   @Override
@@ -84,10 +82,8 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     return builder.build();
   }
 
-  /**
-   * Extract partition information from segment metadata.
-   * Returns a list of strings in format "columnName_partitionId" for all partitioned columns.
-   */
+  /// Extract partition information from segment metadata.
+  /// Returns a list of strings in format "columnName_partitionId" for all partitioned columns.
   private List<String> getPartitionInfo(VirtualColumnContext context) {
     List<String> partitionInfo = new ArrayList<>();
     SegmentMetadata segmentMetadata = context.getSegmentMetadata();
@@ -116,10 +112,8 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     return partitionInfo;
   }
 
-  /**
-   * Forward index reader for multi-value partition column.
-   * Returns all dictionary IDs (0, 1, 2, ..., n-1) for each document.
-   */
+  /// Forward index reader for multi-value partition column.
+  /// Returns all dictionary IDs (0, 1, 2, ..., n-1) for each document.
   private static class MultiValueConstantForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
     private final int _numValues;
     private final int[] _dictIds;
@@ -170,10 +164,8 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
   }
 
-  /**
-   * Minimal dictionary that extends BaseImmutableDictionary for virtual columns.
-   * Follows the same pattern as StringDictionary but for in-memory virtual column values.
-   */
+  /// Minimal dictionary that extends BaseImmutableDictionary for virtual columns.
+  /// Follows the same pattern as StringDictionary but for in-memory virtual column values.
   private static class MultiValueConstantStringDictionary extends BaseImmutableDictionary {
     private final List<String> _values;
     private final Object2IntOpenHashMap<String> _valueToIndexMap;

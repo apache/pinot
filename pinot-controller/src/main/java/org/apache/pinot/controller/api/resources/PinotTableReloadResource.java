@@ -55,25 +55,14 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-/**
- * REST API resource for reloading table segments.
- * <ul>
- *   <li>
- *     POST requests:
- *     <ul>
- *       <li>"/segments/{tableName}/{segmentName}/reload": reload a specific segment</li>
- *       <li>"/segments/{tableName}/reload": reload all segments in a table (optionally within a time range)</li>
- *     </ul>
- *   </li>
- *   <li>
- *     GET requests:
- *     <ul>
- *       <li>"/segments/segmentReloadStatus/{jobId}": get status for a submitted reload job</li>
- *       <li>"/segments/{tableNameWithType}/needReload": check if table segments need reloading</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// REST API resource for reloading table segments.
+///
+/// - POST requests:
+///   - "/segments/{tableName}/{segmentName}/reload": reload a specific segment
+///   - "/segments/{tableName}/reload": reload all segments in a table (optionally within a time range)
+/// - GET requests:
+///   - "/segments/segmentReloadStatus/{jobId}": get status for a submitted reload job
+///   - "/segments/{tableNameWithType}/needReload": check if table segments need reloading
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
 })

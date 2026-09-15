@@ -22,9 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
 
-/**
- * Window value aggregator for BOOL_AND window function.
- */
+/// Window value aggregator for BOOL_AND window function.
 public class BoolAndWindowValueAggregator implements WindowValueAggregator<Object> {
   private int _numFalse = 0;
   private int _numTrue = 0;

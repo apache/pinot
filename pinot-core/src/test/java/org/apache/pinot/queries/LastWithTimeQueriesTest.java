@@ -66,9 +66,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for LASTWITHTIME queries.
- */
+/// Queries test for LASTWITHTIME queries.
 public class LastWithTimeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LastQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

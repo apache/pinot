@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 
 
-///
 /// Rewrites CAST function type aliases from Calcite type names to Pinot type names:
 /// - BIGINT -> LONG
 /// - VARCHAR -> STRING

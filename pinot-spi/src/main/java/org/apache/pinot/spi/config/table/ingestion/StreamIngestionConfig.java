@@ -29,9 +29,7 @@ import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
 
 
-/**
- * Contains all the configs related to the streams for ingestion
- */
+/// Contains all the configs related to the streams for ingestion
 public class StreamIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("All configs for the streams from which to ingest")

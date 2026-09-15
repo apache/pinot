@@ -69,7 +69,7 @@ public class PlannerContextTest {
   @Test
   public void testOptionsAreAccessibleThroughUnwrap() {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
-    Map<String, String> options = Map.of("workerRuntime", "datafusion");
+    Map<String, String> options = Map.of("optionKey", "optionValue");
     PlannerContext ctx = PlannerContext.forTesting(options, config);
 
     PlannerContext unwrapped = ctx.getRelOptPlanner().getContext().unwrap(PlannerContext.class);

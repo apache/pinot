@@ -38,10 +38,8 @@ public interface MutableInvertedIndex extends InvertedIndexReader<MutableRoaring
     }
   }
 
-  /**
-   * Add the docId to the posting list for the dictionary id.
-   * @param dictId dictionary id
-   * @param docId document id
-   */
+  /// Add the docId to the posting list for the dictionary id.
+  /// @param dictId dictionary id
+  /// @param docId document id
   void add(int dictId, int docId);
 }

@@ -22,25 +22,17 @@ import java.io.Closeable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-/**
- * The {@code StarTreeV2} class is a wrapper on top of star-tree, its metadata, and the data sources associated
- * with it.
- */
+/// The `StarTreeV2` class is a wrapper on top of star-tree, its metadata, and the data sources associated
+/// with it.
 public interface StarTreeV2 extends Closeable {
 
-  /**
-   * Returns the {@link StarTree} data structure.
-   */
+  /// Returns the [StarTree] data structure.
   StarTree getStarTree();
 
-  /**
-   * Returns the metadata of the star-tree.
-   */
+  /// Returns the metadata of the star-tree.
   StarTreeV2Metadata getMetadata();
 
-  /**
-   * Returns the data source for the given column name, where the column name could be dimension name or from
-   * {@link AggregationFunctionColumnPair#toColumnName()}.
-   */
+  /// Returns the data source for the given column name, where the column name could be dimension name or from
+  /// [AggregationFunctionColumnPair#toColumnName()].
   DataSource getDataSource(String columnName);
 }

@@ -584,11 +584,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  /**
-   * Validates that a RuntimeException from getStreamMetadataProvider() (e.g., stream auth failure, unreachable
-   * endpoint) does not crash the status checker. The faulty segment should be treated as "not caught up" while
-   * other segments continue to be checked normally.
-   */
+  /// Validates that a RuntimeException from getStreamMetadataProvider() (e.g., stream auth failure, unreachable
+  /// endpoint) does not crash the status checker. The faulty segment should be treated as "not caught up" while
+  /// other segments continue to be checked normally.
   @Test
   public void testGetStreamMetadataProviderThrowsException() {
     String segA0 = "tableA__0__0__123Z";

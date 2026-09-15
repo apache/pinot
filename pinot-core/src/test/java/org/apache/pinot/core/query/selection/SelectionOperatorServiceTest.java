@@ -46,10 +46,8 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * The <code>SelectionOperatorServiceTest</code> class provides unit tests for {@link SelectionOperatorUtils} and
- * {@link SelectionOperatorService}.
- */
+/// The `SelectionOperatorServiceTest` class provides unit tests for [SelectionOperatorUtils] and
+/// [SelectionOperatorService].
 public class SelectionOperatorServiceTest {
   private final String[] _columnNames = {
       "int", "long", "float", "double", "big_decimal", "string", "bytes", "int_array", "long_array", "float_array",

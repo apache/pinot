@@ -21,10 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * This class gives the details of a particular segment and it's status
- *
- */
+/// This class gives the details of a particular segment and it's status
 public class SegmentStatusInfo {
   @JsonProperty("segmentName")
   String _segmentName;

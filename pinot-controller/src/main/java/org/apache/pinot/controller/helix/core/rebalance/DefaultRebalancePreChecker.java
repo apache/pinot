@@ -17,8 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,16 +27,13 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
 import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,10 +49,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class DefaultRebalancePreChecker implements RebalancePreChecker {
-  public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
-  public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
-  public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
+  public static final String DISK_UTILIZATION = "diskUtilization";
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
   public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
 
@@ -91,8 +84,6 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Right now pre-check items are done sequentially. If pre-check items are to be done in parallel, we should not
     // use linked hash map but to sort the result in the end
     Map<String, RebalancePreCheckerResult> preCheckResult = new LinkedHashMap<>();
-    // Check for reload status
-    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(tableNameWithType, tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
         checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
@@ -106,15 +97,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       diskUtilizationThreshold = 1.0;
     }
 
-    // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
+    // Check if all servers involved in the rebalance have enough disk space, both while the rebalance is running and
+    // once it is done.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
-    preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
-        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, true));
-    // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
-    preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
-        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, false));
+    preCheckResult.put(DISK_UTILIZATION, checkDiskUtilization(preCheckContext, diskUtilizationThreshold));
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
         preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
@@ -126,47 +112,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return preCheckResult;
   }
 
-  /**
-   * Checks if the current segments on any servers needs a reload (table config or schema change that hasn't been
-   * applied yet). This check does not guarantee that the segments in deep store are up to date.
-   * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
-   *       and add a pre-check here to call that API.
-   */
-  private RebalancePreCheckerResult checkReloadNeededOnServers(String tableNameWithType, Logger tableRebalanceLogger) {
-    tableRebalanceLogger.info("Fetching whether reload is needed");
-    Boolean needsReload = null;
-    if (_executorService == null) {
-      tableRebalanceLogger.warn("Executor service is null, skipping needsReload check");
-      return RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually");
-    }
-    try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
-      TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
-          _pinotHelixResourceManager);
-      TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
-          metadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType, 30_000);
-      Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
-      int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
-      tableRebalanceLogger.info("Received {} needs reload responses and {} failed responses from servers assigned "
-          + "to table", needsReloadMetadata.size(), failedResponses);
-      needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
-      if (!needsReload && failedResponses > 0) {
-        tableRebalanceLogger.warn("Received {} failed responses from servers and needsReload is false from returned "
-            + "responses, check needsReload status manually", failedResponses);
-        needsReload = null;
-      }
-    } catch (InvalidConfigException | IOException e) {
-      tableRebalanceLogger.warn("Caught exception while trying to fetch reload status from servers", e);
-    }
-
-    return needsReload == null
-        ? RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually")
-        : !needsReload ? RebalancePreCheckerResult.pass("No need to reload")
-            : RebalancePreCheckerResult.warn("Reload needed prior to running rebalance");
-  }
-
-  /**
-   * Checks if minimize data movement is set for the given table in the TableConfig
-   */
+  /// Checks if minimize data movement is set for the given table in the TableConfig
   private RebalancePreCheckerResult checkIsMinimizeDataMovement(TableConfig tableConfig,
       RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Checking whether minimizeDataMovement is set");
@@ -274,13 +220,32 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
   }
 
-  private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment,
-      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold, boolean worstCase) {
-    boolean isDiskUtilSafe = true;
-    StringBuilder message =
-        new StringBuilder("UNSAFE. Servers with unsafe disk utilization (>" + (short) (threshold * 100) + "%): ");
-    String sep = "";
+  /// Estimates whether the servers of the target assignment stay within the disk utilization threshold, based on the
+  /// average segment size and the number of segments added to and removed from each server. Two points in time are
+  /// estimated:
+  ///
+  /// - **After the rebalance**, i.e. once every server has both added and removed all the segments it has to. Going
+  ///   over the threshold there is an error whatever the rebalance config, since no way of running the rebalance
+  ///   brings the end state back within the threshold.
+  /// - **During the rebalance**, where a server can transiently hold the segments it is gaining on top of the ones it
+  ///   is about to lose. Only servers actually gaining segments are estimated: one that merely sheds them can only be
+  ///   over the threshold because it already was, which the rebalance neither causes nor can be blamed for. Only
+  ///   `lowDiskMode` rules that peak out, by waiting for the segments to be deleted before adding the new ones, so
+  ///   going over the threshold there is an error unless it is enabled. `downtime` does not help: it replaces the
+  ///   IdealState with the target assignment in one go, without ordering the drops before the adds. Worse, that
+  ///   one-shot path skips the incremental one `lowDiskMode` acts on, so `downtime` cancels `lowDiskMode` out
+  ///   entirely. `bestEfforts` weakens it rather than cancelling it — the deletes are still awaited, just no longer
+  ///   unconditionally — so it downgrades the result to a warning instead of an error.
+  ///
+  /// Every segment is assumed to take up disk space on each server it is assigned to. Downstream projects where that
+  /// does not hold (e.g. because a segment can be stored outside of the server, as indicated by
+  /// [TierConfig#getTierBackend()]) can override this.
+  protected RebalancePreCheckerResult checkDiskUtilization(PreCheckContext preCheckContext, double threshold) {
+    Map<String, Map<String, String>> currentAssignment = preCheckContext.getCurrentAssignment();
+    Map<String, Map<String, String>> targetAssignment = preCheckContext.getTargetAssignment();
+    TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails = preCheckContext.getTableSubTypeSizeDetails();
+    List<String> serversUnsafeDuringRebalance = new ArrayList<>();
+    List<String> serversUnsafeAfterRebalance = new ArrayList<>();
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
 
@@ -326,22 +291,60 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationGain = newSegmentSet.size() * avgSegmentSize;
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
-      long diskUtilizationFootprint =
-          diskUsage.getUsedSpaceBytes() + diskUtilizationGain - (worstCase ? 0 : diskUtilizationLoss);
-      double diskUtilizationFootprintRatio =
-          (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
-
-      if (diskUtilizationFootprintRatio >= threshold) {
-        isDiskUtilSafe = false;
-        message.append(sep)
-            .append(server)
-            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRatio * 100)));
-        sep = ", ";
+      // While the rebalance is running, the segments being added can co-exist with the ones being removed. A server
+      // gaining nothing never builds up that transient usage: it is only ever over the threshold because it already
+      // was, which is not something this rebalance causes nor something lowDiskMode could do anything about. If it is
+      // still over once the rebalance is done, the estimate below catches it
+      if (diskUtilizationGain > 0) {
+        addIfOverThreshold(serversUnsafeDuringRebalance, server,
+            (double) (diskUsage.getUsedSpaceBytes() + diskUtilizationGain) / diskUsage.getTotalSpaceBytes(), threshold);
       }
+      addIfOverThreshold(serversUnsafeAfterRebalance, server,
+          (double) (diskUsage.getUsedSpaceBytes() + diskUtilizationGain - diskUtilizationLoss)
+              / diskUsage.getTotalSpaceBytes(), threshold);
     }
-    return isDiskUtilSafe ? RebalancePreCheckerResult.pass(
-        String.format("Within threshold (<%d%%)", (short) (threshold * 100)))
-        : RebalancePreCheckerResult.error(message.toString());
+
+    // A server over the threshold once the rebalance is done is over it during the rebalance as well, so the end state
+    // is what to report first: it is both the more severe problem and the one that has to be solved by adding capacity
+    // rather than by tuning the rebalance config
+    if (!serversUnsafeAfterRebalance.isEmpty()) {
+      return RebalancePreCheckerResult.error(
+          getUnsafeDiskUtilizationMessage("AFTER rebalance", serversUnsafeAfterRebalance, threshold));
+    }
+    String withinThreshold = String.format("Within threshold (<%d%%)", (short) (threshold * 100));
+    if (serversUnsafeDuringRebalance.isEmpty()) {
+      return RebalancePreCheckerResult.pass(withinThreshold);
+    }
+    // lowDiskMode is the only way to rule the transient disk usage above out, since it waits for the segments to be
+    // deleted before adding the new ones. It is however only honored by the incremental rebalance path, which downtime
+    // skips altogether by replacing the IdealState with the target assignment in one go
+    RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
+    if (rebalanceConfig.isDowntime() || !rebalanceConfig.isLowDiskMode()) {
+      return RebalancePreCheckerResult.error(
+          getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold)
+              + (rebalanceConfig.isDowntime()
+              ? ". lowDiskMode, which would delete segments before adding the new ones, has no effect while downtime "
+              + "is enabled"
+              : ". Enable lowDiskMode to delete segments before adding the new ones"));
+    }
+    String serversGoingOver = " Servers that would go over it DURING the rebalance: " + String.join(", ",
+        serversUnsafeDuringRebalance) + ".";
+    return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance." + serversGoingOver + " lowDiskMode "
+        + "avoids that transient disk usage by deleting segments before adding the new ones");
+  }
+
+  private static void addIfOverThreshold(List<String> servers, String server, double utilizationRatio,
+      double threshold) {
+    if (utilizationRatio >= threshold) {
+      servers.add(server + String.format(" (%d%%)", (short) (utilizationRatio * 100)));
+    }
+  }
+
+  /// The threshold is rendered as `>=` because [#addIfOverThreshold] flags a server whose utilization reaches it, not
+  /// only one that exceeds it.
+  private static String getUnsafeDiskUtilizationMessage(String when, List<String> servers, double threshold) {
+    return String.format("UNSAFE. Servers with unsafe disk utilization %s (>=%d%%): %s", when,
+        (short) (threshold * 100), String.join(", ", servers));
   }
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
@@ -370,6 +373,13 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
         warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
+      }
+      // Downtime replaces the IdealState with the target assignment in one go, skipping the incremental path that is
+      // the only one honoring lowDiskMode
+      if (rebalanceConfig.isLowDiskMode()) {
+        pass = false;
+        warnings.add("lowDiskMode has no effect when downtime is enabled, disable downtime for segments to be deleted "
+            + "before the new ones are added.");
       }
     }
 

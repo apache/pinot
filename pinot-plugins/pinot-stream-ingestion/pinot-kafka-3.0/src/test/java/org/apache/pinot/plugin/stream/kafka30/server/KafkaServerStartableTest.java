@@ -65,11 +65,12 @@ public class KafkaServerStartableTest {
   }
 
   @Test
-  public void testStopReleasesBrokerPort()
+  public void testStopMakesBrokerUnavailable()
       throws Exception {
     int kafkaServerPort = NetUtils.findOpenPort();
+    String brokerList = "localhost:" + kafkaServerPort;
     Properties serverProperties = new Properties();
-    serverProperties.put("kafka.server.bootstrap.servers", "localhost:" + kafkaServerPort);
+    serverProperties.put("kafka.server.bootstrap.servers", brokerList);
     serverProperties.put("kafka.server.port", Integer.toString(kafkaServerPort));
     serverProperties.put("kafka.server.broker.id", "0");
     serverProperties.put("kafka.server.owner.name", getClass().getSimpleName());
@@ -79,11 +80,13 @@ public class KafkaServerStartableTest {
     kafkaServerStartable.init(serverProperties);
     kafkaServerStartable.start();
     try {
-      Assert.assertFalse(NetUtils.available(kafkaServerPort), "Kafka port should be in use while broker is running");
+      Assert.assertTrue(kafkaServerStartable.isKafkaAvailable(brokerList),
+          "Kafka broker should be reachable while running");
     } finally {
       kafkaServerStartable.stop();
     }
-    Assert.assertTrue(NetUtils.available(kafkaServerPort), "Kafka port should be released after broker stop");
+    Assert.assertFalse(kafkaServerStartable.isKafkaAvailable(brokerList),
+        "Kafka broker should be unavailable after stop");
   }
 
   private static final class TestableKafkaServerStartable extends KafkaServerStartable {

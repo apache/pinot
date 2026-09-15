@@ -28,8 +28,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggregationFunction {
-  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Nullable

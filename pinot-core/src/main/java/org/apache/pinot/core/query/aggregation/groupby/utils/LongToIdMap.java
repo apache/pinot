@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for long.
- */
+/// Implementation of [ValueToIdMap] for long.
 public class LongToIdMap implements ValueToIdMap {
   private final Long2IntOpenHashMap _valueToIdMap;
   private final LongArrayList _idToValueMap;

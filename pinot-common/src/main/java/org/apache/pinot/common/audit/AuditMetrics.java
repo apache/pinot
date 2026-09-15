@@ -35,12 +35,10 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * Abstraction layer for audit metrics that handles the complexity of routing metrics
- * to the appropriate component-specific metrics (Controller vs Broker).
- * This class provides a clean API for audit components to record metrics without
- * needing to know about the underlying component type.
- */
+/// Abstraction layer for audit metrics that handles the complexity of routing metrics
+/// to the appropriate component-specific metrics (Controller vs Broker).
+/// This class provides a clean API for audit components to record metrics without
+/// needing to know about the underlying component type.
 @Singleton
 public class AuditMetrics {
   private static final Logger LOG = LoggerFactory.getLogger(AuditMetrics.class);
@@ -48,12 +46,10 @@ public class AuditMetrics {
   private final TimerRecorder _timerRecorder;
   private final MeterRecorder _meterRecorder;
 
-  /**
-   * Creates an AuditMetrics instance that will route metrics to the appropriate component.
-   *
-   * @param delegate The component-specific metrics instance (ControllerMetrics or BrokerMetrics)
-   * @param serviceRole The service role (CONTROLLER, BROKER, etc.)
-   */
+  /// Creates an AuditMetrics instance that will route metrics to the appropriate component.
+  ///
+  /// @param delegate The component-specific metrics instance (ControllerMetrics or BrokerMetrics)
+  /// @param serviceRole The service role (CONTROLLER, BROKER, etc.)
   @Inject
   public AuditMetrics(AbstractMetrics<?, ?, ?, ?> delegate, ServiceRole serviceRole) {
     requireNonNull(delegate, "Component metrics cannot be null");
@@ -78,24 +74,20 @@ public class AuditMetrics {
     }
   }
 
-  /**
-   * Adds a timed value for the given audit timer.
-   * This method mirrors the AbstractMetrics.addTimedValue() interface.
-   *
-   * @param timer The audit timer to record
-   * @param duration The duration to record
-   */
+  /// Adds a timed value for the given audit timer.
+  /// This method mirrors the AbstractMetrics.addTimedValue() interface.
+  ///
+  /// @param timer The audit timer to record
+  /// @param duration The duration to record
   public void addTimedValue(AuditTimer timer, long duration) {
     _timerRecorder.record(timer, duration);
   }
 
-  /**
-   * Adds a metered global value for the given audit meter.
-   * This method mirrors the AbstractMetrics.addMeteredGlobalValue() interface.
-   *
-   * @param meter The audit meter to record
-   * @param count The count to record
-   */
+  /// Adds a metered global value for the given audit meter.
+  /// This method mirrors the AbstractMetrics.addMeteredGlobalValue() interface.
+  ///
+  /// @param meter The audit meter to record
+  /// @param count The count to record
   public void addMeteredGlobalValue(AuditMeter meter, long count) {
     _meterRecorder.record(meter, count);
   }

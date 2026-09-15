@@ -33,85 +33,78 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 
 
-/**
- * A custom query parser that implements minimum_should_match behavior.
- * This parser creates Boolean queries with should clauses and enforces a minimum
- * number of matches.
- *
- * <p>This parser supports the following minimum_should_match formats:</p>
- * <ul>
- *   <li><strong>Positive integer:</strong> "3" - at least 3 should clauses must match</li>
- *   <li><strong>Negative integer:</strong> "-2" - at most 2 should clauses can be missing</li>
- *   <li><strong>Positive percentage:</strong> "80%" - at least 80% of should clauses must match</li>
- *   <li><strong>Negative percentage:</strong> "-20%" - at most 20% of should clauses can be missing</li>
- * </ul>
- *
- * <p><strong>Example usage:</strong></p>
- * <ul>
- *   <li>Input: 'java OR python OR scala' with minimumShouldMatch=2
- *       <br>Output: BooleanQuery with 3 should clauses, requiring at least 2 matches</li>
- *   <li>Input: 'machine learning OR deep learning OR neural networks' with minimumShouldMatch="80%"
- *       <br>Output: BooleanQuery with 3 should clauses, requiring at least 2 matches (80% of 3 = 2.4, rounded down
- *       to 2)</li>
- *   <li>Input: 'error OR warning OR critical' with minimumShouldMatch="-1"
- *       <br>Output: BooleanQuery with 3 should clauses, allowing at most 1 to be missing (requiring at least 2
- *       matches)</li>
- * </ul>
- *
- * <p><strong>Behavior:</strong></p>
- * <ul>
- *   <li>Single term queries: Returns TermQuery (minimum_should_match is ignored)</li>
- *   <li>Multiple term queries: Returns BooleanQuery with should clauses and minimum match requirement</li>
- *   <li>Null/empty queries: Throws ParseException</li>
- * </ul>
- *
- * <p>This parser extends Lucene's QueryParserBase and implements the required abstract methods.
- * It uses the provided Analyzer for tokenization and creates appropriate Lucene Boolean queries.</p>
- */
+/// A custom query parser that implements minimum_should_match behavior.
+/// This parser creates Boolean queries with should clauses and enforces a minimum
+/// number of matches.
+///
+/// This parser supports the following minimum_should_match formats:
+///
+/// - **Positive integer:** "3" - at least 3 should clauses must match
+/// - **Negative integer:** "-2" - at most 2 should clauses can be missing
+/// - **Positive percentage:** "80%" - at least 80% of should clauses must match
+/// - **Negative percentage:** "-20%" - at most 20% of should clauses can be missing
+///
+/// **Example usage:**
+///
+/// - Input: 'java OR python OR scala' with minimumShouldMatch=2
+///
+///      Output: BooleanQuery with 3 should clauses, requiring at least 2 matches
+/// - Input: 'machine learning OR deep learning OR neural networks' with minimumShouldMatch="80%"
+///
+///      Output: BooleanQuery with 3 should clauses, requiring at least 2 matches (80% of 3 = 2.4, rounded down
+///      to 2)
+/// - Input: 'error OR warning OR critical' with minimumShouldMatch="-1"
+///
+///      Output: BooleanQuery with 3 should clauses, allowing at most 1 to be missing (requiring at least 2
+///      matches)
+///
+/// **Behavior:**
+///
+/// - Single term queries: Returns TermQuery (minimum_should_match is ignored)
+/// - Multiple term queries: Returns BooleanQuery with should clauses and minimum match requirement
+/// - Null/empty queries: Throws ParseException
+///
+/// This parser extends Lucene's QueryParserBase and implements the required abstract methods.
+/// It uses the provided Analyzer for tokenization and creates appropriate Lucene Boolean queries.
 public class MatchQueryParser extends QueryParserBase {
-  /** The field name to search in */
+  /// The field name to search in
   private final String _field;
 
-  /** The analyzer used for tokenizing the query */
+  /// The analyzer used for tokenizing the query
   private final Analyzer _analyzer;
 
-  /** The minimum should match specification (stored as string for dynamic calculation) */
+  /// The minimum should match specification (stored as string for dynamic calculation)
   private String _minimumShouldMatch = "1";
 
-  /** The default operator for combining terms */
+  /// The default operator for combining terms
   private BooleanClause.Occur _defaultOperator = BooleanClause.Occur.SHOULD;
 
-  /** Pattern for parsing percentage values */
+  /// Pattern for parsing percentage values
   private static final Pattern PERCENTAGE_PATTERN = Pattern.compile("^(-?\\d+)%$");
 
-  /**
-   * Constructs a new MinimumShouldMatchQueryParser with the specified field and analyzer.
-   *
-   * @param field the field name to search in (must not be null)
-   * @param analyzer the analyzer to use for tokenizing queries (must not be null)
-   * @throws IllegalArgumentException if field or analyzer is null
-   */
+  /// Constructs a new MinimumShouldMatchQueryParser with the specified field and analyzer.
+  ///
+  /// @param field the field name to search in (must not be null)
+  /// @param analyzer the analyzer to use for tokenizing queries (must not be null)
+  /// @throws IllegalArgumentException if field or analyzer is null
   public MatchQueryParser(String field, Analyzer analyzer) {
     super();
     _field = field;
     _analyzer = analyzer;
   }
 
-  /**
-   * Validates the minimum should match specification.
-   *
-   * <p>This method validates the format and range of the minimum_should_match value:</p>
-   * <ul>
-   *   <li><strong>Positive integer:</strong> "3" - at least 3 should clauses must match</li>
-   *   <li><strong>Negative integer:</strong> "-2" - at most 2 should clauses can be missing</li>
-   *   <li><strong>Positive percentage:</strong> "80%" - at least 80% of should clauses must match</li>
-   *   <li><strong>Negative percentage:</strong> "-20%" - at most 20% of should clauses can be missing</li>
-   * </ul>
-   *
-   * @param minimumShouldMatch the minimum should match specification to validate
-   * @return the validated and trimmed value
-   * @throws IllegalArgumentException if the format is invalid or value is out of range
-   */
+  /// Validates the minimum should match specification.
+  ///
+  /// This method validates the format and range of the minimum_should_match value:
+  ///
+  /// - **Positive integer:** "3" - at least 3 should clauses must match
+  /// - **Negative integer:** "-2" - at most 2 should clauses can be missing
+  /// - **Positive percentage:** "80%" - at least 80% of should clauses must match
+  /// - **Negative percentage:** "-20%" - at most 20% of should clauses can be missing
+  ///
+  /// @param minimumShouldMatch the minimum should match specification to validate
+  /// @return the validated and trimmed value
+  /// @throws IllegalArgumentException if the format is invalid or value is out of range
   private String validateMinimumShouldMatch(String minimumShouldMatch) {
     if (minimumShouldMatch == null || minimumShouldMatch.trim().isEmpty()) {
       return "1";
@@ -136,55 +129,46 @@ public class MatchQueryParser extends QueryParserBase {
     }
   }
 
-  /**
-   * Sets the minimum number of should clauses that must match.
-   *
-   * <p>This method supports the same formats as OpenSearch's minimum_should_match:</p>
-   * <ul>
-   *   <li><strong>Positive integer:</strong> "3" - at least 3 should clauses must match</li>
-   *   <li><strong>Negative integer:</strong> "-2" - at most 2 should clauses can be missing</li>
-   *   <li><strong>Positive percentage:</strong> "80%" - at least 80% of should clauses must match</li>
-   *   <li><strong>Negative percentage:</strong> "-20%" - at most 20% of should clauses can be missing</li>
-   * </ul>
-   *
-   * <p>Examples:</p>
-   * <ul>
-   *   <li>setMinimumShouldMatch("3") - requires at least 3 matches</li>
-   *   <li>setMinimumShouldMatch("-1") - allows at most 1 to be missing</li>
-   *   <li>setMinimumShouldMatch("80%") - requires at least 80% matches</li>
-   *   <li>setMinimumShouldMatch("-20%") - allows at most 20% to be missing</li>
-   * </ul>
-   *
-   * @param minimumShouldMatch the minimum should match specification (integer or percentage)
-   * @throws IllegalArgumentException if the format is invalid or value is out of range
-   */
+  /// Sets the minimum number of should clauses that must match.
+  ///
+  /// This method supports the same formats as OpenSearch's minimum_should_match:
+  ///
+  /// - **Positive integer:** "3" - at least 3 should clauses must match
+  /// - **Negative integer:** "-2" - at most 2 should clauses can be missing
+  /// - **Positive percentage:** "80%" - at least 80% of should clauses must match
+  /// - **Negative percentage:** "-20%" - at most 20% of should clauses can be missing
+  ///
+  /// Examples:
+  ///
+  /// - setMinimumShouldMatch("3") - requires at least 3 matches
+  /// - setMinimumShouldMatch("-1") - allows at most 1 to be missing
+  /// - setMinimumShouldMatch("80%") - requires at least 80% matches
+  /// - setMinimumShouldMatch("-20%") - allows at most 20% to be missing
+  ///
+  /// @param minimumShouldMatch the minimum should match specification (integer or percentage)
+  /// @throws IllegalArgumentException if the format is invalid or value is out of range
   public void setMinimumShouldMatch(String minimumShouldMatch) {
     _minimumShouldMatch = validateMinimumShouldMatch(minimumShouldMatch);
   }
 
-  /**
-   * Sets the default operator for combining terms.
-   *
-   * @param defaultOperator the default operator (MUST for AND, SHOULD for OR)
-   */
+  /// Sets the default operator for combining terms.
+  ///
+  /// @param defaultOperator the default operator (MUST for AND, SHOULD for OR)
   public void setDefaultOperator(BooleanClause.Occur defaultOperator) {
     _defaultOperator = defaultOperator;
   }
 
-  /**
-   * Parses the given query string and returns an appropriate Lucene Query.
-   *
-   * <p>This method performs the following steps:</p>
-   * <ol>
-   *   <li>Validates the input query (null, empty, whitespace-only)</li>
-   *   <li>Parses the query using Lucene's QueryParser</li>
-   *   <li>Applies minimum_should_match behavior to Boolean queries</li>
-   * </ol>
-   *
-   * @param query the query string to parse (must not be null or empty)
-   * @return a Lucene Query object representing the parsed query
-   * @throws ParseException if the query is null, empty, or parsing fails
-   */
+  /// Parses the given query string and returns an appropriate Lucene Query.
+  ///
+  /// This method performs the following steps:
+  ///
+  /// 1. Validates the input query (null, empty, whitespace-only)
+  /// 2. Parses the query using Lucene's QueryParser
+  /// 3. Applies minimum_should_match behavior to Boolean queries
+  ///
+  /// @param query the query string to parse (must not be null or empty)
+  /// @return a Lucene Query object representing the parsed query
+  /// @throws ParseException if the query is null, empty, or parsing fails
   @Override
   public Query parse(String query)
       throws ParseException {
@@ -218,23 +202,19 @@ public class MatchQueryParser extends QueryParserBase {
     return parsedQuery;
   }
 
-  /**
-   * Applies minimum_should_match behavior to a BooleanQuery.
-   *
-   * @param booleanQuery the BooleanQuery to modify
-   * @return the modified BooleanQuery with minimum_should_match applied
-   */
+  /// Applies minimum_should_match behavior to a BooleanQuery.
+  ///
+  /// @param booleanQuery the BooleanQuery to modify
+  /// @return the modified BooleanQuery with minimum_should_match applied
   private Query applyMinimumShouldMatch(BooleanQuery booleanQuery) {
     return applyMinimumShouldMatch(booleanQuery, new HashSet<>());
   }
 
-  /**
-   * Applies minimum_should_match behavior to a BooleanQuery with infinite loop protection.
-   *
-   * @param booleanQuery the BooleanQuery to modify
-   * @param visitedQueries set of already visited BooleanQueries to prevent infinite loops
-   * @return the modified BooleanQuery with minimum_should_match applied
-   */
+  /// Applies minimum_should_match behavior to a BooleanQuery with infinite loop protection.
+  ///
+  /// @param booleanQuery the BooleanQuery to modify
+  /// @param visitedQueries set of already visited BooleanQueries to prevent infinite loops
+  /// @return the modified BooleanQuery with minimum_should_match applied
   private Query applyMinimumShouldMatch(BooleanQuery booleanQuery, Set<BooleanQuery> visitedQueries) {
     if (visitedQueries.contains(booleanQuery)) {
       return booleanQuery;
@@ -269,13 +249,11 @@ public class MatchQueryParser extends QueryParserBase {
     return builder.build();
   }
 
-  /**
-   * Calculates the actual minimum should match value based on the number of tokens and the specified value.
-   *
-   * @param totalTokens the total number of tokens in the query
-   * @param minimumShouldMatchValue the minimum should match specification
-   * @return the calculated minimum should match value
-   */
+  /// Calculates the actual minimum should match value based on the number of tokens and the specified value.
+  ///
+  /// @param totalTokens the total number of tokens in the query
+  /// @param minimumShouldMatchValue the minimum should match specification
+  /// @return the calculated minimum should match value
   private int calculateMinimumShouldMatch(int totalTokens, String minimumShouldMatchValue) {
     String value = minimumShouldMatchValue.trim();
 
@@ -301,31 +279,27 @@ public class MatchQueryParser extends QueryParserBase {
     }
   }
 
-  /**
-   * Reinitializes the parser with a new CharStream.
-   *
-   * <p>This method is required by QueryParserBase but is not used in this implementation
-   * since we override the parse(String) method directly. The method is left as a no-op.</p>
-   *
-   * @param input the CharStream to reinitialize with (ignored in this implementation)
-   */
+  /// Reinitializes the parser with a new CharStream.
+  ///
+  /// This method is required by QueryParserBase but is not used in this implementation
+  /// since we override the parse(String) method directly. The method is left as a no-op.
+  ///
+  /// @param input the CharStream to reinitialize with (ignored in this implementation)
   @Override
   public void ReInit(CharStream input) {
     // This method is required by QueryParserBase but not used in our implementation
     // since we override parse(String) directly
   }
 
-  /**
-   * Creates a top-level query for the specified field.
-   *
-   * <p>This method is required by QueryParserBase but is not supported in this implementation.
-   * Use the parse(String) method instead for query parsing.</p>
-   *
-   * @param field the field name (ignored in this implementation)
-   * @return never returns (always throws UnsupportedOperationException)
-   * @throws ParseException never thrown (method always throws UnsupportedOperationException)
-   * @throws UnsupportedOperationException always thrown, indicating this method is not supported
-   */
+  /// Creates a top-level query for the specified field.
+  ///
+  /// This method is required by QueryParserBase but is not supported in this implementation.
+  /// Use the parse(String) method instead for query parsing.
+  ///
+  /// @param field the field name (ignored in this implementation)
+  /// @return never returns (always throws UnsupportedOperationException)
+  /// @throws ParseException never thrown (method always throws UnsupportedOperationException)
+  /// @throws UnsupportedOperationException always thrown, indicating this method is not supported
   @Override
   public Query TopLevelQuery(String field)
       throws ParseException {

@@ -40,17 +40,15 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the explicit-tree {@code stageStats} rendering mode of {@link MultiStageStatsTreeBuilder}, in particular
- * with plugin-defined operator types (ids >= {@link OperatorTypeDescriptor#PLUGIN_ID_FLOOR}) whose
- * {@link StatMap.Key} enums are unknown to the built-in {@link MultiStageOperator.Type} world.
- */
+/// Tests the explicit-tree `stageStats` rendering mode of [MultiStageStatsTreeBuilder], in particular
+/// with plugin-defined operator types (ids >= [OperatorTypeDescriptor#PLUGIN_ID_FLOOR]) whose
+/// [StatMap.Key] enums are unknown to the built-in [MultiStageOperator.Type] world.
 public class MultiStageStatsTreeBuilderTest {
 
   private static final DataSchema SCHEMA =
       new DataSchema(new String[]{"col"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
-  /** A plugin-only stat enum, intentionally unrelated to any built-in operator's StatKey. */
+  /// A plugin-only stat enum, intentionally unrelated to any built-in operator's StatKey.
   public enum TestPluginStat implements StatMap.Key {
     EMITTED_ROWS(StatMap.Type.LONG),
     CUSTOM_COUNTER(StatMap.Type.LONG);
@@ -115,12 +113,10 @@ public class MultiStageStatsTreeBuilderTest {
     return stats;
   }
 
-  /**
-   * A stage tree made exclusively of plugin types must render fully (no node dropped, custom stat fields present)
-   * and must nest the sender stage's tree under the node whose plan-node id resolves to a
-   * {@link MailboxReceiveNode} — even though the receive node carries a plugin type, not the built-in
-   * MAILBOX_RECEIVE.
-   */
+  /// A stage tree made exclusively of plugin types must render fully (no node dropped, custom stat fields present)
+  /// and must nest the sender stage's tree under the node whose plan-node id resolves to a
+  /// [MailboxReceiveNode] — even though the receive node carries a plugin type, not the built-in
+  /// MAILBOX_RECEIVE.
   @Test
   public void testPluginTypedTreeRendersWithCrossStageNesting() {
     OperatorTypeDescriptor sendType = pluginType(300, "TEST_PLUGIN_SEND");
@@ -154,10 +150,8 @@ public class MultiStageStatsTreeBuilderTest {
     Assert.assertEquals(nestedStage2.get("emittedRows").asLong(), 5);
   }
 
-  /**
-   * PIPELINE_BREAKER nodes must be collapsed (children hoisted into the parent) so the JSON shape matches the
-   * legacy renderer, which nests the breaker's receive operators directly under the LEAF.
-   */
+  /// PIPELINE_BREAKER nodes must be collapsed (children hoisted into the parent) so the JSON shape matches the
+  /// legacy renderer, which nests the breaker's receive operators directly under the LEAF.
   @Test
   public void testPipelineBreakerCollapsed() {
     MultiStageOperator.Type leaf = MultiStageOperator.Type.LEAF;
@@ -177,11 +171,9 @@ public class MultiStageStatsTreeBuilderTest {
     Assert.assertEquals(json.get("children").get(0).get("type").asText(), "MAILBOX_RECEIVE");
   }
 
-  /**
-   * Legacy-path regression: a flat stats list with a plugin type at the send position must not throw
-   * {@code ArithmeticException} (the built-in PARALLELISM key cannot be read from a foreign StatMap, which used to
-   * yield a zero divisor).
-   */
+  /// Legacy-path regression: a flat stats list with a plugin type at the send position must not throw
+  /// `ArithmeticException` (the built-in PARALLELISM key cannot be read from a foreign StatMap, which used to
+  /// yield a zero divisor).
   @Test
   public void testLegacyPathWithPluginSendTypeDoesNotThrow() {
     OperatorTypeDescriptor sendType = pluginType(300, "TEST_PLUGIN_SEND");

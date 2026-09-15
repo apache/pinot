@@ -28,10 +28,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Utilities for parsing and validating Kafka partition subset configuration
- * (stream.kafka.partition.ids) from stream config.
- */
+/// Utilities for parsing and validating Kafka partition subset configuration
+/// (stream.kafka.partition.ids) from stream config.
 public final class KafkaPartitionSubsetUtils {
 
   static final int MAX_TOTAL_PARTITION_IDS = 10_000;
@@ -39,28 +37,26 @@ public final class KafkaPartitionSubsetUtils {
   private KafkaPartitionSubsetUtils() {
   }
 
-  /**
-   * Reads the optional partition ID specification from the stream config map.
-   * Supports three formats, which can be mixed in a single value:
-   * <ul>
-   *   <li>Individual IDs: {@code "0,2,5"}</li>
-   *   <li>Inclusive ranges (both start and end are included): {@code "0-399"}</li>
-   *   <li>Mixed: {@code "0-99,200,300-399"}</li>
-   * </ul>
-   * Returns a sorted, deduplicated list for stable ordering when used for partition group metadata.
-   * Duplicate IDs in the config are silently removed; this ensures stable ordering and prevents
-   * duplicate processing of the same partition.
-   *
-   * <p>The total number of unique partition IDs must not exceed {@link #MAX_TOTAL_PARTITION_IDS}
-   * (currently 10,000). This guard prevents accidental OOM from typos or overly broad ranges.
-   *
-   * @param streamConfigMap table stream config map (e.g. from
-   *                        {@link org.apache.pinot.spi.stream.StreamConfig#getStreamConfigsMap()})
-   * @return Sorted list of unique partition IDs when stream.kafka.partition.ids is set and non-empty;
-   *         null when not set or blank
-   * @throws IllegalArgumentException if the value contains invalid entries or exceeds
-   *         {@link #MAX_TOTAL_PARTITION_IDS}
-   */
+  /// Reads the optional partition ID specification from the stream config map.
+  /// Supports three formats, which can be mixed in a single value:
+  ///
+  /// - Individual IDs: `"0,2,5"`
+  /// - Inclusive ranges (both start and end are included): `"0-399"`
+  /// - Mixed: `"0-99,200,300-399"`
+  ///
+  /// Returns a sorted, deduplicated list for stable ordering when used for partition group metadata.
+  /// Duplicate IDs in the config are silently removed; this ensures stable ordering and prevents
+  /// duplicate processing of the same partition.
+  ///
+  /// The total number of unique partition IDs must not exceed [#MAX_TOTAL_PARTITION_IDS]
+  /// (currently 10,000). This guard prevents accidental OOM from typos or overly broad ranges.
+  ///
+  /// @param streamConfigMap table stream config map (e.g. from
+  ///                        [org.apache.pinot.spi.stream.StreamConfig#getStreamConfigsMap()])
+  /// @return Sorted list of unique partition IDs when stream.kafka.partition.ids is set and non-empty;
+  ///         null when not set or blank
+  /// @throws IllegalArgumentException if the value contains invalid entries or exceeds
+  ///         [#MAX_TOTAL_PARTITION_IDS]
   @Nullable
   public static List<Integer> getPartitionIdsFromConfig(Map<String, String> streamConfigMap) {
     String key = KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS);

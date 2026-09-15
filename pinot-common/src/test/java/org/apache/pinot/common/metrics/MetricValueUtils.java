@@ -24,13 +24,11 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.SettableValue;
 
 
-/**
- * Test utility for reading gauge values from {@link AbstractMetrics} without depending on a specific metrics
- * implementation. Reads via {@link AbstractMetrics#getGaugeValue(String)} first (covers gauges registered via the
- * {@code setValueOf*Gauge}/{@code addValueTo*Gauge} family that populate the internal value map), and falls back to
- * looking the metric up in the registry and reading it via the {@link SettableValue} SPI (covers pure-supplier paths
- * like {@code setOrUpdateGauge(Supplier)}, {@code setOrUpdateGauge(long)}, and {@code addCallbackGauge}).
- */
+/// Test utility for reading gauge values from [AbstractMetrics] without depending on a specific metrics
+/// implementation. Reads via [AbstractMetrics#getGaugeValue(String)] first (covers gauges registered via the
+/// `setValueOf*Gauge`/`addValueTo*Gauge` family that populate the internal value map), and falls back to
+/// looking the metric up in the registry and reading it via the [SettableValue] SPI (covers pure-supplier paths
+/// like `setOrUpdateGauge(Supplier)`, `setOrUpdateGauge(long)`, and `addCallbackGauge`).
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MetricValueUtils {
   private MetricValueUtils() {

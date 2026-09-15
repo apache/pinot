@@ -48,20 +48,16 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Base implementation of the H3 index creator.
- * <p>Index file layout:
- * <ul>
- *   <li>Header</li>
- *   <ul>
- *     <li>Version (int)</li>
- *     <li>Number of unique H3 ids (int)</li>
- *     <li>Resolutions (short)</li>
- *   </ul>
- *   <li>Long dictionary</li>
- *   <li>Bitmap inverted index</li>
- * </ul>
- */
+/// Base implementation of the H3 index creator.
+///
+/// Index file layout:
+///
+/// - Header
+///   - Version (int)
+///   - Number of unique H3 ids (int)
+///   - Resolutions (short)
+/// - Long dictionary
+/// - Bitmap inverted index
 public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   public static final int VERSION = 1;
   public static final int HEADER_LENGTH = 10;
@@ -159,9 +155,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     bitmapWriter.add(_nextDocId++);
   }
 
-  /**
-   * Writes the bitmap to the temporary index files for the given H3 id.
-   */
+  /// Writes the bitmap to the temporary index files for the given H3 id.
   void add(long h3Id, BitmapDataProvider bitmap)
       throws IOException {
     _dictionaryStream.writeLong(h3Id);
@@ -169,10 +163,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     bitmap.serialize(_bitmapValueStream);
   }
 
-  /**
-   * Generates the final index file from the temporary index files. Should be called after all the bitmaps are added to
-   * the temporary index files.
-   */
+  /// Generates the final index file from the temporary index files. Should be called after all the bitmaps are added to
+  /// the temporary index files.
   void generateIndexFile()
       throws IOException {
     // Write the end offset of the last bitmap

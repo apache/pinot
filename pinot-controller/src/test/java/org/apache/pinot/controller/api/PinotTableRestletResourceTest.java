@@ -58,6 +58,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -84,9 +86,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
-/**
- * Test for table creation
- */
+/// Test for table creation
 public class PinotTableRestletResourceTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
@@ -530,6 +530,66 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
+  @Test
+  public void testNonDeterministicTransformCreateAndLegacyUpdate()
+      throws Exception {
+    String tableName = "legacyNonDeterministicTransform";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "now()")));
+    TableConfig legacyTableConfig = getRealtimeTableBuilder(tableName)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    IOException createError =
+        expectThrows(IOException.class, () -> createTable(legacyTableConfig.toJsonString()));
+    assertHasStatus(createError, 400);
+    assertTrue(createError.getMessage().contains("Function 'now' has VOLATILE volatility"), createError.getMessage());
+
+    // Seed the config below the REST validation layer to model a table persisted before this validation existed.
+    DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyTableConfig);
+
+    TableConfig update = getTableConfig(tableName, "REALTIME");
+    update.getValidationConfig().setRetentionTimeValue("10");
+    JsonNode validationResponse = JsonUtils.stringToJsonNode(tableClient().validateTableConfig(update.toJsonString()));
+    assertTrue(validationResponse.has("REALTIME"));
+
+    JsonNode response = JsonUtils.stringToJsonNode(updateTable(tableName, update.toJsonString()));
+    assertTrue(response.has("status"));
+
+    TableConfig stored = getTableConfig(tableName, "REALTIME");
+    assertEquals(stored.getValidationConfig().getRetentionTimeValue(), "10");
+    assertEquals(stored.getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(), "now()");
+
+    IngestionConfig changedIngestionConfig = new IngestionConfig();
+    changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "plus(now(), 1)")));
+    update.setIngestionConfig(changedIngestionConfig);
+    PinotAdminException validationError =
+        expectThrows(PinotAdminException.class, () -> tableClient().validateTableConfig(update.toJsonString()));
+    assertTrue(validationError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        validationError.getMessage());
+
+    IOException updateError = expectThrows(IOException.class, () -> updateTable(tableName, update.toJsonString()));
+    assertHasStatus(updateError, 400);
+    assertTrue(updateError.getMessage().contains("Function 'now' has VOLATILE volatility"), updateError.getMessage());
+  }
+
+  @Test
+  public void testCreateTableRejectsNonDeterministicSchemaTransform()
+      throws Exception {
+    String tableName = "nonDeterministicSchemaTransform";
+    Schema schema = DEFAULT_INSTANCE.createDummySchema(tableName);
+    schema.getFieldSpecFor("dimA").setTransformFunction("now()");
+
+    // Seed below the schema REST validation layer to model a schema persisted before this validation existed.
+    DEFAULT_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+
+    TableConfig tableConfig = getOfflineTableBuilder(tableName).build();
+    IOException createError = expectThrows(IOException.class, () -> createTable(tableConfig.toJsonString()));
+    assertHasStatus(createError, 400);
+    assertTrue(createError.getMessage().contains("Function 'now' has VOLATILE volatility"), createError.getMessage());
+  }
+
   private void deleteAllTables()
       throws IOException {
     List<String> tables = getTableNames("offline", null, null, null);
@@ -922,24 +982,22 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replication factors.
-   * This method tests both REALTIME and OFFLINE table configurations.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
-   *  available instances. The creation is expected to fail, and the test verifies that the exception message
-   *  contains the expected error.
-   * 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
-   *  fail, and the test verifies that the exception message contains the expected error.
-   * 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
-   * testing. These creations are expected to succeed.
-   * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
-   * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
-   * messages are returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replication factors.
+  /// This method tests both REALTIME and OFFLINE table configurations.
+  ///
+  /// The method performs the following steps:
+  /// 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
+  ///  available instances. The creation is expected to fail, and the test verifies that the exception message
+  ///  contains the expected error.
+  /// 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
+  ///  fail, and the test verifies that the exception message contains the expected error.
+  /// 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
+  /// testing. These creations are expected to succeed.
+  /// 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
+  /// invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
+  /// messages are returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidTableReplication()
       throws Exception {
@@ -955,20 +1013,18 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.OFFLINE);
   }
 
-  /**
-   * Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
-   * This method tests the REALTIME table configuration.
-   *
-   * The method performs the following steps:
-   * 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
-   * fail, and the test verifies that the exception message contains the expected error.
-   * 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
-   * testing. This creation is expected to succeed.
-   * 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
-   * value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
-   *
-   * @throws Exception if any error occurs during the validation process
-   */
+  /// Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
+  /// This method tests the REALTIME table configuration.
+  ///
+  /// The method performs the following steps:
+  /// 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
+  /// fail, and the test verifies that the exception message contains the expected error.
+  /// 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
+  /// testing. This creation is expected to succeed.
+  /// 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
+  /// value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
+  ///
+  /// @throws Exception if any error occurs during the validation process
   @Test
   public void validateInvalidReplicaGroupConfig()
       throws Exception {
@@ -1080,9 +1136,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertTrue(msg.contains("Table nonExistentTable_REALTIME does not exist"), msg);
   }
 
-  /**
-   * Updating existing REALTIME table with invalid replication factor should throw exception.
-   */
+  /// Updating existing REALTIME table with invalid replication factor should throw exception.
   private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableConfig tableConfig = (tableType == TableType.REALTIME
@@ -1114,9 +1168,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  /**
-   * When table is created with invalid replication factor, it should throw exception.
-   */
+  /// When table is created with invalid replication factor, it should throw exception.
   private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);

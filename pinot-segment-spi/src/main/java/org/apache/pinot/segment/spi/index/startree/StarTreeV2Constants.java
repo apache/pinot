@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
-/**
- * The {@code StarTreeV2Constants} class contains all the constant values used by star-tree.
- */
+/// The `StarTreeV2Constants` class contains all the constant values used by star-tree.
 public class StarTreeV2Constants {
   private StarTreeV2Constants() {
   }

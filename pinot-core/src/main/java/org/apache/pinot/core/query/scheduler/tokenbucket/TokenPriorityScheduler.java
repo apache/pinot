@@ -31,11 +31,9 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority.
- * This is a thin wrapper factory class that configures {@link PriorityScheduler} with
- * the right concrete classes. All the priority based scheduling logic is in {@link PriorityScheduler}
- */
+/// Schedules queries from a [SchedulerGroup] with highest number of tokens on priority.
+/// This is a thin wrapper factory class that configures [PriorityScheduler] with
+/// the right concrete classes. All the priority based scheduling logic is in [PriorityScheduler]
 public class TokenPriorityScheduler extends PriorityScheduler {
   public static final String TOKENS_PER_MS_KEY = "tokens_per_ms";
   public static final String TOKEN_LIFETIME_MS_KEY = "token_lifetime_ms";

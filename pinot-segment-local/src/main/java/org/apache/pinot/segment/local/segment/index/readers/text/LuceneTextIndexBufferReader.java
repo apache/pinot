@@ -32,25 +32,21 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-/**
- * Utility class for reading Lucene text index from a combined buffer.
- * This class provides methods to extract files and create Lucene Directory
- * from a PinotDataBuffer containing the combined text index data.
- */
+/// Utility class for reading Lucene text index from a combined buffer.
+/// This class provides methods to extract files and create Lucene Directory
+/// from a PinotDataBuffer containing the combined text index data.
 public class LuceneTextIndexBufferReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexBufferReader.class);
 
   private LuceneTextIndexBufferReader() {
   }
 
-  /**
-   * Creates a Lucene Directory from a PinotDataBuffer containing combined text index
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @param column the column name
-   * @return Lucene Directory that reads from the buffer
-   * @throws IOException if buffer parsing fails
-   */
+  /// Creates a Lucene Directory from a PinotDataBuffer containing combined text index
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @param column the column name
+  /// @return Lucene Directory that reads from the buffer
+  /// @throws IOException if buffer parsing fails
   public static Directory createLuceneDirectory(PinotDataBuffer indexBuffer, String column)
       throws IOException {
     // Parse buffer header and metadata
@@ -63,14 +59,12 @@ public class LuceneTextIndexBufferReader {
     return new PinotBufferLuceneDirectory(indexBuffer, fileMap, column);
   }
 
-  /**
-   * Extracts docId mapping buffer from combined index buffer
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @param column the column name
-   * @return PinotDataBuffer for docId mapping, or null if not found
-   * @throws IOException if extraction fails
-   */
+  /// Extracts docId mapping buffer from combined index buffer
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @param column the column name
+  /// @return PinotDataBuffer for docId mapping, or null if not found
+  /// @throws IOException if extraction fails
   public static PinotDataBuffer extractDocIdMappingBuffer(PinotDataBuffer indexBuffer, String column)
       throws IOException {
     String mappingFileName = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
@@ -82,14 +76,12 @@ public class LuceneTextIndexBufferReader {
     return null;
   }
 
-  /**
-   * Extracts properties from combined index buffer
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @param column the column name
-   * @return Properties object, or empty Properties if not found
-   * @throws IOException if extraction fails
-   */
+  /// Extracts properties from combined index buffer
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @param column the column name
+  /// @return Properties object, or empty Properties if not found
+  /// @throws IOException if extraction fails
   public static Properties extractProperties(PinotDataBuffer indexBuffer, String column)
       throws IOException {
     String propertiesFileName = V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE;
@@ -103,49 +95,41 @@ public class LuceneTextIndexBufferReader {
     return new Properties();
   }
 
-  /**
-   * Checks if buffer contains a specific file
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @param fileName the file name to check
-   * @return true if file exists in buffer
-   * @throws IOException if buffer parsing fails
-   */
+  /// Checks if buffer contains a specific file
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @param fileName the file name to check
+  /// @return true if file exists in buffer
+  /// @throws IOException if buffer parsing fails
   public static boolean hasFile(PinotDataBuffer indexBuffer, String fileName)
       throws IOException {
     return getFileInfo(indexBuffer, fileName) != null;
   }
 
-  /**
-   * Gets list of all files in the buffer
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @return list of file names
-   * @throws IOException if buffer parsing fails
-   */
+  /// Gets list of all files in the buffer
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @return list of file names
+  /// @throws IOException if buffer parsing fails
   public static List<String> listFiles(PinotDataBuffer indexBuffer)
       throws IOException {
     TextIndexMetadata metadata = parseBufferMetadata(indexBuffer);
     return metadata.getFileNames();
   }
 
-  /**
-   * Gets file info for a specific file
-   *
-   * @param indexBuffer the buffer containing combined text index data
-   * @param fileName the file name
-   * @return FileInfo object, or null if not found
-   * @throws IOException if buffer parsing fails
-   */
+  /// Gets file info for a specific file
+  ///
+  /// @param indexBuffer the buffer containing combined text index data
+  /// @param fileName the file name
+  /// @return FileInfo object, or null if not found
+  /// @throws IOException if buffer parsing fails
   public static FileInfo getFileInfo(PinotDataBuffer indexBuffer, String fileName)
       throws IOException {
     TextIndexMetadata metadata = parseBufferMetadata(indexBuffer);
     return metadata.getFileInfoMap().get(fileName);
   }
 
-  /**
-   * Parses buffer metadata from the combined index buffer
-   */
+  /// Parses buffer metadata from the combined index buffer
   private static TextIndexMetadata parseBufferMetadata(PinotDataBuffer indexBuffer)
       throws IOException {
     // Read and validate header
@@ -218,17 +202,13 @@ public class LuceneTextIndexBufferReader {
     return new LuceneTextIndexHeader.TextIndexMetadata(magic, version, totalSize, fileCount, fileNames, fileInfoMap);
   }
 
-  /**
-   * Builds file map from buffer metadata
-   */
+  /// Builds file map from buffer metadata
   private static Map<String, LuceneTextIndexHeader.FileInfo> buildFileMap(PinotDataBuffer indexBuffer,
       LuceneTextIndexHeader.TextIndexMetadata metadata) {
     return metadata.getFileInfoMap();
   }
 
-  /**
-   * Parses properties from buffer
-   */
+  /// Parses properties from buffer
   private static Properties parsePropertiesFromBuffer(PinotDataBuffer propertiesBuffer)
       throws IOException {
     Properties properties = new Properties();

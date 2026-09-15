@@ -167,8 +167,62 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         "No option should be injected when the broker default is unset");
   }
 
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsInjectsStreamingDistinctFlushThreshold()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "5000",
+        "Broker default should be injected when query option is absent");
+    Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD),
+        "The distinct default must not also enable streaming group-by");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsStreamingDistinctPerQueryOverrideWins()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, "0");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "0",
+        "Per-query SET = 0 must override the broker default");
+
+    queryOptions.clear();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, "100");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "100",
+        "Per-query SET must take precedence over the broker default");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsNoStreamingDistinctInjectionWhenConfigUnset()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold(null);
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD),
+        "No option should be injected when the broker default is unset");
+  }
+
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
       @Nullable String streamingGroupByFlushThreshold)
+      throws Exception {
+    return newHandlerWithFlushThresholds(streamingGroupByFlushThreshold, null);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithStreamingDistinctFlushThreshold(
+      @Nullable String streamingDistinctFlushThreshold)
+      throws Exception {
+    return newHandlerWithFlushThresholds(null, streamingDistinctFlushThreshold);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithFlushThresholds(
+      @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold)
       throws Exception {
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
@@ -176,6 +230,10 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     if (streamingGroupByFlushThreshold != null) {
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           streamingGroupByFlushThreshold);
+    }
+    if (streamingDistinctFlushThreshold != null) {
+      config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
+          streamingDistinctFlushThreshold);
     }
     BrokerQueryEventListenerFactory.init(config);
     BrokerMetrics.register(mock(BrokerMetrics.class));

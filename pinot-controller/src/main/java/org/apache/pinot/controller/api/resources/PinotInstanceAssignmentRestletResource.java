@@ -246,13 +246,11 @@ public class PinotInstanceAssignmentRestletResource {
     return instancePartitionsMap;
   }
 
-  /**
-   * Assign instances given the type of instancePartitions.
-   * @param instancePartitionsMap the empty map to be filled.
-   * @param tableConfig table config
-   * @param instanceConfigs list of instance configs
-   * @param instancePartitionsType type of instancePartitions
-   */
+  /// Assign instances given the type of instancePartitions.
+  /// @param instancePartitionsMap the empty map to be filled.
+  /// @param tableConfig table config
+  /// @param instanceConfigs list of instance configs
+  /// @param instancePartitionsType type of instancePartitions
   private void assignInstancesForInstancePartitionsType(Map<String, InstancePartitions> instancePartitionsMap,
       TableConfig tableConfig, List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();

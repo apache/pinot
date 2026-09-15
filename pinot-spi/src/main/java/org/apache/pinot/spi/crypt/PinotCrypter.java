@@ -22,29 +22,21 @@ import java.io.File;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * The PinotCrypter will encrypt and decrypt segments when they are downloaded. This class is especially useful in cases
- * where segments cannot be stored unencrypted in storage.
- */
+/// The PinotCrypter will encrypt and decrypt segments when they are downloaded. This class is especially useful in
+/// cases where segments cannot be stored unencrypted in storage.
 public interface PinotCrypter {
 
-  /**
-   * Initializes a crypter with any configurations it might need.
-   * @param config
-   */
+  /// Initializes a crypter with any configurations it might need.
+  /// @param config
   void init(PinotConfiguration config);
 
-  /**
-   * Encrypts the file into the file location provided. The implementation should clean up file after any failures.
-   * @param decryptedFile
-   * @param encryptedFile
-   */
+  /// Encrypts the file into the file location provided. The implementation should clean up file after any failures.
+  /// @param decryptedFile
+  /// @param encryptedFile
   void encrypt(File decryptedFile, File encryptedFile);
 
-  /**
-   * Decrypts file into file location provided. The implementation should clean up file after any failures.
-   * @param encryptedFile
-   * @param decryptedFile
-   */
+  /// Decrypts file into file location provided. The implementation should clean up file after any failures.
+  /// @param encryptedFile
+  /// @param decryptedFile
   void decrypt(File encryptedFile, File decryptedFile);
 }

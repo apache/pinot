@@ -29,9 +29,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for HelixHelper. This is in pinot-controller mostly to have the necessary test fixtures.
- */
+/// Tests for HelixHelper. This is in pinot-controller mostly to have the necessary test fixtures.
 public class HelixHelperTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   public static final String RESOURCE_NAME = "potato_OFFLINE";
@@ -50,9 +48,7 @@ public class HelixHelperTest {
         .addResource(TEST_INSTANCE.getHelixClusterName(), RESOURCE_NAME, idealState);
   }
 
-  /**
-   * Regression test for large ideal state updates failing silently
-   */
+  /// Regression test for large ideal state updates failing silently
   @Test
   public void testWriteLargeIdealState() {
     final int numSegments = 20000;

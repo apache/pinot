@@ -139,27 +139,21 @@ public class BaseTableDataManagerAcquireSegmentTest {
     return tableDataManager;
   }
 
-  /**
-   * Returns the concrete {@link TableDataManager} instance under test. Default returns a stock
-   * {@link OfflineTableDataManager}; subclasses override to test a different implementation while inheriting all
-   * test bodies.
-   */
+  /// Returns the concrete [TableDataManager] instance under test. Default returns a stock
+  /// [OfflineTableDataManager]; subclasses override to test a different implementation while inheriting all
+  /// test bodies.
   protected TableDataManager newTableDataManager() {
     return new OfflineTableDataManager();
   }
 
-  /**
-   * Returns the {@link HelixManager} mock wired into the TDM under test. Default returns a bare Mockito mock
-   * — fine for the inherited test bodies which do not read cluster config or property store directly.
-   * Subclasses that exercise paths reading those override to stub them.
-   */
+  /// Returns the [HelixManager] mock wired into the TDM under test. Default returns a bare Mockito mock
+  /// — fine for the inherited test bodies which do not read cluster config or property store directly.
+  /// Subclasses that exercise paths reading those override to stub them.
   protected HelixManager createHelixManagerMock() {
     return mock(HelixManager.class);
   }
 
-  /**
-   * Returns the TDM-map key under which a segment with the given name is registered.
-   */
+  /// Returns the TDM-map key under which a segment with the given name is registered.
   protected String tdmKey(String segmentName) {
     return segmentName;
   }

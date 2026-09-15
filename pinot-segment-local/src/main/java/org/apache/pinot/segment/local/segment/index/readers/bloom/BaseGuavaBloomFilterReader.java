@@ -24,10 +24,9 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Base implementation of the reader for guava bloom filter.
- * <p>The format of the data should be aligned with the guava bloom filter.
- */
+/// Base implementation of the reader for guava bloom filter.
+///
+/// The format of the data should be aligned with the guava bloom filter.
 public abstract class BaseGuavaBloomFilterReader implements BloomFilterReader {
   // Format of the data buffer header:
   //   - Strategy ordinal: 1 byte

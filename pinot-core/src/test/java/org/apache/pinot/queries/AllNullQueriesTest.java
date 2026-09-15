@@ -52,10 +52,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * Queries test for INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL and STRING data types with nullHandlingEnabled
- * where all input values are nulls.
- */
+/// Queries test for INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL and STRING data types with nullHandlingEnabled
+/// where all input values are nulls.
 public class AllNullQueriesTest extends BaseQueriesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";

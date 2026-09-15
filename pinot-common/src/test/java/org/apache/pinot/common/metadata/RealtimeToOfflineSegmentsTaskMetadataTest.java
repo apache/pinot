@@ -25,9 +25,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Tests for converting to and from ZNRecord to {@link RealtimeToOfflineSegmentsTaskMetadata}
- */
+/// Tests for converting to and from ZNRecord to [RealtimeToOfflineSegmentsTaskMetadata]
 public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
   @Test

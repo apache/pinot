@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.common.compression;
 
-/**
- * Compressor interface for bytes compress/decompress.
- * Note that the compress method will also encode the size of original bytes as the first
- */
+/// Compressor interface for bytes compress/decompress.
+/// Note that the compress method will also encode the size of original bytes as the first
 public interface Compressor {
 
   byte[] compress(byte[] input)

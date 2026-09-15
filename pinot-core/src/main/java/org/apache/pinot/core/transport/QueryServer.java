@@ -49,10 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryServer} is the Netty server that runs on Pinot Server to handle the instance requests sent from Pinot
- * Brokers.
- */
+/// The `QueryServer` is the Netty server that runs on Pinot Server to handle the instance requests sent from
+/// Pinot Brokers.
 public class QueryServer {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
@@ -66,23 +64,19 @@ public class QueryServer {
   private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
 
 
-  /**
-   * Create an unsecured server instance
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   */
+  /// Create an unsecured server instance
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
   public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
     this(port, nettyConfig, null, instanceRequestHandler);
   }
 
-  /**
-   * Create a server instance with TLS config
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   * @param tlsConfig TLS/SSL config
-   */
+  /// Create a server instance with TLS config
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
+  /// @param tlsConfig TLS/SSL config
   public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
     _port = port;
     _tlsConfig = tlsConfig;

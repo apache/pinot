@@ -103,9 +103,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     secondControllerStarter.stop();
   }
 
-  /**
-   * Find the table names for all the partitions.
-   */
+  /// Find the table names for all the partitions.
   private void findTableNamesForAllPartitions() {
     _partitionToTableMap = new HashMap<>();
 

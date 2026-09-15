@@ -44,26 +44,23 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration tests for the {@code SubmitWithStream} stats-reporting path. Verifies that:
- * <ol>
- *   <li>Queries run to completion with correct results when stream stats are enabled per-query via the
- *   {@code streamStats} query option.</li>
- *   <li>The broker response contains a non-null {@code streamStatsCoverage} array indexed by stage id with
- *   {@code responded} &gt; 0 and {@code missing} = {@code mergeFailed} = 0 on the success path.</li>
- *   <li>An N-ary set operation (three-way UNION) produces a correct tree-shaped stats payload — regression coverage
- *   for the known loss in the legacy flat-binary / inorder format when a set op has more than two inputs.</li>
- *   <li>The cluster-level config ({@code pinot.broker.mse.stream.stats}) activates stream mode
- *   for all queries without a per-query option.</li>
- * </ol>
- *
- * <p><b>Why this class spins up its own cluster instead of using the shared suite cluster:</b>
- * {@link #testClusterLevelConfigActivatesStreamMode} requires the broker to start with
- * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_STREAM_STATS} set to {@code true} (a
- * non-default value). That configuration is applied at broker startup via {@link #overrideBrokerConf} and cannot
- * be changed without restarting the broker. Using a shared cluster would therefore affect every other test class
- * that shares it.
- */
+/// Integration tests for the `SubmitWithStream` stats-reporting path. Verifies that:
+///
+/// 1. Queries run to completion with correct results when stream stats are enabled per-query via the
+///    `streamStats` query option.
+/// 2. The broker response contains a non-null `streamStatsCoverage` array indexed by stage id with
+///    `responded` &gt; 0 and `missing` = `mergeFailed` = 0 on the success path.
+/// 3. An N-ary set operation (three-way UNION) produces a correct tree-shaped stats payload — regression coverage
+///    for the known loss in the legacy flat-binary / inorder format when a set op has more than two inputs.
+/// 4. The cluster-level config (`pinot.broker.mse.stream.stats`) activates stream mode
+///    for all queries without a per-query option.
+///
+/// **Why this class spins up its own cluster instead of using the shared suite cluster:**
+/// [#testClusterLevelConfigActivatesStreamMode] requires the broker to start with
+/// [org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_STREAM_STATS] set to `true` (a
+/// non-default value). That configuration is applied at broker startup via [#overrideBrokerConf] and cannot
+/// be changed without restarting the broker. Using a shared cluster would therefore affect every other test class
+/// that shares it.
 public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamStatsReportingIntegrationTest.class);
@@ -102,10 +99,8 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     setupDimensionTable();
   }
 
-  /**
-   * Sets up the {@value #DIM_TABLE} dimension table, broadcast as the build side of the semi-join in
-   * {@link #testSemiJoinPipelineBreaker}, which makes the planner emit a {@code PIPELINE_BREAKER} exchange.
-   */
+  /// Sets up the {@value #DIM_TABLE} dimension table, broadcast as the build side of the semi-join in
+  /// [#testSemiJoinPipelineBreaker], which makes the planner emit a `PIPELINE_BREAKER` exchange.
   private void setupDimensionTable()
       throws Exception {
     Schema dimSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
@@ -141,18 +136,14 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
 
   // ─── helpers ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Posts a multi-stage query with the {@code streamStats=true} option.
-   */
+  /// Posts a multi-stage query with the `streamStats=true` option.
   private JsonNode postWithStreamStats(@Language("sql") String sql)
       throws Exception {
     return postQueryWithOptions(sql, STREAM_OPTION);
   }
 
-  /**
-   * Asserts that the {@code streamStatsCoverage} array in the response is well-formed: every non-null entry must have
-   * responded &gt; 0, mergeFailed = 0, and missing = 0.
-   */
+  /// Asserts that the `streamStatsCoverage` array in the response is well-formed: every non-null entry must have
+  /// responded &gt; 0, mergeFailed = 0, and missing = 0.
   private static void assertFullCoverage(JsonNode response) {
     JsonNode coverage = response.get("streamStatsCoverage");
     assertNotNull(coverage, "streamStatsCoverage should be present in stream-mode response");
@@ -175,9 +166,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
 
   // ─── tests ────────────────────────────────────────────────────────────────────
 
-  /**
-   * Simple aggregation — exercises the one-stage path and verifies results + coverage.
-   */
+  /// Simple aggregation — exercises the one-stage path and verifies results + coverage.
   @Test
   public void testSimpleAggregation()
       throws Exception {
@@ -193,9 +182,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     assertFullCoverage(response);
   }
 
-  /**
-   * Join query — creates at least two non-root stages and verifies that stats arrive for all of them.
-   */
+  /// Join query — creates at least two non-root stages and verifies that stats arrive for all of them.
   @Test
   public void testJoinQuery()
       throws Exception {
@@ -217,10 +204,8 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
         "Join should produce at least 3 stages, got coverage of size: " + coverage.size());
   }
 
-  /**
-   * Three-way UNION — exercises the N-ary set-op path that the legacy flat-binary format reconstructed incorrectly.
-   * Verifies that results are correct and that coverage is full (no missing stats from any branch).
-   */
+  /// Three-way UNION — exercises the N-ary set-op path that the legacy flat-binary format reconstructed incorrectly.
+  /// Verifies that results are correct and that coverage is full (no missing stats from any branch).
   @Test
   public void testThreeWayUnion()
       throws Exception {
@@ -243,24 +228,21 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
         "Three-way UNION should produce at least 4 stages, coverage size: " + coverage.size());
   }
 
-  /**
-   * Dynamic-broadcast semi-join — exercises the {@code PIPELINE_BREAKER} path, which is the case that double-counted
-   * opchain completions before the fix. A pipeline-breaker opchain is built from the same
-   * {@link org.apache.pinot.query.runtime.plan.OpChainExecutionContext} as its stage's main (leaf) opchain, so it
-   * carries an identical {@code OpChainId} and fires the server-side completion listener too. If it were reported as
-   * a separate stage it would satisfy the expected-opchain count one early, prematurely emit {@code ServerDone}, and
-   * the real leaf opchain's stats would be dropped.
-   *
-   * <p>This guards both observable variants of that bug:
-   * <ul>
-   *   <li>{@link #assertFullCoverage} catches the missing / shape-mismatch variant (responded/missing/mergeFailed
-   *   would not reconcile);</li>
-   *   <li>the per-stage tree assertion catches the silent-replacement variant — where the pipeline-breaker's own
-   *   tree is recorded as the stage with {@code missing=0} — by requiring the leaf stage to still carry the folded
-   *   pipeline-breaker subtree ({@code LEAF → MAILBOX_RECEIVE → MAILBOX_SEND → LEAF}), exactly as the legacy
-   *   mailbox path reports it.</li>
-   * </ul>
-   */
+  /// Dynamic-broadcast semi-join — exercises the `PIPELINE_BREAKER` path, which is the case that double-counted
+  /// opchain completions before the fix. A pipeline-breaker opchain is built from the same
+  /// [org.apache.pinot.query.runtime.plan.OpChainExecutionContext] as its stage's main (leaf) opchain, so it
+  /// carries an identical `OpChainId` and fires the server-side completion listener too. If it were reported as
+  /// a separate stage it would satisfy the expected-opchain count one early, prematurely emit `ServerDone`, and
+  /// the real leaf opchain's stats would be dropped.
+  ///
+  /// This guards both observable variants of that bug:
+  ///
+  /// - [#assertFullCoverage] catches the missing / shape-mismatch variant (responded/missing/mergeFailed
+  ///   would not reconcile);
+  /// - the per-stage tree assertion catches the silent-replacement variant — where the pipeline-breaker's own
+  ///   tree is recorded as the stage with `missing=0` — by requiring the leaf stage to still carry the folded
+  ///   pipeline-breaker subtree (`LEAF → MAILBOX_RECEIVE → MAILBOX_SEND → LEAF`), exactly as the legacy
+  ///   mailbox path reports it.
   @Test
   public void testSemiJoinPipelineBreaker()
       throws Exception {
@@ -292,15 +274,13 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
             + "Actual tree: " + stageStats.toPrettyString());
   }
 
-  /**
-   * Multiple build sides — two dynamic-broadcast semi-joins on the same leaf stage produce one
-   * {@code PipelineBreakerOperator} with two {@code MAILBOX_RECEIVE} children. The fold collapses same-stage receives
-   * ({@code PipelineBreakerOperator.calculateUpstreamStats} → {@code mergeUpstream}), so the leaf's flat stats keep
-   * fewer receive entries than the live breaker has children. The stream encoder must trim the graft to the receives
-   * the fold kept; an untrimmed graft makes {@code treeSize > flatSize}, the encoder throws, and the leaf stage's
-   * stats are silently dropped (coverage still reports {@code missing=0}). Assert no drop: full coverage AND the leaf
-   * still carries the folded pipeline-breaker subtree.
-   */
+  /// Multiple build sides — two dynamic-broadcast semi-joins on the same leaf stage produce one
+  /// `PipelineBreakerOperator` with two `MAILBOX_RECEIVE` children. The fold collapses same-stage receives
+  /// (`PipelineBreakerOperator.calculateUpstreamStats` → `mergeUpstream`), so the leaf's flat stats keep
+  /// fewer receive entries than the live breaker has children. The stream encoder must trim the graft to the receives
+  /// the fold kept; an untrimmed graft makes `treeSize > flatSize`, the encoder throws, and the leaf stage's
+  /// stats are silently dropped (coverage still reports `missing=0`). Assert no drop: full coverage AND the leaf
+  /// still carries the folded pipeline-breaker subtree.
   @Test
   public void testSemiJoinWithMultipleBuildSides()
       throws Exception {
@@ -324,15 +304,13 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
             + stageStats.toPrettyString());
   }
 
-  /**
-   * {@code skip.pipeline.breaker.stats=true} — the leaf opchain does NOT fold the pipeline breaker, so its flat stats
-   * are just {@code [LEAF, MAILBOX_SEND]}. The pipeline-breaker opchain still runs and is stashed server-side; the
-   * fix gates the graft on {@code isKeepPipelineBreakerStats()} so nothing is grafted here. Without that gate the
-   * graft would overshoot the flat list, the encoder would throw {@code treeSize != flatSize}, and the leaf stage's
-   * stats would be silently dropped ({@link #assertFullCoverage} cannot catch it — the broker still sees
-   * {@code missing=0}). So we assert both full coverage AND that the leaf stage reports its own stats with no
-   * pipeline-breaker child.
-   */
+  /// `skip.pipeline.breaker.stats=true` — the leaf opchain does NOT fold the pipeline breaker, so its flat stats
+  /// are just `[LEAF, MAILBOX_SEND]`. The pipeline-breaker opchain still runs and is stashed server-side; the
+  /// fix gates the graft on `isKeepPipelineBreakerStats()` so nothing is grafted here. Without that gate the
+  /// graft would overshoot the flat list, the encoder would throw `treeSize != flatSize`, and the leaf stage's
+  /// stats would be silently dropped ([#assertFullCoverage] cannot catch it — the broker still sees
+  /// `missing=0`). So we assert both full coverage AND that the leaf stage reports its own stats with no
+  /// pipeline-breaker child.
   @Test
   public void testSemiJoinPipelineBreakerWithoutKeepingStats()
       throws Exception {
@@ -382,11 +360,9 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     }
   }
 
-  /**
-   * Recursively searches the stats tree for a {@code LEAF} node that has at least one {@code MAILBOX_RECEIVE} child —
-   * the signature of a dynamic-broadcast build side that executed as a pipeline breaker and had its stats folded into
-   * the leaf opchain's tree.
-   */
+  /// Recursively searches the stats tree for a `LEAF` node that has at least one `MAILBOX_RECEIVE` child —
+  /// the signature of a dynamic-broadcast build side that executed as a pipeline breaker and had its stats folded into
+  /// the leaf opchain's tree.
   private static boolean hasLeafWithPipelineBreaker(JsonNode node) {
     if (node == null || node.isNull()) {
       return false;
@@ -411,7 +387,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     return false;
   }
 
-  /** Recursively searches the stats tree for any {@code LEAF} node — i.e. the leaf stage's own stats are present. */
+  /// Recursively searches the stats tree for any `LEAF` node — i.e. the leaf stage's own stats are present.
   private static boolean hasLeaf(JsonNode node) {
     if (node == null || node.isNull()) {
       return false;
@@ -430,11 +406,9 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     return false;
   }
 
-  /**
-   * Verifies that the cluster-level config {@code pinot.broker.mse.stream.stats=true}
-   * activates stream mode for queries that do not carry the per-query option. The broker is restarted with the config
-   * set for this test class via {@link #overrideBrokerConf}.
-   */
+  /// Verifies that the cluster-level config `pinot.broker.mse.stream.stats=true`
+  /// activates stream mode for queries that do not carry the per-query option. The broker is restarted with the config
+  /// set for this test class via [#overrideBrokerConf].
   @Test
   public void testClusterLevelConfigActivatesStreamMode()
       throws Exception {

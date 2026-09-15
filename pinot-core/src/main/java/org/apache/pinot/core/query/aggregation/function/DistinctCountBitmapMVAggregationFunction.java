@@ -19,50 +19,18 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code DistinctCountBitmapMVAggregationFunction} calculates the number of distinct values for a given multi-value
- * expression using RoaringBitmap. The bitmap stores the actual values for {@code INT} expression, or hash code of the
- * values for other data types (values with the same hash code will only be counted once).
- */
 public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitmapAggregationFunction {
 
-  public DistinctCountBitmapMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP_MV"));
+  public DistinctCountBitmapMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP_MV"), nullHandlingEnabled);
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTBITMAPMV;
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMV(length, aggregationResultHolder, blockValSet, blockValSet.getValueType().getStoredType());
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet,
-        blockValSet.getValueType().getStoredType());
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet,
-        blockValSet.getValueType().getStoredType());
   }
 }

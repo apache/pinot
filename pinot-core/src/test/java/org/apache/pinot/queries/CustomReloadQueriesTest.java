@@ -110,12 +110,10 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
     };
   }
 
-  /**
-   * If a columns approximate cardinality is lesser than actual cardinality and its bits per element also reduces
-   * because of this, then enabling dictionary for that column should result in updating both bits per element
-   * and cardinality. In this test, we will verify both segment metadata and query results
-   * @throws Exception
-   */
+  /// If a columns approximate cardinality is lesser than actual cardinality and its bits per element also reduces
+  /// because of this, then enabling dictionary for that column should result in updating both bits per element
+  /// and cardinality. In this test, we will verify both segment metadata and query results
+  /// @throws Exception
   @Test(dataProvider = "alphabets")
   public void testReducedBitsPerElementWithNoDictCardinalityApproximation(String[] alphabets)
       throws Exception {

@@ -124,7 +124,7 @@ Drop your video or a link to your session in the [#pinot-youtube-channel](https:
 $ git clone https://github.com/apache/pinot.git
 $ cd pinot
 
-# Pinot services require JDK 21+ to build and run
+# Pinot services require JDK 25+ to build and run
 # Java/JDBC clients and SPI artifacts continue to target Java 11 bytecode
 
 # Build Pinot
@@ -192,6 +192,7 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
+- [Release policy](RELEASE_POLICY.md)
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

@@ -21,10 +21,8 @@ package org.apache.pinot.core.util;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-/**
- * Creates a function which associates generic values with a class and memoizes this association atomically.
- * @param <T>
- */
+/// Creates a function which associates generic values with a class and memoizes this association atomically.
+/// @param <T>
 public class MemoizedClassAssociation<T> extends ClassValue<T> {
 
   public static <T> Function<Class<?>, T> of(Supplier<T> supplier) {

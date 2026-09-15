@@ -37,10 +37,8 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 
-/**
- * MiniKafkaCluster for Kafka 4.x using Testcontainers with KRaft mode (no ZooKeeper).
- * Uses the apache/kafka-native image for fast startup.
- */
+/// MiniKafkaCluster for Kafka 4.x using Testcontainers with KRaft mode (no ZooKeeper).
+/// Uses the apache/kafka-native image for fast startup.
 public final class MiniKafkaCluster implements StreamDataServerStartable, Closeable {
 
   private static final String KAFKA_IMAGE = "apache/kafka:4.0.0";

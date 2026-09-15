@@ -30,11 +30,9 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
-/**
- * Shared Calcite registration utilities for arithmetic scalar functions.
- *
- * <p>This helper is stateless and thread-safe.
- */
+/// Shared Calcite registration utilities for arithmetic scalar functions.
+///
+/// This helper is stateless and thread-safe.
 final class ArithmeticFunctionUtils {
   private ArithmeticFunctionUtils() {
   }

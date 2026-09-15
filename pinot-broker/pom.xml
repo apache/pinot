@@ -78,6 +78,17 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <!--
+      Required by ControllerTest in the pinot-controller test-jar above, which uses PinotAdminClient.
+      pinot-controller declares pinot-java-client at test scope, and test-scoped dependencies are not
+      transitive, so it does not reach pinot-broker's test classpath. The other consumers of the
+      controller test-jar already have it, either declared directly or via pinot-integration-test-base.
+    -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-query-planner</artifactId>

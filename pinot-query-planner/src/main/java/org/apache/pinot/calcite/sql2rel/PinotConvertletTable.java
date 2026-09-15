@@ -34,10 +34,8 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.util.Litmus;
 
 
-/**
- * PinotConvertletTable is a wrapper of {@link StandardConvertletTable} with the customizations of not converting
- * certain SqlCalls, e.g. TIMESTAMPADD, TIMESTAMPDIFF.
- */
+/// PinotConvertletTable is a wrapper of [StandardConvertletTable] with the customizations of not converting
+/// certain SqlCalls, e.g. TIMESTAMPADD, TIMESTAMPDIFF.
 public class PinotConvertletTable implements SqlRexConvertletTable {
 
   public static final PinotConvertletTable INSTANCE = new PinotConvertletTable();
@@ -78,10 +76,8 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
     }
   }
 
-  /**
-   * Override {@link org.apache.calcite.sql2rel.StandardConvertletTable.TimestampAddConvertlet} to not convert the
-   * SqlCall to arithmetic time expression.
-   */
+  /// Override [org.apache.calcite.sql2rel.StandardConvertletTable.TimestampAddConvertlet] to not convert the
+  /// SqlCall to arithmetic time expression.
   private static class TimestampAddConvertlet implements SqlRexConvertlet {
     private static final TimestampAddConvertlet INSTANCE = new TimestampAddConvertlet();
 
@@ -94,10 +90,8 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
     }
   }
 
-  /**
-   * Override {@link org.apache.calcite.sql2rel.StandardConvertletTable.TimestampDiffConvertlet} to not convert the
-   * SqlCall to arithmetic time expression.
-   */
+  /// Override [org.apache.calcite.sql2rel.StandardConvertletTable.TimestampDiffConvertlet] to not convert the
+  /// SqlCall to arithmetic time expression.
   private static class TimestampDiffConvertlet implements SqlRexConvertlet {
     private static final TimestampDiffConvertlet INSTANCE = new TimestampDiffConvertlet();
 
@@ -110,10 +104,8 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
     }
   }
 
-  /**
-   * Override the standard convertlet for BETWEEN to avoid the rewrite to >= AND <= for MV columns since that breaks
-   * the filter predicate's semantics.
-   */
+  /// Override the standard convertlet for BETWEEN to avoid the rewrite to >= AND <= for MV columns since that breaks
+  /// the filter predicate's semantics.
   private static class BetweenConvertlet implements SqlRexConvertlet {
     private static final BetweenConvertlet INSTANCE = new BetweenConvertlet();
 
@@ -151,9 +143,7 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
     }
   }
 
-  /**
-   * Check if a comparison call involves ROW expressions.
-   */
+  /// Check if a comparison call involves ROW expressions.
   private static boolean isRowComparison(SqlCall call) {
     if (call.getOperandList().size() != 2) {
       return false;

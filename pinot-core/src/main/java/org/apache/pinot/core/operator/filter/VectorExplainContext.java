@@ -24,12 +24,10 @@ import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Runtime-visible vector metadata for explain and debug output.
- *
- * <p>Includes the {@link VectorExecutionMode} so that explain output makes the execution
- * strategy explicit and understandable.</p>
- */
+/// Runtime-visible vector metadata for explain and debug output.
+///
+/// Includes the [VectorExecutionMode] so that explain output makes the execution
+/// strategy explicit and understandable.
 public final class VectorExplainContext {
   private final VectorBackendType _backendType;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
@@ -50,9 +48,7 @@ public final class VectorExplainContext {
   @Nullable
   private final Boolean _effectiveHnswUseBoundedQueue;
 
-  /**
-   * Full constructor with all fields including HNSW runtime control metadata.
-   */
+  /// Full constructor with all fields including HNSW runtime control metadata.
   public VectorExplainContext(VectorBackendType backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction, @Nullable VectorExecutionMode executionMode,
       int effectiveNprobe, boolean effectiveExactRerank, int effectiveSearchCount,
@@ -84,9 +80,7 @@ public final class VectorExplainContext {
     return _distanceFunction;
   }
 
-  /**
-   * Returns the execution mode selected for this query, or null if not yet determined.
-   */
+  /// Returns the execution mode selected for this query, or null if not yet determined.
   @Nullable
   public VectorExecutionMode getExecutionMode() {
     return _executionMode;
@@ -109,54 +103,40 @@ public final class VectorExplainContext {
     return _fallbackReason;
   }
 
-  /**
-   * Returns the search mode label for the adaptive planner, or {@code null} if not set.
-   */
+  /// Returns the search mode label for the adaptive planner, or `null` if not set.
   @Nullable
   public String getSearchMode() {
     return _searchMode;
   }
 
-  /**
-   * Returns the effective efSearch value. Returns 0 if not applicable (non-HNSW backends).
-   */
+  /// Returns the effective efSearch value. Returns 0 if not applicable (non-HNSW backends).
   public int getEffectiveEfSearch() {
     return _effectiveEfSearch;
   }
 
-  /**
-   * Returns the effective distance threshold, or -1 if not set.
-   */
+  /// Returns the effective distance threshold, or -1 if not set.
   public float getEffectiveThreshold() {
     return _effectiveThreshold;
   }
 
-  /**
-   * Returns the vector search mode enum describing how ANN interacts with filters.
-   */
+  /// Returns the vector search mode enum describing how ANN interacts with filters.
   public VectorSearchMode getVectorSearchMode() {
     return _vectorSearchMode;
   }
 
-  /**
-   * Returns the filter selectivity as a ratio (0.0 to 1.0), or -1 if no filter is applied.
-   * A selectivity of 0.1 means 10% of documents pass the filter.
-   */
+  /// Returns the filter selectivity as a ratio (0.0 to 1.0), or -1 if no filter is applied.
+  /// A selectivity of 0.1 means 10% of documents pass the filter.
   public double getFilterSelectivity() {
     return _filterSelectivity;
   }
 
-  /**
-   * Returns the effective HNSW relative-distance check mode, or null if not applicable.
-   */
+  /// Returns the effective HNSW relative-distance check mode, or null if not applicable.
   @Nullable
   public Boolean getEffectiveHnswUseRelativeDistance() {
     return _effectiveHnswUseRelativeDistance;
   }
 
-  /**
-   * Returns the effective HNSW bounded queue mode, or null if not applicable.
-   */
+  /// Returns the effective HNSW bounded queue mode, or null if not applicable.
   @Nullable
   public Boolean getEffectiveHnswUseBoundedQueue() {
     return _effectiveHnswUseBoundedQueue;

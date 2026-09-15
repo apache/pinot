@@ -74,12 +74,12 @@ public class StringDictionary extends BaseImmutableDictionary {
     return getUnpaddedString(dictId, getBuffer());
   }
 
-  /** Same as getStringValue(int) but allows reusing buffer, instead of allocating on each call. */
+  /// Same as getStringValue(int) but allows reusing buffer, instead of allocating on each call.
   public String getStringValue(int dictId, byte[] buffer) {
     return getUnpaddedString(dictId, buffer);
   }
 
-  /** Allocate buffer to use with getString(int, byte[]) method. */
+  /// Allocate buffer to use with getString(int, byte\[\]) method.
   @Override
   public byte[] getBuffer() {
     return super.getBuffer();

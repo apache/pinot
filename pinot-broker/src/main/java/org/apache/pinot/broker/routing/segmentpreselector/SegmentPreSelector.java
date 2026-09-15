@@ -21,21 +21,14 @@ package org.apache.pinot.broker.routing.segmentpreselector;
 import java.util.Set;
 
 
-/**
- * The segment pre-selector filters the unnecessary online segments for the query.
- * <p>Segment pre-selector examples:
- * <ul>
- *   <li>
- *     For table with segment merge/rollup enabled, select the merged segments over the original segments with the same
- *     data
- *   </li>
- * </ul>
- */
+/// The segment pre-selector filters the unnecessary online segments for the query.
+///
+/// Segment pre-selector examples:
+///   - For table with segment merge/rollup enabled, select the merged segments over the original segments with the
+///     same data
 public interface SegmentPreSelector {
 
-  /**
-   * Pre-selects the online segments to filter out the unnecessary segments. This method might modify the online segment
-   * set passed in.
-   */
+  /// Pre-selects the online segments to filter out the unnecessary segments. This method might modify the online
+  /// segment set passed in.
   Set<String> preSelect(Set<String> onlineSegments);
 }

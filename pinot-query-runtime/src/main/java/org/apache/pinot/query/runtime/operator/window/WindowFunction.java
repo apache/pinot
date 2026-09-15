@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -28,11 +29,8 @@ import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 
 
-/**
- * This class provides the basic structure for window functions. It provides the batch row processing API:
- * processRows(List<Object[]> rows) which processes a batch of rows at a time.
- *
- */
+/// This class provides the basic structure for window functions. It provides the batch row processing API:
+/// processRows(List<Object[]> rows) which processes a batch of rows at a time.
 public abstract class WindowFunction extends AggregationUtils.Accumulator {
   protected final int[] _orderKeys;
   protected final int[] _inputRefs;
@@ -54,35 +52,30 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
     }
   }
 
-  /**
-   * Batch processing API for Window functions.
-   * This method processes a batch of rows at a time.
-   * Each row generates one object as output.
-   * Note, the input and output list size should be the same.
-   *
-   * @param rows List of rows to process
-   * @return List of rows with the window function applied
-   */
+  /// Batch processing API for Window functions.
+  /// This method processes a batch of rows at a time.
+  /// Each row generates one object as output.
+  /// Note, the input and output list size should be the same.
+  ///
+  /// @param rows List of rows to process
+  /// @return List of rows with the window function applied
   public abstract List<Object> processRows(List<Object[]> rows);
 
+  @Nullable
   protected Object extractValueFromRow(Object[] row) {
     return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
   }
 
-  /**
-   * Returns whether peer-group information is required to apply the given EXCLUDE clause. {@code CURRENT_ROW} only
-   * touches the current row, so callers can skip the O(n) peer-boundary computation when the frame doesn't otherwise
-   * depend on peer bounds (i.e. ROWS frames).
-   */
+  /// Returns whether peer-group information is required to apply the given EXCLUDE clause. `CURRENT_ROW` only
+  /// touches the current row, so callers can skip the O(n) peer-boundary computation when the frame doesn't otherwise
+  /// depend on peer bounds (i.e. ROWS frames).
   protected static boolean needsPeerBoundaries(WindowNode.WindowExclusion exclude) {
     return exclude == WindowNode.WindowExclusion.GROUP || exclude == WindowNode.WindowExclusion.TIES;
   }
 
-  /**
-   * Fills {@code peerStart} and {@code peerEnd} with the inclusive bounds of each row's peer group based on the
-   * ORDER BY keys. Rows are peers iff they share the same ORDER BY values. With no ORDER BY clause every row is a peer
-   * of every other row in the partition.
-   */
+  /// Fills `peerStart` and `peerEnd` with the inclusive bounds of each row's peer group based on the
+  /// ORDER BY keys. Rows are peers iff they share the same ORDER BY values. With no ORDER BY clause every row is a peer
+  /// of every other row in the partition.
   protected void computePeerBoundaries(List<Object[]> rows, int[] peerStart, int[] peerEnd) {
     int numRows = rows.size();
     if (_orderKeys.length == 0) {
@@ -114,10 +107,8 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
     return true;
   }
 
-  /**
-   * Returns the first index in {@code [fs, fe]} that is not excluded by the SQL EXCLUDE clause for the current row
-   * {@code i} whose peer group is {@code [pStart, pEnd]}. Returns {@code -1} if no such index exists.
-   */
+  /// Returns the first index in `[fs, fe]` that is not excluded by the SQL EXCLUDE clause for the current row
+  /// `i` whose peer group is `[pStart, pEnd]`. Returns `-1` if no such index exists.
   protected static int firstNonExcluded(int fs, int fe, int i, int pStart, int pEnd,
       WindowNode.WindowExclusion exclude) {
     if (fs > fe) {
@@ -144,10 +135,8 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
     }
   }
 
-  /**
-   * Returns the inclusive lower index of the base frame for the row at index {@code i} given its peer group
-   * {@code [pStart, pEnd]} and the total {@code numRows} in the partition.
-   */
+  /// Returns the inclusive lower index of the base frame for the row at index `i` given its peer group
+  /// `[pStart, pEnd]` and the total `numRows` in the partition.
   protected int frameStartForRow(int i, int pStart, int numRows) {
     if (_windowFrame.isRowType()) {
       int lb = _windowFrame.getLowerBound();
@@ -156,10 +145,8 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
     return _windowFrame.isUnboundedPreceding() ? 0 : pStart;
   }
 
-  /**
-   * Returns the inclusive upper index of the base frame for the row at index {@code i} given its peer group
-   * {@code [pStart, pEnd]} and the total {@code numRows} in the partition.
-   */
+  /// Returns the inclusive upper index of the base frame for the row at index `i` given its peer group
+  /// `[pStart, pEnd]` and the total `numRows` in the partition.
   protected int frameEndForRow(int i, int pEnd, int numRows) {
     if (_windowFrame.isRowType()) {
       int ub = _windowFrame.getUpperBound();
@@ -168,10 +155,8 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
     return _windowFrame.isUnboundedFollowing() ? numRows - 1 : pEnd;
   }
 
-  /**
-   * Returns the last index in {@code [fs, fe]} that is not excluded by the SQL EXCLUDE clause for the current row
-   * {@code i} whose peer group is {@code [pStart, pEnd]}. Returns {@code -1} if no such index exists.
-   */
+  /// Returns the last index in `[fs, fe]` that is not excluded by the SQL EXCLUDE clause for the current row
+  /// `i` whose peer group is `[pStart, pEnd]`. Returns `-1` if no such index exists.
   protected static int lastNonExcluded(int fs, int fe, int i, int pStart, int pEnd,
       WindowNode.WindowExclusion exclude) {
     if (fs > fe) {

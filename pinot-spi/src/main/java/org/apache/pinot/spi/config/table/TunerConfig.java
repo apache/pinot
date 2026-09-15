@@ -25,11 +25,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Encapsulates custom config for {@link org.apache.pinot.spi.config.table.tuner.TableConfigTuner}
- * The 'name' field specifies the exact type of tuner used for this table. This is used by the
- * controller to retrieve the specific implementation during table creation.
- */
+/// Encapsulates custom config for [org.apache.pinot.spi.config.table.tuner.TableConfigTuner]
+/// The 'name' field specifies the exact type of tuner used for this table. This is used by the
+/// controller to retrieve the specific implementation during table creation.
 public class TunerConfig extends BaseJsonConfig {
 
   private String _name;

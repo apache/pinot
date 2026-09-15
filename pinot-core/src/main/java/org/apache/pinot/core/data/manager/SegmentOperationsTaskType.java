@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.core.data.manager;
 
-/**
- * Labels the task type for segment operations throttler binding.
- *
- * <p>This is implemented as a class with static instances (type-safe enum pattern) rather than a Java enum
- * to allow extensibility. Extend this class to define additional custom task types while maintaining compatibility
- * with the base task types defined here.</p>
- */
+/// Labels the task type for segment operations throttler binding.
+///
+/// This is implemented as a class with static instances (type-safe enum pattern) rather than a Java enum
+/// to allow extensibility. Extend this class to define additional custom task types while maintaining compatibility
+/// with the base task types defined here.
 public class SegmentOperationsTaskType {
   public static final SegmentOperationsTaskType CONSUMER =
       new SegmentOperationsTaskType("CONSUMER");
@@ -32,10 +30,8 @@ public class SegmentOperationsTaskType {
       new SegmentOperationsTaskType("REFRESH");
   public static final SegmentOperationsTaskType RELOAD =
       new SegmentOperationsTaskType("RELOAD");
-  /**
-   * @deprecated Use {@link #REFRESH} or {@link #RELOAD} instead. Segment refresh and reload operations are now
-   * tracked as separate task types for independent throttling.
-   */
+  /// @deprecated Use [#REFRESH] or [#RELOAD] instead. Segment refresh and reload operations are now
+  /// tracked as separate task types for independent throttling.
   @Deprecated
   public static final SegmentOperationsTaskType REFRESH_OR_RELOAD =
       new SegmentOperationsTaskType("REFRESH_OR_RELOAD");

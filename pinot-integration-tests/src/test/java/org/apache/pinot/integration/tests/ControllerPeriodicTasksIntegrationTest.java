@@ -64,11 +64,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for all {@link org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask}s.
- * The intention of these tests is not to test functionality of daemons, but simply to check that they run as expected
- * and process the tables when the controller starts.
- */
+/// Integration test for all [org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask]s.
+/// The intention of these tests is not to test functionality of daemons, but simply to check that they run as expected
+/// and process the tables when the controller starts.
 // TODO: Add tests for other ControllerPeriodicTasks (RetentionManager, RealtimeSegmentValidationManager).
 public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
@@ -422,10 +420,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     }, 600_000L, "Timeout when waiting for BrokerResourceValidationManager");
   }
 
-  /**
-   * Verifies that BrokerResourceValidationManager also repairs broker resource for a logical table
-   * when a new broker is added (Issue #15751).
-   */
+  /// Verifies that BrokerResourceValidationManager also repairs broker resource for a logical table
+  /// when a new broker is added (Issue #15751).
   @Test
   public void testBrokerResourceValidationManagerRepairsLogicalTable()
       throws Exception {

@@ -135,15 +135,13 @@ public class PeriodicTaskSchedulerTest {
     assertEquals(numTimesStopCalled.get(), numTasks);
   }
 
-  /**
-   * Test that {@link PeriodicTaskScheduler} is thread safe and does not run the same task more than once at any time.
-   * This is done by attempting to run the same task object in 20 different threads at the same time. While the test
-   * case launches 20 threads to keep {@link PeriodicTaskScheduler} busy, it waits for only around half of them to
-   * complete. The test case then checks whether the threads that did not complete execution were waiting to execute
-   * (i.e they had requested execution, but had not executed yet). This "waiting" indicates that task execution was
-   * being properly synchronized (otherwise all the tasks would have just run immediately). 'isRunning' variable within
-   * the task is used to check that the task is not executing more than once at any given time.
-   */
+  /// Test that [PeriodicTaskScheduler] is thread safe and does not run the same task more than once at any time.
+  /// This is done by attempting to run the same task object in 20 different threads at the same time. While the test
+  /// case launches 20 threads to keep [PeriodicTaskScheduler] busy, it waits for only around half of them to
+  /// complete. The test case then checks whether the threads that did not complete execution were waiting to execute
+  /// (i.e they had requested execution, but had not executed yet). This "waiting" indicates that task execution was
+  /// being properly synchronized (otherwise all the tasks would have just run immediately). 'isRunning' variable within
+  /// the task is used to check that the task is not executing more than once at any given time.
   @Test
   public void testConcurrentExecutionOfSameTask()
       throws Exception {
@@ -283,12 +281,10 @@ public class PeriodicTaskSchedulerTest {
     assertEquals(numTimesRunCalled.get(), 0, "Task should never run if the CRON expression is invalid");
   }
 
-  /**
-   * Test that the scheduler used to schedule Pinot Minion tasks (PinotTaskManager) is not
-   * using the same quartz scheduler instance. It also tests that if we stop a Controller cron
-   * task, Minion tasks are not stopped or interfered with.
-   * @throws Exception
-   */
+  /// Test that the scheduler used to schedule Pinot Minion tasks (PinotTaskManager) is not
+  /// using the same quartz scheduler instance. It also tests that if we stop a Controller cron
+  /// task, Minion tasks are not stopped or interfered with.
+  /// @throws Exception
   @Test
   public void testControllerAndMinionCronSchedulerIsolation() throws Exception {
     //quartz minion task scheduler
@@ -348,9 +344,7 @@ public class PeriodicTaskSchedulerTest {
     }
   }
 
-  /**
-   * Dummy job implementation needed to fulfill Quartz's verification layer.
-   */
+  /// Dummy job implementation needed to fulfill Quartz's verification layer.
   public static class MockMinionJob implements Job {
     @Override
     public void execute(JobExecutionContext context) {

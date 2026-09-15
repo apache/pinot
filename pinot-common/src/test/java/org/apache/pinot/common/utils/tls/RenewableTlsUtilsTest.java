@@ -62,14 +62,12 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Command used to generated the keystore and truststore files:
- * 1. keytool -genkeypair -keyalg RSA -keysize 2048 -keystore keystore.p12 -storetype PKCS12 -storepass changeit
- * -keypass changeit -validity 18250
- * 2. keytool -export -alias mykey -file certificate.cer -keystore keystore.p12 -storetype PKCS12 -storepass changeit
- * 3. keytool -import -alias mykey -file certificate.cer -keystore truststore.p12 -storetype PKCS12 -storepass changeit
- * -noprompt
- */
+/// Command used to generated the keystore and truststore files:
+/// 1. keytool -genkeypair -keyalg RSA -keysize 2048 -keystore keystore.p12 -storetype PKCS12 -storepass changeit
+/// -keypass changeit -validity 18250
+/// 2. keytool -export -alias mykey -file certificate.cer -keystore keystore.p12 -storetype PKCS12 -storepass changeit
+/// 3. keytool -import -alias mykey -file certificate.cer -keystore truststore.p12 -storetype PKCS12 -storepass changeit
+/// -noprompt
 public class RenewableTlsUtilsTest {
   private static final String TLS_RESOURCE_FOLDER = "tls/";
   private static final String TLS_KEYSTORE_FILE = "keystore.p12";

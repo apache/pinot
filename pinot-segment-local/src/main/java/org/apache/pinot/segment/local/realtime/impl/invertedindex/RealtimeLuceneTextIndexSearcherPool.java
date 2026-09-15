@@ -26,20 +26,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class manages a thread pool used for searching over realtime Lucene segments by {@link RealtimeLuceneTextIndex}.
- * The pool max size is equivalent to pinot.query.scheduler.query_worker_threads to ensure each worker thread can have
- * an accompanying Lucene searcher thread if needed. init() is called in BaseServerStarter to avoid creating a
- * dependency on pinot-core.
- *
- * <p>The pool supports dynamic resizing via {@link #resize(int)} so that it stays in sync when
- * query_worker_threads is changed at runtime through cluster config.
- *
- * <p>The executor is wrapped with QueryThreadContext.contextAwareExecutorService(executor, false) to propagate
- * QueryThreadContext for CPU/memory tracking, but WITHOUT registering tasks for cancellation. This prevents
- * Thread.interrupt() during Lucene search which could corrupt FSDirectory used by IndexWriter.
- * See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
- */
+/// This class manages a thread pool used for searching over realtime Lucene segments by
+/// [RealtimeLuceneTextIndex]. The pool max size is equivalent to pinot.query.scheduler.query_worker_threads to
+/// ensure each worker thread can have an accompanying Lucene searcher thread if needed. init() is called in
+/// BaseServerStarter to avoid creating a dependency on pinot-core.
+///
+/// The pool supports dynamic resizing via [#resize(int)] so that it stays in sync when
+/// query_worker_threads is changed at runtime through cluster config.
+///
+/// The executor is wrapped with QueryThreadContext.contextAwareExecutorService(executor, false) to propagate
+/// QueryThreadContext for CPU/memory tracking, but WITHOUT registering tasks for cancellation. This prevents
+/// Thread.interrupt() during Lucene search which could corrupt FSDirectory used by IndexWriter.
+/// See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
 public class RealtimeLuceneTextIndexSearcherPool {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndexSearcherPool.class);
 
@@ -69,14 +67,12 @@ public class RealtimeLuceneTextIndexSearcherPool {
     return _executorService;
   }
 
-  /**
-   * Dynamically resizes the maximum pool size of the underlying {@link ScalingThreadPoolExecutor}.
-   * Since the base executor has corePoolSize=0, only maximumPoolSize needs to be adjusted.
-   * When shrinking, idle threads are interrupted immediately; busy threads finish their current
-   * Lucene search task before exiting, so no in-flight search is disrupted.
-   *
-   * @param newMaxSize the new maximum thread count (must be &gt; 0)
-   */
+  /// Dynamically resizes the maximum pool size of the underlying [ScalingThreadPoolExecutor].
+  /// Since the base executor has corePoolSize=0, only maximumPoolSize needs to be adjusted.
+  /// When shrinking, idle threads are interrupted immediately; busy threads finish their current
+  /// Lucene search task before exiting, so no in-flight search is disrupted.
+  ///
+  /// @param newMaxSize the new maximum thread count (must be &gt; 0)
   public synchronized void resize(int newMaxSize) {
     if (newMaxSize <= 0) {
       LOGGER.warn("Invalid Lucene searcher pool size: {}. Must be > 0. Skipping resize.", newMaxSize);
@@ -91,9 +87,7 @@ public class RealtimeLuceneTextIndexSearcherPool {
     LOGGER.info("Resized Lucene searcher pool: {} -> {}", oldMaxSize, newMaxSize);
   }
 
-  /**
-   * Returns the current maximum pool size. Primarily for testing.
-   */
+  /// Returns the current maximum pool size. Primarily for testing.
   public int getMaxPoolSize() {
     return _baseExecutor.getMaximumPoolSize();
   }

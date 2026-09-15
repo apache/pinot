@@ -23,11 +23,9 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Encapsulates a collection of bitmaps, and allows inversion without modifying the bitmaps.
- * Provides simplified access to efficient cardinality calculation which work regardless of
- * inversion status without computing the complement of the union of the bitmaps.
- */
+/// Encapsulates a collection of bitmaps, and allows inversion without modifying the bitmaps.
+/// Provides simplified access to efficient cardinality calculation which work regardless of
+/// inversion status without computing the complement of the union of the bitmaps.
 public class BitmapCollection {
   private final int _numDocs;
   private boolean _inverted;
@@ -39,22 +37,18 @@ public class BitmapCollection {
     _bitmaps = bitmaps;
   }
 
-  /**
-   * Inverts the bitmaps in constant time and space.
-   * @return this bitmap collection inverted.
-   */
+  /// Inverts the bitmaps in constant time and space.
+  /// @return this bitmap collection inverted.
   public BitmapCollection invert() {
     _inverted = !_inverted;
     return this;
   }
 
-  /**
-   * Computes the size of the intersection of the bitmaps efficiently regardless of negation, without
-   * needing to invert inputs or materialize an intermediate bitmap.
-   *
-   * @param bitmaps to intersect with
-   * @return the size of the intersection of the bitmaps in this collection and in the other collection
-   */
+  /// Computes the size of the intersection of the bitmaps efficiently regardless of negation, without
+  /// needing to invert inputs or materialize an intermediate bitmap.
+  ///
+  /// @param bitmaps to intersect with
+  /// @return the size of the intersection of the bitmaps in this collection and in the other collection
   public int andCardinality(BitmapCollection bitmaps) {
     ImmutableRoaringBitmap left = reduceInternal();
     ImmutableRoaringBitmap right = bitmaps.reduceInternal();
@@ -71,14 +65,12 @@ public class BitmapCollection {
     }
   }
 
-  /**
-   * Computes the size of the union of the bitmaps efficiently regardless of negation, without
-   * needing to invert inputs or materialize an intermediate bitmap. If either this collection
-   * or the other collection has more than one bitmap, the union will be materialized.
-   *
-   * @param bitmaps to intersect with
-   * @return the size of the union of the bitmaps in this collection and in the other collection
-   */
+  /// Computes the size of the union of the bitmaps efficiently regardless of negation, without
+  /// needing to invert inputs or materialize an intermediate bitmap. If either this collection
+  /// or the other collection has more than one bitmap, the union will be materialized.
+  ///
+  /// @param bitmaps to intersect with
+  /// @return the size of the union of the bitmaps in this collection and in the other collection
   public int orCardinality(BitmapCollection bitmaps) {
     ImmutableRoaringBitmap left = reduceInternal();
     ImmutableRoaringBitmap right = bitmaps.reduceInternal();
@@ -102,14 +94,12 @@ public class BitmapCollection {
     return BufferFastAggregation.or(_bitmaps);
   }
 
-  /**
-   * Reduces the bitmaps to a single bitmap. In common cases, when the collection
-   * is not inverted and only has one bitmap, this operation is cheap. However,
-   * this may be a costly operation: a new bitmap may be allocated, one or many
-   * bitmaps may need to be inverted. Prefer {@see andCardinality} or {@see orCardinality}
-   * when appropriate.
-   * @return a bitmap
-   */
+  /// Reduces the bitmaps to a single bitmap. In common cases, when the collection
+  /// is not inverted and only has one bitmap, this operation is cheap. However,
+  /// this may be a costly operation: a new bitmap may be allocated, one or many
+  /// bitmaps may need to be inverted. Prefer {@see andCardinality} or {@see orCardinality}
+  /// when appropriate.
+  /// @return a bitmap
   public ImmutableRoaringBitmap reduce() {
     if (!_inverted) {
       return reduceInternal();

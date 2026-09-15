@@ -3393,40 +3393,139 @@ public class InstanceAssignmentTest {
       assertEquals(steadyStatePartitions.getInstances(0, rg), initialPartitions.getInstances(0, rg));
     }
   }
-  /**
-   * Verifies that subset-partition tables use the total Kafka partition count (not the subset size)
-   * for instance assignment, producing the same server spread as a normal full-partition table.
-   *
-   * <p><b>Topology:</b> 2 Kafka topic partitions, 4 servers, 2 replica groups,
-   * 1 instance per partition per replica group.
-   * <ul>
-   *   <li>Table A has {@code stream.kafka.partition.ids = "0"} (consumes only Kafka partition 0)</li>
-   *   <li>Table B has {@code stream.kafka.partition.ids = "1"} (consumes only Kafka partition 1)</li>
-   * </ul>
-   *
-   * <p>The {@link ImplicitRealtimeTablePartitionSelector} always fetches the <em>total</em>
-   * Kafka partition count from {@link StreamMetadataProvider#fetchPartitionCount} (= 2). This
-   * produces an instance map with <b>two distinct slots</b> so that {@link
-   * org.apache.pinot.controller.helix.core.assignment.segment.RealtimeSegmentAssignment} routes
-   * Kafka partition 0 → slot 0 and Kafka partition 1 → slot 1, each backed by different servers.
-   *
-   * <p>Without this behaviour ({@code numPartitions = subsetSize = 1}), only slot 0 exists, and
-   * the assignment computes {@code kafkaPartitionId % 1 = 0} for <em>every</em> Kafka partition,
-   * routing all consuming segments to the same slot-0 servers — a hotspot on lower-indexed servers.
-   *
-   * <p><b>Pre-computed hash rotations</b> (used for exact expected server values):
-   * <pre>
-   *   Math.abs("subsetTablePartition0_REALTIME".hashCode()) % 4 = 0  →  no rotation
-   *   Pool after rotation: [s0, s1, s2, s3]
-   *   Round-robin to 2 RGs:  RG0=[s0,s2],  RG1=[s1,s3]
-   *     slot 0: RG0=s0, RG1=s1   |   slot 1: RG0=s2, RG1=s3
-   *
-   *   Math.abs("subsetTablePartition1_REALTIME".hashCode()) % 4 = 1  →  rotate by 1
-   *   Pool after rotation: [s1, s2, s3, s0]
-   *   Round-robin to 2 RGs:  RG0=[s1,s3],  RG1=[s2,s0]
-   *     slot 0: RG0=s1, RG1=s2   |   slot 1: RG0=s3, RG1=s0
-   * </pre>
-   */
+
+  /// FD_AWARE must accept Helix pool tags that do not start at 0 (e.g. 1/2/3).
+  /// Every other pool-based test uses {@code pool = i % numPools}, so this crash had no coverage.
+  /// See <a href="https://github.com/apache/pinot/issues/12239">#12239</a>.
+  @Test
+  public void testPoolBasedFDAwareNonZeroBasedPools() {
+    // Same first topology as testPoolBasedFDAware, but pool = (i % numPools) + 1 → {1,2,3,4,5}.
+    int numInstances = 21;
+    int numPools = 5;
+    int numReplicaGroups = 3;
+    int numInstancesPerReplicaGroup = numInstances / numReplicaGroups;
+    List<InstanceConfig> instanceConfigs =
+        newFDAwarePoolInstanceConfigs(numInstances, numPools);
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig(OFFLINE_TAG, true, numPools, null);
+    InstanceReplicaGroupPartitionConfig replicaPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, 0, 0, false,
+            null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+        .build();
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    assertFilledUniqueAssignment(instancePartitions, instanceConfigs, numReplicaGroups,
+        numInstancesPerReplicaGroup);
+
+    // Incremental uplift with minimizeDataMovement hits setExistingInstance with the raw pool ids.
+    numInstances = 28;
+    numReplicaGroups = 4;
+    numInstancesPerReplicaGroup = numInstances / numReplicaGroups;
+    instanceConfigs = newFDAwarePoolInstanceConfigs(numInstances, numPools);
+    replicaPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, 0, 0, true,
+            null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), true)))
+        .build();
+    driver = new InstanceAssignmentDriver(tableConfig);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    assertFilledUniqueAssignment(instancePartitions, instanceConfigs, numReplicaGroups,
+        numInstancesPerReplicaGroup);
+
+    // Reporter case: pools {1,2,3}.
+    numInstances = 6;
+    numPools = 3;
+    numReplicaGroups = 3;
+    numInstancesPerReplicaGroup = 2;
+    instanceConfigs = newFDAwarePoolInstanceConfigs(numInstances, numPools);
+    tagPoolConfig = new InstanceTagPoolConfig(OFFLINE_TAG, true, numPools, null);
+    replicaPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, 0, 0, false,
+            null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+        .build();
+    driver = new InstanceAssignmentDriver(tableConfig);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    assertFilledUniqueAssignment(instancePartitions, instanceConfigs, numReplicaGroups,
+        numInstancesPerReplicaGroup);
+  }
+
+  /// Builds pool-tagged instance configs whose pool ids start at 1 rather than 0.
+  private static List<InstanceConfig> newFDAwarePoolInstanceConfigs(int numInstances, int numPools) {
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      int pool = (i % numPools) + 1;
+      InstanceConfig instanceConfig =
+          new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i + SERVER_INSTANCE_POOL_PREFIX + pool);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfig.getRecord().setMapField(InstanceUtils.POOL_KEY, Map.of(OFFLINE_TAG, Integer.toString(pool)));
+      instanceConfigs.add(instanceConfig);
+    }
+    return instanceConfigs;
+  }
+
+  private static void assertFilledUniqueAssignment(InstancePartitions instancePartitions,
+      List<InstanceConfig> instanceConfigs, int numReplicaGroups, int numInstancesPerReplicaGroup) {
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
+    assertEquals(instancePartitions.getNumPartitions(), 1);
+    Set<String> candidates = new HashSet<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      candidates.add(instanceConfig.getInstanceName());
+    }
+    Set<String> assigned = new HashSet<>();
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      List<String> instances = instancePartitions.getInstances(0, replicaGroupId);
+      assertEquals(instances.size(), numInstancesPerReplicaGroup);
+      for (String instance : instances) {
+        assertTrue(candidates.contains(instance), instance);
+        assertTrue(assigned.add(instance), instance);
+      }
+    }
+    assertEquals(assigned.size(), numReplicaGroups * numInstancesPerReplicaGroup);
+  }
+
+  /// Verifies that subset-partition tables use the total Kafka partition count (not the subset size)
+  /// for instance assignment, producing the same server spread as a normal full-partition table.
+  ///
+  /// **Topology:** 2 Kafka topic partitions, 4 servers, 2 replica groups,
+  /// 1 instance per partition per replica group.
+  ///
+  /// - Table A has `stream.kafka.partition.ids = "0"` (consumes only Kafka partition 0)
+  /// - Table B has `stream.kafka.partition.ids = "1"` (consumes only Kafka partition 1)
+  ///
+  /// The [ImplicitRealtimeTablePartitionSelector] always fetches the _total_
+  /// Kafka partition count from [StreamMetadataProvider#fetchPartitionCount] (= 2). This
+  /// produces an instance map with **two distinct slots** so that
+  /// [org.apache.pinot.controller.helix.core.assignment.segment.RealtimeSegmentAssignment] routes
+  /// Kafka partition 0 → slot 0 and Kafka partition 1 → slot 1, each backed by different servers.
+  ///
+  /// Without this behaviour (`numPartitions = subsetSize = 1`), only slot 0 exists, and
+  /// the assignment computes `kafkaPartitionId % 1 = 0` for _every_ Kafka partition,
+  /// routing all consuming segments to the same slot-0 servers — a hotspot on lower-indexed servers.
+  ///
+  /// **Pre-computed hash rotations** (used for exact expected server values):
+  ///
+  /// ```
+  /// Math.abs("subsetTablePartition0_REALTIME".hashCode()) % 4 = 0  →  no rotation
+  /// Pool after rotation: [s0, s1, s2, s3]
+  /// Round-robin to 2 RGs:  RG0=[s0,s2],  RG1=[s1,s3]
+  ///   slot 0: RG0=s0, RG1=s1   |   slot 1: RG0=s2, RG1=s3
+  ///
+  /// Math.abs("subsetTablePartition1_REALTIME".hashCode()) % 4 = 1  →  rotate by 1
+  /// Pool after rotation: [s1, s2, s3, s0]
+  /// Round-robin to 2 RGs:  RG0=[s1,s3],  RG1=[s2,s0]
+  ///   slot 0: RG0=s1, RG1=s2   |   slot 1: RG0=s3, RG1=s0
+  /// ```
   @Test
   public void testSubsetPartitionInstanceAssignmentNoHotspot() {
     final int numReplicas = 2;

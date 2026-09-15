@@ -22,14 +22,10 @@ import java.util.List;
 import java.util.Optional;
 
 
-/**
- * This interfaces carries the RLS/CLS filter for a particular table
- */
+/// This interfaces carries the RLS/CLS filter for a particular table
 public interface TableRowColAccessResult {
-  /**
-   * Returns the RLS filters associated with a particular table. RLS filters are defined as a list.
-   * @return optional of the RLS filters. Empty optional if there are no RLS filters defined on this table
-   */
+  /// Returns the RLS filters associated with a particular table. RLS filters are defined as a list.
+  /// @return optional of the RLS filters. Empty optional if there are no RLS filters defined on this table
   Optional<List<String>> getRLSFilters();
 
   void setRLSFilters(List<String> rlsFilters);

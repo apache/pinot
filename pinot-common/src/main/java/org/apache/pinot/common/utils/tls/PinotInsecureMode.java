@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.common.utils.tls;
 
-/**
- * This class is used to determine if Pinot is running in insecure mode. This is used to determine if Pinot components
- * should use trust all CA certificates when using TLS.
- */
+/// This class is used to determine if Pinot is running in insecure mode. This is used to determine if Pinot components
+/// should use trust all CA certificates when using TLS.
 public class PinotInsecureMode {
   private static volatile boolean _pinotInInsecureMode = false;
 

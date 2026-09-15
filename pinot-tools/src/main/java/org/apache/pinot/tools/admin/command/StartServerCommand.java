@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartServer command.
- *
- */
+/// Class to implement StartServer command.
 @CommandLine.Command(name = "StartServer", mixinStandardHelpOptions = true)
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);

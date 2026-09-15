@@ -24,22 +24,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation for table sampler providers.
- *
- * NOTE:
- *   - The annotated class must implement {@code org.apache.pinot.broker.routing.tablesampler.TableSampler}.
- *   - The annotated class must be public and concrete with a no-arg constructor.
- *   - The class must be discoverable via the packages configured with
- *     {@code pinot.broker.table.sampler.annotation.packages}.
- */
+/// Annotation for table sampler providers.
+///
+/// NOTE:
+///   - The annotated class must implement `org.apache.pinot.broker.routing.tablesampler.TableSampler`.
+///   - The annotated class must be public and concrete with a no-arg constructor.
+///   - The class must be discoverable via the packages configured with
+///     `pinot.broker.table.sampler.annotation.packages`.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface TableSamplerProvider {
 
-  /**
-   * Alias name for the sampler (used in table config).
-   */
+  /// Alias name for the sampler (used in table config).
   String name();
 
   boolean enabled() default true;

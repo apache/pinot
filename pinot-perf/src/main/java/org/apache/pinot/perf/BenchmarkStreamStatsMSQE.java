@@ -60,29 +60,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * JMH benchmark comparing multi-stage query latency between the legacy stats mode and the
- * {@code SubmitWithStream} stream-stats mode.
- *
- * <p>Three benchmark methods cover representative MSQE plan shapes:
- * <ul>
- *   <li>{@link #aggregation()} — single leaf stage feeding a root aggregate.</li>
- *   <li>{@link #tripleJoin()} — three-way self-join: 3 leaf stages + 2 join intermediates + 1 aggregate.</li>
- *   <li>{@link #sleep()} — single leaf scan with {@code sleep} applied per row; requires {@code -ea} to actually
- *       sleep (wired in {@link #main}). With assertions enabled each of the ~20 matching rows per server sleeps 1 ms,
- *       giving a stable ~20 ms query duration to isolate stats-path overhead.</li>
- * </ul>
- *
- * <p>Four concurrent client threads ({@link Threads}) share one embedded two-server cluster
- * ({@link State Scope.Benchmark}), exposing lock-contention and gRPC-stream overhead that only surfaces under
- * concurrency.
- *
- * <p>Example run:
- * <pre>
- *   mvn package -pl pinot-perf -DskipTests
- *   java -jar pinot-perf/target/benchmarks.jar BenchmarkStreamStatsMSQE
- * </pre>
- */
+/// JMH benchmark comparing multi-stage query latency between the legacy stats mode and the
+/// `SubmitWithStream` stream-stats mode.
+///
+/// Three benchmark methods cover representative MSQE plan shapes:
+///
+/// - [#aggregation()] — single leaf stage feeding a root aggregate.
+/// - [#tripleJoin()] — three-way self-join: 3 leaf stages + 2 join intermediates + 1 aggregate.
+/// - [#sleep()] — single leaf scan with `sleep` applied per row; requires `-ea` to actually
+///      sleep (wired in [#main]). With assertions enabled each of the ~20 matching rows per server sleeps 1 ms,
+///      giving a stable ~20 ms query duration to isolate stats-path overhead.
+///
+/// Four concurrent client threads ([Threads]) share one embedded two-server cluster
+/// ([`Scope.Benchmark`]\[State\]), exposing lock-contention and gRPC-stream overhead that only surfaces under
+/// concurrency.
+///
+/// Example run:
+///
+/// ```
+/// mvn package -pl pinot-perf -DskipTests
+/// java -jar pinot-perf/target/benchmarks.jar BenchmarkStreamStatsMSQE
+/// ```
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 // jvmArgsPrepend is baked into the generated JMH test class so that `java -jar benchmarks.jar` works without
@@ -126,14 +124,11 @@ public class BenchmarkStreamStatsMSQE extends BaseClusterIntegrationTest {
       .addMetric(METRIC_COL, FieldSpec.DataType.LONG)
       .build();
 
-  /**
-   * Stats reporting mode:
-   * <ul>
-   *   <li>{@code "legacy"} — standard opchain-stats path (existing behaviour).</li>
-   *   <li>{@code "stream"} — enables {@code streamStats=true} per-query, activating the
-   *   {@code SubmitWithStream} bidi-RPC path.</li>
-   * </ul>
-   */
+  /// Stats reporting mode:
+  ///
+  /// - `"legacy"` — standard opchain-stats path (existing behaviour).
+  /// - `"stream"` — enables `streamStats=true` per-query, activating the
+  ///   `SubmitWithStream` bidi-RPC path.
   @Param({"legacy", "stream"})
   private String _statsMode;
 
@@ -203,19 +198,15 @@ public class BenchmarkStreamStatsMSQE extends BaseClusterIntegrationTest {
     FileUtils.deleteQuietly(_tempDir);
   }
 
-  /**
-   * Single leaf stage feeding a root aggregate — the minimal MSQE plan shape.
-   */
+  /// Single leaf stage feeding a root aggregate — the minimal MSQE plan shape.
   @Benchmark
   public JsonNode aggregation()
       throws Exception {
     return executeQuery("SELECT COUNT(*), SUM(" + METRIC_COL + ") FROM " + TABLE_NAME);
   }
 
-  /**
-   * Three-way self-join: 3 leaf scan stages + 2 join intermediates + 1 aggregate (6 stages total). Exercises the
-   * stats fan-in across the full plan simultaneously.
-   */
+  /// Three-way self-join: 3 leaf scan stages + 2 join intermediates + 1 aggregate (6 stages total). Exercises the
+  /// stats fan-in across the full plan simultaneously.
   @Benchmark
   public JsonNode tripleJoin()
       throws Exception {
@@ -226,12 +217,10 @@ public class BenchmarkStreamStatsMSQE extends BaseClusterIntegrationTest {
         + "WHERE t2." + INT_COL + " % 10 = 0");
   }
 
-  /**
-   * Single-stage scan with {@code sleep} applied per matching row. The filter {@code intCol % 1000 = 42} selects
-   * roughly 10 values per segment → ~20 rows per server. The sleep argument references {@code intCol} to prevent
-   * Calcite from constant-folding the literal and collapsing the call to a single broker-side evaluation.
-   * With {@code -ea} each row sleeps 1 ms giving a stable ~20 ms query duration.
-   */
+  /// Single-stage scan with `sleep` applied per matching row. The filter `intCol % 1000 = 42` selects
+  /// roughly 10 values per segment → ~20 rows per server. The sleep argument references `intCol` to prevent
+  /// Calcite from constant-folding the literal and collapsing the call to a single broker-side evaluation.
+  /// With `-ea` each row sleeps 1 ms giving a stable ~20 ms query duration.
   @Benchmark
   public JsonNode sleep()
       throws Exception {

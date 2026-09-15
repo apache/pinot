@@ -27,15 +27,11 @@ import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * Broker resource state model generator describes the transitions for the resources
- * broker will serve.
- *
- * Online to Offline, Online to Dropped
- * Offline to Online, Offline to Dropped
- *
- *
- */
+/// Broker resource state model generator describes the transitions for the resources
+/// broker will serve.
+///
+/// Online to Offline, Online to Dropped
+/// Offline to Online, Offline to Dropped
 public class PinotHelixBrokerResourceOnlineOfflineStateModelGenerator {
   private PinotHelixBrokerResourceOnlineOfflineStateModelGenerator() {
   }
@@ -68,13 +64,9 @@ public class PinotHelixBrokerResourceOnlineOfflineStateModelGenerator {
     statePriorityList.add(DROPPED_STATE);
     record.setListField(StateModelDefinitionProperty.STATE_PRIORITY_LIST.toString(), statePriorityList);
 
-    /**
-     *
-     * If you are wondering what R and -1 signify, here is an explanation -1 means that don't even
-     * try to keep any instances in this state. R says that all instances in the preference list
-     * should be in this state.
-     *
-     */
+    /// If you are wondering what R and -1 signify, here is an explanation -1 means that don't even
+    /// try to keep any instances in this state. R says that all instances in the preference list
+    /// should be in this state.
     for (String state : statePriorityList) {
       String key = state + ".meta";
       Map<String, String> metadata = new HashMap<String, String>();

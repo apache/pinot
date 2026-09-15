@@ -37,10 +37,8 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code SinglePartitionColumnSegmentPruner} prunes segments based on their partition metadata stored in ZK. The
- * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
- */
+/// The `SinglePartitionColumnSegmentPruner` prunes segments based on their partition metadata stored in ZK. The
+/// pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final String _tableNameWithType;
   private final String _partitionColumn;

@@ -23,9 +23,7 @@ import java.util.Iterator;
 import org.apache.pinot.common.proto.Broker;
 
 
-/**
- * A prepared statement, which is used to escape query parameters sent to Pinot.
- */
+/// A prepared statement, which is used to escape query parameters sent to Pinot.
 public class GrpcPreparedStatement {
   private final GrpcConnection _connection;
   private final String _statement;
@@ -55,71 +53,57 @@ public class GrpcPreparedStatement {
     return statement;
   }
 
-  /**
-   * Executes this prepared statement.
-   *
-   * @return The query results
-   */
+  /// Executes this prepared statement.
+  ///
+  /// @return The query results
   public GrpcResultSetGroup execute()
       throws IOException {
     return _connection.executeGrpc(fillStatementWithParameters());
   }
 
-  /**
-   * Executes this prepared statement asynchronously.
-   *
-   * @return The query results
-   */
+  /// Executes this prepared statement asynchronously.
+  ///
+  /// @return The query results
   public Iterator<Broker.BrokerResponse> executeWithIterator() {
     return _connection.executeWithIterator(fillStatementWithParameters());
   }
 
-  /**
-   * Replaces the given parameter by its value.
-   *
-   * @param parameterIndex The index of the parameter to replace
-   * @param value The value of the parameter to replace
-   */
+  /// Replaces the given parameter by its value.
+  ///
+  /// @param parameterIndex The index of the parameter to replace
+  /// @param value The value of the parameter to replace
   public void setString(int parameterIndex, String value) {
     _parameters[parameterIndex] = "'" + value.replace("'", "''") + "'";
   }
 
-  /**
-   * Replaces the given parameter by its value.
-   *
-   * @param parameterIndex The index of the parameter to replace
-   * @param value The value of the parameter to replace
-   */
+  /// Replaces the given parameter by its value.
+  ///
+  /// @param parameterIndex The index of the parameter to replace
+  /// @param value The value of the parameter to replace
   public void setInt(int parameterIndex, int value) {
     _parameters[parameterIndex] = String.valueOf(value);
   }
 
-  /**
-   * Replaces the given parameter by its value.
-   *
-   * @param parameterIndex The index of the parameter to replace
-   * @param value The value of the parameter to replace
-   */
+  /// Replaces the given parameter by its value.
+  ///
+  /// @param parameterIndex The index of the parameter to replace
+  /// @param value The value of the parameter to replace
   public void setLong(int parameterIndex, long value) {
     _parameters[parameterIndex] = String.valueOf(value);
   }
 
-  /**
-   * Replaces the given parameter by its value.
-   *
-   * @param parameterIndex The index of the parameter to replace
-   * @param value The value of the parameter to replace
-   */
+  /// Replaces the given parameter by its value.
+  ///
+  /// @param parameterIndex The index of the parameter to replace
+  /// @param value The value of the parameter to replace
   public void setFloat(int parameterIndex, float value) {
     _parameters[parameterIndex] = String.valueOf(value);
   }
 
-  /**
-   * Replaces the given parameter by its value.
-   *
-   * @param parameterIndex The index of the parameter to replace
-   * @param value The value of the parameter to replace
-   */
+  /// Replaces the given parameter by its value.
+  ///
+  /// @param parameterIndex The index of the parameter to replace
+  /// @param value The value of the parameter to replace
   public void setDouble(int parameterIndex, double value) {
     _parameters[parameterIndex] = String.valueOf(value);
   }

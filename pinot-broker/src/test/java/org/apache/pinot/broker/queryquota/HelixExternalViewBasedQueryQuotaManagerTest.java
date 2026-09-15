@@ -327,10 +327,10 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
     Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 1);
 
-    runQueries(100, true, APP_NAME);
-    runQueries(100, true, "otherApp");
+    assertApplicationRateLimitedInBurst(APP_NAME, 100);
+    assertApplicationRateLimitedInBurst("otherApp", 100);
     runQueries(100, false, "someApp");
-    runQueries(201, true, "someApp");
+    assertApplicationRateLimitedInBurst("someApp", 201);
 
     Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 3);
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
@@ -696,5 +696,14 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     } else {
       Assert.assertTrue(failCount == 0, "Expected no failure with qps: " + qps + " and app :" + appName);
     }
+  }
+
+  private void assertApplicationRateLimitedInBurst(String appName, int numQueries) {
+    for (int i = 0; i < numQueries; i++) {
+      if (!_queryQuotaManager.acquireApplication(appName)) {
+        return;
+      }
+    }
+    Assert.fail("Expected application rate limiting for " + numQueries + " queries and app: " + appName);
   }
 }

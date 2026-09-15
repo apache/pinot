@@ -36,11 +36,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Verifies that the broker-side background cleanup scheduler automatically deletes expired cursor responses
- * without any manual DELETE API call. Uses a short expiration (3s) and aggressive cron frequency (2s) to
- * keep test runtime low.
- */
+/// Verifies that the broker-side background cleanup scheduler automatically deletes expired cursor responses
+/// without any manual DELETE API call. Uses a short expiration (3s) and aggressive cron frequency (2s) to
+/// keep test runtime low.
 public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(CursorCronCleanupIntegrationTest.class);
   private static final int NUM_OFFLINE_SEGMENTS = 8;

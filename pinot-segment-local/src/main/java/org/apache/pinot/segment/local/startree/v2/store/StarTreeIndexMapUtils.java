@@ -39,33 +39,29 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 
-/**
- * The {@code StarTreeIndexMapUtils} class is a utility class to store/load star-tree index map to/from file.
- * <p>
- * The star-tree index map file contains index maps for multiple star-trees, where the index map is a map from index to
- * the offset and size in the star-tree index file.
- * <p>
- * The entry in the index file is stored in the following format (for STAR_TREE index type, column is null):
- * <ul>
- *   <li>$starTreeId.$column.$indexType.OFFSET = $indexOffsetInFile</li>
- *   <li>$starTreeId.$column.$indexType.SIZE = $indexSize</li>
- * </ul>
- * <p>
- * For an example:
- * <ul>
- *   <li>0.null.STAR_TREE.OFFSET = 0</li>
- *   <li>0.null.STAR_TREE.SIZE = 2000</li>
- *   <li>0.dimension1.FORWARD.OFFSET = 2000</li>
- *   <li>0.dimension1.FORWARD.SIZE = 1000</li>
- *   <li>0.dimension2.FORWARD.OFFSET = 3000</li>
- *   <li>0.dimension2.FORWARD.SIZE = 1500</li>
- *   <li>0.sum__metric.FORWARD.OFFSET = 4500</li>
- *   <li>0.sum__metric.FORWARD.SIZE = 1000</li>
- *   <li>1.null.STAR_TREE.OFFSET = 5500</li>
- *   <li>1.null.STAR_TREE.SIZE = 2500</li>
- *   <li>...</li>
- * </ul>
- */
+/// The `StarTreeIndexMapUtils` class is a utility class to store/load star-tree index map to/from file.
+///
+/// The star-tree index map file contains index maps for multiple star-trees, where the index map is a map from index to
+/// the offset and size in the star-tree index file.
+///
+/// The entry in the index file is stored in the following format (for STAR_TREE index type, column is null):
+///
+/// - $starTreeId.$column.$indexType.OFFSET = $indexOffsetInFile
+/// - $starTreeId.$column.$indexType.SIZE = $indexSize
+///
+/// For an example:
+///
+/// - 0.null.STAR_TREE.OFFSET = 0
+/// - 0.null.STAR_TREE.SIZE = 2000
+/// - 0.dimension1.FORWARD.OFFSET = 2000
+/// - 0.dimension1.FORWARD.SIZE = 1000
+/// - 0.dimension2.FORWARD.OFFSET = 3000
+/// - 0.dimension2.FORWARD.SIZE = 1500
+/// - 0.sum\_\_metric.FORWARD.OFFSET = 4500
+/// - 0.sum\_\_metric.FORWARD.SIZE = 1000
+/// - 1.null.STAR_TREE.OFFSET = 5500
+/// - 1.null.STAR_TREE.SIZE = 2500
+/// - ...
 public class StarTreeIndexMapUtils {
   private StarTreeIndexMapUtils() {
   }
@@ -77,16 +73,12 @@ public class StarTreeIndexMapUtils {
   private static final String OFFSET_SUFFIX = "OFFSET";
   private static final String SIZE_SUFFIX = "SIZE";
 
-  /**
-   * Type of the index.
-   */
+  /// Type of the index.
   public enum IndexType {
     STAR_TREE, FORWARD_INDEX
   }
 
-  /**
-   * Key of the index map.
-   */
+  /// Key of the index map.
   public static class IndexKey implements Comparable<IndexKey> {
     public final IndexType _indexType;
     // For star-tree index, column will be null
@@ -97,9 +89,7 @@ public class StarTreeIndexMapUtils {
       _column = column;
     }
 
-    /**
-     * Returns the property name for the index.
-     */
+    /// Returns the property name for the index.
     public String getPropertyName(int starTreeId, String suffix) {
       return String.format(KEY_TEMPLATE, starTreeId, _column, _indexType, suffix);
     }
@@ -126,9 +116,7 @@ public class StarTreeIndexMapUtils {
     }
   }
 
-  /**
-   * Value of the index map.
-   */
+  /// Value of the index map.
   public static class IndexValue implements Comparable<IndexValue> {
     public long _offset;
     public long _size;
@@ -147,9 +135,7 @@ public class StarTreeIndexMapUtils {
     }
   }
 
-  /**
-   * Stores the index maps for multiple star-trees into a file.
-   */
+  /// Stores the index maps for multiple star-trees into a file.
   public static void storeToFile(List<List<Pair<IndexKey, IndexValue>>> indexMaps, File indexMapFile)
       throws ConfigurationException {
     Preconditions.checkState(!indexMapFile.exists(), "Star-tree index map file already exists");
@@ -168,9 +154,7 @@ public class StarTreeIndexMapUtils {
     CommonsConfigurationUtils.saveToFile(configuration, indexMapFile);
   }
 
-  /**
-   * Loads the index maps for multiple star-trees from an input stream.
-   */
+  /// Loads the index maps for multiple star-trees from an input stream.
   public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream,
       List<StarTreeV2Metadata> starTreeMetadataList)
       throws ConfigurationException {

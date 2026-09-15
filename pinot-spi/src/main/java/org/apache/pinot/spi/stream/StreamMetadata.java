@@ -21,16 +21,14 @@ package org.apache.pinot.spi.stream;
 import java.util.List;
 
 
-/**
- * Groups partition metadata for a single stream/topic.
- *
- * <p>This replaces the flat {@code List<PartitionGroupMetadata>} pattern where partitions from all streams were mixed
- * together and required partition ID padding to identify stream membership.
- *
- * <p>The {@link PartitionGroupMetadata} items within this container use Pinot-encoded partition IDs
- * (i.e., {@code streamIndex * 10000 + streamPartitionId}) to maintain backward compatibility with segment names
- * stored in ZooKeeper.
- */
+/// Groups partition metadata for a single stream/topic.
+///
+/// This replaces the flat `List<PartitionGroupMetadata>` pattern where partitions from all streams were mixed
+/// together and required partition ID padding to identify stream membership.
+///
+/// The [PartitionGroupMetadata] items within this container use Pinot-encoded partition IDs
+/// (i.e., `streamIndex * 10000 + streamPartitionId`) to maintain backward compatibility with segment names
+/// stored in ZooKeeper.
 public class StreamMetadata {
 
   private final StreamConfig _streamConfig;
@@ -56,10 +54,8 @@ public class StreamMetadata {
     return _partitionGroupMetadataList;
   }
 
-  /**
-   * Returns the total number of partitions for this stream. This may be greater than the size of
-   * {@link #getPartitionGroupMetadataList()} when only a subset of partitions is assigned.
-   */
+  /// Returns the total number of partitions for this stream. This may be greater than the size of
+  /// [#getPartitionGroupMetadataList()] when only a subset of partitions is assigned.
   public int getNumPartitions() {
     return _numPartitions;
   }

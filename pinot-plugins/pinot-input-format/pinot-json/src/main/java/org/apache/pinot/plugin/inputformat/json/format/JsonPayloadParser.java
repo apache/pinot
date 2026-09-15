@@ -19,6 +19,9 @@
 package org.apache.pinot.plugin.inputformat.json.format;
 
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /// Parses a stream payload encoded in a particular (text or binary) JSON representation into a Jackson-style
@@ -40,15 +43,31 @@ public interface JsonPayloadParser {
   /// corresponding parser is used without consulting this method.
   ///
   /// @param payload backing byte array
-  /// @param offset  start offset of the record within {@code payload}
+  /// @param offset  start offset of the record within `payload`
   /// @param length  number of bytes belonging to the record
-  /// @return {@code true} if the leading bytes match this format's magic / version signature
+  /// @return `true` if the leading bytes match this format's magic / version signature
   boolean matches(byte[] payload, int offset, int length);
 
-  /// Parses the {@code [offset, offset + length)} region of {@code payload} into a mutable
+  /// Parses the `[offset, offset + length)` region of `payload` into a mutable
   /// `Map<String, Object>` following the value contract described on this interface.
   ///
   /// @throws Exception if the region is not valid for this format
   Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception;
+
+  /// Parses the payload directly into `destination`, avoiding a top-level per-record map when the
+  /// implementation supports it. When this method returns `false`, it must leave `destination` unchanged so
+  /// the caller can safely fall back to [#parse]. When it returns `true`, it must overwrite every requested
+  /// field (using `null` for missing fields) and leave unrequested fields unchanged. When `fields` is `null`,
+  /// it must populate every top-level field present in the payload. If parsing throws, `destination` may be
+  /// partially modified and the caller must discard or clear it before reuse.
+  ///
+  /// @param fields fields to populate, or `null` to populate every top-level field
+  /// @return `true` when the payload was decoded into `destination`; `false` when the caller
+  ///     should fall back to [#parse]
+  default boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
+      throws Exception {
+    return false;
+  }
 }

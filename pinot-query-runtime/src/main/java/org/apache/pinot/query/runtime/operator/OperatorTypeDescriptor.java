@@ -23,67 +23,55 @@ import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 
 
-/**
- * SPI for MSE operator type descriptors. Built-in types are the entries of {@link MultiStageOperator.Type}. Plugin
- * authors can implement this interface and register descriptors via
- * {@code META-INF/services/org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor} to extend the set of known
- * operator types without modifying core.
- *
- * <p>Instances are registered in {@link OperatorTypeRegistry} at startup. Descriptors should be effectively singletons
- * within a JVM — the registry stores one instance per id, and stage-stats equality checks
- * ({@link org.apache.pinot.query.runtime.plan.MultiStageQueryStats.StageStats#equals}) rely on
- * {@link Object#equals} comparing the two descriptor lists element-by-element. Built-in enum constants satisfy this
- * naturally via identity equality; plugin implementations should either be singletons or override {@link #equals}.
- */
+/// SPI for MSE operator type descriptors. Built-in types are the entries of [MultiStageOperator.Type]. Plugin
+/// authors can implement this interface and register descriptors via
+/// `META-INF/services/org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor` to extend the set of known
+/// operator types without modifying core.
+///
+/// Instances are registered in [OperatorTypeRegistry] at startup. Descriptors should be effectively singletons
+/// within a JVM — the registry stores one instance per id, and stage-stats equality checks
+/// ([org.apache.pinot.query.runtime.plan.MultiStageQueryStats.StageStats#equals]) rely on
+/// [Object#equals] comparing the two descriptor lists element-by-element. Built-in enum constants satisfy this
+/// naturally via identity equality; plugin implementations should either be singletons or override [#equals].
 public interface OperatorTypeDescriptor {
 
-  /**
-   * First id available to plugin-defined operator types. Built-in types ({@link MultiStageOperator.Type}) use ids 0–15;
-   * ids 16–255 are reserved for future built-ins. Plugin ids must be &ge; this value.
-   */
+  /// First id available to plugin-defined operator types. Built-in types ([MultiStageOperator.Type]) use ids
+  /// 0–15; ids 16–255 are reserved for future built-ins. Plugin ids must be &ge; this value.
   int PLUGIN_ID_FLOOR = 256;
 
-  /**
-   * Stable numeric id used in the gRPC wire format and the legacy binary stat format. Must be unique across all
-   * descriptors loaded in the same JVM.
-   *
-   * <p>Built-in types use ids 0–255. Plugin types must use ids &ge; {@value #PLUGIN_ID_FLOOR}.
-   *
-   * <p><b>Plugin ids and the legacy format:</b> the legacy binary stat format (mailbox EOS path,
-   * {@code MultiStageQueryStats.StageStats#serialize}) encodes this id as a single unsigned byte, so it can only
-   * represent ids 0–255. Plugin-defined operator types therefore can only report stats in stream-mode stats
-   * reporting ({@code SubmitWithStream}), whose proto carries the id as an int32. The legacy serializer rejects
-   * out-of-range ids with an {@code IllegalStateException} rather than truncating them; the mailbox send path
-   * catches that and degrades to sending empty stats with a warning, so a plugin operator running in legacy mode
-   * keeps its queries working but loses its stats (and logs one warning per EOS).
-   */
+  /// Stable numeric id used in the gRPC wire format and the legacy binary stat format. Must be unique across all
+  /// descriptors loaded in the same JVM.
+  ///
+  /// Built-in types use ids 0–255. Plugin types must use ids &ge; {@value #PLUGIN_ID_FLOOR}.
+  ///
+  /// **Plugin ids and the legacy format:** the legacy binary stat format (mailbox EOS path,
+  /// `MultiStageQueryStats.StageStats#serialize`) encodes this id as a single unsigned byte, so it can only
+  /// represent ids 0–255. Plugin-defined operator types therefore can only report stats in stream-mode stats
+  /// reporting (`SubmitWithStream`), whose proto carries the id as an int32. The legacy serializer rejects
+  /// out-of-range ids with an `IllegalStateException` rather than truncating them; the mailbox send path
+  /// catches that and degrades to sending empty stats with a warning, so a plugin operator running in legacy mode
+  /// keeps its queries working but loses its stats (and logs one warning per EOS).
   int getId();
 
-  /** Display name used in logs and stats JSON output. */
+  /// Display name used in logs and stats JSON output.
   String name();
 
-  /**
-   * Returns the key class for the operator's {@link StatMap}.
-   *
-   * <p>The returned class must be {@code Class<K>} where {@code K extends Enum<K> & StatMap.Key}. The generic
-   * parameter is erased at runtime, so the raw {@code Class} type is used here to remain compatible with the
-   * {@link MultiStageOperator.Type} enum's existing {@code getStatKeyClass()} signature.
-   */
+  /// Returns the key class for the operator's [StatMap].
+  ///
+  /// The returned class must be `Class<K>` where `K extends Enum<K> & StatMap.Key`. The generic
+  /// parameter is erased at runtime, so the raw `Class` type is used here to remain compatible with the
+  /// [MultiStageOperator.Type] enum's existing `getStatKeyClass()` signature.
   @SuppressWarnings("rawtypes")
   Class getStatKeyClass();
 
-  /**
-   * Merges this operator's stats into the broker response. Each implementation casts {@code map} to its specific
-   * {@link StatMap} key type (which is guaranteed by the serialization contract that the key class matches
-   * {@link #getStatKeyClass()}).
-   */
+  /// Merges this operator's stats into the broker response. Each implementation casts `map` to its specific
+  /// [StatMap] key type (which is guaranteed by the serialization contract that the key class matches
+  /// [#getStatKeyClass()]).
   void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
-  /**
-   * Updates MSE metrics from this operator's stats. Default implementation is a no-op; override when the operator
-   * produces metrics that should be recorded at query completion. Emissions are routed by the active
-   * {@link MseMetrics} mode (server / mse / dual).
-   */
+  /// Updates MSE metrics from this operator's stats. Default implementation is a no-op; override when the operator
+  /// produces metrics that should be recorded at query completion. Emissions are routed by the active
+  /// [MseMetrics] mode (server / mse / dual).
   default void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
   }
 }

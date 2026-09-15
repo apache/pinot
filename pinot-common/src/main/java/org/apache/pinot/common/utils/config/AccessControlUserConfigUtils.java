@@ -28,11 +28,9 @@ import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.UserConfig;
 
 
-/**
- * UserConfigUtils is responsible for two things:
- * 1. Used to acquire user config by parsing znRecord that stored in Zookeeper
- * 2. Used to construct znRecord by packaging user config
- */
+/// UserConfigUtils is responsible for two things:
+/// 1. Used to acquire user config by parsing znRecord that stored in Zookeeper
+/// 2. Used to construct znRecord by packaging user config
 public class AccessControlUserConfigUtils {
   private AccessControlUserConfigUtils() {
   }

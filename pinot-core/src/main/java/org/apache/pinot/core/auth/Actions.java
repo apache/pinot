@@ -19,10 +19,8 @@
 
 package org.apache.pinot.core.auth;
 
-/**
- * Different action types used in finer grain access control of the rest endpoints
- * Action names are in <verb><noun> format, e.g. GetSchema, ListTables, etc.
- */
+/// Different action types used in finer grain access control of the rest endpoints
+/// Action names are in <verb><noun> format, e.g. GetSchema, ListTables, etc.
 public class Actions {
   // Action names for cluster
   public static class Cluster {

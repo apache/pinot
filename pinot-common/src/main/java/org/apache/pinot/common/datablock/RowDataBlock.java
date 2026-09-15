@@ -22,9 +22,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * Wrapper for row-wise data table. It stores data in row-major format.
- */
+/// Wrapper for row-wise data table. It stores data in row-major format.
 public class RowDataBlock extends BaseDataBlock {
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;

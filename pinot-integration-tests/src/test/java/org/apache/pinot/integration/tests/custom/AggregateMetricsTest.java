@@ -33,9 +33,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Integration test that enables aggregate metrics for the LLC real-time table.
- */
+/// Integration test that enables aggregate metrics for the LLC real-time table.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class AggregateMetricsTest extends CustomDataQueryClusterIntegrationTest {
 

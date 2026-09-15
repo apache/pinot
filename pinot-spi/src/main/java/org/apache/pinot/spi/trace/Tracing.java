@@ -25,9 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Global registration for tracing implementations.
- */
+/// Global registration for tracing implementations.
 public class Tracing {
   private Tracing() {
   }
@@ -58,10 +56,8 @@ public class Tracing {
     return TracerHolder.TRACER;
   }
 
-  /**
-   * Get the active recording on the current thread to write values into.
-   * @return the active recording
-   */
+  /// Get the active recording on the current thread to write values into.
+  /// @return the active recording
   public static InvocationRecording activeRecording() {
     return getTracer().activeRecording();
   }
@@ -80,10 +76,8 @@ public class Tracing {
     }
   }
 
-  /**
-   * Used only when something has gone wrong and even the default tracer cannot be loaded
-   * (won't happen except in tests or completely custom deployments which exclude pinot-segment-local).
-   */
+  /// Used only when something has gone wrong and even the default tracer cannot be loaded
+  /// (won't happen except in tests or completely custom deployments which exclude pinot-segment-local).
   private static final class FallbackTracer implements Tracer {
     static final FallbackTracer INSTANCE = new FallbackTracer();
 

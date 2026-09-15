@@ -27,11 +27,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic negation scalar function implementation.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Polymorphic negation scalar function implementation.
+///
+/// Instances are immutable and thread-safe.
 @ScalarFunction
 public class NegateScalarFunction extends BaseUnaryArithmeticScalarFunction {
 

@@ -37,9 +37,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
-/**
- * Accountant task that is used to publish heap usage metrics.
- */
+/// Accountant task that is used to publish heap usage metrics.
 public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFactory {
 
   @Override

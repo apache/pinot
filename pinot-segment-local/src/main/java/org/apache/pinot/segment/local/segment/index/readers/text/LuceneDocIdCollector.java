@@ -29,20 +29,18 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A simple collector created to bypass all the heap heavy process
- * of collecting the results in Lucene. Lucene by default will
- * create a {@link org.apache.lucene.search.TopScoreDocCollector}
- * which internally uses a {@link org.apache.lucene.search.TopDocsCollector}
- * and uses a PriorityQueue to maintain the top results. From the heap usage
- * experiments (please see the design doc), we found out that this was
- * substantially contributing to heap whereas we currently don't need any
- * scoring or top doc collecting.
- * Every time Lucene finds a matching document for the text search query,
- * a callback is invoked into this collector that simply collects the
- * matching doc's docID. We store the docID in a bitmap to be traversed later
- * as part of doc id iteration etc.
- */
+/// A simple collector created to bypass all the heap heavy process
+/// of collecting the results in Lucene. Lucene by default will
+/// create a [org.apache.lucene.search.TopScoreDocCollector]
+/// which internally uses a [org.apache.lucene.search.TopDocsCollector]
+/// and uses a PriorityQueue to maintain the top results. From the heap usage
+/// experiments (please see the design doc), we found out that this was
+/// substantially contributing to heap whereas we currently don't need any
+/// scoring or top doc collecting.
+/// Every time Lucene finds a matching document for the text search query,
+/// a callback is invoked into this collector that simply collects the
+/// matching doc's docID. We store the docID in a bitmap to be traversed later
+/// as part of doc id iteration etc.
 public class LuceneDocIdCollector implements Collector {
 
   private final MutableRoaringBitmap _docIds;

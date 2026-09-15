@@ -81,7 +81,9 @@ public class DataBlockBuilder {
     Object[] nullPlaceholders = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
       nullBitmaps[colId] = new RoaringBitmap();
-      nullPlaceholders[colId] = storedTypes[colId].getNullPlaceholder();
+      // Resolved on the logical type, not the stored type: UUID overrides getNullPlaceholder() to return the nil
+      // UUID, whereas its stored type BYTES would yield a zero-length placeholder that is not a valid UUID.
+      nullPlaceholders[colId] = dataSchema.getColumnDataType(colId).getNullPlaceholder();
     }
     int nullFixedBytes = numColumns * Integer.BYTES * 2;
     int rowSizeInBytes = calculateBytesPerRow(dataSchema);
@@ -254,7 +256,11 @@ public class DataBlockBuilder {
       ByteBuffer fixedSize, PagedPinotOutputStream varSize, RoaringBitmap nullBitmap,
       Object2IntOpenHashMap<String> dictionary, @Nullable AggregationFunction aggFunction)
       throws IOException {
-    ColumnDataType storedType = dataSchema.getColumnDataType(colId).getStoredType();
+    // Dispatch on the stored type, but read null placeholders off the logical type: UUID overrides
+    // getNullPlaceholder() to return the nil UUID, whereas its stored type BYTES would yield a zero-length
+    // placeholder that is not a valid UUID. The two agree for every other type (see DataSchemaTest).
+    ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
+    ColumnDataType storedType = columnDataType.getStoredType();
     int numRows = columns.get(colId).length;
 
     Object[] column = columns.get(colId);
@@ -266,7 +272,7 @@ public class DataBlockBuilder {
     switch (storedType) {
       // Single-value column
       case INT: {
-        int nullPlaceholder = (int) storedType.getNullPlaceholder();
+        int nullPlaceholder = (int) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -281,7 +287,7 @@ public class DataBlockBuilder {
         break;
       }
       case LONG: {
-        long nullPlaceholder = (long) storedType.getNullPlaceholder();
+        long nullPlaceholder = (long) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -296,7 +302,7 @@ public class DataBlockBuilder {
         break;
       }
       case FLOAT: {
-        float nullPlaceholder = (float) storedType.getNullPlaceholder();
+        float nullPlaceholder = (float) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -311,7 +317,7 @@ public class DataBlockBuilder {
         break;
       }
       case DOUBLE: {
-        double nullPlaceholder = (double) storedType.getNullPlaceholder();
+        double nullPlaceholder = (double) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -326,7 +332,7 @@ public class DataBlockBuilder {
         break;
       }
       case BIG_DECIMAL: {
-        BigDecimal nullPlaceholder = (BigDecimal) storedType.getNullPlaceholder();
+        BigDecimal nullPlaceholder = (BigDecimal) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -342,7 +348,7 @@ public class DataBlockBuilder {
       }
       case STRING: {
         ToIntFunction<String> didSupplier = k -> dictionary.size();
-        int nullPlaceHolder = dictionary.computeIfAbsent((String) storedType.getNullPlaceholder(), didSupplier);
+        int nullPlaceHolder = dictionary.computeIfAbsent((String) columnDataType.getNullPlaceholder(), didSupplier);
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -358,7 +364,7 @@ public class DataBlockBuilder {
         break;
       }
       case BYTES: {
-        ByteArray nullPlaceholder = (ByteArray) storedType.getNullPlaceholder();
+        ByteArray nullPlaceholder = (ByteArray) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -373,7 +379,7 @@ public class DataBlockBuilder {
         break;
       }
       case MAP: {
-        Map nullPlaceholder = (Map) storedType.getNullPlaceholder();
+        Map nullPlaceholder = (Map) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -389,7 +395,7 @@ public class DataBlockBuilder {
       }
       // Multi-value column
       case INT_ARRAY: {
-        int[] nullPlaceholder = (int[]) storedType.getNullPlaceholder();
+        int[] nullPlaceholder = (int[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -404,7 +410,7 @@ public class DataBlockBuilder {
         break;
       }
       case LONG_ARRAY: {
-        long[] nullPlaceholder = (long[]) storedType.getNullPlaceholder();
+        long[] nullPlaceholder = (long[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -419,7 +425,7 @@ public class DataBlockBuilder {
         break;
       }
       case FLOAT_ARRAY: {
-        float[] nullPlaceholder = (float[]) storedType.getNullPlaceholder();
+        float[] nullPlaceholder = (float[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -434,7 +440,7 @@ public class DataBlockBuilder {
         break;
       }
       case DOUBLE_ARRAY: {
-        double[] nullPlaceholder = (double[]) storedType.getNullPlaceholder();
+        double[] nullPlaceholder = (double[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -449,7 +455,7 @@ public class DataBlockBuilder {
         break;
       }
       case BIG_DECIMAL_ARRAY: {
-        BigDecimal[] nullPlaceholder = (BigDecimal[]) storedType.getNullPlaceholder();
+        BigDecimal[] nullPlaceholder = (BigDecimal[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -464,7 +470,7 @@ public class DataBlockBuilder {
         break;
       }
       case STRING_ARRAY: {
-        String[] nullPlaceholder = (String[]) storedType.getNullPlaceholder();
+        String[] nullPlaceholder = (String[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
@@ -479,7 +485,7 @@ public class DataBlockBuilder {
         break;
       }
       case BYTES_ARRAY: {
-        ByteArray[] nullPlaceholder = (ByteArray[]) storedType.getNullPlaceholder();
+        ByteArray[] nullPlaceholder = (ByteArray[]) columnDataType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];

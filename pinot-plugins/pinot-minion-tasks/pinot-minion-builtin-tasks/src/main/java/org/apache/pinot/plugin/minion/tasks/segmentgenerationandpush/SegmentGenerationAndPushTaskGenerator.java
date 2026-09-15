@@ -53,40 +53,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentGenerationAndPushTaskGenerator generates task configs for SegmentGenerationAndPush minion tasks.
- *
- * This generator consumes configs from org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig:
- *   inputDirURI - Required, the location of input data directory
- *   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
- *   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
- *   inputDirURI if not specified.
- *   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
- *
- *   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
- *   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred
- *   from outputDirURI if not specified.
- *   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
- *   overwriteOutput - Optional, delete the output segment directory if set to true.
- *
- *   recordReader.className - Optional, the class name of RecordReader. Default to be inferred from inputFormat if
- *   not specified.
- *   recordReader.configClassName - Optional, the class name of RecordReaderConfig. Default to be inferred from
- *   inputFormat if not specified.
- *   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
- *
- *   schema - Optional, Pinot schema in Json string.
- *   schemaURI - Optional, the URI to query for Pinot schema.
- *
- *   segmentNameGenerator.type - Optional, the segment name generator to create segment name.
- *   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
- *
- *   push.mode - Optional, push job type: TAR/URI/METADATA, default to METADATA
- *   push.controllerUri - Optional, controller uri to send push request to, default to the controller vip uri.
- *   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri.
- *   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri.
- *
- */
+/// SegmentGenerationAndPushTaskGenerator generates task configs for SegmentGenerationAndPush minion tasks.
+///
+/// This generator consumes configs from org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig:
+///   inputDirURI - Required, the location of input data directory
+///   inputFormat - Required, the input file format, e.g. JSON/Avro/Parquet/CSV/...
+///   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
+///   inputDirURI if not specified.
+///   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+///   includeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to include.
+///   excludeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to exclude.
+///
+///   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
+///   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred
+///   from outputDirURI if not specified.
+///   output.fs.prop.<keys> - Optional, the configs to initialize output filesystem.
+///   overwriteOutput - Optional, delete the output segment directory if set to true.
+///
+///   recordReader.className - Optional, the class name of RecordReader. Default to be inferred from inputFormat if
+///   not specified.
+///   recordReader.configClassName - Optional, the class name of RecordReaderConfig. Default to be inferred from
+///   inputFormat if not specified.
+///   recordReader.prop.<keys> - Optional, the configs used to initialize RecordReaderConfig.
+///
+///   schema - Optional, Pinot schema in Json string.
+///   schemaURI - Optional, the URI to query for Pinot schema.
+///
+///   segmentNameGenerator.type - Optional, the segment name generator to create segment name.
+///   segmentNameGenerator.configs.<keys> - Optional, configs of segment name generator.
+///
+///   push.mode - Optional, push job type: TAR/URI/METADATA, default to METADATA
+///   push.controllerUri - Optional, controller uri to send push request to, default to the controller vip uri.
+///   push.segmentUriPrefix - Optional, segment download uri prefix, used when push.mode=uri.
+///   push.segmentUriSuffix - Optional, segment download uri suffix, used when push.mode=uri.
 @TaskGenerator
 public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskGenerator.class);

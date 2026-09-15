@@ -53,9 +53,7 @@ public class DictionaryIndexConfig extends IndexConfig {
     this(false, onHeap, useVarLengthDictionary, intern);
   }
 
-  /**
-   * Constructor for patching an existing config, but overrides the useVarLengthDictionary property with the input
-   */
+  /// Constructor for patching an existing config, but overrides the useVarLengthDictionary property with the input
   public DictionaryIndexConfig(DictionaryIndexConfig base, boolean useVarLengthDictionary) {
     this(base.isEnabled(), base.isOnHeap(), useVarLengthDictionary, base.getIntern());
   }

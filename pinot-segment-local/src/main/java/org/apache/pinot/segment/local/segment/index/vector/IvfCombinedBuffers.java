@@ -28,36 +28,36 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
-/// Canonical helper for opening an IVF combined index file as a {@link PinotDataBuffer}.
+/// Canonical helper for opening an IVF combined index file as a [PinotDataBuffer].
 ///
-/// Used by the production reader factory ({@code VectorIndexType.ReaderFactory}) and by tests
+/// Used by the production reader factory (`VectorIndexType.ReaderFactory`) and by tests
 /// and benchmarks that instantiate IVF readers directly against a temp directory. Keeping one
 /// implementation guarantees identical file resolution, byte order, mmap mode, and ownership
 /// semantics across all callers, and makes a future consolidation (when IVF moves into the
 /// combined-form segment index file) a single point of change.
 ///
 /// **Ownership:** the returned buffer is owned by the caller (typically the IVF reader,
-/// which closes it in its own {@code close()}).
+/// which closes it in its own `close()`).
 ///
-/// **Byte order:** the buffer is mapped {@link ByteOrder#BIG_ENDIAN} to match the IVF_FLAT
+/// **Byte order:** the buffer is mapped [ByteOrder#BIG_ENDIAN] to match the IVF_FLAT
 /// on-disk format. IVF_PQ handles its own little-endian payload via stream wrappers inside
-/// {@link IvfPqIndexFormat}, so the buffer-level order is irrelevant for IVF_PQ but is consistent
+/// [IvfPqIndexFormat], so the buffer-level order is irrelevant for IVF_PQ but is consistent
 /// with IVF_FLAT for symmetry.
 public final class IvfCombinedBuffers {
 
   private IvfCombinedBuffers() {
   }
 
-  /// Resolves the IVF index sidecar file for {@code column} under {@code segmentDir} and maps
-  /// the full file as a read-only {@link PinotDataBuffer}.
+  /// Resolves the IVF index sidecar file for `column` under `segmentDir` and maps
+  /// the full file as a read-only [PinotDataBuffer].
   ///
   /// @param segmentDir segment directory containing the sidecar file
   /// @param column     column name; used to locate the sidecar file
   /// @param config     vector index configuration; used to determine the file extension
-  /// @param ownerLabel short owner label included in {@code PinotDataBuffer} accounting
-  ///                   (e.g. {@code "vector-ivf_flat"}, {@code "test-vector"}, {@code "bench-vector"});
+  /// @param ownerLabel short owner label included in `PinotDataBuffer` accounting
+  ///                   (e.g. `"vector-ivf_flat"`, `"test-vector"`, `"bench-vector"`);
   ///                   used only for diagnostics
-  /// @return a {@code PinotDataBuffer} holding the full sidecar file contents; the caller takes ownership
+  /// @return a `PinotDataBuffer` holding the full sidecar file contents; the caller takes ownership
   ///         and is responsible for closing it
   /// @throws IllegalStateException if the sidecar file is missing
   /// @throws RuntimeException       if mmap fails
@@ -82,7 +82,7 @@ public final class IvfCombinedBuffers {
     }
   }
 
-  /// Convenience overload for callers that already hold the resolved {@link File} (e.g. the
+  /// Convenience overload for callers that already hold the resolved [File] (e.g. the
   /// production reader factory). Maps the given file directly.
   public static PinotDataBuffer mapCombinedFile(File indexFile, String column, String ownerLabel) {
     Preconditions.checkArgument(indexFile != null, "indexFile must not be null");
@@ -100,7 +100,7 @@ public final class IvfCombinedBuffers {
     }
   }
 
-  /// Best-effort close of a {@link PinotDataBuffer}. Used by IVF readers during constructor
+  /// Best-effort close of a [PinotDataBuffer]. Used by IVF readers during constructor
   /// failure to release the mmap when the caller never sees a reader instance to close. Swallows
   /// any close-time exception so the original cause propagates unmasked.
   public static void closeQuietly(@Nullable PinotDataBuffer buffer) {

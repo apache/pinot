@@ -26,11 +26,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic absolute-value scalar function implementation.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Polymorphic absolute-value scalar function implementation.
+///
+/// Instances are immutable and thread-safe.
 @ScalarFunction
 public class AbsScalarFunction extends BaseUnaryArithmeticScalarFunction {
 

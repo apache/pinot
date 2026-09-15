@@ -22,7 +22,7 @@ import com.fasterxml.jackson.dataformat.smile.SmileConstants;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 
 
-/// Parses <a href="https://github.com/FasterXML/smile-format-specification">Smile</a>, Jackson's own binary
+/// Parses [Smile](https://github.com/FasterXML/smile-format-specification), Jackson's own binary
 /// JSON encoding. Values decode to the same Java types Jackson produces for text JSON (Smile may additionally
 /// emit `Float` and `byte[]` scalars, which Pinot handles downstream).
 ///

@@ -54,20 +54,19 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
- * the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
- * download segments from peer servers even when the deep store is down. This is done by injection of failures in
- * the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
- *
- * Besides standard tests, it also verifies that
- * (1) All the segments on all servers are in either ONLINE or CONSUMING states
- * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
- */
+/// Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer and a fake PinotFS as
+/// the deep store for segments. This test enables the peer to peer segment download scheme to test Pinot servers can
+/// download segments from peer servers even when the deep store is down. This is done by injection of failures in
+/// the fake PinotFS segment upload api (i.e., copyFromLocal) for all segments whose seq number mod 5 is 0.
+///
+/// Besides standard tests, it also verifies that
+/// (1) All the segments on all servers are in either ONLINE or CONSUMING states
+/// (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_SERVERS = 2;

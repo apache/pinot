@@ -41,20 +41,16 @@ public class DoubleVectorOpUtils {
     return a;
   }
 
-  /**
-   * return a new DoubleArrayList initialized with a
-   * @param a array to initialize
-   * @return a new DoubleArrayList initialized with a
-   */
+  /// return a new DoubleArrayList initialized with a
+  /// @param a array to initialize
+  /// @return a new DoubleArrayList initialized with a
   public static DoubleArrayList createAndInitialize(double[] a) {
     return new DoubleArrayList(a);
   }
 
-  /**
-   * return a new DoubleArrayList with all zeros
-   * @param len length of array
-   * @return a new DoubleArrayList with all zeros
-   */
+  /// return a new DoubleArrayList with all zeros
+  /// @param len length of array
+  /// @return a new DoubleArrayList with all zeros
   public static DoubleArrayList createAndInitialize(int len) {
     Preconditions.checkState(len > 0, "Asking for an array of length %s", len);
     return new DoubleArrayList(new double[len]);

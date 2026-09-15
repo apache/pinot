@@ -121,11 +121,9 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
     return null;
   }
 
-  /**
-   * Tests maxRowsInDistinct: after merging segments, accumulated numDocsScanned exceeds the budget
-   * and the combine operator sets the early termination flag. LIMIT is set high so the query cannot
-   * naturally satisfy (distinct values < LIMIT).
-   */
+  /// Tests maxRowsInDistinct: after merging segments, accumulated numDocsScanned exceeds the budget
+  /// and the combine operator sets the early termination flag. LIMIT is set high so the query cannot
+  /// naturally satisfy (distinct values < LIMIT).
   @Test
   public void testMaxRowsInDistinctEarlyTermination()
       throws Exception {
@@ -158,11 +156,9 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
         "MSQ response should expose earlyTerminationReasons instead of legacy V1 flags. Response: " + response);
   }
 
-  /**
-   * Tests maxRowsWithoutChangeInDistinct: when merging a segment adds no new distinct values, the
-   * segment's numDocsScanned counts toward the no-change budget. With 2 identical segments, the
-   * second segment's merge triggers the limit.
-   */
+  /// Tests maxRowsWithoutChangeInDistinct: when merging a segment adds no new distinct values, the
+  /// segment's numDocsScanned counts toward the no-change budget. With 2 identical segments, the
+  /// second segment's merge triggers the limit.
   @Test
   public void testNoChangeEarlyTermination()
       throws Exception {

@@ -38,14 +38,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for compound vector retrieval patterns:
- * <ul>
- *   <li>metadata filter + top-K ANN</li>
- *   <li>metadata filter + threshold/radius</li>
- *   <li>top-K + threshold combination</li>
- * </ul>
- */
+/// Tests for compound vector retrieval patterns:
+///
+/// - metadata filter + top-K ANN
+/// - metadata filter + threshold/radius
+/// - top-K + threshold combination
 public class VectorCompoundQueryTest {
 
   // --- Execution mode selection for compound patterns ---

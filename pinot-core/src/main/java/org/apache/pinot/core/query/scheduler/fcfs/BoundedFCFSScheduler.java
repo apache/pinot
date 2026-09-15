@@ -31,11 +31,9 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Per group FCFS algorithm with bounded resource management per {@link SchedulerGroup}
- * This class is a thin wrapper factory that configures {@link PriorityScheduler} with right
- * concrete classes. All the scheduling logic resides in {@link PriorityScheduler}
- */
+/// Per group FCFS algorithm with bounded resource management per [SchedulerGroup]
+/// This class is a thin wrapper factory that configures [PriorityScheduler] with right
+/// concrete classes. All the scheduling logic resides in [PriorityScheduler]
 public class BoundedFCFSScheduler extends PriorityScheduler {
   public static BoundedFCFSScheduler create(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
       ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {

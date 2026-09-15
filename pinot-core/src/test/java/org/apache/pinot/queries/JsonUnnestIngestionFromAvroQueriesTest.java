@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -61,12 +62,11 @@ import org.testng.annotations.Test;
 import static org.apache.avro.Schema.*;
 
 
-/**
- * Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
- * column in a Pinot segment.
- */
+/// Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
+/// column in a Pinot segment.
 public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest-" + UUID.randomUUID());
   private static final File AVRO_DATA_FILE = new File(INDEX_DIR, "JsonIngestionFromAvroTest.avro");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -120,7 +120,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  /** @return {@link GenericRow} representing a row in Pinot table. */
+  /// @return [GenericRow] representing a row in Pinot table.
   private static GenericRow createTableRecord(int intValue, String stringValue, List<Object> arrayValue,
       Object eventTimeValue) {
     GenericRow record = new GenericRow();
@@ -293,7 +293,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return avroRecordReader;
   }
 
-  /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
+  /// Create an AVRO file and then ingest it into Pinot while creating a JsonIndex.
   @BeforeClass
   public void setUp()
       throws Exception {

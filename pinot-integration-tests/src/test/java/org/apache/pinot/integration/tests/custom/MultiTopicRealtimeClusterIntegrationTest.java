@@ -53,18 +53,16 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for a single realtime table that ingests from N Kafka topics using
- * the {@link StreamIngestionConfig#getStreamConfigMaps()} multi-stream configuration.
- *
- * <p>The number of topics is controlled by {@link #getNumTopics()}. For each topic index {@code i},
- * a Kafka topic named {@code multiTopicTest_topic{i}} is created and populated with
- * {@link #RECORDS_PER_TOPIC} CSV records whose {@code source} column is set to {@code TOPIC_{i}}
- * and whose {@code value} column falls in the exclusive range {@code [i*100 + 1, i*100 + 100]}.
- *
- * <p>Queries then verify that every topic's data is present and correctly isolated.
- * Subclasses can override {@link #getNumTopics()} to test with a different number of topics.
- */
+/// Integration test for a single realtime table that ingests from N Kafka topics using
+/// the [StreamIngestionConfig#getStreamConfigMaps()] multi-stream configuration.
+///
+/// The number of topics is controlled by [#getNumTopics()]. For each topic index `i`,
+/// a Kafka topic named `multiTopicTest_topic{i}` is created and populated with
+/// [#RECORDS_PER_TOPIC] CSV records whose `source` column is set to `TOPIC\_{i}`
+/// and whose `value` column falls in the exclusive range `[i*100 + 1, i*100 + 100]`.
+///
+/// Queries then verify that every topic's data is present and correctly isolated.
+/// Subclasses can override [#getNumTopics()] to test with a different number of topics.
 public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TABLE_NAME = "multiTopicTable";
   private static final String TOPIC_PREFIX = "multiTopicTest_topic";
@@ -74,10 +72,8 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
   private static final String CSV_DELIMITER = ",";
   private static final String CSV_HEADER = "id,name,source,value,ts";
 
-  /**
-   * Returns the number of Kafka topics to create. Override in subclasses to test
-   * with a different topic count.
-   */
+  /// Returns the number of Kafka topics to create. Override in subclasses to test
+  /// with a different topic count.
   protected int getNumTopics() {
     return 3;
   }

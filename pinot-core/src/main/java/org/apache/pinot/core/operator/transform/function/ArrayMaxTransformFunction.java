@@ -27,14 +27,12 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The ArrayMaxTransformFunction class implements arrayMax function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayMax(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayMax(mvColumn)
- * SELECT SUM(arrayMax(mvColumn)) FROM table
- */
+/// The ArrayMaxTransformFunction class implements arrayMax function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayMax(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayMax(mvColumn)
+/// SELECT SUM(arrayMax(mvColumn)) FROM table
 public class ArrayMaxTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayMax";
 

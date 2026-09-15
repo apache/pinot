@@ -69,7 +69,7 @@ public class FakePinotTimer implements PinotTimer {
     return _count.get();
   }
 
-  /** Total elapsed time recorded in milliseconds. */
+  /// Total elapsed time recorded in milliseconds.
   public long sumMs() {
     return _sumDurationMs.get();
   }

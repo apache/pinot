@@ -19,11 +19,13 @@
 package org.apache.pinot.broker.routing.segmentpartition;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -43,14 +45,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code PartitionDataManager} manages partitions of a table. It manages
- *   1. all the online segments associated with the partition and their allocated servers
- *   2. all the replica of a specific segment.
- * It provides API to query
- *   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
- *   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
- */
+/// The `PartitionDataManager` manages partitions of a table. It manages
+///   1. all the online segments associated with the partition and their allocated servers
+///   2. all the replica of a specific segment.
+/// It provides API to query
+///   1. For each partition ID, what are the servers that contains ALL segments belong to this partition ID.
+///   2. For each server, what are all the partition IDs and list of segments of those partition IDs on this server.
 public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionMetadataManager.class);
   private static final int INVALID_PARTITION_ID = -1;
@@ -68,8 +68,13 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
 
   // computed value based on status change.
-  private transient TablePartitionInfo _tablePartitionInfo;
-  private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
+  // NOTE: Volatile because they are written while the table's routing entry is built or updated, and read without any
+  // lock by unrelated threads (e.g. query planner threads). The writers are serialized by BaseBrokerRoutingManager,
+  // which holds the per-table routing table build lock around init() and around every subsequent update; this class'
+  // own 'synchronized' does not cover init(). Both graphs are effectively immutable once published, so the volatile
+  // write provides all the happens-before edge the readers need.
+  private volatile TablePartitionInfo _tablePartitionInfo;
+  private volatile TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions, long newSegmentExpirationMs) {
@@ -267,8 +272,13 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
               : segmentsReducingFullyReplicatedServers.subList(0, 10) + "...", _tableNameWithType);
     }
     // Process new segments
+    // Partitions whose segments are all excluded below hold data but end up without partition info. Track them so that
+    // consumers requiring a fully replicated server per partition can tell them apart from genuinely empty partitions.
+    Set<Integer> partitionsWithOnlyDeferredSegments = Set.of();
     if (!newSegmentInfoEntries.isEmpty()) {
       List<String> excludedNewSegments = new ArrayList<>();
+      // Sorted for deterministic reporting
+      Set<Integer> excludedNewSegmentPartitions = new TreeSet<>();
       for (Map.Entry<String, SegmentInfo> entry : newSegmentInfoEntries) {
         String segment = entry.getKey();
         SegmentInfo segmentInfo = entry.getValue();
@@ -286,6 +296,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfoMap[partitionId] = partitionInfo;
           } else {
             excludedNewSegments.add(segment);
+            excludedNewSegmentPartitions.add(partitionId);
           }
         } else {
           // If the new segment is not the first segment of a partition, add it only if it won't reduce the fully
@@ -297,6 +308,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfo._segments.add(segment);
           } else {
             excludedNewSegments.add(segment);
+            excludedNewSegmentPartitions.add(partitionId);
           }
         }
       }
@@ -305,10 +317,25 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
             numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
       }
+      // NOTE: Computed against the final partition info map, i.e. after the whole new segment pass, rather than latched
+      // when a segment is excluded: a partition can hold both an excluded new segment and one that ends up populating
+      // the partition info, and which of the two is visited first depends on the iteration order of _segmentInfoMap.
+      excludedNewSegmentPartitions.removeIf(partitionId -> partitionInfoMap[partitionId] != null);
+      if (!excludedNewSegmentPartitions.isEmpty()) {
+        // An unmodifiable view rather than Set.copyOf(): it enforces the accessor's effectively-immutable contract and
+        // keeps the sorted iteration order.
+        partitionsWithOnlyDeferredSegments = Collections.unmodifiableSet(excludedNewSegmentPartitions);
+        int numAffectedPartitions = excludedNewSegmentPartitions.size();
+        List<Integer> partitionsToLog = new ArrayList<>(excludedNewSegmentPartitions);
+        LOGGER.warn("Found {} partitions: {} without partition info because all their segments are new segments "
+                + "without all replicas available in table: {}", numAffectedPartitions,
+            numAffectedPartitions <= 10 ? partitionsToLog : partitionsToLog.subList(0, 10) + "...",
+            _tableNameWithType);
+      }
     }
     _tablePartitionReplicatedServersInfo =
         new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName,
-            _numPartitions, partitionInfoMap, segmentsWithInvalidPartition);
+            _numPartitions, partitionInfoMap, segmentsWithInvalidPartition, partitionsWithOnlyDeferredSegments);
   }
 
   private void computeTablePartitionInfo() {

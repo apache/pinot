@@ -37,15 +37,13 @@ import static org.mockito.Mockito.mock;
 public class ClusterChangeMediatorTest {
   private final Lock _lock = new ReentrantLock();
 
-  /**
-   * Tests the potential deadlock between Helix callback handling thread and ClusterChangeMediator change handling
-   * thread when the ClusterChangeMediator is stopped.
-   * The deadlock chain is as following:
-   * - ClusterChangeMediator.stop() is called and waiting for the change handling thread to stop
-   * - Helix callback handling thread acquires a lock, then send a cluster change to the mediator which is blocked
-   *   ClusterChangeMediator.stop() (both stop() and enqueueChange() are synchronized)
-   * - The change handling thread waits on the lock held by the Helix callback handling thread
-   */
+  /// Tests the potential deadlock between Helix callback handling thread and ClusterChangeMediator change handling
+  /// thread when the ClusterChangeMediator is stopped.
+  /// The deadlock chain is as following:
+  /// - ClusterChangeMediator.stop() is called and waiting for the change handling thread to stop
+  /// - Helix callback handling thread acquires a lock, then send a cluster change to the mediator which is blocked
+  ///   ClusterChangeMediator.stop() (both stop() and enqueueChange() are synchronized)
+  /// - The change handling thread waits on the lock held by the Helix callback handling thread
   @Test
   public void testDeadLock() {
     ClusterChangeMediator mediator = new ClusterChangeMediator(

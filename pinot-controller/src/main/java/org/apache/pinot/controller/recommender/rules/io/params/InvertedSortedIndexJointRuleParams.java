@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.InvertedSortedIndexJointRule.*;
 
 
-/**
- * Thresholds and parameters used in InvertedSortedIndexJointRule
- */
+/// Thresholds and parameters used in InvertedSortedIndexJointRule
 public class InvertedSortedIndexJointRuleParams {
 
   // When the number of indices we recommend increment 1,

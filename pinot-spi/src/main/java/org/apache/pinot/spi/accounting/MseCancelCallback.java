@@ -19,9 +19,7 @@
 package org.apache.pinot.spi.accounting;
 
 public interface MseCancelCallback {
-  /**
-   * Cancels the query with the given queryId.
-   * The call is asynchronous.
-   */
+  /// Cancels the query with the given queryId.
+  /// The call is asynchronous.
   void cancelQuery(long queryId);
 }

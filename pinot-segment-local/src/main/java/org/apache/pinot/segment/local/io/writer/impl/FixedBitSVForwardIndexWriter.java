@@ -26,10 +26,8 @@ import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index writer for single-value columns. The values written are dictionary
- * ids.
- */
+/// Bit-compressed dictionary-encoded forward index writer for single-value columns. The values written are dictionary
+/// ids.
 public class FixedBitSVForwardIndexWriter implements Closeable {
   private final PinotDataBuffer _dataBuffer;
   private final FixedBitIntReaderWriter _intReaderWriter;

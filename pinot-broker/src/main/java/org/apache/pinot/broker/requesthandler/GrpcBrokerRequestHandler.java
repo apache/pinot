@@ -54,9 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>GrpcBrokerRequestHandler</code> class communicates query request via GRPC.
- */
+/// The `GrpcBrokerRequestHandler` class communicates query request via GRPC.
 @ThreadSafe
 public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
@@ -115,10 +113,8 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     return doReduce(originalBrokerRequest, responseMap, timeoutMs);
   }
 
-  /**
-   * Executes scatter: sends the query to servers and collects per-server streaming response iterators.
-   * Subclasses may override to replace or augment the scatter step.
-   */
+  /// Executes scatter: sends the query to servers and collects per-server streaming response iterators.
+  /// Subclasses may override to replace or augment the scatter step.
   protected Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> doScatter(long requestId, TableRouteInfo route,
       RequestContext requestContext) {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
@@ -141,10 +137,8 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     return responseMap;
   }
 
-  /**
-   * Executes the reduce step on the given responseMap.
-   * Subclasses may override to perform custom reduce logic or augment the responseMap.
-   */
+  /// Executes the reduce step on the given responseMap.
+  /// Subclasses may override to perform custom reduce logic or augment the responseMap.
   protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, long timeoutMs)
       throws Exception {
@@ -155,9 +149,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     return brokerResponse;
   }
 
-  /**
-   * Query pinot server for data table.
-   */
+  /// Query pinot server for data table.
   private void sendRequest(long requestId, TableType tableType, BrokerRequest brokerRequest,
       Map<ServerInstance, SegmentsToQuery> routingTable,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
@@ -212,9 +204,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     }
   }
 
-  /**
-   * Check if a server that was previously detected as unhealthy is now healthy.
-   */
+  /// Check if a server that was previously detected as unhealthy is now healthy.
   private FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);

@@ -29,9 +29,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests order by queries
- */
+/// Tests order by queries
 public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQueriesTest {
   private static final InstancePlanMakerImplV2 TRIM_ENABLED_PLAN_MAKER = new InstancePlanMakerImplV2();
 
@@ -53,10 +51,8 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
         expectedNumEntriesScannedPostFilter, 400000L, expectedResultTable);
   }
 
-  /**
-   * Provides various combinations of order by.
-   * In order to calculate the expected results, the results from a group by were taken, and then ordered accordingly.
-   */
+  /// Provides various combinations of order by.
+  /// In order to calculate the expected results, the results from a group by were taken, and then ordered accordingly.
   @DataProvider
   public Object[][] groupByOrderByDataProvider() {
     List<Object[]> entries = new ArrayList<>();

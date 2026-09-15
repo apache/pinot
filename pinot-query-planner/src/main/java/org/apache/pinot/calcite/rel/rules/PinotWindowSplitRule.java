@@ -36,13 +36,11 @@ import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.sql.SqlAggFunction;
 
-/**
- * A RelOptRule to split a single LogicalWindow with multiple window groups
- * into a chain of LogicalWindows, where each has exactly one window group.
- *
- * This version correctly handles window expressions that refer to constants
- * by shifting RexInputRef pointers as the input field count changes down the chain.
- */
+/// A RelOptRule to split a single LogicalWindow with multiple window groups
+/// into a chain of LogicalWindows, where each has exactly one window group.
+///
+/// This version correctly handles window expressions that refer to constants
+/// by shifting RexInputRef pointers as the input field count changes down the chain.
 public class PinotWindowSplitRule extends RelOptRule {
 
   public static final PinotWindowSplitRule INSTANCE = new PinotWindowSplitRule();
@@ -106,14 +104,12 @@ public class PinotWindowSplitRule extends RelOptRule {
     call.transformTo(currentInput);
   }
 
-  /**
-   * A RexShuttle that shifts indices of RexInputRefs that point to constants.
-   *
-   * A RexInputRef can point to an input field or a constant. If its index is >= originalInputFieldCount,
-   * it's a constant. When we chain windows, the input field count for subsequent windows increases,
-   * so we must shift the indices for these constant references to avoid them being misinterpreted
-   * as input field references.
-   */
+  /// A RexShuttle that shifts indices of RexInputRefs that point to constants.
+  ///
+  /// A RexInputRef can point to an input field or a constant. If its index is >= originalInputFieldCount,
+  /// it's a constant. When we chain windows, the input field count for subsequent windows increases,
+  /// so we must shift the indices for these constant references to avoid them being misinterpreted
+  /// as input field references.
   static class RexConstantRefShifter extends RexShuttle {
     private final int _originalInputFieldCount;
     private final int _shift;
@@ -155,9 +151,7 @@ public class PinotWindowSplitRule extends RelOptRule {
       return super.visitCall(call);
     }
 
-    /**
-     * Applies the shuttle to all expressions within a Window.Group.
-     */
+    /// Applies the shuttle to all expressions within a Window.Group.
     public Window.Group apply(Window.Group group) {
       List<Window.RexWinAggCall> newAggCalls = group.aggCalls.stream()
           .map(agg -> (Window.RexWinAggCall) agg.accept(this))

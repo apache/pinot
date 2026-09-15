@@ -28,16 +28,14 @@ import org.apache.pinot.controller.recommender.rules.io.configs.PartitionConfig;
 import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 
 
-/**
- * Manager for the overwritten configs in the input and output
- * overwritten configs:
- * Devs/sres/advanced user want to use the rule engine to recommend configs.
- * However, based on their experience or due to a special optimization for a use case,
- * they know that it will help to have inverted index on a particular column.
- * But they still want to run the engine to recommend inverted indexes on other columns (if applicable) and recommend
- * other configs (sorted, bloom etc).
- * The engine will do it's job of recommending by taking into account the overwritten config and honoring it.
- */
+/// Manager for the overwritten configs in the input and output
+/// overwritten configs:
+/// Devs/sres/advanced user want to use the rule engine to recommend configs.
+/// However, based on their experience or due to a special optimization for a use case,
+/// they know that it will help to have inverted index on a particular column.
+/// But they still want to run the engine to recommend inverted indexes on other columns (if applicable) and recommend
+/// other configs (sorted, bloom etc).
+/// The engine will do it's job of recommending by taking into account the overwritten config and honoring it.
 public class ConfigManager {
   SegmentSizeRecommendations _segmentSizeRecommendations;
   IndexConfig _indexConfig = new IndexConfig();

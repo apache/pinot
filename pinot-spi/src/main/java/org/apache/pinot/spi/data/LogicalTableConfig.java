@@ -32,26 +32,20 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Represents the configuration for a logical table in Pinot.
- *
- * <p>
- * <ul>
- *   <li><b>tableName</b>: The name of the logical table.</li>
- *   <li><b>physicalTableConfigMap</b>: A map of physical table names to their configurations.</li>
- *   <li><b>brokerTenant</b>: The tenant for the broker.</li>
- *   <li><b>queryConfig</b>: Configuration for query execution on the logical table.</li>
- *   <li><b>quotaConfig</b>: Configuration for quota management on the logical table.</li>
- *   <li><b>refOfflineTableName</b>: The name of the offline table whose table config is referenced by this logical
- *   table.</li>
- *   <li><b>refRealtimeTableName</b>: The name of the realtime table whose table config is referenced by this logical
- *   table.</li>
- *   <li><b>timeBoundaryConfig</b>: Configuration for time boundaries of the logical table. This is used to determine
- *   the time boundaries for queries on the logical table, especially in hybrid scenarios where both offline and
- *   realtime data are present.</li>
- * </ul>
- * </p>
- */
+/// Represents the configuration for a logical table in Pinot.
+///
+/// - **tableName**: The name of the logical table.
+/// - **physicalTableConfigMap**: A map of physical table names to their configurations.
+/// - **brokerTenant**: The tenant for the broker.
+/// - **queryConfig**: Configuration for query execution on the logical table.
+/// - **quotaConfig**: Configuration for quota management on the logical table.
+/// - **refOfflineTableName**: The name of the offline table whose table config is referenced by this logical
+///   table.
+/// - **refRealtimeTableName**: The name of the realtime table whose table config is referenced by this logical
+///   table.
+/// - **timeBoundaryConfig**: Configuration for time boundaries of the logical table. This is used to determine
+///   the time boundaries for queries on the logical table, especially in hybrid scenarios where both offline and
+///   realtime data are present.
 public class LogicalTableConfig extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -157,16 +151,12 @@ public class LogicalTableConfig extends BaseJsonConfig {
     return DEFAULT_MAPPER.valueToTree(this);
   }
 
-  /**
-   * Returns a single-line json string representation of the schema.
-   */
+  /// Returns a single-line json string representation of the schema.
   public String toSingleLineJsonString() {
     return toJsonObject().toString();
   }
 
-  /**
-   * Returns a pretty json string representation of the schema.
-   */
+  /// Returns a pretty json string representation of the schema.
   public String toPrettyJsonString() {
     try {
       return JsonUtils.objectToPrettyString(toJsonObject());

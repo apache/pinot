@@ -26,9 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * Dictionary of a single string value.
- */
+/// Dictionary of a single string value.
 public class ConstantValueStringDictionary extends BaseConstantValueDictionary {
   private final String _value;
   private final byte[] _bytes;

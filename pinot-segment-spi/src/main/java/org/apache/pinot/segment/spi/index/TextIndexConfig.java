@@ -114,10 +114,8 @@ public class TextIndexConfig extends IndexConfig {
         LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
   }
 
-  /**
-   * @deprecated Use the new constructor with storeInSegmentFile parameter instead.
-   * This constructor will be removed in a future version.
-   */
+  /// @deprecated Use the new constructor with storeInSegmentFile parameter instead.
+  /// This constructor will be removed in a future version.
   @Deprecated
   public TextIndexConfig(Boolean luceneUseCompoundFile, Object rawValue,
                         boolean noRawData, boolean enableQueryCache, List<String> stopWordsInclude,
@@ -195,17 +193,15 @@ public class TextIndexConfig extends IndexConfig {
     _storeInSegmentFile = storeInSegmentFile == null ? LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE : storeInSegmentFile;
   }
 
-  /**
-   * Parses the input value to a List of Strings.
-   * Handles both String (CSV format) and List<String> (from JSON array) inputs.
-   * This enables proper round-trip serialization/deserialization since the getter returns List<String>
-   * which Jackson serializes as a JSON array, but the original input format was CSV string.
-   *
-   * @param value the input value (can be String, List, or null)
-   * @param escapeComma if true, don't split on escaped commas when parsing String
-   * @param trim whether to trim each value
-   * @return parsed list of strings, empty list if input is null or empty
-   */
+  /// Parses the input value to a List of Strings.
+  /// Handles both String (CSV format) and List<String> (from JSON array) inputs.
+  /// This enables proper round-trip serialization/deserialization since the getter returns List<String>
+  /// which Jackson serializes as a JSON array, but the original input format was CSV string.
+  ///
+  /// @param value the input value (can be String, List, or null)
+  /// @param escapeComma if true, don't split on escaped commas when parsing String
+  /// @param trim whether to trim each value
+  /// @return parsed list of strings, empty list if input is null or empty
   @SuppressWarnings("unchecked")
   private static List<String> parseToList(final @Nullable Object value, final boolean escapeComma, final boolean trim) {
     if (value == null) {
@@ -233,11 +229,9 @@ public class TextIndexConfig extends IndexConfig {
     return _rawValueForTextIndex;
   }
 
-  /**
-   * Whether Lucene query result cache should be enabled.
-   *
-   * While it helps a lot with performance for repeated queries, on the downside it causes heap issues.
-   */
+  /// Whether Lucene query result cache should be enabled.
+  ///
+  /// While it helps a lot with performance for repeated queries, on the downside it causes heap issues.
   public boolean isEnableQueryCache() {
     return _enableQueryCache;
   }
@@ -254,56 +248,43 @@ public class TextIndexConfig extends IndexConfig {
     return _stopWordsExclude;
   }
 
-  /**
-   * Whether Lucene IndexWriter uses compound file format. Improves indexing speed but may cause file descriptor issues
-   */
+  /// Whether Lucene IndexWriter uses compound file format. Improves indexing speed but may cause file descriptor issues
   public boolean isLuceneUseCompoundFile() {
     return _luceneUseCompoundFile;
   }
 
-  /**
-   * Lucene buffer size. Helps with indexing speed but may cause heap issues
-   */
+  /// Lucene buffer size. Helps with indexing speed but may cause heap issues
   public int getLuceneMaxBufferSizeMB() {
     return _luceneMaxBufferSizeMB;
   }
 
-  /**
-   * Lucene analyzer fully qualified class name specifying which analyzer class to use for indexing
-   */
+  /// Lucene analyzer fully qualified class name specifying which analyzer class to use for indexing
   public String getLuceneAnalyzerClass() {
     return _luceneAnalyzerClass;
   }
 
-  /**
-   * Lucene analyzer arguments in String type. At runtime, the string representation are best-effort coerced into the
-   * proper type with the fully-qualified value type specified in luceneAnalyzerClassArgTypes
-   */
+  /// Lucene analyzer arguments in String type. At runtime, the string representation are best-effort coerced into the
+  /// proper type with the fully-qualified value type specified in luceneAnalyzerClassArgTypes
   public List<String> getLuceneAnalyzerClassArgs() {
     return _luceneAnalyzerClassArgs;
   }
 
-  /**
-   * Lucene analyzer fully qualified argument value types for each argument. At runtime, the values specified in the
-   * luceneAnalyserClassArgs (string representation) are best-effort coerced into the specified value type.
-   */
+  /// Lucene analyzer fully qualified argument value types for each argument. At runtime, the values specified in the
+  /// luceneAnalyserClassArgs (string representation) are best-effort coerced into the specified value type.
   public List<String> getLuceneAnalyzerClassArgTypes() {
     return _luceneAnalyzerClassArgTypes;
   }
 
-  /**
-   * Lucene query parser fully qualified class name specifying which lucene query parser class to use for query parsing
-   */
+  /// Lucene query parser fully qualified class name specifying which lucene query parser class to use for query parsing
   public String getLuceneQueryParserClass() {
     return _luceneQueryParserClass;
   }
 
-  /**
-   *  Whether to enable prefix and suffix wildcard term matching (i.e., .*value for prefix and value.* for suffix
-   *  term matching) in a phrase query. By default, Pinot today treats .* in a phrase query like ".*value str1 value.*"
-   *  as literal. If this flag is enabled, .*value will be treated as suffix matching and value.* will be treated as
-   *  prefix matching.
-   */
+  /// Whether to enable prefix and suffix wildcard term matching (i.e., .\*value for prefix and value.\* for suffix
+  /// term matching) in a phrase query. By default, Pinot today treats .\* in a phrase query like ".\*value str1
+  /// value.\*"
+  /// as literal. If this flag is enabled, .\*value will be treated as suffix matching and value.\* will be treated as
+  /// prefix matching.
   public boolean isEnablePrefixSuffixMatchingInPhraseQueries() {
     return _enablePrefixSuffixMatchingInPhraseQueries;
   }
@@ -328,11 +309,9 @@ public class TextIndexConfig extends IndexConfig {
     return _caseSensitive;
   }
 
-  /**
-   * Whether to store text index in segment file and cleanup the directory structure.
-   * @return true if text index should be stored in segment file and directory cleaned up,
-   *         false to keep directory structure
-   */
+  /// Whether to store text index in segment file and cleanup the directory structure.
+  /// @return true if text index should be stored in segment file and directory cleaned up,
+  ///         false to keep directory structure
   public boolean isStoreInSegmentFile() {
     return _storeInSegmentFile;
   }

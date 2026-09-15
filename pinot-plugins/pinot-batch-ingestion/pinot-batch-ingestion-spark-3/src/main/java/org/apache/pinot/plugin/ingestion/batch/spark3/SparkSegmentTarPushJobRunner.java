@@ -59,7 +59,7 @@ public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunn
           throws Exception {
         PluginManager.get().init();
         for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+          PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
               new PinotConfiguration(pinotFSSpec));
         }
         try {

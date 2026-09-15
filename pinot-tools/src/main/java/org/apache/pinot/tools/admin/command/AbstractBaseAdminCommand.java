@@ -39,11 +39,8 @@ import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 
-/**
- * Super class for all the commands.
- * Implements the common printUsage method.
- *
- */
+/// Super class for all the commands.
+/// Implements the common printUsage method.
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String URI_TABLES_PATH = "/tables/";

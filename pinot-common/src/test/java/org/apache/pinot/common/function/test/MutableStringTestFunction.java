@@ -21,9 +21,7 @@ package org.apache.pinot.common.function.test;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Test-only scalar function used to verify that stateful function instances are reused across evaluations.
- */
+/// Test-only scalar function used to verify that stateful function instances are reused across evaluations.
 @SuppressWarnings("unused")
 public class MutableStringTestFunction {
   private String _baseString = "";

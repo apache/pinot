@@ -169,13 +169,11 @@ public class InvertedIndexType
     private ReaderFactory() {
     }
 
-    /**
-     * Creates a {@link InvertedIndexReader}.
-     *
-     * Unless {@link #createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)}, this method first try to use the
-     * forward index reader in case it is also an inverted index. That is the case, for example, when the column is
-     * sorted and single value.
-     */
+    /// Creates a [InvertedIndexReader].
+    ///
+    /// Unless [#createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)], this method first try to use the
+    /// forward index reader in case it is also an inverted index. That is the case, for example, when the column is
+    /// sorted and single value.
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
@@ -197,12 +195,10 @@ public class InvertedIndexType
       }
     }
 
-    /**
-     * Directly creates a {@link InvertedIndexReader}.
-     *
-     * Unless {@link #createIndexReader}, this method always tries to create the actual inverted index reader instead of
-     * try to use the forward index when the column is sorted and single value.
-     */
+    /// Directly creates a [InvertedIndexReader].
+    ///
+    /// Unless [#createIndexReader], this method always tries to create the actual inverted index reader instead
+    /// of try to use the forward index when the column is sorted and single value.
     public InvertedIndexReader createSkippingForward(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
         throws IOException {
       if (!metadata.hasDictionary()) {

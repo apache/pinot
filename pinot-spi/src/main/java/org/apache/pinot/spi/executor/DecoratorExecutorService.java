@@ -31,20 +31,18 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 
-/**
- * DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
- * functionality.
- *
- * Specifically, all tasks submitted to the ExecutorService are decorated before they are executed.
- * This allows to add functionality before and after the task is executed without modifying the task itself.
- *
- * For example, {@link MdcExecutor} uses this to set the MDC context before the task is executed and clear it after the
- * execution without having to modify the task itself. Implementations may also use {@link BeforeAfter} instead of this
- * class, given it already includes methods to be executed before and after the task without having to deal with the
- * decoration process.
- *
- * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
- */
+/// DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
+/// functionality.
+///
+/// Specifically, all tasks submitted to the ExecutorService are decorated before they are executed.
+/// This allows to add functionality before and after the task is executed without modifying the task itself.
+///
+/// For example, [MdcExecutor] uses this to set the MDC context before the task is executed and clear it after the
+/// execution without having to modify the task itself. Implementations may also use [BeforeAfter] instead of this
+/// class, given it already includes methods to be executed before and after the task without having to deal with the
+/// decoration process.
+///
+/// TODO: Convert this class and its usages into an Executor instead of an ExecutorService
 public abstract class DecoratorExecutorService implements ExecutorService {
   protected final ExecutorService _executorService;
   private final Consumer<Future<?>> _onSubmit;
@@ -58,44 +56,36 @@ public abstract class DecoratorExecutorService implements ExecutorService {
     _onSubmit = onSubmit;
   }
 
-  /**
-   * Decorates the callable task.
-   *
-   * This method is called by the submit, invokeAll, and invokeAny methods to decorate the task before it is executed.
-   *
-   * Usually implementations should return a new Callable that wraps the received task. The new Callable should call the
-   * received task in its call method, and do whatever is needed before and after the call.
-   *
-   * For example {@link MdcExecutor} uses this to set the MDC context before the task is executed and clear it after the
-   * execution without having to modify the task itself.
-   *
-   * There are three important places to decorate or intercept the task:
-   *
-   * <ol>
-   *   <li>At the beginning of the task execution. This is done by executing code inside the decorator Callable before
-   *   calling the task.call() method.</li>
-   *   <li>At the end of the task execution. This is done by executing code inside the decorator Callable after calling
-   *   the task.call() method.</li>
-   *   <li>Before the task is submitted to the executor. This is done by executing code directly in this method.
-   *   For example, one implementation could use that to count how many tasks have been submitted to the executor<./li>
-   * </ol>
-   *
-   * @param task the actual task that has to be executed
-   * @return the decorated task
-   */
+  /// Decorates the callable task.
+  ///
+  /// This method is called by the submit, invokeAll, and invokeAny methods to decorate the task before it is executed.
+  ///
+  /// Usually implementations should return a new Callable that wraps the received task. The new Callable should call
+  /// the received task in its call method, and do whatever is needed before and after the call.
+  ///
+  /// For example [MdcExecutor] uses this to set the MDC context before the task is executed and clear it after
+  /// the execution without having to modify the task itself.
+  ///
+  /// There are three important places to decorate or intercept the task:
+  ///
+  /// 1. At the beginning of the task execution. This is done by executing code inside the decorator Callable before
+  ///    calling the task.call() method.
+  /// 2. At the end of the task execution. This is done by executing code inside the decorator Callable after calling
+  ///    the task.call() method.
+  /// 3. Before the task is submitted to the executor. This is done by executing code directly in this method.
+  ///    For example, one implementation could use that to count how many tasks have been submitted to the
+  ///    executor<./li>
+  ///
+  /// @param task the actual task that has to be executed
+  /// @return the decorated task
   protected abstract <T> Callable<T> decorate(Callable<T> task);
 
-  /**
-   * Like {@link #decorate(Callable)} but for Runnable tasks.
-   */
+  /// Like [#decorate(Callable)] but for Runnable tasks.
   protected abstract Runnable decorate(Runnable task);
 
-  /**
-   *
-   * @param tasks
-   * @return
-   * @param <T>
-   */
+  /// @param tasks
+  /// @return
+  /// @param <T>
   protected <T> Collection<? extends Callable<T>> decorateTasks(Collection<? extends Callable<T>> tasks) {
     return tasks.stream().map(this::decorate).collect(Collectors.toList());
   }
@@ -189,21 +179,15 @@ public abstract class DecoratorExecutorService implements ExecutorService {
       super(executorService);
     }
 
-    /**
-     * Called before the runnable/callable is executed
-     */
+    /// Called before the runnable/callable is executed
     public abstract void before();
 
-    /**
-     * Called after the runnable/callable is executed, only if it was successful
-     */
+    /// Called after the runnable/callable is executed, only if it was successful
     public abstract void afterSuccess();
 
-    /**
-     * Called after the runnable/callable is executed, even if it fails.
-     * This is the equivalent to a finally block in a try/catch (but cannot be called finally because it is a reserved
-     * keyword in Java).
-     */
+    /// Called after the runnable/callable is executed, even if it fails.
+    /// This is the equivalent to a finally block in a try/catch (but cannot be called finally because it is a reserved
+    /// keyword in Java).
     public abstract void afterAnything();
 
     @Override

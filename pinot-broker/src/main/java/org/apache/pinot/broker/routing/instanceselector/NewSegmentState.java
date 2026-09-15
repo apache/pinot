@@ -22,9 +22,7 @@ import java.util.List;
 import javax.annotation.concurrent.Immutable;
 
 
-/**
- * Contains the push time and candidate instances for a new segment.
- */
+/// Contains the push time and candidate instances for a new segment.
 @Immutable
 public class NewSegmentState {
   // Segment creation time. This could be

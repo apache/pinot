@@ -30,9 +30,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 
 
-/**
- * Contains function to convert a datatype to another datatype.
- */
+/// Contains function to convert a datatype to another datatype.
 public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
   }
@@ -103,74 +101,60 @@ public class DataTypeConversionFunctions {
     return targetDataType.convert(value, sourceType);
   }
 
-  /**
-   * Converts {@link BigDecimal} to bytes.
-   * Only scale of upto 2 bytes is supported by the function
-   * @param bigDecimal big decimal number
-   * @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
-   * ENDIAN order.
-   */
+  /// Converts [BigDecimal] to bytes.
+  /// Only scale of upto 2 bytes is supported by the function
+  /// @param bigDecimal big decimal number
+  /// @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
+  /// ENDIAN order.
   @ScalarFunction
   public static byte[] bigDecimalToBytes(BigDecimal bigDecimal) {
     return BigDecimalUtils.serialize(bigDecimal);
   }
 
-  /**
-   * Converts serialized {@link BigDecimal} bytes to value.
-   * @param bytes array that contains the bytes of the unscaled value appended to 2 bytes of the scale in BIG ENDIAN
-   *              order.
-   * @return big decimal number
-   */
+  /// Converts serialized [BigDecimal] bytes to value.
+  /// @param bytes array that contains the bytes of the unscaled value appended to 2 bytes of the scale in BIG ENDIAN
+  ///              order.
+  /// @return big decimal number
   @ScalarFunction
   public static BigDecimal bytesToBigDecimal(byte[] bytes) {
     return BigDecimalUtils.deserialize(bytes);
   }
 
-  /**
-   * convert simple hex string to byte array
-   * @param hex a plain hex string e.g. 'f0e1a3b2'
-   * @return byte array representation of hex string
-   */
+  /// convert simple hex string to byte array
+  /// @param hex a plain hex string e.g. 'f0e1a3b2'
+  /// @return byte array representation of hex string
   @ScalarFunction
   public static byte[] hexToBytes(String hex) {
     return BytesUtils.toBytes(hex);
   }
 
-  /**
-   * convert simple bytes array to hex string
-   * @param bytes any byte array
-   * @return plain hex string e.g. 'f012be3c'
-   */
+  /// convert simple bytes array to hex string
+  /// @param bytes any byte array
+  /// @return plain hex string e.g. 'f012be3c'
   @ScalarFunction
   public static String bytesToHex(byte[] bytes) {
     return BytesUtils.toHexString(bytes);
   }
 
-  /**
-   * Encodes bytes using {@link Base64}.
-   * @param input original bytes
-   * @return base64 encoded bytes
-   */
+  /// Encodes bytes using [Base64].
+  /// @param input original bytes
+  /// @return base64 encoded bytes
   @ScalarFunction
   public static byte[] base64Encode(byte[] input) {
     return Base64.getEncoder().encode(input);
   }
 
-  /**
-   * Decodes {@link Base64} encoded bytes.
-   * @param input base64 encoded bytes
-   * @return decoded bytes
-   */
+  /// Decodes [Base64] encoded bytes.
+  /// @param input base64 encoded bytes
+  /// @return decoded bytes
   @ScalarFunction
   public static byte[] base64Decode(byte[] input) {
     return Base64.getDecoder().decode(input);
   }
 
-  /**
-   * Converts a hex string to the corresponded long value.
-   * @param input hex decimal string
-   * @return decoded long value
-   */
+  /// Converts a hex string to the corresponded long value.
+  /// @param input hex decimal string
+  /// @return decoded long value
   @ScalarFunction
   public static long hexDecimalToLong(String input) {
     if (input.startsWith("0x")) {
@@ -179,11 +163,9 @@ public class DataTypeConversionFunctions {
     return Long.parseLong(input, 16);
   }
 
-  /**
-   * Converts a long value to corresponded hex decimal string
-   * @param input long value
-   * @return encoded hex decimal string
-   */
+  /// Converts a long value to corresponded hex decimal string
+  /// @param input long value
+  /// @return encoded hex decimal string
   @ScalarFunction
   public static String longToHexDecimal(long input) {
     return Long.toHexString(input);

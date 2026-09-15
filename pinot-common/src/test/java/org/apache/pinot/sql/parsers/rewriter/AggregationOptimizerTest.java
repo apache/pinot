@@ -682,18 +682,14 @@ public class AggregationOptimizerTest {
     }
   }
 
-  /**
-   * Helper to assert the top-level function operator of an expression.
-   */
+  /// Helper to assert the top-level function operator of an expression.
   private void assertTopLevelOperator(Expression expression, String expectedOperator) {
     Function functionCall = expression.getFunctionCall();
     assertNotNull(functionCall);
     assertEquals(functionCall.getOperator(), expectedOperator);
   }
 
-  /**
-   * Verifies that the expression is optimized to: sum(column) + constant * count(column)
-   */
+  /// Verifies that the expression is optimized to: sum(column) + constant \* count(column)
   private void verifyOptimizedAddition(Expression expression, String columnName, int constantValue) {
     Function function = expression.getFunctionCall();
     assertNotNull(function);
@@ -722,9 +718,7 @@ public class AggregationOptimizerTest {
     assertEquals(countOperand.getIdentifier().getName(), columnName);
   }
 
-  /**
-   * Verifies that the expression is optimized to: sum(column) + constant * count(column) for float constants
-   */
+  /// Verifies that the expression is optimized to: sum(column) + constant \* count(column) for float constants
   private void verifyOptimizedFloatAddition(Expression expression, String columnName, double constantValue) {
     Function function = expression.getFunctionCall();
     assertNotNull(function);
@@ -752,9 +746,7 @@ public class AggregationOptimizerTest {
     assertEquals(countOperand.getIdentifier().getName(), columnName);
   }
 
-  /**
-   * Verifies that the expression is optimized to: sum(column) - constant * count(column)
-   */
+  /// Verifies that the expression is optimized to: sum(column) - constant \* count(column)
   private void verifyOptimizedSubtraction(Expression expression, String columnName, int constantValue) {
     Function function = expression.getFunctionCall();
     assertNotNull(function);
@@ -782,9 +774,7 @@ public class AggregationOptimizerTest {
     assertEquals(countOperand.getIdentifier().getName(), columnName);
   }
 
-  /**
-   * Verifies that the expression is optimized to: constant * count(column) - sum(column)
-   */
+  /// Verifies that the expression is optimized to: constant \* count(column) - sum(column)
   private void verifyOptimizedSubtractionReversed(Expression expression, int constantValue, String columnName) {
     Function function = expression.getFunctionCall();
     assertNotNull(function);

@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.spi.accounting;
 
-/**
- * ThreadResourceSnapshot is a utility class that helps to track the CPU time and memory allocated.
- * {@link ThreadResourceUsageProvider} provides cumulative CPU time and memory allocated for the current thread.
- * This class uses that provider to snapshot start for a task executed by that thread.
- */
+/// ThreadResourceSnapshot is a utility class that helps to track the CPU time and memory allocated.
+/// [ThreadResourceUsageProvider] provides cumulative CPU time and memory allocated for the current thread.
+/// This class uses that provider to snapshot start for a task executed by that thread.
 public class ThreadResourceSnapshot {
   private long _startCpuTime;
   private long _startAllocatedBytes;
 
-  /**
-   * Creates a new tracker and takes initial snapshots.
-   */
+  /// Creates a new tracker and takes initial snapshots.
   public ThreadResourceSnapshot() {
     reset();
   }
@@ -39,18 +35,14 @@ public class ThreadResourceSnapshot {
     _startAllocatedBytes = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
   }
 
-  /**
-   * Gets the CPU time used so far in nanoseconds.
-   * This is the difference between the current CPU time and the start CPU time.
-   */
+  /// Gets the CPU time used so far in nanoseconds.
+  /// This is the difference between the current CPU time and the start CPU time.
   public long getCpuTimeNs() {
     return ThreadResourceUsageProvider.getCurrentThreadCpuTime() - _startCpuTime;
   }
 
-  /**
-   * Gets the memory allocated so far in bytes.
-   * This is the difference between the current allocated bytes and the start allocated bytes.
-   */
+  /// Gets the memory allocated so far in bytes.
+  /// This is the difference between the current allocated bytes and the start allocated bytes.
   public long getAllocatedBytes() {
     return ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() - _startAllocatedBytes;
   }

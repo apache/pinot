@@ -85,30 +85,26 @@ public class RecordReaderFactory {
     register(FileFormat.ARROW, DEFAULT_ARROW_RECORD_READER_CLASS, DEFAULT_ARROW_RECORD_READER_CONFIG_CLASS);
   }
 
-  /**
-   * Construct a RecordReaderConfig instance from a given file path.
-   *
-   * @param recordReaderConfigClassName
-   * @param readerConfigFile
-   * @return
-   * @throws IOException
-   * @throws ClassNotFoundException
-   */
+  /// Construct a RecordReaderConfig instance from a given file path.
+  ///
+  /// @param recordReaderConfigClassName
+  /// @param readerConfigFile
+  /// @return
+  /// @throws IOException
+  /// @throws ClassNotFoundException
   public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
       String readerConfigFile)
       throws IOException, ClassNotFoundException {
     return getRecordReaderConfigByClassName(recordReaderConfigClassName, new File(readerConfigFile));
   }
 
-  /**
-   * Construct a RecordReaderConfig instance from a given file.
-   *
-   * @param recordReaderConfigClassName
-   * @param readerConfigFile
-   * @return
-   * @throws IOException
-   * @throws ClassNotFoundException
-   */
+  /// Construct a RecordReaderConfig instance from a given file.
+  ///
+  /// @param recordReaderConfigClassName
+  /// @param readerConfigFile
+  /// @return
+  /// @throws IOException
+  /// @throws ClassNotFoundException
   public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
       File readerConfigFile)
       throws IOException, ClassNotFoundException {
@@ -118,14 +114,12 @@ public class RecordReaderFactory {
     return recordReaderConfig;
   }
 
-  /**
-   * Construct a RecordReaderConfig instance from a given file.
-   *
-   * @param fileFormat
-   * @param readerConfigFile
-   * @return a RecordReaderConfig instance
-   * @throws Exception
-   */
+  /// Construct a RecordReaderConfig instance from a given file.
+  ///
+  /// @param fileFormat
+  /// @param readerConfigFile
+  /// @return a RecordReaderConfig instance
+  /// @throws Exception
   public static RecordReaderConfig getRecordReaderConfig(FileFormat fileFormat, String readerConfigFile)
       throws Exception {
     String fileFormatKey = fileFormat.name().toUpperCase();
@@ -136,9 +130,7 @@ public class RecordReaderFactory {
     throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
   }
 
-  /**
-   * Creates a {@link RecordReaderConfig} instance using file format and reader config properties
-   */
+  /// Creates a [RecordReaderConfig] instance using file format and reader config properties
   public static RecordReaderConfig getRecordReaderConfig(FileFormat fileFormat, Map<String, String> configs)
       throws ClassNotFoundException, IOException {
     String readerConfigClassName = getRecordReaderConfigClassName(fileFormat.toString());
@@ -150,9 +142,7 @@ public class RecordReaderFactory {
     return null;
   }
 
-  /**
-   * Constructs and initializes a RecordReader based on the given RecordReader class name and config.
-   */
+  /// Constructs and initializes a RecordReader based on the given RecordReader class name and config.
   public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile,
       Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
@@ -161,18 +151,14 @@ public class RecordReaderFactory {
     return recordReader;
   }
 
-  /**
-   * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
-   */
+  /// Constructs and initializes a RecordReader based on the given file format and RecordReader config.
   public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
       @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     return getRecordReader(fileFormat.name(), dataFile, fieldsToRead, recordReaderConfig);
   }
 
-  /**
-   * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
-   */
+  /// Constructs and initializes a RecordReader based on the given file format and RecordReader config.
   public static RecordReader getRecordReader(String fileFormat, File dataFile, Set<String> fieldsToRead,
       @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
@@ -183,22 +169,18 @@ public class RecordReaderFactory {
     return getRecordReaderByClass(recordReaderClassName, dataFile, fieldsToRead, recordReaderConfig);
   }
 
-  /**
-   * Get registered RecordReader class name given a file format string.
-   *
-   * @param fileFormatStr the file format string (case-insensitive)
-   * @return recordReaderClassName or null if not found
-   */
+  /// Get registered RecordReader class name given a file format string.
+  ///
+  /// @param fileFormatStr the file format string (case-insensitive)
+  /// @return recordReaderClassName or null if not found
   public static String getRecordReaderClassName(String fileFormatStr) {
     return DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormatStr.toUpperCase());
   }
 
-  /**
-   * Get registered RecordReaderConfig class name given a file format string.
-   *
-   * @param fileFormatStr the file format string (case-insensitive)
-   * @return recordReaderConfigClassName or null if not found
-   */
+  /// Get registered RecordReaderConfig class name given a file format string.
+  ///
+  /// @param fileFormatStr the file format string (case-insensitive)
+  /// @return recordReaderConfigClassName or null if not found
   public static String getRecordReaderConfigClassName(String fileFormatStr) {
     return DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatStr.toUpperCase());
   }

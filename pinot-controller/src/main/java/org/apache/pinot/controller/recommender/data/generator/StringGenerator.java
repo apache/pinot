@@ -24,9 +24,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Sep 12, 2014
- */
+/// Sep 12, 2014
 
 public class StringGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;

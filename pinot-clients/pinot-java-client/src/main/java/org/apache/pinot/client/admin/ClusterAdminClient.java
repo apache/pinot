@@ -27,9 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-/**
- * Client for cluster-level administration operations.
- */
+/// Client for cluster-level administration operations.
 public class ClusterAdminClient extends BaseServiceAdminClient {
 
   public ClusterAdminClient(PinotAdminTransport transport, String controllerAddress,
@@ -43,9 +41,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Updates a single cluster configuration entry.
-   */
+  /// Updates a single cluster configuration entry.
   public String updateClusterConfig(String configName, @Nullable String configValue)
       throws PinotAdminException {
     try {
@@ -56,9 +52,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
     }
   }
 
-  /**
-   * Gets all cluster configurations.
-   */
+  /// Gets all cluster configurations.
   public String getClusterConfigs()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/cluster/configs", null, _headers);
@@ -72,9 +66,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Runs a periodic task cluster-wide.
-   */
+  /// Runs a periodic task cluster-wide.
   public String runPeriodicTask(String taskName)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("taskname", taskName);
@@ -82,9 +74,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Runs a periodic task for a specific table and type.
-   */
+  /// Runs a periodic task for a specific table and type.
   public String runPeriodicTask(String taskName, @Nullable String tableName, @Nullable String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -99,9 +89,7 @@ public class ClusterAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches controller application configurations.
-   */
+  /// Fetches controller application configurations.
   public PinotAppConfigs getAppConfigs()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/appconfigs", null, _headers);

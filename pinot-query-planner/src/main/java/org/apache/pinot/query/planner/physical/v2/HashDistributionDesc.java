@@ -28,14 +28,11 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 
 
-/**
- * Descriptor for hash distribution of data.
- * <p>
- *   <b>Example:</b> Say a given plan node will have n streams of data in the output. Then, if the
- *   {@link #_keys} is [3, 1], {@link #_hashFunction} is "Murmur" and {@link #_numPartitions} is 5,
- *   then the record to stream mapping can be determined using (Murmur(valueAtIndex3, valueAtIndex1) % 5) % n.
- * </p>
- */
+/// Descriptor for hash distribution of data.
+///
+///   **Example:** Say a given plan node will have n streams of data in the output. Then, if the
+///   [#_keys] is \[3, 1\], [#_hashFunction] is "Murmur" and [#_numPartitions] is 5,
+///   then the record to stream mapping can be determined using (Murmur(valueAtIndex3, valueAtIndex1) % 5) % n.
 public class HashDistributionDesc {
   private final int _cachedHashCode;
   private final List<Integer> _keys;
@@ -61,10 +58,8 @@ public class HashDistributionDesc {
     return _numPartitions;
   }
 
-  /**
-   * Returns the hash distribution descriptor for the given target mapping, or {@code null} if we can't preserve
-   * partitioning info.
-   */
+  /// Returns the hash distribution descriptor for the given target mapping, or `null` if we can't preserve
+  /// partitioning info.
   public Set<HashDistributionDesc> apply(PinotDistMapping mapping) {
     for (Integer currentKey : _keys) {
       if (currentKey >= mapping.getSourceCount() || CollectionUtils.isEmpty(mapping.getTargets(currentKey))) {

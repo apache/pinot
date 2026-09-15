@@ -29,19 +29,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_T
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
 
 
-/**
- * Utility class to centralize all metrics reporting for the Pinot server.
- *
- */
+/// Utility class to centralize all metrics reporting for the Pinot server.
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
   private static final ServerMetrics NOOP = new ServerMetrics(new NoopPinotMetricsRegistry());
 
   private static final AtomicReference<ServerMetrics> SERVER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 
-  /**
-   * register the serverMetrics onto this class, so that we don't need to pass it down as a parameter
-   */
+  /// register the serverMetrics onto this class, so that we don't need to pass it down as a parameter
   public static boolean register(ServerMetrics serverMetrics) {
     return SERVER_METRICS_INSTANCE.compareAndSet(NOOP, serverMetrics);
   }
@@ -51,9 +46,7 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
     SERVER_METRICS_INSTANCE.set(NOOP);
   }
 
-  /**
-   * should always call after registration
-   */
+  /// should always call after registration
   public static ServerMetrics get() {
     return SERVER_METRICS_INSTANCE.get();
   }

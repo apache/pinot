@@ -31,9 +31,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 
 
-/**
- * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
- */
+/// This utility class serialize/deserialize between [Worker.StagePlan] elements to Planner elements.
 public class QueryPlanSerDeUtils {
   private QueryPlanSerDeUtils() {
   }

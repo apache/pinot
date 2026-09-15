@@ -19,15 +19,17 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class AndFilterOperatorTest {
@@ -44,9 +46,9 @@ public class AndFilterOperatorTest {
     AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
-    Assert.assertEquals(iterator.next(), 3);
-    Assert.assertEquals(iterator.next(), 28);
-    Assert.assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.next(), 3);
+    assertEquals(iterator.next(), 28);
+    assertEquals(iterator.next(), Constants.EOF);
   }
 
   @Test
@@ -63,9 +65,9 @@ public class AndFilterOperatorTest {
     AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
-    Assert.assertEquals(iterator.next(), 3);
-    Assert.assertEquals(iterator.next(), 6);
-    Assert.assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.next(), 3);
+    assertEquals(iterator.next(), 6);
+    assertEquals(iterator.next(), Constants.EOF);
   }
 
   @Test
@@ -86,9 +88,9 @@ public class AndFilterOperatorTest {
     AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
-    Assert.assertEquals(iterator.next(), 3);
-    Assert.assertEquals(iterator.next(), 6);
-    Assert.assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.next(), 3);
+    assertEquals(iterator.next(), 6);
+    assertEquals(iterator.next(), Constants.EOF);
   }
 
   @Test
@@ -122,18 +124,18 @@ public class AndFilterOperatorTest {
     AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2, null, numDocs, false);
     BlockDocIdIterator iterator1 = andFilterOperator1.getNextBlock().getBlockDocIdSet().iterator();
     BlockDocIdIterator iterator2 = andFilterOperator2.getNextBlock().getBlockDocIdSet().iterator();
-    Assert.assertEquals(iterator1.next(), 0);
-    Assert.assertEquals(iterator1.next(), 60);
-    Assert.assertEquals(iterator1.next(), 120);
-    Assert.assertEquals(iterator1.next(), 180);
+    assertEquals(iterator1.next(), 0);
+    assertEquals(iterator1.next(), 60);
+    assertEquals(iterator1.next(), 120);
+    assertEquals(iterator1.next(), 180);
 
-    Assert.assertEquals(iterator2.next(), 0);
-    Assert.assertEquals(iterator2.next(), 60);
-    Assert.assertEquals(iterator2.next(), 120);
-    Assert.assertEquals(iterator2.next(), 180);
+    assertEquals(iterator2.next(), 0);
+    assertEquals(iterator2.next(), 60);
+    assertEquals(iterator2.next(), 120);
+    assertEquals(iterator2.next(), 180);
 
     for (int i = 0; i < numDocs / 10; i++) {
-      Assert.assertEquals(iterator1.next(), iterator2.next());
+      assertEquals(iterator1.next(), iterator2.next());
     }
   }
 
@@ -155,11 +157,11 @@ public class AndFilterOperatorTest {
     AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
-    Assert.assertEquals(iterator.next(), 2);
-    Assert.assertEquals(iterator.next(), 3);
-    Assert.assertEquals(iterator.next(), 6);
-    Assert.assertEquals(iterator.next(), 28);
-    Assert.assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.next(), 2);
+    assertEquals(iterator.next(), 3);
+    assertEquals(iterator.next(), 6);
+    assertEquals(iterator.next(), 28);
+    assertEquals(iterator.next(), Constants.EOF);
   }
 
   @Test
@@ -171,11 +173,11 @@ public class AndFilterOperatorTest {
     int[] nullDocIds2 = new int[]{3, 4, 5, 6, 7};
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
   }
 
   @Test
@@ -187,11 +189,11 @@ public class AndFilterOperatorTest {
     int[] nullDocIds2 = new int[]{};
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, false);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(0));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(1, 2, 3));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(0));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(1, 2, 3));
   }
 
   @Test
@@ -201,11 +203,11 @@ public class AndFilterOperatorTest {
     int[] nullDocIds1 = new int[]{4, 5, 6};
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of());
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of());
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
 
@@ -216,23 +218,23 @@ public class AndFilterOperatorTest {
     int[] nullDocIds1 = new int[]{4, 5, 6};
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), List.of(1, 2, 3));
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of(0, 7, 8, 9));
   }
 
   @Test
   public void testAndWithAllMatchesAll() {
     int numDocs = 10;
     AndFilterOperator andFilterOperator =
-        new AndFilterOperator(Arrays.asList(new MatchAllFilterOperator(numDocs), new MatchAllFilterOperator(numDocs)),
+        new AndFilterOperator(List.of(new MatchAllFilterOperator(numDocs), new MatchAllFilterOperator(numDocs)),
             null, numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of());
+    assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), List.of());
   }
 
   @Test
@@ -242,12 +244,12 @@ public class AndFilterOperatorTest {
     int[] emptyDocIds = new int[0];
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(
+        List.of(
             new TestFilterOperator(regularDocIds, numDocs),
             new TestFilterOperator(emptyDocIds, numDocs)
         ), null, numDocs, false);
 
-    Assert.assertEquals((andFilterOperator.getTrues()).getOptimizedDocIdSet(), EmptyDocIdSet.getInstance());
+    assertEquals((andFilterOperator.getTrues()).getOptimizedDocIdSet(), EmptyDocIdSet.getInstance());
   }
 
   @Test
@@ -256,11 +258,76 @@ public class AndFilterOperatorTest {
     int numDocs2 = 50;
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
-        Arrays.asList(
+        List.of(
             new MatchAllFilterOperator(numDocs),
             new MatchAllFilterOperator(numDocs2)
         ), null, numDocs, false);
 
-    Assert.assertTrue(andFilterOperator.getTrues() instanceof MatchAllDocIdSet);
+    assertTrue(andFilterOperator.getTrues() instanceof MatchAllDocIdSet);
+  }
+
+  @Test
+  public void testCanProduceBitmapsWhenAllChildrenCan() {
+    int numDocs = 40;
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10), bitmapOp(numDocs, false, 3, 10, 20)), null, numDocs, false);
+    assertTrue(andOperator.canProduceBitmaps());
+    assertTrue(andOperator.canOptimizeCount());
+  }
+
+  @Test
+  public void testCannotProduceBitmapsWhenAnyChildCannot() {
+    int numDocs = 40;
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10), new TestFilterOperator(new int[]{3, 10, 20}, numDocs)), null,
+        numDocs, false);
+    assertFalse(andOperator.canProduceBitmaps());
+    assertFalse(andOperator.canOptimizeCount());
+  }
+
+  @Test
+  public void testGetBitmapsIntersectionForTwoChildren() {
+    int numDocs = 40;
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10, 15, 16, 28), bitmapOp(numDocs, false, 3, 6, 8, 20, 28)), null,
+        numDocs, false);
+    assertEquals(andOperator.getBitmaps().reduce().toArray(), new int[]{3, 28});
+  }
+
+  @Test
+  public void testGetBitmapsIntersectionForThreeChildren() {
+    int numDocs = 40;
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 6, 10, 15, 16, 28), bitmapOp(numDocs, false, 3, 6, 8, 20, 28),
+            bitmapOp(numDocs, false, 1, 2, 3, 6, 30)), null, numDocs, false);
+    assertEquals(andOperator.getBitmaps().reduce().toArray(), new int[]{3, 6});
+  }
+
+  @Test
+  public void testGetBitmapsWithExclusiveChild() {
+    int numDocs = 10;
+    // Second child is exclusive: it matches every doc except {2, 4}, so reduce() must materialize its complement
+    // before the intersection. The AND is {1, 2, 3, 4, 5} minus {2, 4}.
+    AndFilterOperator andOperator = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 1, 2, 3, 4, 5), bitmapOp(numDocs, true, 2, 4)), null, numDocs, false);
+    assertEquals(andOperator.getBitmaps().reduce().toArray(), new int[]{1, 3, 5});
+  }
+
+  @Test
+  public void testGetBitmapsWithNestedAnd() {
+    int numDocs = 40;
+    AndFilterOperator childAnd = new AndFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 6, 28), bitmapOp(numDocs, false, 3, 6, 8, 28)), null, numDocs,
+        false);
+    AndFilterOperator andOperator =
+        new AndFilterOperator(List.of(childAnd, bitmapOp(numDocs, false, 3, 6, 30)), null, numDocs, false);
+    assertTrue(andOperator.canProduceBitmaps());
+    assertEquals(andOperator.getBitmaps().reduce().toArray(), new int[]{3, 6});
+  }
+
+  private static BitmapBasedFilterOperator bitmapOp(int numDocs, boolean exclusive, int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return new BitmapBasedFilterOperator(bitmap.toImmutableRoaringBitmap(), exclusive, numDocs);
   }
 }

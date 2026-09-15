@@ -25,10 +25,8 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * SameValueMutableForwardIndex is used to wrap any MutableForwardIndex, but store the same value. This is done to
- * allow noRawDataForTextIndex config to work with mutable indexes.
- */
+/// SameValueMutableForwardIndex is used to wrap any MutableForwardIndex, but store the same value. This is done to
+/// allow noRawDataForTextIndex config to work with mutable indexes.
 public class SameValueMutableForwardIndex implements MutableForwardIndex {
   private final String _actualValue;
   private final Object[] _actualValues;

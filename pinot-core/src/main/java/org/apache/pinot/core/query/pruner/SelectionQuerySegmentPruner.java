@@ -39,23 +39,18 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Segment pruner for selection queries.
- * <ul>
- *   <li>For selection query with LIMIT 0, keep 1 segment to create the data schema</li>
- *   <li>For selection only query without filter, keep enough documents to fulfill the LIMIT requirement</li>
- *   <li>
- *     For selection order-by query, if the first order-by expression is an identifier (column), prune segments based on
- *     the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement. This works both
- *     without a filter and with a filter: with a filter, each segment contributes towards the LIMIT only the number of
- *     rows that <em>provably</em> match the filter based on min/max metadata (its total docs if it fully matches, 0
- *     otherwise). Using this lower bound on matching rows keeps the boundary safe, so segments are never pruned when
- *     they might still hold a top-n matching row. The optimization is skipped when null handling is active for the
- *     order-by/predicate columns because nulls are stored as a default value that pollutes the min/max metadata
- *     (see #18685).
- *   </li>
- * </ul>
- */
+/// Segment pruner for selection queries.
+///
+/// - For selection query with LIMIT 0, keep 1 segment to create the data schema
+/// - For selection only query without filter, keep enough documents to fulfill the LIMIT requirement
+/// - For selection order-by query, if the first order-by expression is an identifier (column), prune segments based
+///   on the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement. This works
+///   both without a filter and with a filter: with a filter, each segment contributes towards the LIMIT only the
+///   number of rows that _provably_ match the filter based on min/max metadata (its total docs if it fully
+///   matches, 0 otherwise). Using this lower bound on matching rows keeps the boundary safe, so segments are never
+///   pruned when they might still hold a top-n matching row. The optimization is skipped when null handling is active
+///   for the order-by/predicate columns because nulls are stored as a default value that pollutes the min/max
+///   metadata (see #18685).
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SelectionQuerySegmentPruner implements SegmentPruner {
 
@@ -97,8 +92,12 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
       return List.of(segments.get(0));
     }
 
-    // Skip pruning segments for upsert table because valid doc index is equivalent to a filter
-    if (segments.get(0).getValidDocIds() != null) {
+    // Skip pruning when a post-selection doc mask makes the raw total-doc count overstate the surviving rows, which
+    // would otherwise under-return under LIMIT. Both signals are set uniformly across a table's segments, so the
+    // first segment suffices: upsert's valid-doc index, or an externally-supplied deleted-doc set. Skipping keeps
+    // results correct -- every segment is still scanned and the mask applied during the scan.
+    IndexSegment firstSegment = segments.get(0);
+    if (firstSegment.getValidDocIds() != null || firstSegment.hasDeletedDocIds()) {
       return segments;
     }
 
@@ -111,10 +110,9 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     }
   }
 
-  /**
-   * Helper method to prune segments for selection only queries without filter.
-   * <p>We just need to keep enough documents to fulfill the LIMIT requirement.
-   */
+  /// Helper method to prune segments for selection only queries without filter.
+  ///
+  /// We just need to keep enough documents to fulfill the LIMIT requirement.
   private List<IndexSegment> pruneSelectionOnly(List<IndexSegment> segments, QueryContext query) {
     List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
     int remainingDocs = query.getLimit();
@@ -129,18 +127,17 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     return selectedSegments;
   }
 
-  /**
-   * Helper method to prune segments for selection order-by queries.
-   * <p>When the first order-by expression is an identifier (column), we can prune segments based on the column min/max
-   * value:
-   * <ul>
-   *   <li>1. Sort all the segments by the column min/max value</li>
-   *   <li>2. Pick the top segments until we get enough documents to fulfill the LIMIT and OFFSET requirement</li>
-   *   <li>3. Keep the segments that has value overlap with the selected ones; remove the others</li>
-   * </ul>
-   * <p>Each segment contributes towards the LIMIT only its {@link #guaranteedMatchingDocs} (a lower bound on its
-   * matching rows), so the optimization remains correct when a filter is present.
-   */
+  /// Helper method to prune segments for selection order-by queries.
+  ///
+  /// When the first order-by expression is an identifier (column), we can prune segments based on the column min/max
+  /// value:
+  ///
+  /// - 1. Sort all the segments by the column min/max value
+  /// - 2. Pick the top segments until we get enough documents to fulfill the LIMIT and OFFSET requirement
+  /// - 3. Keep the segments that has value overlap with the selected ones; remove the others
+  ///
+  /// Each segment contributes towards the LIMIT only its [#guaranteedMatchingDocs] (a lower bound on its
+  /// matching rows), so the optimization remains correct when a filter is present.
   private List<IndexSegment> pruneSelectionOrderBy(List<IndexSegment> segments, QueryContext query) {
     List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
     assert orderByExpressions != null;
@@ -233,17 +230,14 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     return selectedSegments;
   }
 
-  /**
-   * Returns a lower bound on the number of rows in the segment that match the query filter, used to decide how many
-   * leading segments must be kept to guarantee the LIMIT + OFFSET requirement.
-   * <ul>
-   *   <li>Without a filter, every row matches, so this is the exact total doc count.</li>
-   *   <li>With a filter, this is the total doc count if the segment <em>provably</em> matches the filter for all of its
-   *   rows (based on min/max metadata), and 0 otherwise. Using 0 for segments that only partially (or not provably
-   *   fully) match is a safe under-count: such segments are still kept (they overlap the boundary), but they never let
-   *   the boundary advance past rows they might contain.</li>
-   * </ul>
-   */
+  /// Returns a lower bound on the number of rows in the segment that match the query filter, used to decide how many
+  /// leading segments must be kept to guarantee the LIMIT + OFFSET requirement.
+  ///
+  /// - Without a filter, every row matches, so this is the exact total doc count.
+  /// - With a filter, this is the total doc count if the segment _provably_ matches the filter for all of
+  ///   its rows (based on min/max metadata), and 0 otherwise. Using 0 for segments that only partially (or not provably
+  ///   fully) match is a safe under-count: such segments are still kept (they overlap the boundary), but they never let
+  ///   the boundary advance past rows they might contain.
   private long guaranteedMatchingDocs(IndexSegment segment, QueryContext query) {
     int totalDocs = segment.getSegmentMetadata().getTotalDocs();
     FilterContext filter = query.getFilter();
@@ -253,11 +247,9 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     return fullyMatches(segment, filter, query) ? totalDocs : 0;
   }
 
-  /**
-   * Returns {@code true} only if <em>all</em> rows of the segment provably satisfy the filter, based on min/max
-   * metadata. A {@code false} result never means "does not match"; it means "cannot prove that all rows match", which
-   * is always safe to treat as a 0 lower bound. NOT and unsupported predicates conservatively return {@code false}.
-   */
+  /// Returns `true` only if _all_ rows of the segment provably satisfy the filter, based on min/max
+  /// metadata. A `false` result never means "does not match"; it means "cannot prove that all rows match", which
+  /// is always safe to treat as a 0 lower bound. NOT and unsupported predicates conservatively return `false`.
   private boolean fullyMatches(IndexSegment segment, FilterContext filter, QueryContext query) {
     switch (filter.getType()) {
       case AND:
@@ -286,12 +278,10 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     }
   }
 
-  /**
-   * Returns {@code true} only if all rows of the segment provably satisfy the predicate, based on the predicate
-   * column's min/max metadata. Only identifier predicates on non-nullable columns of types {@code RANGE} (e.g.
-   * {@code >, >=, <, <=}), {@code EQ} ({@code =}) and {@code NOT_EQ} ({@code <>}) are supported; everything else
-   * conservatively returns {@code false}.
-   */
+  /// Returns `true` only if all rows of the segment provably satisfy the predicate, based on the predicate
+  /// column's min/max metadata. Only identifier predicates on non-nullable columns of types `RANGE` (e.g.
+  /// `>, >=, <, <=`), `EQ` (`=`) and `NOT_EQ` (`<>`) are supported; everything else
+  /// conservatively returns `false`.
   private boolean predicateFullyMatches(IndexSegment segment, Predicate predicate, QueryContext query) {
     ExpressionContext lhs = predicate.getLhs();
     if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
@@ -340,10 +330,8 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     }
   }
 
-  /**
-   * Returns {@code true} if the segment's whole {@code [minValue, maxValue]} range provably satisfies the range
-   * predicate (i.e. it is fully contained within the predicate's bounds).
-   */
+  /// Returns `true` if the segment's whole `[minValue, maxValue]` range provably satisfies the range
+  /// predicate (i.e. it is fully contained within the predicate's bounds).
   private boolean rangeFullyMatches(RangePredicate predicate, Comparable minValue, Comparable maxValue,
       DataType dataType) {
     String lowerBound = predicate.getLowerBound();
@@ -375,18 +363,17 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     return true;
   }
 
-  /**
-   * Returns whether null handling is active for the column, in which case this optimization must be skipped. Pinot
-   * stores nulls as a default value that pollutes the column min/max metadata and the total doc count; only when null
-   * handling is enabled are those null rows excluded from comparisons, which is when the pollution becomes unsafe to
-   * reason about (with null handling disabled, nulls are simply the default value and the min/max stay accurate). This
-   * mirrors the null caution in {@code SelectionPlanNode#isSorted}.
-   * <p>A column carries null semantics only when null handling is enabled for the query <b>and</b> the column is
-   * nullable. Nullability follows the same resolution used at segment build time (e.g.
-   * {@code BaseSegmentCreator#isNullable}): under column-based null handling the per-column
-   * {@link FieldSpec#isNullable} flag, otherwise (table/query-level null handling) all columns are nullable. The check
-   * is conservative: an unknown schema or column is treated as null-handling-active.
-   */
+  /// Returns whether null handling is active for the column, in which case this optimization must be skipped. Pinot
+  /// stores nulls as a default value that pollutes the column min/max metadata and the total doc count; only when null
+  /// handling is enabled are those null rows excluded from comparisons, which is when the pollution becomes unsafe to
+  /// reason about (with null handling disabled, nulls are simply the default value and the min/max stay accurate). This
+  /// mirrors the null caution in `SelectionPlanNode#isSorted`.
+  ///
+  /// A column carries null semantics only when null handling is enabled for the query **and** the column is
+  /// nullable. Nullability follows the same resolution used at segment build time (e.g.
+  /// `BaseSegmentCreator#isNullable`): under column-based null handling the per-column
+  /// [FieldSpec#isNullable] flag, otherwise (table/query-level null handling) all columns are nullable. The check
+  /// is conservative: an unknown schema or column is treated as null-handling-active.
   private static boolean isNullHandlingActive(QueryContext query, String column) {
     if (!query.isNullHandlingEnabled()) {
       // Null semantics are off: nulls are just the default value, so min/max and doc counts stay accurate.
@@ -410,11 +397,9 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
         || (value instanceof Float && ((Float) value).isNaN());
   }
 
-  /**
-   * Converts a predicate literal to the column's stored type. Any parse failure propagates to the caller, which treats
-   * it as "cannot prove full match" (this pruner must stay conservative; an actually invalid query is rejected by the
-   * preceding {@link ColumnValueSegmentPruner} or by query execution).
-   */
+  /// Converts a predicate literal to the column's stored type. Any parse failure propagates to the caller, which treats
+  /// it as "cannot prove full match" (this pruner must stay conservative; an actually invalid query is rejected by the
+  /// preceding [ColumnValueSegmentPruner] or by query execution).
   private static Comparable convertValue(String stringValue, DataType dataType) {
     return dataType.convertInternal(stringValue);
   }

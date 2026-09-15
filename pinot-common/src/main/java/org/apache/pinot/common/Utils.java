@@ -37,11 +37,9 @@ public class Utils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
-  /**
-   * Rethrows an exception, even if it is not in the method signature.
-   *
-   * @param t The exception to rethrow.
-   */
+  /// Rethrows an exception, even if it is not in the method signature.
+  ///
+  /// @param t The exception to rethrow.
   public static void rethrowException(Throwable t) {
     /* Error can be thrown anywhere and is type erased on rethrowExceptionInner, making the cast in
     rethrowExceptionInner a no-op, allowing us to rethrow the exception without declaring it. */
@@ -54,9 +52,7 @@ public class Utils {
     throw (T) exception;
   }
 
-  /**
-   * Obtains the name of the calling method and line number. This is slow, only use this for debugging!
-   */
+  /// Obtains the name of the calling method and line number. This is slow, only use this for debugging!
   public static String getCallingMethodDetails() {
     try {
       throw new RuntimeException();
@@ -71,13 +67,12 @@ public class Utils {
     return UNIQUE_ID_GEN.incrementAndGet();
   }
 
-  /**
-   * Takes a string, removes all characters that are not letters or digits and capitalizes the next letter following a
-   * series of characters that are not letters or digits. For example, toCamelCase("Hello world!") returns "HelloWorld".
-   *
-   * @param text The text to camel case
-   * @return The camel cased version of the string given
-   */
+  /// Takes a string, removes all characters that are not letters or digits and capitalizes the next letter following a
+  /// series of characters that are not letters or digits. For example, toCamelCase("Hello world!") returns
+  /// "HelloWorld".
+  ///
+  /// @param text The text to camel case
+  /// @return The camel cased version of the string given
   public static String toCamelCase(String text) {
     int length = text.length();
     StringBuilder builder = new StringBuilder(length);
@@ -101,20 +96,16 @@ public class Utils {
     return builder.toString();
   }
 
-  /**
-   * Write the version of Pinot components to the log at info level.
-   */
+  /// Write the version of Pinot components to the log at info level.
   public static void logVersions() {
     for (Map.Entry<String, String> titleVersionEntry : getComponentVersions().entrySet()) {
       LOGGER.info("Using {} {}", titleVersionEntry.getKey(), titleVersionEntry.getValue());
     }
   }
 
-  /**
-   * Obtains the version numbers of the Pinot components.
-   *
-   * @return A map of component name to component version.
-   */
+  /// Obtains the version numbers of the Pinot components.
+  ///
+  /// @return A map of component name to component version.
   public static Map<String, String> getComponentVersions() {
     Map<String, String> componentVersions = new HashMap<>();
 

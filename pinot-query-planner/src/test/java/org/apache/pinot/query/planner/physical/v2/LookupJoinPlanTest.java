@@ -167,10 +167,8 @@ public class LookupJoinPlanTest {
         "Right input should be a MailboxReceiveNode (from exchange)");
   }
 
-  /**
-   * Verify EXPLAIN output shows the dim table in the same stage as the join (no exchange between them).
-   * This is the V2 equivalent of QueryCompilationTest.testJoinPushTransitivePredicateLookupJoin().
-   */
+  /// Verify EXPLAIN output shows the dim table in the same stage as the join (no exchange between them).
+  /// This is the V2 equivalent of QueryCompilationTest.testJoinPushTransitivePredicateLookupJoin().
   @Test
   public void testLookupJoinExplainPlan() {
     String query = "EXPLAIN PLAN FOR "
@@ -238,10 +236,8 @@ public class LookupJoinPlanTest {
         "Join should have exactly 2 child exchanges. EXPLAIN output:\n" + explain);
   }
 
-  /**
-   * When a hash join feeds into a lookup join (hash+lookup against same dim table),
-   * the hash join must be in a separate stage — not absorbed into the lookup join's leaf fragment.
-   */
+  /// When a hash join feeds into a lookup join (hash+lookup against same dim table),
+  /// the hash join must be in a separate stage — not absorbed into the lookup join's leaf fragment.
   @Test
   public void testLookupJoinAfterHashJoin() {
     // hash_join(a, b) → lookup_join(result, b)
@@ -271,11 +267,9 @@ public class LookupJoinPlanTest {
             + "(hash join should be in a separate stage)");
   }
 
-  /**
-   * When a lookup join's result feeds into another join (e.g., LEFT JOIN active_subs),
-   * the lookup join must be in its own isolated fragment. The outer join must NOT be absorbed
-   * into the lookup join's leaf stage.
-   */
+  /// When a lookup join's result feeds into another join (e.g., LEFT JOIN active_subs),
+  /// the lookup join must be in its own isolated fragment. The outer join must NOT be absorbed
+  /// into the lookup join's leaf stage.
   @Test
   public void testJoinAboveLookupJoin() {
     // lookup_join(a, b) → regular_join(result, a)
@@ -306,11 +300,9 @@ public class LookupJoinPlanTest {
             + "(lookup join result should be in a separate stage)");
   }
 
-  /**
-   * Verify that the lookup join fragment is properly structured: has a table name (from the dim
-   * table registered via LOOKUP_LOCAL_EXCHANGE), right input is a TableScanNode (in same fragment),
-   * and left input is a MailboxReceiveNode (separate fragment).
-   */
+  /// Verify that the lookup join fragment is properly structured: has a table name (from the dim
+  /// table registered via LOOKUP_LOCAL_EXCHANGE), right input is a TableScanNode (in same fragment),
+  /// and left input is a MailboxReceiveNode (separate fragment).
   @Test
   public void testLookupJoinFragmentIsolation() {
     String query = "SELECT /*+ joinOptions(join_strategy='lookup') */ a.col1, b.col2 FROM a_REALTIME a "
@@ -339,10 +331,8 @@ public class LookupJoinPlanTest {
     fail("Should find a fragment containing a lookup JoinNode");
   }
 
-  /**
-   * Verify that a non-lookup join is completely unaffected by LookupJoinRule.
-   * Both inputs should be MailboxReceiveNodes (standard exchange behavior).
-   */
+  /// Verify that a non-lookup join is completely unaffected by LookupJoinRule.
+  /// Both inputs should be MailboxReceiveNodes (standard exchange behavior).
   @Test
   public void testNonLookupJoinUnaffected() {
     // Same query as testNonLookupJoinPlanStructure but explicitly checking no LOOKUP_LOCAL_EXCHANGE

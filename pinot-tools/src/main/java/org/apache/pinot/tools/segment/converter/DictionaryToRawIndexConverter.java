@@ -55,9 +55,7 @@ import picocli.CommandLine;
 
 
 
-/**
- * Class to convert segment with dictionary encoded column to raw index (without dictionary).
- */
+/// Class to convert segment with dictionary encoded column to raw index (without dictionary).
 @SuppressWarnings({"FieldCanBeLocal", "unused", "rawtypes", "unchecked"})
 @CommandLine.Command
 public class DictionaryToRawIndexConverter {
@@ -96,56 +94,46 @@ public class DictionaryToRawIndexConverter {
       description = "print this message")
   private boolean _help = false;
 
-  /**
-   * Setter for {@link #_dataDir}
-   * @param dataDir Data directory containing un-tarred segments.
-   * @return this
-   */
+  /// Setter for [#_dataDir]
+  /// @param dataDir Data directory containing un-tarred segments.
+  /// @return this
   public DictionaryToRawIndexConverter setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
   }
 
-  /**
-   * Setter for {@link #_outputDir}
-   *
-   * @param outputDir Directory where output segments should be written
-   * @return this
-   */
+  /// Setter for [#_outputDir]
+  ///
+  /// @param outputDir Directory where output segments should be written
+  /// @return this
   public DictionaryToRawIndexConverter setOutputDir(String outputDir) {
     _outputDir = outputDir;
     return this;
   }
 
-  /**
-   * Setter for columns to convert.
-   *
-   * @param columns Comma separated list of columns
-   * @return this
-   */
+  /// Setter for columns to convert.
+  ///
+  /// @param columns Comma separated list of columns
+  /// @return this
   public DictionaryToRawIndexConverter setColumns(String columns) {
     _columns = columns;
     return this;
   }
 
-  /**
-   * Setter for {@link #_overwrite}
-   * When set to true, already existing output directory is overwritten.
-   *
-   * @param overwrite True for overwriting existing output dir, False otherwise
-   * @return this
-   */
+  /// Setter for [#_overwrite]
+  /// When set to true, already existing output directory is overwritten.
+  ///
+  /// @param overwrite True for overwriting existing output dir, False otherwise
+  /// @return this
   public DictionaryToRawIndexConverter setOverwrite(boolean overwrite) {
     _overwrite = overwrite;
     return this;
   }
 
-  /**
-   * Method to perform the conversion for a set of segments in the {@link #_dataDir}
-   *
-   * @return True if successful, False otherwise
-   * @throws Exception
-   */
+  /// Method to perform the conversion for a set of segments in the [#_dataDir]
+  ///
+  /// @return True if successful, False otherwise
+  /// @throws Exception
   public boolean convert()
       throws Exception {
     if (_help) {
@@ -199,17 +187,15 @@ public class DictionaryToRawIndexConverter {
     return ret;
   }
 
-  /**
-   * This method converts the specified columns of the given segment from dictionary encoded
-   * forward index to raw index without dictionary.
-   *
-   * @param segmentDir Segment directory
-   * @param columns Columns to convert
-   * @param outputDir Directory for writing output segment
-   * @param compressOutput Tar/gzip the output segment
-   * @return True if successful, False otherwise
-   * @throws Exception
-   */
+  /// This method converts the specified columns of the given segment from dictionary encoded
+  /// forward index to raw index without dictionary.
+  ///
+  /// @param segmentDir Segment directory
+  /// @param columns Columns to convert
+  /// @param outputDir Directory for writing output segment
+  /// @param compressOutput Tar/gzip the output segment
+  /// @return True if successful, False otherwise
+  /// @throws Exception
   public boolean convertSegment(File segmentDir, String[] columns, File outputDir, boolean compressOutput)
       throws Exception {
     File newSegment;
@@ -245,13 +231,11 @@ public class DictionaryToRawIndexConverter {
     return true;
   }
 
-  /**
-   * Helper method to update the metadata.properties for the converted segment.
-   *
-   * @param segmentDir Segment directory
-   * @param columns Converted columns
-   * @param tableName New table name to be written in the meta-data. Skipped if null.
-   */
+  /// Helper method to update the metadata.properties for the converted segment.
+  ///
+  /// @param segmentDir Segment directory
+  /// @param columns Converted columns
+  /// @param tableName New table name to be written in the meta-data. Skipped if null.
   private void updateMetadata(File segmentDir, String[] columns, String tableName)
       throws ConfigurationException {
     File metadataFile = new File(segmentDir, MetadataKeys.METADATA_FILE_NAME);
@@ -270,9 +254,7 @@ public class DictionaryToRawIndexConverter {
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
-  /**
-   * Helper method to print usage at the command line interface.
-   */
+  /// Helper method to print usage at the command line interface.
   public void printUsage() {
     System.out.println("Usage: DictionaryTORawIndexConverter");
     for (Field field : DictionaryToRawIndexConverter.class.getDeclaredFields()) {
@@ -285,14 +267,12 @@ public class DictionaryToRawIndexConverter {
     }
   }
 
-  /**
-   * Helper method to perform conversion for the specific column.
-   *
-   * @param segment Input segment to convert
-   * @param column Column to convert
-   * @param newSegment Directory where raw index to be written
-   * @throws IOException
-   */
+  /// Helper method to perform conversion for the specific column.
+  ///
+  /// @param segment Input segment to convert
+  /// @param column Column to convert
+  /// @param newSegment Directory where raw index to be written
+  /// @throws IOException
   private void convertOneColumn(IndexSegment segment, String column, File newSegment)
       throws IOException {
     DataSource dataSource = segment.getDataSource(column);
@@ -361,13 +341,11 @@ public class DictionaryToRawIndexConverter {
     deleteForwardIndex(newSegment.getParentFile(), column, dataSourceMetadata.isSorted());
   }
 
-  /**
-   * Helper method to remove the forward index for the given column.
-   *
-   * @param segmentDir Segment directory from which to remove the forward index.
-   * @param column Column for which to remove the index.
-   * @param sorted True if column is sorted, False otherwise
-   */
+  /// Helper method to remove the forward index for the given column.
+  ///
+  /// @param segmentDir Segment directory from which to remove the forward index.
+  /// @param column Column for which to remove the index.
+  /// @param sorted True if column is sorted, False otherwise
   private void deleteForwardIndex(File segmentDir, String column, boolean sorted) {
     File dictionaryFile = new File(segmentDir, (column + V1Constants.Dict.FILE_EXTENSION));
     FileUtils.deleteQuietly(dictionaryFile);
@@ -378,11 +356,9 @@ public class DictionaryToRawIndexConverter {
     FileUtils.deleteQuietly(fwdIndexFile);
   }
 
-  /**
-   * Helper method to get the length
-   * @param dictionary Column dictionary
-   * @return Length of longest entry
-   */
+  /// Helper method to get the length
+  /// @param dictionary Column dictionary
+  /// @return Length of longest entry
   private int getLengthOfLongestEntry(Dictionary dictionary) {
     int lengthOfLongestEntry = 0;
     int length = dictionary.length();
@@ -392,12 +368,10 @@ public class DictionaryToRawIndexConverter {
     return lengthOfLongestEntry;
   }
 
-  /**
-   * Main method for the class.
-   *
-   * @param args Arguments for the converter
-   * @throws Exception
-   */
+  /// Main method for the class.
+  ///
+  /// @param args Arguments for the converter
+  /// @throws Exception
   public static void main(String[] args)
       throws Exception {
     DictionaryToRawIndexConverter converter = new DictionaryToRawIndexConverter();

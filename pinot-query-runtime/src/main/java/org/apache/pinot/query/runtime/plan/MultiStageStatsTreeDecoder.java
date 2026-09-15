@@ -31,27 +31,21 @@ import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 import org.apache.pinot.query.runtime.operator.OperatorTypeRegistry;
 
 
-/**
- * Broker-side decoder turning {@link Worker.MultiStageStatsTree} payloads into {@link StageStatsTreeNode} instances
- * the broker accumulates by stage id (and merges across worker reports for the same stage).
- *
- * <p>Pairs with {@link MultiStageStatsTreeEncoder} on the server side.
- */
+/// Broker-side decoder turning [Worker.MultiStageStatsTree] payloads into [StageStatsTreeNode] instances
+/// the broker accumulates by stage id (and merges across worker reports for the same stage).
+///
+/// Pairs with [MultiStageStatsTreeEncoder] on the server side.
 public final class MultiStageStatsTreeDecoder {
-  /**
-   * Maximum allowed operator-tree depth. A plan this deep would require an extraordinary number of nested operators
-   * and almost certainly indicates a malformed or adversarial payload; cap and fail with {@link DecodeFailedException}
-   * rather than risking a stack overflow on the Netty event-loop thread.
-   */
+  /// Maximum allowed operator-tree depth. A plan this deep would require an extraordinary number of nested operators
+  /// and almost certainly indicates a malformed or adversarial payload; cap and fail with [DecodeFailedException]
+  /// rather than risking a stack overflow on the Netty event-loop thread.
   static final int MAX_OPERATOR_TREE_DEPTH = 64;
 
   private MultiStageStatsTreeDecoder() {
   }
 
-  /**
-   * Thrown when a payload cannot be decoded — usually because the operator type id is unknown to this broker
-   * (newer-server / older-broker case). The broker logs and marks the stage {@code mergeFailed}; the query continues.
-   */
+  /// Thrown when a payload cannot be decoded — usually because the operator type id is unknown to this broker
+  /// (newer-server / older-broker case). The broker logs and marks the stage `mergeFailed`; the query continues.
   public static class DecodeFailedException extends Exception {
     public DecodeFailedException(String message) {
       super(message);
@@ -62,10 +56,8 @@ public final class MultiStageStatsTreeDecoder {
     }
   }
 
-  /**
-   * Decodes a single {@link Worker.StageStatsNode} (recursive). Used directly when the caller already has a node and
-   * a known stage id.
-   */
+  /// Decodes a single [Worker.StageStatsNode] (recursive). Used directly when the caller already has a node and
+  /// a known stage id.
   public static StageStatsTreeNode decodeNode(Worker.StageStatsNode node)
       throws DecodeFailedException {
     return decodeNode(node, 0);
@@ -94,10 +86,8 @@ public final class MultiStageStatsTreeDecoder {
     return new StageStatsTreeNode(type, node.getPlanNodeIdsList(), statMap, children);
   }
 
-  /**
-   * Result of decoding a {@link Worker.MultiStageStatsTree}: the current-stage tree plus any upstream-stage trees the
-   * opchain attached to its report (e.g. from pipeline-breaker stats).
-   */
+  /// Result of decoding a [Worker.MultiStageStatsTree]: the current-stage tree plus any upstream-stage trees the
+  /// opchain attached to its report (e.g. from pipeline-breaker stats).
   public static final class Decoded {
     private final int _currentStageId;
     private final StageStatsTreeNode _currentStage;
@@ -123,11 +113,9 @@ public final class MultiStageStatsTreeDecoder {
     }
   }
 
-  /**
-   * Decodes a full {@link Worker.MultiStageStatsTree} into a {@link Decoded} containing the current-stage tree and a
-   * map of upstream-stage trees keyed by stage id. Throws {@link DecodeFailedException} on any decode error; the
-   * caller is responsible for logging and marking {@code mergeFailed}.
-   */
+  /// Decodes a full [Worker.MultiStageStatsTree] into a [Decoded] containing the current-stage tree and a
+  /// map of upstream-stage trees keyed by stage id. Throws [DecodeFailedException] on any decode error; the
+  /// caller is responsible for logging and marking `mergeFailed`.
   public static Decoded decode(Worker.MultiStageStatsTree proto)
       throws DecodeFailedException {
     StageStatsTreeNode currentStage = decodeNode(proto.getCurrentStage());

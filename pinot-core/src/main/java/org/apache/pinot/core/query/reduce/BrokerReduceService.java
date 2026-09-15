@@ -49,10 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>BrokerReduceService</code> class provides service to reduce data tables gathered from multiple servers
- * to {@link BrokerResponseNative}.
- */
+/// The `BrokerReduceService` class provides service to reduce data tables gathered from multiple servers
+/// to [BrokerResponseNative].
 @ThreadSafe
 public class BrokerReduceService extends BaseReduceService {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
@@ -176,41 +174,38 @@ public class BrokerReduceService extends BaseReduceService {
         serverBrokerRequest.getPinotQuery().getQueryOptions().get(QueryOptionKey.MATERIALIZED_VIEW_REWRITE));
   }
 
-  /**
-   * Merge-only counterpart of {@link #reduceOnDataTable}: merges the per-server DataTables into a single
-   * intermediate {@link DataTable} WITHOUT finalizing (no {@code extractFinalResult}). Returns
-   * {@code null} when there is nothing to merge (empty map, or all servers returned no data / errored).
-   * Reuses the same schema-filtering preamble and reducer/trim resolution as the regular reduce.
-   *
-   * <p>The returned DataTable carries intermediate, non-finalized state (byte-shape identical to a
-   * single server's partial response).
-   *
-   * <p>If one or more input server DataTables are dropped during merge (e.g., due to a schema
-   * conflict with the first non-empty table), the returned DataTable's metadata carries the
-   * {@link DataTable.MetadataKey#INCOMPLETE_MERGE} flag set to {@code "true"} and the
-   * {@link BrokerMeter#RESPONSE_MERGE_EXCEPTIONS} meter is incremented. The callers can
-   * read the flag and decide policy (skip, retry, accept).
-   *
-   * <p>Execution stats from the input DataTables are aggregated via {@link ExecutionStatsAggregator}
-   * and written back onto the merged DataTable: additive longs (e.g. {@code numDocsScanned},
-   * {@code numSegments*}, {@code threadCpuTimeNs}), {@code minConsumingFreshnessTimeMs} (MIN-reduced),
-   * boolean flags ({@code groupsTrimmed}, {@code numGroupsLimitReached}, etc., OR-reduced),
-   * per-server exceptions, and trace info (JSON-encoded if {@code trace=true}). This method does NOT bump
-   * broker meters/timers for the input stats.
-   *
-   * <p>Limitations on stats:
-   * <ul>
-   *   <li>Exception attribution to original servers is lost; the wire format is {@code Map<Integer,
-   *       String>} so collisions on the same error code are resolved last-write-wins.
-   *   <li>Per-server trace info is JSON-encoded into a single {@code TRACE_INFO} entry
-   * </ul>
-   *
-   * <p>WARNING: this performs a full cross-server merge and re-serializes the result — heavyweight work
-   * that must be run asynchronously, decoupled from request serving. Intended for callers that want to
-   * intercept the merged intermediate result instead of the finalized one.
-   *
-   * <p>[org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
-   */
+  /// Merge-only counterpart of [#reduceOnDataTable]: merges the per-server DataTables into a single
+  /// intermediate [DataTable] WITHOUT finalizing (no `extractFinalResult`). Returns
+  /// `null` when there is nothing to merge (empty map, or all servers returned no data / errored).
+  /// Reuses the same schema-filtering preamble and reducer/trim resolution as the regular reduce.
+  ///
+  /// The returned DataTable carries intermediate, non-finalized state (byte-shape identical to a
+  /// single server's partial response).
+  ///
+  /// If one or more input server DataTables are dropped during merge (e.g., due to a schema
+  /// conflict with the first non-empty table), the returned DataTable's metadata carries the
+  /// [DataTable.MetadataKey#INCOMPLETE_MERGE] flag set to `"true"` and the
+  /// [BrokerMeter#RESPONSE_MERGE_EXCEPTIONS] meter is incremented. The callers can
+  /// read the flag and decide policy (skip, retry, accept).
+  ///
+  /// Execution stats from the input DataTables are aggregated via [ExecutionStatsAggregator]
+  /// and written back onto the merged DataTable: additive longs (e.g. `numDocsScanned`,
+  /// `numSegments*`, `threadCpuTimeNs`), `minConsumingFreshnessTimeMs` (MIN-reduced),
+  /// boolean flags (`groupsTrimmed`, `numGroupsLimitReached`, etc., OR-reduced),
+  /// per-server exceptions, and trace info (JSON-encoded if `trace=true`). This method does NOT bump
+  /// broker meters/timers for the input stats.
+  ///
+  /// Limitations on stats:
+  ///
+  /// - Exception attribution to original servers is lost; the wire format is `Map<Integer, String>` so collisions on
+  ///   the same error code are resolved last-write-wins.
+  /// - Per-server trace info is JSON-encoded into a single `TRACE_INFO` entry
+  ///
+  /// WARNING: this performs a full cross-server merge and re-serializes the result — heavyweight work
+  /// that must be run asynchronously, decoupled from request serving. Intended for callers that want to
+  /// intercept the merged intermediate result instead of the finalized one.
+  ///
+  /// \[org.apache.pinot.spi.query.QueryThreadContext\] must already be set up before calling this method.
   @Nullable
   public DataTable mergeOnDataTable(BrokerRequest serverBrokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
@@ -252,18 +247,16 @@ public class BrokerReduceService extends BaseReduceService {
     return merged;
   }
 
-  /**
-   * Processes per-server response metadata and filters {@code dataTableMap} in place:
-   *  - drops tables with a null schema
-   *  - drops empty tables (remembering their schema as a fallback)
-   *  - drops tables whose column data types conflict with the first non-empty table
-   *  (collected into {@code conflictingServers}).
-   *
-   * When an {@code aggregator} is provided, per-table execution stats are aggregated before a table is
-   * dropped.
-   * Returns the remembered data schema (non-empty preferred, else empty-table schema, else
-   * {@code null}).
-   */
+  /// Processes per-server response metadata and filters `dataTableMap` in place:
+  ///  - drops tables with a null schema
+  ///  - drops empty tables (remembering their schema as a fallback)
+  ///  - drops tables whose column data types conflict with the first non-empty table
+  ///  (collected into `conflictingServers`).
+  ///
+  /// When an `aggregator` is provided, per-table execution stats are aggregated before a table is
+  /// dropped.
+  /// Returns the remembered data schema (non-empty preferred, else empty-table schema, else
+  /// `null`).
   private static DataSchema filterDataTablesAndPickSchema(Map<ServerRoutingInstance, DataTable> dataTableMap,
       @Nullable ExecutionStatsAggregator aggregator, List<ServerRoutingInstance> conflictingServers) {
     DataSchema dataSchemaFromEmptyDataTable = null;
@@ -307,10 +300,8 @@ public class BrokerReduceService extends BaseReduceService {
     return dataSchemaFromNonEmptyDataTable != null ? dataSchemaFromNonEmptyDataTable : dataSchemaFromEmptyDataTable;
   }
 
-  /**
-   * Resolves the group-by trim parameters (query option overrides, else broker defaults) and builds the
-   * {@link DataTableReducerContext}
-   */
+  /// Resolves the group-by trim parameters (query option overrides, else broker defaults) and builds the
+  /// [DataTableReducerContext]
   private DataTableReducerContext createReducerContext(@Nullable Map<String, String> queryOptions,
       long reduceTimeOutMs) {
     Integer minGroupTrimSizeQueryOption = null;

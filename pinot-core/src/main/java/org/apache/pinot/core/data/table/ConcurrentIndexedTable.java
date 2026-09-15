@@ -26,9 +26,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Thread safe {@link Table} implementation for aggregating Records based on combination of keys
- */
+/// Thread safe [Table] implementation for aggregating Records based on combination of keys
 public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
@@ -39,9 +37,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
         new ConcurrentHashMap<>(initialCapacity), executorService);
   }
 
-  /**
-   * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
-   */
+  /// Thread safe implementation of upsert for inserting [Record] into [Table]
   @Override
   public boolean upsert(Key key, Record record) {
     if (_hasOrderBy) {

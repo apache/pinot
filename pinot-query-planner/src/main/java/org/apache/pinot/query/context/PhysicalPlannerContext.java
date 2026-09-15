@@ -35,9 +35,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Per-query unique context dedicated for the physical planner.
- */
+/// Per-query unique context dedicated for the physical planner.
 public class PhysicalPlannerContext {
   private final Supplier<Integer> _nodeIdGenerator = new Supplier<>() {
     private int _id = 0;
@@ -47,22 +45,18 @@ public class PhysicalPlannerContext {
       return _id++;
     }
   };
-  /**
-   * This is hacky. When assigning workers to the leaf-stage we cache the instanceId to QueryServerInstance values.
-   * This way we can continue to use instance IDs throughout planning and convert them back to QueryServerInstance
-   * while working with the Dispatchable Plan.
-   * TODO: We should not use this map and instead have a centralized place for instanceId to QueryServerInstance
-   *   mapping.
-   */
+  /// This is hacky. When assigning workers to the leaf-stage we cache the instanceId to QueryServerInstance values.
+  /// This way we can continue to use instance IDs throughout planning and convert them back to QueryServerInstance
+  /// while working with the Dispatchable Plan.
+  /// TODO: We should not use this map and instead have a centralized place for instanceId to QueryServerInstance
+  ///   mapping.
   private final Map<String, QueryServerInstance> _instanceIdToQueryServerInstance = new HashMap<>();
   @Nullable
   private final RoutingManager _routingManager;
   private final String _hostName;
   private final int _port;
   private final long _requestId;
-  /**
-   * Instance ID of the instance corresponding to this process.
-   */
+  /// Instance ID of the instance corresponding to this process.
   private final String _instanceId;
   private final Map<String, String> _queryOptions;
   private final boolean _useLiteMode;
@@ -76,10 +70,8 @@ public class PhysicalPlannerContext {
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
   private int _liteModeEffectiveSortLimit = -1;
 
-  /**
-   * Used by controller when it needs to extract table names from the query.
-   * TODO: Controller should only rely on SQL parser to extract table names.
-   */
+  /// Used by controller when it needs to extract table names from the query.
+  /// TODO: Controller should only rely on SQL parser to extract table names.
   public PhysicalPlannerContext() {
     _routingManager = null;
     _hostName = "";
@@ -199,13 +191,10 @@ public class PhysicalPlannerContext {
     return _liteModeEffectiveSortLimit;
   }
 
-  /**
-   * Gets a random instance id from the registered instances in the context.
-   * <p>
-   *   <b>Important:</b> This method will always return a server instanceId, unless no server has yet been registered
-   *   with the context, which could happen for queries which don't consist of any table-scans.
-   * </p>
-   */
+  /// Gets a random instance id from the registered instances in the context.
+  ///
+  ///   **Important:** This method will always return a server instanceId, unless no server has yet been registered
+  ///   with the context, which could happen for queries which don't consist of any table-scans.
   public String getRandomInstanceId() {
     Preconditions.checkState(!_instanceIdToQueryServerInstance.isEmpty(), "No instances present in context");
     if (_instanceIdToQueryServerInstance.size() == 1) {

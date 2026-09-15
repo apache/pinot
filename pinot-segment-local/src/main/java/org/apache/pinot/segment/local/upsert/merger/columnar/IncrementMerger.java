@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-/**
- * Merges 2 records and returns the merged record.
- * Add the new value from incoming row to the existing value from numeric field. Then return the merged record.
- */
+/// Merges 2 records and returns the merged record.
+/// Add the new value from incoming row to the existing value from numeric field. Then return the merged record.
 public class IncrementMerger implements PartialUpsertColumnMerger {
 
-  /**
-   * Increment the new value from incoming row to the given field of previous record.
-   */
+  /// Increment the new value from incoming row to the given field of previous record.
   @Override
   public Object merge(Object previousValue, Object currentValue) {
     return addNumbers((Number) previousValue, (Number) currentValue);

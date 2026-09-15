@@ -32,20 +32,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A utility class to create {@link ExecutorService} instances.
- *
- * In order to create a new executor, the {@code create} methods should be called.
- * These methods take an executor type as an argument.
- *
- * Pinot includes two executor service plugins:
- * <ul>
- *   <li>{@code cached}: creates a new cached thread pool</li>
- *   <li>{@code fixed}: creates a new fixed thread pool.</li>
- * </ul>
- *
- * @see ServiceLoader
- */
+/// A utility class to create [ExecutorService] instances.
+///
+/// In order to create a new executor, the `create` methods should be called.
+/// These methods take an executor type as an argument.
+///
+/// Pinot includes two executor service plugins:
+///
+/// - `cached`: creates a new cached thread pool
+/// - `fixed`: creates a new fixed thread pool.
+///
+/// @see ServiceLoader
 public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
   private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
@@ -101,26 +98,22 @@ public class ExecutorServiceUtils {
     return provider.create(conf, confPrefix, baseName);
   }
 
-  /**
-   * Shuts down the given executor service.
-   *
-   * This method blocks a default number of millis in order to wait for termination. In case the executor doesn't
-   * terminate in that time, the code continues with a logging.
-   *
-   * @throws RuntimeException if this threads is interrupted when waiting for termination.
-   */
+  /// Shuts down the given executor service.
+  ///
+  /// This method blocks a default number of millis in order to wait for termination. In case the executor doesn't
+  /// terminate in that time, the code continues with a logging.
+  ///
+  /// @throws RuntimeException if this threads is interrupted when waiting for termination.
   public static void close(ExecutorService executorService) {
     close(executorService, DEFAULT_TERMINATION_MILLIS);
   }
 
-  /**
-   * Shuts down the given executor service.
-   *
-   * This method blocks up to the given millis in order to wait for termination. In case the executor doesn't terminate
-   * in that time, the code continues with a logging.
-   *
-   * @throws RuntimeException if this threads is interrupted when waiting for termination.
-   */
+  /// Shuts down the given executor service.
+  ///
+  /// This method blocks up to the given millis in order to wait for termination. In case the executor doesn't terminate
+  /// in that time, the code continues with a logging.
+  ///
+  /// @throws RuntimeException if this threads is interrupted when waiting for termination.
   public static void close(ExecutorService executorService, long terminationMillis) {
     executorService.shutdown();
     try {

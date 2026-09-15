@@ -34,10 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class to check if a new segment is within the configured storage quota for the table
- *
- */
+/// Class to check if a new segment is within the configured storage quota for the table
 public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
 
@@ -78,9 +75,7 @@ public class StorageQuotaChecker {
     return new QuotaCheckerResponse(false, msg);
   }
 
-  /**
-   * Returns whether the new added segment is within the storage quota.
-   */
+  /// Returns whether the new added segment is within the storage quota.
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
       long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes)
       throws InvalidConfigException {
@@ -238,10 +233,8 @@ public class StorageQuotaChecker {
     }
   }
 
-  /**
-   * Checks whether the table is within the storage quota.
-   * @return true if storage quota is exceeded by the table, else false.
-   */
+  /// Checks whether the table is within the storage quota.
+  /// @return true if storage quota is exceeded by the table, else false.
   public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
     try {
       return !isSegmentStorageWithinQuota(tableConfig, null, 0, 0)._isSegmentWithinQuota;

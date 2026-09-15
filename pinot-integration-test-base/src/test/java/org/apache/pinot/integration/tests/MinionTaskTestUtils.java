@@ -37,7 +37,9 @@ public class MinionTaskTestUtils {
   }
 
   public static void assertNoTaskSchedule(TaskSchedulingInfo info) {
-    assertNotNull(info.getScheduledTaskNames());
+    // Null task names mean scheduling failed; surface the recorded errors instead of a bare null assertion.
+    assertNotNull(info.getScheduledTaskNames(), "Scheduling failed with generation errors: "
+        + info.getGenerationErrors() + ", scheduling errors: " + info.getSchedulingErrors());
     assertTrue(info.getScheduledTaskNames().isEmpty());
     assertNoTaskErrors(info);
   }

@@ -31,14 +31,12 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Base class for set operators like INTERSECT and EXCEPT / MINUS that always have two children.
- */
+/// Base class for set operators like INTERSECT and EXCEPT / MINUS that always have two children.
 public abstract class BinarySetOperator extends SetOperator {
 
   protected final MultiStageOperator _leftChildOperator;
   protected final MultiStageOperator _rightChildOperator;
-  protected final Multiset<Record> _rightRowSet;
+  protected Multiset<Record> _rightRowSet;
   private MseBlock.Eos _eos;
   private boolean _isRightChildOperatorProcessed;
 
@@ -52,11 +50,9 @@ public abstract class BinarySetOperator extends SetOperator {
     _rightRowSet = HashMultiset.create();
   }
 
-  /**
-   * Processes the right child operator and builds the set of rows that can be used to filter the left child.
-   *
-   * @return EoS block after processing the right child completely.
-   */
+  /// Processes the right child operator and builds the set of rows that can be used to filter the left child.
+  ///
+  /// @return EoS block after processing the right child completely.
   protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();
     while (block.isData()) {
@@ -71,11 +67,9 @@ public abstract class BinarySetOperator extends SetOperator {
     return block;
   }
 
-  /**
-   * Processes the left child operator and returns blocks of rows that match the criteria defined by the set operation.
-   *
-   * @return block containing matched rows or EoS, never {@code null}.
-   */
+  /// Processes the left child operator and returns blocks of rows that match the criteria defined by the set operation.
+  ///
+  /// @return block containing matched rows or EoS, never `null`.
   protected MseBlock processLeftOperator() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
@@ -111,6 +105,7 @@ public abstract class BinarySetOperator extends SetOperator {
         return mseBlock;
       } else if (mseBlock.isError()) {
         _eos = (MseBlock.Eos) mseBlock;
+        releaseBuffers();
         return _eos;
       } else if (mseBlock.isSuccess()) {
         // If it's a regular EOS block, we continue to process the left child operator.
@@ -121,19 +116,33 @@ public abstract class BinarySetOperator extends SetOperator {
     MseBlock mseBlock = processLeftOperator();
     if (mseBlock.isEos()) {
       _eos = (MseBlock.Eos) mseBlock;
+      releaseBuffers();
       return _eos;
     } else {
       return mseBlock;
     }
   }
 
-  /**
-   * Returns true if the row matches the criteria defined by the set operation.
-   * <p>
-   * Also updates the right row set based on the operator.
-   *
-   * @param row the row from the left operator to be checked for matching.
-   * @return true if the row is matched.
-   */
+  /// Replaces `_rightRowSet` with a fresh, empty multiset rather than clearing it: `HashMultiset.clear()` walks every
+  /// entry and still leaves the backing table at the capacity it grew to, which for a wide INTERSECT / EXCEPT is the
+  /// bulk of what we are trying to release. Safe to swap because [#handleRowMatched(Object[])] is only reached from
+  /// [#processLeftOperator()], which [#getNextBlock()] stops calling once `_eos` is set — and `_eos` is set before
+  /// every release.
+  @Override
+  protected void releaseBuffers() {
+    _rightRowSet = HashMultiset.create();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_rightRowSet.isEmpty();
+  }
+
+  /// Returns true if the row matches the criteria defined by the set operation.
+  ///
+  /// Also updates the right row set based on the operator.
+  ///
+  /// @param row the row from the left operator to be checked for matching.
+  /// @return true if the row is matched.
   protected abstract boolean handleRowMatched(Object[] row);
 }

@@ -37,9 +37,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for {@link VectorRadiusFilterOperator}.
- */
+/// Tests for [VectorRadiusFilterOperator].
 public class VectorRadiusFilterOperatorTest {
 
   @Test

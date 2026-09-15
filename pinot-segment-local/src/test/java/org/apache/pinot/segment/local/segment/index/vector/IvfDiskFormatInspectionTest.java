@@ -36,16 +36,14 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Disk-format inspection for IVF index files. Builds a tiny index of each IVF variant,
- * decodes the raw bytes header-by-header against the documented layout, and asserts that
- * (a) the on-disk fields match the creator config, and (b) the buffer-based reader returns
- * the same field values via its public API. This is the contract validation between
- * creator and reader after the PinotBuffer reader rewrite.
- *
- * <p>Each test method prints a compact byte-level dump to stdout so disk-format regressions
- * are visible in build logs.</p>
- */
+/// Disk-format inspection for IVF index files. Builds a tiny index of each IVF variant,
+/// decodes the raw bytes header-by-header against the documented layout, and asserts that
+/// (a) the on-disk fields match the creator config, and (b) the buffer-based reader returns
+/// the same field values via its public API. This is the contract validation between
+/// creator and reader after the PinotBuffer reader rewrite.
+///
+/// Each test method prints a compact byte-level dump to stdout so disk-format regressions
+/// are visible in build logs.
 public class IvfDiskFormatInspectionTest {
 
   private static final String COLUMN = "v";
@@ -284,13 +282,11 @@ public class IvfDiskFormatInspectionTest {
   // Combined-form output (storeInSegmentFile=true)
   // ---------------------------------------------------------------------------
 
-  /**
-   * When {@code storeInSegmentFile=true}, the IVF_FLAT creator must write to the {@code
-   * .vector.ivfflat.combined.index} extension instead of the legacy {@code .vector.ivfflat.index}
-   * combined. The on-disk bytes are byte-identical to the legacy form; only the file name differs.
-   * The V2→V3 converter picks up the combined extension via the standard {@code copyIndexIfExists}
-   * path and packs the bytes into {@code columns.psf}.
-   */
+  /// When `storeInSegmentFile=true` , the IVF_FLAT creator must write to the `.vector.ivfflat.combined.index` extension
+  /// instead of the legacy `.vector.ivfflat.index`
+  /// combined. The on-disk bytes are byte-identical to the legacy form; only the file name differs.
+  /// The V2→V3 converter picks up the combined extension via the standard `copyIndexIfExists`
+  /// path and packs the bytes into `columns.psf`.
   @Test
   public void testIvfFlatCreatorWritesCombinedExtensionWhenFlagOn()
       throws Exception {
@@ -336,9 +332,7 @@ public class IvfDiskFormatInspectionTest {
     }
   }
 
-  /**
-   * Symmetric coverage for IVF_PQ — same expectations.
-   */
+  /// Symmetric coverage for IVF_PQ — same expectations.
   @Test
   public void testIvfPqCreatorWritesCombinedExtensionWhenFlagOn()
       throws Exception {

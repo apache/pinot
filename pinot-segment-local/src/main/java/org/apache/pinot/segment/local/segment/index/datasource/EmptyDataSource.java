@@ -26,9 +26,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The {@code EmptyImmutableDataSource} class is the data source for a column in the immutable segment with 0 rows.
- */
+/// The `EmptyImmutableDataSource` class is the data source for a column in the immutable segment with 0 rows.
 public class EmptyDataSource extends BaseDataSource {
 
   public EmptyDataSource(FieldSpec fieldSpec) {

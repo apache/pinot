@@ -30,11 +30,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * The <code>EmptySelectionOperator</code> class provides the operator for selection query with LIMIT less or equal to 0
- * on a single segment.
- * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
- */
+/// The `EmptySelectionOperator` class provides the operator for selection query with LIMIT less or equal
+/// to 0 on a single segment.
+///
+/// NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
 public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 

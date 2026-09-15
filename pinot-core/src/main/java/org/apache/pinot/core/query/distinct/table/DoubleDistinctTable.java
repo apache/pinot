@@ -40,14 +40,14 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DoubleDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "DoubleDistinctTable#mergeDistinctTable";
+
   private final DoubleOpenHashSet _valueSet;
   private final OrderByExpressionContext _orderByExpression;
 
   private DoubleHeapPriorityQueue _priorityQueue;
 
-  /**
-   * Constructor for distinct table without data table (on the server side).
-   */
+  /// Constructor for distinct table without data table (on the server side).
   public DoubleDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable OrderByExpressionContext orderByExpression) {
     super(dataSchema, limit, nullHandlingEnabled);
@@ -56,9 +56,7 @@ public class DoubleDistinctTable extends DistinctTable {
     _orderByExpression = orderByExpression;
   }
 
-  /**
-   * Constructor for distinct table with data table (on the broker side).
-   */
+  /// Constructor for distinct table with data table (on the broker side).
   public DoubleDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable OrderByExpressionContext orderByExpression, DataTable dataTable) {
     super(dataSchema, limit, nullHandlingEnabled);
@@ -140,14 +138,17 @@ public class DoubleDistinctTable extends DistinctTable {
     if (doubleDistinctTable._hasNull) {
       addNull();
     }
+    int numValuesMerged = 0;
     DoubleIterator doubleIterator = doubleDistinctTable._valueSet.iterator();
     if (hasLimit()) {
       if (hasOrderBy()) {
         while (doubleIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           addWithOrderBy(doubleIterator.nextDouble());
         }
       } else {
         while (doubleIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(doubleIterator.nextDouble())) {
             return;
           }
@@ -156,6 +157,7 @@ public class DoubleDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       while (doubleIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
         addUnbounded(doubleIterator.nextDouble());
       }
     }

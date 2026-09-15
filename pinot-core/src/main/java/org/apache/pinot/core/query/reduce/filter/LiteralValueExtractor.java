@@ -22,9 +22,7 @@ import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Value extractor for a literal.
- */
+/// Value extractor for a literal.
 public class LiteralValueExtractor implements ValueExtractor {
   private final LiteralContext _literal;
 

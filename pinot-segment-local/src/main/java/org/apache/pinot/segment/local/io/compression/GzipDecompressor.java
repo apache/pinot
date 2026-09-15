@@ -25,9 +25,7 @@ import java.util.zip.Inflater;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Implementation of {@link ChunkDecompressor} using GZIP decompression algorithm.
- */
+/// Implementation of [ChunkDecompressor] using GZIP decompression algorithm.
 class GzipDecompressor implements ChunkDecompressor {
 
   private final Inflater _decompressor;

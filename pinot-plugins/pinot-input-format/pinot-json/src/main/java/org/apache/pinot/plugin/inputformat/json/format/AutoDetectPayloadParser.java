@@ -19,13 +19,16 @@
 package org.apache.pinot.plugin.inputformat.json.format;
 
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /// Resolves the concrete parser per message from the payload's leading magic / version bytes, then delegates.
 /// Backs [JsonPayloadFormat#AUTO], so the decoder can always call `parse` without a null / mode check.
 class AutoDetectPayloadParser implements JsonPayloadParser {
 
-  /// Always {@code true}: this parser accepts any payload and resolves the real format at [#parse] time. It is
+  /// Always `true`: this parser accepts any payload and resolves the real format at [#parse] time. It is
   /// deliberately excluded from the detection order it drives.
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
@@ -36,5 +39,13 @@ class AutoDetectPayloadParser implements JsonPayloadParser {
   public Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception {
     return JsonPayloadFormat.detectParser(payload, offset, length).parse(payload, offset, length);
+  }
+
+  @Override
+  public boolean parse(byte[] payload, int offset, int length, GenericRow destination,
+      @Nullable Set<String> fields)
+      throws Exception {
+    return JsonPayloadFormat.detectParser(payload, offset, length)
+        .parse(payload, offset, length, destination, fields);
   }
 }

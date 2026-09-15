@@ -23,9 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link FlatQuantizer} computeDistance behavior.
- */
+/// Tests for [FlatQuantizer] computeDistance behavior.
 public class FlatQuantizerTest {
 
   @Test

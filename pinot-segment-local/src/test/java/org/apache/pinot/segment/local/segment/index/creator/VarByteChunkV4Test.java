@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
@@ -39,12 +41,16 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
 public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
@@ -130,6 +136,61 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     testWriteRead(bytesMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, new ByteSplitterMV(),
         VarByteChunkWriter::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
     FileUtils.deleteQuietly(bytesMVFile);
+  }
+
+  /// A sealed MAP column is a chunked raw index over serialized frames, and a projected `attributes['key']` resolves
+  /// to a selective read against it. Pins that the V4 implementation, also inherited by V5 and V6, agrees with
+  /// deserializing the whole frame for every compression type.
+  @Test(dataProvider = "params")
+  public void testMapSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+      throws Exception {
+    File mapSVFile = new File(file, "testMapSV");
+    int numDocs = 1000;
+    List<Map<String, Object>> maps = new ArrayList<>(numDocs);
+    try (VarByteChunkWriter writer = createWriter(mapSVFile, compressionType, chunkSize)) {
+      for (int i = 0; i < numDocs; i++) {
+        // Dotted OpenTelemetry-style keys, the first two of equal length so the scan has to compare their bytes
+        // rather than skip on a length mismatch.
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("k8s.workload.name", "workload-" + i);
+        map.put("k8s.workload.kind", "Deployment");
+        map.put("k8s.namespace.name", "namespace-" + i % 7);
+        map.put("host_logical_cpus", i);
+        maps.add(map);
+        writer.putBytes(MapUtils.serializeMap(map));
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(mapSVFile);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.MAP, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      // A value-only assertion would also pass through ForwardIndexReader's full-map fallback. Pin the actual
+      // dispatch target so removing either optimized override makes this regression test fail.
+      assertSame(reader.getClass()
+              .getMethod("getMapEntryValue", int.class, VarByteChunkForwardIndexReaderV4.ReaderContext.class,
+                  PreparedMapKey.class)
+              .getDeclaringClass(),
+          VarByteChunkForwardIndexReaderV4.class);
+      assertSame(reader.getClass()
+              .getMethod("getMapEntryValueAsString", int.class, VarByteChunkForwardIndexReaderV4.ReaderContext.class,
+                  PreparedMapKey.class)
+              .getDeclaringClass(),
+          VarByteChunkForwardIndexReaderV4.class);
+      PreparedMapKey workloadName = new PreparedMapKey("k8s.workload.name");
+      PreparedMapKey cpus = new PreparedMapKey("host_logical_cpus");
+      PreparedMapKey absent = new PreparedMapKey("k8s.workload.namf");
+      for (int i = 0; i < numDocs; i++) {
+        Map<String, Object> expected = maps.get(i);
+        assertEquals(reader.getMap(i, context), expected);
+        assertEquals(reader.getMapEntryValue(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValue(i, context, cpus), expected.get("host_logical_cpus"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, cpus), String.valueOf(i));
+        assertNull(reader.getMapEntryValue(i, context, absent));
+        assertNull(reader.getMapEntryValueAsString(i, context, absent));
+      }
+    }
+    FileUtils.deleteQuietly(mapSVFile);
   }
 
   static class StringSplitterMV implements Function<String, String[]> {

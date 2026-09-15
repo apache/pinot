@@ -22,9 +22,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Min value aggregator
- */
+/// Min value aggregator
 public class MinValueAggregator implements ValueAggregator {
 
   private final FieldSpec.DataType _dataType;

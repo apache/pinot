@@ -41,23 +41,21 @@ import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
 
 
-/**
- * Reads an Apache Arrow IPC file <b>one record batch at a time</b> through the seekable
- * {@link ArrowFileReader} ({@link ArrowFileReader#getRecordBlocks()} +
- * {@link ArrowFileReader#loadRecordBatch}), so peak resident off-heap memory is a single record
- * batch rather than the whole materialised column set. Shared by the per-column
- * {@link BatchedArrowColumnReader}s created over it: at most one batch is loaded at any instant.
- *
- * <p>Peak memory therefore equals the largest record batch, which is a write-time, producer-chosen
- * property — the same memory model as the row-major {@link ArrowRecordReader}. Reading a column to
- * completion re-loads every batch (Arrow Java loads whole batches), so the column-major consumer
- * pays {@code N x} batch loads across {@code N} columns; this read amplification is the accepted
- * cost of Arrow's horizontal record-batch layout. Dictionary-encoded columns are decoded per batch
- * (mirroring the row-major {@link ArrowRecordExtractor}); the transient decoded vectors are released
- * when the next batch loads.
- *
- * <p>This class is not thread-safe.
- */
+/// Reads an Apache Arrow IPC file **one record batch at a time** through the seekable
+/// [ArrowFileReader] ([ArrowFileReader#getRecordBlocks()] +
+/// [ArrowFileReader#loadRecordBatch]), so peak resident off-heap memory is a single record
+/// batch rather than the whole materialised column set. Shared by the per-column
+/// [BatchedArrowColumnReader]s created over it: at most one batch is loaded at any instant.
+///
+/// Peak memory therefore equals the largest record batch, which is a write-time, producer-chosen
+/// property — the same memory model as the row-major [ArrowRecordReader]. Reading a column to
+/// completion re-loads every batch (Arrow Java loads whole batches), so the column-major consumer
+/// pays `N x` batch loads across `N` columns; this read amplification is the accepted
+/// cost of Arrow's horizontal record-batch layout. Dictionary-encoded columns are decoded per batch
+/// (mirroring the row-major [ArrowRecordExtractor]); the transient decoded vectors are released
+/// when the next batch loads.
+///
+/// This class is not thread-safe.
 final class BatchedArrowFileSource implements Closeable {
 
   private final RootAllocator _allocator;
@@ -137,13 +135,13 @@ final class BatchedArrowFileSource implements Closeable {
     return _batchStartDoc[batchIdx];
   }
 
-  /** The batch index currently resident, or -1 if none. A column reader's cached per-batch delegate
-   * is valid only while this equals the batch it was built for (the shared cursor may have moved). */
+  /// The batch index currently resident, or -1 if none. A column reader's cached per-batch delegate
+  /// is valid only while this equals the batch it was built for (the shared cursor may have moved).
   int loadedBatchIdx() {
     return _loadedBatchIdx;
   }
 
-  /** Index of the batch owning {@code docId} (binary search over the cumulative offsets). */
+  /// Index of the batch owning `docId` (binary search over the cumulative offsets).
   int batchIndexForDoc(int docId) {
     int lo = 0;
     int hi = _blocks.size() - 1;
@@ -158,10 +156,8 @@ final class BatchedArrowFileSource implements Closeable {
     return lo;
   }
 
-  /**
-   * The effective Arrow {@link Field} of a column — the decoded value field for dictionary-encoded
-   * columns, the raw field otherwise. Used for type predicates without loading any batch data.
-   */
+  /// The effective Arrow [Field] of a column — the decoded value field for dictionary-encoded
+  /// columns, the raw field otherwise. Used for type predicates without loading any batch data.
   Field effectiveField(String columnName) {
     FieldVector source = _root.getVector(columnName);
     Dictionary dictionary = resolveDictionary(source);
@@ -172,10 +168,8 @@ final class BatchedArrowFileSource implements Closeable {
     return new Field(columnName, valueField.getFieldType(), valueField.getChildren());
   }
 
-  /**
-   * Ensure {@code batchIdx} is the loaded batch, then return the column's {@link FieldVector} for it
-   * (decoded if dictionary-encoded). The returned vector is valid only until the next batch loads.
-   */
+  /// Ensure `batchIdx` is the loaded batch, then return the column's [FieldVector] for it
+  /// (decoded if dictionary-encoded). The returned vector is valid only until the next batch loads.
   FieldVector columnVector(String columnName, int batchIdx)
       throws IOException {
     ensureBatchLoaded(batchIdx);
@@ -194,10 +188,8 @@ final class BatchedArrowFileSource implements Closeable {
     return decoded;
   }
 
-  /**
-   * The bound dictionary for {@code source} if it is dictionary-encoded, or {@code null} otherwise.
-   * Throws if the column is dictionary-encoded but its dictionary is missing from the source.
-   */
+  /// The bound dictionary for `source` if it is dictionary-encoded, or `null` otherwise.
+  /// Throws if the column is dictionary-encoded but its dictionary is missing from the source.
   @Nullable
   private Dictionary resolveDictionary(FieldVector source) {
     DictionaryEncoding encoding = source.getField().getDictionary();

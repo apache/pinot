@@ -74,10 +74,9 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 ///       opinionated; format-string inference (`1:DAYS:EPOCH` vs `1:MILLISECONDS:EPOCH`,
 ///       `SIMPLE_DATE_FORMAT`, etc.) is unsupported.
 ///
-///
 /// Thread-safety: all methods are stateless and static.
 ///
-/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+/// ## Partition model (TIME-WINDOWED ONLY in PR 1)
 ///
 /// This analyzer validates time-windowed MVs only: the source must have a time column, the MV
 /// must have a designated time column derived from it, and `bucketTimePeriod` is hard-required.
@@ -425,7 +424,6 @@ public final class MaterializedViewAnalyzer {
   ///       [#validateSourceTable] rejects it from MV creation, but the resolver itself
   ///       returns the name so downstream error messages can refer to the typed form)
   ///
-  ///
   /// Throws when both exist (hybrid) or neither exists.
   ///
   /// Public because [org.apache.pinot.materializedview.scheduler.MaterializedViewTaskScheduler]
@@ -552,7 +550,7 @@ public final class MaterializedViewAnalyzer {
   /// surfacing the rejection at create/update time gives the operator a clear error.
   ///
   /// The allow-list of "MV-side re-aggregatable" functions is sourced from
-  /// {@link MaterializedViewAggregationCatalog} — the same catalog the MV schema inferer
+  /// [MaterializedViewAggregationCatalog] — the same catalog the MV schema inferer
   /// uses to pick column types. Both consumers MUST agree on the supported set so an MV
   /// produced by the inferer cannot be later rejected here, and conversely so this analyzer
   /// cannot accept an MV the rewrite engine can't use.
@@ -780,7 +778,6 @@ public final class MaterializedViewAnalyzer {
   ///   - It is registered as a [DateTimeFieldSpec] (not a dimension / metric)
   ///   - It is produced by some SELECT expression (present in `partitionExprMaps`'s
   ///       values) — i.e. physically present in the MV
-  ///
   ///
   /// The stricter "format/granularity also match what the SELECT expression actually
   /// produces" check is performed by Step 7 ([#validateMaterializedViewTimeColumnFormat]), which

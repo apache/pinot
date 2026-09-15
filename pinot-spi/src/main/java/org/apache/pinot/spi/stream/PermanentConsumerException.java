@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A stream subsystem error that indicates a situation that is not likely to clear up by retrying the request (for
- * example, no such topic or offset out of range).
- */
+/// A stream subsystem error that indicates a situation that is not likely to clear up by retrying the request (for
+/// example, no such topic or offset out of range).
 public class PermanentConsumerException extends RuntimeException {
   public PermanentConsumerException(Throwable cause) {
     super(cause);

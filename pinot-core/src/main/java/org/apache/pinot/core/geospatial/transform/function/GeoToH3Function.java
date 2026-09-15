@@ -32,11 +32,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- *  A function that returns the H3 index address of a given geolocation. The function can take either 3 or 2 arguments:
- *   - geoToH3(longitude, latitude, h3Resolution)
- *   - geoToH3(point, h3Resolution)
- */
+/// A function that returns the H3 index address of a given geolocation. The function can take either 3 or 2 arguments:
+///  - geoToH3(longitude, latitude, h3Resolution)
+///  - geoToH3(point, h3Resolution)
 public class GeoToH3Function extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "geoToH3";
   private TransformFunction _firstArgument;

@@ -33,9 +33,9 @@ import static org.testng.Assert.assertTrue;
 /// These tests pin the supported-set and the type mapping so a future refactor cannot
 /// silently drop or remap an entry without a test failure. In particular:
 ///
-///   - the {@code DISTINCTCOUNTRAW*} entries are pinned to {@link DataType#BYTES} even
-///     though the v1 aggregation functions return {@code STRING} from
-///     {@code getFinalResultColumnType()} — this divergence is intentional (see catalog
+///   - the `DISTINCTCOUNTRAW*` entries are pinned to [DataType#BYTES] even
+///     though the v1 aggregation functions return `STRING` from
+///     `getFinalResultColumnType()` — this divergence is intentional (see catalog
 ///     class javadoc) and load-bearing for MV ingestion / rewrite correctness.
 public class MaterializedViewAggregationCatalogTest {
 

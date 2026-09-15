@@ -29,10 +29,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Tests for execution-thread resolution in {@link InstancePlanMakerImplV2}, covering the interplay
- * between {@code max.execution.threads}, {@code default.execution.threads}, and per-query overrides.
- */
+/// Tests for execution-thread resolution in [InstancePlanMakerImplV2], covering the interplay
+/// between `max.execution.threads`, `default.execution.threads`, and per-query overrides.
 public class InstancePlanMakerImplV2Test {
 
   private static final String BASE_QUERY = "SELECT * FROM testTable";

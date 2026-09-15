@@ -21,9 +21,7 @@ package org.apache.pinot.tsdb.spi;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 
 
-/**
- * The result of logical planning.
- */
+/// The result of logical planning.
 public class TimeSeriesLogicalPlanResult {
   private final BaseTimeSeriesPlanNode _planNode;
   private final TimeBuckets _timeBuckets;

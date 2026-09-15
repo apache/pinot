@@ -38,10 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the {@link PinotTaskGenerator} which reads the 'taskTimeoutMs',
- * 'numConcurrentTasksPerInstance' and 'maxAttemptsPerTask' from the cluster config.
- */
+/// Base implementation of the [PinotTaskGenerator] which reads the 'taskTimeoutMs',
+/// 'numConcurrentTasksPerInstance' and 'maxAttemptsPerTask' from the cluster config.
 public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskGenerator.class);
 
@@ -79,29 +77,25 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 
-  /**
-   * Updates the max num tasks parameter with the actual maximum number of subtasks based on
-   * 1. configured value for the table subtask
-   * 2. default value for the task type
-   * 3. if the task is triggered manually or adhoc
-   * 4. any cluster default(s)
-   * This is required to provide user visibility to the maximum number of subtasks that were used for the task
-   * @param defaultNumSubTasks - the default number of subtasks for the task type
-   */
+  /// Updates the max num tasks parameter with the actual maximum number of subtasks based on
+  /// 1. configured value for the table subtask
+  /// 2. default value for the task type
+  /// 3. if the task is triggered manually or adhoc
+  /// 4. any cluster default(s)
+  /// This is required to provide user visibility to the maximum number of subtasks that were used for the task
+  /// @param defaultNumSubTasks - the default number of subtasks for the task type
   public int getAndUpdateMaxNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
     int maxNumSubTasks = getNumSubTasks(taskConfigs, defaultNumSubTasks, tableName);
     taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumSubTasks));
     return maxNumSubTasks;
   }
 
-  /**
-   * Gets the final maximum number of subtasks for the given table based on the
-   * 1. configured value for the table subtask
-   * 2. default value for the task type
-   * 3. if the task is triggered manually or adhoc
-   * 4. any cluster default(s)
-   * @param defaultNumSubTasks - the default number of subtasks for the task type
-   */
+  /// Gets the final maximum number of subtasks for the given table based on the
+  /// 1. configured value for the table subtask
+  /// 2. default value for the task type
+  /// 3. if the task is triggered manually or adhoc
+  /// 4. any cluster default(s)
+  /// @param defaultNumSubTasks - the default number of subtasks for the task type
   public int getNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
     int tableMaxNumTasks = defaultNumSubTasks;
     String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
@@ -151,15 +145,13 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
         Integer.class, _clusterInfoAccessor);
   }
 
-  /**
-   * Returns the list of segment zk metadata for available segments in the table. The list does NOT filter out inactive
-   * segments based on the lineage. In order to compute the valid segments, we look at both idealstate and segment
-   * zk metadata in the property store and compute the intersection. In this way, we can avoid picking the dangling
-   * segments.
-   *
-   * @param tableNameWithType
-   * @return the list of segment zk metadata for available segments in the table.
-   */
+  /// Returns the list of segment zk metadata for available segments in the table. The list does NOT filter out inactive
+  /// segments based on the lineage. In order to compute the valid segments, we look at both idealstate and segment
+  /// zk metadata in the property store and compute the intersection. In this way, we can avoid picking the dangling
+  /// segments.
+  ///
+  /// @param tableNameWithType
+  /// @return the list of segment zk metadata for available segments in the table.
   public List<SegmentZKMetadata> getSegmentsZKMetadataForTable(String tableNameWithType) {
     IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
     Set<String> segmentsForTable = idealState.getPartitionSet();

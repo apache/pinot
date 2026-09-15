@@ -41,12 +41,10 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
- * {@link BrokerRequestHandler} based on the requested handle type.
- *
- * {@see: @CommonConstant
- */
+/// `BrokerRequestHandlerDelegate` delegates the inbound broker request to one of the enabled
+/// [BrokerRequestHandler] based on the requested handle type.
+///
+/// {@see: @CommonConstant
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
@@ -79,6 +77,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public int preConnectServers(long deadlineMs) {
+    // Only the single-stage handler owns the broker-to-server Netty channels; the multi-stage (gRPC)
+    // and time-series paths have nothing to pre-connect here.
+    return _singleStageBrokerRequestHandler.preConnectServers(deadlineMs);
+  }
+
+  @Override
   public void shutDown() {
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
@@ -87,6 +92,14 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_timeSeriesRequestHandler != null) {
       _timeSeriesRequestHandler.shutDown();
     }
+  }
+
+  /// Warms only the single-stage handler. It owns the broker-to-server netty channels, which is the data
+  /// plane that starts empty on a fresh broker; the multi-stage handler already warms its own compile path
+  /// in `start()`, and the time-series handler shares the single-stage transport.
+  @Override
+  public boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return _singleStageBrokerRequestHandler.warmUp(config, deadlineMs);
   }
 
   @Override

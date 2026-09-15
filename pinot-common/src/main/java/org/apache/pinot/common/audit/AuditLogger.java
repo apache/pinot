@@ -23,10 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for audit logging in Pinot components.
- * Uses SLF4J with structured JSON logging format and supports dynamic configuration.
- */
+/// Utility class for audit logging in Pinot components.
+/// Uses SLF4J with structured JSON logging format and supports dynamic configuration.
 public final class AuditLogger {
 
   private static final String PINOT_AUDIT_LOGGER_NAME = "org.apache.pinot.audit";
@@ -39,13 +37,11 @@ public final class AuditLogger {
     // Private constructor to prevent instantiation
   }
 
-  /**
-   * Logs an audit event as structured JSON at INFO level.
-   * Implements graceful degradation - audit logging failures will not propagate
-   * and will be logged separately for monitoring.
-   *
-   * @param auditEvent the audit event to log
-   */
+  /// Logs an audit event as structured JSON at INFO level.
+  /// Implements graceful degradation - audit logging failures will not propagate
+  /// and will be logged separately for monitoring.
+  ///
+  /// @param auditEvent the audit event to log
   public static void auditLog(AuditEvent auditEvent) {
     if (auditEvent == null) {
       return;

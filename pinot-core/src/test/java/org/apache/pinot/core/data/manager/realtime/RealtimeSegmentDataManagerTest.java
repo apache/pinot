@@ -29,7 +29,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
@@ -48,6 +50,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -83,8 +86,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -653,6 +659,96 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testOffloadRemovesSegmentMetadataBeforeReleasingConsumerSemaphore()
+      throws Exception {
+    // Use a fresh coordinator. Other tests release the shared semaphore without acquiring it, which inflates permits.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      // MutableSegmentImpl.offload() removes the segment from the upsert/dedup metadata managers. For partial upsert in
+      // PROTECTED mode that is where the primary keys are reverted to their previous locations, so it has to run
+      // (1) after the stream consumer is closed, so nothing can consume into the offloaded segment, and
+      // (2) while the consumer semaphore is still held, so the next consuming segment cannot replay against
+      //     un-reverted state.
+      AtomicInteger permitsWhenMetadataRemoved = new AtomicInteger(-1);
+      AtomicBoolean streamConsumerClosedWhenMetadataRemoved = new AtomicBoolean(false);
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doAnswer(invocation -> {
+        permitsWhenMetadataRemoved.set(semaphore.availablePermits());
+        streamConsumerClosedWhenMetadataRemoved.set(segmentDataManager.isStreamConsumerClosed());
+        return null;
+      }).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.offload();
+
+      verify(realtimeSegment).offload();
+      Assert.assertTrue(streamConsumerClosedWhenMetadataRemoved.get(),
+          "Stream consumer must be closed before the segment metadata is removed");
+      Assert.assertEquals(permitsWhenMetadataRemoved.get(), 0,
+          "Segment metadata must be removed while the consumer semaphore is still held");
+      Assert.assertEquals(semaphore.availablePermits(), 1, "Consumer semaphore must be released after offload");
+      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+    }
+  }
+
+  @Test
+  public void testOffloadAfterParallelConsumptionReleaseDoesNotReleaseSemaphoreTwice()
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      // With ALLOW_DURING_BUILD_ONLY / ALLOW_ALWAYS, buildSegmentInternal() and downloadSegmentAndReplace() let the
+      // next consuming segment start early by closing the consumer and releasing the semaphore together.
+      segmentDataManager.closeStreamConsumerAndReleaseSemaphore();
+      Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
+      Assert.assertEquals(semaphore.availablePermits(), 1,
+          "Consumer semaphore must be released for parallel consumption");
+      Assert.assertFalse(segmentDataManager.getConsumerSemaphoreAcquired().get());
+
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doAnswer(invocation -> null).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      segmentDataManager.offload();
+
+      verify(realtimeSegment).offload();
+      Assert.assertEquals(semaphore.availablePermits(), 1, "Offload must not release the consumer semaphore twice");
+    }
+  }
+
+  @Test
+  public void testOffloadReleasesConsumerSemaphoreWhenMetadataRemovalFails()
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+
+      MutableSegmentImpl realtimeSegment = spy((MutableSegmentImpl) segmentDataManager.getSegment());
+      doThrow(new RuntimeException("metadata removal failed")).when(realtimeSegment).offload();
+      segmentDataManager.setRealtimeSegment(realtimeSegment);
+
+      try {
+        segmentDataManager.offload();
+        Assert.fail("Expected the metadata removal failure to propagate");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "metadata removal failed");
+      }
+      // A failed metadata removal must not leave the semaphore held, or the partition can never consume again.
+      Assert.assertEquals(semaphore.availablePermits(), 1,
+          "Consumer semaphore must be released even when metadata removal fails");
+    }
+  }
+
+  @Test
   public void testOnlineTransitionSkipsLocalBuildOnCrcMismatch()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
@@ -1216,13 +1312,11 @@ public class RealtimeSegmentDataManagerTest {
     runCompletionModeDownloadTest("", "", expectedResult);
   }
 
-  /**
-   * Helper method to run completion mode download tests with different download URL scenarios.
-   *
-   * @param freshMetadataDownloadUrl The download URL returned by fetchZKMetadata (fresh metadata)
-   * @param initialSegmentDownloadUrl The download URL in the initial segment metadata
-   * @param expectedResult The expected test result (state and buildAndReplaceCalled flag)
-   */
+  /// Helper method to run completion mode download tests with different download URL scenarios.
+  ///
+  /// @param freshMetadataDownloadUrl The download URL returned by fetchZKMetadata (fresh metadata)
+  /// @param initialSegmentDownloadUrl The download URL in the initial segment metadata
+  /// @param expectedResult The expected test result (state and buildAndReplaceCalled flag)
   private void runCompletionModeDownloadTest(String freshMetadataDownloadUrl,
       String initialSegmentDownloadUrl, TestResult expectedResult)
       throws Exception {
@@ -1261,9 +1355,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /**
-   * Creates a table config with DOWNLOAD completion mode.
-   */
+  /// Creates a table config with DOWNLOAD completion mode.
   private TableConfig createTableConfigWithDownloadCompletionMode()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
@@ -1272,9 +1364,7 @@ public class RealtimeSegmentDataManagerTest {
     return tableConfig;
   }
 
-  /**
-   * Creates a mock table data manager that returns the specified download URL in fresh metadata.
-   */
+  /// Creates a mock table data manager that returns the specified download URL in fresh metadata.
   private RealtimeTableDataManager createMockTableDataManager(String downloadUrl) {
     RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
     when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
@@ -1299,9 +1389,7 @@ public class RealtimeSegmentDataManagerTest {
     return mockTableDataManager;
   }
 
-  /**
-   * Executes the consumer with a KEEP response to trigger the completion mode logic.
-   */
+  /// Executes the consumer with a KEEP response to trigger the completion mode logic.
   private void executeConsumerWithKeepResponse(FakeRealtimeSegmentDataManager segmentDataManager) {
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
@@ -1316,28 +1404,20 @@ public class RealtimeSegmentDataManagerTest {
     consumer.run();
   }
 
-  /**
-   * Helper class to encapsulate expected test results for segment state transitions.
-   * <p>
-   * This class holds the expected state of a {@link RealtimeSegmentDataManager} after a test,
-   * as well as whether the build-and-replace operation was expected to be called.
-   */
+  /// Helper class to encapsulate expected test results for segment state transitions.
+  ///
+  /// This class holds the expected state of a [RealtimeSegmentDataManager] after a test,
+  /// as well as whether the build-and-replace operation was expected to be called.
   private static class TestResult {
-    /**
-     * The expected state of the {@link RealtimeSegmentDataManager} after the test execution.
-     */
+    /// The expected state of the [RealtimeSegmentDataManager] after the test execution.
     final RealtimeSegmentDataManager.State _expectedState;
-    /**
-     * Whether the build-and-replace operation was expected to be called during the test.
-     */
+    /// Whether the build-and-replace operation was expected to be called during the test.
     final boolean _expectedBuildAndReplaceCalled;
 
-    /**
-     * Constructs a TestResult with the expected state and build-and-replace flag.
-     *
-     * @param expectedState The expected state of the segment manager after the test.
-     * @param expectedBuildAndReplaceCalled Whether build-and-replace was expected to be called.
-     */
+    /// Constructs a TestResult with the expected state and build-and-replace flag.
+    ///
+    /// @param expectedState The expected state of the segment manager after the test.
+    /// @param expectedBuildAndReplaceCalled Whether build-and-replace was expected to be called.
     TestResult(RealtimeSegmentDataManager.State expectedState, boolean expectedBuildAndReplaceCalled) {
       _expectedState = expectedState;
       _expectedBuildAndReplaceCalled = expectedBuildAndReplaceCalled;
@@ -1433,6 +1513,21 @@ public class RealtimeSegmentDataManagerTest {
 
     public RealtimeTableDataManager getTableDataManager() {
       return _tableDataManager;
+    }
+
+    /// Replaces the mutable segment so tests can observe or fail its offload().
+    public void setRealtimeSegment(MutableSegmentImpl realtimeSegment)
+        throws Exception {
+      Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+      realtimeSegmentField.setAccessible(true);
+      realtimeSegmentField.set(this, realtimeSegment);
+    }
+
+    public boolean isStreamConsumerClosed()
+        throws Exception {
+      Field streamConsumerClosedField = RealtimeSegmentDataManager.class.getDeclaredField("_streamConsumerClosed");
+      streamConsumerClosedField.setAccessible(true);
+      return ((AtomicBoolean) streamConsumerClosedField.get(this)).get();
     }
 
     public String getStopReason() {

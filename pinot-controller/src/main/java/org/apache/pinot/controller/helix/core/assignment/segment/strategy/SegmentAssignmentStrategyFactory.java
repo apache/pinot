@@ -28,17 +28,13 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 
 
-/**
- * Factory for SegmentAssignmentStrategy
- */
+/// Factory for SegmentAssignmentStrategy
 public class SegmentAssignmentStrategyFactory {
 
   private SegmentAssignmentStrategyFactory() {
   }
 
-  /**
-   * Determine Segment Assignment strategy
-   */
+  /// Determine Segment Assignment strategy
   public static SegmentAssignmentStrategy getSegmentAssignmentStrategy(HelixManager helixManager,
       TableConfig tableConfig, String assignmentType, InstancePartitions instancePartitions) {
     String assignmentStrategy = null;

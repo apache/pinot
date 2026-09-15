@@ -33,9 +33,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
- */
+/// The `MutableDataSource` class is the data source for a column in the mutable segment.
 @SuppressWarnings("rawtypes")
 public class MutableDataSource extends BaseDataSource {
 

@@ -134,11 +134,9 @@ public class ProtoBufUtils {
     return false;
   }
 
-  /**
-   * Get java type str from {@link Descriptors.FieldDescriptor} which directly fetched from protobuf object.
-   *
-   * @return The returned code phrase will be used as java type str in codegen sections.
-   */
+  /// Get java type str from [Descriptors.FieldDescriptor] which directly fetched from protobuf object.
+  ///
+  /// @return The returned code phrase will be used as java type str in codegen sections.
   public static String getTypeStrFromProto(Descriptors.FieldDescriptor desc) {
     switch (desc.getJavaType()) {
       case INT:

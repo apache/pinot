@@ -116,7 +116,7 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
   @Override
   protected IngestionConfig getIngestionConfig() {
     List<TransformConfig> transforms = new ArrayList<>();
-    transforms.add(new TransformConfig("timestampInEpoch", "now()"));
+    transforms.add(new TransformConfig("timestampInEpoch", "1704067200000"));
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transforms);

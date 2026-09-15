@@ -35,9 +35,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
-/**
- * Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
- */
+/// Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
 public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   public static final PinotJoinExchangeNodeInsertRule INSTANCE =
       new PinotJoinExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -129,12 +127,10 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
   }
 
-  /**
-   * For non-equi RIGHT JOINs (no equi keys), the default RANDOM(left)+BROADCAST(right) is incorrect because each
-   * worker independently tracks matched right rows via a local BitSet. Workers that receive only a subset of left rows
-   * will incorrectly emit right rows as unmatched. Invert to BROADCAST(left)+RANDOM(right) so each worker has the
-   * full left table and can correctly determine which of its local right rows are unmatched.
-   */
+  /// For non-equi RIGHT JOINs (no equi keys), the default RANDOM(left)+BROADCAST(right) is incorrect because each
+  /// worker independently tracks matched right rows via a local BitSet. Workers that receive only a subset of left rows
+  /// will incorrectly emit right rows as unmatched. Invert to BROADCAST(left)+RANDOM(right) so each worker has the
+  /// full left table and can correctly determine which of its local right rows are unmatched.
   private static PinotHintOptions.DistributionType inferLeftDistributionType(JoinInfo joinInfo,
       JoinRelType joinType) {
     if (!joinInfo.leftKeys.isEmpty()) {

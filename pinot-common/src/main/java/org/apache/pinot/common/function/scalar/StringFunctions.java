@@ -36,58 +36,48 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Inbuilt String Transformation Functions
- * The functions can be used as UDFs in Query when added in the FunctionRegistry.
- * @ScalarFunction annotation is used with each method for the registration
- *
- * Example usage:
- * <code> SELECT UPPER(playerName) FROM baseballStats LIMIT 10 </code>
- */
+/// Inbuilt String Transformation Functions
+/// The functions can be used as UDFs in Query when added in the FunctionRegistry.
+/// @ScalarFunction annotation is used with each method for the registration
+///
+/// Example usage:
+/// `SELECT UPPER(playerName) FROM baseballStats LIMIT 10`
 public class StringFunctions {
   private StringFunctions() {
   }
 
   private static final Soundex SOUNDEX = new Soundex();
 
-  /**
-   * @see StringUtils#reverse(String)
-   * @param input
-   * @return reversed input in from end to start
-   */
+  /// @see StringUtils#reverse(String)
+  /// @param input
+  /// @return reversed input in from end to start
   @ScalarFunction
   public static String reverse(String input) {
     return StringUtils.reverse(input);
   }
 
-  /**
-   * @see String#toLowerCase())
-   * @param input
-   * @return string in lower case format
-   */
+  /// @see String#toLowerCase())
+  /// @param input
+  /// @return string in lower case format
   @ScalarFunction
   public static String lower(String input) {
     return input.toLowerCase();
   }
 
-  /**
-   * @see String#toUpperCase()
-   * @param input
-   * @return string in upper case format
-   */
+  /// @see String#toUpperCase()
+  /// @param input
+  /// @return string in upper case format
   @ScalarFunction
   public static String upper(String input) {
     return input.toUpperCase();
   }
 
-  /**
-   * Converts the first letter of each word to uppercase and the rest to lowercase.
-   * Words are delimited by whitespace characters.
-   * This is a standard SQL function for title case conversion.
-   *
-   * @param input the input string to convert
-   * @return string with the first letter of each word capitalized and the rest in lowercase
-   */
+  /// Converts the first letter of each word to uppercase and the rest to lowercase.
+  /// Words are delimited by whitespace characters.
+  /// This is a standard SQL function for title case conversion.
+  ///
+  /// @param input the input string to convert
+  /// @return string with the first letter of each word capitalized and the rest in lowercase
   @ScalarFunction
   public static String initcap(String input) {
     if (input == null || input.isEmpty()) {
@@ -114,27 +104,23 @@ public class StringFunctions {
     return result.toString();
   }
 
-  /**
-   * @see String#substring(int)
-   * @param input Parent string
-   * @param beginIndex index from which substring should be created
-   * @return substring from beginIndex to end of the parent string
-   */
+  /// @see String#substring(int)
+  /// @param input Parent string
+  /// @param beginIndex index from which substring should be created
+  /// @return substring from beginIndex to end of the parent string
   @ScalarFunction
   public static String substr(String input, int beginIndex) {
     return StringUtils.substring(input, beginIndex);
   }
 
-  /**
-   * Returns the substring of the main string from beginIndex to endIndex.
-   * If endIndex is -1 returns the substring from begingIndex to end of the string.
-   *
-   * @see String#substring(int, int)
-   * @param input Parent string
-   * @param beginIndex index from which substring should be created
-   * @param endIndex index at which substring should be terminated
-   * @return substring from beginIndex to endIndex
-   */
+  /// Returns the substring of the main string from beginIndex to endIndex.
+  /// If endIndex is -1 returns the substring from begingIndex to end of the string.
+  ///
+  /// @see String#substring(int, int)
+  /// @param input Parent string
+  /// @param beginIndex index from which substring should be created
+  /// @param endIndex index at which substring should be terminated
+  /// @return substring from beginIndex to endIndex
   @ScalarFunction
   public static String substr(String input, int beginIndex, int endIndex) {
     if (endIndex == -1) {
@@ -143,24 +129,20 @@ public class StringFunctions {
     return StringUtils.substring(input, beginIndex, endIndex);
   }
 
-  /**
-   * @param input Parent string
-   * @param beginIndex 1 based index from which substring should be created
-   * @return substring from beginIndex to end of the parent string
-   */
+  /// @param input Parent string
+  /// @param beginIndex 1 based index from which substring should be created
+  /// @return substring from beginIndex to end of the parent string
   @ScalarFunction
   public static String substring(String input, int beginIndex) {
     return StringUtils.substring(input, beginIndex - 1);
   }
 
-  /**
-   * Returns the substring of the main string from beginIndex of length.
-   *
-   * @param input Parent string
-   * @param beginIndex 1 based index from which substring should be created
-   * @param length length of substring to be created
-   * @return a substirng of input string from beginIndex of length 'length'
-   */
+  /// Returns the substring of the main string from beginIndex of length.
+  ///
+  /// @param input Parent string
+  /// @param beginIndex 1 based index from which substring should be created
+  /// @param length length of substring to be created
+  /// @return a substirng of input string from beginIndex of length 'length'
   @ScalarFunction
   public static String substring(String input, int beginIndex, int length) {
     // index is always 1 based
@@ -169,32 +151,26 @@ public class StringFunctions {
     return StringUtils.substring(input, beginIndex, endIndex);
   }
 
-  /**
-   * Joins two input strings with no separator in between.
-   */
+  /// Joins two input strings with no separator in between.
   @ScalarFunction
   public static String concat(String input1, String input2) {
     return input1 + input2;
   }
 
-  /**
-   * @see String#trim()
-   * @param input
-   * @return trim spaces from both ends of the string
-   */
+  /// @see String#trim()
+  /// @param input
+  /// @return trim spaces from both ends of the string
   @ScalarFunction
   public static String trim(String input) {
     return input.trim();
   }
 
-  /**
-   * Standard SQL trim function.
-   *
-   * @param end BOTH|LEADING|TRAILING
-   * @param characters characters to be trimmed off
-   * @param value value to trim
-   * @return trim the characters from both/leading/trailing end of the string
-   */
+  /// Standard SQL trim function.
+  ///
+  /// @param end BOTH|LEADING|TRAILING
+  /// @param characters characters to be trimmed off
+  /// @param value value to trim
+  /// @return trim the characters from both/leading/trailing end of the string
   @ScalarFunction
   public static String trim(String end, String characters, String value) {
     int length = value.length();
@@ -225,159 +201,131 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * @see StringUtils#left(String, int)
-   * @param input
-   * @return get substring starting from the first index and extending upto specified length.
-   */
+  /// @see StringUtils#left(String, int)
+  /// @param input
+  /// @return get substring starting from the first index and extending upto specified length.
   @ScalarFunction(names = {"leftSubStr", "left"})
   public static String leftSubStr(String input, int length) {
     return StringUtils.left(input, length);
   }
 
-  /**
-   * @see StringUtils#right(String, int)
-   * @param input
-   * @return get substring ending at the last index with specified length
-   */
+  /// @see StringUtils#right(String, int)
+  /// @param input
+  /// @return get substring ending at the last index with specified length
   @ScalarFunction(names = {"rightSubStr", "right"})
   public static String rightSubStr(String input, int length) {
     return StringUtils.right(input, length);
   }
 
-  /**
-   * @see String#length()
-   * @param input
-   * @return length of the string
-   */
+  /// @see String#length()
+  /// @param input
+  /// @return length of the string
   @ScalarFunction
   public static int length(String input) {
     return input.length();
   }
 
-  /**
-   * @see StringUtils#ordinalIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurrence of a substring within the String
-   * @param input
-   * @param find substring to find
-   * @param instance Integer denoting the instance no.
-   * @return start index of the Nth instance of substring in main string
-   */
+  /// @see StringUtils#ordinalIndexOf(CharSequence, CharSequence, int)
+  /// Return the Nth occurrence of a substring within the String
+  /// @param input
+  /// @param find substring to find
+  /// @param instance Integer denoting the instance no.
+  /// @return start index of the Nth instance of substring in main string
   @ScalarFunction
   public static int strpos(String input, String find, int instance) {
     return StringUtils.ordinalIndexOf(input, find, instance);
   }
 
-  /**
-   * @see StringUtils#indexOf(CharSequence, CharSequence)
-   * Return the 1st occurrence of a substring within the String
-   * @param input
-   * @param find substring to find
-   * @return start index of the 1st instance of substring in main string
-   */
+  /// @see StringUtils#indexOf(CharSequence, CharSequence)
+  /// Return the 1st occurrence of a substring within the String
+  /// @param input
+  /// @param find substring to find
+  /// @return start index of the 1st instance of substring in main string
   @ScalarFunction
   public static int strpos(String input, String find) {
     return StringUtils.indexOf(input, find);
   }
 
-  /**
-   * @see StringUtils#lastIndexOf(CharSequence, CharSequence)
-   * Return the last occurrence of a substring within the String
-   * @param input
-   * @param find substring to find
-   * @return start index of the last instance of substring in main string
-   */
+  /// @see StringUtils#lastIndexOf(CharSequence, CharSequence)
+  /// Return the last occurrence of a substring within the String
+  /// @param input
+  /// @param find substring to find
+  /// @return start index of the last instance of substring in main string
   @ScalarFunction
   public static int strrpos(String input, String find) {
     return StringUtils.lastIndexOf(input, find);
   }
 
-  /**
-   * @see StringUtils#lastIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurrence of a substring in string starting from the end of the string.
-   * @param input
-   * @param find substring to find
-   * @param instance Integer denoting the instance no.
-   * @return start index of the Nth instance of substring in main string starting from the end of the string.
-   */
+  /// @see StringUtils#lastIndexOf(CharSequence, CharSequence, int)
+  /// Return the Nth occurrence of a substring in string starting from the end of the string.
+  /// @param input
+  /// @param find substring to find
+  /// @param instance Integer denoting the instance no.
+  /// @return start index of the Nth instance of substring in main string starting from the end of the string.
   @ScalarFunction
   public static int strrpos(String input, String find, int instance) {
     return StringUtils.lastIndexOf(input, find, instance);
   }
 
-  /**
-   * @see StringUtils#startsWith(CharSequence, CharSequence)
-   * @param input
-   * @param prefix substring to check if it is the prefix
-   * @return true if string starts with prefix, false o.w.
-   */
+  /// @see StringUtils#startsWith(CharSequence, CharSequence)
+  /// @param input
+  /// @param prefix substring to check if it is the prefix
+  /// @return true if string starts with prefix, false o.w.
   @ScalarFunction
   public static boolean startsWith(String input, String prefix) {
     return StringUtils.startsWith(input, prefix);
   }
 
-  /**
-   * @see StringUtils#endsWith(CharSequence, CharSequence)
-   * @param input
-   * @param suffix substring to check if it is the prefix
-   * @return true if string ends with prefix, false o.w.
-   */
+  /// @see StringUtils#endsWith(CharSequence, CharSequence)
+  /// @param input
+  /// @param suffix substring to check if it is the prefix
+  /// @return true if string ends with prefix, false o.w.
   @ScalarFunction
   public static boolean endsWith(String input, String suffix) {
     return StringUtils.endsWith(input, suffix);
   }
 
-  /**
-   * @see StringUtils#rightPad(String, int, char)
-   * @param input
-   * @param size final size of the string
-   * @param pad pad string to be used
-   * @return string padded from the right side with pad to reach final size
-   */
+  /// @see StringUtils#rightPad(String, int, char)
+  /// @param input
+  /// @param size final size of the string
+  /// @param pad pad string to be used
+  /// @return string padded from the right side with pad to reach final size
   @ScalarFunction
   public static String rpad(String input, int size, String pad) {
     return StringUtils.rightPad(input, size, pad);
   }
 
-  /**
-   * @see StringUtils#leftPad(String, int, char)
-   * @param input
-   * @param size final size of the string
-   * @param pad pad string to be used
-   * @return string padded from the left side with pad to reach final size
-   */
+  /// @see StringUtils#leftPad(String, int, char)
+  /// @param input
+  /// @param size final size of the string
+  /// @param pad pad string to be used
+  /// @return string padded from the left side with pad to reach final size
   @ScalarFunction
   public static String lpad(String input, int size, String pad) {
     return StringUtils.leftPad(input, size, pad);
   }
 
-  /**
-   * @see String#codePointAt(int)
-   * @param input
-   * @return the Unicode codepoint of the first character of the string
-   */
+  /// @see String#codePointAt(int)
+  /// @param input
+  /// @return the Unicode codepoint of the first character of the string
   @ScalarFunction
   public static int codepoint(String input) {
     return input.codePointAt(0);
   }
 
-  /**
-   * @see Character#toChars(int)
-   * @param codepoint
-   * @return the character corresponding to the Unicode codepoint
-   */
+  /// @see Character#toChars(int)
+  /// @param codepoint
+  /// @return the character corresponding to the Unicode codepoint
   @ScalarFunction
   public static String chr(int codepoint) {
     char[] result = Character.toChars(codepoint);
     return new String(result);
   }
 
-  /**
-   * @param bytes
-   * @param charsetName encoding
-   * @return bytearray to string
-   * returns null on exception
-   */
+  /// @param bytes
+  /// @param charsetName encoding
+  /// @return bytearray to string
+  /// returns null on exception
   @ScalarFunction
   public static String fromBytes(byte[] bytes, String charsetName) {
     try {
@@ -387,12 +335,10 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * @param input
-   * @param charsetName encoding
-   * @return bytearray to string
-   * returns null on exception
-   */
+  /// @param input
+  /// @param charsetName encoding
+  /// @return bytearray to string
+  /// returns null on exception
   @ScalarFunction
   public static byte[] toBytes(String input, String charsetName) {
     try {
@@ -402,49 +348,39 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * @see StandardCharsets#UTF_8#encode(String)
-   * @param input
-   * @return bytes
-   */
+  /// @see StandardCharsets#UTF_8#encode(String)
+  /// @param input
+  /// @return bytes
   @ScalarFunction
   public static byte[] toUtf8(String input) {
     return input.getBytes(StandardCharsets.UTF_8);
   }
 
-  /**
-   * @param input bytes
-   * @return UTF8 encoded string
-   */
+  /// @param input bytes
+  /// @return UTF8 encoded string
   @ScalarFunction
   public static String fromUtf8(byte[] input) {
     return new String(input, StandardCharsets.UTF_8);
   }
 
-  /**
-   * @see StandardCharsets#US_ASCII#encode(String)
-   * @param input
-   * @return bytes
-   */
+  /// @see StandardCharsets#US_ASCII#encode(String)
+  /// @param input
+  /// @return bytes
   @ScalarFunction
   public static byte[] toAscii(String input) {
     return input.getBytes(StandardCharsets.US_ASCII);
   }
 
-  /**
-   * @param input bytes
-   * @return ASCII encoded string
-   */
+  /// @param input bytes
+  /// @return ASCII encoded string
   @ScalarFunction
   public static String fromAscii(byte[] input) {
     return new String(input, StandardCharsets.US_ASCII);
   }
 
-  /**
-   * @param input UUID as string
-   * @return bytearray
-   * returns bytes and null on exception
-   */
+  /// @param input UUID as string
+  /// @return bytearray
+  /// returns bytes and null on exception
   @ScalarFunction
   public static byte[] toUUIDBytes(String input) {
     try {
@@ -454,64 +390,52 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * @param input UUID serialized to its 16-byte form
-   * @return canonical RFC 4122 String representation of the UUID
-   */
+  /// @param input UUID serialized to its 16-byte form
+  /// @return canonical RFC 4122 String representation of the UUID
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
     return UuidUtils.toString(input);
   }
 
-  /**
-   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
-   * @param input
-   * @return transforms string with NFC normalization form.
-   */
+  /// @see Normalizer#normalize(CharSequence, Normalizer.Form)
+  /// @param input
+  /// @return transforms string with NFC normalization form.
   @ScalarFunction
   public static String normalize(String input) {
     return Normalizer.normalize(input, Normalizer.Form.NFC);
   }
 
-  /**
-   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
-   * @param input
-   * @param form
-   * @return transforms string with the specified normalization form
-   */
+  /// @see Normalizer#normalize(CharSequence, Normalizer.Form)
+  /// @param input
+  /// @param form
+  /// @return transforms string with the specified normalization form
   @ScalarFunction
   public static String normalize(String input, String form) {
     Normalizer.Form targetForm = Normalizer.Form.valueOf(form);
     return Normalizer.normalize(input, targetForm);
   }
 
-  /**
-   * @see StringUtils#split(String, String)
-   * @param input
-   * @param delimiter
-   * @return splits string on specified delimiter and returns an array.
-   */
+  /// @see StringUtils#split(String, String)
+  /// @param input
+  /// @param delimiter
+  /// @return splits string on specified delimiter and returns an array.
   @ScalarFunction(names = {"split", "stringToArray"})
   public static String[] split(String input, String delimiter) {
     return StringUtils.splitByWholeSeparator(input, delimiter);
   }
 
-  /**
-   * @param input
-   * @param delimiter
-   * @param limit
-   * @return splits string on specified delimiter limiting the number of results till the specified limit
-   */
+  /// @param input
+  /// @param delimiter
+  /// @param limit
+  /// @return splits string on specified delimiter limiting the number of results till the specified limit
   @ScalarFunction(names = {"split", "stringToArray"})
   public static String[] split(String input, String delimiter, int limit) {
     return StringUtils.splitByWholeSeparator(input, delimiter, limit);
   }
 
-  /**
-   * @param input an input string for prefix strings generations.
-   * @param maxlength the max length of the prefix strings for the string.
-   * @return generate an array of prefix strings of the string that are shorter than the specified length.
-   */
+  /// @param input an input string for prefix strings generations.
+  /// @param maxlength the max length of the prefix strings for the string.
+  /// @return generate an array of prefix strings of the string that are shorter than the specified length.
   @ScalarFunction
   public static String[] prefixes(String input, int maxlength) {
     int arrLength = Math.min(maxlength, input.length());
@@ -522,12 +446,10 @@ public class StringFunctions {
     return prefixArr;
   }
 
-  /**
-   * @param input an input string for prefix strings generations.
-   * @param maxlength the max length of the prefix strings for the string.
-   * @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
-   * @return generate an array of prefix matchers of the string that are shorter than the specified length.
-   */
+  /// @param input an input string for prefix strings generations.
+  /// @param maxlength the max length of the prefix strings for the string.
+  /// @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
+  /// @return generate an array of prefix matchers of the string that are shorter than the specified length.
   @ScalarFunction(nullableParameters = true)
   public static String[] prefixesWithPrefix(String input, int maxlength, @Nullable String prefix) {
     if (prefix == null) {
@@ -541,11 +463,9 @@ public class StringFunctions {
     return prefixArr;
   }
 
-  /**
-   * @param input an input string for suffix strings generations.
-   * @param maxlength the max length of the suffix strings for the string.
-   * @return generate an array of suffix strings of the string that are shorter than the specified length.
-   */
+  /// @param input an input string for suffix strings generations.
+  /// @param maxlength the max length of the suffix strings for the string.
+  /// @return generate an array of suffix strings of the string that are shorter than the specified length.
   @ScalarFunction
   public static String[] suffixes(String input, int maxlength) {
     int arrLength = Math.min(maxlength, input.length());
@@ -556,12 +476,10 @@ public class StringFunctions {
     return suffixArr;
   }
 
-  /**
-   * @param input an input string for suffix strings generations.
-   * @param maxlength the max length of the suffix strings for the string.
-   * @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
-   * @return generate an array of suffix matchers of the string that are shorter than the specified length.
-   */
+  /// @param input an input string for suffix strings generations.
+  /// @param maxlength the max length of the suffix strings for the string.
+  /// @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
+  /// @return generate an array of suffix matchers of the string that are shorter than the specified length.
   @ScalarFunction(nullableParameters = true)
   public static String[] suffixesWithSuffix(String input, int maxlength, @Nullable String suffix) {
     if (suffix == null) {
@@ -575,13 +493,11 @@ public class StringFunctions {
     return suffixArr;
   }
 
-  /**
-   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
-   * @param input the input String to be split into parts.
-   * @param delimiter the specified delimiter to split the input string.
-   * @param index we allow negative value for index which indicates the index from the end.
-   * @return splits string on specified delimiter and returns String at specified index from the split.
-   */
+  /// TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
+  /// @param input the input String to be split into parts.
+  /// @param delimiter the specified delimiter to split the input string.
+  /// @param index we allow negative value for index which indicates the index from the end.
+  /// @return splits string on specified delimiter and returns String at specified index from the split.
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
     // compare with BenchmarkSplitPart (perf module) for future changes
@@ -708,20 +624,18 @@ public class StringFunctions {
     return "null";
   }
 
-  /**
-   * Splits input by delimiter with a limit on the number of parts and returns the part at the given index.
-   * Avoids allocating the full String array by scanning the input directly.
-   *
-   * <p>Replicates the semantics of {@link StringUtils#splitByWholeSeparator(String, String, int)}:
-   * leading separators are stripped, consecutive separators in the middle are collapsed,
-   * and trailing separators produce one empty trailing token.
-   *
-   * @param input the input String to be split into parts.
-   * @param delimiter the specified delimiter to split the input string.
-   * @param limit the max count of parts that the input string can be split into (0 or negative means unlimited).
-   * @param index the specified index for the split parts to be returned; negative indices count from the end.
-   * @return the part at the given index, or "null" if the index is out of bounds.
-   */
+  /// Splits input by delimiter with a limit on the number of parts and returns the part at the given index.
+  /// Avoids allocating the full String array by scanning the input directly.
+  ///
+  /// Replicates the semantics of [StringUtils#splitByWholeSeparator(String, String, int)]:
+  /// leading separators are stripped, consecutive separators in the middle are collapsed,
+  /// and trailing separators produce one empty trailing token.
+  ///
+  /// @param input the input String to be split into parts.
+  /// @param delimiter the specified delimiter to split the input string.
+  /// @param limit the max count of parts that the input string can be split into (0 or negative means unlimited).
+  /// @param index the specified index for the split parts to be returned; negative indices count from the end.
+  /// @return the part at the given index, or "null" if the index is out of bounds.
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int limit, int index) {
     // Null/empty delimiter splits on whitespace — complex rules best handled by Apache Commons.
@@ -759,11 +673,9 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * Counts the number of fields produced by splitting input with the given delimiter and limit,
-   * following splitByWholeSeparator semantics (leading seps stripped, consecutive collapsed,
-   * trailing seps produce one empty field). Does not allocate any String objects.
-   */
+  /// Counts the number of fields produced by splitting input with the given delimiter and limit,
+  /// following splitByWholeSeparator semantics (leading seps stripped, consecutive collapsed,
+  /// trailing seps produce one empty field). Does not allocate any String objects.
   private static int countFieldsLimited(String input, String delimiter, int effectiveLimit,
       int inputLen, int delimLen) {
     int pos = 0;
@@ -803,11 +715,9 @@ public class StringFunctions {
     return totalFields;
   }
 
-  /**
-   * Extracts the field at the given positive index by scanning forward through the input.
-   * Follows splitByWholeSeparator semantics: leading separators stripped, consecutive collapsed,
-   * trailing separators produce one empty token. With limit, the last field gets the remainder.
-   */
+  /// Extracts the field at the given positive index by scanning forward through the input.
+  /// Follows splitByWholeSeparator semantics: leading separators stripped, consecutive collapsed,
+  /// trailing separators produce one empty token. With limit, the last field gets the remainder.
   private static String splitPartLimitedForward(String input, String delimiter, int effectiveLimit, int index,
       int inputLen, int delimLen) {
     int pos = 0;
@@ -863,44 +773,36 @@ public class StringFunctions {
     return "null";
   }
 
-  /**
-   * @see StringUtils#repeat(char, int)
-   * @param input
-   * @param times
-   * @return concatenate the string to itself specified number of times
-   */
+  /// @see StringUtils#repeat(char, int)
+  /// @param input
+  /// @param times
+  /// @return concatenate the string to itself specified number of times
   @ScalarFunction
   public static String repeat(String input, int times) {
     return StringUtils.repeat(input, times);
   }
 
-  /**
-   * @see StringUtils#repeat(String, String, int)
-   * @param input
-   * @param times
-   * @return concatenate the string to itself specified number of times with specified separator
-   */
+  /// @see StringUtils#repeat(String, String, int)
+  /// @param input
+  /// @param times
+  /// @return concatenate the string to itself specified number of times with specified separator
   @ScalarFunction
   public static String repeat(String input, String sep, int times) {
     return StringUtils.repeat(input, sep, times);
   }
 
-  /**
-   * @see StringUtils#remove(String, String)
-   * @param input
-   * @param search
-   * @return removes all instances of search from string
-   */
+  /// @see StringUtils#remove(String, String)
+  /// @param input
+  /// @param search
+  /// @return removes all instances of search from string
   @ScalarFunction
   public static String remove(String input, String search) {
     return Strings.CS.remove(input, search);
   }
 
-  /**
-   * @param input1
-   * @param input2
-   * @return returns the Hamming distance of input1 and input2, note that the two strings must have the same length.
-   */
+  /// @param input1
+  /// @param input2
+  /// @return returns the Hamming distance of input1 and input2, note that the two strings must have the same length.
   @ScalarFunction
   public static int hammingDistance(String input1, String input2) {
     if (input1.length() != input2.length()) {
@@ -915,16 +817,14 @@ public class StringFunctions {
     return distance;
   }
 
-  /**
-   * Calculates the Levenshtein edit distance between two strings.
-   * The Levenshtein distance is the minimum number of single-character edits
-   * (insertions, deletions, or substitutions) needed to transform one string into another.
-   * This complements the existing hammingDistance function by handling strings of different lengths.
-   *
-   * @param input1 First string
-   * @param input2 Second string
-   * @return The Levenshtein distance between the two strings
-   */
+  /// Calculates the Levenshtein edit distance between two strings.
+  /// The Levenshtein distance is the minimum number of single-character edits
+  /// (insertions, deletions, or substitutions) needed to transform one string into another.
+  /// This complements the existing hammingDistance function by handling strings of different lengths.
+  ///
+  /// @param input1 First string
+  /// @param input2 Second string
+  /// @return The Levenshtein distance between the two strings
   @ScalarFunction
   public static int levenshteinDistance(String input1, String input2) {
     int len1 = input1.length();
@@ -964,75 +864,58 @@ public class StringFunctions {
     return dp[len1][len2];
   }
 
-  /**
-   * @see String#contains(CharSequence)
-   * @param input
-   * @param substring
-   * @return returns true if substring present in main string else false.
-   */
+  /// @see String#contains(CharSequence)
+  /// @param input
+  /// @param substring
+  /// @return returns true if substring present in main string else false.
   @ScalarFunction
   public static boolean contains(String input, String substring) {
     return input.contains(substring);
   }
 
-  /**
-   * Compare input strings lexicographically.
-   * @return the value 0 if the first string argument is equal to second string; a value less than 0 if first string
-   * argument is lexicographically less than the second string argument; and a value greater than 0 if the first string
-   * argument is lexicographically greater than the second string argument.
-   */
+  /// Compare input strings lexicographically.
+  /// @return the value 0 if the first string argument is equal to second string; a value less than 0 if first string
+  /// argument is lexicographically less than the second string argument; and a value greater than 0 if the first string
+  /// argument is lexicographically greater than the second string argument.
   @ScalarFunction
   public static int strcmp(String input1, String input2) {
     return input1.compareTo(input2);
   }
 
-  /**
-   *
-   * @param input plaintext string
-   * @return url encoded string
-   */
+  /// @param input plaintext string
+  /// @return url encoded string
   @ScalarFunction
   public static String encodeUrl(String input) {
     return URIUtils.encode(input);
   }
 
-  /**
-   *
-   * @param input url encoded string
-   * @return plaintext string
-   */
+  /// @param input url encoded string
+  /// @return plaintext string
   @ScalarFunction
   public static String decodeUrl(String input) {
     return URIUtils.decode(input);
   }
 
-  /**
-   * @param input binary data
-   * @return Base64 encoded String
-   */
+  /// @param input binary data
+  /// @return Base64 encoded String
   @ScalarFunction
   public static String toBase64(byte[] input) {
     return Base64.getEncoder().encodeToString(input);
   }
 
-  /**
-   * @param input Base64 encoded String
-   * @return decoded binary data
-   */
+  /// @param input Base64 encoded String
+  /// @return decoded binary data
   @ScalarFunction
   public static byte[] fromBase64(String input) {
     return Base64.getDecoder().decode(input);
   }
 
-  /**
-   * Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
-   * to filter out malformed json.
-   * Null values are handled by the function invoker here and this function processes the results on non-null values.
-   *
-   * @param inputStr Input string to test for valid json
-   * @return  true in case of valid json parsing else false
-   *
-   */
+  /// Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
+  /// to filter out malformed json.
+  /// Null values are handled by the function invoker here and this function processes the results on non-null values.
+  ///
+  /// @param inputStr Input string to test for valid json
+  /// @return  true in case of valid json parsing else false
   @ScalarFunction
   public static boolean isJson(String inputStr) {
     try {
@@ -1043,9 +926,7 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * Returns the Soundex code for a string. Empty string returns "0000" (SQL standard behaviour).
-   */
+  /// Returns the Soundex code for a string. Empty string returns "0000" (SQL standard behaviour).
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static String soundex(@Nullable String input) {
@@ -1058,11 +939,9 @@ public class StringFunctions {
     return SOUNDEX.soundex(input);
   }
 
-  /**
-   * Returns an integer 0-4 indicating how similar two strings sound based on their Soundex codes.
-   * 4 means the codes are identical; 0 means they share no common code characters.
-   * The framework null-propagates when either argument is null.
-   */
+  /// Returns an integer 0-4 indicating how similar two strings sound based on their Soundex codes.
+  /// 4 means the codes are identical; 0 means they share no common code characters.
+  /// The framework null-propagates when either argument is null.
   @ScalarFunction
   public static int difference(String input1, String input2) {
     String code1 = soundex(input1);
@@ -1076,24 +955,20 @@ public class StringFunctions {
     return matches;
   }
 
-  /**
-   * Returns the ASCII code of the first character, or 0 for an empty string.
-   * Matches SQL standard behavior (MySQL, PostgreSQL, Trino).
-   *
-   * @param input the input string
-   * @return ASCII value of the first character, or 0 if the string is empty
-   */
+  /// Returns the ASCII code of the first character, or 0 for an empty string.
+  /// Matches SQL standard behavior (MySQL, PostgreSQL, Trino).
+  ///
+  /// @param input the input string
+  /// @return ASCII value of the first character, or 0 if the string is empty
   @ScalarFunction
   public static int ascii(String input) {
     return input.isEmpty() ? 0 : (int) input.charAt(0);
   }
 
-  /**
-   * Returns a string consisting of {@code n} space characters.
-   *
-   * @param n the number of spaces
-   * @return a string of n spaces, or empty string if n is non-positive
-   */
+  /// Returns a string consisting of `n` space characters.
+  ///
+  /// @param n the number of spaces
+  /// @return a string of n spaces, or empty string if n is non-positive
   @ScalarFunction
   public static String space(int n) {
     if (n <= 0) {
@@ -1102,17 +977,15 @@ public class StringFunctions {
     return StringUtils.repeat(' ', n);
   }
 
-  /**
-   * Returns the substring before (positive count) or after (negative count) the Nth delimiter occurrence.
-   *
-   * <p>MySQL-compatible semantics: {@code substringIndex("a.b.c.d", ".", 2)} returns {@code "a.b"}.
-   * Negative count counts from the right: {@code substringIndex("a.b.c.d", ".", -2)} returns {@code "c.d"}.
-   *
-   * @param input the input string
-   * @param delimiter the delimiter to search for
-   * @param count occurrence count (positive = from left, negative = from right)
-   * @return the substring, or the entire input if the delimiter does not occur enough times
-   */
+  /// Returns the substring before (positive count) or after (negative count) the Nth delimiter occurrence.
+  ///
+  /// MySQL-compatible semantics: `substringIndex("a.b.c.d", ".", 2)` returns `"a.b"`.
+  /// Negative count counts from the right: `substringIndex("a.b.c.d", ".", -2)` returns `"c.d"`.
+  ///
+  /// @param input the input string
+  /// @param delimiter the delimiter to search for
+  /// @param count occurrence count (positive = from left, negative = from right)
+  /// @return the substring, or the entire input if the delimiter does not occur enough times
   @ScalarFunction(names = {"substringIndex", "substring_index"})
   public static String substringIndex(String input, String delimiter, int count) {
     if (count == 0 || delimiter.isEmpty()) {
@@ -1127,13 +1000,11 @@ public class StringFunctions {
     }
   }
 
-  /**
-   * Returns the first line of the input string (up to the first line terminator).
-   * Handles Unix ({@code \n}), Windows ({@code \r\n}), and old Mac ({@code \r}) line endings.
-   *
-   * @param input the input string
-   * @return the first line, without the line terminator
-   */
+  /// Returns the first line of the input string (up to the first line terminator).
+  /// Handles Unix (`\n`), Windows (`\r\n`), and old Mac (`\r`) line endings.
+  ///
+  /// @param input the input string
+  /// @return the first line, without the line terminator
   @ScalarFunction
   public static String firstLine(String input) {
     int idxN = input.indexOf('\n');
@@ -1145,36 +1016,30 @@ public class StringFunctions {
     return input.substring(0, idx);
   }
 
-  /**
-   * Returns true if the string starts with the given prefix, ignoring case differences.
-   *
-   * @param input the input string
-   * @param prefix the prefix to check
-   * @return true if the input starts with the prefix (case-insensitive)
-   */
+  /// Returns true if the string starts with the given prefix, ignoring case differences.
+  ///
+  /// @param input the input string
+  /// @param prefix the prefix to check
+  /// @return true if the input starts with the prefix (case-insensitive)
   @ScalarFunction
   public static boolean startsWithCaseInsensitive(String input, String prefix) {
     return Strings.CI.startsWith(input, prefix);
   }
 
-  /**
-   * Returns true if the string ends with the given suffix, ignoring case differences.
-   *
-   * @param input the input string
-   * @param suffix the suffix to check
-   * @return true if the input ends with the suffix (case-insensitive)
-   */
+  /// Returns true if the string ends with the given suffix, ignoring case differences.
+  ///
+  /// @param input the input string
+  /// @param suffix the suffix to check
+  /// @return true if the input ends with the suffix (case-insensitive)
   @ScalarFunction
   public static boolean endsWithCaseInsensitive(String input, String suffix) {
     return Strings.CI.endsWith(input, suffix);
   }
 
-  /**
-   * Returns true if all characters in the string are valid ASCII (values 0–127).
-   *
-   * @param input the input string
-   * @return true if every character is in the ASCII range
-   */
+  /// Returns true if all characters in the string are valid ASCII (values 0–127).
+  ///
+  /// @param input the input string
+  /// @return true if every character is in the ASCII range
   @ScalarFunction
   public static boolean isValidASCII(String input) {
     for (int i = 0; i < input.length(); i++) {
@@ -1185,50 +1050,42 @@ public class StringFunctions {
     return true;
   }
 
-  /**
-   * Returns the number of bytes in the UTF-8 representation of the string.
-   *
-   * @param input the input string
-   * @return byte length of the UTF-8 encoded string
-   */
+  /// Returns the number of bytes in the UTF-8 representation of the string.
+  ///
+  /// @param input the input string
+  /// @return byte length of the UTF-8 encoded string
   @ScalarFunction(names = {"octetLength", "octet_length"})
   public static int octetLength(String input) {
     return input.getBytes(StandardCharsets.UTF_8).length;
   }
 
-  /**
-   * Returns the number of bits in the UTF-8 representation of the string.
-   *
-   * @param input the input string
-   * @return bit length of the UTF-8 encoded string
-   */
+  /// Returns the number of bits in the UTF-8 representation of the string.
+  ///
+  /// @param input the input string
+  /// @return bit length of the UTF-8 encoded string
   @ScalarFunction(names = {"bitLength", "bit_length"})
   public static int bitLength(String input) {
     return octetLength(input) * 8;
   }
 
-  /**
-   * Returns the number of Unicode codepoints in the string.
-   * Unlike {@link #length(String)}, this correctly counts supplementary characters (e.g., emoji) as one.
-   *
-   * @param input the input string
-   * @return number of Unicode codepoints
-   */
+  /// Returns the number of Unicode codepoints in the string.
+  /// Unlike [#length(String)], this correctly counts supplementary characters (e.g., emoji) as one.
+  ///
+  /// @param input the input string
+  /// @return number of Unicode codepoints
   @ScalarFunction(names = {"charLength", "char_length", "characterLength", "character_length"})
   public static int charLength(String input) {
     return input.codePointCount(0, input.length());
   }
 
-  /**
-   * Returns the number of non-overlapping matches of a regular expression pattern in the string.
-   *
-   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
-   * adding a {@code RegexpCountConstFunctions} variant in the {@code regexp/} package.
-   *
-   * @param input the input string
-   * @param regexp the regular expression pattern
-   * @return count of non-overlapping matches
-   */
+  /// Returns the number of non-overlapping matches of a regular expression pattern in the string.
+  ///
+  /// Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+  /// adding a `RegexpCountConstFunctions` variant in the `regexp/` package.
+  ///
+  /// @param input the input string
+  /// @param regexp the regular expression pattern
+  /// @return count of non-overlapping matches
   @ScalarFunction(names = {"regexpCount", "regexp_count"})
   public static int regexpCount(String input, String regexp) {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
@@ -1239,16 +1096,14 @@ public class StringFunctions {
     return count;
   }
 
-  /**
-   * Returns the first substring that matches the regular expression, or null if no match is found.
-   *
-   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
-   * adding a {@code RegexpSubstrConstFunctions} variant in the {@code regexp/} package.
-   *
-   * @param input the input string
-   * @param regexp the regular expression pattern
-   * @return the first matching substring, or null if no match
-   */
+  /// Returns the first substring that matches the regular expression, or null if no match is found.
+  ///
+  /// Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+  /// adding a `RegexpSubstrConstFunctions` variant in the `regexp/` package.
+  ///
+  /// @param input the input string
+  /// @param regexp the regular expression pattern
+  /// @return the first matching substring, or null if no match
   @Nullable
   @ScalarFunction(names = {"regexpSubstr", "regexp_substr"})
   public static String regexpSubstr(String input, String regexp) {
@@ -1256,24 +1111,23 @@ public class StringFunctions {
     return matcher.find() ? matcher.group() : null;
   }
 
-  /**
-   * Returns a string with every occurrence of a character in {@code from} replaced by the corresponding character in
-   * {@code to}. Characters in {@code input} that do not appear in {@code from} are left unchanged. If {@code from} is
-   * longer than {@code to}, characters beyond the length of {@code to} are deleted from the result. Equivalent to the
-   * SQL standard {@code TRANSLATE(string, from, to)} function supported by PostgreSQL, Oracle, and Trino.
-   *
-   * <p>Examples:
-   * <pre>
-   *   translate("hello", "aeiou", "AEIOU") → "hEllO"
-   *   translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
-   *   translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
-   * </pre>
-   *
-   * @param input the source string
-   * @param from  characters to search for (must not be null)
-   * @param to    replacement characters (must not be null; may be shorter than {@code from})
-   * @return the translated string
-   */
+  /// Returns a string with every occurrence of a character in `from` replaced by the corresponding character in
+  /// `to`. Characters in `input` that do not appear in `from` are left unchanged. If `from` is
+  /// longer than `to`, characters beyond the length of `to` are deleted from the result. Equivalent to the
+  /// SQL standard `TRANSLATE(string, from, to)` function supported by PostgreSQL, Oracle, and Trino.
+  ///
+  /// Examples:
+  ///
+  /// ```
+  /// translate("hello", "aeiou", "AEIOU") → "hEllO"
+  /// translate("abc", "abc", "xy")        → "xy"   (c has no target → deleted)
+  /// translate("abcdef", "ace", "XY")     → "XbYdf" (e has no target → deleted)
+  /// ```
+  ///
+  /// @param input the source string
+  /// @param from  characters to search for (must not be null)
+  /// @param to    replacement characters (must not be null; may be shorter than `from`)
+  /// @return the translated string
   @ScalarFunction
   public static String translate(String input, String from, String to) {
     if (input.isEmpty() || from.isEmpty()) {
@@ -1293,43 +1147,40 @@ public class StringFunctions {
     return sb.toString();
   }
 
-  /**
-   * Replaces a substring of {@code input} with {@code replacement}, starting at the 1-based position {@code start}
-   * and replacing {@code length} characters. Equivalent to the SQL standard
-   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function supported by PostgreSQL and Trino.
-   *
-   * <p>When {@code length} is omitted (i.e. {@code OVERLAY(string PLACING new_str FROM start)}), it defaults to the
-   * length of {@code replacement}, so the replaced and inserted substrings are the same width.
-   *
-   * <p>Examples:
-   * <pre>
-   *   overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
-   *   overlay("hello world", "there", 7, 5)  → "hello there"
-   *   overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
-   *   overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
-   * </pre>
-   *
-   * @param input       the source string
-   * @param replacement the string to insert
-   * @param start       1-based position in {@code input} at which replacement begins (clamped to [1, len+1])
-   * @return the result string
-   */
+  /// Replaces a substring of `input` with `replacement`, starting at the 1-based position `start`
+  /// and replacing `length` characters. Equivalent to the SQL standard
+  /// `OVERLAY(string PLACING replacement FROM start FOR length)` function supported by PostgreSQL and Trino.
+  ///
+  /// When `length` is omitted (i.e. `OVERLAY(string PLACING new_str FROM start)`), it defaults to the
+  /// length of `replacement`, so the replaced and inserted substrings are the same width.
+  ///
+  /// Examples:
+  ///
+  /// ```
+  /// overlay("hello world", "there", 7)     → "hello there"   (length defaults to len("there") = 5)
+  /// overlay("hello world", "there", 7, 5)  → "hello there"
+  /// overlay("abcdef", "XY", 3, 0)          → "abXYcdef"      (insertion without deletion)
+  /// overlay("abcdef", "XY", 3, 4)          → "abXY"          (delete 4 chars cdef, insert 2)
+  /// ```
+  ///
+  /// @param input       the source string
+  /// @param replacement the string to insert
+  /// @param start       1-based position in `input` at which replacement begins (clamped to \[1, len+1\])
+  /// @return the result string
   @ScalarFunction
   public static String overlay(String input, String replacement, int start) {
     return overlay(input, replacement, start, replacement.length());
   }
 
-  /**
-   * Replaces {@code length} characters of {@code input} with {@code replacement}, starting at the 1-based position
-   * {@code start}. Equivalent to the SQL standard
-   * {@code OVERLAY(string PLACING replacement FROM start FOR length)} function.
-   *
-   * @param input       the source string
-   * @param replacement the string to insert
-   * @param start       1-based start position (clamped to [1, len+1])
-   * @param length      number of characters to delete from {@code input} (clamped to [0, remaining])
-   * @return the result string
-   */
+  /// Replaces `length` characters of `input` with `replacement`, starting at the 1-based position
+  /// `start`. Equivalent to the SQL standard
+  /// `OVERLAY(string PLACING replacement FROM start FOR length)` function.
+  ///
+  /// @param input       the source string
+  /// @param replacement the string to insert
+  /// @param start       1-based start position (clamped to \[1, len+1\])
+  /// @param length      number of characters to delete from `input` (clamped to \[0, remaining\])
+  /// @return the result string
   @ScalarFunction
   public static String overlay(String input, String replacement, int start, int length) {
     int len = input.length();

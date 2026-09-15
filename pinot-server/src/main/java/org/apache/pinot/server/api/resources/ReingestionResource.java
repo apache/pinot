@@ -100,9 +100,7 @@ public class ReingestionResource {
   @Inject
   private ServerInstance _serverInstance;
 
-  /**
-   * Simple data class to hold job details.
-   */
+  /// Simple data class to hold job details.
   public static class ReingestionJob {
     private final String _jobId;
     private final String _segmentName;
@@ -128,9 +126,7 @@ public class ReingestionResource {
     }
   }
 
-  /**
-   * New API to get all running re-ingestion jobs.
-   */
+  /// New API to get all running re-ingestion jobs.
   @GET
   @Path("/reingestSegment/jobs")
   @Produces(MediaType.APPLICATION_JSON)
@@ -225,10 +221,8 @@ public class ReingestionResource {
     return Response.ok(job).build();
   }
 
-  /**
-   * The actual re-ingestion logic, moved into a separate method for clarity.
-   * This is essentially the old synchronous logic you had in reingestSegment.
-   */
+  /// The actual re-ingestion logic, moved into a separate method for clarity.
+  /// This is essentially the old synchronous logic you had in reingestSegment.
   private void doReingestSegment(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
       IndexLoadingConfig indexLoadingConfig, @Nullable Semaphore segmentBuildSemaphore)
       throws Exception {

@@ -29,14 +29,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Utility methods for deriving retention-related objects from a {@link TableConfig}.
+/// Utility methods for deriving retention-related objects from a [TableConfig].
 public class TableConfigRetentionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigRetentionUtils.class);
 
   private TableConfigRetentionUtils() {
   }
 
-  /// Builds a {@link RetentionStrategy} from {@code tableConfig}, or returns {@code null} when the
+  /// Builds a [RetentionStrategy] from `tableConfig`, or returns `null` when the
   /// retention config is absent, empty, or malformed. A null return means no retention is configured
   /// and no segment should be treated as purgeable.
   ///

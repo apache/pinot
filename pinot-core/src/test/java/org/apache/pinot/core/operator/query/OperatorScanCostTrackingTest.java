@@ -54,9 +54,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that query operators correctly push scan cost metrics into {@link QueryScanCostContext}
- */
+/// Verifies that query operators correctly push scan cost metrics into [QueryScanCostContext]
 public class OperatorScanCostTrackingTest {
   private static final String RAW_TABLE_NAME = "scanCostTestTable";
   private static final String SEGMENT_NAME = "scanCostTestSegment";

@@ -27,10 +27,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests deserialization of a ResultSet given hardcoded Pinot results.
- *
- */
+/// Tests deserialization of a ResultSet given hardcoded Pinot results.
 public class ResultSetGroupTest {
   private final DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
 

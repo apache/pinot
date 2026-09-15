@@ -30,11 +30,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
-/**
- * Function that returns all H3 indexes within a specified hexagonal grid distance from a given origin index.
- * The function takes two arguments:
- *  - gridDisk(origin, k)
- */
+/// Function that returns all H3 indexes within a specified hexagonal grid distance from a given origin index.
+/// The function takes two arguments:
+///  - gridDisk(origin, k)
 public class GridDiskFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "gridDisk";
   private TransformFunction _originArgument;

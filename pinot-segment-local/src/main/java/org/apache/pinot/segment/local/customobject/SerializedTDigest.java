@@ -24,9 +24,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-/**
- * Serialized and comparable version of TDigest. Compares TDigest for a specific percentile value.
- */
+/// Serialized and comparable version of TDigest. Compares TDigest for a specific percentile value.
 public class SerializedTDigest implements Comparable<SerializedTDigest> {
   private final double _percentile;
   private final TDigest _tDigest;

@@ -41,41 +41,22 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
-/**
- * Segment assignment for LLC real-time table.
- * <ul>
- *   <li>
- *     For the CONSUMING segments, it is very similar to replica-group based segment assignment with the following
- *     differences:
- *     <ul>
- *       <li>
- *         1. Within a replica-group, all segments of the same stream partition are always assigned to the same exactly
- *         one instance, and because of that we can directly assign or rebalance the CONSUMING segments to the instances
- *         based on the partition id
- *       </li>
- *       <li>
- *         2. If no explicit partition is configured in the instance partitions, partition id for an instance is derived
- *         from the index of the instance (within the replica-group for replica-group based assignment)
- *       </li>
- *     </ul>
- *   </li>
- *   <li>
- *     For the COMPLETED segments:
- *     <ul>
- *       <li>
- *         If COMPLETED instance partitions are provided, reassign COMPLETED segments the same way as
- *         {@link OfflineSegmentAssignment} to relocate COMPLETED segments and offload them from CONSUMING instances to
- *         COMPLETED instances
- *       </li>
- *       <li>
- *         If COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
- *         segments with CONSUMING instance partitions to ensure COMPLETED segments are served by the correct instances
- *         when instances for the table has been changed.
- *       </li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// Segment assignment for LLC real-time table.
+///
+/// - For the CONSUMING segments, it is very similar to replica-group based segment assignment with the following
+///   differences:
+///   - 1. Within a replica-group, all segments of the same stream partition are always assigned to the same exactly
+///     one instance, and because of that we can directly assign or rebalance the CONSUMING segments to the
+///     instances based on the partition id
+///   - 2. If no explicit partition is configured in the instance partitions, partition id for an instance is
+///     derived from the index of the instance (within the replica-group for replica-group based assignment)
+/// - For the COMPLETED segments:
+///   - If COMPLETED instance partitions are provided, reassign COMPLETED segments the same way as
+///     [OfflineSegmentAssignment] to relocate COMPLETED segments and offload them from CONSUMING instances to
+///     COMPLETED instances
+///   - If COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
+///     segments with CONSUMING instance partitions to ensure COMPLETED segments are served by the correct instances
+///     when instances for the table has been changed.
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
   @Override
@@ -106,9 +87,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     return instancesAssigned;
   }
 
-  /**
-   * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
-   */
+  /// Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int segmentPartitionId =
         SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager, _partitionColumn);

@@ -229,11 +229,9 @@ public class ServerQueryLogger {
     }
   }
 
-  /**
-   * Returns {@code true} when the query should be logged even if the query log rate is reached.
-   *
-   * TODO: come up with other criteria for forcing a log and come up with better numbers.
-   */
+  /// Returns `true` when the query should be logged even if the query log rate is reached.
+  ///
+  /// TODO: come up with other criteria for forcing a log and come up with better numbers.
   private static boolean forceLog(long schedulerWaitMs, long numDocsScanned, long numSegmentsPrunedInvalid) {
     // If scheduler wait time is larger than 100ms, force the log.
     if (schedulerWaitMs > 100) {

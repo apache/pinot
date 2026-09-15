@@ -47,11 +47,9 @@ public class GroovyTemplateUtils {
     return templateRendered;
   }
 
-  /**
-   Construct default template context:
-   today : today's date in format `yyyy-MM-dd`, example value: '2020-05-06'
-   yesterday : yesterday's date in format `yyyy-MM-dd`, example value: '2020-05-06'
-   */
+  /// Construct default template context:
+  /// today : today's date in format `yyyy-MM-dd`, example value: '2020-05-06'
+  /// yesterday : yesterday's date in format `yyyy-MM-dd`, example value: '2020-05-06'
   public static Map<String, Object> getDefaultContextMap() {
     Map<String, Object> defaultContextMap = new HashMap<>();
     Instant now = Instant.now();

@@ -33,11 +33,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * An operator for order-by queries DESC that are partially sorted over the sorting keys.
- *
- * @see LinearSelectionOrderByOperator
- */
+/// An operator for order-by queries DESC that are partially sorted over the sorting keys.
+///
+/// @see LinearSelectionOrderByOperator
 public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrderByOperator {
 
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_DESC";

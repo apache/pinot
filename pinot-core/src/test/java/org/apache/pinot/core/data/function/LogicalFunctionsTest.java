@@ -28,10 +28,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the scalar transform functions for logical operators
- * Currently, only not operator is supported.
- */
+/// Tests the scalar transform functions for logical operators
+/// Currently, only not operator is supported.
 public class LogicalFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,

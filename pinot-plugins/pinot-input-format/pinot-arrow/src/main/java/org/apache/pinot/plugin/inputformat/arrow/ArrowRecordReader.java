@@ -31,9 +31,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Record reader for Apache Arrow IPC file format.
- */
+/// Record reader for Apache Arrow IPC file format.
 public class ArrowRecordReader implements RecordReader {
   private final ArrowRecordExtractor _extractor = new ArrowRecordExtractor();
   private final ArrowRecordExtractor.Record _record = new ArrowRecordExtractor.Record();

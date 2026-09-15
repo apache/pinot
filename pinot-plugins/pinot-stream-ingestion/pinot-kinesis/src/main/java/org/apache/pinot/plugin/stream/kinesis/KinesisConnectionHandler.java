@@ -43,9 +43,7 @@ import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 
-/**
- * Manages the Kinesis stream connection, given the stream name and aws region
- */
+/// Manages the Kinesis stream connection, given the stream name and aws region
 public class KinesisConnectionHandler implements Closeable {
   protected final KinesisConfig _config;
   protected final KinesisClient _kinesisClient;
@@ -109,9 +107,7 @@ public class KinesisConnectionHandler implements Closeable {
     return kinesisClientBuilder.build();
   }
 
-  /**
-   * Lists all shards of the stream
-   */
+  /// Lists all shards of the stream
   public List<Shard> getShards() {
     ListShardsResponse listShardsResponse =
         _kinesisClient.listShards(ListShardsRequest.builder().streamName(_config.getStreamTopicName()).build());

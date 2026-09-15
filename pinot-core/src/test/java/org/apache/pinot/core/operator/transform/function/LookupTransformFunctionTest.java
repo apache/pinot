@@ -53,15 +53,14 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     DimensionTableDataManager.registerDimensionTable(TABLE_NAME, mockDataManager());
   }
 
-  /**
-   * Mocks a {@link DimensionTableDataManager} which looks like:
-   * TeamID (PK, str) | TeamName(str) | TeamName_MV(str[]) | TeamInteger(int) | TeamInteger_MV(int[]) | TeamFloat
-   * (float) | ...
-   *
-   * All values are dynamically created to be variations of the primary key.
-   * e.g.
-   * lookupRowByPrimaryKey(['FOO']) -> (TeamID: 'foo', TeamName: 'teamName_for_foo', TeamInteger: hashCode(['foo']), ...
-   */
+  /// Mocks a [DimensionTableDataManager] which looks like:
+  /// TeamID (PK, str) | TeamName(str) | TeamName_MV(str\[\]) | TeamInteger(int) | TeamInteger_MV(int\[\]) | TeamFloat
+  /// (float) | ...
+  ///
+  /// All values are dynamically created to be variations of the primary key.
+  /// e.g.
+  /// lookupRowByPrimaryKey(\['FOO'\]) -> (TeamID: 'foo', TeamName: 'teamName_for_foo',
+  ///     TeamInteger: hashCode(\['foo'\]), ...
   private DimensionTableDataManager mockDataManager() {
     DimensionTableDataManager tableManager = mock(DimensionTableDataManager.class);
 

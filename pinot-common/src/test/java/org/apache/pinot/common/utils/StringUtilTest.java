@@ -25,9 +25,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
 
 
-/**
- * Tests for {@link StringUtil} class.
- */
+/// Tests for [StringUtil] class.
 public class StringUtilTest {
 
   @Test

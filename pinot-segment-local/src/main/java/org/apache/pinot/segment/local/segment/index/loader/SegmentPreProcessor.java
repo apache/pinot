@@ -22,7 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.ServiceLoader;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -54,21 +57,55 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Use mmap to load the segment and perform all pre-processing steps. (This can be slow)
- * <p>Pre-processing steps include:
- * <ul>
- *   <li>Use {@link InvertedIndexHandler} to create inverted indices</li>
- *   <li>Use {@link DefaultColumnHandler} to update auto-generated default columns</li>
- *   <li>Use {@link ColumnMinMaxValueGenerator} to add min/max value to column metadata</li>
- * </ul>
- */
+/// Use mmap to load the segment and perform all pre-processing steps. (This can be slow)
+///
+/// Pre-processing steps include:
+///
+/// - Use [InvertedIndexHandler] to create inverted indices
+/// - Use [DefaultColumnHandler] to update auto-generated default columns
+/// - Use [ColumnMinMaxValueGenerator] to add min/max value to column metadata
 public class SegmentPreProcessor implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
+
+  // The highest-priority ServiceLoader-registered provider, or null to use this class directly. Resolved once, at
+  // first use (segment loading), by which point PluginManager has loaded the plugin classloaders.
+  @Nullable
+  private static final SegmentPreProcessorProvider PROVIDER = loadProvider();
+
+  @Nullable
+  private static SegmentPreProcessorProvider loadProvider() {
+    // Enumerate this class's own classloader plus every plugin classloader: new-style plugins live in isolated
+    // realms whose services a plain ServiceLoader.load() cannot see (see PluginManager#getPluginClassLoaders).
+    Set<ClassLoader> classLoaders = new LinkedHashSet<>();
+    classLoaders.add(SegmentPreProcessorProvider.class.getClassLoader());
+    classLoaders.addAll(PluginManager.get().getPluginClassLoaders());
+    SegmentPreProcessorProvider best = null;
+    for (ClassLoader classLoader : classLoaders) {
+      for (SegmentPreProcessorProvider provider : ServiceLoader.load(SegmentPreProcessorProvider.class,
+          classLoader)) {
+        if (best == null || provider.getPriority() > best.getPriority()) {
+          best = provider;
+        }
+      }
+    }
+    if (best != null) {
+      LOGGER.info("Using segment pre-processor provider: {}", best.getClass().getName());
+    }
+    return best;
+  }
+
+  /// Creates the segment pre-processor: the highest-priority [SegmentPreProcessorProvider]'s instance, or a plain
+  /// [SegmentPreProcessor] when no provider is registered.
+  public static SegmentPreProcessor create(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    return PROVIDER != null
+        ? PROVIDER.create(segmentDirectory, indexLoadingConfig)
+        : new SegmentPreProcessor(segmentDirectory, indexLoadingConfig);
+  }
 
   private final SegmentDirectory _segmentDirectory;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -124,6 +161,11 @@ public class SegmentPreProcessor implements AutoCloseable {
               segmentWriter);
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
+
+      // Resolve per-key index configs for OPEN_STRUCT child columns so index handlers don't strip
+      // inverted/range indexes that the OpenStructColumnSplitter wrote during segment creation.
+      _indexLoadingConfig.addOpenStructChildConfigs(
+          (SegmentMetadataImpl) _segmentDirectory.getSegmentMetadata());
 
       // Update single-column indices, like inverted index, json index etc.
       List<IndexHandler> indexHandlers = new ArrayList<>();
@@ -193,11 +235,9 @@ public class SegmentPreProcessor implements AutoCloseable {
         _tableConfig);
   }
 
-  /**
-   * This method checks if there is any discrepancy between the segment and current table config and schema.
-   * If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
-   * all types of indices and column min/max values are checked against what's set in table config and schema.
-   */
+  /// This method checks if there is any discrepancy between the segment and current table config and schema.
+  /// If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
+  /// all types of indices and column min/max values are checked against what's set in table config and schema.
   public boolean needProcess()
       throws Exception {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
@@ -424,10 +464,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     return true;
   }
 
-  /**
-   * Remove all the existing inverted index temp files before loading segments, by looking
-   * for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
-   */
+  /// Remove all the existing inverted index temp files before loading segments, by looking
+  /// for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
   private void removeInvertedIndexTempFiles(File indexDir) {
     File[] directoryListing = indexDir.listFiles();
     if (directoryListing == null) {

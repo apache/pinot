@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.Range;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
@@ -31,17 +32,20 @@ import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
- */
+/// Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
 public class RexExpressionUtilsTest {
   private RexBuilder _rexBuilder;
   private RelDataTypeFactory _typeFactory;
@@ -50,6 +54,20 @@ public class RexExpressionUtilsTest {
   public void setup() {
     _typeFactory = new TypeFactory();
     _rexBuilder = new RexBuilder(_typeFactory);
+  }
+
+  @Test
+  public void testUuidLiteralRoundTrip() {
+    UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder().build());
+
+    RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(_rexBuilder.makeUuidLiteral(uuid));
+    Assert.assertEquals(literal.getDataType(), ColumnDataType.UUID);
+    Assert.assertEquals(literal.getValue(), new ByteArray(UuidUtils.toBytes(uuid)));
+
+    RexLiteral roundTrip = RexExpressionUtils.toRexLiteral(relBuilder, literal);
+    Assert.assertEquals(roundTrip.getTypeName(), SqlTypeName.UUID);
+    Assert.assertEquals(roundTrip.getValue(), uuid);
   }
 
   @Test

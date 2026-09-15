@@ -33,9 +33,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Test class for {@link ImplicitHybridTableRouteProvider} to test the routing table calculation (calculateRoutes)
- */
+/// Test class for [ImplicitHybridTableRouteProvider] to test the routing table calculation (calculateRoutes)
 public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTableRouteTest {
 
   private TableRouteInfo getImplicitHybridTableRouteInfo(String tableName) {
@@ -147,17 +145,15 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
     }
   }
 
-  /**
-   * This is a copy of the section in BaseSingleStageBrokerRequestHandlerTest.doHandleRequest which gets the
-   * routing tables for offline and realtime tables. It also get the list of unavailable segments and the number of
-   * pruned segments.
-   * Note that an important side effect of this method is that it sets the offlineBrokerRequest and
-   * realtimeBrokerRequest to null if the routing table is empty. This is used in subsequent code to determine if
-   * either of the physical tables is available
-   * @param tableName table name
-   * @param routingManager Routing manager
-   * @return GetTableRouteResult containing the routing tables, unavailable segments and number of pruned segments
-   */
+  /// This is a copy of the section in BaseSingleStageBrokerRequestHandlerTest.doHandleRequest which gets the
+  /// routing tables for offline and realtime tables. It also get the list of unavailable segments and the number of
+  /// pruned segments.
+  /// Note that an important side effect of this method is that it sets the offlineBrokerRequest and
+  /// realtimeBrokerRequest to null if the routing table is empty. This is used in subsequent code to determine if
+  /// either of the physical tables is available
+  /// @param tableName table name
+  /// @param routingManager Routing manager
+  /// @return GetTableRouteResult containing the routing tables, unavailable segments and number of pruned segments
   private static GetTableRouteResult getTableRouting(String tableName, RoutingManager routingManager) {
 // Get the tables hit by the request
     String offlineTableName = null;
@@ -246,16 +242,14 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
         realtimeTableDisabled);
   }
 
-  /**
-   * Checks if two table routes are the same. A expected routingTable is a Map<String, Set<String>> where the key is the
-   * server name and the value is a set of segments. This is compared to the routing table
-   * Map<ServerInstance, SegmentsToQuery>
-   * @param tableName
-   * @param expectedOfflineRoutingTable
-   * @param expectedRealtimeRoutingTable
-   * @param isOfflineExpected
-   * @param isRealtimeExpected
-   */
+  /// Checks if two table routes are the same. A expected routingTable is a Map<String, Set<String>> where the key is
+  /// the server name and the value is a set of segments. This is compared to the routing table
+  /// Map<ServerInstance, SegmentsToQuery>
+  /// @param tableName
+  /// @param expectedOfflineRoutingTable
+  /// @param expectedRealtimeRoutingTable
+  /// @param isOfflineExpected
+  /// @param isRealtimeExpected
   private void assertEqualsTableRouteInfoGetTableRouteResult(String tableName,
       Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {

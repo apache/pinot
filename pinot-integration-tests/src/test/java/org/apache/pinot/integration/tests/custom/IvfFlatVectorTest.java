@@ -40,13 +40,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for IVF_FLAT vector index backend with VECTOR_SIMILARITY queries.
- *
- * <p>Follows the same pattern as {@link VectorTest} to ensure the IVF_FLAT backend works
- * end-to-end in a real Pinot cluster: schema creation, offline segment build with IVF_FLAT
- * vector index, segment upload, and query execution via VECTOR_SIMILARITY.
- */
+/// Integration test for IVF_FLAT vector index backend with VECTOR_SIMILARITY queries.
+///
+/// Follows the same pattern as [VectorTest] to ensure the IVF_FLAT backend works
+/// end-to-end in a real Pinot cluster: schema creation, offline segment build with IVF_FLAT
+/// vector index, segment upload, and query execution via VECTOR_SIMILARITY.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
 
@@ -129,11 +127,9 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  /**
-   * Tests that VECTOR_SIMILARITY with IVF_FLAT returns valid results.
-   * Uses a large candidate count to maximize recall with the default nprobe.
-   * Follows the same pattern as {@link VectorTest#testVectorSimilarity}.
-   */
+  /// Tests that VECTOR_SIMILARITY with IVF_FLAT returns valid results.
+  /// Uses a large candidate count to maximize recall with the default nprobe.
+  /// Follows the same pattern as [VectorTest#testVectorSimilarity].
   @Test(dataProvider = "useBothQueryEngines")
   public void testVectorSimilarity(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -185,9 +181,7 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
             + exactTopDist + ")");
   }
 
-  /**
-   * Tests that the pre-computed L2 distance column matches the computed l2Distance scalar function.
-   */
+  /// Tests that the pre-computed L2 distance column matches the computed l2Distance scalar function.
   @Test(dataProvider = "useBothQueryEngines")
   public void testL2DistanceComputation(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -210,10 +204,8 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  /**
-   * Tests threshold search with vectorDistanceThreshold query option.
-   * The threshold is in euclideanDistance space (squared L2, no sqrt).
-   */
+  /// Tests threshold search with vectorDistanceThreshold query option.
+  /// The threshold is in euclideanDistance space (squared L2, no sqrt).
   @Test(dataProvider = "useBothQueryEngines")
   public void testThresholdSearch(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -247,9 +239,7 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  /**
-   * Tests compound pattern: metadata filter + threshold search.
-   */
+  /// Tests compound pattern: metadata filter + threshold search.
   @Test(dataProvider = "useBothQueryEngines")
   public void testCompoundFilterAndThreshold(boolean useMultiStageQueryEngine)
       throws Exception {

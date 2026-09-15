@@ -47,9 +47,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Queries test for Subnet Containment for IP Address queries.
- */
+/// Queries test for Subnet Containment for IP Address queries.
 public class IsSubnetOfQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "IsSubnetOfQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

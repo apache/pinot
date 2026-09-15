@@ -40,11 +40,9 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 
 
-/**
- * Create many small segments with many columns to test metadata overhead.
- * Test is rather slow (1 minute+) and thus disabled by default.
- * Still, it can be useful to run it manually.
- */
+/// Create many small segments with many columns to test metadata overhead.
+/// Test is rather slow (1 minute+) and thus disabled by default.
+/// Still, it can be useful to run it manually.
 @Test(suiteName = "CustomClusterIntegrationTest", enabled = false)
 public class BigNumberOfSegmentsTest extends CustomDataQueryClusterIntegrationTest {
 

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.spi.config.table.assignment;
 
-/**
- * The type of the instance partitions.
- * <p>
- *   The instance partitions name will be of the format {@code <rawTableName>_<instancePartitionsType>}, e.g.
- *   {@code table_OFFLINE}, {@code table_CONSUMING}, {@code table_COMPLETED}.
- */
+/// The type of the instance partitions.
+///
+///   The instance partitions name will be of the format `<rawTableName>_<instancePartitionsType>`, e.g.
+///   `table_OFFLINE`, `table_CONSUMING`, `table_COMPLETED`.
 public enum InstancePartitionsType {
   OFFLINE,    // For (ONLINE) segments from offline table
   CONSUMING,  // For consuming (CONSUMING) segments from LLC real-time table

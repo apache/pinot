@@ -41,16 +41,14 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Functional tests for the lineage-aware segment delete check in
- * {@link PinotHelixResourceManager#deleteSegments(String, List)} and the
- * {@code segmentsFrom} re-validation in
- * {@link PinotHelixResourceManager#endReplaceSegments(String, String,
- * org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest)}.
- *
- * <p>Each test uses unique segment names so that the asynchronous segment-ZK-metadata cleanup performed by
- * {@code SegmentDeletionManager} cannot interfere with the next test's segment additions.
- */
+/// Functional tests for the lineage-aware segment delete check in
+/// [PinotHelixResourceManager#deleteSegments(String, List)] and the
+/// `segmentsFrom` re-validation in
+/// [PinotHelixResourceManager#endReplaceSegments(String, String,
+///     org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest)].
+///
+/// Each test uses unique segment names so that the asynchronous segment-ZK-metadata cleanup performed by
+/// `SegmentDeletionManager` cannot interfere with the next test's segment additions.
 public class LineageDeleteExclusionTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String RAW_TABLE_NAME = "lineageDeleteTable";

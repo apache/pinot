@@ -56,15 +56,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Accounting mechanism for thread task execution status and thread resource usage sampling
- * Design and algorithm see
- * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
- *
- * TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
- * this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
- * achieving stability.
- */
+/// Accounting mechanism for thread task execution status and thread resource usage sampling
+/// Design and algorithm see
+/// https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+///
+/// TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
+/// this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
+/// achieving stability.
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
   @Override
@@ -75,9 +73,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
   public static class PerQueryCPUMemResourceUsageAccountant implements ThreadAccountant {
     private static final Logger LOGGER = LoggerFactory.getLogger(PerQueryCPUMemResourceUsageAccountant.class);
 
-    /**
-     * Executor service for the thread accounting task, slightly higher priority than normal priority
-     */
+    /// Executor service for the thread accounting task, slightly higher priority than normal priority
     private static final String ACCOUNTANT_TASK_NAME = "CPUMemThreadAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
     private final ExecutorService _executorService = Executors.newSingleThreadExecutor(r -> {
@@ -294,17 +290,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           totalHeapUsage);
     }
 
-    /**
-     * The triggered level for the actions, only the highest level action will get triggered. Severity is defined by
-     * the ordinal Normal(0) does not trigger any action.
-     */
+    /// The triggered level for the actions, only the highest level action will get triggered. Severity is defined by
+    /// the ordinal Normal(0) does not trigger any action.
     protected enum TriggeringLevel {
       Normal, HeapMemoryAlarmingVerbose, CPUTimeBasedKilling, HeapMemoryCritical, HeapMemoryPanic
     }
 
-    /**
-     * A watcher task to perform usage sampling, aggregation, and query preemption
-     */
+    /// A watcher task to perform usage sampling, aggregation, and query preemption
     @SuppressWarnings({"rawtypes", "unchecked"})
     protected class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
       protected final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
@@ -455,10 +447,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.debug("Heap used bytes: {}", _usedBytes);
       }
 
-      /**
-       * Evaluate triggering levels of query preemption
-       * Triggers should be mutually exclusive and evaluated following level high -> low
-       */
+      /// Evaluate triggering levels of query preemption
+      /// Triggers should be mutually exclusive and evaluated following level high -> low
       protected void evalTriggers() {
         TriggeringLevel previousTriggeringLevel = _triggeringLevel;
 
@@ -570,9 +560,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
       }
 
-      /**
-       * Kill the query with the highest cost (memory footprint/cpu time/...)
-       */
+      /// Kill the query with the highest cost (memory footprint/cpu time/...)
       protected void killMostExpensiveQuery() {
         if (!_memorySamplingEnabled) {
           return;

@@ -58,15 +58,13 @@ public class GrpcRequesterIdentity extends RequesterIdentity {
     _metadata = metadata;
   }
 
-  /**
-   * Following the same logic of
-   * {@link org.apache.pinot.broker.api.HttpRequesterIdentity} to get client IP
-   * If reverse proxy is used X-Forwarded-For will be populated
-   * If X-Forwarded-For is not present, check if x-real-ip is present
-   * Since X-Forwarded-For can contain comma separated list of values,
-   * we convert it to ";" delimiter to avoid
-   * downstream parsing errors for other fields where "," is being used
-   */
+  /// Following the same logic of
+  /// [org.apache.pinot.broker.api.HttpRequesterIdentity] to get client IP
+  /// If reverse proxy is used X-Forwarded-For will be populated
+  /// If X-Forwarded-For is not present, check if x-real-ip is present
+  /// Since X-Forwarded-For can contain comma separated list of values,
+  /// we convert it to ";" delimiter to avoid
+  /// downstream parsing errors for other fields where "," is being used
   @Override
   public String getClientIp() {
     if (_metadata != null) {

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -27,10 +28,15 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -38,6 +44,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentMetadataImplTest {
@@ -98,6 +105,41 @@ public class SegmentMetadataImplTest {
       assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
       assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
       assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
+    }
+  }
+
+  /// Index sizes come from the local `index_map`, so a segment loaded through the stream constructor (tiered
+  /// storage, no index directory) reports none while the rest of the metadata matches the directory load.
+  @Test
+  public void testIndexSizesOnlyFromIndexDir()
+      throws Exception {
+    // The fixture builds a v1 segment; index sizes exist only in the v3 index_map.
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    SegmentMetadataImpl fromDir = new SegmentMetadataImpl(_segmentDirectory);
+    assertEquals(fromDir.getVersion(), SegmentVersion.v3);
+    SegmentMetadataImpl fromStreams;
+    try (FileInputStream metadataProperties =
+        new FileInputStream(SegmentDirectoryPaths.findMetadataFile(_segmentDirectory));
+        FileInputStream creationMeta =
+            new FileInputStream(SegmentDirectoryPaths.findCreationMetaFile(_segmentDirectory))) {
+      fromStreams = new SegmentMetadataImpl(metadataProperties, creationMeta);
+    }
+
+    assertEquals(fromStreams.getColumnMetadataMap().keySet(), fromDir.getColumnMetadataMap().keySet());
+    assertEquals(fromStreams.getTotalDocs(), fromDir.getTotalDocs());
+    assertEquals(fromStreams.getSchema(), fromDir.getSchema());
+    for (Map.Entry<String, ColumnMetadata> entry : fromDir.getColumnMetadataMap().entrySet()) {
+      ColumnMetadata dirColumn = entry.getValue();
+      assertTrue(dirColumn.getNumIndexes() > 0, entry.getKey());
+      long forwardSize = dirColumn.getIndexSizeFor(StandardIndexes.forward());
+      assertTrue(forwardSize > 0, entry.getKey());
+      assertEquals(((ColumnMetadataImpl) dirColumn).getIndexSizeMap().get(StandardIndexes.forward()),
+          (Long) forwardSize, entry.getKey());
+      ColumnMetadata streamColumn = fromStreams.getColumnMetadataMap().get(entry.getKey());
+      assertEquals(streamColumn.getNumIndexes(), 0, entry.getKey());
+      assertEquals(streamColumn.getIndexSizeFor(StandardIndexes.forward()), ColumnMetadata.UNAVAILABLE,
+          entry.getKey());
+      assertTrue(((ColumnMetadataImpl) streamColumn).getIndexSizeMap().isEmpty(), entry.getKey());
     }
   }
 }

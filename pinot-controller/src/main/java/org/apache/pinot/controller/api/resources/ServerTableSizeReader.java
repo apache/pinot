@@ -25,28 +25,36 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Get the size information details from the server. Only the servers returning success are returned by the method
- * For servers returning errors (http error or otherwise), no entry is created in the return map
- */
+/// Get the size information details from the server. Only the servers returning success are returned by the method
+/// For servers returning errors (http error or otherwise), no entry is created in the return map
 public class ServerTableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
+  @Nullable
+  private final AuthProvider _authProvider;
 
   public ServerTableSizeReader(Executor executor, HttpClientConnectionManager connectionManager) {
+    this(executor, connectionManager, null);
+  }
+
+  public ServerTableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
+      @Nullable AuthProvider authProvider) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _authProvider = authProvider;
   }
 
   /// Reads server segment sizes without compression statistics.
@@ -94,7 +102,7 @@ public class ServerTableSizeReader {
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size"
+      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size"
           + (requestCompressionStats ? "?includeCompressionStats=true" : "")
           + (includeColumnCompressionStats ? "&includeColumnCompressionStats=true" : "");
       serverUrls.add(tableSizeUri);
@@ -102,7 +110,7 @@ public class ServerTableSizeReader {
 
     // Helper service to run a httpget call to the server
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs,
             "get segment size info from servers");

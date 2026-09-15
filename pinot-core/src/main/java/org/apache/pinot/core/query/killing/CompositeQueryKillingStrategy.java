@@ -24,21 +24,18 @@ import java.util.stream.Collectors;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * Combines multiple {@link QueryKillingStrategy} instances with AND/OR semantics.
- *
- * <p>Strategies are sorted by {@link QueryKillingStrategy#priority()} (lower = checked first).
- * In {@link Mode#ANY} mode, the first strategy that triggers produces the kill report.
- * In {@link Mode#ALL} mode, all strategies must trigger for a kill.</p>
- *
- */
+/// Combines multiple [QueryKillingStrategy] instances with AND/OR semantics.
+///
+/// Strategies are sorted by [QueryKillingStrategy#priority()] (lower = checked first).
+/// In [Mode#ANY] mode, the first strategy that triggers produces the kill report.
+/// In [Mode#ALL] mode, all strategies must trigger for a kill.
 public class CompositeQueryKillingStrategy implements QueryKillingStrategy {
 
-  /** Composition mode for combining strategies. */
+  /// Composition mode for combining strategies.
   public enum Mode {
-    /** Kill if ANY strategy triggers (OR). */
+    /// Kill if ANY strategy triggers (OR).
     ANY,
-    /** Kill only if ALL strategies trigger (AND). */
+    /// Kill only if ALL strategies trigger (AND).
     ALL
   }
 

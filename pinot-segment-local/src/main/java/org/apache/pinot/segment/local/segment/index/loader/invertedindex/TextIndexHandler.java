@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -27,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -52,24 +52,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class for text indexes used by {@link SegmentPreProcessor}.
- * to create text index for column during segment load time. Currently, text index is always
- * created (if enabled on a column) during segment generation
- *
- * (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
- * detects the existence of text index and returns.
- *
- * (2) A reload is issued on an existing segment with existing text index. The handler
- * detects the existence of text index and returns.
- *
- * (3) A reload is issued on an existing segment after text index is enabled on an existing
- * column. Read the forward index to create text index.
- *
- * (4) A reload is issued on an existing segment after text index is enabled on a newly
- * added column. In this case, the default column handler would have taken care of adding
- * forward index for the new column. Read the forward index to create text index.
- */
+/// Helper class for text indexes used by
+/// [org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor].
+/// to create text index for column during segment load time. Currently, text index is always
+/// created (if enabled on a column) during segment generation
+///
+/// (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
+/// detects the existence of text index and returns.
+///
+/// (2) A reload is issued on an existing segment with existing text index. The handler
+/// detects the existence of text index and returns.
+///
+/// (3) A reload is issued on an existing segment after text index is enabled on an existing
+/// column. Read the forward index to create text index.
+///
+/// (4) A reload is issued on an existing segment after text index is enabled on a newly
+/// added column. In this case, the default column handler would have taken care of adding
+/// forward index for the new column. Read the forward index to create text index.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class TextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
@@ -173,11 +172,9 @@ public class TextIndexHandler extends BaseIndexHandler {
     return false;
   }
 
-  /**
-   * Right now the text index is supported on STRING columns.
-   * Later we can add support for text index on BYTES columns
-   * @param columnMetadata metadata for column
-   */
+  /// Right now the text index is supported on STRING columns.
+  /// Later we can add support for text index on BYTES columns
+  /// @param columnMetadata metadata for column
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
     if (columnMetadata.getDataType() != DataType.STRING) {
@@ -311,18 +308,16 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /**
-   * Checks if text index configuration has changed based on storeInSegmentFile field config flag.
-   *
-   * The method uses TextIndexUtils.hasTextIndex() to determine the current format and compare with desired format:
-   * - If TextIndexUtils.hasTextIndex() returns true: means text index in directory format
-   * - If TextIndexUtils.hasTextIndex() returns false means no text index in directory format
-   *
-   * @param columnName the column name to check
-   * @param segmentReader the segment reader to access the segment
-   * @return true if the text index configuration has changed and needs reprocessing, false otherwise
-   * @throws Exception if there's an error checking the text index directory structure
-   */
+  /// Checks if text index configuration has changed based on storeInSegmentFile field config flag.
+  ///
+  /// The method uses TextIndexUtils.hasTextIndex() to determine the current format and compare with desired format:
+  /// - If TextIndexUtils.hasTextIndex() returns true: means text index in directory format
+  /// - If TextIndexUtils.hasTextIndex() returns false means no text index in directory format
+  ///
+  /// @param columnName the column name to check
+  /// @param segmentReader the segment reader to access the segment
+  /// @return true if the text index configuration has changed and needs reprocessing, false otherwise
+  /// @throws Exception if there's an error checking the text index directory structure
   private boolean hasTextIndexConfigurationChanged(String columnName, SegmentDirectory.Reader segmentReader)
       throws Exception {
     // Get current configuration
@@ -341,12 +336,10 @@ public class TextIndexHandler extends BaseIndexHandler {
     return expectedFormat != currentFormat;
   }
 
-  /**
-   * Clean up existing text index files for recovery purposes.
-   *
-   * @param indexDir the index directory
-   * @param columnName the column name
-   */
+  /// Clean up existing text index files for recovery purposes.
+  ///
+  /// @param indexDir the index directory
+  /// @param columnName the column name
   private void cleanupExistingTextIndexFiles(File indexDir, String columnName) {
     // Remove any existing text index files for this column
     File[] textIndexFiles = indexDir.listFiles((dir, name) -> {
@@ -362,14 +355,12 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /**
-   * Convert text index to V3 combined format by merging into columns.psf.
-   *
-   * @param segmentWriter the segment writer
-   * @param columnName the column name
-   * @param segmentDirectory the segment directory
-   * @throws Exception if there's an error during conversion
-   */
+  /// Convert text index to V3 combined format by merging into columns.psf.
+  ///
+  /// @param segmentWriter the segment writer
+  /// @param columnName the column name
+  /// @param segmentDirectory the segment directory
+  /// @throws Exception if there's an error during conversion
   private void convertTextIndexToV3Format(SegmentDirectory.Writer segmentWriter, String columnName,
       File segmentDirectory)
       throws Exception {
@@ -389,21 +380,24 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   private Set<String> getColumnsWithLegacyNativeTextIndex() {
+    // Legacy native text indexes are sidecar files that older segment formats wrote into the segment's local
+    // directory. A SegmentDirectory that is not backed by a local directory reports a null index dir and cannot
+    // hold such files, so there is nothing to look for. Returning early also keeps the version sub-directory
+    // resolution below from being handed a null parent, which yields a path relative to the working directory
+    // for v3 and another null for v1/v2.
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir == null) {
+      return Set.of();
+    }
     File segmentDirectory =
         SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
-    Set<String> columns = new HashSet<>();
-    for (String column : _segmentDirectory.getSegmentMetadata().getAllColumns()) {
-      if (hasLegacyNativeTextIndex(indexDir, segmentDirectory, column)) {
-        columns.add(column);
-      }
+    Collection<String> allColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
+    Set<String> columns = new HashSet<>(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(indexDir, allColumns));
+    // Preserves the original short-circuit: the version subdirectory is only consulted when it is a
+    // different directory from the segment root.
+    if (!segmentDirectory.equals(indexDir)) {
+      columns.addAll(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(segmentDirectory, allColumns));
     }
     return columns;
-  }
-
-  private boolean hasLegacyNativeTextIndex(File indexDir, File segmentDirectory, String column) {
-    String legacyNativeTextIndexFile = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    return new File(indexDir, legacyNativeTextIndexFile).exists()
-        || (!segmentDirectory.equals(indexDir) && new File(segmentDirectory, legacyNativeTextIndexFile).exists());
   }
 }

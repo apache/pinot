@@ -25,10 +25,8 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
-/**
- * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
- * Zstd.compress(destinationBuffer, sourceBuffer)
- */
+/// Implementation of [ChunkCompressor] using Zstandard(Zstd) compression algorithm.
+/// Zstd.compress(destinationBuffer, sourceBuffer)
 class ZstandardCompressor implements ChunkCompressor {
 
   static final ZstandardCompressor INSTANCE = new ZstandardCompressor();

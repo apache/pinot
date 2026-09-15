@@ -32,9 +32,7 @@ import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * A Pinot result set group, containing the results given back by Pinot for a given query.
- */
+/// A Pinot result set group, containing the results given back by Pinot for a given query.
 public class GrpcResultSetGroup {
   private final DataSchema _schema;
   private final ExecutionStats _executionStats;
@@ -62,11 +60,9 @@ public class GrpcResultSetGroup {
     return _brokerResponseIterator.hasNext();
   }
 
-  /**
-   * Obtains the next result set from the iterator
-   *
-   * @return The result set
-   */
+  /// Obtains the next result set from the iterator
+  ///
+  /// @return The result set
   @Nullable
   public ResultSet getNextResultSet() {
     _currentResultSet = new GrpcResultSet(_schema, _brokerResponseIterator.next());

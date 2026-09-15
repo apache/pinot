@@ -52,11 +52,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
- * segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
- * time.
- */
+/// Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
+/// segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
+/// time.
 public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactMergeTaskExecutor.class);
@@ -214,13 +212,11 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
   }
 
-  /**
-   * Retrieves the max ZK creation time from task configuration with proper null handling.
-   *
-   * @param configs Task configuration map
-   * @return Max ZK creation time in milliseconds
-   * @throws IllegalStateException if the configuration value is invalid
-   */
+  /// Retrieves the max ZK creation time from task configuration with proper null handling.
+  ///
+  /// @param configs Task configuration map
+  /// @return Max ZK creation time in milliseconds
+  /// @throws IllegalStateException if the configuration value is invalid
   long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
     String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
     if (maxCreationTimeStr == null) {

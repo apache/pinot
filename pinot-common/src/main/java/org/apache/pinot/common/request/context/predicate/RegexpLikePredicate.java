@@ -24,13 +24,22 @@ import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
-/**
- * Predicate for REGEXP_LIKE with optional match parameters
- */
+/// Predicate for `REGEXP_LIKE` with optional match parameters.
+///
+/// Instances are read concurrently: a predicate belongs to the query's filter tree, which is built once per query and
+/// then shared by the threads that build and run the per-segment plans. The lazily compiled pattern is therefore
+/// published safely; see [#getPattern].
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
   private final boolean _caseInsensitive;
-  private Pattern _pattern = null;
+
+  /// Lazily compiled cache of [#getPattern].
+  ///
+  /// `volatile` is required, not just for the null check in [#getPattern]: without it the pattern is published
+  /// unsafely, and a racing thread can read the non-null reference while the fields written by the pattern's
+  /// construction are still invisible to it. Using such a pattern to create a matcher fails with a
+  /// `NullPointerException`.
+  private volatile Pattern _pattern;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
     super(lhs);
@@ -57,11 +66,17 @@ public class RegexpLikePredicate extends BasePredicate {
     return _caseInsensitive;
   }
 
+  /// Returns the compiled pattern, lazily compiling and caching it on first access.
+  ///
+  /// Uses the racy-single-check idiom: two threads may each compile the pattern, but both compile the same one, so
+  /// the duplicate work is harmless. Correctness relies on `_pattern` being `volatile`; see the field for why.
   public Pattern getPattern() {
-    if (_pattern == null) {
-      _pattern = PatternFactory.compile(_value, _caseInsensitive);
+    Pattern pattern = _pattern;
+    if (pattern == null) {
+      pattern = PatternFactory.compile(_value, _caseInsensitive);
+      _pattern = pattern;
     }
-    return _pattern;
+    return pattern;
   }
 
   @Override

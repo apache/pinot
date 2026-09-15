@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for float.
- */
+/// Implementation of [ValueToIdMap] for float.
 public class FloatToIdMap implements ValueToIdMap {
   private final Float2IntOpenHashMap _valueToIdMap;
   private final FloatArrayList _idToValueMap;

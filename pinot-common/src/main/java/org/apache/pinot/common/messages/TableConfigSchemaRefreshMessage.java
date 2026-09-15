@@ -27,9 +27,7 @@ public class TableConfigSchemaRefreshMessage extends Message {
   public static final String REFRESH_TABLE_CONFIG_AND_SCHEMA = "REFRESH_TABLE_CONFIG_AND_SCHEMA";
   private static final String TABLE_NAME_KEY = "tableName";
 
-  /**
-   * Constructor for the sender.
-   */
+  /// Constructor for the sender.
   public TableConfigSchemaRefreshMessage(String tableNameWithType) {
     super(Message.MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_TABLE_CONFIG_AND_SCHEMA);
@@ -39,9 +37,7 @@ public class TableConfigSchemaRefreshMessage extends Message {
     znRecord.setSimpleField(TABLE_NAME_KEY, tableNameWithType);
   }
 
-  /**
-   * Constructor for the receiver.
-   */
+  /// Constructor for the receiver.
   public TableConfigSchemaRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_TABLE_CONFIG_AND_SCHEMA)) {

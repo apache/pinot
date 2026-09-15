@@ -31,55 +31,32 @@ import org.joda.time.DateTimeField;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for
- * TIMESTAMP type.
- * <p>
- *  <ul>
- *    <li>
- *      This transform function should be invoked with arguments:
- *      <ul>
- *        <li>
- *        <li>
- *          Unit of truncation: second, minute, hour, day, week, month, quarter, year
- *        </li>
- *          Timestamp column input (or expression), this should always be in the specified units since epoch UTC
- *        </li>
- *        <li>
- *          Incoming units in terms of the TimeUnit enum. For example NANOSECONDS, SECONDS etc
- *        </li>
- *        <li>
- *          Optional Truncation Time zone as specified in the zone-index.properties file, these timezones are both
- *          DateTime and JodaTime compatible.
- *          If unspecified this is UTC
- *        </li>
- *        <li>
- *          Output TimeUnit enum: NANOSECONDS, SECONDS, MILLISECONDS. If unspecified this is the same as incoming unit
- *        </li>
- *      </ul>
- *    </li>
- *  </ul>
- *
- * It returns the time as output time unit since UTC epoch
- *
- * Example conversions from the presto's date_trunc invocations to the equivalent invocation.
- *
- * Note that presto has a proper TIMESTAMP (and TIMESTAMP_WITH_TIMEZONE) type. Pinot lacks such a type
- * and thus we need to specify the input timezone and granularity. Also note that Presto internally stores the timestamp
- * as milliseconds since UTC epoch.
- *
- * <ul>
- *   <li>
- *     to_unixtime(date_trunc('hour', from_unixtime(ts_in_millis/1000.0))) * 1000 -> dateTrunc('hour', ts_in_millis,
- *     'MILLISECONDS')
- *   </li>
- *   <li>
- *     to_unixtime(date_trunc('month', from_unixtime(ts_in_seconds, 'Europe/Berlin'))) -> dateTrunc('month',
- *     ts_in_millis, 'SECONDS', 'Europe/Berlin')
- *     Note how the truncation is done at months, as defined by the Berlin timezone.
- *   </li>
- * </ul>
- */
+/// The `DateTruncTransformationFunction` class implements the sql compatible date_trunc function for
+/// TIMESTAMP type.
+///
+/// - This transform function should be invoked with arguments:
+///   -
+///   - Unit of truncation: second, minute, hour, day, week, month, quarter, year
+///     Timestamp column input (or expression), this should always be in the specified units since epoch UTC
+///   - Incoming units in terms of the TimeUnit enum. For example NANOSECONDS, SECONDS etc
+///   - Optional Truncation Time zone as specified in the zone-index.properties file, these timezones are both
+///     DateTime and JodaTime compatible.
+///     If unspecified this is UTC
+///   - Output TimeUnit enum: NANOSECONDS, SECONDS, MILLISECONDS. If unspecified this is the same as incoming unit
+///
+/// It returns the time as output time unit since UTC epoch
+///
+/// Example conversions from the presto's date_trunc invocations to the equivalent invocation.
+///
+/// Note that presto has a proper TIMESTAMP (and TIMESTAMP_WITH_TIMEZONE) type. Pinot lacks such a type and thus we need
+/// to specify the input timezone and granularity. Also note that Presto internally stores the timestamp as milliseconds
+/// since UTC epoch.
+///
+/// - to_unixtime(date_trunc('hour', from_unixtime(ts_in_millis/1000.0))) \* 1000 -> dateTrunc('hour', ts_in_millis,
+///   'MILLISECONDS')
+/// - to_unixtime(date_trunc('month', from_unixtime(ts_in_seconds, 'Europe/Berlin'))) -> dateTrunc('month',
+///   ts_in_millis, 'SECONDS', 'Europe/Berlin')
+///   Note how the truncation is done at months, as defined by the Berlin timezone.
 public class DateTruncTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTrunc";
   public static final String EXAMPLE_INVOCATION = FUNCTION_NAME + "('week', time_expression, 'seconds', <TZ>, "

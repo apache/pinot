@@ -22,9 +22,7 @@ import java.nio.ByteBuffer;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Helper wrapper class for {@link MutableRoaringBitmap} to make it thread-safe.
- */
+/// Helper wrapper class for [MutableRoaringBitmap] to make it thread-safe.
 public class ThreadSafeMutableRoaringBitmap {
   private final MutableRoaringBitmap _mutableRoaringBitmap;
 
@@ -68,6 +66,12 @@ public class ThreadSafeMutableRoaringBitmap {
 
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
+  }
+
+  /// Cardinality of docIds in `[rangeStart, rangeEnd)`. Cheaper than cloning the bitmap just to
+  /// check range coverage.
+  public synchronized long rangeCardinality(long rangeStart, long rangeEnd) {
+    return _mutableRoaringBitmap.rangeCardinality(rangeStart, rangeEnd);
   }
 
   /// Returns a point-in-time snapshot of the bitmap as a serialized byte array.

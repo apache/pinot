@@ -32,9 +32,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Unit test for {@link AndDocIdSet}, focusing on the bitmap-only intersection path.
- */
+/// Unit test for [AndDocIdSet], focusing on the bitmap-only intersection path.
 public class AndDocIdSetTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);

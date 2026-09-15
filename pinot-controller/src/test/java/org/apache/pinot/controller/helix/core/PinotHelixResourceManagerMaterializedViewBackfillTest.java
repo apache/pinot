@@ -49,10 +49,10 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/// Unit tests for the {@code MaterializedViewConsistencyManager} reverse-index backfill on
-/// {@link PinotHelixResourceManager#backfillMaterializedViewReverseIndex} and the symmetric
+/// Unit tests for the `MaterializedViewConsistencyManager` reverse-index backfill on
+/// [PinotHelixResourceManager#backfillMaterializedViewReverseIndex] and the symmetric
 /// DROP-MV `extractSourceTableName` fallback inside
-/// {@code notifyMaterializedViewConsistencyManagerForTableDrop}.
+/// `notifyMaterializedViewConsistencyManagerForTableDrop`.
 ///
 /// Together these close the post-restart orphan window xiangfu0 flagged in #18544: an MV
 /// whose definition znode is missing (best-effort persist failed at create, znode removed by

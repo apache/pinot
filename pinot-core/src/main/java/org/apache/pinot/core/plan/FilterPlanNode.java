@@ -65,6 +65,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -72,6 +73,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -80,6 +82,10 @@ public class FilterPlanNode implements PlanNode {
   private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
+  /// Documents a vector predicate may consider as candidates for this query, or null when the query places no such
+  /// restriction. Held by reference; the snapshot is not modified while the plan executes.
+  @Nullable
+  private ImmutableRoaringBitmap _requiredVectorDocIds;
 
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
@@ -97,41 +103,47 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
+    // Read the snapshot before the document count, never the other way round. A consuming segment publishes a row by
+    // adding it, then raising the count, then marking it valid, so reading the count last guarantees every document in
+    // the snapshot is below it. See FilterPlanNodeTest#testConsistentSnapshot.
+    MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    // Vector top-K is not monotonic, so a restricted visible-document set must reach candidate generation instead of
+    // only being intersected with the result. Test the snapshot first so ordinary queries skip the filter tree walk.
+    _requiredVectorDocIds = docIdsSnapshot != null && _filter != null && containsVectorPredicate(_filter)
+        ? docIdsSnapshot : null;
+
+    // Candidate generation and the outer valid-document AND must observe the same document set for this query.
+    ImmutableRoaringBitmap outerDocIdsSnapshot = docIdsSnapshot;
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (queryableDocIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+      if (outerDocIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter =
+            new BitmapBasedFilterOperator(outerDocIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (queryableDocIdsSnapshot != null) {
-      return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+    } else if (outerDocIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(outerDocIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
   }
 
-  /**
-   * Returns a mapping from predicates to their evaluators.
-   */
+  /// Returns a mapping from predicates to their evaluators.
   public List<Pair<Predicate, PredicateEvaluator>> getPredicateEvaluators() {
     return _predicateEvaluators;
   }
 
-  /**
-   * H3 index can be applied on ST_Distance iff:
-   * <ul>
-   *   <li>Predicate is of type RANGE</li>
-   *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
-   *   <li>One argument of the ST_Distance function is an identifier, the other argument is an literal</li>
-   *   <li>The identifier column has H3 index</li>
-   * </ul>
-   */
+  /// H3 index can be applied on ST_Distance iff:
+  ///
+  /// - Predicate is of type RANGE
+  /// - Left-hand-side of the predicate is an ST_Distance function
+  /// - One argument of the ST_Distance function is an identifier, the other argument is an literal
+  /// - The identifier column has H3 index
   private boolean canApplyH3IndexForDistanceCheck(Predicate predicate, FunctionContext function) {
     if (predicate.getType() != Predicate.Type.RANGE) {
       return false;
@@ -162,16 +174,13 @@ public class FilterPlanNode implements PlanNode {
         FieldConfig.IndexType.H3);
   }
 
-  /**
-   * H3 index can be applied for inclusion check iff:
-   * <ul>
-   *   <li>Predicate is of type EQ</li>
-   *   <li>Left-hand-side of the predicate is an ST_Within or ST_Contains function</li>
-   *   <li>For ST_Within, the first argument is an identifier, the second argument is literal</li>
-   *   <li>For ST_Contains function the first argument is literal, the second argument is an identifier</li>
-   *   <li>The identifier column has H3 index</li>
-   * </ul>
-   */
+  /// H3 index can be applied for inclusion check iff:
+  ///
+  /// - Predicate is of type EQ
+  /// - Left-hand-side of the predicate is an ST_Within or ST_Contains function
+  /// - For ST_Within, the first argument is an identifier, the second argument is literal
+  /// - For ST_Contains function the first argument is literal, the second argument is an identifier
+  /// - The identifier column has H3 index
   private boolean canApplyH3IndexForInclusionCheck(Predicate predicate, FunctionContext function) {
     if (predicate.getType() != Predicate.Type.EQ) {
       return false;
@@ -214,9 +223,7 @@ public class FilterPlanNode implements PlanNode {
     return function.getFunctionName().equals(ItemTransformFunction.FUNCTION_NAME);
   }
 
-  /**
-   * Helper method to build the operator tree from the filter.
-   */
+  /// Helper method to build the operator tree from the filter.
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter, int numDocs) {
     List<FilterContext> childFilters;
     List<BaseFilterOperator> childFilterOperators;
@@ -224,9 +231,10 @@ public class FilterPlanNode implements PlanNode {
       case AND:
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
+        List<FilterContext> retainedChildFilters = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator;
-          if (isVectorSimilarityFilter(childFilter) && hasNonVectorSibling(childFilters)) {
+          if (isVectorSimilarityFilter(childFilter) && hasSafeMetadataSibling(childFilters)) {
             // Pass filtered context so vector operator reports correct execution mode
             childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
           } else {
@@ -238,13 +246,14 @@ public class FilterPlanNode implements PlanNode {
           } else if (!childFilterOperator.isResultMatchingAll()) {
             // Remove child filter operators that match all records
             childFilterOperators.add(childFilterOperator);
+            retainedChildFilters.add(childFilter);
           }
         }
         // Wire pre-filter bitmaps for filter-aware ANN: if an AND contains a
         // VectorSimilarityFilterOperator alongside other filter children, evaluate the
         // non-vector filters first and pass the resulting bitmap to the vector operator
         // so it can restrict HNSW graph traversal to the pre-filtered document set.
-        wirePreFilterForVectorOperators(childFilterOperators, numDocs);
+        wirePreFilterForVectorOperators(retainedChildFilters, childFilterOperators, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, childFilterOperators, numDocs);
       case OR:
         childFilters = filter.getChildren();
@@ -358,19 +367,16 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
-  /**
-   * Constructs the appropriate vector similarity filter operator based on index availability.
-   *
-   * <p>Decision tree:</p>
-   * <ol>
-   *   <li>If the segment has a vector index for the column, use {@link VectorSimilarityFilterOperator}
-   *       with query options (nprobe, rerank, maxCandidates).</li>
-   *   <li>If no vector index exists, fall back to {@link ExactVectorScanFilterOperator} which
-   *       performs brute-force scan of the forward index.</li>
-   * </ol>
-   *
-   * @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
-   */
+  /// Constructs the appropriate vector similarity filter operator based on index availability.
+  ///
+  /// Decision tree:
+  ///
+  /// 1. If the segment has a vector index for the column, use [VectorSimilarityFilterOperator]
+  ///       with query options (nprobe, rerank, maxCandidates).
+  /// 2. If no vector index exists, fall back to [ExactVectorScanFilterOperator] which
+  ///       performs brute-force scan of the forward index.
+  ///
+  /// @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
   private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
       VectorSimilarityPredicate predicate, String column, int numDocs, boolean hasMetadataFilter) {
     VectorIndexReader vectorIndex = dataSource.getVectorIndex();
@@ -378,10 +384,49 @@ public class FilterPlanNode implements PlanNode {
     boolean isMutableSegment = _indexSegment.getSegmentMetadata().isMutableSegment();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
 
+    // Nothing in this segment is visible to the query, so no candidate generation is needed and no reader
+    // capability is required. The outer valid-document AND would discard any result anyway.
+    if (_requiredVectorDocIds != null && _requiredVectorDocIds.isEmpty()) {
+      return EmptyFilterOperator.getInstance();
+    }
+
     if (vectorIndex != null) {
-      // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
-      ForwardIndexReader<?> forwardIndexReader = null;
       VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
+      // A required candidate scope can only be honored by a reader that does filtered search. When it cannot, the
+      // ANN index is unusable for this query and an exact scan over the allowed documents is the correct plan --
+      // decided here, where both the reader capability and the forward index availability are known.
+      if (_requiredVectorDocIds != null && !supportsPreFilter(vectorIndex)) {
+        ForwardIndexReader<?> exactScanReader = dataSource.getForwardIndex();
+        Preconditions.checkState(exactScanReader != null,
+            "Cannot honor required candidate doc IDs on vector column: %s -- vector index reader does not support "
+                + "filtered search and no forward index is available", column);
+        return new ExactVectorScanFilterOperator(exactScanReader, predicate, column, numDocs, vectorIndexConfig,
+            getFilteredSearchUnsupportedReason(isMutableSegment), searchParams, _requiredVectorDocIds);
+      }
+
+      // Mutable HNSW filtered search materializes the full NumericDocValues view before applying the bitmap. For a
+      // selective required scope, scanning only the visible forward-index rows is both exact and substantially
+      // cheaper. Preserve correctness for the other strategy outcomes by continuing to pass the required scope to
+      // candidate generation -- a required scope must never be applied as a post-filter. If the forward index is
+      // disabled, retain filtered ANN so this optimization does not make a previously executable query fail.
+      if (_requiredVectorDocIds != null && isMutableSegment) {
+        VectorSearchMode mode = VectorSearchStrategy.decideMode(numDocs,
+            _requiredVectorDocIds.getCardinality(),
+            /* hasVectorIndex= */ true,
+            /* indexSupportsPreFilter= */ true,
+            /* isMutableSegment= */ true,
+            backendType, searchParams);
+        if (mode == VectorSearchMode.EXACT_SCAN) {
+          ForwardIndexReader<?> exactScanReader = dataSource.getForwardIndex();
+          if (exactScanReader != null) {
+            return new ExactVectorScanFilterOperator(exactScanReader, predicate, column, numDocs, vectorIndexConfig,
+                "required_doc_ids_strategy_exact_scan", searchParams, _requiredVectorDocIds);
+          }
+        }
+      }
+
+      // ANN index path: pass the forward index when rerank or threshold needs exact distances.
+      ForwardIndexReader<?> forwardIndexReader = null;
       if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
         forwardIndexReader = dataSource.getForwardIndex();
         Preconditions.checkState(!searchParams.hasDistanceThreshold() || forwardIndexReader != null,
@@ -389,7 +434,7 @@ public class FilterPlanNode implements PlanNode {
             column);
       }
       return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter);
+          vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
     }
 
     // Exact scan fallback: no vector index on this segment
@@ -397,14 +442,12 @@ public class FilterPlanNode implements PlanNode {
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
     return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
+        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams, _requiredVectorDocIds);
   }
 
-  /**
-   * Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
-   * with metadata filters. This sets the hasMetadataFilter flag so the operator reports
-   * the correct filtered ANN execution mode.
-   */
+  /// Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
+  /// with metadata filters. This sets the hasMetadataFilter flag so the operator reports
+  /// the correct filtered ANN execution mode.
   private BaseFilterOperator constructFilteredVectorOperator(FilterContext filter, int numDocs) {
     Predicate predicate = filter.getPredicate();
     String column = predicate.getLhs().getIdentifier();
@@ -413,33 +456,44 @@ public class FilterPlanNode implements PlanNode {
         numDocs, true);
   }
 
-  /**
-   * Returns true if the child list contains at least one non-VECTOR_SIMILARITY predicate
-   * (i.e., a real metadata filter sibling).
-   */
-  private static boolean hasNonVectorSibling(List<FilterContext> childFilters) {
+  /// Returns true if the child list contains at least one sibling subtree with no vector predicate.
+  private static boolean hasSafeMetadataSibling(List<FilterContext> childFilters) {
     for (FilterContext child : childFilters) {
-      if (!isVectorSimilarityFilter(child)) {
+      if (!containsVectorPredicate(child)) {
         return true;
       }
     }
     return false;
   }
 
-  /**
-   * Returns true if the filter is a VECTOR_SIMILARITY predicate.
-   */
+  /// Returns true if the filter is a VECTOR_SIMILARITY predicate.
   private static boolean isVectorSimilarityFilter(FilterContext filter) {
     return filter.getType() == FilterContext.Type.PREDICATE
         && filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
   }
 
-  /**
-   * Constructs the vector radius filter operator based on index availability.
-   *
-   * <p>The radius operator always needs the forward index for exact distance computation.
-   * When a vector index is available, it is used for candidate retrieval before exact filtering.</p>
-   */
+  /// Returns true when any node in the subtree is a vector top-K predicate. Such a subtree must never be
+  /// materialized as metadata for another vector predicate because doing so executes candidate generation out of its
+  /// original boolean context and can incorrectly push candidate results into a sibling.
+  private static boolean containsVectorPredicate(FilterContext filter) {
+    if (filter.getType() == FilterContext.Type.PREDICATE) {
+      return filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
+    }
+    if (filter.getType() == FilterContext.Type.AND || filter.getType() == FilterContext.Type.OR
+        || filter.getType() == FilterContext.Type.NOT) {
+      for (FilterContext child : filter.getChildren()) {
+        if (containsVectorPredicate(child)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Constructs the vector radius filter operator based on index availability.
+  ///
+  /// The radius operator always needs the forward index for exact distance computation.
+  /// When a vector index is available, it is used for candidate retrieval before exact filtering.
   private BaseFilterOperator constructVectorRadiusOperator(DataSource dataSource,
       VectorSimilarityRadiusPredicate predicate, String column, int numDocs) {
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
@@ -451,40 +505,37 @@ public class FilterPlanNode implements PlanNode {
         vectorIndexConfig);
   }
 
-  /**
-   * Wires pre-filter bitmaps for filter-aware ANN search when an AND node contains both
-   * vector similarity operators and non-vector filter operators.
-   *
-   * <p>When the vector index reader supports pre-filtering (implements
-   * {@link org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader}), the non-vector
-   * siblings are evaluated eagerly to produce a combined bitmap. This bitmap is passed to the
-   * {@link VectorSimilarityFilterOperator} so that the HNSW graph traversal is restricted to
-   * pre-filtered documents, improving recall for selective filters.</p>
-   *
-   * <p><b>Trade-off: eager filter evaluation.</b> The non-vector filter predicates are materialized
-   * into bitmaps before the vector search begins. This is intentional because the filter bitmap must
-   * be fully materialized before it can be passed to the vector index for pre-filtered ANN search.
-   * The {@link VectorSearchStrategy} selectivity check below ensures we only pay this cost when the
-   * estimated cardinality suggests pre-filtering is worthwhile.</p>
-   *
-   * <p>If no vector operators are found or the reader does not support pre-filtering,
-   * this method is a no-op and the AND operator falls back to the default post-filter path.</p>
-   *
-   * @param childOperators the list of child filter operators under an AND node
-   * @param numDocs total documents in the segment
-   */
-  private void wirePreFilterForVectorOperators(List<BaseFilterOperator> childOperators, int numDocs) {
+  /// Wires metadata bitmaps when an AND node contains both vector similarity operators and non-vector filters.
+  ///
+  /// The existing adaptive behavior is preserved: only bitmap-producing filters are considered, and
+  /// [VectorSearchStrategy] decides whether the filter-aware reader should receive the bitmap.
+  ///
+  /// **Trade-off: eager filter evaluation.** The non-vector filter predicates are materialized
+  /// into bitmaps before the vector search begins. This is intentional because the filter bitmap must
+  /// be fully materialized before it can be passed to the vector index for pre-filtered ANN search.
+  /// The [VectorSearchStrategy] selectivity check below ensures queries only pay this cost when the estimated
+  /// cardinality suggests pre-filtering is worthwhile.
+  ///
+  /// If no vector operators are found, this method is a no-op. A query whose reader does not support pre-filtering
+  /// retains the default post-filter path.
+  ///
+  /// @param childOperators the list of child filter operators under an AND node
+  /// @param numDocs total documents in the segment
+  private void wirePreFilterForVectorOperators(List<FilterContext> childFilters,
+      List<BaseFilterOperator> childOperators, int numDocs) {
     if (childOperators.size() < 2) {
       return;
     }
 
-    // Find vector similarity operators that support pre-filtering
+    // Find indexed vector similarity operators and non-vector metadata siblings.
     List<VectorSimilarityFilterOperator> vectorOps = new ArrayList<>();
     List<BaseFilterOperator> nonVectorOps = new ArrayList<>();
-    for (BaseFilterOperator op : childOperators) {
-      if (op instanceof VectorSimilarityFilterOperator) {
+    for (int i = 0; i < childOperators.size(); i++) {
+      FilterContext childFilter = childFilters.get(i);
+      BaseFilterOperator op = childOperators.get(i);
+      if (isVectorSimilarityFilter(childFilter) && op instanceof VectorSimilarityFilterOperator) {
         vectorOps.add((VectorSimilarityFilterOperator) op);
-      } else {
+      } else if (!containsVectorPredicate(childFilter)) {
         nonVectorOps.add(op);
       }
     }
@@ -521,9 +572,7 @@ public class FilterPlanNode implements PlanNode {
     }
 
     // Combine non-vector filter bitmaps via AND.
-    // Note: this eagerly evaluates non-vector filters. BaseFilterOperator subclasses cache
-    // their results, so the subsequent evaluation by AndFilterOperator will reuse the cached
-    // bitmaps without double-evaluation.
+    // Bitmap-producing filters are cheap to evaluate again when the final AND executes.
     MutableRoaringBitmap combinedBitmap = null;
     for (BaseFilterOperator op : nonVectorOps) {
       BitmapCollection bitmapCollection = op.getBitmaps();
@@ -543,16 +592,11 @@ public class FilterPlanNode implements PlanNode {
     // the estimated selectivity. Only pass the bitmap if the strategy recommends
     // FILTER_THEN_ANN; otherwise fall back to the default post-filter path.
     int estimatedFilteredDocs = combinedBitmap.getCardinality();
-    // isMutableSegment=false is acceptable here because the supportsPreFilter() check above
-    // already ensures we only reach this point for immutable segments with
-    // FilterAwareVectorIndexReader. MutableVectorIndex does not implement
-    // FilterAwareVectorIndexReader, so mutable segments exit early via the
-    // anySupportsPreFilter guard.
     // backendType and searchParams are passed as null here because at the pre-filter wiring
     // stage we are deciding whether to activate pre-filtering at all, not per-backend tuning.
     // The strategy currently uses only selectivity (numDocs, estimatedFilteredDocs) for this
     // decision. Per-backend and per-query-option tuning is handled later inside the operator.
-    VectorSearchStrategy.Decision decision = VectorSearchStrategy.decide(
+    VectorSearchMode mode = VectorSearchStrategy.decideMode(
         numDocs, estimatedFilteredDocs,
         /* hasVectorIndex= */ true,
         /* indexSupportsPreFilter= */ true,
@@ -560,7 +604,7 @@ public class FilterPlanNode implements PlanNode {
         /* backendType= */ null,
         /* searchParams= */ null);
 
-    if (decision.getMode() != VectorSearchMode.FILTER_THEN_ANN) {
+    if (mode != VectorSearchMode.FILTER_THEN_ANN) {
       return;
     }
 
@@ -570,6 +614,18 @@ public class FilterPlanNode implements PlanNode {
         vectorOp.setPreFilterBitmap(combinedBitmap);
       }
     }
+  }
+
+  private static boolean supportsPreFilter(VectorIndexReader vectorIndex) {
+    return vectorIndex instanceof FilterAwareVectorIndexReader
+        && ((FilterAwareVectorIndexReader) vectorIndex).supportsPreFilter();
+  }
+
+  /// Reason reported by [ExactVectorScanFilterOperator] when a vector index exists but cannot restrict its search to
+  /// the documents the query is allowed to see.
+  private static String getFilteredSearchUnsupportedReason(boolean isMutableSegment) {
+    return isMutableSegment ? "mutable_vector_index_not_filter_aware"
+        : "vector_index_not_filter_aware";
   }
 
   private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig,

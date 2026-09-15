@@ -27,17 +27,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Extracts intermediate set results for cross-segment merging.
- *
- * <p>For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
- * to length-prefix-encoded composite strings, producing a {@code Set<String>} per step.
- */
+/// Extracts intermediate set results for cross-segment merging.
+///
+/// For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
+/// to length-prefix-encoded composite strings, producing a `Set<String>` per step.
 class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<Set>> {
   protected final int _numSteps;
 
@@ -84,7 +82,7 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
   private Set convertToValueSet(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    FieldSpec.DataType storedType = dictionary.getValueType();
+    DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(numValues);

@@ -387,19 +387,17 @@ public class TaskMetricsEmitterTest {
     taskType2WithOneTable();
   }
 
-  /**
-   * Test for previously in-progress tasks that completed between runs:
-   * Tasks that were in-progress in the previous run but completed before the current run
-   * should still have their metrics reported in the current run.
-   *
-   * Scenario:
-   * - Run 1: Task "taskCompletedBetweenRuns" is in-progress with 1 error subtask
-   * - Run 2: Task "taskCompletedBetweenRuns" has completed and is no longer in getTasksInProgress()
-   *
-   * Expected: Metrics for "taskCompletedBetweenRuns" should still be emitted in Run 2 by detecting it via
-   * _previousInProgressTasks tracking. The emitter maintains state of tasks that were in-progress
-   * in the previous execution cycle and includes completed tasks in the current cycle's metrics.
-   */
+  /// Test for previously in-progress tasks that completed between runs:
+  /// Tasks that were in-progress in the previous run but completed before the current run
+  /// should still have their metrics reported in the current run.
+  ///
+  /// Scenario:
+  /// - Run 1: Task "taskCompletedBetweenRuns" is in-progress with 1 error subtask
+  /// - Run 2: Task "taskCompletedBetweenRuns" has completed and is no longer in getTasksInProgress()
+  ///
+  /// Expected: Metrics for "taskCompletedBetweenRuns" should still be emitted in Run 2 by detecting it via
+  /// \_previousInProgressTasks tracking. The emitter maintains state of tasks that were in-progress
+  /// in the previous execution cycle and includes completed tasks in the current cycle's metrics.
   @Test
   public void testReportsPreviouslyInProgressTasksThatCompletedBetweenRuns() {
     String taskType = "SegmentGenerationAndPushTask";
@@ -454,21 +452,19 @@ public class TaskMetricsEmitterTest {
         "Previously in-progress task that completed between runs should still be reported");
   }
 
-  /**
-   * Test for short-lived tasks that started and completed between runs:
-   * Tasks that started AND completed between two collection runs should have their
-   * metrics reported.
-   *
-   * Scenario:
-   * - Run 1: No tasks in-progress
-   * - Between runs: Task "taskShortLived" starts and completes (very short-lived)
-   * - Run 2: No tasks in-progress (taskShortLived already completed)
-   *
-   * Expected: Metrics for "taskShortLived" should be emitted in Run 2 by detecting it via
-   * getTasksInProgressAndRecent(taskType, timestamp) which uses WorkflowContext.getJobStartTimes() to find tasks that
-   * started after the previous execution timestamp. The emitter combines in-progress tasks and
-   * short-lived tasks in a single Helix call to avoid duplicate getWorkflowConfig/getWorkflowContext calls.
-   */
+  /// Test for short-lived tasks that started and completed between runs:
+  /// Tasks that started AND completed between two collection runs should have their
+  /// metrics reported.
+  ///
+  /// Scenario:
+  /// - Run 1: No tasks in-progress
+  /// - Between runs: Task "taskShortLived" starts and completes (very short-lived)
+  /// - Run 2: No tasks in-progress (taskShortLived already completed)
+  ///
+  /// Expected: Metrics for "taskShortLived" should be emitted in Run 2 by detecting it via
+  /// getTasksInProgressAndRecent(taskType, timestamp) which uses WorkflowContext.getJobStartTimes() to find tasks that
+  /// started after the previous execution timestamp. The emitter combines in-progress tasks and
+  /// short-lived tasks in a single Helix call to avoid duplicate getWorkflowConfig/getWorkflowContext calls.
   @Test
   public void testReportsTasksThatStartAndCompleteBetweenRuns() {
     String taskType = "SegmentGenerationAndPushTask";

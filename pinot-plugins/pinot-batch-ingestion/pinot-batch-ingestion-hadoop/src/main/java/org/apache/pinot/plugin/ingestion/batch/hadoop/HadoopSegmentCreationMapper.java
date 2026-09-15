@@ -100,7 +100,8 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     // Register file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+      PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+          new PinotConfiguration(pinotFSSpec));
     }
   }
 

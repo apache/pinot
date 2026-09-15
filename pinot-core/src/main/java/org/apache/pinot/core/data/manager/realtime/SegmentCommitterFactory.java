@@ -31,9 +31,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 
 
-/**
- * Factory for the SegmentCommitter interface
- */
+/// Factory for the SegmentCommitter interface
 public class SegmentCommitterFactory {
   private static Logger _logger;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;

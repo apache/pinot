@@ -44,9 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link StreamMetadataProvider} implementation for the Pulsar stream
- */
+/// A [StreamMetadataProvider] implementation for the Pulsar stream
 public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler
     implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
@@ -85,16 +83,14 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     return partitionIds;
   }
 
-  /**
-   * Fetch the messageId and use it as offset.
-   * If offset criteria is smallest, the message id of earliest record in the partition is returned.
-   * If offset criteria is largest, the message id of the largest record in the partition is returned.
-   * throws {@link IllegalArgumentException} if the offset criteria is invalid
-   * throws {@link PulsarClientException} if there was an error from pulsar server on requesting message ids.
-   * @param offsetCriteria offset criteria to fetch {@link StreamPartitionMsgOffset}.
-   *                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
-   * @param timeoutMillis fetch timeout
-   */
+  /// Fetch the messageId and use it as offset.
+  /// If offset criteria is smallest, the message id of earliest record in the partition is returned.
+  /// If offset criteria is largest, the message id of the largest record in the partition is returned.
+  /// throws [IllegalArgumentException] if the offset criteria is invalid
+  /// throws [PulsarClientException] if there was an error from pulsar server on requesting message ids.
+  /// @param offsetCriteria offset criteria to fetch [StreamPartitionMsgOffset].
+  ///                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
+  /// @param timeoutMillis fetch timeout
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
@@ -119,10 +115,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
   }
 
-  /**
-   * We assume 1:1 mapping from partitionGroupId to partitionId in pulsar. This works because pulsar doesn't have
-   * the concept of child partitions as well as reducing the current number of partition.
-   */
+  /// We assume 1:1 mapping from partitionGroupId to partitionId in pulsar. This works because pulsar doesn't have
+  /// the concept of child partitions as well as reducing the current number of partition.
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis) {

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 /// Single source of truth for every per-partition state transition on the
 /// [MaterializedViewRuntimeMetadata] runtime znode.
 ///
-/// <h3>Why this class exists</h3>
+/// ## Why this class exists
 ///
 /// Before this manager landed, the runtime znode was mutated by three separate sites — the
 /// minion executor (APPEND / OVERWRITE / DELETE task commits), the scheduler (false-positive
@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 /// recompute on APPEND all live behind the public API.  Callers express intent
 /// (`appendValid`, `markStale`, ...) and never see the persistence machinery.
 ///
-/// <h3>Architecture</h3>
+/// ## Architecture
 ///
 /// Three layers, deliberately separated:
 ///
@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 ///         propagate (fail-fast, no retry)
 ///       - any other exception → propagate
 ///
-/// <h3>Retry profile</h3>
+/// ## Retry profile
 ///
 /// Two profiles, calibrated to op semantics:
 ///
@@ -91,14 +91,14 @@ import org.slf4j.LoggerFactory;
 ///     either run for real or revert again.  Spending 128 retries to save one task is
 ///     wasteful.
 ///
-/// <h3>Concurrency</h3>
+/// ## Concurrency
 ///
 /// The manager is thread-safe and stateless above the ZK property store handle.  Concurrent
 /// callers contending on the same MV runtime znode are serialized by ZK CAS; one thread's
 /// commit invalidates the other's snapshot, the loser re-fetches and re-runs its mutator.
 /// Different MVs map to different znodes — no cross-MV contention.
 ///
-/// <h3>Scope discipline</h3>
+/// ## Scope discipline
 ///
 /// This class manages exactly the partition map and `watermarkMs` field of
 /// [MaterializedViewRuntimeMetadata].  It MUST NOT acquire other znodes
@@ -253,10 +253,10 @@ public final class MaterializedViewPartitionManager {
   /// "tracked", so a later base-table backfill flows through the standard VALID → STALE →
   /// OVERWRITE cycle.
   ///
-  /// <p><b>Commit-time backfill guard.</b> The scheduler dispatched DELETE because the source
+  /// **Commit-time backfill guard.** The scheduler dispatched DELETE because the source
   /// window had zero overlapping segments, but a backfill can land between dispatch and this
   /// commit.  `sourceFingerprintSupplier` recomputes the source fingerprint for the window from
-  /// live segment ZK metadata and is invoked <i>inside</i> the CAS mutator, so emptiness is
+  /// live segment ZK metadata and is invoked _inside_ the CAS mutator, so emptiness is
   /// re-evaluated on every attempt immediately before the version-checked write — not against a
   /// snapshot captured before the (under contention, possibly multi-second) retry loop.  If the
   /// supplier reports the source is no longer empty (`getSegmentCount() != 0`), the op is a no-op
@@ -267,7 +267,7 @@ public final class MaterializedViewPartitionManager {
   /// as STALE — stranding it as a permanently-empty in-coverage bucket the broker would route
   /// empty results from.
   ///
-  /// <p>Full atomicity across the two ZooKeeper subsystems (source-table segment metadata and the
+  /// Full atomicity across the two ZooKeeper subsystems (source-table segment metadata and the
   /// MV runtime znode) is not achievable, so a narrow residual window remains within a single CAS
   /// attempt: if a backfill segment appears AND the consistency manager's (debounced) STALE mark
   /// for it fires — as a no-op, because the bucket is still STALE — strictly between this attempt's
@@ -280,11 +280,11 @@ public final class MaterializedViewPartitionManager {
   /// snapshot-before-loop left wide open (the snapshot could be stale for the entire CAS retry
   /// budget, up to several seconds).
   ///
-  /// <p><b>Scope note:</b> the supplier is a caller-provided callback — the manager invokes it but
+  /// **Scope note:** the supplier is a caller-provided callback — the manager invokes it but
   /// keeps no compile-time dependency on source-table services, preserving the scope discipline
   /// documented at the class level.
   ///
-  /// <p><b>Design context (open question):</b> The continued existence of the `VALID-empty`
+  /// **Design context (open question):** The continued existence of the `VALID-empty`
   /// shape is under review.  An alternative model removes the entry entirely on DELETE
   /// (treating empty buckets as VACANT), which requires extending
   /// [MaterializedViewTaskUtils#computeContiguousUpperMs] to walk past VACANT buckets and

@@ -39,11 +39,9 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
-/**
- * Unit tests verifying null-safety fixes in GcsPinotFS:
- * - open() throws FileNotFoundException (not NPE) when the blob does not exist
- * - copy() throws FileNotFoundException (not NPE) when the source blob does not exist
- */
+/// Unit tests verifying null-safety fixes in GcsPinotFS:
+/// - open() throws FileNotFoundException (not NPE) when the blob does not exist
+/// - copy() throws FileNotFoundException (not NPE) when the source blob does not exist
 public class GcsPinotFSNullSafetyTest {
 
   private Storage _mockStorage;

@@ -39,9 +39,7 @@ public class BrokerQueryEventListenerFactory {
   private static BrokerQueryEventListener _brokerQueryEventListener;
   private static Set<String> _trackedHeaders;
 
-  /**
-   * Initializes BrokerQueryEventListener and tracked headers.
-   */
+  /// Initializes BrokerQueryEventListener and tracked headers.
   public static void init(PinotConfiguration config) {
     // Initialize BrokerQueryEventListener
     initializeBrokerQueryEventListener(config);
@@ -49,10 +47,8 @@ public class BrokerQueryEventListenerFactory {
     initializeTrackedHeaders(config);
   }
 
-  /**
-   * Initializes BrokerQueryEventListener with event-listener configurations.
-   * @param config The subset of the configuration containing the event-listener-related keys
-   */
+  /// Initializes BrokerQueryEventListener with event-listener configurations.
+  /// @param config The subset of the configuration containing the event-listener-related keys
   private static void initializeBrokerQueryEventListener(PinotConfiguration config) {
     String brokerQueryEventListenerClassName =
         config.getProperty(CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME, DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME);
@@ -68,10 +64,8 @@ public class BrokerQueryEventListenerFactory {
     LOGGER.info("Initialized BrokerQueryEventListener: {}", _brokerQueryEventListener.getClass().getName());
   }
 
-  /**
-   * Initializes tracked request-headers to extract from query request.
-   * @param config The subset of the configuration containing the event-listener-related keys
-   */
+  /// Initializes tracked request-headers to extract from query request.
+  /// @param config The subset of the configuration containing the event-listener-related keys
   private static void initializeTrackedHeaders(PinotConfiguration config) {
     String trackedHeaders = config.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS);
     if (StringUtils.isNotEmpty(trackedHeaders)) {
@@ -88,17 +82,13 @@ public class BrokerQueryEventListenerFactory {
     }
   }
 
-  /**
-   * Returns the BrokerQueryEventListener instance.
-   */
+  /// Returns the BrokerQueryEventListener instance.
   public static BrokerQueryEventListener getBrokerQueryEventListener() {
     return Preconditions.checkNotNull(_brokerQueryEventListener,
         "BrokerQueryEventListenerFactory has not been initialized");
   }
 
-  /**
-   * Returns the set of tracked headers.
-   */
+  /// Returns the set of tracked headers.
   public static Set<String> getTrackedHeaders() {
     return Preconditions.checkNotNull(_trackedHeaders, "BrokerQueryEventListenerFactory has not been initialized");
   }

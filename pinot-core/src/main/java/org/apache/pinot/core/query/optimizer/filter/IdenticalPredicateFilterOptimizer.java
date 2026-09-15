@@ -30,16 +30,14 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * This optimizer folds predicates that compare an expression to itself to a constant TRUE/FALSE literal, so the engine
- * does not evaluate them per-row. Such predicates are not typical to write by hand (e.g. {@code WHERE col1 = col1}),
- * but they are also produced internally and would otherwise be expensive.
- *
- * <p>{@code PredicateComparisonRewriter} rewrites a column-to-column comparison {@code a <op> b} into
- * {@code comparison(a, b) = true} (e.g. {@code equals(a, b) = true}). When the two operands are the same expression,
- * the inner comparison has a constant value, which this optimizer substitutes: {@code true} for {@code =}, {@code >=},
- * {@code <=} and {@code false} for {@code !=}, {@code >}, {@code <}.
- */
+/// This optimizer folds predicates that compare an expression to itself to a constant TRUE/FALSE literal, so the engine
+/// does not evaluate them per-row. Such predicates are not typical to write by hand (e.g. `WHERE col1 = col1`),
+/// but they are also produced internally and would otherwise be expensive.
+///
+/// `PredicateComparisonRewriter` rewrites a column-to-column comparison `a <op> b` into
+/// `comparison(a, b) = true` (e.g. `equals(a, b) = true`). When the two operands are the same expression,
+/// the inner comparison has a constant value, which this optimizer substitutes: `true` for `=`, `>=`,
+/// `<=` and `false` for `!=`, `>`, `<`.
 public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   // Comparison operators that are always true / always false when their two operands are identical.
@@ -70,12 +68,10 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
     return filterExpression;
   }
 
-  /**
-   * Folds a predicate of the form 'comparison(a, a) = true' — a comparison whose two operands are the <em>same</em>
-   * expression — to the constant value it must always have. Returns an empty {@link Optional} when the predicate is
-   * not such a comparison: the operands differ, the right-hand side is not the literal {@code true}, or the function
-   * is a non-comparison like 'startsWith(a, a) = true' whose value cannot be determined here.
-   */
+  /// Folds a predicate of the form 'comparison(a, a) = true' — a comparison whose two operands are the _same_
+  /// expression — to the constant value it must always have. Returns an empty [Optional] when the predicate is
+  /// not such a comparison: the operands differ, the right-hand side is not the literal `true`, or the function
+  /// is a non-comparison like 'startsWith(a, a) = true' whose value cannot be determined here.
   private Optional<Boolean> foldIdenticalComparisonWithTrueLiteral(List<Expression> operands) {
     // The predicate must be 'comparison(a, b) = true'.
     if (operands.size() != 2 || operands.get(0).getFunctionCall() == null || !isLiteralTrue(operands.get(1))) {

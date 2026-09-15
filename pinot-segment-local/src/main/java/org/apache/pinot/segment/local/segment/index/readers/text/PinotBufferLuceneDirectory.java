@@ -32,11 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Custom Lucene Directory implementation that reads from a PinotDataBuffer.
- * This allows Lucene to work with combined text index buffers without creating
- * temporary files or directories.
- */
+/// Custom Lucene Directory implementation that reads from a PinotDataBuffer.
+/// This allows Lucene to work with combined text index buffers without creating
+/// temporary files or directories.
 public class PinotBufferLuceneDirectory extends Directory {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBufferLuceneDirectory.class);
 

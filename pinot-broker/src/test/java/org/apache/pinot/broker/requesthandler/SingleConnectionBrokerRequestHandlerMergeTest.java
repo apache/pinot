@@ -36,12 +36,12 @@ import static org.testng.Assert.assertTrue;
 
 
 /// Regression test for the MV-split DataTable merge contract in
-/// {@link SingleConnectionBrokerRequestHandler#mergeDataTablesByIdentity}.
+/// [SingleConnectionBrokerRequestHandler#mergeDataTablesByIdentity].
 ///
-/// <p>Pins the invariant that the same physical server (matching hostname/port/tableType) appearing
+/// Pins the invariant that the same physical server (matching hostname/port/tableType) appearing
 /// on BOTH the base sub-query and the MV sub-query contributes two distinct entries to the merged
 /// map.  Using a regular HashMap would collapse the two entries (since
-/// {@link ServerRoutingInstance#equals} keys on hostname/port/tableType), silently undercounting
+/// [ServerRoutingInstance#equals] keys on hostname/port/tableType), silently undercounting
 /// results during the broker reduce.
 public class SingleConnectionBrokerRequestHandlerMergeTest {
 

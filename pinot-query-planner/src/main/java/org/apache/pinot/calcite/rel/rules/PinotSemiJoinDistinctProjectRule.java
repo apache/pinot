@@ -33,11 +33,9 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 
 
-/**
- * Special rule for Pinot, this rule always append a distinct to the
- * {@link org.apache.calcite.rel.logical.LogicalProject} on top of a Semi join
- * {@link org.apache.calcite.rel.core.Join} to ensure the correctness of the query.
- */
+/// Special rule for Pinot, this rule always append a distinct to the
+/// [org.apache.calcite.rel.logical.LogicalProject] on top of a Semi join
+/// [org.apache.calcite.rel.core.Join] to ensure the correctness of the query.
 public class PinotSemiJoinDistinctProjectRule extends RelOptRule {
   public static final PinotSemiJoinDistinctProjectRule INSTANCE =
       new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, null);

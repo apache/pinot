@@ -23,9 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.IntFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -285,6 +287,16 @@ public class QuickstartRunner {
       throws Exception {
     new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
+  }
+
+  /// @return names of the tables [#bootstrapTable()] creates, so that callers can tell which sample queries can
+  /// actually be answered.
+  public Set<String> getBootstrappedTableNames() {
+    Set<String> tableNames = new HashSet<>();
+    for (QuickstartTableRequest request : _tableRequests) {
+      tableNames.add(request.getTableName());
+    }
+    return tableNames;
   }
 
   public void bootstrapTable()

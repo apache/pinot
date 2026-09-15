@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
-/**
- * Config for Partitioner
- */
+/// Config for Partitioner
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PartitionerConfig {
 
@@ -52,49 +50,37 @@ public class PartitionerConfig {
     _columnPartitionConfig = columnPartitionConfig;
   }
 
-  /**
-   * The type of Partitioner
-   */
+  /// The type of Partitioner
   @JsonProperty
   public PartitionerFactory.PartitionerType getPartitionerType() {
     return _partitionerType;
   }
 
-  /**
-   * The number of partitions to create
-   */
+  /// The number of partitions to create
   @JsonProperty
   public int getNumPartitions() {
     return _numPartitions;
   }
 
-  /**
-   * The column name to use for partitioning
-   */
+  /// The column name to use for partitioning
   @JsonProperty
   public String getColumnName() {
     return _columnName;
   }
 
-  /**
-   * The transform function to use for calculating partitions
-   */
+  /// The transform function to use for calculating partitions
   @JsonProperty
   public String getTransformFunction() {
     return _transformFunction;
   }
 
-  /**
-   * Column partition config from a table config
-   */
+  /// Column partition config from a table config
   @JsonProperty
   public ColumnPartitionConfig getColumnPartitionConfig() {
     return _columnPartitionConfig;
   }
 
-  /**
-   * Builder for a PartitioningConfig
-   */
+  /// Builder for a PartitioningConfig
   public static class Builder {
     private PartitionerFactory.PartitionerType _partitionerType = DEFAULT_PARTITIONER_TYPE;
     private int _numPartitions;

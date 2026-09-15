@@ -20,62 +20,44 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.List;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * Mailbox that's used to send data.
- *
- * Usages of this interface should follow the pattern:
- *
- * <ol>
- *   <li>Zero or more calls to {@link #send(MseBlock.Data)}</li>
- *   <li>Then exactly one of:
- *     <ul>
- *       <li>One call to {@link #send(MseBlock.Eos, List)} if the receiver is not early terminated</li>
- *       <li>One call to {@link #cancel(Throwable)} if the sender wants to cancel the receiver</li>
- *     </ul>
- *   </li>
- * </ol>
- */
+/// Mailbox that's used to send data.
+///
+/// Usages of this interface should follow the pattern:
+///
+/// 1. Zero or more calls to [#send(MseBlock.Data)]
+/// 2. Then exactly one of:
+///   - One call to [#send(MseBlock.Eos, List)] if the receiver is not early terminated
+///   - One call to [#cancel(Throwable)] if the sender wants to cancel the receiver
 public interface SendingMailbox extends AutoCloseable {
 
-  /**
-   * Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the
-   * receiver.
-   */
+  /// Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the
+  /// receiver.
   boolean isLocal();
 
-  /**
-   * Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
-   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
-   * error sending the data, since that would allow {@link BlockExchange} to exit early.
-   */
+  /// Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
+  /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
+  /// an error sending the data, since that would allow
+  /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
   void send(MseBlock.Data data);
 
-  /**
-   * Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
-   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
-   * error sending the data, since that would allow {@link BlockExchange} to exit early.
-   */
+  /// Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
+  /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
+  /// an error sending the data, since that would allow
+  /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
   void send(MseBlock.Eos block, List<DataBuffer> serializedStats);
 
-  /**
-   * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
-   * No more blocks can be sent after calling this method.
-   */
+  /// Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
+  /// No more blocks can be sent after calling this method.
   void cancel(Throwable t);
 
-  /**
-   * Returns whether the {@link ReceivingMailbox} is already closed. There is no need to send more blocks after the
-   * mailbox is terminated.
-   */
+  /// Returns whether the [ReceivingMailbox] is already closed. There is no need to send more blocks after the
+  /// mailbox is terminated.
   boolean isTerminated();
 
-  /**
-   * Returns whether the {@link ReceivingMailbox} is considered itself finished, and is expected a EOS block with
-   * statistics to be sent next.
-   */
+  /// Returns whether the [ReceivingMailbox] is considered itself finished, and is expected a EOS block with
+  /// statistics to be sent next.
   boolean isEarlyTerminated();
 }

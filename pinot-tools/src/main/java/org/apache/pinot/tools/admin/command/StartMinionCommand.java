@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartMinion command.
- *
- */
+/// Class to implement StartMinion command.
 @CommandLine.Command(name = "StartMinion", mixinStandardHelpOptions = true)
 public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);

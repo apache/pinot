@@ -25,56 +25,38 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * SegmentGenerationTaskSpec defines all the required information in order to generate Pinot Segment.
- * Note that this task creates a segment directory, not tar file.
- */
+/// SegmentGenerationTaskSpec defines all the required information in order to generate Pinot Segment.
+/// Note that this task creates a segment directory, not tar file.
 public class SegmentGenerationTaskSpec implements Serializable {
   public static final String CUSTOM_SUBSET = "custom";
   public static final String CUSTOM_PREFIX = CUSTOM_SUBSET + '.';
 
-  /**
-   * Table config to create segment
-   */
+  /// Table config to create segment
   private TableConfig _tableConfig;
 
-  /**
-   * Table schema
-   */
+  /// Table schema
   private Schema _schema;
 
-  /**
-   * Used to init record reader to read from data file
-   */
+  /// Used to init record reader to read from data file
   private RecordReaderSpec _recordReaderSpec;
 
-  /**
-   * Used to generate segment name
-   */
+  /// Used to generate segment name
   private SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
-  /**
-   * Data file path
-   */
+  /// Data file path
   private String _inputFilePath;
 
-  /**
-   * Output segment directory to host all data files
-   */
+  /// Output segment directory to host all data files
   private String _outputDirectoryPath;
 
-  /**
-   * sequence id
-   */
+  /// sequence id
   private int _sequenceId;
 
   private boolean _failOnEmptySegment = false;
 
   private boolean _createMetadataTarGz = false;
 
-  /**
-   * Custom properties set into segment metadata
-   */
+  /// Custom properties set into segment metadata
   private Map<String, String> _customProperties = new HashMap<>();
 
   public TableConfig getTableConfig() {

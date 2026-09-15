@@ -25,9 +25,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the {@link VectorBackendType} enum.
- */
+/// Tests for the [VectorBackendType] enum.
 public class VectorBackendTypeTest {
 
   @Test

@@ -23,44 +23,36 @@ import java.util.regex.Pattern;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Implementation of regexp_extract that assumes pattern is not constant.
- */
+/// Implementation of regexp_extract that assumes pattern is not constant.
 public class RegexpExtractVarFunctions {
   private RegexpExtractVarFunctions() {
   }
 
-  /**
-   * @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
-   * @param value
-   * @param regexp
-   * @return the matched result.
-   */
+  /// @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
+  /// @param value
+  /// @param regexp
+  /// @return the matched result.
   @ScalarFunction
   public static String regexpExtractVar(String value, String regexp) {
     return regexpExtractVar(value, regexp, 0, "");
   }
 
-  /**
-   * @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
-   * @param value
-   * @param regexp
-   * @param group
-   * @return the matched result.
-   */
+  /// @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
+  /// @param value
+  /// @param regexp
+  /// @param group
+  /// @return the matched result.
   @ScalarFunction
   public static String regexpExtractVar(String value, String regexp, int group) {
     return regexpExtractVar(value, regexp, group, "");
   }
 
-  /**
-   * Regular expression that extract first matched substring.
-   * @param value input value
-   * @param regexp regular expression
-   * @param group the group number within the regular expression to extract.
-   * @param defaultValue the default value if no match found
-   * @return the matched result
-   */
+  /// Regular expression that extract first matched substring.
+  /// @param value input value
+  /// @param regexp regular expression
+  /// @param group the group number within the regular expression to extract.
+  /// @param defaultValue the default value if no match found
+  /// @return the matched result
   @ScalarFunction
   public static String regexpExtractVar(String value, String regexp, int group, String defaultValue) {
     Pattern p = Pattern.compile(regexp);

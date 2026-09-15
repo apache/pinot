@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.nio.ByteOrder;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -27,10 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reader for bitmap based inverted index. Please reference
- * {@link BitmapInvertedIndexWriter} for the index file layout.
- */
+/// Reader for bitmap based inverted index. Please reference
+/// [org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter] for the index file
+/// layout.
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 

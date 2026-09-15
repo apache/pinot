@@ -47,6 +47,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -55,9 +56,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link RealtimeSegmentAssignment#rebalanceTable} method for table with tiers
- */
+/// Tests the [RealtimeSegmentAssignment#rebalanceTable] method for table with tiers
 public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final int NUM_PARTITIONS = 4;
@@ -126,6 +125,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
       String segmentName = path.substring(path.lastIndexOf('/') + 1);
       return new ZNRecord(segmentName);
     });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (String segmentName : _segments) {
+      segmentZNRecords.add(new ZNRecord(segmentName));
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     //noinspection unchecked
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
@@ -367,9 +373,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 
-  /**
-   * Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
-   */
+  /// Selects segments with sequence number 5-14 i.e. 10 segments per partition (40 segments)
   private static class TestSegmentSelectorA implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -383,9 +387,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
-   */
+  /// Selects segments with sequence number 0-4 i.e. 5 segments per partition (20 segments)
   private static class TestSegmentSelectorB implements TierSegmentSelector {
     @Override
     public String getType() {
@@ -399,9 +401,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Selects no segments
-   */
+  /// Selects no segments
   private static class TestSegmentSelectorC implements TierSegmentSelector {
     @Override
     public String getType() {

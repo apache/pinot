@@ -67,28 +67,27 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotAccessControlUserRestletResource {
-  /**
-   * URI Mappings:
-   * - "/user", "/users/": List all the users
-   * - "/users/{username}", "/users/{username}/": List config for specified username.
-   *
-   * - "/user", "/users/" : Add a user
-   * <pre>
-   *       POST Request Body Example :
-   *        {
-   *         "username": "user1",
-   *         "password": "user1@passwd",
-   *         "component": "BROKER",
-   *         "role" : "ADMIN",
-   *         "tables": ["table1", "table2"],
-   *         "permissions": ["READ"]
-   *        }
-   *  </pre>
-   *
-   *  - "/users/{username}", "/users/{username}/"
-   *  PUT Request body example : same as POST Request Body
-   * {@inheritDoc}
-   */
+  /// URI Mappings:
+  /// - "/user", "/users/": List all the users
+  /// - "/users/{username}", "/users/{username}/": List config for specified username.
+  ///
+  /// - "/user", "/users/" : Add a user
+  ///
+  /// ```
+  /// POST Request Body Example :
+  ///  {
+  ///   "username": "user1",
+  ///   "password": "user1@passwd",
+  ///   "component": "BROKER",
+  ///   "role" : "ADMIN",
+  ///   "tables": ["table1", "table2"],
+  ///   "permissions": ["READ"]
+  ///  }
+  /// ```
+  ///
+  ///  - "/users/{username}", "/users/{username}/"
+  ///  PUT Request body example : same as POST Request Body
+  /// {@inheritDoc}
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotAccessControlUserRestletResource.class);
 
   @Inject

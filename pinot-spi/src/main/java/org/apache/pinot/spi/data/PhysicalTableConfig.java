@@ -22,10 +22,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * This class represents the configuration for a physical table in {@link LogicalTableConfig}.
- * This is empty by design and more docs would be added as features are added.
- */
+/// This class represents the configuration for a physical table in [LogicalTableConfig].
+/// This is empty by design and more docs would be added as features are added.
 public class PhysicalTableConfig extends BaseJsonConfig {
   @JsonProperty("multiCluster")
   private final boolean _isMultiCluster;

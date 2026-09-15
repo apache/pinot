@@ -25,9 +25,7 @@ import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
-/**
- * Utility to perform intersection of sorted ranges
- */
+/// Utility to perform intersection of sorted ranges
 public class SortedRangeIntersection {
   private SortedRangeIntersection() {
   }

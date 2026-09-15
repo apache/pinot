@@ -44,28 +44,28 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
-/// MV schema inferer. Validates {@code AS definedSQL} via Calcite's
-/// {@link QueryEnvironment} and emits a {@link ResolvedColumnDefinition} per output
+/// MV schema inferer. Validates `AS definedSQL` via Calcite's
+/// [QueryEnvironment] and emits a [ResolvedColumnDefinition] per output
 /// column. Scope is deliberately narrow:
 ///
 /// - **Data type** comes from Calcite's validated row type (multi-stage engine semantics).
 /// - **Time column** (the projection alias matching `timeColumnName`) is always pinned to
-///   {@link DataType#TIMESTAMP} with format `1:MILLISECONDS:TIMESTAMP` and granularity
+///   [DataType#TIMESTAMP] with format `1:MILLISECONDS:TIMESTAMP` and granularity
 ///   `1:MILLISECONDS`. The inferer does not try to derive granularity from the SELECT
 ///   expression — the table-create-time analyzer handles base-column / `bucketTimePeriod`
 ///   alignment. Users who need a different time-column shape must use the explicit column
 ///   list form.
-/// - **Aggregations on the MV-supported allow-list** ({@link MaterializedViewAggregationCatalog})
-///   take their {@link DataType} from the catalog so the sketch `BYTES` override that the
+/// - **Aggregations on the MV-supported allow-list** ([MaterializedViewAggregationCatalog])
+///   take their [DataType] from the catalog so the sketch `BYTES` override that the
 ///   rewrite engine relies on is preserved.
-/// - All other columns are emitted as {@link ColumnRole#DIMENSION} with the Calcite-derived
+/// - All other columns are emitted as [ColumnRole#DIMENSION] with the Calcite-derived
 ///   `DataType`, NOT NULL, no format / no default. Users who need different defaults,
 ///   nullability, multi-value, or a non-DIMENSION role should fall back to an explicit
 ///   column list.
 ///
 /// Calcite's validator is also responsible for catching SQL-shape errors (column typos,
 /// function arity, JOIN, multi-FROM, multi-value source, etc.) at DDL-compile time —
-/// the inferer simply surfaces those as {@link DdlCompilationException}.
+/// the inferer simply surfaces those as [DdlCompilationException].
 public final class MaterializedViewSchemaInferer {
 
   /// MV time columns are pinned to millis-epoch TIMESTAMP. The downstream analyzer enforces
@@ -177,9 +177,9 @@ public final class MaterializedViewSchemaInferer {
   ///
   ///   1. Time column (alias matches `timeColumnName`) → canonical TIMESTAMP DATETIME.
   ///   2. Recognised MV aggregation (operator on the catalog allow-list) → catalog
-  ///      {@link DataType}, METRIC role. Sketch aggregations land as BYTES per the
+  ///      [DataType], METRIC role. Sketch aggregations land as BYTES per the
   ///      catalog's load-bearing override.
-  ///   3. Everything else → Calcite-derived {@link DataType}, DIMENSION role.
+  ///   3. Everything else → Calcite-derived [DataType], DIMENSION role.
   private static ResolvedColumnDefinition inferColumn(Expression item, String columnName,
       RelDataTypeField calciteField, String timeColumnName) {
     if (columnName.equalsIgnoreCase(timeColumnName)) {

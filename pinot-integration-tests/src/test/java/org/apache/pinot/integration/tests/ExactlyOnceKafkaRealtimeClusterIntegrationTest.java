@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,7 +34,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -44,199 +42,99 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.pinot.integration.tests.SharedKafkaRealtimeIntegrationTestSuite.ScenarioLease;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.Test;
 
 
-public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ExactlyOnceKafkaRealtimeClusterIntegrationTest.class);
+/// Focused transactional-ingestion scenario for the shared Kafka realtime suite.
+public class ExactlyOnceKafkaRealtimeClusterIntegrationTest {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(ExactlyOnceKafkaRealtimeClusterIntegrationTest.class);
+  private static final String TABLE_NAME = "mytableExactlyOnce";
+  private static final String TOPIC_NAME = "ExactlyOnceKafkaRealtimeClusterIntegrationTest";
+  private static final int RECORDS_PER_TRANSACTION = 1_000;
+  private static final long RECORDS_PER_TRANSACTIONAL_PHASE = 2L * RECORDS_PER_TRANSACTION;
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
   private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 60_000L;
-  private static final long COUNT_RECORDS_DRAIN_TIMEOUT_MS = 60_000L;
-  private static final Duration COUNT_RECORDS_END_OFFSETS_TIMEOUT = Duration.ofSeconds(10);
-  private static final Duration COUNT_RECORDS_POSITION_TIMEOUT = Duration.ofSeconds(5);
-  private static final Duration COUNT_RECORDS_PRIMING_POLL_TIMEOUT = Duration.ofMillis(200);
-  private static final Duration COUNT_RECORDS_POLL_TIMEOUT = Duration.ofSeconds(2);
+  private static final long COUNT_RECORDS_DRAIN_TIMEOUT_MS = 30_000L;
+  private static final Duration COUNT_RECORDS_POLL_TIMEOUT = Duration.ofMillis(50);
+  private static final Duration COUNT_RECORDS_QUIESCENCE_POLL_TIMEOUT = Duration.ofMillis(200);
+  private static final Duration COUNT_RECORDS_CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
-  @Override
-  public void addTableConfig(TableConfig tableConfig)
-      throws IOException {
+  @Test
+  public void testCommittedTransactionsOnly()
+      throws Throwable {
+    SharedKafkaRealtimeIntegrationTestSuite owner =
+        SharedKafkaRealtimeIntegrationTestSuite.getSharedSuiteOwner();
+    ScenarioLease lease = owner.newScenario(TABLE_NAME, TOPIC_NAME);
+    Throwable primaryFailure = null;
+    try {
+      owner.createScenarioTopic(lease);
+      List<File> avroFiles = owner.unpackScenarioData(lease);
+      owner.addScenarioSchema(lease);
+      TableConfig tableConfig = owner.createScenarioTableConfig(lease, avroFiles.get(0),
+          owner.getScenarioStreamConfigs(lease._topicName, true));
+      addTableConfigWithRetry(owner, lease, tableConfig);
+
+      long expectedRecords = RECORDS_PER_TRANSACTIONAL_PHASE;
+      pushTransactionalData(owner, lease, avroFiles, expectedRecords);
+      waitForPinotCount(owner, lease, expectedRecords, 1_200_000L);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      owner.closeScenario(lease, primaryFailure, null);
+    }
+  }
+
+  private void addTableConfigWithRetry(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      TableConfig tableConfig)
+      throws Exception {
+    lease._tableCreated = true;
     for (int attempt = 1; attempt <= REALTIME_TABLE_CONFIG_RETRY_COUNT; attempt++) {
       try {
-        super.addTableConfig(tableConfig);
-        LOGGER.info("Successfully added table config on attempt {}", attempt);
+        owner.addTableConfig(tableConfig);
+        owner.waitForAllRealtimePartitionsConsuming(
+            TableNameBuilder.REALTIME.tableNameWithType(lease._tableName),
+            owner.getRealtimePartitionsReadyTimeoutMs());
         return;
       } catch (IOException e) {
-        if (!isRetryableRealtimePartitionMetadataError(e) || attempt == REALTIME_TABLE_CONFIG_RETRY_COUNT) {
-          LOGGER.error("Failed to add table config on attempt {} of {}", attempt, REALTIME_TABLE_CONFIG_RETRY_COUNT, e);
+        if (owner.scenarioTableExists(lease._tableName)) {
+          owner.waitForAllRealtimePartitionsConsuming(
+              TableNameBuilder.REALTIME.tableNameWithType(lease._tableName),
+              owner.getRealtimePartitionsReadyTimeoutMs());
+          return;
+        }
+        if (!isRetryableRealtimePartitionMetadataError(e, lease._topicName)
+            || attempt == REALTIME_TABLE_CONFIG_RETRY_COUNT) {
           throw e;
         }
-        LOGGER.warn("Attempt {} failed with retryable error, waiting for Kafka metadata and retrying...", attempt, e);
-        waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
+        waitForKafkaTopicMetadataReadyForConsumer(owner.getKafkaBrokerList(), lease._topicName,
+            owner.getNumKafkaPartitions());
         try {
           Thread.sleep(REALTIME_TABLE_CONFIG_RETRY_WAIT_MS);
         } catch (InterruptedException interruptedException) {
           Thread.currentThread().interrupt();
-          throw new IOException("Interrupted while retrying realtime table creation for topic: " + getKafkaTopic(),
+          throw new IOException("Interrupted while retrying table creation: " + lease._tableName,
               interruptedException);
         }
       }
     }
   }
 
-  @Override
-  protected boolean useKafkaTransaction() {
-    return true;
-  }
-
-  // No getKafkaExtraProperties override. The previous override set
-  // log.flush.interval.messages=1 on the embedded broker, which forced a per-record fsync
-  // on every partition log. Each setUp pushes ~115 545 records * 2 transactions ~= 231 k
-  // records, so the broker's I/O thread was buried under hundreds of thousands of fsync
-  // calls on the CI runner's shared disk. The transaction COMMIT marker writes
-  // (WriteTxnMarkers requests from the coordinator -> data-partition leaders) ride the
-  // same per-partition I/O queue, so they were stuck behind the fsync backlog -- the LSO
-  // never advanced, and read_committed consumers (the test's verification consumer plus
-  // the Pinot server) saw nothing within the 120 s budget. Kafka's transactional protocol
-  // already provides durability via acks=all and transaction.state.log.replication.factor=3,
-  // so the forced fsync was redundant. Removing it eliminates both observed stall modes.
-
-  @Override
-  protected int getNumKafkaBrokers() {
-    return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
-  }
-
-  @Override
-  protected long getDocsLoadedTimeoutMs() {
-    return 1_200_000L;
-  }
-
-  /**
-   * Diagnostic override of the inherited "wait for COUNT(*) to converge" loop. The base
-   * implementation polls every 100 ms and, on timeout, only reports the assertion message
-   * "Failed to load N documents" with no progress information -- so the silent 20-minute
-   * gap that has been the dominant flake on CI is impossible to triage from the surefire
-   * log. This override does the same convergence wait but prints periodic progress lines
-   * (current count, kafka log-end-offsets per partition, kafka read_committed count) and,
-   * on timeout, dumps a thread-stack snapshot for every Kafka / Pinot consumer thread
-   * before throwing the same AssertionError shape the inherited code produced.
-   *
-   * Note: pure observability change. No retry, no behavior change on the success path.
-   */
-  @Override
-  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
-    long expected = getCountStarResult();
-    long start = System.currentTimeMillis();
-    long deadline = start + timeoutMs;
-    long lastProgressLog = 0L;
-    long lastChangeAt = start;
-    long lastSeenCount = -1L;
-    long lastCount = -1L;
-    int iterations = 0;
-    LOGGER.info("[diag] waitForAllDocsLoaded start: table={} expected={} timeoutMs={}", tableName, expected, timeoutMs);
-    while (System.currentTimeMillis() < deadline) {
-      iterations++;
-      try {
-        lastCount = getCurrentCountStarResult(tableName);
-      } catch (Exception e) {
-        LOGGER.debug("[diag] count query error", e);
-      }
-      if (lastCount == expected) {
-        LOGGER.info("[diag] Pinot COUNT(*) converged: count={} elapsed={}ms iterations={}", lastCount,
-            System.currentTimeMillis() - start, iterations);
-        return;
-      }
-      long now = System.currentTimeMillis();
-      if (lastCount != lastSeenCount) {
-        lastSeenCount = lastCount;
-        lastChangeAt = now;
-      }
-      // Print a progress line every 5 s so the silent gap is no longer silent.
-      if (now - lastProgressLog >= 5_000L) {
-        long sinceChangeMs = now - lastChangeAt;
-        long uncommittedKafka = -1L;
-        long committedKafka = -1L;
-        try {
-          uncommittedKafka = countRecords(getKafkaBrokerList(), "read_uncommitted");
-          committedKafka = countRecords(getKafkaBrokerList(), "read_committed");
-        } catch (Exception e) {
-          LOGGER.debug("[diag] kafka diagnostic count failed", e);
-        }
-        // ERROR (not WARN) so the periodic line passes the test BurstFilter that DENIES below-ERROR.
-        LOGGER.error(
-            "[diag] elapsed={}ms pinotCount={} expected={} stallMs={} kafkaCommitted={} kafkaUncommitted={} iter={}",
-            now - start, lastCount, expected, sinceChangeMs, committedKafka, uncommittedKafka, iterations);
-        lastProgressLog = now;
-      }
-      try {
-        Thread.sleep(500L);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      }
-    }
-    long elapsed = System.currentTimeMillis() - start;
-    LOGGER.error("[diag] waitForAllDocsLoaded timed out: table={} expected={} lastCount={} elapsed={}ms", tableName,
-        expected, lastCount, elapsed);
-    long kafkaCommittedFinal = -1L;
-    long kafkaUncommittedFinal = -1L;
-    try {
-      kafkaCommittedFinal = countRecords(getKafkaBrokerList(), "read_committed");
-      kafkaUncommittedFinal = countRecords(getKafkaBrokerList(), "read_uncommitted");
-    } catch (Exception ignored) {
-      // best-effort
-    }
-    LOGGER.error("[diag] kafka final state: read_committed={} read_uncommitted={}", kafkaCommittedFinal,
-        kafkaUncommittedFinal);
-    dumpRelevantThreadStacks();
-    throw new AssertionError(String.format(
-        "Failed to load %d documents (lastCount=%d, kafkaCommitted=%d, kafkaUncommitted=%d, elapsed=%dms)", expected,
-        lastCount, kafkaCommittedFinal, kafkaUncommittedFinal, elapsed));
-  }
-
-  /**
-   * Dump stack traces for threads whose names suggest they are part of the Pinot realtime
-   * consumer pipeline or the Kafka consumer pool. Helps identify whether the stall is in
-   * fetch, segment commit, GC, or somewhere unexpected.
-   */
-  private void dumpRelevantThreadStacks() {
-    Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
-    int dumped = 0;
-    for (Map.Entry<Thread, StackTraceElement[]> entry : all.entrySet()) {
-      Thread t = entry.getKey();
-      String name = t.getName();
-      if (name == null) {
-        continue;
-      }
-      boolean interesting = name.contains("RealtimeSegment") || name.contains("kafka") || name.contains("Kafka")
-          || name.contains("HelixTaskExecutor") || name.contains("PartitionConsumer") || name.contains("mytable__");
-      if (!interesting) {
-        continue;
-      }
-      StringBuilder sb = new StringBuilder();
-      sb.append("[diag] thread '").append(name).append("' state=").append(t.getState());
-      for (StackTraceElement el : entry.getValue()) {
-        sb.append("\n    at ").append(el);
-      }
-      LOGGER.error(sb.toString());
-      dumped++;
-    }
-    LOGGER.error("[diag] thread dump: dumped {} of {} total threads", dumped, all.size());
-  }
-
-  @Override
-  protected void pushAvroIntoKafka(List<File> avroFiles)
+  private void pushTransactionalData(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      List<File> avroFiles, long expectedRecords)
       throws Exception {
-    String kafkaBrokerList = getKafkaBrokerList();
-    LOGGER.info("Pushing transactional data to Kafka at: {}", kafkaBrokerList);
-    LOGGER.info("Avro files count: {}", avroFiles.size());
-
+    String brokerList = owner.getKafkaBrokerList();
     Properties producerProps = new Properties();
-    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerList);
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
     producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
     producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
@@ -246,97 +144,30 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     producerProps.put(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "600000");
     producerProps.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "test-transaction-" + UUID.randomUUID());
 
-    // Use a SINGLE producer for both abort and commit transactions.
-    // With a single producer, the coordinator's state machine ensures that after
-    // abortTransaction() returns, it returns CONCURRENT_TRANSACTIONS for any new
-    // transaction operations until the abort is fully done (markers written).
     try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps)) {
       producer.initTransactions();
-      LOGGER.info("initTransactions() succeeded");
-
-      // Transaction 1: aborted batch
-      long abortedCount = pushAvroRecords(producer, avroFiles, false);
-      LOGGER.info("Aborted batch: {} records", abortedCount);
-
-      // Transaction 2: committed batch
-      long committedCount = pushAvroRecords(producer, avroFiles, true);
-      LOGGER.info("Committed batch: {} records", committedCount);
-    }
-
-    // After producer is closed, verify the topic actually exposes ALL expected records to
-    // an independent read_committed consumer. This is stricter than the previous
-    // "any record visible" check: it confirms transaction markers have been fully
-    // propagated for every committed record, which is the actual exactly-once contract,
-    // and surfaces partial-commit bugs that the old check would have hidden.
-    LOGGER.info("Producer closed. Verifying that all {} committed records are readable from Kafka...",
-        getCountStarResult());
-    waitForAllCommittedRecordsVisible(kafkaBrokerList, getCountStarResult());
-  }
-
-  /**
-   * Wait until an independent read_committed consumer can read exactly {@code expected}
-   * records from the topic. Throws an {@link AssertionError} if the count never matches
-   * within 120 s, or if it overshoots (which would indicate the aborted batch leaked
-   * through). Reaching this method's "ok" return is the gate that the rest of setUp
-   * relies on -- the caller (the inherited setUp in {@link BaseRealtimeClusterIntegrationTest})
-   * then waits for Pinot's COUNT(*) to converge on the same count.
-   */
-  private void waitForAllCommittedRecordsVisible(String brokerList, long expected) {
-    long deadline = System.currentTimeMillis() + 120_000L;
-    int lastCommitted = 0;
-    int lastUncommitted = 0;
-    int iteration = 0;
-
-    while (System.currentTimeMillis() < deadline) {
-      iteration++;
-      lastCommitted = countRecords(brokerList, "read_committed");
-      if (lastCommitted == expected) {
-        LOGGER.info("Verification OK: read_committed={} after {} iterations", lastCommitted, iteration);
-        return;
-      }
-      if (lastCommitted > expected) {
-        // Aborted batch leaked through, or the test pushed more records than getCountStarResult().
-        lastUncommitted = countRecords(brokerList, "read_uncommitted");
+      long abortedCount = pushAvroRecords(owner, lease, producer, avroFiles, false, expectedRecords);
+      long committedCount = pushAvroRecords(owner, lease, producer, avroFiles, true, expectedRecords);
+      if (abortedCount != expectedRecords || committedCount != expectedRecords) {
         throw new AssertionError(String.format(
-            "[ExactlyOnce] read_committed count overshot expected on broker %s: read_committed=%d, expected=%d, "
-                + "read_uncommitted=%d", brokerList, lastCommitted, expected, lastUncommitted));
-      }
-      if (iteration == 1 || iteration % 5 == 0) {
-        lastUncommitted = countRecords(brokerList, "read_uncommitted");
-        LOGGER.info("Verification iteration {}: read_committed={}/{}, read_uncommitted={}", iteration, lastCommitted,
-            expected, lastUncommitted);
-      }
-      try {
-        Thread.sleep(2_000L);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
+            "Unexpected transactional input counts: aborted=%d committed=%d expected=%d", abortedCount,
+            committedCount, expectedRecords));
       }
     }
 
-    lastUncommitted = countRecords(brokerList, "read_uncommitted");
-    LOGGER.error("VERIFICATION FAILED after 120s: read_committed={}/{}, read_uncommitted={}", lastCommitted, expected,
-        lastUncommitted);
-    throw new AssertionError(String.format(
-        "[ExactlyOnce] Kafka topic did not expose all %d committed records within 120s; "
-            + "read_committed=%d, read_uncommitted=%d", expected, lastCommitted, lastUncommitted));
+    waitForTransactionalVisibility(brokerList, lease._topicName, expectedRecords);
   }
 
-  /**
-   * Push Avro records to Kafka within a transaction. Does NOT call initTransactions().
-   * Returns the number of records sent.
-   */
-  private long pushAvroRecords(KafkaProducer<byte[], byte[]> producer, List<File> avroFiles, boolean commit)
+  private long pushAvroRecords(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      KafkaProducer<byte[], byte[]> producer, List<File> avroFiles, boolean commit, long maxRecords)
       throws Exception {
-    int maxMessagesPerTransaction =
-        getMaxNumKafkaMessagesPerBatch() > 0 ? getMaxNumKafkaMessagesPerBatch() : Integer.MAX_VALUE;
-    long counter = 0;
+    long counter = 0L;
     int recordsInTransaction = 0;
     boolean hasOpenTransaction = false;
-    byte[] header = getKafkaMessageHeader();
-    String partitionColumn = getPartitionColumn();
+    byte[] header = owner.getKafkaMessageHeader();
+    String partitionColumn = owner.getPartitionColumn();
 
-    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65_536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
@@ -355,46 +186,110 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
             datumWriter.write(genericRecord, binaryEncoder);
             binaryEncoder.flush();
 
-            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(counter)
+            byte[] keyBytes = partitionColumn == null ? Longs.toByteArray(counter)
                 : genericRecord.get(partitionColumn).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            byte[] bytes = outputStream.toByteArray();
-            producer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, bytes));
+            producer.send(new ProducerRecord<>(lease._topicName, keyBytes, outputStream.toByteArray()));
             counter++;
-
             recordsInTransaction++;
-            if (recordsInTransaction >= maxMessagesPerTransaction) {
-              if (commit) {
-                producer.commitTransaction();
-              } else {
-                producer.abortTransaction();
-              }
+            if (recordsInTransaction >= RECORDS_PER_TRANSACTION) {
+              finishTransaction(producer, commit);
               hasOpenTransaction = false;
+            }
+            if (counter >= maxRecords) {
+              if (hasOpenTransaction) {
+                finishTransaction(producer, commit);
+              }
+              return counter;
             }
           }
         }
       }
     }
     if (hasOpenTransaction) {
-      if (commit) {
-        producer.commitTransaction();
-      } else {
-        producer.abortTransaction();
-      }
+      finishTransaction(producer, commit);
     }
     return counter;
   }
 
-  /**
-   * Count records visible in the topic with the given isolation level.
-   *
-   * <p>For {@code read_committed}, {@link KafkaConsumer#endOffsets(java.util.Collection, Duration)}
-   * returns the LSO (Last Stable Offset) per partition; for {@code read_uncommitted} it returns the
-   * log-end-offset. We poll until every partition's position catches up to that snapshot rather than
-   * breaking on the first empty poll. On a freshly assigned consumer the first poll often returns
-   * empty while metadata/fetch sessions are being established, and breaking on it produced false
-   * zero counts and spurious {@code markers were not propagated} failures.
-   */
-  private int countRecords(String brokerList, String isolationLevel) {
+  private static void finishTransaction(KafkaProducer<byte[], byte[]> producer, boolean commit) {
+    // Ensure aborted records reach the broker so read_uncommitted observes the complete transaction.
+    producer.flush();
+    if (commit) {
+      producer.commitTransaction();
+    } else {
+      producer.abortTransaction();
+    }
+  }
+
+  private void waitForTransactionalVisibility(String brokerList, String topic, long expected) {
+    long deadline = System.currentTimeMillis() + 120_000L;
+    int lastCommitted = 0;
+    int lastUncommitted = 0;
+    int iteration = 0;
+    while (System.currentTimeMillis() < deadline) {
+      iteration++;
+      lastCommitted = countRecords(brokerList, topic, "read_committed", expected);
+      lastUncommitted = countRecords(brokerList, topic, "read_uncommitted", expected * 2L);
+      if (lastCommitted == expected && lastUncommitted == expected * 2L) {
+        return;
+      }
+      if (lastCommitted > expected || lastUncommitted > expected * 2L) {
+        throw new AssertionError(String.format(
+            "[ExactlyOnce] transactional views overshot: read_committed=%d expected=%d read_uncommitted=%d "
+                + "expectedUncommitted=%d", lastCommitted, expected, lastUncommitted, expected * 2L));
+      }
+      if (iteration == 1 || iteration % 5 == 0) {
+        LOGGER.info("Transactional visibility: committed={}/{}, uncommitted={}/{}", lastCommitted, expected,
+            lastUncommitted, expected * 2L);
+      }
+      try {
+        Thread.sleep(2_000L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    throw new AssertionError(String.format(
+        "[ExactlyOnce] topic views did not converge: read_committed=%d expected=%d read_uncommitted=%d "
+            + "expectedUncommitted=%d", lastCommitted, expected, lastUncommitted, expected * 2L));
+  }
+
+  private void waitForPinotCount(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease, long expected,
+      long timeoutMs) {
+    long start = System.currentTimeMillis();
+    long deadline = start + timeoutMs;
+    long lastProgressLog = 0L;
+    long lastCount = -1L;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        lastCount = owner.getCurrentCountStarResult(lease._tableName);
+      } catch (Exception e) {
+        LOGGER.debug("Count query failed while transactional ingestion was converging", e);
+      }
+      if (lastCount == expected) {
+        return;
+      }
+      long now = System.currentTimeMillis();
+      if (now - lastProgressLog >= 5_000L) {
+        LOGGER.error("Transactional Pinot ingestion progress: elapsedMs={} count={} expected={} kafkaCommitted={}",
+            now - start, lastCount, expected,
+            countRecords(owner.getKafkaBrokerList(), lease._topicName, "read_committed", expected));
+        lastProgressLog = now;
+      }
+      try {
+        Thread.sleep(500L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    dumpRelevantThreadStacks();
+    throw new AssertionError(String.format(
+        "Failed to load %d committed documents into %s (lastCount=%d, elapsed=%dms)", expected, lease._tableName,
+        lastCount, System.currentTimeMillis() - start));
+  }
+
+  private int countRecords(String brokerList, String topic, String isolationLevel, long expectedRecords) {
     Properties props = new Properties();
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "txn-diag-" + isolationLevel + "-" + UUID.randomUUID());
@@ -402,143 +297,107 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, Integer.toString(10 * 1024 * 1024));
+    props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100000");
+    props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, Integer.toString(50 * 1024 * 1024));
+    props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, Integer.toString(100 * 1024 * 1024));
+    props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "50");
 
     int totalRecords = 0;
-    try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props)) {
-      List<PartitionInfo> partitions = consumer.partitionsFor(getKafkaTopic(), Duration.ofSeconds(10));
+    KafkaConsumer<byte[], byte[]> consumer = null;
+    try {
+      consumer = new KafkaConsumer<>(props);
+      List<PartitionInfo> partitions = consumer.partitionsFor(topic, Duration.ofSeconds(10));
       if (partitions == null || partitions.isEmpty()) {
-        LOGGER.warn("No partitions found for topic {}", getKafkaTopic());
         return 0;
       }
       List<TopicPartition> topicPartitions = new ArrayList<>(partitions.size());
-      for (PartitionInfo pi : partitions) {
-        topicPartitions.add(new TopicPartition(pi.topic(), pi.partition()));
+      for (PartitionInfo partition : partitions) {
+        topicPartitions.add(new TopicPartition(partition.topic(), partition.partition()));
       }
       consumer.assign(topicPartitions);
       consumer.seekToBeginning(topicPartitions);
-      // Prime the consumer's metadata/fetch session with a short poll so the subsequent
-      // endOffsets() and position() calls do not block on cold metadata resolution. Any records
-      // returned here advance the consumer position and must be counted, otherwise we could return
-      // a caught-up position with totalRecords==0.
-      ConsumerRecords<byte[], byte[]> primingRecords = consumer.poll(COUNT_RECORDS_PRIMING_POLL_TIMEOUT);
-      totalRecords += primingRecords.count();
-      Map<TopicPartition, Long> endOffsets = consumer.endOffsets(topicPartitions, COUNT_RECORDS_END_OFFSETS_TIMEOUT);
-      long totalEndOffset = 0L;
-      for (Long offset : endOffsets.values()) {
-        totalEndOffset += offset;
-      }
-      if (totalEndOffset == 0L) {
-        // Two cases, both correctly returning 0:
-        //  - read_committed: LSO is at 0 on every partition, i.e. no transaction has been finalized yet.
-        //  - read_uncommitted: the topic is genuinely empty.
-        // A timeout from endOffsets() throws TimeoutException and goes to the catch block below,
-        // so reaching here means the broker returned 0 for every partition.
-        LOGGER.info("countRecords({}): endOffsets returned 0 for all partitions ({})", isolationLevel, endOffsets);
-        return totalRecords;
-      }
       long deadline = System.currentTimeMillis() + COUNT_RECORDS_DRAIN_TIMEOUT_MS;
-      boolean caughtUp = false;
       while (System.currentTimeMillis() < deadline) {
-        if (allPartitionsCaughtUp(consumer, topicPartitions, endOffsets)) {
-          caughtUp = true;
-          break;
+        totalRecords += consumer.poll(COUNT_RECORDS_POLL_TIMEOUT).count();
+        // Raw Kafka end offsets include transaction control records, so visible data count is the completion signal.
+        if (totalRecords >= expectedRecords) {
+          if (totalRecords == expectedRecords) {
+            totalRecords += consumer.poll(COUNT_RECORDS_QUIESCENCE_POLL_TIMEOUT).count();
+          }
+          return totalRecords;
         }
-        ConsumerRecords<byte[], byte[]> records = consumer.poll(COUNT_RECORDS_POLL_TIMEOUT);
-        totalRecords += records.count();
       }
-      if (!caughtUp) {
-        LOGGER.warn("countRecords({}) drain timed out after {}ms; returning partial count {}. positions={}, "
-                + "endOffsets={}", isolationLevel, COUNT_RECORDS_DRAIN_TIMEOUT_MS, totalRecords,
-            currentPositions(consumer, topicPartitions), endOffsets);
-      }
+      LOGGER.warn("Kafka diagnostic count timed out: isolation={} count={} expected={}",
+          isolationLevel, totalRecords, expectedRecords);
     } catch (Exception e) {
-      LOGGER.error("Error counting records with {}", isolationLevel, e);
+      LOGGER.error("Error counting Kafka records with isolation level {}", isolationLevel, e);
+      totalRecords = -1;
+    } finally {
+      if (consumer != null) {
+        try {
+          consumer.close(COUNT_RECORDS_CLOSE_TIMEOUT);
+        } catch (Exception e) {
+          LOGGER.warn("Failed to close Kafka diagnostic consumer for isolation level {}", isolationLevel, e);
+        }
+      }
     }
     return totalRecords;
   }
 
-  private boolean allPartitionsCaughtUp(KafkaConsumer<byte[], byte[]> consumer, List<TopicPartition> topicPartitions,
-      Map<TopicPartition, Long> endOffsets) {
-    for (TopicPartition tp : topicPartitions) {
-      Long endOffset = endOffsets.get(tp);
-      // position(tp, Duration) bounds the call so a slow metadata/offset fetch cannot exceed the
-      // outer drain deadline.
-      if (endOffset == null || consumer.position(tp, COUNT_RECORDS_POSITION_TIMEOUT) < endOffset) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private Map<TopicPartition, Long> currentPositions(KafkaConsumer<byte[], byte[]> consumer,
-      List<TopicPartition> topicPartitions) {
-    Map<TopicPartition, Long> positions = new LinkedHashMap<>();
-    for (TopicPartition tp : topicPartitions) {
-      try {
-        positions.put(tp, consumer.position(tp, COUNT_RECORDS_POSITION_TIMEOUT));
-      } catch (Exception e) {
-        positions.put(tp, -1L);
-      }
-    }
-    return positions;
-  }
-
-  private boolean isRetryableRealtimePartitionMetadataError(Throwable throwable) {
-    String errorToken = "Failed to fetch partition information for topic: " + getKafkaTopic();
-    Throwable current = throwable;
-    while (current != null) {
-      String message = current.getMessage();
-      if (message != null && message.contains(errorToken)) {
+  private static boolean isRetryableRealtimePartitionMetadataError(Throwable throwable, String topic) {
+    String errorToken = "Failed to fetch partition information for topic: " + topic;
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      if (current.getMessage() != null && current.getMessage().contains(errorToken)) {
         return true;
       }
-      current = current.getCause();
     }
     return false;
   }
 
-  private void waitForKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
-    TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions), 200L,
-        KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
-        "Kafka topic '" + topic + "' metadata is not visible to consumers");
-    // For transactional consumers, verify metadata is visible with read_committed isolation level too
-    TestUtils.waitForCondition(
-        aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions, "read_committed"),
-        200L, KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
-        "Kafka topic '" + topic + "' metadata is not visible to read_committed consumers");
+  private static void waitForKafkaTopicMetadataReadyForConsumer(String brokerList, String topic,
+      int expectedPartitions) {
+    TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(brokerList, topic, expectedPartitions,
+            "read_uncommitted"), 200L, KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
+        "Kafka topic metadata is not visible: " + topic);
+    TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(brokerList, topic, expectedPartitions,
+            "read_committed"), 200L, KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
+        "Kafka transactional topic metadata is not visible: " + topic);
   }
 
-  private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
+  private static boolean isKafkaTopicMetadataReadyForConsumer(String brokerList, String topic,
+      int expectedPartitions, String isolationLevel) {
     Properties consumerProps = new Properties();
-    consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
-    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "pinot-kafka-topic-ready-" + UUID.randomUUID());
-    consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-    consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-    consumerProps.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
-    consumerProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
-    try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
-      List<PartitionInfo> partitionInfos = consumer.partitionsFor(topic, Duration.ofSeconds(5));
-      return partitionInfos != null && partitionInfos.size() >= expectedPartitions;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions, String isolationLevel) {
-    Properties consumerProps = new Properties();
-    consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
-    String groupId = "pinot-kafka-topic-ready-" + isolationLevel + "-" + UUID.randomUUID();
-    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
+    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "pinot-topic-ready-" + UUID.randomUUID());
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
     consumerProps.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
     consumerProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
     try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
-      List<PartitionInfo> partitionInfos = consumer.partitionsFor(topic, Duration.ofSeconds(5));
-      return partitionInfos != null && partitionInfos.size() >= expectedPartitions;
+      List<PartitionInfo> partitions = consumer.partitionsFor(topic, Duration.ofSeconds(5));
+      return partitions != null && partitions.size() >= expectedPartitions;
     } catch (Exception e) {
       return false;
     }
+  }
+
+  private static void dumpRelevantThreadStacks() {
+    int dumped = 0;
+    for (Map.Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
+      String name = entry.getKey().getName();
+      if (name == null || !(name.contains("RealtimeSegment") || name.contains("kafka") || name.contains("Kafka")
+          || name.contains("HelixTaskExecutor") || name.contains("PartitionConsumer"))) {
+        continue;
+      }
+      StringBuilder stack = new StringBuilder("Thread '").append(name).append("' state=")
+          .append(entry.getKey().getState());
+      for (StackTraceElement element : entry.getValue()) {
+        stack.append("\n    at ").append(element);
+      }
+      LOGGER.error(stack.toString());
+      dumped++;
+    }
+    LOGGER.error("Dumped {} Kafka/Pinot consumer thread stacks", dumped);
   }
 }

@@ -40,11 +40,9 @@ public class NetUtils {
   private static final String DUMMY_OUT_IPV4 = "8.8.8.8";
   private static final String DUMMY_OUT_IPV6 = "2001:4860:4860::8888";
 
-  /**
-   * Get the ip address of local host.
-   *
-   * @return IP address {@link String}, either IPv4 or IPv6 format depending on java.net.preferIPv6Addresses property.
-   */
+  /// Get the ip address of local host.
+  ///
+  /// @return IP address [String], either IPv4 or IPv6 format depending on java.net.preferIPv6Addresses property.
   public static String getHostAddress()
       throws SocketException, UnknownHostException {
     boolean isIPv6Preferred = Boolean.parseBoolean(System.getProperty("java.net.preferIPv6Addresses"));
@@ -71,12 +69,10 @@ public class NetUtils {
     return localAddress.getHostAddress();
   }
 
-  /**
-   * Get a local IPv6 address out of IPv4/IPv6 addresses queried based on the local hostname.
-   * If no IPv6 address is found, fall back to default InetAddress.getLocalHost() behavior.
-   *
-   * @return {@link InetAddress} object representing a local IPv6 address.
-   */
+  /// Get a local IPv6 address out of IPv4/IPv6 addresses queried based on the local hostname.
+  /// If no IPv6 address is found, fall back to default InetAddress.getLocalHost() behavior.
+  ///
+  /// @return [InetAddress] object representing a local IPv6 address.
   private static InetAddress getLocalIPv6Address() throws UnknownHostException {
     for (InetAddress address : InetAddress.getAllByName(InetAddress.getLocalHost().getHostName())) {
       if (address instanceof Inet6Address && !address.isAnyLocalAddress()) {
@@ -88,11 +84,9 @@ public class NetUtils {
     return Inet4Address.getLocalHost();
   }
 
-  /**
-   * Get the hostname or IP address.
-   *
-   * @return The hostname if available, otherwise a dotted quad address. Returns null if neither can be determined.
-   */
+  /// Get the hostname or IP address.
+  ///
+  /// @return The hostname if available, otherwise a dotted quad address. Returns null if neither can be determined.
   public static String getHostnameOrAddress() {
     try {
       return InetAddress.getLocalHost().getCanonicalHostName();
@@ -105,11 +99,9 @@ public class NetUtils {
     }
   }
 
-  /**
-   * Find an open port.
-   * @return an open port
-   * @throws IOException
-   */
+  /// Find an open port.
+  /// @return an open port
+  /// @throws IOException
   public static int findOpenPort()
       throws IOException {
     try (ServerSocket socket = new ServerSocket(0)) {
@@ -117,11 +109,9 @@ public class NetUtils {
     }
   }
 
-  /**
-   * Find the first open port from default port in an incremental order.
-   * @param basePort
-   * @return an open port
-   */
+  /// Find the first open port from default port in an incremental order.
+  /// @param basePort
+  /// @return an open port
   public static int findOpenPort(int basePort) {
     while (!available(basePort)) {
       basePort++;
@@ -129,11 +119,9 @@ public class NetUtils {
     return basePort;
   }
 
-  /**
-   * Checks to see if a specific port is available.
-   *
-   * @param port the port to check for availability
-   */
+  /// Checks to see if a specific port is available.
+  ///
+  /// @param port the port to check for availability
   public static boolean available(int port) {
     ServerSocket ss = null;
     DatagramSocket ds = null;

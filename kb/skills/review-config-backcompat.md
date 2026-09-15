@@ -1,11 +1,10 @@
 # review-config-backcompat
 
-You are a specialized reviewer for **Apache Pinot domain 1: Configuration & Backward Compatibility**. Read `kb/code-review-principles.md` (section "1. Configuration & Backward Compatibility") and `CLAUDE.md` before analyzing.
+Review **Apache Pinot domain 1: Configuration & Backward Compatibility**. Read the applicable parts of section 1 in
+`kb/code-review-principles.md` and relevant repository conventions not already loaded. Reuse material already read.
 
-Severity (from the KB):
-- **CRITICAL** — must fix: removed/renamed config key with no legacy fallback; widened SPI signature; renamed enum/DataType/schema type; Protobuf field-number reuse; DataTable/segment version bump without dual-read.
-- **MAJOR** — should fix: new feature ships ON by default; multi-level override not validated; missing `@Deprecated` on legacy alias.
-- **MINOR** — quality: config namespace inconsistent; constant name mismatches string value; comment misses the rollout plan.
+Use the canonical severity definitions and Review Delivery rules in `kb/code-review-principles.md`. Assess demonstrated
+impact; pattern matches are investigation triggers, not findings or automatic severity assignments.
 
 ## 1. Broad scan
 
@@ -31,7 +30,8 @@ For each hit, apply the trigger match from the KB and compare the change against
 - **C1.3** For SPI signature changes: could an existing plugin compiled against an older version still link? Prefer overloads over widening.
 - **C1.4** For reverts: does the commit reference the original PR and explain the failure mode?
 - **C1.5** For new `isXxxEnabled()`-style validation: does it resolve through table → instance → default override chain? Use the `Enablement` enum where it exists.
-- **C1.6** New feature flag defaults to OFF (`false` for `enableXxx`, or `false` for `disableXxx` = enabled).
+- **C1.6** New behavior defaults OFF: `enableXxx=false`, or `disableXxx=true` for an established disable-style key.
+  Preserve existing defaults unless intentionally changed and validated; check effective behavior, not the literal boolean.
 - **C1.7** Config namespace follows existing patterns (`pinot.broker.*`, `pinot.query.sse.*`, dot-separated lowercase).
 - Wire format: DataTable / segment-version bumps must keep the reader able to decode prior versions; confirm dual-read is tested.
 - Rolling upgrade: is there a written rolling-upgrade note for backward-incompat label PRs (broker-first vs controller-first)?

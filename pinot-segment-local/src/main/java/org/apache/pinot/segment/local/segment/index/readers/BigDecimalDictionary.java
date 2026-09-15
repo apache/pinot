@@ -24,9 +24,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for BigDecimal type.
- */
+/// Extension of [BaseImmutableDictionary] that implements immutable dictionary for BigDecimal type.
 public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {

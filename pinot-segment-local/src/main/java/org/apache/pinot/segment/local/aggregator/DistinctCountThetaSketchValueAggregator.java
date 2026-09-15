@@ -20,9 +20,9 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
-import org.apache.datasketches.theta.SetOperationBuilder;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
+import org.apache.datasketches.theta.ThetaSetOperationBuilder;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -33,7 +33,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Object> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
-  private final SetOperationBuilder _setOperationBuilder;
+  private final ThetaSetOperationBuilder _setOperationBuilder;
   private final int _nominalEntries;
 
   // This changes a lot similar to the Bitmap aggregator
@@ -46,7 +46,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     } else {
       _nominalEntries = arguments.get(0).getLiteral().getIntValue();
     }
-    _setOperationBuilder = Union.builder().setNominalEntries(_nominalEntries);
+    _setOperationBuilder = ThetaUnion.builder().setNominalEntries(_nominalEntries);
   }
 
   @Override
@@ -64,7 +64,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     return _nominalEntries;
   }
 
-  private void singleItemUpdate(Union thetaUnion, Object rawValue) {
+  private void singleItemUpdate(ThetaUnion thetaUnion, Object rawValue) {
     if (rawValue instanceof String) {
       thetaUnion.update((String) rawValue);
     } else if (rawValue instanceof Integer) {
@@ -77,17 +77,17 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       thetaUnion.update((Float) rawValue);
     } else if (rawValue instanceof Object[]) {
       multiItemUpdate(thetaUnion, (Object[]) rawValue);
-    } else if (rawValue instanceof Sketch) {
-      thetaUnion.union((Sketch) rawValue);
-    } else if (rawValue instanceof Union) {
-      thetaUnion.union(((Union) rawValue).getResult());
+    } else if (rawValue instanceof ThetaSketch) {
+      thetaUnion.union((ThetaSketch) rawValue);
+    } else if (rawValue instanceof ThetaUnion) {
+      thetaUnion.union(((ThetaUnion) rawValue).getResult());
     } else {
       throw new IllegalStateException(
           "Unsupported data type for Theta Sketch aggregation: " + rawValue.getClass().getSimpleName());
     }
   }
 
-  private void multiItemUpdate(Union thetaUnion, Object[] rawValues) {
+  private void multiItemUpdate(ThetaUnion thetaUnion, Object[] rawValues) {
     if (rawValues instanceof String[]) {
       for (String s : (String[]) rawValues) {
         thetaUnion.update(s);
@@ -118,10 +118,10 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   public Object getInitialAggregatedValue(Object rawValue) {
     // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
     assert rawValue != null;
-    Union thetaUnion = _setOperationBuilder.buildUnion();
-    if (rawValue instanceof byte[]) { // Serialized Sketch
+    ThetaUnion thetaUnion = _setOperationBuilder.buildUnion();
+    if (rawValue instanceof byte[]) { // Serialized ThetaSketch
       byte[] bytes = (byte[]) rawValue;
-      Sketch sketch = deserializeAggregatedValue(bytes);
+      ThetaSketch sketch = deserializeAggregatedValue(bytes);
       thetaUnion.union(sketch);
     } else if (rawValue instanceof byte[][]) { // Multiple Serialized Sketches
       byte[][] serializedSketches = (byte[][]) rawValue;
@@ -135,14 +135,14 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
     return thetaUnion;
   }
 
-  private Union extractUnion(Object value) {
+  private ThetaUnion extractUnion(Object value) {
     if (value == null) {
       return _setOperationBuilder.buildUnion();
-    } else if (value instanceof Union) {
-      return (Union) value;
-    } else if (value instanceof Sketch) {
-      Sketch sketch = (Sketch) value;
-      Union thetaUnion = _setOperationBuilder.buildUnion();
+    } else if (value instanceof ThetaUnion) {
+      return (ThetaUnion) value;
+    } else if (value instanceof ThetaSketch) {
+      ThetaSketch sketch = (ThetaSketch) value;
+      ThetaUnion thetaUnion = _setOperationBuilder.buildUnion();
       thetaUnion.union(sketch);
       return thetaUnion;
     } else {
@@ -153,9 +153,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public Object applyRawValue(Object aggregatedValue, Object rawValue) {
-    Union thetaUnion = extractUnion(aggregatedValue);
+    ThetaUnion thetaUnion = extractUnion(aggregatedValue);
     if (rawValue instanceof byte[]) {
-      Sketch sketch = deserializeAggregatedValue((byte[]) rawValue);
+      ThetaSketch sketch = deserializeAggregatedValue((byte[]) rawValue);
       thetaUnion.union(sketch);
     } else {
       singleItemUpdate(thetaUnion, rawValue);
@@ -166,7 +166,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public Object applyAggregatedValue(Object value, Object aggregatedValue) {
-    Union thetaUnion = extractUnion(aggregatedValue);
+    ThetaUnion thetaUnion = extractUnion(aggregatedValue);
     singleItemUpdate(thetaUnion, value);
     _maxByteSize = Math.max(_maxByteSize, thetaUnion.getCurrentBytes());
     return thetaUnion;
@@ -189,10 +189,10 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public byte[] serializeAggregatedValue(Object value) {
-    if (value instanceof Union) {
-      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((Union) value).getResult());
-    } else if (value instanceof Sketch) {
-      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((Sketch) value));
+    if (value instanceof ThetaUnion) {
+      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaUnion) value).getResult());
+    } else if (value instanceof ThetaSketch) {
+      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaSketch) value));
     } else {
       throw new IllegalStateException(
           "Unsupported data type for Theta Sketch aggregation: " + value.getClass().getSimpleName());
@@ -200,7 +200,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   }
 
   @Override
-  public Sketch deserializeAggregatedValue(byte[] bytes) {
+  public ThetaSketch deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes);
   }
 }

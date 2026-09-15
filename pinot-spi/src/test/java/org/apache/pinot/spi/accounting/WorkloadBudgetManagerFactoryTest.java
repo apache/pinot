@@ -31,10 +31,8 @@ import static org.testng.Assert.assertNotNull;
 
 public class WorkloadBudgetManagerFactoryTest {
 
-  /**
-   * Custom test WorkloadBudgetManager implementation that should be discovered by reflection.
-   * This class is placed in a package path that matches the reflection pattern ".*\.plugin\.workload\..*"
-   */
+  /// Custom test WorkloadBudgetManager implementation that should be discovered by reflection.
+  /// This class is placed in a package path that matches the reflection pattern ".\*\.plugin\.workload\..\*"
   @WorkloadBudgetManagerAnnotation
   public static class TestCustomWorkloadBudgetManager extends DefaultWorkloadBudgetManager {
     public TestCustomWorkloadBudgetManager(PinotConfiguration config) {

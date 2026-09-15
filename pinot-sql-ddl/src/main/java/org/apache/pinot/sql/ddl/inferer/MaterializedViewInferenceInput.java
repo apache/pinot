@@ -23,8 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 
 
-/// Bundle of inputs the {@link MaterializedViewSchemaInferer} needs to derive the MV
-/// column list from {@code AS definedSQL}. Immutable struct so future stateful collaborators
+/// Bundle of inputs the [MaterializedViewSchemaInferer] needs to derive the MV
+/// column list from `AS definedSQL`. Immutable struct so future stateful collaborators
 /// can be added without breaking the inferer's public API.
 public final class MaterializedViewInferenceInput {
 
@@ -45,16 +45,16 @@ public final class MaterializedViewInferenceInput {
     _tableCache = tableCache;
   }
 
-  /// The raw user-typed text of the {@code AS <query>} clause. Already extracted by
-  /// {@link org.apache.pinot.sql.ddl.compile.DdlCompiler} so the inferer never needs to do
+  /// The raw user-typed text of the `AS <query>` clause. Already extracted by
+  /// [org.apache.pinot.sql.ddl.compile.DdlCompiler] so the inferer never needs to do
   /// substring slicing itself.
   public String definedSql() {
     return _definedSql;
   }
 
-  /// The MV's database scope (from a {@code db.mvName} reference), or {@code null} when
+  /// The MV's database scope (from a `db.mvName` reference), or `null` when
   /// the MV is in the cluster's default database. Threaded into Calcite's
-  /// {@code QueryEnvironment} as the default-catalog name for validator lookups.
+  /// `QueryEnvironment` as the default-catalog name for validator lookups.
   @Nullable
   public String databaseName() {
     return _databaseName;
@@ -65,16 +65,16 @@ public final class MaterializedViewInferenceInput {
     return _viewTableName;
   }
 
-  /// User-supplied {@code PROPERTIES (...)} entries, with original casing preserved.
-  /// The inferer reads {@code timeColumnName} (case-insensitively) to decide which SELECT
+  /// User-supplied `PROPERTIES (...)` entries, with original casing preserved.
+  /// The inferer reads `timeColumnName` (case-insensitively) to decide which SELECT
   /// alias becomes the MV's primary time column.
   public Map<String, String> properties() {
     return _properties;
   }
 
-  /// {@link TableCache} backing Calcite's catalog. Required so {@code QueryEnvironment}
-  /// can validate {@code definedSql} against the live cluster catalog. The inferer
-  /// surfaces a {@code DdlCompilationException} when this is null.
+  /// [TableCache] backing Calcite's catalog. Required so `QueryEnvironment`
+  /// can validate `definedSql` against the live cluster catalog. The inferer
+  /// surfaces a `DdlCompilationException` when this is null.
   @Nullable
   public TableCache tableCache() {
     return _tableCache;

@@ -25,9 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * StreamDataProducer is the interface for stream data sources. E.g. KafkaDataProducer.
- */
+/// StreamDataProducer is the interface for stream data sources. E.g. KafkaDataProducer.
 public interface StreamDataProducer extends AutoCloseable {
   void init(Properties props);
 
@@ -41,24 +39,20 @@ public interface StreamDataProducer extends AutoCloseable {
 
   void close();
 
-  /**
-   * Allows the producer to optimize for a batched write.
-   * This will help increase throughput in some cases
-   * @param topic the topic of the output
-   * @param rows the rows
-   */
+  /// Allows the producer to optimize for a batched write.
+  /// This will help increase throughput in some cases
+  /// @param topic the topic of the output
+  /// @param rows the rows
   default void produceBatch(String topic, List<byte[]> rows) {
     for (byte[] row : rows) {
       produce(topic, row);
     }
   }
 
-  /**
-   * Allows the producer to optimize for a batched write.
-   * This will help increase throughput in some cases
-   * @param topic the topic of the output
-   * @param payloadWithKey the payload rows with key
-   */
+  /// Allows the producer to optimize for a batched write.
+  /// This will help increase throughput in some cases
+  /// @param topic the topic of the output
+  /// @param payloadWithKey the payload rows with key
   default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey, boolean includeHeaders) {
     for (RowWithKey rowWithKey : payloadWithKey) {
       if (rowWithKey.getKey() == null) {
@@ -79,10 +73,8 @@ public interface StreamDataProducer extends AutoCloseable {
     produceKeyedBatch(topic, payloadWithKey, false);
   }
 
-    /**
-     * Helper class so the key and payload can be easily tied together instead of using a pair
-     * The class is intended for StreamDataProducer only
-     */
+    /// Helper class so the key and payload can be easily tied together instead of using a pair
+    /// The class is intended for StreamDataProducer only
   class RowWithKey {
     private final byte[] _key;
     private final byte[] _payload;

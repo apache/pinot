@@ -32,16 +32,16 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Structural tests for {@link TimeExprValidator#parse}.  Pin both the
+/// Structural tests for [TimeExprValidator#parse].  Pin both the
 /// happy paths (each accepted shape parses to the expected ADT variant with the right
 /// literal arguments) and the error paths (each rejected construct surfaces a
-/// {@link ParseException} with a message that names the
+/// [ParseException] with a message that names the
 /// offending construct).  No policy is asserted here — TIMESTAMP-ness, base-column-name
 /// matching, and bucket alignment are tested at the consumer (validator / inferer) level.
 public class TimeExprParserTest {
 
   /// Parses a SELECT-list item from the SQL `SELECT <item> FROM t` and returns the
-  /// alias-stripped Thrift {@link Expression}.  The SQL helper is the same shape the MV
+  /// alias-stripped Thrift [Expression].  The SQL helper is the same shape the MV
   /// validator and inferer use in production, so tests exercise the parser against
   /// realistic Calcite output rather than hand-built Expression trees that might drift
   /// from what Pinot's parser actually emits.

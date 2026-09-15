@@ -26,12 +26,10 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link PinotRelDecorrelator#verifyRowTypePreserved}, the replacement for Calcite's
- * {@code Litmus.THROW} post-decorrelation assertion (CALCITE-7379). The structural-divergence (throw) branch is the
- * safety net that distinguishes a tolerable nullability-only change from a real wrong-typed plan; it is not reachable
- * from a passing SQL query, so it is pinned here with hand-built row-type fixtures.
- */
+/// Unit tests for [PinotRelDecorrelator#verifyRowTypePreserved], the replacement for Calcite's
+/// `Litmus.THROW` post-decorrelation assertion (CALCITE-7379). The structural-divergence (throw) branch is the
+/// safety net that distinguishes a tolerable nullability-only change from a real wrong-typed plan; it is not reachable
+/// from a passing SQL query, so it is pinned here with hand-built row-type fixtures.
 public class PinotRelDecorrelatorTest {
   private static final RelDataTypeFactory TYPE_FACTORY = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
 

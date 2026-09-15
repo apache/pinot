@@ -207,10 +207,8 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
             + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
   }
 
-  /**
-   * Helper method to wait for a table config to be updated. The provided condition is used to check if the table config
-   * has been updated.
-   */
+  /// Helper method to wait for a table config to be updated. The provided condition is used to check if the table
+  /// config has been updated.
   private void waitForTableConfigUpdate(Function<TableConfig, Boolean> condition) {
     // Wait for table config to be updated
     TestUtils.waitForCondition(
@@ -221,19 +219,15 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     );
   }
 
-  /**
-   * Helper method to assert that a query does not use a star-tree index.
-   */
+  /// Helper method to assert that a query does not use a star-tree index.
   private void checkQueryDoesNotUseStarTreeIndex(String query, int expectedResult) throws Exception {
     JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + query);
     assertFalse(explainPlan.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX));
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
 
-  /**
-   * Helper method to assert that a query uses a star-tree index. Waits if necessary for the star-tree index to be
-   * built.
-   */
+  /// Helper method to assert that a query uses a star-tree index. Waits if necessary for the star-tree index to be
+  /// built.
   private void checkQueryUsesStarTreeIndex(String query, int expectedResult) throws Exception {
     // Wait for the star-tree indexes to be built if needed
     TestUtils.waitForCondition(
@@ -250,9 +244,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
 
-  /**
-   * Helper method to return the int result of a distinct count query.
-   */
+  /// Helper method to return the int result of a distinct count query.
   private int getDistinctCountResult(String query) throws Exception {
     JsonNode result = postQuery(query);
     return result.get("resultTable").get("rows").get(0).get(0).asInt();

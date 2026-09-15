@@ -38,12 +38,10 @@ public abstract class QueryAccessControlFactory {
 
   public abstract QueryAccessControl create();
 
-  /**
-   * Build a QueryAccessControlFactory from a `PinotConfiguration`.
-   *
-   * @param configuration Populated PinotConfiguration
-   * @return Concrete QueryAccessControlFactory instance or null if there is an error
-   */
+  /// Build a QueryAccessControlFactory from a `PinotConfiguration`.
+  ///
+  /// @param configuration Populated PinotConfiguration
+  /// @return Concrete QueryAccessControlFactory instance or null if there is an error
   @Nullable
   public static QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
     String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);

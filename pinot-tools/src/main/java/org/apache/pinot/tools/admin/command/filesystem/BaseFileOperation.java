@@ -29,9 +29,7 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 import picocli.CommandLine;
 
 
-/**
- * Base class for file operation classes
- */
+/// Base class for file operation classes
 public abstract class BaseFileOperation implements Command {
 
   @CommandLine.ParentCommand

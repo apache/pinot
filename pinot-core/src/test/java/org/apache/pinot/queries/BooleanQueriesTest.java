@@ -48,9 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Queries test for BOOLEAN data type.
- */
+/// Queries test for BOOLEAN data type.
 public class BooleanQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BooleanQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

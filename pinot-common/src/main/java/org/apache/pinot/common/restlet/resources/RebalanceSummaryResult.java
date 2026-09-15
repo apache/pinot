@@ -28,9 +28,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 
-/**
- * Holds the summary data of the rebalance result
- */
+/// Holds the summary data of the rebalance result
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceSummaryResult {
@@ -38,11 +36,9 @@ public class RebalanceSummaryResult {
   private final SegmentInfo _segmentInfo;
   private final List<TagInfo> _tagsInfo;
 
-  /**
-   * Constructor for RebalanceSummaryResult
-   * @param serverInfo server related summary information
-   * @param segmentInfo segment related summary information
-   */
+  /// Constructor for RebalanceSummaryResult
+  /// @param serverInfo server related summary information
+  /// @param segmentInfo segment related summary information
   @JsonCreator
   public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
       @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo,
@@ -77,16 +73,14 @@ public class RebalanceSummaryResult {
     protected int _segmentsUnchanged;
     protected List<String> _tagList;
 
-    /**
-     * Constructor for ServerSegmentChangeInfo
-     * @param serverStatus server status, whether it was added, removed, or unchanged as part of this rebalance
-     * @param totalSegmentsAfterRebalance expected total segments on this server after rebalance
-     * @param totalSegmentsBeforeRebalance current number of segments on this server before rebalance
-     * @param segmentsAdded number of segments expected to be added as part of this rebalance
-     * @param segmentsDeleted number of segments expected to be deleted as part of this rebalance
-     * @param segmentsUnchanged number of segments that aren't moving from this server as part of this rebalance
-     * @param tagList server tag list
-     */
+    /// Constructor for ServerSegmentChangeInfo
+    /// @param serverStatus server status, whether it was added, removed, or unchanged as part of this rebalance
+    /// @param totalSegmentsAfterRebalance expected total segments on this server after rebalance
+    /// @param totalSegmentsBeforeRebalance current number of segments on this server before rebalance
+    /// @param segmentsAdded number of segments expected to be added as part of this rebalance
+    /// @param segmentsDeleted number of segments expected to be deleted as part of this rebalance
+    /// @param segmentsUnchanged number of segments that aren't moving from this server as part of this rebalance
+    /// @param tagList server tag list
     @JsonCreator
     public ServerSegmentChangeInfo(@JsonProperty("serverStatus") ServerStatus serverStatus,
         @JsonProperty("totalSegmentsAfterRebalance") int totalSegmentsAfterRebalance,
@@ -156,11 +150,9 @@ public class RebalanceSummaryResult {
     private final int _valueBeforeRebalance;
     private final int _expectedValueAfterRebalance;
 
-    /**
-     * Constructor for RebalanceChangeInfo
-     * @param valueBeforeRebalance current value before rebalance
-     * @param expectedValueAfterRebalance expected value after rebalance
-     */
+    /// Constructor for RebalanceChangeInfo
+    /// @param valueBeforeRebalance current value before rebalance
+    /// @param expectedValueAfterRebalance expected value after rebalance
     @JsonCreator
     public RebalanceChangeInfo(@JsonProperty("valueBeforeRebalance") int valueBeforeRebalance,
         @JsonProperty("expectedValueAfterRebalance") int expectedValueAfterRebalance) {
@@ -264,16 +256,14 @@ public class RebalanceSummaryResult {
     protected Set<String> _serversGettingNewSegments;
     protected Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
-    /**
-     * Constructor for ServerInfo
-     * @param numServersGettingNewSegments total number of servers receiving new segments as part of this rebalance
-     * @param numServers number of servers before and after this rebalance
-     * @param serversAdded set of servers getting added as part of this rebalance
-     * @param serversRemoved set of servers getting removed as part of this rebalance
-     * @param serversUnchanged set of servers existing both before and as part of this rebalance
-     * @param serversGettingNewSegments set of servers getting segments added
-     * @param serverSegmentChangeInfo per server statistics for this rebalance
-     */
+    /// Constructor for ServerInfo
+    /// @param numServersGettingNewSegments total number of servers receiving new segments as part of this rebalance
+    /// @param numServers number of servers before and after this rebalance
+    /// @param serversAdded set of servers getting added as part of this rebalance
+    /// @param serversRemoved set of servers getting removed as part of this rebalance
+    /// @param serversUnchanged set of servers existing both before and as part of this rebalance
+    /// @param serversGettingNewSegments set of servers getting segments added
+    /// @param serverSegmentChangeInfo per server statistics for this rebalance
     @JsonCreator
     public ServerInfo(@JsonProperty("numServersGettingNewSegments") int numServersGettingNewSegments,
         @JsonProperty("numServers") @Nullable RebalanceChangeInfo numServers,
@@ -348,34 +338,32 @@ public class RebalanceSummaryResult {
     private final Map<String, Long> _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
     private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
 
-    /**
-     * Constructor for ConsumingSegmentToBeMovedSummary
-     * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
-     * @param numServersGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
-     * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up.
-     *                                                           Map from segment name to its number of offsets to
-     *                                                           catch up on the new server. This is essentially the
-     *                                                           difference between the latest offset of the stream
-     *                                                           and the segment's start offset of the stream. The
-     *                                                           map is set to null if the number of offsets to catch
-     *                                                           up could not be determined for at least one
-     *                                                           consuming segment
-     * @param consumingSegmentsToBeMovedWithOldestAgeInMinutes oldest consuming segments to be moved to catch up. Map
-     *                                                         from segment name to its age in minutes. The map is
-     *                                                         set to null if ZK metadata is not available or the
-     *                                                         creation time is not found for at least one consuming
-     *                                                         segment.
-     *                                                         The age of a segment is determined by its creation
-     *                                                         time from ZK metadata. Segment age is an approximation
-     *                                                         to data age for a consuming segment. It may not reflect
-     *                                                         the actual oldest age of data in the consuming segment.
-     *                                                         For reasons, a segment could consume events which date
-     *                                                         before the segment created. We collect segment age
-     *                                                         here as there is no obvious way to get the age of the
-     *                                                         oldest data in the stream for a specific consuming
-     *                                                         segment
-     * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
-     */
+    /// Constructor for ConsumingSegmentToBeMovedSummary
+    /// @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
+    /// @param numServersGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
+    /// @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up.
+    ///                                                           Map from segment name to its number of offsets to
+    ///                                                           catch up on the new server. This is essentially the
+    ///                                                           difference between the latest offset of the stream
+    ///                                                           and the segment's start offset of the stream. The
+    ///                                                           map is set to null if the number of offsets to catch
+    ///                                                           up could not be determined for at least one
+    ///                                                           consuming segment
+    /// @param consumingSegmentsToBeMovedWithOldestAgeInMinutes oldest consuming segments to be moved to catch up. Map
+    ///                                                         from segment name to its age in minutes. The map is
+    ///                                                         set to null if ZK metadata is not available or the
+    ///                                                         creation time is not found for at least one consuming
+    ///                                                         segment.
+    ///                                                         The age of a segment is determined by its creation
+    ///                                                         time from ZK metadata. Segment age is an approximation
+    ///                                                         to data age for a consuming segment. It may not reflect
+    ///                                                         the actual oldest age of data in the consuming segment.
+    ///                                                         For reasons, a segment could consume events which date
+    ///                                                         before the segment created. We collect segment age
+    ///                                                         here as there is no obvious way to get the age of the
+    ///                                                         oldest data in the stream for a specific consuming
+    ///                                                         segment
+    /// @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
     @JsonCreator
     public ConsumingSegmentToBeMovedSummary(
         @JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
@@ -422,17 +410,15 @@ public class RebalanceSummaryResult {
       protected int _numConsumingSegmentsToBeAdded;
       protected long _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
-      /**
-       * Constructor for ConsumingSegmentSummaryPerServer
-       * @param numConsumingSegmentsToBeAdded number of consuming segments to be added to this server
-       * @param totalOffsetsToCatchUpAcrossAllConsumingSegments total number of offsets to catch up across all consuming
-       *                                                         segments. The number of offsets to catch up for a
-       *                                                         consuming segment is essentially the difference
-       *                                                         between the latest offset of the stream and the
-       *                                                         segment's start offset of the stream. Set to -1 if
-       *                                                         the offsets to catch up could not be determined for
-       *                                                         at least one consuming segment
-       */
+      /// Constructor for ConsumingSegmentSummaryPerServer
+      /// @param numConsumingSegmentsToBeAdded number of consuming segments to be added to this server
+      /// @param totalOffsetsToCatchUpAcrossAllConsumingSegments total number of offsets to catch up across all
+      ///                                                         consuming segments. The number of offsets to catch up
+      ///                                                         for a consuming segment is essentially the difference
+      ///                                                         between the latest offset of the stream and the
+      ///                                                         segment's start offset of the stream. Set to -1 if the
+      ///                                                         offsets to catch up could not be determined for at
+      ///                                                         least one consuming segment
       @JsonCreator
       public ConsumingSegmentSummaryPerServer(
           @JsonProperty("numConsumingSegmentsToBeAdded") int numConsumingSegmentsToBeAdded,
@@ -487,18 +473,16 @@ public class RebalanceSummaryResult {
     protected RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
     protected ConsumingSegmentToBeMovedSummary _consumingSegmentToBeMovedSummary;
 
-    /**
-     * Constructor for SegmentInfo
-     * @param totalSegmentsToBeMoved total number of segments to be moved as part of this rebalance
-     * @param totalSegmentsToBeDeleted total number of segments to be deleted from any server as part of this rebalance
-     * @param maxSegmentsAddedToASingleServer maximum segments added to a single server as part of this rebalance
-     * @param estimatedAverageSegmentSizeInBytes estimated average size of segments in bytes
-     * @param totalEstimatedDataToBeMovedInBytes total estimated amount of data to be moved as part of this rebalance
-     * @param replicationFactor replication factor before and after this rebalance
-     * @param numSegmentsInSingleReplica number of segments in single replica before and after this rebalance
-     * @param numSegmentsAcrossAllReplicas total number of segments across all replicas before and after this rebalance
-     * @param consumingSegmentToBeMovedSummary consuming segment summary. Set to null if the table is an offline table
-     */
+    /// Constructor for SegmentInfo
+    /// @param totalSegmentsToBeMoved total number of segments to be moved as part of this rebalance
+    /// @param totalSegmentsToBeDeleted total number of segments to be deleted from any server as part of this rebalance
+    /// @param maxSegmentsAddedToASingleServer maximum segments added to a single server as part of this rebalance
+    /// @param estimatedAverageSegmentSizeInBytes estimated average size of segments in bytes
+    /// @param totalEstimatedDataToBeMovedInBytes total estimated amount of data to be moved as part of this rebalance
+    /// @param replicationFactor replication factor before and after this rebalance
+    /// @param numSegmentsInSingleReplica number of segments in single replica before and after this rebalance
+    /// @param numSegmentsAcrossAllReplicas total number of segments across all replicas before and after this rebalance
+    /// @param consumingSegmentToBeMovedSummary consuming segment summary. Set to null if the table is an offline table
     @JsonCreator
     public SegmentInfo(@JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
         @JsonProperty("totalSegmentsToBeDeleted") int totalSegmentsToBeDeleted,

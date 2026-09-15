@@ -24,9 +24,7 @@ import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.xerial.snappy.Snappy;
 
 
-/**
- * Implementation of {@link ChunkDecompressor} using Snappy.
- */
+/// Implementation of [ChunkDecompressor] using Snappy.
 class SnappyDecompressor implements ChunkDecompressor {
 
   static final SnappyDecompressor INSTANCE = new SnappyDecompressor();

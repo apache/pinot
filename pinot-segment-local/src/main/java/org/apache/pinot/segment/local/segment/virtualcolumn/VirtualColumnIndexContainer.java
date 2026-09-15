@@ -27,21 +27,31 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
-/**
- * Column index container for virtual columns.
- */
+/// Column index container for virtual columns.
 public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
   private final Dictionary _dictionary;
+  private final NullValueVectorReader _nullValueVector;
 
   public VirtualColumnIndexContainer(ForwardIndexReader<?> forwardIndex, InvertedIndexReader<?> invertedIndex,
       Dictionary dictionary) {
+    this(forwardIndex, invertedIndex, dictionary, null);
+  }
+
+  /// @param nullValueVector marks which documents of the virtual column are null, or `null` when the column has no
+  ///                        null value. A virtual column whose value is genuinely unavailable (e.g. the time range of
+  ///                        a CONSUMING segment) must supply one, otherwise the engine treats the placeholder value
+  ///                        stored in the forward index as a real value.
+  public VirtualColumnIndexContainer(ForwardIndexReader<?> forwardIndex, InvertedIndexReader<?> invertedIndex,
+      Dictionary dictionary, @Nullable NullValueVectorReader nullValueVector) {
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
     _dictionary = dictionary;
+    _nullValueVector = nullValueVector;
   }
 
   @Nullable
@@ -56,6 +66,9 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
     if (indexType.equals(StandardIndexes.dictionary())) {
       return (I) _dictionary;
     }
+    if (indexType.equals(StandardIndexes.nullValueVector())) {
+      return (I) _nullValueVector;
+    }
     return null;
   }
 
@@ -68,6 +81,9 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
     }
     if (_dictionary != null) {
       _dictionary.close();
+    }
+    if (_nullValueVector != null) {
+      _nullValueVector.close();
     }
   }
 }

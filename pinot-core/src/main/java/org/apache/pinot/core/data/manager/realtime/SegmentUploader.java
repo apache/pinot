@@ -25,14 +25,10 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 
 public interface SegmentUploader {
 
-  /**
-   * Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded.
-   */
+  /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName);
 
-  /**
-   * Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded. The upload will
-   * wait for the specified timeout.
-   */
+  /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded. The upload will
+  /// wait for the specified timeout.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
 }

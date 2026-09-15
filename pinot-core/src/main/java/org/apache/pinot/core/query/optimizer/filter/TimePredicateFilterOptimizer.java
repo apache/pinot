@@ -45,33 +45,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code TimePredicateFilterOptimizer} optimizes the time related predicates:
- * <ul>
- *   <li>
- *     Optimizes TIME_CONVERT/DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
- *     to the inner expression.
- *     <p>E.g. "dateTimeConvert(col, '1:SECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') > 27013846" will be optimized
- *     to "col >= 1620831600".
- *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
- *     not common on time column, and they cannot be optimized to a single range predicate.
- *   </li>
- *   <li>
- *     Optimizes DATE_TRUNC function with range/equality predicates by either rounding up or down to closest granularity
- *     step
- *     <p>E.g. "dateTrunc('DAY', col, 'MILLISECONDS') > 1620777600000" will be optimized
- *     to "col > 1620863999999" as 1620863999999 is the largest value that can be truncated to 1620777600000
- *     <p>E.g. "datetrunc('DAY', col, 'MILLISECONDS') <= 1620777600010" will be optimized
- *     to col <= 1620863999999 as the next granularity step lower than 1620777600010 is 1620777600000 and 1620863999999
- *     is the largest value that truncates to be lower than the specified literal.
- *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
- *     not common on time column, and they cannot be optimized to a single range predicate.
- *     <p>NOTE: Timezones are not yet supported for the datetrunc optimizer</p>
- *   </li>
- * </ul>
- *
- * NOTE: This optimizer is followed by the {@link MergeRangeFilterOptimizer}, which can merge the generated ranges.
- */
+/// The `TimePredicateFilterOptimizer` optimizes the time related predicates:
+///
+/// - Optimizes TIME_CONVERT/DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
+///   to the inner expression.
+///
+///   E.g. "dateTimeConvert(col, '1:SECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') > 27013846" will be optimized
+///   to "col >= 1620831600".
+///
+///   NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
+///   not common on time column, and they cannot be optimized to a single range predicate.
+/// - Optimizes DATE_TRUNC function with range/equality predicates by either rounding up or down to closest
+///   granularity step
+///
+///   E.g. "dateTrunc('DAY', col, 'MILLISECONDS') > 1620777600000" will be optimized
+///   to "col > 1620863999999" as 1620863999999 is the largest value that can be truncated to 1620777600000
+///
+///   E.g. "datetrunc('DAY', col, 'MILLISECONDS') <= 1620777600010" will be optimized
+///   to col <= 1620863999999 as the next granularity step lower than 1620777600010 is 1620777600000 and 1620863999999
+///   is the largest value that truncates to be lower than the specified literal.
+///
+///   NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
+///   not common on time column, and they cannot be optimized to a single range predicate.
+///
+///   NOTE: Timezones are not yet supported for the datetrunc optimizer
+///
+/// NOTE: This optimizer is followed by the [MergeRangeFilterOptimizer], which can merge the generated ranges.
 public class TimePredicateFilterOptimizer implements FilterOptimizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimePredicateFilterOptimizer.class);
 
@@ -107,10 +106,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     return filterExpression;
   }
 
-  /**
-   * Helper method to optimize TIME_CONVERT function with range/equality predicate to directly apply the predicate to
-   * the inner expression. Changes are applied in-place of the filter function.
-   */
+  /// Helper method to optimize TIME_CONVERT function with range/equality predicate to directly apply the predicate to
+  /// the inner expression. Changes are applied in-place of the filter function.
   private static void optimizeTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> timeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
@@ -259,10 +256,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /**
-   * Helper method to optimize DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
-   * to the inner expression. Changes are applied in-place of the filter function.
-   */
+  /// Helper method to optimize DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
+  /// to the inner expression. Changes are applied in-place of the filter function.
   private static void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTimeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
@@ -552,9 +547,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /**
-   * Helper method to round up the given value based on the granularity.
-   */
+  /// Helper method to round up the given value based on the granularity.
   private static long ceil(long millisValue, long granularityMillis) {
     return (millisValue + granularityMillis - 1) / granularityMillis * granularityMillis;
   }
@@ -568,18 +561,14 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     filterFunction.setOperands(newOperands);
   }
 
-  /**
-   * Helper function to find the floor of acceptable values truncating to a specified value
-   * Computes floor inverse of date trunc function
-   */
+  /// Helper function to find the floor of acceptable values truncating to a specified value
+  /// Computes floor inverse of date trunc function
   private static long dateTruncFloor(long timeValue, String outputTimeUnit) {
     return TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
   }
 
-  /**
-   * Helper function that finds the maximum value (ceiling) that truncates to specified value
-   * Computes ceiling inverse of date trunc function
-   */
+  /// Helper function that finds the maximum value (ceiling) that truncates to specified value
+  /// Computes ceiling inverse of date trunc function
   private static long dateTruncCeil(String unit, long timeValue, String outputTimeUnit) {
     long floorMillis = dateTruncFloor(timeValue, outputTimeUnit);
     return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(floorMillis)

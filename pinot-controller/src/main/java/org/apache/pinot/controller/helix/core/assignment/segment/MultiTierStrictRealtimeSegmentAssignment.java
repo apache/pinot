@@ -36,11 +36,9 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * This segment assignment policy allows the table to use multiple tiers when rebalancing table. This can be used for
- * dedup table, whose segments out of TTL can be moved to new tiers without messing up the dedup metadata tracked on
- * the CONSUMING servers.
- */
+/// This segment assignment policy allows the table to use multiple tiers when rebalancing table. This can be used for
+/// dedup table, whose segments out of TTL can be moved to new tiers without messing up the dedup metadata tracked on
+/// the CONSUMING servers.
 public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtimeSegmentAssignment {
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
@@ -88,12 +86,10 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
     return newAssignment;
   }
 
-  /**
-   * Multi-tier override: pick the latest committed LLC segment in the partition (highest sequence number) and return
-   * its assignment only if the segment is still on the CONSUMING instance pool. If the latest segment has been moved
-   * to a tier (or its ZK metadata is unavailable), return {@code null} so the new CONSUMING segment falls back to the
-   * assignment derived from instance partitions.
-   */
+  /// Multi-tier override: pick the latest committed LLC segment in the partition (highest sequence number) and return
+  /// its assignment only if the segment is still on the CONSUMING instance pool. If the latest segment has been moved
+  /// to a tier (or its ZK metadata is unavailable), return `null` so the new CONSUMING segment falls back to the
+  /// assignment derived from instance partitions.
   @Nullable
   @Override
   protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {

@@ -56,6 +56,9 @@ import static org.testng.Assert.assertTrue;
 
 public class PulsarConsumerTest {
   private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:3.2.2");
+  // The image defaults to 6 GiB, which can exhaust the Docker VM when unit tests use multiple forks.
+  private static final String PULSAR_MEMORY = "-Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g";
+  private static final Duration PULSAR_STARTUP_TIMEOUT = Duration.ofMinutes(10);
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
   public static final String TEST_TOPIC_BATCH = "test-topic-batch";
@@ -75,7 +78,8 @@ public class PulsarConsumerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _pulsar = new PulsarContainer(PULSAR_IMAGE).withStartupTimeout(Duration.ofMinutes(5));
+    _pulsar = new PulsarContainer(PULSAR_IMAGE).withEnv("PULSAR_MEM", PULSAR_MEMORY)
+        .withStartupTimeout(PULSAR_STARTUP_TIMEOUT);
     _pulsar.start();
     try (PulsarAdmin admin = PulsarAdmin.builder().serviceHttpUrl(_pulsar.getHttpServiceUrl()).build()) {
       Topics topics = admin.topics();
@@ -88,10 +92,12 @@ public class PulsarConsumerTest {
     }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    _pulsar.stop();
+    if (_pulsar != null) {
+      _pulsar.stop();
+    }
   }
 
   public void publishRecords(PulsarClient client)

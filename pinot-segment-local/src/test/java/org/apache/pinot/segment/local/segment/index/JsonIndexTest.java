@@ -54,9 +54,7 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
 
-/**
- * Unit test for {@link JsonIndexCreator} and {@link JsonIndexReader}.
- */
+/// Unit test for [JsonIndexCreator] and [JsonIndexReader].
 public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIndexTest");
   private static final String ON_HEAP_COLUMN_NAME = "onHeap";
@@ -403,26 +401,22 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
-  /**
-   * Creates a JSON index with the given config and adds the given records
-   * @param createOnHeap Whether to create an on-heap index
-   * @param jsonIndexConfig the JSON index config
-   * @param records the records to be added to the index
-   * @throws IOException on error
-   */
+  /// Creates a JSON index with the given config and adds the given records
+  /// @param createOnHeap Whether to create an on-heap index
+  /// @param jsonIndexConfig the JSON index config
+  /// @param records the records to be added to the index
+  /// @throws IOException on error
   private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records)
       throws IOException {
     createIndex(createOnHeap, jsonIndexConfig, records, false);
   }
 
-  /**
-   * Creates a JSON index with the given config and adds the given records
-   * @param createOnHeap Whether to create an on-heap index
-   * @param jsonIndexConfig the JSON index config
-   * @param records the records to be added to the index
-   * @param continueOnError whether continueOnError should be enabled or disabled
-   * @throws IOException on error
-   */
+  /// Creates a JSON index with the given config and adds the given records
+  /// @param createOnHeap Whether to create an on-heap index
+  /// @param jsonIndexConfig the JSON index config
+  /// @param records the records to be added to the index
+  /// @param continueOnError whether continueOnError should be enabled or disabled
+  /// @throws IOException on error
   private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records, boolean continueOnError)
       throws IOException {
     try (JsonIndexCreator indexCreator = createOnHeap

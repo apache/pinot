@@ -93,9 +93,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Base class for integration tests that involve a complete Pinot cluster.
- */
+/// Base class for integration tests that involve a complete Pinot cluster.
 @Listeners(NettyTestNGListener.class)
 public abstract class ClusterTest extends ControllerTest {
   protected static final String TEMP_DIR =
@@ -168,15 +166,11 @@ public abstract class ClusterTest extends ControllerTest {
     setUseMultiStageQueryEngine(true);
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseBrokerStarter createBrokerStarter() {
     return new HelixBrokerStarter();
   }
@@ -203,6 +197,9 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
+    int brokerQueryRunnerPort = NetUtils.findOpenPort(_nextBrokerQueryRunnerPort);
+    brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerQueryRunnerPort);
+    _nextBrokerQueryRunnerPort = brokerQueryRunnerPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -235,15 +232,11 @@ public abstract class ClusterTest extends ControllerTest {
     return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideServerConf(PinotConfiguration serverConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseServerStarter createServerStarter() {
     return new HelixServerStarter();
   }
@@ -326,15 +319,11 @@ public abstract class ClusterTest extends ControllerTest {
     return brokerStarter;
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideMinionConf(PinotConfiguration minionConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseMinionStarter createMinionStarter() {
     return new MinionStarter();
   }
@@ -434,42 +423,32 @@ public abstract class ClusterTest extends ControllerTest {
     return startOneBroker(brokerConfig);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, File tarDir)
       throws Exception {
     uploadSegments(tableName, TableType.OFFLINE, tarDir);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, List<File> tarDirs)
       throws Exception {
     uploadSegments(tableName, TableType.OFFLINE, tarDirs);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, TableType tableType, File tarDir)
       throws Exception {
     uploadSegments(tableName, tableType, List.of(tarDir));
   }
 
-  /**
-   * Returns the headers to be sent to the controller for segment upload flow.
-   * Can be overridden to add custom headers, e.g., for authentication.
-   * By default, returns an empty list.
-   */
+  /// Returns the headers to be sent to the controller for segment upload flow.
+  /// Can be overridden to add custom headers, e.g., for authentication.
+  /// By default, returns an empty list.
   protected List<Header> getSegmentUploadAuthHeaders() {
     return List.of();
   }
 
-  /**
-   * Upload all segments inside the given directories to the cluster.
-   */
+  /// Upload all segments inside the given directories to the cluster.
   protected void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
       throws Exception {
     List<File> segmentTarFiles = new ArrayList<>();
@@ -588,9 +567,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  /**
-   * Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
-   */
+  /// Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
   public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
     if (useGrpcEndpoint()) {
@@ -599,18 +576,14 @@ public abstract class ClusterTest extends ControllerTest {
     return queryBrokerHttpEndpoint(query);
   }
 
-  /**
-   * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
-   * This is used for testing timeseries queries.
-   */
+  /// Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
+  /// This is used for testing timeseries queries.
   public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
     return getTimeseriesQuery(getBrokerBaseApiUrl(), query, startTime, endTime, headers);
   }
 
-  /**
-   * Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
-   * This is used for testing timeseries queries.
-   */
+  /// Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
+  /// This is used for testing timeseries queries.
   public JsonNode getTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
     try {
@@ -652,18 +625,14 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  /**
-   * Queries the broker's query endpoint (/query/sql)
-   */
+  /// Queries the broker's query endpoint (/query/sql)
   public JsonNode queryBrokerHttpEndpoint(@Language("sql") String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
   }
 
-  /**
-   * Queries the broker's grpc query endpoint (/query/sql).
-   */
+  /// Queries the broker's grpc query endpoint (/query/sql).
   public JsonNode queryBrokerGrpcEndpoint(@Language("sql") String query)
       throws Exception {
     return queryGrpcEndpoint(query,
@@ -689,9 +658,7 @@ public abstract class ClusterTest extends ControllerTest {
     return System.currentTimeMillis() % 2 == 0;
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query/sql)
-   */
+  /// Queries the broker's sql query endpoint (/query/sql)
   protected JsonNode postQuery(@Language("sql") String query, Map<String, String> headers)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
@@ -712,9 +679,7 @@ public abstract class ClusterTest extends ControllerTest {
     return Map.of();
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query or /query/sql)
-   */
+  /// Queries the broker's sql query endpoint (/query or /query/sql)
   public static JsonNode postQuery(@Language("sql") String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
@@ -837,18 +802,14 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.objectToJsonNode(object);
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
-   */
+  /// Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
   protected JsonNode postQueryWithOptions(@Language("sql") String query, String queryOptions)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         Map.of("queryOptions", queryOptions));
   }
 
-  /**
-   * Queries the controller's sql query endpoint (/sql)
-   */
+  /// Queries the controller's sql query endpoint (/sql)
   public JsonNode postQueryToController(@Language("sql") String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
@@ -860,9 +821,7 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.stringToJsonNode(response);
   }
 
-  /**
-   * Execute a query and extract the count result
-   */
+  /// Execute a query and extract the count result
   protected int getQueryNumResultRows(String query) throws Exception {
     JsonNode response = postQuery(query);
     JsonNode resTbl = response.get("resultTable");
@@ -880,9 +839,7 @@ public abstract class ClusterTest extends ControllerTest {
     return Map.of("queryOptions", queryOptions.toString());
   }
 
-  /**
-   * Queries the controller's sql query endpoint (/sql)
-   */
+  /// Queries the controller's sql query endpoint (/sql)
   public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {

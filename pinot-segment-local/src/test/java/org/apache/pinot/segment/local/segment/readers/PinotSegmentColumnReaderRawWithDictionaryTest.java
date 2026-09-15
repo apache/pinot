@@ -36,7 +36,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/// Unit tests for {@link PinotSegmentColumnReader#getDictId(int)} when the forward index is RAW
+/// Unit tests for [PinotSegmentColumnReader#getDictId(int)] when the forward index is RAW
 /// and a separate (shared) dictionary is materialized for the column. This is the encoding used by
 /// star-tree dimension columns that opt into shared dictionaries — the FI stores raw values, and
 /// the star-tree builder needs to resolve a dict-id per doc by looking the raw value up in the

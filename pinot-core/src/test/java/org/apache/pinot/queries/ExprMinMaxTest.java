@@ -58,9 +58,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Queries test for exprmin/exprmax functions.
- */
+/// Queries test for exprmin/exprmax functions.
 public class ExprMinMaxTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";

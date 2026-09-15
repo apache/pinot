@@ -34,10 +34,8 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.commons.collections4.CollectionUtils;
 
 
-/**
- * Mapping specifically for Pinot Data Distribution and trait mapping. A mapping is defined for a source / destination
- * RelNode pair and is used to track how input fields are mapped to output fields.
- */
+/// Mapping specifically for Pinot Data Distribution and trait mapping. A mapping is defined for a source / destination
+/// RelNode pair and is used to track how input fields are mapped to output fields.
 public class PinotDistMapping {
   private final int _sourceCount;
   private final Map<Integer, List<Integer>> _sourceToTargetMapping = new HashMap<>();
@@ -93,21 +91,16 @@ public class PinotDistMapping {
     return RelCollations.of(newFieldCollations);
   }
 
-  /**
-   * If a given RelNode is not guaranteed to preserve the sort order of the input, this returns true.
-   */
+  /// If a given RelNode is not guaranteed to preserve the sort order of the input, this returns true.
   public static boolean doesDropCollation(RelNode relNode) {
     return !(relNode instanceof Project) && !(relNode instanceof Filter);
   }
 
-  /**
-   * Consider a node that is partitioned on the key: [1]. If there's a project node on top of this, with project
-   * expressions as: [RexInputRef#0, RexInputRef#1, RexInputRef#1], then the project node will have two hash
-   * distribution descriptors: [1] and [2]. This method computes all such mappings for the given key indexes.
-   * <p>
-   *   This is a common occurrence in Calcite plans.
-   * </p>
-   */
+  /// Consider a node that is partitioned on the key: \[1\]. If there's a project node on top of this, with project
+  /// expressions as: \[RexInputRef#0, RexInputRef#1, RexInputRef#1\], then the project node will have two hash
+  /// distribution descriptors: \[1\] and \[2\]. This method computes all such mappings for the given key indexes.
+  ///
+  ///   This is a common occurrence in Calcite plans.
   public static void computeAllMappings(int index, List<Integer> currentKey, PinotDistMapping mapping,
       Deque<Integer> runningKey, List<List<Integer>> newKeysSink) {
     if (index == currentKey.size()) {

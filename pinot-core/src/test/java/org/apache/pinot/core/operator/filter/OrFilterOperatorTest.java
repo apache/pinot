@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeSet;
@@ -28,8 +27,12 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
-import org.testng.Assert;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class OrFilterOperatorTest {
@@ -40,8 +43,8 @@ public class OrFilterOperatorTest {
     int[] docIds1 = new int[]{2, 3, 10, 15, 16, 28};
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     TreeSet<Integer> treeSet = new TreeSet<>();
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds1)));
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds2)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds1)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds2)));
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
@@ -52,8 +55,9 @@ public class OrFilterOperatorTest {
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
-      Assert.assertEquals(docId, expectedIterator.next().intValue());
+      assertEquals(docId, expectedIterator.next().intValue());
     }
+    assertFalse(expectedIterator.hasNext());
   }
 
   @Test
@@ -63,9 +67,9 @@ public class OrFilterOperatorTest {
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
     TreeSet<Integer> treeSet = new TreeSet<>();
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds1)));
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds2)));
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds3)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds1)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds2)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds3)));
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
@@ -77,8 +81,9 @@ public class OrFilterOperatorTest {
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
-      Assert.assertEquals(docId, expectedIterator.next().intValue());
+      assertEquals(docId, expectedIterator.next().intValue());
     }
+    assertFalse(expectedIterator.hasNext());
   }
 
   @Test
@@ -88,9 +93,9 @@ public class OrFilterOperatorTest {
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
     TreeSet<Integer> treeSet = new TreeSet<>();
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds1)));
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds2)));
-    treeSet.addAll(Arrays.asList(ArrayUtils.toObject(docIds3)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds1)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds2)));
+    treeSet.addAll(List.of(ArrayUtils.toObject(docIds3)));
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
@@ -106,8 +111,9 @@ public class OrFilterOperatorTest {
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
-      Assert.assertEquals(docId, expectedIterator.next().intValue());
+      assertEquals(docId, expectedIterator.next().intValue());
     }
+    assertFalse(expectedIterator.hasNext());
   }
 
   @Test
@@ -119,11 +125,11 @@ public class OrFilterOperatorTest {
     int[] nullDocIds2 = new int[]{3, 4, 5, 6, 7};
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(8, 9));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(8, 9));
   }
 
   @Test
@@ -135,11 +141,11 @@ public class OrFilterOperatorTest {
     int[] nullDocIds2 = new int[]{};
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, false);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(4, 5, 6, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(4, 5, 6, 7, 8, 9));
   }
 
   @Test
@@ -149,11 +155,11 @@ public class OrFilterOperatorTest {
     int[] nullDocIds1 = new int[]{4, 5, 6};
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(1, 2, 3));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(0, 7, 8, 9));
   }
 
   @Test
@@ -163,11 +169,11 @@ public class OrFilterOperatorTest {
     int[] nullDocIds1 = new int[]{4, 5, 6};
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
+        List.of(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
         numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of());
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of());
   }
 
   @Test
@@ -175,11 +181,11 @@ public class OrFilterOperatorTest {
     int numDocs = 10;
 
     OrFilterOperator orFilterOperator =
-        new OrFilterOperator(Arrays.asList(EmptyFilterOperator.getInstance(), EmptyFilterOperator.getInstance()), null,
+        new OrFilterOperator(List.of(EmptyFilterOperator.getInstance(), EmptyFilterOperator.getInstance()), null,
             numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of());
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of());
+    assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
 
   @Test
@@ -188,12 +194,12 @@ public class OrFilterOperatorTest {
     int[] regularDocIds = new int[]{1, 2, 3};
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(
+        List.of(
             new TestFilterOperator(regularDocIds, numDocs),
             new MatchAllFilterOperator(numDocs)
         ), null, numDocs, false);
 
-    Assert.assertTrue((orFilterOperator.getTrues()).getOptimizedDocIdSet() instanceof MatchAllDocIdSet);
+    assertTrue((orFilterOperator.getTrues()).getOptimizedDocIdSet() instanceof MatchAllDocIdSet);
   }
 
   @Test
@@ -202,11 +208,77 @@ public class OrFilterOperatorTest {
     int[] emptyDocIds = new int[0];
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
-        Arrays.asList(
+        List.of(
             new TestFilterOperator(emptyDocIds, numDocs),
             new TestFilterOperator(emptyDocIds, numDocs)
         ), null, numDocs, false);
 
-    Assert.assertTrue(orFilterOperator.getTrues().getOptimizedDocIdSet() instanceof EmptyDocIdSet);
+    assertTrue(orFilterOperator.getTrues().getOptimizedDocIdSet() instanceof EmptyDocIdSet);
+  }
+
+  @Test
+  public void testCanProduceBitmapsWhenAllChildrenCan() {
+    int numDocs = 40;
+    OrFilterOperator orOperator = new OrFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10), bitmapOp(numDocs, false, 3, 10, 20)), null, numDocs, false);
+    assertTrue(orOperator.canProduceBitmaps());
+    assertTrue(orOperator.canOptimizeCount());
+  }
+
+  @Test
+  public void testCannotProduceBitmapsWhenAnyChildCannot() {
+    int numDocs = 40;
+    OrFilterOperator orOperator = new OrFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10), new TestFilterOperator(new int[]{3, 10, 20}, numDocs)), null,
+        numDocs, false);
+    assertFalse(orOperator.canProduceBitmaps());
+    assertFalse(orOperator.canOptimizeCount());
+  }
+
+  @Test
+  public void testGetBitmapsUnionForTwoChildren() {
+    int numDocs = 40;
+    OrFilterOperator orOperator = new OrFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 10, 15, 16, 28), bitmapOp(numDocs, false, 3, 6, 8, 20, 28)), null,
+        numDocs, false);
+    assertEquals(orOperator.getBitmaps().reduce().toArray(), new int[]{2, 3, 6, 8, 10, 15, 16, 20, 28});
+  }
+
+  @Test
+  public void testGetBitmapsUnionForThreeChildren() {
+    int numDocs = 40;
+    OrFilterOperator orOperator = new OrFilterOperator(
+        List.of(bitmapOp(numDocs, false, 2, 3, 6), bitmapOp(numDocs, false, 3, 6, 8), bitmapOp(numDocs, false, 1)),
+        null, numDocs, false);
+    assertEquals(orOperator.getBitmaps().reduce().toArray(), new int[]{1, 2, 3, 6, 8});
+  }
+
+  @Test
+  public void testGetBitmapsWithExclusiveChild() {
+    int numDocs = 10;
+    // Second child is exclusive: it matches every doc except {0..7}, i.e. {8, 9}, so reduce() must materialize its
+    // complement before the union. The OR is {1, 3} union {8, 9}.
+    OrFilterOperator orOperator = new OrFilterOperator(
+        List.of(bitmapOp(numDocs, false, 1, 3), bitmapOp(numDocs, true, 0, 1, 2, 3, 4, 5, 6, 7)), null, numDocs,
+        false);
+    assertEquals(orOperator.getBitmaps().reduce().toArray(), new int[]{1, 3, 8, 9});
+  }
+
+  @Test
+  public void testGetBitmapsWithNestedOr() {
+    int numDocs = 40;
+    OrFilterOperator childOr =
+        new OrFilterOperator(List.of(bitmapOp(numDocs, false, 2, 3), bitmapOp(numDocs, false, 6, 8)), null,
+            numDocs, false);
+    OrFilterOperator orOperator =
+        new OrFilterOperator(List.of(childOr, bitmapOp(numDocs, false, 1, 30)), null, numDocs, false);
+    assertTrue(orOperator.canProduceBitmaps());
+    assertEquals(orOperator.getBitmaps().reduce().toArray(), new int[]{1, 2, 3, 6, 8, 30});
+  }
+
+  private static BitmapBasedFilterOperator bitmapOp(int numDocs, boolean exclusive, int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return new BitmapBasedFilterOperator(bitmap.toImmutableRoaringBitmap(), exclusive, numDocs);
   }
 }

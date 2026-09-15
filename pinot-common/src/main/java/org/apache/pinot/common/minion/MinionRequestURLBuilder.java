@@ -23,9 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
-/**
- * MinionRequestURLBuilder is the helper class to generate URLs for task APIs.
- */
+/// MinionRequestURLBuilder is the helper class to generate URLs for task APIs.
 public class MinionRequestURLBuilder {
 
   private final String _baseUrl;

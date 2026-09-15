@@ -26,12 +26,13 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class ArrayAggBytesFunction extends BaseArrayAggBytesFunction<ObjectArrayList<ByteArray>> {
-  public ArrayAggBytesFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, nullHandlingEnabled);
+  public ArrayAggBytesFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
+    super(expression, dataType, nullHandlingEnabled);
   }
 
   @Override

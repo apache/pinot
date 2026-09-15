@@ -29,13 +29,11 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Scalar wrapper for filterMv so FunctionRegistry can expose type signatures for query planning and execution paths
- * that resolve scalar functions.
- *
- * <p>Each FunctionInvoker creates a new instance of this class, so instance fields are safe to use without
- * synchronization. The evaluator is cached per instance to avoid repeated creation for the same predicate.</p>
- */
+/// Scalar wrapper for filterMv so FunctionRegistry can expose type signatures for query planning and execution paths
+/// that resolve scalar functions.
+///
+/// Each FunctionInvoker creates a new instance of this class, so instance fields are safe to use without
+/// synchronization. The evaluator is cached per instance to avoid repeated creation for the same predicate.
 @ScalarFunction
 public class FilterMvScalarFunction implements PinotScalarFunction {
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP =

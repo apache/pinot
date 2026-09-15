@@ -27,9 +27,7 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-/**
- * Polymorphic notEquals (!=) scalar function implementation
- */
+/// Polymorphic notEquals (!=) scalar function implementation
 @ScalarFunction
 public class NotEqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 

@@ -35,10 +35,8 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistryListener;
 import org.apache.pinot.spi.metrics.PinotTimer;
 
 
-/**
- * In-memory, no-JMX {@link PinotMetricsRegistry} for unit-testing {@code AbstractMetrics}-derived classes without
- * requiring a real metrics plugin on the classpath.
- */
+/// In-memory, no-JMX [PinotMetricsRegistry] for unit-testing `AbstractMetrics`-derived classes without
+/// requiring a real metrics plugin on the classpath.
 public class FakePinotMetricsRegistry implements PinotMetricsRegistry {
   private final Map<PinotMetricName, PinotMetric> _metrics = new ConcurrentHashMap<>();
   private final List<Listener> _listeners = new CopyOnWriteArrayList<>();
@@ -135,9 +133,7 @@ public class FakePinotMetricsRegistry implements PinotMetricsRegistry {
     }
   }
 
-  /**
-   * Callback surface used by {@link PinotMetricsRegistryListener} subclasses that wrap a {@link Listener}.
-   */
+  /// Callback surface used by [PinotMetricsRegistryListener] subclasses that wrap a [Listener].
   public interface Listener {
     void onMetricAdded(PinotMetricName name, PinotMetric metric);
     void onMetricRemoved(PinotMetricName name);

@@ -26,9 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Container object for TLS/SSL configuration of pinot clients and servers (netty, grizzly, etc.)
- */
+/// Container object for TLS/SSL configuration of pinot clients and servers (netty, grizzly, etc.)
 public class TlsConfig {
   private boolean _clientAuthEnabled;
   private String _keyStoreType = KeyStore.getDefaultType();

@@ -21,10 +21,16 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -157,12 +163,10 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo", "default"), "null");
   }
 
-  /**
-   * The default-value {@code jsonPath*} overloads return the caller's default for input that cannot begin a JSON
-   * value (plain text, null, empty) without invoking the parser - this avoids the {@code fillInStackTrace()} cost
-   * of a thrown-and-caught {@link InvalidJsonException} on the ingestion hot path. Behavior is unchanged for valid
-   * JSON and for any input that could begin a JSON value (which is still handed to the parser).
-   */
+  /// The default-value `jsonPath*` overloads return the caller's default for input that cannot begin a JSON
+  /// value (plain text, null, empty) without invoking the parser - this avoids the `fillInStackTrace()` cost
+  /// of a thrown-and-caught [InvalidJsonException] on the ingestion hot path. Behavior is unchanged for valid
+  /// JSON and for any input that could begin a JSON value (which is still handed to the parser).
   @Test
   public void testJsonPathDefaultVariantsSkipNonJson() {
     // Plain-text input (e.g. a raw log line) -> default, no exception thrown.
@@ -202,12 +206,10 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString("'single quoted'", "$.x", "def"), "def");
   }
 
-  /**
-   * {@code jsonExtractObject} parses a JSON document once into a reusable Map/List (or passes through an
-   * already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
-   * is navigable by {@code jsonPath*} with results identical to parsing the raw string - enabling parse-once
-   * transform configs.
-   */
+  /// `jsonExtractObject` parses a JSON document once into a reusable Map/List (or passes through an
+  /// already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
+  /// is navigable by `jsonPath*` with results identical to parsing the raw string - enabling parse-once
+  /// transform configs.
   @Test
   public void testJsonExtractObject()
       throws Exception {
@@ -453,6 +455,84 @@ public class JsonFunctionsTest {
       throws JsonProcessingException {
     String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path, expected);
     assertEquals(value, expected);
+  }
+
+  @Test
+  public void testJsonPathStringOnExtractedValues()
+      throws JsonProcessingException {
+    // A value resolved from an already-parsed record tree (not a JSON string) keeps its runtime Java type.
+    // UUID / LocalDate / LocalTime are non-JSON-native scalars a record extractor can materialize; they render
+    // as their natural unquoted string, never wrapped in JSON string quotes.
+    UUID uuid = UUID.fromString("657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", uuid), "$.v"), "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", uuid), "$.v", "default"),
+        "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), "2026-07-20");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), "19:54:37");
+
+    // The fast-path variants share the same rendering helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathStringFast(Map.of("v", uuid), "$.v", "default"),
+        "657ae8f8-b702-3cf4-9a05-300348c1623e");
+    assertEquals(JsonFunctions.jsonPathStringFirstMatch(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v", "default"),
+        "2026-07-20");
+
+    // Numbers, Boolean, and Map / List / Set containers follow the json-path-to-string behavior of
+    // jsonExtractScalar (i.e. JsonUtils.objectToString), so a scalar number is unquoted and a container is JSON.
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", 42), "$.v"), "42");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", 1.5d), "$.v"), "1.5");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", new BigDecimal("123.45")), "$.v"), "123.45");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", true), "$.v"), "true");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", Map.of("k", "w")), "$.v"), "{\"k\":\"w\"}");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", List.of(1, 2, 3)), "$.v"), "[1,2,3]");
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", Set.of("x")), "$.v"), "[\"x\"]");
+
+    // Timestamp follows objectToString (portable epoch millis), not its timezone-dependent JDBC toString form.
+    Timestamp timestamp = new Timestamp(1000L);
+    assertEquals(JsonFunctions.jsonPathString(Map.of("v", timestamp), "$.v"), JsonUtils.objectToString(timestamp));
+  }
+
+  @Test
+  public void testJsonPathLongOnExtractedValues() {
+    // Boolean is JSON-native and follows the numeric convention of jsonExtractScalar: true -> 1, false -> 0.
+    assertEquals(JsonFunctions.jsonPathLong("{\"v\":true}", "$.v"), 1L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", false), "$.v"), 0L);
+
+    // A value resolved from an already-parsed record tree (not a JSON string) keeps its runtime Java type.
+    // Timestamp / LocalDate / LocalTime are non-JSON-native scalars a record extractor can materialize; they
+    // convert to their Pinot internal numeric form - epoch millis, days since epoch, millis since midnight.
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", new Timestamp(1000L)), "$.v"), 1000L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), 20654L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), 71677000L);
+
+    // The fast-path variants share the same conversion helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathLongFast(Map.of("v", new Timestamp(1000L)), "$.v", -1L), 1000L);
+    assertEquals(JsonFunctions.jsonPathLongFirstMatch(Map.of("v", true), "$.v", -1L), 1L);
+
+    // Every Number narrows through longValue, and a value with no numeric meaning yields the default.
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", new BigDecimal("123.45")), "$.v"), 123L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", UUID.randomUUID()), "$.v", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathLong(Map.of("v", Map.of("k", "w")), "$.v", -1L), -1L);
+  }
+
+  @Test
+  public void testJsonPathDoubleOnExtractedValues() {
+    // Boolean is JSON-native and follows the numeric convention of jsonExtractScalar: true -> 1, false -> 0.
+    assertEquals(JsonFunctions.jsonPathDouble("{\"v\":true}", "$.v"), 1d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", false), "$.v"), 0d);
+
+    // Timestamp / LocalDate / LocalTime convert to the same internal numeric form as jsonPathLong.
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", new Timestamp(1000L)), "$.v"), 1000d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", LocalDate.of(2026, 7, 20)), "$.v"), 20654d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", LocalTime.of(19, 54, 37)), "$.v"), 71677000d);
+
+    // The fast-path variants share the same conversion helper and must produce identical results.
+    assertEquals(JsonFunctions.jsonPathDoubleFast(Map.of("v", new Timestamp(1000L)), "$.v", -1d), 1000d);
+    assertEquals(JsonFunctions.jsonPathDoubleFirstMatch(Map.of("v", true), "$.v", -1d), 1d);
+
+    // Every Number widens through doubleValue, and a value with no numeric meaning yields the default.
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", new BigDecimal("123.45")), "$.v"), 123.45d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", UUID.randomUUID()), "$.v", -1d), -1d);
+    assertEquals(JsonFunctions.jsonPathDouble(Map.of("v", Map.of("k", "w")), "$.v", -1d), -1d);
   }
 
   @DataProvider

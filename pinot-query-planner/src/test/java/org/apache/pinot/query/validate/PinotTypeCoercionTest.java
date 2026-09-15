@@ -27,11 +27,9 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link PinotTypeCoercion} — in particular, the rule that prefers casting the non-column-reference operand
- * in TIMESTAMP-vs-BIGINT binary comparisons. This avoids wrapping a column in a per-row CAST when the other side is a
- * literal or constant subexpression, which is both faster on the query path and preserves index applicability.
- */
+/// Tests for [PinotTypeCoercion] — in particular, the rule that prefers casting the non-column-reference operand
+/// in TIMESTAMP-vs-BIGINT binary comparisons. This avoids wrapping a column in a per-row CAST when the other side is a
+/// literal or constant subexpression, which is both faster on the query path and preserves index applicability.
 public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
 
   // 1746022135000 ms == 2025-04-30 14:08:55 UTC (used for deterministic literal-vs-TIMESTAMP comparisons).
@@ -50,11 +48,9 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /**
-   * Sanity: the test schema ordinals we hard-code below match the actual columns. If
-   * {@code QueryEnvironmentTestBase#getSchemaBuilder} changes column order, this test fails first
-   * with a clear message instead of cascading failures across the suite.
-   */
+  /// Sanity: the test schema ordinals we hard-code below match the actual columns. If
+  /// `QueryEnvironmentTestBase#getSchemaBuilder` changes column order, this test fails first
+  /// with a clear message instead of cascading failures across the suite.
   @Test
   public void testSchemaOrdinalsAreStable() {
     String plan = explain("SELECT ts_timestamp, col7 FROM a");
@@ -64,10 +60,8 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Expected col7 to project from " + COL7_ORD + ". Got:\n" + plan);
   }
 
-  /**
-   * When a TIMESTAMP column is compared to a BIGINT literal, the cast must land on the literal side so that constant
-   * folding produces a TIMESTAMP literal and the column is not wrapped in a per-row CAST.
-   */
+  /// When a TIMESTAMP column is compared to a BIGINT literal, the cast must land on the literal side so that constant
+  /// folding produces a TIMESTAMP literal and the column is not wrapped in a per-row CAST.
   @Test
   public void testTimestampColumnVsBigintLiteralKeepsColumnUnwrapped() {
     // Cover all binary comparison operators in both orientations. Calcite renders != as <>.
@@ -93,10 +87,8 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
     }
   }
 
-  /**
-   * Symmetric case: when a BIGINT column is compared to a TIMESTAMP literal, the cast must land on the literal side
-   * so that constant folding produces a BIGINT literal and the column is not wrapped in a per-row CAST.
-   */
+  /// Symmetric case: when a BIGINT column is compared to a TIMESTAMP literal, the cast must land on the literal side
+  /// so that constant folding produces a BIGINT literal and the column is not wrapped in a per-row CAST.
   @Test
   public void testBigintColumnVsTimestampLiteralKeepsColumnUnwrapped() {
     String plan =
@@ -107,11 +99,9 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Expected TIMESTAMP literal folded to BIGINT and column unwrapped. Got:\n" + plan);
   }
 
-  /**
-   * When a TIMESTAMP column is compared to a non-column TIMESTAMP-typed expression (e.g. {@code NOW() - 1000}, which
-   * after binary-arithmetic coercion is BIGINT-typed and then folded back to TIMESTAMP for the comparison), the
-   * resulting plan must keep the column unwrapped and constant-fold the right-hand side to a TIMESTAMP literal.
-   */
+  /// When a TIMESTAMP column is compared to a non-column TIMESTAMP-typed expression (e.g. `NOW() - 1000`, which
+  /// after binary-arithmetic coercion is BIGINT-typed and then folded back to TIMESTAMP for the comparison), the
+  /// resulting plan must keep the column unwrapped and constant-fold the right-hand side to a TIMESTAMP literal.
   @Test
   public void testTimestampColumnVsConstantSubexpressionKeepsColumnUnwrapped() {
     // NOW() - 1000 is a constant for the lifetime of the query: arithmetic coercion casts NOW() to BIGINT, the
@@ -128,11 +118,9 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
   }
 
-  /**
-   * When a BIGINT column is compared to a non-column TIMESTAMP-typed expression (e.g. {@code NOW()}), the existing
-   * behavior of casting the TIMESTAMP side to BIGINT must be preserved: the BIGINT column stays unwrapped, and the
-   * TIMESTAMP function is folded to a BIGINT literal.
-   */
+  /// When a BIGINT column is compared to a non-column TIMESTAMP-typed expression (e.g. `NOW()`), the existing
+  /// behavior of casting the TIMESTAMP side to BIGINT must be preserved: the BIGINT column stays unwrapped, and the
+  /// TIMESTAMP function is folded to a BIGINT literal.
   @Test
   public void testBigintColumnVsTimestampFunctionKeepsColumnUnwrapped() {
     String plan = explain("SELECT col7 FROM a WHERE col7 < NOW()");
@@ -142,10 +130,8 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Right-hand side should be folded to a BIGINT literal. Got:\n" + plan);
   }
 
-  /**
-   * When both operands are column references (TIMESTAMP vs BIGINT), neither side wins the "non-column" tie-breaker, so
-   * we fall back to the long-standing default of casting the TIMESTAMP side to BIGINT.
-   */
+  /// When both operands are column references (TIMESTAMP vs BIGINT), neither side wins the "non-column" tie-breaker, so
+  /// we fall back to the long-standing default of casting the TIMESTAMP side to BIGINT.
   @Test
   public void testBothColumnReferencesFallsBackToCastTimestampToBigint() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > col7");
@@ -153,10 +139,8 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Expected fallback to cast TIMESTAMP column to BIGINT when both operands are columns. Got:\n" + plan);
   }
 
-  /**
-   * TIMESTAMP-column vs TIMESTAMP-function shouldn't trigger any CAST — both sides are already TIMESTAMP, so the
-   * coercion rule should not fire and Calcite should compare directly.
-   */
+  /// TIMESTAMP-column vs TIMESTAMP-function shouldn't trigger any CAST — both sides are already TIMESTAMP, so the
+  /// coercion rule should not fire and Calcite should compare directly.
   @Test
   public void testTimestampColumnVsTimestampFunctionHasNoCast() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > NOW()");
@@ -166,13 +150,11 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "No CAST should appear in the plan. Got:\n" + plan);
   }
 
-  /**
-   * Regression for the {@code ago()}-style use case: {@code __time > ago('PT5M')} should keep the column unwrapped.
-   * {@code ago(String)} is a scalar function that returns {@code long} (rendered as BIGINT in SQL), so the comparison
-   * is TIMESTAMP-vs-BIGINT and the new rule applies. Before this rule, the column was wrapped in {@code CAST(.. AS
-   * BIGINT)} per row, which made the query significantly slower than the workaround {@code __time > concat(ago(...),
-   * '')} that happened to push the cast onto the literal side via the VARCHAR coercion path.
-   */
+  /// Regression for the `ago()`-style use case: `__time > ago('PT5M')` should keep the column unwrapped.
+  /// `ago(String)` is a scalar function that returns `long` (rendered as BIGINT in SQL), so the comparison
+  /// is TIMESTAMP-vs-BIGINT and the new rule applies. Before this rule, the column was wrapped in `CAST(.. AS BIGINT)`
+  /// per row, which made the query significantly slower than the workaround `__time > concat(ago(...), '')` that
+  /// happened to push the cast onto the literal side via the VARCHAR coercion path.
   @Test
   public void testTimestampColumnVsAgoFunctionKeepsColumnUnwrapped() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp > ago('PT5M')");
@@ -186,10 +168,8 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "Right-hand side should be constant-folded to a TIMESTAMP literal. Got:\n" + plan);
   }
 
-  /**
-   * Binary-arithmetic coercion (TIMESTAMP +/- BIGINT) is unchanged: the result must be BIGINT (long arithmetic), so the
-   * TIMESTAMP side is always cast to BIGINT regardless of which side is a column.
-   */
+  /// Binary-arithmetic coercion (TIMESTAMP +/- BIGINT) is unchanged: the result must be BIGINT (long arithmetic),
+  /// so the TIMESTAMP side is always cast to BIGINT regardless of which side is a column.
   @Test
   public void testBinaryArithmeticStillCastsTimestampToBigint() {
     String plan = explain("SELECT ts_timestamp FROM a WHERE ts_timestamp + 1000 > 0");
@@ -199,14 +179,13 @@ public class PinotTypeCoercionTest extends QueryEnvironmentTestBase {
         "TIMESTAMP column must be cast to BIGINT for binary arithmetic. Got:\n" + plan);
   }
 
-  /**
-   * Regression test for issue #18881: a TIMESTAMP column compared to a sub-second epoch-millis literal must preserve
-   * the millisecond component. With Calcite's default TIMESTAMP precision of 0, the implicit literal-to-TIMESTAMP cast
-   * added by {@link PinotTypeCoercion#binaryComparisonCoercion} folded through {@code RexBuilder.clean ->
-   * TimestampString.round(0)}, truncating the literal to whole seconds — so {@code ts = 1761667561482} silently became
-   * {@code ts = 1761667561000} and matched no rows. Pinot's {@code TypeSystem} now pins TIMESTAMP to precision 3, so
-   * the folded literal keeps its millis. The column must also stay unwrapped (the property #18396 added).
-   */
+  /// Regression test for issue #18881: a TIMESTAMP column compared to a sub-second epoch-millis literal must preserve
+  /// the millisecond component. With Calcite's default TIMESTAMP precision of 0, the implicit literal-to-TIMESTAMP cast
+  /// added by [PinotTypeCoercion#binaryComparisonCoercion] folded through
+  /// `RexBuilder.clean -> TimestampString.round(0)` , truncating the literal to whole seconds — so `ts = 1761667561482`
+  /// silently became
+  /// `ts = 1761667561000` and matched no rows. Pinot's `TypeSystem` now pins TIMESTAMP to precision 3, so
+  /// the folded literal keeps its millis. The column must also stay unwrapped (the property #18396 added).
   @Test
   public void testTimestampColumnVsSubSecondLiteralPreservesMillis() {
     // 1761667561482 ms has a non-zero sub-second component (.482). The rendered wall-clock date/seconds depend on the

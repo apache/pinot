@@ -49,17 +49,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 
-/**
- * Base class for columnar segment building tests containing common setup and utility methods.
- *
- * <p>This base class provides:
- * <ul>
- *   <li>Common test data and schema setup</li>
- *   <li>Segment creation utility methods</li>
- *   <li>Validation utility methods</li>
- *   <li>Test data generation</li>
- * </ul>
- */
+/// Base class for columnar segment building tests containing common setup and utility methods.
+///
+/// This base class provides:
+///
+/// - Common test data and schema setup
+/// - Segment creation utility methods
+/// - Validation utility methods
+/// - Test data generation
 public abstract class ColumnarSegmentBuildingTestBase {
   protected static final String TEMP_DIR = System.getProperty("java.io.tmpdir");
   protected static final String TABLE_NAME = "testTable";
@@ -532,9 +529,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
     return data;
   }
 
-  /**
-   * Simple test record reader for the test data.
-   */
+  /// Simple test record reader for the test data.
   protected static class TestRecordReader implements RecordReader {
     private final List<GenericRow> _data;
     private int _currentIndex = 0;

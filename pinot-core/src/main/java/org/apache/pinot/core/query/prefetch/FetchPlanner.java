@@ -23,31 +23,25 @@ import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * FetchPlanner decides what data to prefetch for the given query to reduce the time waiting for data, which might be
- * read from some slow storage backend, to reduce the query latency. Although the plan methods take in an indexSegment
- * object, it should mainly access the segment metadata like what types of index it has, as the index data may not be
- * available, but leaving this to the implementations to check and handle per their own need.
- * TODO: this interface and the dependent classes like QueryContext should be moved to query-spi pkg, yet to be added.
- */
+/// FetchPlanner decides what data to prefetch for the given query to reduce the time waiting for data, which might be
+/// read from some slow storage backend, to reduce the query latency. Although the plan methods take in an indexSegment
+/// object, it should mainly access the segment metadata like what types of index it has, as the index data may not be
+/// available, but leaving this to the implementations to check and handle per their own need.
+/// TODO: this interface and the dependent classes like QueryContext should be moved to query-spi pkg, yet to be added.
 public interface FetchPlanner {
-  /**
-   * Plan what index data to prefetch to help prune the segment before processing it. For example, one can fetch bloom
-   * filter to prune the segment based on the column values in query predicates like IN or EQ.
-   *
-   * @param indexSegment     segment to be pruned.
-   * @param queryContext     context extracted from the query.
-   * @return context to guide data prefetching.
-   */
+  /// Plan what index data to prefetch to help prune the segment before processing it. For example, one can fetch bloom
+  /// filter to prune the segment based on the column values in query predicates like IN or EQ.
+  ///
+  /// @param indexSegment     segment to be pruned.
+  /// @param queryContext     context extracted from the query.
+  /// @return context to guide data prefetching.
   FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext);
 
-  /**
-   * Plan what index data to prefetch to process it. For example, one can fetch all types of index for columns tracked
-   * in QueryContext.
-   *
-   * @param indexSegment segment to be processed.
-   * @param queryContext context extracted from the query.
-   * @return context to guide data prefetching.
-   */
+  /// Plan what index data to prefetch to process it. For example, one can fetch all types of index for columns tracked
+  /// in QueryContext.
+  ///
+  /// @param indexSegment segment to be processed.
+  /// @param queryContext context extracted from the query.
+  /// @return context to guide data prefetching.
   FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext);
 }

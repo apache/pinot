@@ -33,11 +33,11 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 @ThreadSafe
 public interface QueryExecutor {
 
-  /**
-   * Initializes the query executor.
-   * <p>Should be called only once and before calling any other method.
-   * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.query.executor'
-   */
+  /// Initializes the query executor.
+  ///
+  /// Should be called only once and before calling any other method.
+  ///
+  /// NOTE: The config is the subset of server config with prefix 'pinot.server.query.executor'
   void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
@@ -52,16 +52,14 @@ public interface QueryExecutor {
     return new PinotConfiguration();
   }
 
-  /**
-   * Starts the query executor.
-   * <p>Should be called only once after query executor gets initialized but before calling any other method.
-   */
+  /// Starts the query executor.
+  ///
+  /// Should be called only once after query executor gets initialized but before calling any other method.
   void start();
 
-  /**
-   * Shuts down the query executor.
-   * <p>Should be called only once. After calling shut down, no other method should be called.
-   */
+  /// Shuts down the query executor.
+  ///
+  /// Should be called only once. After calling shut down, no other method should be called.
   void shutDown();
 
   /// Executes the non-streaming query with the given [ExecutorService].
@@ -76,9 +74,9 @@ public interface QueryExecutor {
   /// This [ExecutorService] must be wrapped with
   /// [org.apache.pinot.spi.query.QueryThreadContext#contextAwareExecutorService].
   /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
-  /// - For streaming request, the returned {@link InstanceResponseBlock} contains only the metadata. The response is
+  /// - For streaming request, the returned [InstanceResponseBlock] contains only the metadata. The response is
   ///   streamed back via the observer.
-  /// - For non-streaming request, the returned {@link InstanceResponseBlock} contains both data and metadata.
+  /// - For non-streaming request, the returned [InstanceResponseBlock] contains both data and metadata.
   InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer);
 

@@ -25,9 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Class representing configurations related to segment assignment strategy.
- */
+/// Class representing configurations related to segment assignment strategy.
 public class ReplicaGroupStrategyConfig extends BaseJsonConfig {
   private final String _partitionColumn;
   private final int _numInstancesPerPartition;
@@ -40,23 +38,19 @@ public class ReplicaGroupStrategyConfig extends BaseJsonConfig {
     _numInstancesPerPartition = numInstancesPerPartition;
   }
 
-  /**
-   * Returns the name of column used for partitioning. If this is set to null, we use the table level replica groups.
-   * Otherwise, we use the partition level replica groups.
-   * TODO: use partition info from SegmentPartitionConfig
-   *
-   * @return Name of partitioning column.
-   */
+  /// Returns the name of column used for partitioning. If this is set to null, we use the table level replica groups.
+  /// Otherwise, we use the partition level replica groups.
+  /// TODO: use partition info from SegmentPartitionConfig
+  ///
+  /// @return Name of partitioning column.
   @Nullable
   public String getPartitionColumn() {
     return _partitionColumn;
   }
 
-  /**
-   * Returns the number of instances that segments for a partition span.
-   *
-   * @return Number of instances used for a partition.
-   */
+  /// Returns the number of instances that segments for a partition span.
+  ///
+  /// @return Number of instances used for a partition.
   public int getNumInstancesPerPartition() {
     return _numInstancesPerPartition;
   }

@@ -21,16 +21,14 @@ package org.apache.pinot.segment.local.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 
-/**
- * Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
- *
- * <p>Instances inherit the thread-safety characteristics of
- * {@link org.apache.pinot.common.evaluator.GroovyFunctionEvaluator}.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.common.evaluator.GroovyFunctionEvaluator} instead.
- */
+/// Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
+///
+/// Instances inherit the thread-safety characteristics of
+/// [org.apache.pinot.common.evaluator.GroovyFunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.GroovyFunctionEvaluator] instead.
 @Deprecated
 public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.GroovyFunctionEvaluator
     implements FunctionEvaluator {

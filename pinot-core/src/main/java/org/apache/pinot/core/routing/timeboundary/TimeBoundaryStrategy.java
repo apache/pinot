@@ -26,33 +26,25 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 
 public interface TimeBoundaryStrategy {
 
-  /**
-   * Returns the time boundary strategy name.
-   *
-   * @return The time boundary strategy name.
-   */
+  /// Returns the time boundary strategy name.
+  ///
+  /// @return The time boundary strategy name.
   String getName();
 
-  /**
-   * Initializes the time boundary strategy with the given logical table configuration and table cache.
-   * @param logicalTableConfig The logical table configuration to use for initialization.
-   * @param tableCache The table cache to use for initialization.
-   */
+  /// Initializes the time boundary strategy with the given logical table configuration and table cache.
+  /// @param logicalTableConfig The logical table configuration to use for initialization.
+  /// @param tableCache The table cache to use for initialization.
   void init(LogicalTableConfig logicalTableConfig, TableCache tableCache);
 
-  /**
-   * Computes the time boundary for the given physical table names.
-   *
-   * @param routingManager The routing manager to use for computing the time boundary.
-   * @return The computed time boundary information.
-   */
+  /// Computes the time boundary for the given physical table names.
+  ///
+  /// @param routingManager The routing manager to use for computing the time boundary.
+  /// @return The computed time boundary information.
   TimeBoundaryInfo computeTimeBoundary(RoutingManager routingManager);
 
 
-  /**
-   * Returns the list of physical table names that are part of the time boundary.
-   * @param logicalTableConfig The logical table configuration
-   * @return The list of physical table names that are part of the time boundary.
-   */
+  /// Returns the list of physical table names that are part of the time boundary.
+  /// @param logicalTableConfig The logical table configuration
+  /// @return The list of physical table names that are part of the time boundary.
   List<String> getTimeBoundaryTableNames(LogicalTableConfig logicalTableConfig);
 }

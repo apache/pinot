@@ -259,7 +259,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// The request is deserialized on the GRPC thread and the rest of the work is done on the submission thread pool.
   /// Given the submission code should be not blocking, we could directly use the GRPC thread pool, but we decide to
   /// use a different thread pool to be able to time out the submission in the rare case it takes too long.
-  ///
   // TODO: Study if that is actually needed. We could just use the GRPC thread pool and timeout once the execution
   //   starts in the query runner.
   @Override
@@ -456,37 +455,37 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   /// Stream-mode submission handler. The broker keeps the stream open for the query lifetime; the server replies
-  /// with a {@code submit_ack} as the first message and (in subsequent commits) per-opchain
-  /// {@link Worker.OpChainComplete} messages followed by a final {@link Worker.ServerDone}.
+  /// with a `submit_ack` as the first message and (in subsequent commits) per-opchain
+  /// [Worker.OpChainComplete] messages followed by a final [Worker.ServerDone].
   ///
   /// Wires up the gRPC mechanics + plan submission via the existing submission path. A per-opchain completion
-  /// listener registered on {@link org.apache.pinot.query.runtime.executor.OpChainSchedulerService} emits one
-  /// {@link Worker.OpChainComplete} per finished opchain and {@link Worker.ServerDone} once all have reported.
-  /// Cancel is accepted both via the in-stream {@code BrokerToServer.cancel} message and via the legacy unary
-  /// {@link #cancel(Worker.CancelRequest, StreamObserver)} RPC; broker stream-close also triggers a cancel here.
+  /// listener registered on [org.apache.pinot.query.runtime.executor.OpChainSchedulerService] emits one
+  /// [Worker.OpChainComplete] per finished opchain and [Worker.ServerDone] once all have reported.
+  /// Cancel is accepted both via the in-stream `BrokerToServer.cancel` message and via the legacy unary
+  /// [#cancel(Worker.CancelRequest, StreamObserver)] RPC; broker stream-close also triggers a cancel here.
   @Override
   public StreamObserver<Worker.BrokerToServer> submitWithStream(
       StreamObserver<Worker.ServerToBroker> responseObserver) {
     return new SubmitWithStreamObserver(responseObserver);
   }
 
-  /// Per-query state for an open {@code SubmitWithStream} call. Owns the response stream and serialises every
-  /// {@code onNext} call on it via a {@code synchronized} block — gRPC requires {@code StreamObserver.onNext} to be
+  /// Per-query state for an open `SubmitWithStream` call. Owns the response stream and serialises every
+  /// `onNext` call on it via a `synchronized` block — gRPC requires `StreamObserver.onNext` to be
   /// called serially.
   ///
   /// Tracks the expected number of opchains for the request (sum of WorkerMetadata across all stages). An
-  /// {@link OpChainCompletionListener} registered with {@link QueryRunner#registerOpChainCompletionListener}
-  /// fires once per opchain finishing, encodes its stats via {@link MultiStageStatsTreeEncoder}, and emits an
-  /// {@link Worker.OpChainComplete} on the response stream. When the per-request completed-count reaches the
-  /// expected total, {@link Worker.ServerDone} is emitted and the stream is closed.
+  /// [OpChainCompletionListener] registered with [QueryRunner#registerOpChainCompletionListener]
+  /// fires once per opchain finishing, encodes its stats via [MultiStageStatsTreeEncoder], and emits an
+  /// [Worker.OpChainComplete] on the response stream. When the per-request completed-count reaches the
+  /// expected total, [Worker.ServerDone] is emitted and the stream is closed.
   ///
   /// All blocking work (plan deserialization, opchain construction) runs on
-  /// {@link QueryServer#_submissionExecutorService}.
+  /// [QueryServer#_submissionExecutorService].
   private final class SubmitWithStreamObserver implements StreamObserver<Worker.BrokerToServer> {
     private final StreamObserver<Worker.ServerToBroker> _responseObserver;
     /// Serialises onNext calls on the response stream and guards mutable session state.
     private final Object _streamLock = new Object();
-    /// True once we've received the first {@code submit} and dispatched it.
+    /// True once we've received the first `submit` and dispatched it.
     private final AtomicBoolean _submitted = new AtomicBoolean(false);
     /// True once we've completed the response stream (success or error). Idempotent guard.
     private final AtomicBoolean _completed = new AtomicBoolean(false);
@@ -494,27 +493,27 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private final AtomicInteger _expectedOpChains = new AtomicInteger(-1);
     /// Number of opchains that have reported so far via the completion listener.
     private final AtomicInteger _completedOpChains = new AtomicInteger(0);
-    /// Pipeline-breaker root operators awaiting their stage's main (leaf) opchain, keyed by {@link OpChainId}. A
+    /// Pipeline-breaker root operators awaiting their stage's main (leaf) opchain, keyed by [OpChainId]. A
     /// pipeline-breaker opchain shares the same OpChainId as its leaf opchain and is not reported as a separate
     /// stage; its operators are folded into the leaf's flat stats but are absent from the leaf's live operator tree,
     /// so we stash the PB root here and graft it onto the leaf when the leaf opchain reports (see
-    /// {@link #onOpChainComplete} and {@link MultiStageStatsTreeEncoder}). Keyed by OpChainId to support multiple
+    /// [#onOpChainComplete] and [MultiStageStatsTreeEncoder]). Keyed by OpChainId to support multiple
     /// PB-bearing leaf opchains per request (multiple leaf stages / workers). The PB opchain completes strictly
     /// before its leaf — the leaf consumes the PB results, gated on the PB's CountDownLatch in
-    /// {@code PipelineBreakerExecutor}, which establishes a happens-before from this {@code put} to the leaf's
-    /// {@code remove}; {@link ConcurrentHashMap} also makes the cross-executor-thread read safe directly.
+    /// `PipelineBreakerExecutor`, which establishes a happens-before from this `put` to the leaf's
+    /// `remove`; [ConcurrentHashMap] also makes the cross-executor-thread read safe directly.
     private final Map<OpChainId, MultiStageOperator> _pipelineBreakerRoots = new ConcurrentHashMap<>();
     /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
     private volatile long _requestId = -1;
-    /// Completed once {@link #sendSubmitAck} has been called (success or error path). Guards the ack/done race:
-    /// if a trivial opchain finishes before the {@code whenComplete} callback fires, {@code onOpChainComplete}
-    /// waits for this future via {@code thenRun} instead of calling {@link #sendDoneAndComplete} immediately,
-    /// ensuring the broker always receives the {@code submit_ack} before {@code ServerDone}.
+    /// Completed once [#sendSubmitAck] has been called (success or error path). Guards the ack/done race:
+    /// if a trivial opchain finishes before the `whenComplete` callback fires, `onOpChainComplete`
+    /// waits for this future via `thenRun` instead of calling [#sendDoneAndComplete] immediately,
+    /// ensuring the broker always receives the `submit_ack` before `ServerDone`.
     private final CompletableFuture<Void> _ackSentFuture = new CompletableFuture<>();
-    /// True once a {@code submit_ack} has been emitted on the response stream. Unlike {@link #_ackSentFuture}
-    /// (completed outside the lock, after the fact), this flag is set under {@link #_streamLock} at the moment of
-    /// emission, so {@link #sendErrorAndComplete} can reliably decide whether an error may still be delivered as
-    /// the (single allowed) submit_ack or would be a duplicate the broker ignores. Guarded by {@link #_streamLock}.
+    /// True once a `submit_ack` has been emitted on the response stream. Unlike [#_ackSentFuture]
+    /// (completed outside the lock, after the fact), this flag is set under [#_streamLock] at the moment of
+    /// emission, so [#sendErrorAndComplete] can reliably decide whether an error may still be delivered as
+    /// the (single allowed) submit_ack or would be a duplicate the broker ignores. Guarded by [#_streamLock].
     private boolean _ackEmitted;
 
     SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
@@ -641,11 +640,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           });
     }
 
-    /**
-     * Fires once per opchain on this server completing. Encodes the stats into a {@link Worker.MultiStageStatsTree},
-     * emits an {@link Worker.OpChainComplete}, and emits {@link Worker.ServerDone} once all expected opchains have
-     * reported.
-     */
+    /// Fires once per opchain on this server completing. Encodes the stats into a [Worker.MultiStageStatsTree],
+    /// emits an [Worker.OpChainComplete], and emits [Worker.ServerDone] once all expected opchains have
+    /// reported.
     private void onOpChainComplete(OpChainId opChainId, MultiStageOperator rootOperator,
         @Nullable MultiStageQueryStats stats, OpChainExecutionContext context, @Nullable Throwable error) {
       // A pipeline-breaker opchain (dynamic-broadcast semi-join / lookup-join build side) is built from the SAME

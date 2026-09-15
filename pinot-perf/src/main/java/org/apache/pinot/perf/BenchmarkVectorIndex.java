@@ -46,39 +46,38 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 
 
-/**
- * Benchmark harness comparing exact scan, HNSW (Lucene), IVF_FLAT, and IVF_PQ vector indexes.
- *
- * <p>This benchmark measures build time, index size, query latency (p50/p99), and recall@K
- * for each index type across synthetic datasets of configurable size and dimensionality.</p>
- *
- * <p>This class is also the canonical entry point for the broader vector benchmark suite.
- * Set {@code -Dpinot.perf.vector.mode=} to one of {@code frontier}, {@code sanity},
- * {@code filters}, {@code features}, or {@code suite} to select the scenario to run.</p>
- *
- * <h3>Usage</h3>
- * <pre>
- *   # Build the pinot-perf module:
- *   ./mvnw -pl pinot-perf -am compile
- *
- *   # Run the benchmark (standalone):
- *   java -cp pinot-perf/target/classes:... org.apache.pinot.perf.BenchmarkVectorIndex
- *
- *   # Or run via Maven:
- *   ./mvnw -pl pinot-perf exec:java -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex
- * </pre>
- *
- * <h3>Datasets</h3>
- * <ul>
- *   <li><b>Dataset A (L2 Synthetic)</b>: Gaussian random vectors, EUCLIDEAN distance</li>
- *   <li><b>Dataset B (Cosine Normalized)</b>: Unit-normalized vectors, COSINE distance</li>
- * </ul>
- *
- * <p>Ground truth is pre-computed via brute-force scan for each query set.</p>
- *
- * <h3>Thread safety</h3>
- * <p>This class is designed for single-threaded benchmark execution.</p>
- */
+/// Benchmark harness comparing exact scan, HNSW (Lucene), IVF_FLAT, and IVF_PQ vector indexes.
+///
+/// This benchmark measures build time, index size, query latency (p50/p99), and recall@K
+/// for each index type across synthetic datasets of configurable size and dimensionality.
+///
+/// This class is also the canonical entry point for the broader vector benchmark suite.
+/// Set `-Dpinot.perf.vector.mode=` to one of `frontier`, `sanity`,
+/// `filters`, `features`, or `suite` to select the scenario to run.
+///
+/// ## Usage
+///
+/// ```
+/// # Build the pinot-perf module:
+/// ./mvnw -pl pinot-perf -am compile
+///
+/// # Run the benchmark (standalone):
+/// java -cp pinot-perf/target/classes:... org.apache.pinot.perf.BenchmarkVectorIndex
+///
+/// # Or run via Maven:
+/// ./mvnw -pl pinot-perf exec:java -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex
+/// ```
+///
+/// ## Datasets
+///
+/// - **Dataset A (L2 Synthetic)**: Gaussian random vectors, EUCLIDEAN distance
+/// - **Dataset B (Cosine Normalized)**: Unit-normalized vectors, COSINE distance
+///
+/// Ground truth is pre-computed via brute-force scan for each query set.
+///
+/// ## Thread safety
+///
+/// This class is designed for single-threaded benchmark execution.
 public class BenchmarkVectorIndex {
 
   private BenchmarkVectorIndex() {
@@ -88,35 +87,35 @@ public class BenchmarkVectorIndex {
   // Configuration constants
   // ---------------------------------------------------------------------------
 
-  /** Fixed random seed for reproducibility. */
+  /// Fixed random seed for reproducibility.
   private static final long SEED = 42L;
 
-  /** Number of query vectors for recall/latency measurement. */
+  /// Number of query vectors for recall/latency measurement.
   private static final int NUM_QUERIES = Integer.getInteger("pinot.perf.vector.queries", 200);
 
-  /** Number of warmup queries before timing. */
+  /// Number of warmup queries before timing.
   private static final int WARMUP_QUERIES = Integer.getInteger("pinot.perf.vector.warmupQueries", 50);
 
-  /** Column name used for index creation. */
+  /// Column name used for index creation.
   private static final String COLUMN_NAME = "embedding";
 
-  /** Poll interval for heap sampling during index builds. */
+  /// Poll interval for heap sampling during index builds.
   private static final long MEMORY_POLL_INTERVAL_MS = Long.getLong("pinot.perf.vector.memoryPollMs", 10L);
 
-  /** Backend name used for IVF_PQ frontier runs. */
+  /// Backend name used for IVF_PQ frontier runs.
   private static final String IVF_PQ_INDEX_TYPE = "IVF_PQ";
 
-  /** System property selecting which vector benchmark mode to run. */
+  /// System property selecting which vector benchmark mode to run.
   private static final String MODE_PROPERTY = "pinot.perf.vector.mode";
 
-  /** Default benchmark mode when no explicit mode is supplied. */
+  /// Default benchmark mode when no explicit mode is supplied.
   private static final String DEFAULT_MODE = "frontier";
 
-  /** Fully qualified creator class name for IVF_PQ. */
+  /// Fully qualified creator class name for IVF_PQ.
   private static final String IVF_PQ_CREATOR_CLASS =
       "org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreator";
 
-  /** Fully qualified reader class name for IVF_PQ. */
+  /// Fully qualified reader class name for IVF_PQ.
   private static final String IVF_PQ_READER_CLASS =
       "org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader";
 
@@ -124,9 +123,7 @@ public class BenchmarkVectorIndex {
   // Data generation
   // ---------------------------------------------------------------------------
 
-  /**
-   * Generates random Gaussian vectors. Each dimension is drawn from N(0, 1).
-   */
+  /// Generates random Gaussian vectors. Each dimension is drawn from N(0, 1).
   static float[][] generateGaussianVectors(int count, int dimension, long seed) {
     Random rng = new Random(seed);
     float[][] vectors = new float[count][dimension];
@@ -138,9 +135,7 @@ public class BenchmarkVectorIndex {
     return vectors;
   }
 
-  /**
-   * Generates unit-normalized random vectors (for cosine distance benchmarks).
-   */
+  /// Generates unit-normalized random vectors (for cosine distance benchmarks).
   static float[][] generateNormalizedVectors(int count, int dimension, long seed) {
     float[][] vectors = generateGaussianVectors(count, dimension, seed);
     for (int i = 0; i < count; i++) {
@@ -149,9 +144,7 @@ public class BenchmarkVectorIndex {
     return vectors;
   }
 
-  /**
-   * Generates Gaussian vectors with widely varying magnitudes to stress INNER_PRODUCT ranking.
-   */
+  /// Generates Gaussian vectors with widely varying magnitudes to stress INNER_PRODUCT ranking.
   static float[][] generateMagnitudeSkewedVectors(int count, int dimension, long seed) {
     Random rng = new Random(seed ^ 0x9E3779B97F4A7C15L);
     float[][] vectors = generateGaussianVectors(count, dimension, seed);
@@ -168,10 +161,8 @@ public class BenchmarkVectorIndex {
   // Ground truth computation (brute-force exact scan)
   // ---------------------------------------------------------------------------
 
-  /**
-   * Computes brute-force top-K for a single query. Returns an ordered array of doc IDs
-   * sorted by increasing distance.
-   */
+  /// Computes brute-force top-K for a single query. Returns an ordered array of doc IDs
+  /// sorted by increasing distance.
   static int[] exactTopK(float[][] corpus, float[] query, int topK,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     int n = corpus.length;
@@ -193,9 +184,7 @@ public class BenchmarkVectorIndex {
     return result;
   }
 
-  /**
-   * Computes ground truth for all queries. Returns an array of top-K doc ID arrays.
-   */
+  /// Computes ground truth for all queries. Returns an array of top-K doc ID arrays.
   static int[][] computeGroundTruth(float[][] corpus, float[][] queries, int topK,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     int[][] groundTruth = new int[queries.length][];
@@ -205,9 +194,7 @@ public class BenchmarkVectorIndex {
     return groundTruth;
   }
 
-  /**
-   * Computes recall@K: fraction of true top-K neighbors found by the approximate result.
-   */
+  /// Computes recall@K: fraction of true top-K neighbors found by the approximate result.
   static double computeRecall(int[] truthTopK, Set<Integer> approxResult) {
     int hits = 0;
     for (int docId : truthTopK) {
@@ -218,9 +205,7 @@ public class BenchmarkVectorIndex {
     return (double) hits / truthTopK.length;
   }
 
-  /**
-   * Converts a Roaring bitmap to a set of integers.
-   */
+  /// Converts a Roaring bitmap to a set of integers.
   static Set<Integer> bitmapToSet(org.roaringbitmap.buffer.ImmutableRoaringBitmap bitmap) {
     Set<Integer> set = new HashSet<>();
     bitmap.forEach((org.roaringbitmap.IntConsumer) set::add);
@@ -231,9 +216,7 @@ public class BenchmarkVectorIndex {
   // IVF_FLAT index lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds an IVF_FLAT index from corpus vectors. Returns the time in nanoseconds.
-   */
+  /// Builds an IVF_FLAT index from corpus vectors. Returns the time in nanoseconds.
   static BuildMetrics buildIvfFlatIndex(File indexDir, float[][] corpus, int dimension, int nlist,
       VectorIndexConfig.VectorDistanceFunction distFunc)
       throws IOException {
@@ -248,9 +231,7 @@ public class BenchmarkVectorIndex {
     });
   }
 
-  /**
-   * Opens an IVF_FLAT reader with the given nprobe.
-   */
+  /// Opens an IVF_FLAT reader with the given nprobe.
   static IvfFlatVectorIndexReader openIvfReader(File indexDir, int dimension, int nlist, int nprobe,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     VectorIndexConfig config = createIvfConfig(dimension, nlist, distFunc);
@@ -277,9 +258,7 @@ public class BenchmarkVectorIndex {
     return new VectorIndexConfig(false, indexType, dimension, 1, distFunc, props);
   }
 
-  /**
-   * Builds an IVF_PQ config with the supplied coarse quantizer and product quantizer knobs.
-   */
+  /// Builds an IVF_PQ config with the supplied coarse quantizer and product quantizer knobs.
   static VectorIndexConfig createIvfPqConfig(int dimension, int corpusSize, int nlist, int pqM, int pqNbits,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     Map<String, String> props = new HashMap<>();
@@ -294,9 +273,7 @@ public class BenchmarkVectorIndex {
     return new VectorIndexConfig(false, IVF_PQ_INDEX_TYPE, dimension, 1, distFunc, props);
   }
 
-  /**
-   * Returns true if the named class is available on the runtime classpath.
-   */
+  /// Returns true if the named class is available on the runtime classpath.
   static boolean isClassAvailable(String className) {
     try {
       Class.forName(className);
@@ -306,10 +283,8 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Builds a vector index through reflection. This keeps the harness forward-compatible with
-   * backend implementations that may not exist in the current checkout.
-   */
+  /// Builds a vector index through reflection. This keeps the harness forward-compatible with
+  /// backend implementations that may not exist in the current checkout.
   static BuildMetrics buildVectorIndexReflectively(String creatorClassName, File indexDir, float[][] corpus,
       VectorIndexConfig config)
       throws IOException {
@@ -348,9 +323,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Opens a reflected IVF reader and exposes the minimal query surface used by the benchmark.
-   */
+  /// Opens a reflected IVF reader and exposes the minimal query surface used by the benchmark.
   static ReflectiveVectorReader openReflectiveVectorReader(String readerClassName, File indexDir, int numDocs,
       VectorIndexConfig config)
       throws IOException {
@@ -372,9 +345,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Looks up a close method if the backend exposes one.
-   */
+  /// Looks up a close method if the backend exposes one.
   static Method findCloseMethod(Class<?> type) {
     try {
       return type.getMethod("close");
@@ -383,9 +354,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Simple reflective wrapper for IVF readers.
-   */
+  /// Simple reflective wrapper for IVF readers.
   static final class ReflectiveVectorReader implements AutoCloseable {
     private final Object _delegate;
     private final Method _getDocIdsMethod;
@@ -437,9 +406,7 @@ public class BenchmarkVectorIndex {
   // HNSW index lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds an HNSW (Lucene) index from corpus vectors. Returns the time in nanoseconds.
-   */
+  /// Builds an HNSW (Lucene) index from corpus vectors. Returns the time in nanoseconds.
   static BuildMetrics buildHnswIndex(File indexDir, float[][] corpus, int dimension,
       VectorIndexConfig.VectorDistanceFunction distFunc)
       throws IOException {
@@ -454,9 +421,7 @@ public class BenchmarkVectorIndex {
     });
   }
 
-  /**
-   * Opens an HNSW reader. Requires the HNSW index directory to exist.
-   */
+  /// Opens an HNSW reader. Requires the HNSW index directory to exist.
   static HnswVectorIndexReader openHnswReader(File indexDir, int numDocs, int dimension,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     VectorIndexConfig config = createHnswConfig(dimension, distFunc);
@@ -479,9 +444,7 @@ public class BenchmarkVectorIndex {
   // Latency measurement
   // ---------------------------------------------------------------------------
 
-  /**
-   * Measures query latencies (in nanoseconds) over the query set. Runs warmup first.
-   */
+  /// Measures query latencies (in nanoseconds) over the query set. Runs warmup first.
   static long[] measureIvfLatencies(IvfFlatVectorIndexReader reader, float[][] queries, int topK) {
     // Warmup
     int warmup = Math.min(WARMUP_QUERIES, queries.length);
@@ -498,9 +461,7 @@ public class BenchmarkVectorIndex {
     return latencies;
   }
 
-  /**
-   * Measures query latencies for a reader accessed through reflection.
-   */
+  /// Measures query latencies for a reader accessed through reflection.
   static long[] measureReflectiveLatencies(ReflectiveVectorReader reader, float[][] queries, int topK)
       throws IOException {
     int warmup = Math.min(WARMUP_QUERIES, queries.length);
@@ -516,9 +477,7 @@ public class BenchmarkVectorIndex {
     return latencies;
   }
 
-  /**
-   * Measures query latencies for HNSW.
-   */
+  /// Measures query latencies for HNSW.
   static long[] measureHnswLatencies(HnswVectorIndexReader reader, float[][] queries, int topK) {
     int warmup = Math.min(WARMUP_QUERIES, queries.length);
     for (int i = 0; i < warmup; i++) {
@@ -533,9 +492,7 @@ public class BenchmarkVectorIndex {
     return latencies;
   }
 
-  /**
-   * Measures query latencies for exact (brute-force) scan.
-   */
+  /// Measures query latencies for exact (brute-force) scan.
   static long[] measureExactLatencies(float[][] corpus, float[][] queries, int topK,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     int warmup = Math.min(WARMUP_QUERIES, queries.length);
@@ -551,17 +508,13 @@ public class BenchmarkVectorIndex {
     return latencies;
   }
 
-  /**
-   * Returns the p-th percentile from a sorted array of longs.
-   */
+  /// Returns the p-th percentile from a sorted array of longs.
   static long percentile(long[] sorted, double p) {
     int idx = (int) Math.ceil(p / 100.0 * sorted.length) - 1;
     return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
   }
 
-  /**
-   * Converts a set of single-threaded query latencies into batch queries-per-second.
-   */
+  /// Converts a set of single-threaded query latencies into batch queries-per-second.
   static double queriesPerSecond(long[] latencies) {
     long totalLatencyNs = 0L;
     for (long latency : latencies) {
@@ -574,17 +527,13 @@ public class BenchmarkVectorIndex {
   // Index size measurement
   // ---------------------------------------------------------------------------
 
-  /**
-   * Computes the total size of IVF_FLAT index file(s) in a directory.
-   */
+  /// Computes the total size of IVF_FLAT index file(s) in a directory.
   static long ivfIndexSize(File indexDir) {
     File f = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     return f.exists() ? f.length() : 0;
   }
 
-  /**
-   * Computes the total size of HNSW index directory.
-   */
+  /// Computes the total size of HNSW index directory.
   static long hnswIndexSize(File indexDir) {
     File hnswDir = new File(indexDir,
         COLUMN_NAME + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
@@ -594,9 +543,7 @@ public class BenchmarkVectorIndex {
     return hnswDir.exists() ? hnswDir.length() : 0;
   }
 
-  /**
-   * Computes the total size of a directory.
-   */
+  /// Computes the total size of a directory.
   static long directorySize(File indexDir) {
     return FileUtils.sizeOfDirectory(indexDir);
   }
@@ -605,9 +552,7 @@ public class BenchmarkVectorIndex {
   // Result data structures
   // ---------------------------------------------------------------------------
 
-  /**
-   * Holds benchmark results for a single (index_type, parameter_set) combination.
-   */
+  /// Holds benchmark results for a single (index_type, parameter_set) combination.
   static class BenchmarkResult {
     final String _indexType;
     final String _params;
@@ -662,9 +607,7 @@ public class BenchmarkVectorIndex {
   // Benchmark runners
   // ---------------------------------------------------------------------------
 
-  /**
-   * Runs the full benchmark suite for one dataset configuration.
-   */
+  /// Runs the full benchmark suite for one dataset configuration.
   static List<BenchmarkResult> runDatasetBenchmark(String datasetName, float[][] corpus,
       float[][] queries, int dimension, VectorIndexConfig.VectorDistanceFunction distFunc,
       int[] nlistValues, int[] nprobeValues, int[] pqMValues, int[] pqNbitsValues, PrintStream out)
@@ -892,9 +835,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Prints a small backend-oriented summary so the frontier output stays readable.
-   */
+  /// Prints a small backend-oriented summary so the frontier output stays readable.
   static void printBackendSummary(List<BenchmarkResult> results, PrintStream out) {
     Map<String, List<BenchmarkResult>> byBackend = new LinkedHashMap<>();
     for (BenchmarkResult result : results) {
@@ -925,9 +866,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Prints the fastest configuration per backend that satisfies a target recall.
-   */
+  /// Prints the fastest configuration per backend that satisfies a target recall.
   static void printRecallTargetSummary(List<BenchmarkResult> results, double recallTarget, PrintStream out) {
     out.printf("%nTarget recall summary (recall@10 >= %.2f):%n", recallTarget);
     for (String backend : Arrays.asList("Exact Scan", "HNSW", "IVF_FLAT", IVF_PQ_INDEX_TYPE)) {
@@ -952,9 +891,7 @@ public class BenchmarkVectorIndex {
     }
   }
 
-  /**
-   * Parses a comma-separated list of positive integers from a system property.
-   */
+  /// Parses a comma-separated list of positive integers from a system property.
   static int[] parseIntListProperty(String propertyName, int[] defaultValues) {
     String raw = System.getProperty(propertyName);
     if (raw == null || raw.trim().isEmpty()) {
@@ -972,9 +909,7 @@ public class BenchmarkVectorIndex {
   // Main entry point
   // ---------------------------------------------------------------------------
 
-  /**
-   * Runs the complete benchmark suite and prints results to stdout.
-   */
+  /// Runs the complete benchmark suite and prints results to stdout.
   public static void main(String[] args)
       throws Exception {
     String mode = args.length > 0 ? args[0] : System.getProperty(MODE_PROPERTY, DEFAULT_MODE);

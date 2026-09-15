@@ -32,32 +32,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation for chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed
- * number of docs.
- *
- * <p>The layout of the file is as follows:
- * <ul>
- *   <li>Header Section
- *   <ul>
- *     <li>File format version (int)</li>
- *     <li>Total number of chunks (int)</li>
- *     <li>Number of docs per chunk (int)</li>
- *     <li>Size of entry in bytes (int)</li>
- *     <li>Total number of docs (int)</li>
- *     <li>Compression type enum value (int)</li>
- *     <li>Start offset of data header (int)</li>
- *     <li>Data header (start offsets for all chunks)
- *     <ul>
- *       <li>For version 2, offset is stored as int</li>
- *       <li>For version 3 onwards, offset is stored as long</li>
- *     </ul>
- *     </li>
- *   </ul>
- *   </li>
- *   <li>Individual Chunks</li>
- * </ul>
- */
+/// Base implementation for chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains
+/// fixed number of docs.
+///
+/// The layout of the file is as follows:
+///
+/// - Header Section
+///   - File format version (int)
+///   - Total number of chunks (int)
+///   - Number of docs per chunk (int)
+///   - Size of entry in bytes (int)
+///   - Total number of docs (int)
+///   - Compression type enum value (int)
+///   - Start offset of data header (int)
+///   - Data header (start offsets for all chunks)
+///     - For version 2, offset is stored as int
+///     - For version 3 onwards, offset is stored as long
+/// - Individual Chunks
 public abstract class BaseChunkForwardIndexWriter implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkForwardIndexWriter.class);
 
@@ -75,19 +66,17 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   private final int _headerEntryChunkOffsetSize;
   private final long _initialDataOffset;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param file Data file to write into
-   * @param compressionType Type of compression
-   * @param totalDocs Total docs to write
-   * @param numDocsPerChunk Number of docs per data chunk
-   * @param chunkSize Size of chunk
-   * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
-   * @param version version of File
-   * @param fixed if the data type is fixed width (required for version validation)
-   * @throws IOException if the file isn't found or can't be mapped
-   */
+  /// Constructor for the class.
+  ///
+  /// @param file Data file to write into
+  /// @param compressionType Type of compression
+  /// @param totalDocs Total docs to write
+  /// @param numDocsPerChunk Number of docs per data chunk
+  /// @param chunkSize Size of chunk
+  /// @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
+  /// @param version version of File
+  /// @param fixed if the data type is fixed width (required for version validation)
+  /// @throws IOException if the file isn't found or can't be mapped
   protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
@@ -121,16 +110,14 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     _chunkCompressor.close();
   }
 
-  /**
-   * Helper method to write header information.
-   *
-   * @param compressionType Compression type for the data
-   * @param totalDocs Total number of records
-   * @param numDocsPerChunk Number of documents per chunk
-   * @param sizeOfEntry Size of each entry
-   * @param version Version of file
-   * @return Size of header
-   */
+  /// Helper method to write header information.
+  ///
+  /// @param compressionType Compression type for the data
+  /// @param totalDocs Total number of records
+  /// @param numDocsPerChunk Number of documents per chunk
+  /// @param sizeOfEntry Size of each entry
+  /// @param version Version of file
+  /// @return Size of header
   private int writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
       int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
@@ -166,16 +153,12 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     return headerSize;
   }
 
-  /**
-   * Helper method to compress and write the current chunk.
-   * <ul>
-   *   <li> Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks. </li>
-   *   <li> Compresses (if required) and writes the chunk to the data file. </li>
-   *   <li> Updates the header with the current chunks offset. </li>
-   *   <li> Clears up the buffers, so that they can be reused. </li>
-   * </ul>
-   *
-   */
+  /// Helper method to compress and write the current chunk.
+  ///
+  /// - Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks.
+  /// - Compresses (if required) and writes the chunk to the data file.
+  /// - Updates the header with the current chunks offset.
+  /// - Clears up the buffers, so that they can be reused.
   protected void writeChunk() {
     int sizeToWrite;
     _chunkBuffer.flip();

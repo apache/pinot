@@ -71,6 +71,16 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
+  /// Deliberately releases nothing, unlike every other operator.
+  ///
+  /// `_resultMap` is this operator's *output*, not scratch space: [PipelineBreakerExecutor] reads it through
+  /// [#getResultMap()] after the op chain has finished, and `OpChain#close()` fires the callback that unblocks that
+  /// read only after `close()` has already run. Dropping the map here would hand the main op chain empty
+  /// pipeline-breaker results, which `nextBlock()` would then surface as an unexplained error block.
+  @Override
+  protected void releaseBuffers() {
+  }
+
   @Override
   public List<MultiStageOperator> getChildOperators() {
     return _childOperators;
@@ -163,13 +173,9 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
     private final StatMap.Type _type;
 

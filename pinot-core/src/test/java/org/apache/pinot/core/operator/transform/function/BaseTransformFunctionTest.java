@@ -32,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -59,6 +60,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -83,6 +85,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String JSON_STRING_SV_COLUMN = "jsonSV";
   protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
   protected static final String BYTES_SV_COLUMN = "bytesSV";
+  protected static final String UUID_SV_COLUMN = "uuidSV";
   protected static final String VECTOR_1_COLUMN = "vector1";
   protected static final String VECTOR_2_COLUMN = "vector2";
   protected static final String ZERO_VECTOR_COLUMN = "zeroVector";
@@ -109,18 +112,19 @@ public abstract class BaseTransformFunctionTest {
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   /// MV INT column configured as RAW forward with an explicit shared dictionary (no secondary index).
-  /// Carries the same values as {@link #INT_MV_COLUMN} so callers can compare results against the
+  /// Carries the same values as [#INT_MV_COLUMN] so callers can compare results against the
   /// dict-encoded baseline. Exists to exercise the predicate-evaluator code paths for shared-dict + RAW
   /// columns: the forward index serves raw values while a dictionary file lives alongside.
   protected static final String INT_MV_DICT_RAW_COLUMN = "intMVDictRaw";
   /// MV INT column configured as RAW forward with a shared dictionary AND an inverted index. Same values as
-  /// {@link #INT_MV_COLUMN} and {@link #INT_MV_DICT_RAW_COLUMN}. The inverted index is irrelevant inside
+  /// [#INT_MV_COLUMN] and [#INT_MV_DICT_RAW_COLUMN]. The inverted index is irrelevant inside
   /// filterMv (filterMv evaluates a per-value predicate on the already-fetched MV array, not at filter-plan
   /// time), so the result must match both other variants — but exercising this shape makes sure the inverted
   /// index sitting on the column doesn't perturb the predicate evaluator's path selection.
   protected static final String INT_MV_DICT_RAW_INV_COLUMN = "intMVDictRawInv";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
   private static final Random RANDOM = new Random();
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];
@@ -132,6 +136,7 @@ public abstract class BaseTransformFunctionTest {
   protected final String[] _jsonArrayValues = new String[NUM_ROWS];
   protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
+  protected final byte[][] _uuidSVValues = new byte[NUM_ROWS][];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
   protected final long[][] _longMVValues = new long[NUM_ROWS][];
   protected final float[][] _floatMVValues = new float[NUM_ROWS][];
@@ -181,6 +186,9 @@ public abstract class BaseTransformFunctionTest {
           df.format(RANDOM.nextInt() * RANDOM.nextDouble()));
       _stringAlphaNumericSVValues[i] = RandomStringUtils.secure().nextAlphanumeric(26);
       _bytesSVValues[i] = RandomStringUtils.secure().nextAlphanumeric(26).getBytes();
+      long mostSignificantBits = (i % 2 == 0) ? Long.MIN_VALUE + i : Long.MAX_VALUE - i;
+      long leastSignificantBits = ((long) i << Integer.SIZE) | i;
+      _uuidSVValues[i] = UuidUtils.toBytes(new UUID(mostSignificantBits, leastSignificantBits));
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
@@ -251,6 +259,7 @@ public abstract class BaseTransformFunctionTest {
         map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
+      map.put(UUID_SV_COLUMN, _uuidSVValues[i]);
 
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       // Same values as INT_MV_COLUMN so callers can compare results against the dict-encoded baseline and
@@ -304,6 +313,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
+        .addSingleValueDimension(UUID_SV_COLUMN, FieldSpec.DataType.UUID)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
@@ -652,8 +662,13 @@ public abstract class BaseTransformFunctionTest {
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
+    FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
+      if (resultDataType == FieldSpec.DataType.UUID) {
+        assertEquals(bytesValues[i], UuidUtils.toBytes(stringValues[i]));
+      } else {
+        assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
+      }
       assertEquals(bytesValues[i], expectedValues[i]);
     }
     testNullBitmap(transformFunction, null);

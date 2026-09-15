@@ -58,25 +58,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryWorkloadManager} is responsible for managing query workload configurations
- * in a Pinot Helix cluster.
- *
- * <p>
- * It propagates and computes workload costs to be enforced by relevant instances based on
- * the configured propagation scheme. This ensures that workloads can be isolated and resource
- * budgets (CPU and memory) can be enforced consistently across brokers and servers.
- * </p>
- *
- * <p><strong>Responsibilities include:</strong></p>
- * <ul>
- *   <li>Resolving instances based on node type and propagation scheme.</li>
- *   <li>Computing instance costs using a cost split strategy.</li>
- *   <li>Sending HTTP refresh requests to instances with their assigned costs.</li>
- *   <li>Handling workload deletions by propagating delete requests.</li>
- *   <li>Providing lookup APIs for workload costs per instance.</li>
- * </ul>
- */
+/// The `QueryWorkloadManager` is responsible for managing query workload configurations
+/// in a Pinot Helix cluster.
+///
+/// It propagates and computes workload costs to be enforced by relevant instances based on
+/// the configured propagation scheme. This ensures that workloads can be isolated and resource
+/// budgets (CPU and memory) can be enforced consistently across brokers and servers.
+///
+/// **Responsibilities include:**
+///
+/// - Resolving instances based on node type and propagation scheme.
+/// - Computing instance costs using a cost split strategy.
+/// - Sending HTTP refresh requests to instances with their assigned costs.
+/// - Handling workload deletions by propagating delete requests.
+/// - Providing lookup APIs for workload costs per instance.
 public class QueryWorkloadManager implements WorkloadChangeListener {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
@@ -125,29 +120,22 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
         new ThreadPoolExecutor.AbortPolicy());
   }
 
-  /**
-   * Propagates an upsert of a workload's cost configuration to all relevant instances.
-   *
-   * <p>
-   * For each {@link NodeConfig} in the supplied {@link QueryWorkloadConfig}, this method:
-   * </p>
-   * <ol>
-   *   <li>Resolves the {@link PropagationScheme} from the node's configured scheme type.</li>
-   *   <li>Computes the per-instance {@link InstanceCost} map using the configured
-   *       {@link CostSplitter}.</li>
-   *   <li>Sends HTTP refresh requests to each instance with its computed cost.</li>
-   * </ol>
-   *
-   * <p>
-   *  This call is atomic to the extent possible: if any error occurs during estimating the target instances
-   *  and their cost. The entire propagation is aborted and no partial updates are sent to any instances. However,
-   *  if any error occurs during sending the HTTP requests, we do retry the propagation up to a configurable number of
-   *  times and if it still fails, we don't send delete requests to instances that were successfully updated.
-   * </p>
-   *
-   * @param queryWorkloadConfig The workload definition (name, node types, budgets, and propagation
-   *                            scheme) to propagate.
-   */
+  /// Propagates an upsert of a workload's cost configuration to all relevant instances.
+  ///
+  /// For each [NodeConfig] in the supplied [QueryWorkloadConfig], this method:
+  ///
+  /// 1. Resolves the [PropagationScheme] from the node's configured scheme type.
+  /// 2. Computes the per-instance [InstanceCost] map using the configured
+  ///       [CostSplitter].
+  /// 3. Sends HTTP refresh requests to each instance with its computed cost.
+  ///
+  ///  This call is atomic to the extent possible: if any error occurs during estimating the target instances
+  ///  and their cost. The entire propagation is aborted and no partial updates are sent to any instances. However,
+  ///  if any error occurs during sending the HTTP requests, we do retry the propagation up to a configurable number of
+  ///  times and if it still fails, we don't send delete requests to instances that were successfully updated.
+  ///
+  /// @param queryWorkloadConfig The workload definition (name, node types, budgets, and propagation
+  ///                            scheme) to propagate.
   public void propagateWorkloadUpdateMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload update for: {}", queryWorkloadName);
@@ -219,17 +207,13 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     PropagationUtils.mergeCosts(workloadInstanceCostMap, entityInstanceCostMap);
   }
 
-  /**
-   * Propagates a delete for the given workload to all relevant instances.
-   *
-   * <p>
-   * The method resolves the target instances for each {@link NodeConfig} and sends HTTP
-   * delete requests to instruct instances to remove local state associated with the workload
-   * and stop enforcing costs for it.
-   * </p>
-   *
-   * @param queryWorkloadConfig The workload to delete (only the name and node scoping are used).
-   */
+  /// Propagates a delete for the given workload to all relevant instances.
+  ///
+  /// The method resolves the target instances for each [NodeConfig] and sends HTTP
+  /// delete requests to instruct instances to remove local state associated with the workload
+  /// and stop enforcing costs for it.
+  ///
+  /// @param queryWorkloadConfig The workload to delete (only the name and node scoping are used).
   public void propagateDeleteWorkloadMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload delete for: {}", queryWorkloadName);
@@ -275,13 +259,11 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     }
   }
 
-  /**
-   * Propagates workload configurations for multiple tables efficiently.
-   * Deduplicates workloads that apply to multiple tables to avoid redundant propagation.
-   *
-   * @param tableNames List of table names
-   * @param nodeType The node type (BROKER_NODE, SERVER_NODE, or null for both)
-   */
+  /// Propagates workload configurations for multiple tables efficiently.
+  /// Deduplicates workloads that apply to multiple tables to avoid redundant propagation.
+  ///
+  /// @param tableNames List of table names
+  /// @param nodeType The node type (BROKER_NODE, SERVER_NODE, or null for both)
   public void propagateWorkloadForTables(Set<String> tableNames, @Nullable NodeConfig.Type nodeType) {
     if (nodeType == null) {
       // Propagate to both broker and server nodes
@@ -306,12 +288,10 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     propagateWorkloadForHelixTags(allHelixTags);
   }
 
-  /**
-   * Common helper method to propagate workload configurations based on Helix tags.
-   * Batches multiple workloads going to the same instance into a single message.
-   *
-   * @param helixTags Set of Helix tags to filter workload configs
-   */
+  /// Common helper method to propagate workload configurations based on Helix tags.
+  /// Batches multiple workloads going to the same instance into a single message.
+  ///
+  /// @param helixTags Set of Helix tags to filter workload configs
   private void propagateWorkloadForHelixTags(Set<String> helixTags) {
     List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
     if (queryWorkloadConfigs.isEmpty()) {
@@ -362,28 +342,22 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     }
   }
 
-  /**
-   * Computes the workload-to-cost mapping for a specific instance. This is used called by the broker/server
-   * during startup to load its assigned workloads and budgets.
-   *
-   * <p>
-   * This method iterates through all {@link QueryWorkloadConfig}s stored in Zookeeper and
-   * determines which workloads apply to the given instance. For each applicable workload, it
-   * computes the {@link InstanceCost} (CPU and memory budgets) assigned to that instance. The
-   * computation is based on the workload's {@link PropagationScheme} and the manager's
-   * {@link CostSplitter}.
-   * </p>
-   *
-   * <p>
-   * If the instance is not a recognized Pinot broker or server, or if its Helix configuration
-   * cannot be found, an empty map is returned and a warning is logged.
-   * </p>
-   *
-   * @param instanceName The Helix instance name (e.g., {@code Server_foo_8001} or
-   *                     {@code Broker_bar_8099}).
-   * @return A map from workload name to {@link InstanceCost} representing the budgets that apply
-   *         to the given instance for its role.
-   */
+  /// Computes the workload-to-cost mapping for a specific instance. This is used called by the broker/server
+  /// during startup to load its assigned workloads and budgets.
+  ///
+  /// This method iterates through all [QueryWorkloadConfig]s stored in Zookeeper and
+  /// determines which workloads apply to the given instance. For each applicable workload, it
+  /// computes the [InstanceCost] (CPU and memory budgets) assigned to that instance. The
+  /// computation is based on the workload's [PropagationScheme] and the manager's
+  /// [CostSplitter].
+  ///
+  /// If the instance is not a recognized Pinot broker or server, or if its Helix configuration
+  /// cannot be found, an empty map is returned and a warning is logged.
+  ///
+  /// @param instanceName The Helix instance name (e.g., `Server_foo_8001` or
+  ///                     `Broker_bar_8099`).
+  /// @return A map from workload name to [InstanceCost] representing the budgets that apply
+  ///         to the given instance for its role.
   public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
     long startTime = System.currentTimeMillis();
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT, 1L);
@@ -469,32 +443,23 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     }
   }
 
-  /**
-   * Propagates workload configurations for a specific tenant.
-   *
-   * <p>
-   * This method identifies all workload configurations that are associated with the specified
-   * tenant and propagates them to the relevant instances. The tenant name is resolved to its
-   * corresponding Helix tags (broker, offline server, and realtime server tags), and all
-   * workloads whose propagation scope matches these tags are propagated.
-   * </p>
-   *
-   * <p>
-   * The propagation process:
-   * </p>
-   * <ol>
-   *   <li>Resolves the Helix tags associated with the tenant (broker, offline, realtime).</li>
-   *   <li>Filters the workload configs to those whose scope matches the tenant's tags.</li>
-   *   <li>Invokes {@link #propagateWorkloadUpdateMessage(QueryWorkloadConfig)} for each match.</li>
-   * </ol>
-   *
-   * <p>
-   * If no workloads are configured, the method returns immediately. Any exception encountered is
-   * logged but does not cause the method to fail completely.
-   * </p>
-   *
-   * @param tenantName The tenant name (e.g., {@code DefaultTenant}).
-   */
+  /// Propagates workload configurations for a specific tenant.
+  ///
+  /// This method identifies all workload configurations that are associated with the specified
+  /// tenant and propagates them to the relevant instances. The tenant name is resolved to its
+  /// corresponding Helix tags (broker, offline server, and realtime server tags), and all
+  /// workloads whose propagation scope matches these tags are propagated.
+  ///
+  /// The propagation process:
+  ///
+  /// 1. Resolves the Helix tags associated with the tenant (broker, offline, realtime).
+  /// 2. Filters the workload configs to those whose scope matches the tenant's tags.
+  /// 3. Invokes [#propagateWorkloadUpdateMessage(QueryWorkloadConfig)] for each match.
+  ///
+  /// If no workloads are configured, the method returns immediately. Any exception encountered is
+  /// logged but does not cause the method to fail completely.
+  ///
+  /// @param tenantName The tenant name (e.g., `DefaultTenant`).
   public void propagateWorkloadForTenant(String tenantName) {
     NodeConfig.Type nodeType = null;
     if (TagNameUtils.isBrokerTag(tenantName)) {

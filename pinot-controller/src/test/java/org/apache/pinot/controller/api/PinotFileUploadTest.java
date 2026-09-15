@@ -29,9 +29,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the file upload restlet.
- */
+/// Tests for the file upload restlet.
 public class PinotFileUploadTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "fileTable";

@@ -25,10 +25,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
-/**
- * Factory class to create an {@link FunctionEvaluator} for the field spec based on the
- * {@link FieldSpec#getTransformFunction()}
- */
+/// Factory class to create an [FunctionEvaluator] for the field spec based on the
+/// [FieldSpec#getTransformFunction()]
 public class FunctionEvaluatorFactory {
   private static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   private static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
@@ -36,18 +34,17 @@ public class FunctionEvaluatorFactory {
   private FunctionEvaluatorFactory() {
   }
 
-  /**
-   * Creates the {@link FunctionEvaluator} for the given field spec
-   *
-   * 1. If transform expression is defined, use it to create the appropriate {@link FunctionEvaluator}
-   * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling
-   * of time spec. This
-   * is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
-   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy
-   * functions for
-   * handing the Map
-   * 4. Return null, if none of the above
-   */
+  /// Creates the [FunctionEvaluator] for the given field spec
+  ///
+  /// 1. If transform expression is defined, use it to create the appropriate [FunctionEvaluator]
+  /// 2. For TIME column, if conversion is needed, [TimeSpecFunctionEvaluator] for backward compatible handling
+  /// of time spec. This
+  /// is needed until we migrate to [org.apache.pinot.spi.data.DateTimeFieldSpec]
+  /// 3. For columns ending with \_\_KEYS or \_\_VALUES (used for interpreting Map column in Avro), create default
+  ///    groovy
+  /// functions for
+  /// handing the Map
+  /// 4. Return null, if none of the above
   @Nullable
   public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
     FunctionEvaluator functionEvaluator = null;
@@ -107,9 +104,7 @@ public class FunctionEvaluatorFactory {
     }
   }
 
-  /**
-   * @return true if the given transform function is a groovy expression, otherwise returns false
-   */
+  /// @return true if the given transform function is a groovy expression, otherwise returns false
   public static boolean isGroovyExpression(String transformExpression) {
     return transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix());
   }

@@ -30,11 +30,9 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * This class implements the filterMv function for multi-valued columns. It takes 2 arguments, where the first
- * argument is a multi-valued column, and the second argument is a predicate string. The transform function filters
- * values from the multi-valued column based on the predicate.
- */
+/// This class implements the filterMv function for multi-valued columns. It takes 2 arguments, where the first
+/// argument is a multi-valued column, and the second argument is a predicate string. The transform function filters
+/// values from the multi-valued column based on the predicate.
 public class FilterMvTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "filterMv";
 

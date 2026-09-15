@@ -32,10 +32,8 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@code MVScanDocIdIterator} is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
- * matching document ids.
- */
+/// The `MVScanDocIdIterator` is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
+/// matching document ids.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
@@ -118,10 +116,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  /**
-   * This is an approximation of probability calculation in
-   * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
-   */
+  /// This is an approximation of probability calculation in
+  /// org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
   @Override
   public float getEstimatedCardinality(boolean isAndDocIdSet) {
     int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
@@ -167,9 +163,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private interface ValueMatcher {
 
-    /**
-     * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
-     */
+    /// Returns `true` if the value for the given document id matches the predicate, `false` Otherwise.
     boolean doesValueMatch(int docId);
   }
 

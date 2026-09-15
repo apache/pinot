@@ -38,29 +38,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base segment assignment which contains the common assignment strategies.
- * <ul>
- *   <li>
- *     Non-replica-group based assignment (1 replica-group and 1 partition in instance partitions):
- *     <p>Assign the segment to the instance with the least number of segments. In case of a tie, assign the segment to
- *     the instance with the smallest index in the list. Use Helix AutoRebalanceStrategy to rebalance the table.
- *   </li>
- *   <li>
- *     Replica-group based assignment (multiple replica-groups or partitions in instance partitions):
- *     <p>Among replica-groups, always mirror the assignment (pick the same index of the instance).
- *     <p>Within each partition, assign the segment to the instances with the least segments already assigned. In case
- *     of a tie, assign to the instance with the smallest index in the list. Do this for one replica-group and mirror
- *     the assignment to other replica-groups.
- *     <p>To rebalance a table, within each partition, first calculate the number of segments on each instance, loop
- *     over all the segments and keep the assignment if number of segments for the instance has not been reached and
- *     track the not assigned segments, then assign the left-over segments to the instances with the least segments, or
- *     the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
- *     the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
- *     segment moves.
- *   </li>
- * </ul>
- */
+/// Base segment assignment which contains the common assignment strategies.
+///
+/// - Non-replica-group based assignment (1 replica-group and 1 partition in instance partitions):
+///
+///   Assign the segment to the instance with the least number of segments. In case of a tie, assign the segment to
+///   the instance with the smallest index in the list. Use Helix AutoRebalanceStrategy to rebalance the table.
+/// - Replica-group based assignment (multiple replica-groups or partitions in instance partitions):
+///
+///   Among replica-groups, always mirror the assignment (pick the same index of the instance).
+///
+///   Within each partition, assign the segment to the instances with the least segments already assigned. In case
+///   of a tie, assign to the instance with the smallest index in the list. Do this for one replica-group and mirror
+///   the assignment to other replica-groups.
+///
+///   To rebalance a table, within each partition, first calculate the number of segments on each instance, loop
+///   over all the segments and keep the assignment if number of segments for the instance has not been reached and
+///   track the not assigned segments, then assign the left-over segments to the instances with the least segments, or
+///   the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
+///   the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
+///   segment moves.
 public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
@@ -70,6 +67,20 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected String _partitionColumn;
   protected TableConfig _tableConfig;
   protected ControllerMetrics _controllerMetrics;
+
+  // Cache of segment name to the name of the tier it is eligible for (null value means not eligible for any tier), to
+  // avoid reading each segment's ZK metadata on every rebalanceTiers() invocation.
+  // NOTE:
+  // 1. This cache is used for table rebalance only. During rebalance, rebalanceTable() (and thus rebalanceTiers()) can
+  //    be invoked multiple times when the ideal state changes during the rebalance process. The eligible tier of a
+  //    segment is derived from its ZK metadata, which is not expected to change during a rebalance, so it is resolved
+  //    once (with a single bulk ZK read) and reused across invocations. A fresh SegmentAssignment instance is created
+  //    per rebalance (see SegmentAssignmentFactory), so the cache is scoped to a single rebalance.
+  // 2. Segments that are added after the initial bulk read (e.g. realtime segments that commit during a long
+  //    rebalance) will be absent from the cache; they are resolved on demand and merged in, so they are still routed
+  //    to the correct tier.
+  @Nullable
+  private Map<String, String> _segmentToTierName;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics) {
@@ -88,9 +99,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     }
   }
 
-  /**
-   * Rebalances tiers and returns a pair of tier assignments and non-tier assignment.
-   */
+  /// Rebalances tiers and returns a pair of tier assignments and non-tier assignment.
   protected Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> rebalanceTiers(
       Map<String, Map<String, String>> currentAssignment, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap) {
@@ -102,10 +111,17 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     _logger.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
         _tableNameWithType, bootstrap);
 
+    // Resolve the eligible tier of each segment once (single bulk ZK read) and reuse it across the multiple
+    // rebalanceTiers() invocations of this rebalance, instead of reading each segment's ZK metadata every time.
+    // Any new segments come later would not be in _segmentToTierName map, and categorized in the null (default) tier.
+    if (_segmentToTierName == null) {
+      _segmentToTierName =
+          SegmentAssignmentUtils.getSegmentToTierNameMap(_helixManager, _tableNameWithType, sortedTiers);
+    }
+
     // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for
     SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
-        new SegmentAssignmentUtils.TierSegmentAssignment(_helixManager, _tableNameWithType, sortedTiers,
-            currentAssignment);
+        new SegmentAssignmentUtils.TierSegmentAssignment(sortedTiers, currentAssignment, _segmentToTierName);
     Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
         tierSegmentAssignment.getTierNameToSegmentAssignmentMap();
 
@@ -133,9 +149,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     return Pair.of(newTierAssignments, tierSegmentAssignment.getNonTierSegmentAssignment());
   }
 
-  /**
-   * Rebalances segments in the current assignment using the instancePartitions and returns new assignment
-   */
+  /// Rebalances segments in the current assignment using the instancePartitions and returns new assignment
   protected Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap,
       SegmentAssignmentStrategy segmentAssignmentStrategy) {

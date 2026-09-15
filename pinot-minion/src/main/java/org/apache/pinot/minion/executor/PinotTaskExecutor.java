@@ -21,19 +21,13 @@ package org.apache.pinot.minion.executor;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
-/**
- * The interface <code>PinotTaskExecutor</code> defines the APIs for task executors.
- */
+/// The interface `PinotTaskExecutor` defines the APIs for task executors.
 public interface PinotTaskExecutor {
 
-  /**
-   * Executes the task based on the given task config and returns the execution result.
-   */
+  /// Executes the task based on the given task config and returns the execution result.
   Object executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception;
 
-  /**
-   * Tries to cancel the task.
-   */
+  /// Tries to cancel the task.
   void cancel();
 }

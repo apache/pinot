@@ -43,9 +43,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-/**
- * This is a builder pattern for generating a Mock Routing Manager.
- */
+/// This is a builder pattern for generating a Mock Routing Manager.
 public class MockRoutingManagerFactory {
   private static final String TIME_BOUNDARY_COLUMN = "ts";
   private static final String HOST_NAME = "localhost";
@@ -93,11 +91,9 @@ public class MockRoutingManagerFactory {
         .add(serverInstance);
   }
 
-  /**
-   * Registers a routing entry for a table that has no routable segments (e.g. an empty table, or one whose segments
-   * were all pruned). This mirrors {@code BaseBrokerRoutingManager}, which returns a non-null {@link RoutingTable}
-   * with an empty server-to-segments map for such a table (as opposed to {@code null} when no routing entry exists).
-   */
+  /// Registers a routing entry for a table that has no routable segments (e.g. an empty table, or one whose segments
+  /// were all pruned). This mirrors `BaseBrokerRoutingManager`, which returns a non-null [RoutingTable]
+  /// with an empty server-to-segments map for such a table (as opposed to `null` when no routing entry exists).
   public void registerEmptyTable(String tableNameWithType) {
     _tableSegmentServersMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>());
   }

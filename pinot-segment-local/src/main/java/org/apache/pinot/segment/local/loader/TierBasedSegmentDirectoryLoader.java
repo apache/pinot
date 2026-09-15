@@ -38,23 +38,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Implementation of {@link SegmentDirectoryLoader} that can move segments across data dirs configured as storage tiers.
- */
+/// Implementation of [SegmentDirectoryLoader] that can move segments across data dirs configured as storage
+/// tiers.
 @SegmentLoader(name = "tierBased")
 public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
   private static final String SEGMENT_TIER_TRACK_FILE_SUFFIX = ".tier";
   private static final int TRACK_FILE_VERSION = 1;
 
-  /**
-   * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
-   * {@link SegmentDirectory}
-   * @param indexDir the current segment index directory
-   * @param segmentLoaderContext context for instantiation of the SegmentDirectory. The target tier set in context is
-   *                            used to decide which data directory to keep the segment data.
-   * @return instance of {@link SegmentLocalFSDirectory}
-   */
+  /// Creates and loads the [SegmentLocalFSDirectory] which is the default implementation of
+  /// [SegmentDirectory]
+  /// @param indexDir the current segment index directory
+  /// @param segmentLoaderContext context for instantiation of the SegmentDirectory. The target tier set in context is
+  ///                            used to decide which data directory to keep the segment data.
+  /// @return instance of [SegmentLocalFSDirectory]
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
@@ -111,9 +108,7 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     return segmentDirectory;
   }
 
-  /**
-   * Delete segment data on the last known tier as tracked in the tier track file.
-   */
+  /// Delete segment data on the last known tier as tracked in the tier track file.
   @Override
   public void delete(SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
@@ -143,10 +138,8 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     }
   }
 
-  /**
-   * Track version of the track file to be a bit future-proof and avoid worry of escaping separator in tier name
-   * or data path. V1 is like [version][size][tier][size][path]
-   */
+  /// Track version of the track file to be a bit future-proof and avoid worry of escaping separator in tier name
+  /// or data path. V1 is like \[version\]\[size\]\[tier\]\[size\]\[path\]
   @VisibleForTesting
   static void writeTo(File trackFile, String segmentTier, String segmentPath)
       throws IOException {

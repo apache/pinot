@@ -25,10 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 
 
-/**
- * Tracks status of a reload job.
- * Thread-safe for concurrent access.
- */
+/// Tracks status of a reload job.
+/// Thread-safe for concurrent access.
 public class ReloadJobStatus {
   private final String _jobId;
   private final AtomicInteger _failureCount = new AtomicInteger(0);

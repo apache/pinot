@@ -23,10 +23,8 @@ import java.util.function.Consumer;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
-/**
- * A {@link StreamObserver} used by {@link DispatchClient} to obtain the last the response of an async Query Dispatch
- * call.
- */
+/// A [StreamObserver] used by [DispatchClient] to obtain the last the response of an async Query Dispatch
+/// call.
 class LastValueDispatchObserver<E> implements StreamObserver<E> {
   private final QueryServerInstance _serverInstance;
   private final Consumer<AsyncResponse<E>> _callback;

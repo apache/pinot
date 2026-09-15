@@ -26,9 +26,7 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.util.Optionality;
 
 
-/**
- * Pinot custom SqlAggFunction to be registered into SqlOperatorTable.
- */
+/// Pinot custom SqlAggFunction to be registered into SqlOperatorTable.
 public class PinotSqlAggFunction extends SqlAggFunction {
 
   public PinotSqlAggFunction(String name, SqlKind kind, SqlReturnTypeInference returnTypeInference,

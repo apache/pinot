@@ -25,51 +25,51 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// Single source of truth for the aggregation functions an MV definedSQL is allowed to use,
-/// and the {@link DataType} the MV's storage column for that aggregation MUST be declared as.
+/// and the [DataType] the MV's storage column for that aggregation MUST be declared as.
 ///
 /// This catalog is consumed by:
 ///
 ///   - the MV analyzer (allow-list check at create / update time), and
 ///   - the MV schema inferer (picks the column DataType when the user omits explicit column
-///     definitions in {@code CREATE MATERIALIZED VIEW}).
+///     definitions in `CREATE MATERIALIZED VIEW`).
 ///
 /// Both consumers must agree on the supported set, otherwise an MV that the inferer happily
 /// builds could later be rejected by the analyzer (or, worse, accepted and then never picked
 /// up by the rewrite engine because the MV column type doesn't match what the rewrite expects).
 ///
-/// <h3>Why it lives in {@code pinot-common}</h3>
+/// ## Why it lives in `pinot-common`
 ///
-/// The schema inferer lives in {@code pinot-sql-ddl}, which must not depend on
-/// {@code pinot-materialized-view} in production code. {@code pinot-common} is the
+/// The schema inferer lives in `pinot-sql-ddl`, which must not depend on
+/// `pinot-materialized-view` in production code. `pinot-common` is the
 /// lowest-level module both consumers already depend on.
 ///
-/// <h3>Sketch types: deliberate divergence from both engines' surface types</h3>
+/// ## Sketch types: deliberate divergence from both engines' surface types
 ///
-/// Both Pinot engines surface {@code STRING} for raw-sketch aggregations:
+/// Both Pinot engines surface `STRING` for raw-sketch aggregations:
 ///
-///   - The v1 (single-stage) engine's {@code DistinctCountRaw{HLL,HLLPlus,ThetaSketch}AggregationFunction}
-///     return {@code STRING} from {@code getFinalResultColumnType()}.
+///   - The v1 (single-stage) engine's `DistinctCountRaw{HLL,HLLPlus,ThetaSketch}AggregationFunction`
+///     return `STRING` from `getFinalResultColumnType()`.
 ///   - The v2 (multi-stage) engine's Calcite return-type inference (via
-///     {@code PinotReturnTypeInferenceUtils} / {@code SqlReturnTypeInference}) likewise reports
-///     {@code STRING} for these aggregations.
+///     `PinotReturnTypeInferenceUtils` / `SqlReturnTypeInference`) likewise reports
+///     `STRING` for these aggregations.
 ///
-/// In both cases the {@code STRING} is the *display* type — the hex-encoded scalar response a
+/// In both cases the `STRING` is the *display* type — the hex-encoded scalar response a
 /// SQL client receives. It is not the type of the underlying sketch the MV needs to store.
 ///
-/// For an MV column the right type is {@code BYTES}: that is the only shape the rewrite engine
+/// For an MV column the right type is `BYTES`: that is the only shape the rewrite engine
 /// can re-aggregate (each row's stored value is a serialized sketch that gets merged with the
-/// running accumulator). Storing {@code STRING} would silently route the rewrite through the
-/// "hash the literal" branch of {@code DistinctCountHLLAggregationFunction}, producing wrong
+/// running accumulator). Storing `STRING` would silently route the rewrite through the
+/// "hash the literal" branch of `DistinctCountHLLAggregationFunction`, producing wrong
 /// answers without any error.
 ///
 /// This is the source of truth: the
-/// {@code MaterializedViewSchemaInferer} consults this catalog rather than reading
+/// `MaterializedViewSchemaInferer` consults this catalog rather than reading
 /// the engine's surface type for each aggregation, so the inferer is correct even though the
-/// MSE validator would naively report {@code STRING} for these three operators.
+/// MSE validator would naively report `STRING` for these three operators.
 ///
-/// {@code MaterializedViewTaskExecutor#decodeBytesValue} already converts the incoming
+/// `MaterializedViewTaskExecutor#decodeBytesValue` already converts the incoming
 /// hex-encoded string from the source query response into raw bytes when the destination
-/// schema column is {@code BYTES}, so this divergence is end-to-end consistent — but it is
+/// schema column is `BYTES`, so this divergence is end-to-end consistent — but it is
 /// load-bearing and must not be "fixed" to match either engine's surface type.
 ///
 /// The static regression test on this class pins both the supported-set and the type mapping
@@ -79,13 +79,13 @@ public final class MaterializedViewAggregationCatalog {
   private MaterializedViewAggregationCatalog() {
   }
 
-  /// Maps canonical (uppercase) aggregation operator name to the {@link DataType} an MV
+  /// Maps canonical (uppercase) aggregation operator name to the [DataType] an MV
   /// schema column produced by that aggregation MUST be declared as, for MV ingestion AND
   /// rewrite to remain semantically correct.
   ///
-  /// Iteration order is insertion order (see {@link Map#of} on Java 11+: no guarantee, but
-  /// callers should not rely on it). Use {@link #getSupportedOperators()} for the allow-list
-  /// check, {@link #getInferredDataType(String)} for the type lookup.
+  /// Iteration order is insertion order (see [Map#of] on Java 11+: no guarantee, but
+  /// callers should not rely on it). Use [#getSupportedOperators()] for the allow-list
+  /// check, [#getInferredDataType(String)] for the type lookup.
   ///
   /// See the class javadoc for the BYTES-vs-STRING explanation on the sketch entries.
   public static final Map<String, DataType> SUPPORTED_AGGREGATIONS = Map.of(
@@ -105,7 +105,7 @@ public final class MaterializedViewAggregationCatalog {
     return SUPPORTED_AGGREGATIONS.keySet();
   }
 
-  /// Returns true iff {@code operator} (case-insensitive) is one of the catalog's supported
+  /// Returns true iff `operator` (case-insensitive) is one of the catalog's supported
   /// aggregation function names.
   public static boolean isSupported(String operator) {
     if (operator == null) {
@@ -114,12 +114,12 @@ public final class MaterializedViewAggregationCatalog {
     return SUPPORTED_AGGREGATIONS.containsKey(operator.toUpperCase(Locale.ROOT));
   }
 
-  /// Returns the {@link DataType} an MV schema column produced by {@code operator} must be
-  /// declared as, or {@code null} if {@code operator} is not in the catalog.
+  /// Returns the [DataType] an MV schema column produced by `operator` must be
+  /// declared as, or `null` if `operator` is not in the catalog.
   ///
-  /// Callers should typically pre-check membership with {@link #isSupported(String)} so the
+  /// Callers should typically pre-check membership with [#isSupported(String)] so the
   /// "unsupported aggregation" error path can carry a clear, single-shot message rather than
-  /// a downstream {@link NullPointerException}.
+  /// a downstream [NullPointerException].
   public static DataType getInferredDataType(String operator) {
     if (operator == null) {
       return null;

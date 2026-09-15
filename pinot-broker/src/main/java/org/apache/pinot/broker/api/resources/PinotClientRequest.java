@@ -767,21 +767,19 @@ public class PinotClientRequest {
     return identity;
   }
 
-  /**
-   * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
-   *
-   * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
-   * otherwise, the first error code of the broker response exception array will become the header value.
-   *
-   * By default, returns HTTP 200 OK even for errors. If the request header
-   * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
-   * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
-   *
-   * @param brokerResponse The broker response containing query results or errors
-   * @param httpHeaders The HTTP headers from the request
-   * @return Response
-   * @throws Exception
-   */
+  /// Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
+  ///
+  /// If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
+  /// otherwise, the first error code of the broker response exception array will become the header value.
+  ///
+  /// By default, returns HTTP 200 OK even for errors. If the request header
+  /// 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
+  /// codes based on the error type from QueryErrorCode.getHttpResponseStatus().
+  ///
+  /// @param brokerResponse The broker response containing query results or errors
+  /// @param httpHeaders The HTTP headers from the request
+  /// @return Response
+  /// @throws Exception
   @VisibleForTesting
   public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders,
       BrokerMetrics brokerMetrics)
@@ -838,14 +836,12 @@ public class PinotClientRequest {
         .build();
   }
 
-  /**
-   * Given a query and the responses from the single-stage and multi-stage query engines, analyzes the differences
-   * between the responses and returns a list of differences. Currently, the method only compares the column names,
-   * column types, number of rows in the result set, and the aggregation values for aggregation-only queries.
-   *
-   * TODO: Add more comparison logic for different query types. This would require handling edge cases with group
-   *       trimming, non-deterministic results for order by queries with limits etc.
-   */
+  /// Given a query and the responses from the single-stage and multi-stage query engines, analyzes the differences
+  /// between the responses and returns a list of differences. Currently, the method only compares the column names,
+  /// column types, number of rows in the result set, and the aggregation values for aggregation-only queries.
+  ///
+  /// TODO: Add more comparison logic for different query types. This would require handling edge cases with group
+  ///       trimming, non-deterministic results for order by queries with limits etc.
   private static List<String> analyzeQueryResultDifferences(String query, BrokerResponse v1Response,
       BrokerResponse v2Response) {
     List<String> differences = new ArrayList<>();

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -59,9 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
- */
+/// The `InstancePlanMakerImplV2` class is the default implementation of [PlanMaker].
 public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
   public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
@@ -227,7 +226,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     }
 
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
+    CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, null);
     return new GlobalPlanImplV0(
         new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
   }
@@ -340,6 +339,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setStreamingGroupByFlushThreshold(streamingGroupByFlushThreshold);
       }
     }
+
+    // Set distinct query options. NOTE: This is intentionally outside the group-by block above, because DISTINCT is a
+    // separate query class from aggregation (see QueryContextUtils.isDistinctQuery).
+    if (QueryContextUtils.isDistinctQuery(queryContext)) {
+      // Set streamingDistinctFlushThreshold
+      Integer streamingDistinctFlushThreshold = QueryOptionsUtils.getStreamingDistinctFlushThreshold(queryOptions);
+      if (streamingDistinctFlushThreshold != null) {
+        queryContext.setStreamingDistinctFlushThreshold(streamingDistinctFlushThreshold);
+      }
+    }
   }
 
   @Override
@@ -387,7 +396,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     }
 
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamer);
+    CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, streamer);
     return new GlobalPlanImplV0(
         new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
   }
@@ -403,12 +412,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
-  /**
-   * In-place rewrite QueryContext based on the information from local IndexSegment.
-   *
-   * @param queryContext
-   * @param indexSegment
-   */
+  /// Returns the combine plan node placed above the segment plan nodes, for both the streaming and the
+  /// non-streaming instance plan. `streamer` is null for a non-streaming query.
+  ///
+  /// Which combine operator that node builds is decided inside [CombinePlanNode] itself, per query type, so an
+  /// implementation substituting one query type does not have to reproduce the dispatch for the others.
+  protected CombinePlanNode createCombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext,
+      ExecutorService executorService, @Nullable ResultsBlockStreamer streamer) {
+    return new CombinePlanNode(planNodes, queryContext, executorService, streamer);
+  }
+
+  /// In-place rewrite QueryContext based on the information from local IndexSegment.
+  ///
+  /// @param queryContext
+  /// @param indexSegment
   @VisibleForTesting
   public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
     Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();

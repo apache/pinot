@@ -34,9 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that converts Avro data for 12 segments and runs queries against it.
- */
+/// Integration test that converts Avro data for 12 segments and runs queries against it.
 public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;

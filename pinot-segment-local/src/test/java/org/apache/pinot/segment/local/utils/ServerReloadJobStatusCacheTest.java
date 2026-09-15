@@ -34,10 +34,8 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-/**
- * Unit tests for ServerReloadJobStatusCache to verify correct config injection
- * when onChange is called, cache rebuild logic, and entry migration.
- */
+/// Unit tests for ServerReloadJobStatusCache to verify correct config injection
+/// when onChange is called, cache rebuild logic, and entry migration.
 public class ServerReloadJobStatusCacheTest {
 
   @Test

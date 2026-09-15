@@ -28,16 +28,13 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Implementation of ColumnReader for Pinot segments.
- *
- * <p>This class wraps the existing PinotSegmentColumnReader and provides the ColumnReader interface
- * for columnar segment building. It handles:
- * <ul>
- *   <li>Reading column values from Pinot segments</li>
- *   <li>Resource cleanup</li>
- * </ul>
- */
+/// Implementation of ColumnReader for Pinot segments.
+///
+/// This class wraps the existing PinotSegmentColumnReader and provides the ColumnReader interface
+/// for columnar segment building. It handles:
+///
+/// - Reading column values from Pinot segments
+/// - Resource cleanup
 public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final PinotSegmentColumnReader _segmentColumnReader;
   private final String _columnName;
@@ -45,25 +42,21 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final DataType _dataType;
   private final boolean _skipDefaultNullValues;
 
-  /**
-   * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
-   *
-   * @param indexSegment Source segment to read from
-   * @param columnName Name of the column
-   */
+  /// Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
+  ///
+  /// @param indexSegment Source segment to read from
+  /// @param columnName Name of the column
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName) {
     this(indexSegment, columnName, false);
   }
 
-  /**
-   * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
-   *
-   * @param indexSegment Source segment to read from
-   * @param columnName Name of the column
-   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
-   *                              If true, null values return null. If false, null values return
-   *                              the segment's stored value (which contains the default).
-   */
+  /// Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
+  ///
+  /// @param indexSegment Source segment to read from
+  /// @param columnName Name of the column
+  /// @param skipDefaultNullValues Whether to skip reading default null values from the record.
+  ///                              If true, null values return null. If false, null values return
+  ///                              the segment's stored value (which contains the default).
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName,
       boolean skipDefaultNullValues) {
     this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
@@ -72,17 +65,15 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
         skipDefaultNullValues);
   }
 
-  /**
-   * Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
-   *
-   * @param segmentColumnReader The segment column reader
-   * @param columnName Name of the column
-   * @param numDocs Total number of documents
-   * @param dataType The data type of the column
-   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
-   *                              If true, null values return null. If false, null values return
-   *                              the segment's stored value (which contains the default).
-   */
+  /// Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
+  ///
+  /// @param segmentColumnReader The segment column reader
+  /// @param columnName Name of the column
+  /// @param numDocs Total number of documents
+  /// @param dataType The data type of the column
+  /// @param skipDefaultNullValues Whether to skip reading default null values from the record.
+  ///                              If true, null values return null. If false, null values return
+  ///                              the segment's stored value (which contains the default).
   public PinotSegmentColumnReaderImpl(PinotSegmentColumnReader segmentColumnReader, String columnName,
       int numDocs, DataType dataType, boolean skipDefaultNullValues) {
     _segmentColumnReader = segmentColumnReader;
@@ -203,12 +194,10 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.getBytesMV(docId);
   }
 
-  /**
-   * Validate that the document ID is within valid range.
-   *
-   * @param docId Document ID to validate
-   * @throws IndexOutOfBoundsException if docId is out of range
-   */
+  /// Validate that the document ID is within valid range.
+  ///
+  /// @param docId Document ID to validate
+  /// @throws IndexOutOfBoundsException if docId is out of range
   private void validateDocId(int docId) {
     if (docId < 0 || docId >= _numDocs) {
       throw new IndexOutOfBoundsException(

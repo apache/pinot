@@ -22,9 +22,7 @@ import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.io.WKBReader;
 
 
-/**
- * Constructor function for geography object from WKB.
- */
+/// Constructor function for geography object from WKB.
 public class StGeogFromWKBFunction extends ConstructFromWKBFunction {
   public static final String FUNCTION_NAME = "ST_GeogFromWKB";
 

@@ -68,11 +68,9 @@ public class DefaultLineageManager implements LineageManager {
       Map<String, String> customMap, SegmentLineage lineage) {
   }
 
-  /**
-   * This method:
-   * 1. Update lineage metadata by removing lineage entries
-   * 2. Find segments that need to be deleted
-   */
+  /// This method:
+  /// 1. Update lineage metadata by removing lineage entries
+  /// 2. Find segments that need to be deleted
   @Override
   public void updateLineageForRetention(TableConfig tableConfig, SegmentLineage lineage, List<String> allSegments,
       List<String> segmentsToDelete, Set<String> consumingSegments) {
@@ -135,20 +133,18 @@ public class DefaultLineageManager implements LineageManager {
   }
 
 
-  /**
-   * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
-   *
-   * The replaced segments are safe to delete once the lineage entry has been in "COMPLETED" state for longer
-   * than {@code replacedSegmentsRetentionMs}. The retention applies uniformly to all batch ingestion types —
-   * any replacement protocol (REFRESH-table snapshot replace, APPEND-table minion-driven replace,
-   * segment-group merge) gets the same configurable grace window before its replaced segments are dropped.
-   * The window is configurable via {@code replacedSegmentsRetentionPeriod} in table config; when it is unset
-   * the default is resolved per ingestion type by the caller (longer for REFRESH, shorter for others).
-   *
-   * @param lineageEntry lineage entry
-   * @param replacedSegmentsRetentionMs configured retention in ms for replaced segments
-   * @return True if we can safely delete the replaced segments. False otherwise.
-   */
+  /// Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
+  ///
+  /// The replaced segments are safe to delete once the lineage entry has been in "COMPLETED" state for longer
+  /// than `replacedSegmentsRetentionMs`. The retention applies uniformly to all batch ingestion types —
+  /// any replacement protocol (REFRESH-table snapshot replace, APPEND-table minion-driven replace,
+  /// segment-group merge) gets the same configurable grace window before its replaced segments are dropped.
+  /// The window is configurable via `replacedSegmentsRetentionPeriod` in table config; when it is unset
+  /// the default is resolved per ingestion type by the caller (longer for REFRESH, shorter for others).
+  ///
+  /// @param lineageEntry lineage entry
+  /// @param replacedSegmentsRetentionMs configured retention in ms for replaced segments
+  /// @return True if we can safely delete the replaced segments. False otherwise.
   private boolean shouldDeleteReplacedSegments(LineageEntry lineageEntry, long replacedSegmentsRetentionMs) {
     // Strict < means a 0ms retention won't delete on the exact same millisecond; this is intentional to
     // avoid edge-case races and is consistent with the existing behavior for non-zero retention values.

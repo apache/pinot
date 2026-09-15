@@ -20,10 +20,8 @@ package org.apache.pinot.segment.local.aggregator;
 
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-/**
- * Value aggregator for AVGMV aggregation function.
- * This aggregator handles multi-value columns by computing the average across all values in all arrays.
- */
+/// Value aggregator for AVGMV aggregation function.
+/// This aggregator handles multi-value columns by computing the average across all values in all arrays.
 public class AvgMVValueAggregator extends AvgValueAggregator {
 
   @Override

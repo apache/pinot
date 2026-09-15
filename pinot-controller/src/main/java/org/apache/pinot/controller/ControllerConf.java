@@ -35,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -60,6 +61,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
   public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
+  /// Namespace for the service credentials used by the controller when invoking Server admin APIs.
+  public static final String CONTROLLER_SERVER_ADMIN_AUTH_PREFIX = "controller.server.admin.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
@@ -354,6 +357,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  /// Compatibility-only opt-in for local sources passed to `/ingestFromURI`. Enabling this allows callers with
+  /// access to the endpoint to read files visible to the controller process. Keep disabled unless callers and source
+  /// paths are fully trusted.
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
@@ -448,11 +454,28 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
+  public static final String DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR = "/home/pinot/data/pageCacheWarmupQueries";
+  public static final String CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS = "controller.page.cache.warmup.duration.ms";
+  public static final long DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS = 180_000L;
 
   public static final String CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK = "controller.table.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
+  public static final String CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR =
+      "controller.page.cache.warmup.queries.dataDir";
+
+  // Knobs governing how long endReplaceSegments blocks while waiting for the new segments to become
+  // ONLINE in the ExternalView (IdealState -> ExternalView convergence). The per-attempt wait is
+  // retried up to the configured number of attempts, so the worst-case block is
+  // maxWaitMs * maxRetryAttempts. Defaults preserve the historical hard-coded values.
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS =
+      "controller.segment.replace.externalViewMaxWaitMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS =
+      "controller.segment.replace.externalViewCheckIntervalMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS =
+      "controller.segment.replace.maxRetryAttempts";
+  public static final int DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS = 5;
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
@@ -618,51 +641,39 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS, UNSPECIFIED_THREAD_POOL);
   }
 
-  /**
-   * Rate limit the number of http request object created by controller.
-   * During load testing we saw a higher value (> 20K) can lead to memory pressure on controller.
-   */
+  /// Rate limit the number of http request object created by controller.
+  /// During load testing we saw a higher value (> 20K) can lead to memory pressure on controller.
   public double getControllerWorkloadPropagationRequestsPerSecond() {
     return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_REQUESTS_PER_SECOND, 1000.0);
   }
 
-  /**
-   * Number of threads to used when sending/response for HTTP requests to servers/brokers.
-   */
+  /// Number of threads to used when sending/response for HTTP requests to servers/brokers.
   public int getControllerWorkloadExecutorThreads() {
     // We did benchmarking and found that having 5 threads helps us support about 50 requests per second with latency
     // of about 500ms and CPU utilization of 1% on a 40 core machine and memory consumption of about 100MB.
     return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_THREADS, 5);
   }
 
-  /**
-   * Size of the bounded queue for workload propagation tasks.
-   */
+  /// Size of the bounded queue for workload propagation tasks.
   public int getControllerWorkloadExecutorQueueSize() {
     // We did benchmarking and found that each workload request queuing takes about 100K of memory.
     // So with default of 10,000 queue size we are using about 1GB of memory for queuing in worst case.
     return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE, 10000);
   }
 
-  /**
-   * Number of threads for HTTP callback processing.
-   */
+  /// Number of threads for HTTP callback processing.
   public int getControllerWorkloadHttpExecutorThreads() {
     return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS, 5);
   }
 
-  /**
-   * Size of the bounded queue for HTTP callback tasks.
-   */
+  /// Size of the bounded queue for HTTP callback tasks.
   public int getControllerWorkloadHttpExecutorQueueSize() {
     // We did benchmarking and found that each HTTP callback queuing takes about 10K of memory.
     // So with default of 10,000 queue size we are using about 100MB of memory for queuing in worst case.
     return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE, 10000);
   }
 
-  /**
-   * Timeout in seconds for workload propagation and cost computation operations.
-   */
+  /// Timeout in seconds for workload propagation and cost computation operations.
   public long getControllerWorkloadPropagationTimeoutSeconds() {
     return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS, 120L);
   }
@@ -763,13 +774,11 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_CRON_EXPRESSION, cronExpression);
   }
 
-  /**
-   * Returns the offline segment interval checker frequency in seconds.
-   * Reads {@code controller.offline.segment.interval.checker.frequencyPeriod} as a period string (e.g. "24h"),
-   * falling back to {@code DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the offline segment interval checker frequency in seconds.
+  /// Reads `controller.offline.segment.interval.checker.frequencyPeriod` as a period string (e.g. "24h"),
+  /// falling back to `DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD);
@@ -785,13 +794,11 @@ public class ControllerConf extends PinotConfiguration {
         Long.toString(validationFrequencyInSeconds) + "s");
   }
 
-  /**
-   * Returns the realtime segment validation frequency in seconds.
-   * Reads {@code controller.realtime.segment.validation.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the realtime segment validation frequency in seconds.
+  /// Reads `controller.realtime.segment.validation.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD);
@@ -841,13 +848,11 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_CRON_EXPRESSION, cronExpression);
   }
 
-  /**
-   * Returns the broker resource validation frequency in seconds.
-   * Reads {@code controller.broker.resource.validation.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the broker resource validation frequency in seconds.
+  /// Reads `controller.broker.resource.validation.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getBrokerResourceValidationFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD);
@@ -987,11 +992,9 @@ public class ControllerConf extends PinotConfiguration {
         Long.toString(statusCheckerWaitForPushTimeInSeconds) + "s");
   }
 
-  /**
-   * Returns the segment relocator frequency in seconds.
-   * Reads {@code controller.segment.relocator.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD} if absent or invalid.
-   */
+  /// Returns the segment relocator frequency in seconds.
+  /// Reads `controller.segment.relocator.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD` if absent or invalid.
   public int getSegmentRelocatorFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD);
@@ -1485,11 +1488,9 @@ public class ControllerConf extends PinotConfiguration {
         ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_WARNING_THRESHOLD);
   }
 
-  /**
-   * Returns the segment relocator initial delay in seconds.
-   * Reads {@code controller.segmentRelocator.initialDelayInSeconds}, falling back to a random
-   * value between {@code MIN_INITIAL_DELAY_IN_SECONDS} and {@code MAX_INITIAL_DELAY_IN_SECONDS}.
-   */
+  /// Returns the segment relocator initial delay in seconds.
+  /// Reads `controller.segmentRelocator.initialDelayInSeconds`, falling back to a random
+  /// value between `MIN_INITIAL_DELAY_IN_SECONDS` and `MAX_INITIAL_DELAY_IN_SECONDS`.
   public long getSegmentRelocatorInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -1542,9 +1543,7 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
-  /**
-   * @return true if Groovy functions are disabled in controller config, otherwise returns false.
-   */
+  /// @return true if Groovy functions are disabled in controller config, otherwise returns false.
   public boolean isDisableIngestionGroovy() {
     return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
@@ -1619,10 +1618,22 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
   }
 
-  /**
-   * Get the configured timeseries languages from controller configuration.
-   * @return List of enabled timeseries languages
-   */
+  public long getSegmentReplaceExternalViewMaxWaitMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS);
+  }
+
+  public long getSegmentReplaceExternalViewCheckIntervalMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+  }
+
+  public int getSegmentReplaceMaxRetryAttempts() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS, DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS);
+  }
+
+  /// Get the configured timeseries languages from controller configuration.
+  /// @return List of enabled timeseries languages
   public List<String> getTimeseriesLanguages() {
     String languagesConfig = getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey());
     if (languagesConfig == null) {
@@ -1636,5 +1647,13 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getSegmentCompletionGroupCommitEnabled() {
     return getProperty(CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED, true);
+  }
+
+  public String getPageCacheWarmupQueriesDataDir() {
+    return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR);
+  }
+
+  public long getPageCacheWarmupDurationMs() {
+    return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS, DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS);
   }
 }

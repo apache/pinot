@@ -56,11 +56,9 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * This test mimic the behavior of combining slow operators, where operation is not done by the timeout. When the
- * combine operator returns, test whether the slow operators are properly interrupted, and if all the slow operators are
- * not running in order to safely release the segment references.
- */
+/// This test mimic the behavior of combining slow operators, where operation is not done by the timeout. When the
+/// combine operator returns, test whether the slow operators are properly interrupted, and if all the slow operators
+/// are not running in order to safely release the segment references.
 @SuppressWarnings("rawtypes")
 public class CombineSlowOperatorsTest {
   private static final int NUM_OPERATORS = 10;
@@ -191,10 +189,8 @@ public class CombineSlowOperatorsTest {
         "Should have been cancelled");
   }
 
-  /**
-   * NOTE: It is hard to test the logger behavior, but only one error message about the query timeout should be logged
-   *       for each query.
-   */
+  /// NOTE: It is hard to test the logger behavior, but only one error message about the query timeout should be logged
+  ///       for each query.
   private void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
     BaseResultsBlock intermediateResultsBlock = (BaseResultsBlock) combineOperator.nextBlock();
     List<QueryErrorMessage> errMsgs = intermediateResultsBlock.getErrorMessages();

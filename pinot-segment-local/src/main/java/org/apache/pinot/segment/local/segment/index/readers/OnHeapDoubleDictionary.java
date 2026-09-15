@@ -26,26 +26,23 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Implementation of double dictionary that cache all values on-heap.
- * <p>This is useful for double columns that:
- * <ul>
- *   <li>Have low cardinality double dictionary where memory footprint on-heap is acceptably small</li>
- *   <li>Is heavily queried</li>
- * </ul>
- * <p>This helps avoid creation of double from byte[].
- */
+/// Implementation of double dictionary that cache all values on-heap.
+///
+/// This is useful for double columns that:
+///
+/// - Have low cardinality double dictionary where memory footprint on-heap is acceptably small
+/// - Is heavily queried
+///
+/// This helps avoid creation of double from byte\[\].
 public class OnHeapDoubleDictionary extends BaseImmutableDictionary {
   private final Double2IntOpenHashMap _valToDictId;
   private final double[] _dictIdToVal;
 
-  /**
-   * Constructor for the class.
-   * Populates the value <-> mappings.
-   *
-   * @param dataBuffer Pinot data buffer
-   * @param length Length of the dictionary
-   */
+  /// Constructor for the class.
+  /// Populates the value <-> mappings.
+  ///
+  /// @param dataBuffer Pinot data buffer
+  /// @param length Length of the dictionary
   public OnHeapDoubleDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Double.BYTES);
 

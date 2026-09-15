@@ -54,18 +54,18 @@ public class ColumnContext {
 
   /// Returns the column's dictionary file if one exists, regardless of whether the forward index can answer
   /// dictionary-id reads. Callers that need to select between a dict-id read path and a value read path MUST gate
-  /// on {@link #isDictionaryEncoded()} rather than {@code getDictionary() != null} — a column declared as
-  /// {@code EncodingType.RAW} with an explicit {@code dictionaryIndex} returns a non-null dictionary here but its
-  /// forward index throws on {@link ForwardIndexReader#readDictIds}.
+  /// on [#isDictionaryEncoded()] rather than `getDictionary() != null` — a column declared as
+  /// `EncodingType.RAW` with an explicit `dictionaryIndex` returns a non-null dictionary here but its
+  /// forward index throws on [ForwardIndexReader#readDictIds].
   @Nullable
   public Dictionary getDictionary() {
     return _dictionary;
   }
 
-  /// Returns {@code true} if the column's forward index is dictionary-encoded and the dict-id read path
-  /// ({@link org.apache.pinot.core.common.BlockValSet#getDictionaryIdsSV()}) is callable. A column with
-  /// {@code EncodingType.RAW} + an explicit {@code dictionaryIndex} returns {@code false} here even though
-  /// {@link #getDictionary()} is non-null.
+  /// Returns `true` if the column's forward index is dictionary-encoded and the dict-id read path
+  /// ([org.apache.pinot.core.common.BlockValSet#getDictionaryIdsSV()]) is callable. A column with
+  /// `EncodingType.RAW` + an explicit `dictionaryIndex` returns `false` here even though
+  /// [#getDictionary()] is non-null.
   public boolean isDictionaryEncoded() {
     return _dictionaryEncoded;
   }

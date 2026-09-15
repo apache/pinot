@@ -33,14 +33,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
-/**
- * The <code>StarTreeGroupByExecutor</code> class is the group-by executor for star-tree index.
- * <ul>
- *   <li>The column in function context is function-column pair</li>
- *   <li>No transform function in aggregation</li>
- *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
- * </ul>
- */
+/// The `StarTreeGroupByExecutor` class is the group-by executor for star-tree index.
+///
+/// - The column in function context is function-column pair
+/// - No transform function in aggregation
+/// - For `COUNT` aggregation function, we need to aggregate on the pre-aggregated column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;

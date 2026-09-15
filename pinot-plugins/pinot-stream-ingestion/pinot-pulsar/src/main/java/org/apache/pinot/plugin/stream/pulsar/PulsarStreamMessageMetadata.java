@@ -22,10 +22,9 @@ package org.apache.pinot.plugin.stream.pulsar;
 import java.util.EnumSet;
 
 
-/**
- * Pulsar makes many metadata values available for each message. Please see the pulsar documentation for more details.
- * @see <a href="https://pulsar.apache.org/docs/en/concepts-messaging/#message-properties">Pulsar Message Properties</a>
- */
+/// Pulsar makes many metadata values available for each message. Please see the pulsar documentation for more details.
+/// @see
+///   <a href="https://pulsar.apache.org/docs/en/concepts-messaging/#message-properties">Pulsar Message Properties</a>
 public class PulsarStreamMessageMetadata {
   private PulsarStreamMessageMetadata() {
   }

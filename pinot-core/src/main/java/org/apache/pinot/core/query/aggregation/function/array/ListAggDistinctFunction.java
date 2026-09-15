@@ -27,10 +27,8 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-/**
- * The {@code ListAggDistinctFunction} extends the {@link ListAggFunction} to use {@link ObjectLinkedOpenHashSet} as
- * the intermediate result to hold distinct values for aggregation.
- */
+/// The `ListAggDistinctFunction` extends the [ListAggFunction] to use [ObjectLinkedOpenHashSet] as
+/// the intermediate result to hold distinct values for aggregation.
 public class ListAggDistinctFunction extends ListAggFunction {
 
   public ListAggDistinctFunction(ExpressionContext expression, String separator, boolean nullHandlingEnabled) {

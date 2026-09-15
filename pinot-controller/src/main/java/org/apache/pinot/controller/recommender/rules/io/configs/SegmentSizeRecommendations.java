@@ -23,9 +23,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
 
-/**
- * The recommendations proposed by SegmentSizeRule
- */
+/// The recommendations proposed by SegmentSizeRule
 public class SegmentSizeRecommendations {
 
   private long _numRowsPerSegment;

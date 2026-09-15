@@ -1,0 +1,53 @@
+{
+  "requestId": "8465172461064265729",
+  "brokerId": "Broker_192.168.1.10_8000",
+  "resultTable": {
+    "dataSchema": {
+      "columnNames": [
+        "playerName",
+        "playerId",
+        "numGames",
+        "battingAverage",
+        "isActive",
+        "teams"
+      ],
+      "columnDataTypes": [
+        "STRING",
+        "INT",
+        "LONG",
+        "DOUBLE",
+        "BOOLEAN",
+        "STRING_ARRAY"
+      ]
+    },
+    "rows": [
+      ["Hank Aaron", 1001, 3298, 0.305, false, ["MLN", "ATL", "MIL"]],
+      ["Willie Mays", 1002, 2992, 0.301, false, ["NY1", "SFN", "NYN"]],
+      ["Shohei Ohtani", 1003, 716, 0.277, true, ["LAA", "LAD"]]
+    ]
+  },
+  "exceptions": [],
+  "numRowsResultSet": 3,
+  "numServersQueried": 2,
+  "numServersResponded": 2,
+  "numSegmentsQueried": 12,
+  "numSegmentsProcessed": 8,
+  "numSegmentsMatched": 5,
+  "numConsumingSegmentsQueried": 1,
+  "numSegmentsPrunedByBroker": 2,
+  "numSegmentsPrunedByServer": 2,
+  "numDocsScanned": 4231,
+  "numEntriesScannedInFilter": 97889,
+  "numEntriesScannedPostFilter": 12693,
+  "numGroupsLimitReached": false,
+  "groupsTrimmed": false,
+  "partialResult": false,
+  "totalDocs": 97889,
+  "timeUsedMs": 37,
+  "brokerReduceTimeMs": 4,
+  "minConsumingFreshnessTimeMs": 1750000000000,
+  "offlineThreadCpuTimeNs": 1250000,
+  "realtimeThreadCpuTimeNs": 310000,
+  "tablesQueried": ["baseballStats"],
+  "traceInfo": {}
+}

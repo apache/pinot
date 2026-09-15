@@ -30,17 +30,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
-/**
- * A group of commonly used math transformation which has only one single parameter,
- * including abs, ceil, exp, floor, ln, sqrt.
- * Note:
- * abs(x) -> output data type is either double or BigDecimal.
- * ceil(x) -> output data type is either double or BigDecimal.
- * exp(x) -> output data type is always double.
- * floor(x) -> output data type is either double or BigDecimal.
- * ln(x) -> output data type is always double.
- * sqrt(x) -> output data type is always double.
- */
+/// A group of commonly used math transformation which has only one single parameter,
+/// including abs, ceil, exp, floor, ln, sqrt.
+/// Note:
+/// abs(x) -> output data type is either double or BigDecimal.
+/// ceil(x) -> output data type is either double or BigDecimal.
+/// exp(x) -> output data type is always double.
+/// floor(x) -> output data type is either double or BigDecimal.
+/// ln(x) -> output data type is always double.
+/// sqrt(x) -> output data type is always double.
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private DataType _resultDataType;

@@ -23,11 +23,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/**
- * This class gives the data of a server if there exists any segments that need to be reloaded
- *
- * It has details of server id and returns true/false if there are any segments to be reloaded or not.
- */
+/// This class gives the data of a server if there exists any segments that need to be reloaded
+///
+/// It has details of server id and returns true/false if there are any segments to be reloaded or not.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerSegmentsReloadCheckResponse {
   @JsonProperty("needReload")

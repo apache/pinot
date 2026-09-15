@@ -34,7 +34,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
@@ -51,14 +50,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Lucene text index reader supporting near realtime search. An instance of this
- * is created per consuming segment by {@link MutableSegmentImpl}.
- * Internally it uses {@link LuceneTextIndexCreator} for adding documents to the lucene index
- * as and when they are indexed by the consuming segment.
- *
- * A version of RealtimeLuceneTextIndex adapted to work with multiple columns.
- */
+/// Lucene text index reader supporting near realtime search. An instance of this
+/// is created per consuming segment by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl].
+/// Internally it uses [LuceneTextIndexCreator] for adding documents to the lucene index
+/// as and when they are indexed by the consuming segment.
+///
+/// A version of RealtimeLuceneTextIndex adapted to work with multiple columns.
 public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnRealtimeLuceneTextIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
@@ -76,14 +73,12 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
   private final RealtimeLuceneIndexRefreshManager.SearcherManagerHolder _searcherManagerHolder;
   private final Map<String, MultiColumnLuceneTextIndexReader.ColumnConfig> _perColumnConfigs;
 
-  /**
-   * Created by {@link MutableSegmentImpl}
-   * for each column on which text index has been enabled
-   * @param columns column names
-   * @param segmentIndexDir realtime segment consumer dir
-   * @param segmentName realtime segment name
-   * @param mcTextConfig the table index config
-   */
+  /// Created by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl]
+  /// for each column on which text index has been enabled
+  /// @param columns column names
+  /// @param segmentIndexDir realtime segment consumer dir
+  /// @param segmentName realtime segment name
+  /// @param mcTextConfig the table index config
   public MultiColumnRealtimeLuceneTextIndex(
       List<String> columns,
       BooleanList columnsSV,

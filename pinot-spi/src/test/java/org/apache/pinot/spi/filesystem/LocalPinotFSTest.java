@@ -310,4 +310,25 @@ public class LocalPinotFSTest {
         expectedRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
         fileMetadata.toString());
   }
+
+  @Test
+  public void testListFilesOnPathThatIsNotADirectory()
+      throws IOException {
+    LocalPinotFS localPinotFS = new LocalPinotFS();
+    File tempDirPath = new File(_absoluteTmpDirPath, "test-list-files-invalid-path");
+    Assert.assertTrue(tempDirPath.mkdirs());
+
+    File nonExistentDir = new File(tempDirPath, "nonExistentDir");
+    URI nonExistentUri = nonExistentDir.toURI();
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFiles(nonExistentUri, false));
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFilesWithMetadata(nonExistentUri, false));
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFiles(nonExistentUri, true));
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFilesWithMetadata(nonExistentUri, true));
+
+    File testFile = new File(tempDirPath, "testFile");
+    Assert.assertTrue(testFile.createNewFile());
+    URI fileUri = testFile.toURI();
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFiles(fileUri, false));
+    Assert.assertThrows(IOException.class, () -> localPinotFS.listFilesWithMetadata(fileUri, false));
+  }
 }

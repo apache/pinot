@@ -41,16 +41,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Performs a wildcard match on the encoded variables of a CLP-encoded column group. This is used by the clpMatch
- * function (implemented using {@link org.apache.pinot.sql.parsers.rewriter.ClpRewriter}) and likely wouldn't be called
- * manually by a user.
- * <p>
- * Syntax:
- * <pre>
- *   clpEncodedVarsMatch(columnGroupName_logtype, columnGroupName_encodedVars, wildcardQuery, subQueryIndex)
- * </pre>
- */
+/// Performs a wildcard match on the encoded variables of a CLP-encoded column group. This is used by the clpMatch
+/// function (implemented using [org.apache.pinot.sql.parsers.rewriter.ClpRewriter]) and likely wouldn't be called
+/// manually by a user.
+///
+/// Syntax:
+///
+/// ```
+/// clpEncodedVarsMatch(columnGroupName_logtype, columnGroupName_encodedVars, wildcardQuery, subQueryIndex)
+/// ```
 public class ClpEncodedVarsMatchTransformFunction extends BaseTransformFunction {
   private static final Logger _logger = LoggerFactory.getLogger(ClpEncodedVarsMatchTransformFunction.class);
 

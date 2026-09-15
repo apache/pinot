@@ -22,12 +22,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
 import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
@@ -53,12 +59,12 @@ import static org.apache.pinot.client.Connection.FAIL_ON_EXCEPTIONS;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * This test suite is focused only on validating that the config changes are propagated properly as expected.
- * Validations around different cases arising from cluster config, database config and table config are extensively
- * tested as part of {@link HelixExternalViewBasedQueryQuotaManagerTest}
- */
+/// This test suite is focused only on validating that the config changes are propagated properly as expected.
+/// Validations around different cases arising from cluster config, database config and table config are extensively
+/// tested as part of [org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest]
 public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private static final int OVERLOAD_QUERY_THREADS = 4;
+
   private PinotClientTransport _pinotClientTransport;
   private String _brokerHostPort;
 
@@ -319,11 +325,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueriesOnBroker(databaseMaxQps * 2, true, getLogicalTableName());
   }
 
-  /**
-   * Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
-   * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
-   * @param maxRate max rate allowed by the quota
-   */
+  /// Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
+  /// Then runs the query load with double the max rate and expects queries to fail due to quota breach.
+  /// @param maxRate max rate allowed by the quota
   void testQueryRate(int maxRate) {
     verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);
@@ -361,36 +365,76 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueries(qps, shouldFail, applicationName, getTableName());
   }
 
-  // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
-  // is not comparable to sleepMillis, else the actual qps would end up being much lower than required qps
+  // Pace allowed loads so they exercise the configured rate. Send overload loads concurrently so synchronous query
+  // latency cannot reduce the achieved request rate below the quota and make the rejection assertion timing-sensitive.
   private void runQueries(int qps, boolean shouldFail, String applicationName, String tableName) {
-    int failCount = 0;
-    boolean isLastFail = false;
-    long deadline = System.currentTimeMillis() + 1000;
-
     String query = "SET applicationName='" + applicationName + "'; SELECT COUNT(*) FROM " + tableName;
-
-    for (int i = 0; i < qps; i++) {
-      sleep(deadline, qps - i);
+    int failCount = runQueryLoad(qps, shouldFail, () -> {
       ResultSetGroup resultSetGroup = _pinotConnection.execute(query);
       for (PinotClientException exception : resultSetGroup.getExceptions()) {
         try {
           JsonNode exceptionNode = JsonUtils.stringToJsonNode(exception.getMessage());
           if (exceptionNode.get("errorCode").intValue() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
-            failCount++;
-            isLastFail = i == qps - 1;
-            break;
+            return true;
           }
         } catch (IOException e) {
           throw new UncheckedIOException(e);
         }
       }
-    }
+      return false;
+    });
 
     if (shouldFail) {
-      Assert.assertNotEquals(failCount, 0, "Expected nonzero failures for qps: " + qps + " isLastFail: " + isLastFail);
+      Assert.assertNotEquals(failCount, 0, "Expected nonzero failures for qps: " + qps);
     } else {
-      Assert.assertEquals(failCount, 0, "Expected zero failures for qps: " + qps + " isLastFail: " + isLastFail);
+      Assert.assertEquals(failCount, 0, "Expected zero failures for qps: " + qps);
+    }
+  }
+
+  private static int runQueryLoad(int queryCount, boolean overload, Supplier<Boolean> query) {
+    if (overload) {
+      return runConcurrentQueryLoad(queryCount, query);
+    }
+
+    int failCount = 0;
+    long deadline = System.currentTimeMillis() + 1000;
+    for (int i = 0; i < queryCount; i++) {
+      sleep(deadline, queryCount - i);
+      if (query.get()) {
+        failCount++;
+      }
+    }
+    return failCount;
+  }
+
+  private static int runConcurrentQueryLoad(int queryCount, Supplier<Boolean> query) {
+    int numThreads = Math.min(OVERLOAD_QUERY_THREADS, queryCount);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    try (ExecutorService executorService = Executors.newFixedThreadPool(numThreads)) {
+      List<Future<Boolean>> results = new ArrayList<>(queryCount);
+      try {
+        for (int i = 0; i < queryCount; i++) {
+          results.add(executorService.submit(() -> {
+            startLatch.await();
+            return query.get();
+          }));
+        }
+      } finally {
+        startLatch.countDown();
+      }
+
+      int failCount = 0;
+      for (Future<Boolean> result : results) {
+        if (result.get()) {
+          failCount++;
+        }
+      }
+      return failCount;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while running query load", e);
+    } catch (ExecutionException e) {
+      throw new RuntimeException("Failed to run query load", e.getCause());
     }
   }
 
@@ -448,21 +492,18 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private void runQueriesOnBroker(float qps, boolean shouldFail, String tableName) {
-    int failCount = 0;
-    long deadline = System.currentTimeMillis() + 1000;
-
-    for (int i = 0; i < qps; i++) {
-      sleep(deadline, qps - i);
+    int queryCount = (int) Math.ceil(qps);
+    int failCount = runQueryLoad(queryCount, shouldFail, () -> {
       BrokerResponse resultSetGroup =
           executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + tableName);
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
         if (exception.get("errorCode").asInt() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
-          failCount++;
-          break;
+          return true;
         }
       }
-    }
+      return false;
+    });
 
     if (shouldFail) {
       assertTrue(failCount != 0, "Expected nonzero failures for qps: " + qps);

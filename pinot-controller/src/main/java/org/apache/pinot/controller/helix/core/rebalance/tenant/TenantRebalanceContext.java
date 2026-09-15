@@ -32,11 +32,9 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Default implementation of TenantRebalanceContext that includes parallel and sequential queues
- * for managing tenant rebalance operations. This context is synchronized to ZK by `ZkBasedTenantRebalanceObserver`
- * to ensure consistency across controller restarts.
- */
+/// Default implementation of TenantRebalanceContext that includes parallel and sequential queues
+/// for managing tenant rebalance operations. This context is synchronized to ZK by `ZkBasedTenantRebalanceObserver`
+/// to ensure consistency across controller restarts.
 public class TenantRebalanceContext {
   protected static final int INITIAL_ATTEMPT_ID = 1;
   @JsonProperty("jobId")

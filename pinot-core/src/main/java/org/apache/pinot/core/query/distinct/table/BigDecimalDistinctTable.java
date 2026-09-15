@@ -41,14 +41,14 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class BigDecimalDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "BigDecimalDistinctTable#mergeDistinctTable";
+
   private final HashSet<BigDecimal> _valueSet;
   private final OrderByExpressionContext _orderByExpression;
 
   private ObjectHeapPriorityQueue<BigDecimal> _priorityQueue;
 
-  /**
-   * Constructor for distinct table without data table (on the server side).
-   */
+  /// Constructor for distinct table without data table (on the server side).
   public BigDecimalDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable OrderByExpressionContext orderByExpression) {
     super(dataSchema, limit, nullHandlingEnabled);
@@ -57,9 +57,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
     _orderByExpression = orderByExpression;
   }
 
-  /**
-   * Constructor for distinct table with data table (on the broker side).
-   */
+  /// Constructor for distinct table with data table (on the broker side).
   public BigDecimalDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled,
       @Nullable OrderByExpressionContext orderByExpression, DataTable dataTable) {
     super(dataSchema, limit, nullHandlingEnabled);
@@ -138,13 +136,16 @@ public class BigDecimalDistinctTable extends DistinctTable {
     if (bigDecimalDistinctTable._hasNull) {
       addNull();
     }
+    int numValuesMerged = 0;
     if (hasLimit()) {
       if (hasOrderBy()) {
         for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           addWithOrderBy(value);
         }
       } else {
         for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(value)) {
             return;
           }
@@ -153,6 +154,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       for (BigDecimal value : bigDecimalDistinctTable._valueSet) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
         addUnbounded(value);
       }
     }

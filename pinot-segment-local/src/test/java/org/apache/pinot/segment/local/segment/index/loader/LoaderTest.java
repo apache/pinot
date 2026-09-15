@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -34,11 +33,14 @@ import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -141,10 +143,8 @@ public class LoaderTest {
     testConversion();
   }
 
-  /**
-   * Format converter will leave stale directory around if there were conversion failures. This test checks loading in
-   * that scenario.
-   */
+  /// Format converter will leave stale directory around if there were conversion failures. This test checks loading in
+  /// that scenario.
   @Test
   public void testLoadWithStaleConversionDir()
       throws Exception {
@@ -219,16 +219,38 @@ public class LoaderTest {
   }
 
   private void testBuiltInVirtualColumns(IndexSegment indexSegment) {
-    assertTrue(indexSegment.getColumnNames().containsAll(
-        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME)));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
+    // Iterate the full set so that a newly added built-in virtual column is covered automatically
+    assertTrue(indexSegment.getColumnNames().containsAll(BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS));
+    for (String column : BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS) {
+      assertNotNull(indexSegment.getDataSource(column), "Missing data source for virtual column: " + column);
+    }
+
+    // Segment metadata that this segment carries is exposed as a real value, and is not marked null
+    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.TOTALDOCS).getDictionary().get(0),
+        segmentMetadata.getTotalDocs());
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CRC).getDictionary().get(0),
+        Long.parseLong(segmentMetadata.getCrc()));
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME).getDictionary().get(0),
+        segmentMetadata.getIndexCreationTime());
+    for (String column : List.of(BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC,
+        BuiltInVirtualColumn.CREATIONTIME)) {
+      assertNull(indexSegment.getDataSource(column).getNullValueVector(),
+          "Unexpected null value vector for virtual column: " + column);
+    }
+
+    // This table has no time column, so the segment has no time range and the two time columns read as NULL
+    assertNull(segmentMetadata.getTimeInterval());
+    for (String column : List.of(BuiltInVirtualColumn.STARTTIME, BuiltInVirtualColumn.ENDTIME)) {
+      DataSource dataSource = indexSegment.getDataSource(column);
+      assertEquals(dataSource.getDictionary().get(0), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+      NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+      assertNotNull(nullValueVector, "Missing null value vector for virtual column: " + column);
+      assertEquals(nullValueVector.getNullBitmap().getCardinality(), segmentMetadata.getTotalDocs());
+    }
   }
 
-  /**
-   * Tests loading default string column with empty ("") default null value.
-   */
+  /// Tests loading default string column with empty ("") default null value.
   @Test
   public void testDefaultEmptyValueStringColumn()
       throws Exception {

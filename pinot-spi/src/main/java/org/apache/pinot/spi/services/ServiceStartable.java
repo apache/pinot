@@ -21,11 +21,8 @@ package org.apache.pinot.spi.services;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * ServiceStartable is the general interface to manage a Pinot instance lifecycle for a specific ServiceRole.
- * E.g. Controller/Broker/Server/Minion.
- *
- */
+/// ServiceStartable is the general interface to manage a Pinot instance lifecycle for a specific ServiceRole.
+/// E.g. Controller/Broker/Server/Minion.
 public interface ServiceStartable {
   void init(PinotConfiguration conf)
       throws Exception;

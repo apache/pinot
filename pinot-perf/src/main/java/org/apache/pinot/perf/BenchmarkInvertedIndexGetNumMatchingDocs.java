@@ -40,45 +40,41 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Isolates the work performed by {@code InvertedIndexFilterOperator.getNumMatchingDocs()}
- * on the multi-dictId (numDictIds >= 3) path:
- *
- * <pre>
- *   MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
- *   for (int dictId : dictIds) {
- *     bitmap.or(_invertedIndexReader.getDocIds(dictId));
- *   }
- *   count = bitmap.getCardinality();
- * </pre>
- *
- * <p>Three variants are compared on the same input:
- * <ul>
- *   <li>{@code currentMaterialize} — the baseline (what the operator did before this change, and what the
- *       MV path still does). Allocates a fresh accumulator, ORs in every per-dictId bitmap, then takes the
- *       cardinality of the materialized union.</li>
- *   <li>{@code svSumCardinalities} — the implemented fix for single-value columns. Bitmaps are guaranteed
- *       disjoint, so the union cardinality is the sum of per-bitmap cardinalities. No allocation, no OR
- *       pass. Correctness is undefined for MV columns (would double-count overlapping docIds); we include
- *       it in the MV runs purely for comparison.</li>
- *   <li>{@code mvFastOrCardinality} — a prototyped (but not implemented) variant for multi-value columns.
- *       {@link BufferFastAggregation#orCardinality} streams through containers and computes the union
- *       cardinality without materializing the result. Wins inside K in [~256, ~10K] but regresses
- *       outside that window — see the commit message for the threshold rationale.</li>
- * </ul>
- *
- * <p>Sweep parameters reflect realistic settings for {@code COUNT(*) WHERE col IN (...)}:
- * <ul>
- *   <li>{@code _numDocs} — segment size (5M ~ one realtime segment).</li>
- *   <li>{@code _dictionaryCardinality} — distinct values in the column.</li>
- *   <li>{@code _numDictIdsMatched} — width of the IN clause (the K in N-K OR).</li>
- *   <li>{@code _multiValue} — SV columns produce disjoint bitmaps; MV columns produce overlapping bitmaps.</li>
- * </ul>
- *
- * <p>Cells where numDictIdsMatched > cardinality are skipped via a null sentinel set in {@link #setup()}.
- *
- * <p>Run: {@code java -jar pinot-perf/target/benchmarks.jar BenchmarkInvertedIndexGetNumMatchingDocs}
- */
+/// Isolates the work performed by `InvertedIndexFilterOperator.getNumMatchingDocs()`
+/// on the multi-dictId (numDictIds >= 3) path:
+///
+/// ```
+/// MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+/// for (int dictId : dictIds) {
+///   bitmap.or(_invertedIndexReader.getDocIds(dictId));
+/// }
+/// count = bitmap.getCardinality();
+/// ```
+///
+/// Three variants are compared on the same input:
+///
+/// - `currentMaterialize` — the baseline (what the operator did before this change, and what the
+///      MV path still does). Allocates a fresh accumulator, ORs in every per-dictId bitmap, then takes the
+///      cardinality of the materialized union.
+/// - `svSumCardinalities` — the implemented fix for single-value columns. Bitmaps are guaranteed
+///      disjoint, so the union cardinality is the sum of per-bitmap cardinalities. No allocation, no OR
+///      pass. Correctness is undefined for MV columns (would double-count overlapping docIds); we include
+///      it in the MV runs purely for comparison.
+/// - `mvFastOrCardinality` — a prototyped (but not implemented) variant for multi-value columns.
+///      [BufferFastAggregation#orCardinality] streams through containers and computes the union
+///      cardinality without materializing the result. Wins inside K in \[~256, ~10K\] but regresses
+///      outside that window — see the commit message for the threshold rationale.
+///
+/// Sweep parameters reflect realistic settings for `COUNT(*) WHERE col IN (...)`:
+///
+/// - `_numDocs` — segment size (5M ~ one realtime segment).
+/// - `_dictionaryCardinality` — distinct values in the column.
+/// - `_numDictIdsMatched` — width of the IN clause (the K in N-K OR).
+/// - `_multiValue` — SV columns produce disjoint bitmaps; MV columns produce overlapping bitmaps.
+///
+/// Cells where numDictIdsMatched > cardinality are skipped via a null sentinel set in [#setup()].
+///
+/// Run: `java -jar pinot-perf/target/benchmarks.jar BenchmarkInvertedIndexGetNumMatchingDocs`
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -99,13 +95,13 @@ public class BenchmarkInvertedIndexGetNumMatchingDocs {
   @Param({"false", "true"})
   boolean _multiValue;
 
-  /** For MV columns, average number of dictIds per doc. Ignored for SV. */
+  /// For MV columns, average number of dictIds per doc. Ignored for SV.
   @Param({"4"})
   int _mvValuesPerDoc;
 
-  /** The K bitmaps the operator will OR together — exactly what
-   * {@code _invertedIndexReader.getDocIds(dictIds[i])} returns inside the operator.
-   * Null for invalid cells (K > cardinality). */
+  /// The K bitmaps the operator will OR together — exactly what
+  /// `_invertedIndexReader.getDocIds(dictIds[i])` returns inside the operator.
+  /// Null for invalid cells (K > cardinality).
   private ImmutableRoaringBitmap[] _bitmaps;
 
   // Cache the full per-dictId index across @Param combinations within a single JVM (fork). JMH runs all
@@ -181,11 +177,9 @@ public class BenchmarkInvertedIndexGetNumMatchingDocs {
     return full;
   }
 
-  /**
-   * Baseline: what the operator did before this change, and what the MV path still does. Allocates a
-   * fresh accumulator, ORs in every per-dictId bitmap, then takes the cardinality of the materialized
-   * union.
-   */
+  /// Baseline: what the operator did before this change, and what the MV path still does. Allocates a
+  /// fresh accumulator, ORs in every per-dictId bitmap, then takes the cardinality of the materialized
+  /// union.
   @Benchmark
   public int currentMaterialize() {
     if (_bitmaps == null) {
@@ -198,11 +192,9 @@ public class BenchmarkInvertedIndexGetNumMatchingDocs {
     return bitmap.getCardinality();
   }
 
-  /**
-   * Shipped fix for single-value columns. Bitmaps from a per-dictId inverted index on an SV column are
-   * disjoint, so |⋃ b_i| = Σ |b_i|. No allocation, no OR pass. Correctness is undefined for MV columns
-   * (would double-count overlapping docIds); included in the MV runs purely for comparison.
-   */
+  /// Shipped fix for single-value columns. Bitmaps from a per-dictId inverted index on an SV column are
+  /// disjoint, so |⋃ b_i| = Σ |b_i|. No allocation, no OR pass. Correctness is undefined for MV columns
+  /// (would double-count overlapping docIds); included in the MV runs purely for comparison.
   @Benchmark
   public long svSumCardinalities() {
     if (_bitmaps == null) {
@@ -215,12 +207,10 @@ public class BenchmarkInvertedIndexGetNumMatchingDocs {
     return count;
   }
 
-  /**
-   * Prototyped (but not shipped) variant for multi-value columns. RoaringBitmap's streaming
-   * union-cardinality avoids materializing the merged bitmap. Wins inside K in [~256, ~10K] but regresses
-   * at low K (4-16) and at very high K (~100K) on high-cardinality columns where horizontal-OR's fixed
-   * scratch-buffer allocation and two-pass scan amortize poorly.
-   */
+  /// Prototyped (but not shipped) variant for multi-value columns. RoaringBitmap's streaming
+  /// union-cardinality avoids materializing the merged bitmap. Wins inside K in \[~256, ~10K\] but regresses
+  /// at low K (4-16) and at very high K (~100K) on high-cardinality columns where horizontal-OR's fixed
+  /// scratch-buffer allocation and two-pass scan amortize poorly.
   @Benchmark
   public int mvFastOrCardinality() {
     if (_bitmaps == null) {

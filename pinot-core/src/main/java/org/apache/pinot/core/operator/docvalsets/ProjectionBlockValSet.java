@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
-import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -35,11 +34,9 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * This class represents the BlockValSet for a projection block.
- * It provides api's to access data for a specified projection column.
- * It uses {@link DataBlockCache} to cache the projection data.
- */
+/// This class represents the BlockValSet for a projection block.
+/// It provides api's to access data for a specified projection column.
+/// It uses [DataBlockCache] to cache the projection data.
 public class ProjectionBlockValSet implements BlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
@@ -48,11 +45,9 @@ public class ProjectionBlockValSet implements BlockValSet {
   private boolean _nullBitmapSet;
   private RoaringBitmap _nullBitmap;
 
-  /**
-   * Constructor for the class.
-   * The dataBlockCache is initialized in {@link ProjectionOperator} so that it can be reused across multiple calls to
-   * {@link ProjectionOperator#nextBlock()}.
-   */
+  /// Constructor for the class.
+  /// The dataBlockCache is initialized in [org.apache.pinot.core.operator.ProjectionOperator] so that it can
+  /// be reused across multiple calls to [org.apache.pinot.core.operator.ProjectionOperator#nextBlock()].
   public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, DataSource dataSource) {
     _dataBlockCache = dataBlockCache;
     _column = column;
@@ -99,14 +94,14 @@ public class ProjectionBlockValSet implements BlockValSet {
     return _dataSource.getDictionary();
   }
 
-  /// Returns {@code true} only when there is both a dictionary AND a dict-encoded forward index. Two cases return
-  /// {@code false} even though {@link #getDictionary()} is non-null:
-  /// <ul>
-  ///   <li>{@code EncodingType.RAW} + an explicit {@code dictionaryIndex}: the forward index throws on
-  ///   {@link ForwardIndexReader#readDictIds}.</li>
-  ///   <li>Disabled forward index (dict + inverted/range only): there is no forward index to read dict IDs from.</li>
-  /// </ul>
-  /// Callers selecting between dict-id and value paths must gate on this method, not {@code getDictionary() != null}.
+  /// Returns `true` only when there is both a dictionary AND a dict-encoded forward index. Two cases return
+  /// `false` even though [#getDictionary()] is non-null:
+  ///
+  /// - `EncodingType.RAW` + an explicit `dictionaryIndex`: the forward index throws on
+  ///   [ForwardIndexReader#readDictIds].
+  /// - Disabled forward index (dict + inverted/range only): there is no forward index to read dict IDs from.
+  ///
+  /// Callers selecting between dict-id and value paths must gate on this method, not `getDictionary() != null`.
   @Override
   public boolean isDictionaryEncoded() {
     Dictionary dictionary = _dataSource.getDictionary();

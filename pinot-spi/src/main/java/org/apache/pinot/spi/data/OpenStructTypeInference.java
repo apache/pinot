@@ -22,16 +22,16 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/// Infers the {@link FieldSpec.DataType} for an OPEN_STRUCT key from raw ingested values when the key has
-/// no declared child {@link FieldSpec}. This is OPEN_STRUCT-specific policy (it keeps TIMESTAMP, folds
-/// DATE/TIME/UUID to STRING, widens BYTE/CHARACTER/SHORT to INT, and returns {@code null} for values that
+/// Infers the [FieldSpec.DataType] for an OPEN_STRUCT key from raw ingested values when the key has
+/// no declared child [FieldSpec]. This is OPEN_STRUCT-specific policy (it keeps TIMESTAMP, folds
+/// DATE/TIME/UUID to STRING, widens BYTE/CHARACTER/SHORT to INT, and returns `null` for values that
 /// cannot be represented as a stored column type), distinct from the JSON-node-based inference in
-/// {@code JsonUtils.valueOf}.
+/// `JsonUtils.valueOf`.
 public final class OpenStructTypeInference {
   private OpenStructTypeInference() {
   }
 
-  /// Infers the {@link FieldSpec.DataType} from a raw ingested value. Returns {@code null} when the value
+  /// Infers the [FieldSpec.DataType] from a raw ingested value. Returns `null` when the value
   /// cannot be represented as a stored column type; callers decide whether to drop the entry or fall back
   /// to a default (e.g. STRING).
   @Nullable

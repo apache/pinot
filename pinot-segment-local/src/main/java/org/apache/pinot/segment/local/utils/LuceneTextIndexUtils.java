@@ -38,10 +38,8 @@ import org.apache.lucene.search.WildcardQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Utility class for Lucene text index operations.
- * Contains common methods for parsing options and creating query parsers.
- */
+/// Utility class for Lucene text index operations.
+/// Contains common methods for parsing options and creating query parsers.
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
@@ -59,10 +57,8 @@ public class LuceneTextIndexUtils {
   public static final String TRUE = "true";
   public static final String FALSE = "false";
 
-  /**
-   * Option keys for Lucene text index configuration.
-   * These keys are used in the options string format: "key1=value1,key2=value2"
-   */
+  /// Option keys for Lucene text index configuration.
+  /// These keys are used in the options string format: "key1=value1,key2=value2"
   public static class OptionKey {
     public static final String PARSER = "parser";
     public static final String DEFAULT_OPERATOR = "defaultOperator";
@@ -98,12 +94,9 @@ public class LuceneTextIndexUtils {
   private LuceneTextIndexUtils() {
   }
 
-  /**
-   *
-   * @param query a Lucene query
-   * @return a span query with 0 slop and the original clause order if the input query is boolean query with one or more
-   * prefix or wildcard subqueries; the same query otherwise.
-   */
+  /// @param query a Lucene query
+  /// @return a span query with 0 slop and the original clause order if the input query is boolean query with one or
+  /// more prefix or wildcard subqueries; the same query otherwise.
   public static Query convertToMultiTermSpanQuery(Query query) {
     if (!(query instanceof BooleanQuery)) {
       return query;
@@ -131,17 +124,15 @@ public class LuceneTextIndexUtils {
     return spanNearQuery;
   }
 
-  /**
-   * Creates a Lucene QueryParser with the specified options and parses the query.
-   * This method uses reflection to dynamically apply options to the query parser.
-   *
-   * @param actualQuery The search query string
-   * @param options The parsed options wrapper
-   * @param column The column name for the search
-   * @param analyzer The Lucene analyzer to use
-   * @return The parsed Lucene Query object
-   * @throws RuntimeException if parser creation or query parsing fails
-   */
+  /// Creates a Lucene QueryParser with the specified options and parses the query.
+  /// This method uses reflection to dynamically apply options to the query parser.
+  ///
+  /// @param actualQuery The search query string
+  /// @param options The parsed options wrapper
+  /// @param column The column name for the search
+  /// @param analyzer The Lucene analyzer to use
+  /// @return The parsed Lucene Query object
+  /// @throws RuntimeException if parser creation or query parsing fails
   public static Query createQueryParserWithOptions(String actualQuery, LuceneTextIndexOptions options, String column,
       Analyzer analyzer) {
     Map<String, String> optionsMap = options.getOptions();
@@ -252,10 +243,8 @@ public class LuceneTextIndexUtils {
     }
   }
 
-  /**
-   * Parse the options string into a map of key-value pairs.
-   * This method is now private and should be accessed through LuceneTextIndexOptions class.
-   */
+  /// Parse the options string into a map of key-value pairs.
+  /// This method is now private and should be accessed through LuceneTextIndexOptions class.
   private static Map<String, String> parseOptionsString(String optionsString) {
     if (optionsString == null || optionsString.trim().isEmpty()) {
       return new HashMap<>();
@@ -278,10 +267,8 @@ public class LuceneTextIndexUtils {
     return options;
   }
 
-  /**
-   * Helper class to wrap the parsed Lucene text index options.
-   * Similar to DistinctCountOffHeapAggregationFunction.Parameters pattern.
-   */
+  /// Helper class to wrap the parsed Lucene text index options.
+  /// Similar to DistinctCountOffHeapAggregationFunction.Parameters pattern.
   public static class LuceneTextIndexOptions {
     private final Map<String, String> _options;
 
@@ -366,13 +353,11 @@ public class LuceneTextIndexUtils {
     }
   }
 
-  /**
-   * Creates LuceneTextIndexOptions from a string.
-   * This is a convenience method for creating the options wrapper.
-   *
-   * @param optionsString The options string in format "key1=value1,key2=value2"
-   * @return The LuceneTextIndexOptions wrapper
-   */
+  /// Creates LuceneTextIndexOptions from a string.
+  /// This is a convenience method for creating the options wrapper.
+  ///
+  /// @param optionsString The options string in format "key1=value1,key2=value2"
+  /// @return The LuceneTextIndexOptions wrapper
   public static LuceneTextIndexOptions createOptions(String optionsString) {
     return new LuceneTextIndexOptions(optionsString);
   }

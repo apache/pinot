@@ -28,25 +28,36 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * @deprecated Use DateTimeFieldSpec instead.
- * The <code>TimeGranularitySpec</code> class contains all specs related to time field.
- * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
- * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
- * <p>- <code>TimeUnitSize</code>: size of the time buckets (e.g. 10 MINUTES, 2 HOURS). By default this is set to 1.
- * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g
- * SIMPLE_DATE_FORMAT:yyyyMMdd
- * <p>- <code>Name</code>: name of the time column.
- * <p>E.g.
- * <p>If the time column is in millisecondsSinceEpoch, constructor can be invoked as:
- * <p><code>TimeGranularitySpec(LONG, MILLISECONDS, timeColumnName)</code>
- * <p>If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
- * <p><code>TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)</code>
- * <p>If the time column is in Simple Date Format:
- * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString()
- * +":yyyyMMdd", "hour");
- * </code>
- */
+/// @deprecated Use DateTimeFieldSpec instead.
+/// The `TimeGranularitySpec` class contains all specs related to time field.
+///
+/// - `DataType`: data type of the time column (e.g. INT, LONG).
+///
+/// - `TimeType`: time unit of the time column (e.g. MINUTES, HOURS).
+///
+/// - `TimeUnitSize`: size of the time buckets (e.g. 10 MINUTES, 2 HOURS). By default this is set to 1.
+///
+/// - `TimeFormat`: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g
+/// SIMPLE_DATE_FORMAT:yyyyMMdd
+///
+/// - `Name`: name of the time column.
+///
+/// E.g.
+///
+/// If the time column is in millisecondsSinceEpoch, constructor can be invoked as:
+///
+/// `TimeGranularitySpec(LONG, MILLISECONDS, timeColumnName)`
+///
+/// If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
+///
+/// `TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)`
+///
+/// If the time column is in Simple Date Format:
+///
+/// ```
+/// new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString()
+/// +":yyyyMMdd", "hour");
+/// ```
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec implements Serializable {
@@ -174,11 +185,11 @@ public class TimeGranularitySpec implements Serializable {
     _timeFormat = timeFormat;
   }
 
-  /**
-   * Returns the {@link ObjectNode} representing the time granularity spec.
-   * <p>Only contains fields with non-default value.
-   * <p>NOTE: here we use {@link ObjectNode} to preserve the insertion order.
-   */
+  /// Returns the [ObjectNode] representing the time granularity spec.
+  ///
+  /// Only contains fields with non-default value.
+  ///
+  /// NOTE: here we use [ObjectNode] to preserve the insertion order.
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("name", _name);

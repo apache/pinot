@@ -37,13 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Abstract class to manage all the server resources for query execution.
- * Currently this manages the threadpool for query execution.
- *
- * This class supports soft and hard limits on the number of threads. A
- * scheduler group will not get more than the hard_limit number of threads.
- */
+/// Abstract class to manage all the server resources for query execution.
+/// Currently this manages the threadpool for query execution.
+///
+/// This class supports soft and hard limits on the number of threads. A
+/// scheduler group will not get more than the hard_limit number of threads.
 // TODO: This class supports hard and soft thread limits. Potentially, we can make
 // these limits dynamic - SchedulerGroups with low latency can have higher hard limit
 // than the groups with high latency. That requires more experimentation and tuning
@@ -62,9 +60,7 @@ public abstract class ResourceManager {
     DEFAULT_QUERY_WORKER_THREADS = 2 * numCores;
   }
 
-  /**
-   * Listener notified after thread pools have been resized.
-   */
+  /// Listener notified after thread pools have been resized.
   @FunctionalInterface
   public interface ThreadPoolResizeListener {
     void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads);
@@ -88,9 +84,7 @@ public abstract class ResourceManager {
 
   private final List<ThreadPoolResizeListener> _resizeListeners = new CopyOnWriteArrayList<>();
 
-  /**
-   * @param config configuration for initializing resource manager
-   */
+  /// @param config configuration for initializing resource manager
   public ResourceManager(PinotConfiguration config) {
     _config = config;
     _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
@@ -116,13 +110,11 @@ public abstract class ResourceManager {
     _queryWorkers = MoreExecutors.listeningDecorator(workerService);
   }
 
-  /**
-   * Dynamically resizes the query runner and worker thread pools. Resizing is performed on the underlying
-   * {@link ThreadPoolExecutor} instances, which is transparent to any decorator wrappers.
-   *
-   * @param newRunnerThreads desired number of query runner threads (must be &gt; 0)
-   * @param newWorkerThreads desired number of query worker threads (must be &gt; 0)
-   */
+  /// Dynamically resizes the query runner and worker thread pools. Resizing is performed on the underlying
+  /// [ThreadPoolExecutor] instances, which is transparent to any decorator wrappers.
+  ///
+  /// @param newRunnerThreads desired number of query runner threads (must be &gt; 0)
+  /// @param newWorkerThreads desired number of query worker threads (must be &gt; 0)
   public synchronized void resizeThreadPools(int newRunnerThreads, int newWorkerThreads) {
     if (newRunnerThreads <= 0 || newWorkerThreads <= 0) {
       LOGGER.warn("Invalid thread pool sizes: runnerThreads={}, workerThreads={}. Sizes must be > 0. Skipping resize.",
@@ -154,17 +146,13 @@ public abstract class ResourceManager {
     }
   }
 
-  /**
-   * Registers a listener to be notified after thread pools are resized.
-   */
+  /// Registers a listener to be notified after thread pools are resized.
   public void addThreadPoolResizeListener(ThreadPoolResizeListener listener) {
     _resizeListeners.add(listener);
   }
 
-  /**
-   * Hook for subclasses to update dependent state (e.g. resource limit policies) after thread pools are resized.
-   * Called before external listeners are notified.
-   */
+  /// Hook for subclasses to update dependent state (e.g. resource limit policies) after thread pools are resized.
+  /// Called before external listeners are notified.
   protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
   }
 
@@ -195,28 +183,22 @@ public abstract class ResourceManager {
     _queryRunners.shutdownNow();
   }
 
-  /**
-   * Total number of query runner threads. Query runner threads are 'main'
-   * threads executing the query.
-   * @return
-   */
+  /// Total number of query runner threads. Query runner threads are 'main'
+  /// threads executing the query.
+  /// @return
   final public int getNumQueryRunnerThreads() {
     return _numQueryRunnerThreads;
   }
 
-  /**
-   * Total number of query worker threads. Query worker threads are a pool of threads
-   * for parallel processing of a query.
-   * @return
-   */
+  /// Total number of query worker threads. Query worker threads are a pool of threads
+  /// for parallel processing of a query.
+  /// @return
   final public int getNumQueryWorkerThreads() {
     return _numQueryWorkerThreads;
   }
 
-  /**
-   * Returns executor service for running queries.
-   * @return
-   */
+  /// Returns executor service for running queries.
+  /// @return
   final public ListeningExecutorService getQueryRunners() {
     return _queryRunners;
   }
@@ -226,37 +208,29 @@ public abstract class ResourceManager {
     return _queryWorkers;
   }
 
-  /**
-   * Get the executor service for running the query. The provided executor
-   * service limits the number of resources available for executing query
-   * as per the configured policy
-   * @param query
-   * @param accountant Accountant for a scheduler group
-   * @return
-   */
+  /// Get the executor service for running the query. The provided executor
+  /// service limits the number of resources available for executing query
+  /// as per the configured policy
+  /// @param query
+  /// @param accountant Accountant for a scheduler group
+  /// @return
   public abstract QueryExecutorService getExecutorService(ServerQueryRequest query,
       SchedulerGroupAccountant accountant);
 
-  /**
-   * Hard limit on number of threads for a scheduler group.
-   * A group may not be allotted threads more than this for query execution.
-   * @return number of threads
-   */
+  /// Hard limit on number of threads for a scheduler group.
+  /// A group may not be allotted threads more than this for query execution.
+  /// @return number of threads
   public abstract int getTableThreadsHardLimit();
 
-  /**
-   * Soft limit on the number of threads for a scheduler group.
-   * Queries from a scheduler group will be de-prioritized if the group
-   * is using more than the soft limit.
-   * @return number of threads
-   */
+  /// Soft limit on the number of threads for a scheduler group.
+  /// Queries from a scheduler group will be de-prioritized if the group
+  /// is using more than the soft limit.
+  /// @return number of threads
   public abstract int getTableThreadsSoftLimit();
 
-  /**
-   * Check if the query for a scheduler group can get required resources for scheduling
-   * @param accountant resource accounting information for a group
-   * @return
-   */
+  /// Check if the query for a scheduler group can get required resources for scheduling
+  /// @param accountant resource accounting information for a group
+  /// @return
   public boolean canSchedule(SchedulerGroupAccountant accountant) {
     return accountant.totalReservedThreads() < getTableThreadsHardLimit();
   }

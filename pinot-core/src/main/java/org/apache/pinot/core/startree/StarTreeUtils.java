@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree;
 
+import com.google.common.annotations.VisibleForTesting;
 import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -56,11 +58,9 @@ public class StarTreeUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeUtils.class);
 
-  /**
-   * Extracts the {@link AggregationFunctionColumnPair}s from the given {@link AggregationFunction}s. Returns
-   * {@code null} if any {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumnPair}
-   * (e.g. has multiple arguments, argument is not column etc.).
-   */
+  /// Extracts the [AggregationFunctionColumnPair]s from the given [AggregationFunction]s. Returns
+  /// `null` if any [AggregationFunction] cannot be represented as an [AggregationFunctionColumnPair]
+  /// (e.g. has multiple arguments, argument is not column etc.).
   @Nullable
   public static AggregationFunctionColumnPair[] extractAggregationFunctionPairs(
       AggregationFunction[] aggregationFunctions) {
@@ -79,17 +79,15 @@ public class StarTreeUtils {
     return aggregationFunctionColumnPairs;
   }
 
-  /**
-   * Extracts a map from the column to a list of {@link CompositePredicateEvaluator}s for it. Returns {@code null} if
-   * the filter cannot be solved by the star-tree.
-   *
-   * A predicate can be simple (d1 > 10) or composite (d1 > 10 AND d2 < 50) or multi levelled
-   * (d1 > 50 AND (d2 > 10 OR NOT d2 > 35)).
-   * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
-   * the list are implicitly ANDed together. Any OR and NOT predicates are nested within a CompositePredicate.
-   *
-   * A map from predicates to their evaluators is passed in to accelerate the computation.
-   */
+  /// Extracts a map from the column to a list of [CompositePredicateEvaluator]s for it. Returns `null` if
+  /// the filter cannot be solved by the star-tree.
+  ///
+  /// A predicate can be simple (d1 > 10) or composite (d1 > 10 AND d2 < 50) or multi levelled
+  /// (d1 > 50 AND (d2 > 10 OR NOT d2 > 35)).
+  /// This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
+  /// the list are implicitly ANDed together. Any OR and NOT predicates are nested within a CompositePredicate.
+  ///
+  /// A map from predicates to their evaluators is passed in to accelerate the computation.
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
       @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
@@ -171,14 +169,12 @@ public class StarTreeUtils {
     return predicateEvaluatorsMap;
   }
 
-  /**
-   * Returns whether the query is fit for star tree index.
-   * <p>The query is fit for star tree index if the following conditions are met:
-   * <ul>
-   *   <li>Star-tree contains all aggregation function column pairs</li>
-   *   <li>All predicate columns and group-by columns are star-tree dimensions</li>
-   * </ul>
-   */
+  /// Returns whether the query is fit for star tree index.
+  ///
+  /// The query is fit for star tree index if the following conditions are met:
+  ///
+  /// - Star-tree contains all aggregation function column pairs
+  /// - All predicate columns and group-by columns are star-tree dimensions
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
       List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations,
       @Nullable ExpressionContext[] groupByExpressions, Set<String> predicateColumns) {
@@ -212,13 +208,11 @@ public class StarTreeUtils {
     return starTreeDimensions.containsAll(predicateColumns);
   }
 
-  /**
-   * Evaluates whether the given OR clause is valid for StarTree processing.
-   * StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
-   *
-   * @return The pair of single identifier and predicate evaluators applied to it if true; {@code null} if the OR clause
-   *         cannot be solved with star-tree; a pair of nulls if the OR clause always evaluates to true.
-   */
+  /// Evaluates whether the given OR clause is valid for StarTree processing.
+  /// StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
+  ///
+  /// @return The pair of single identifier and predicate evaluators applied to it if true; `null` if the OR
+  ///         clause cannot be solved with star-tree; a pair of nulls if the OR clause always evaluates to true.
   @Nullable
   private static Pair<String, CompositePredicateEvaluator> isOrClauseValidForStarTree(IndexSegment indexSegment,
       FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
@@ -265,10 +259,8 @@ public class StarTreeUtils {
     return Pair.of(identifier, new CompositePredicateEvaluator(predicateEvaluators));
   }
 
-  /**
-   * Extracts the predicates under the given OR clause, returns {@code false} if there is nested AND or NOT under OR
-   * clause.
-   */
+  /// Extracts the predicates under the given OR clause, returns `false` if there is nested AND or NOT under OR
+  /// clause.
   private static boolean extractOrClausePredicates(FilterContext filter,
       List<ObjectBooleanPair<Predicate>> predicates) {
     assert filter.getType() == FilterContext.Type.OR;
@@ -310,10 +302,8 @@ public class StarTreeUtils {
     return true;
   }
 
-  /**
-   * Returns the predicate evaluator for the given predicate, or {@code null} if the predicate cannot be solved with
-   * star-tree.
-   */
+  /// Returns the predicate evaluator for the given predicate, or `null` if the predicate cannot be solved with
+  /// star-tree.
   @Nullable
   private static PredicateEvaluator getPredicateEvaluator(IndexSegment indexSegment, Predicate predicate,
       List<Pair<Predicate, PredicateEvaluator>> predicatesEvaluatorMapping) {
@@ -347,15 +337,26 @@ public class StarTreeUtils {
     }
     for (Pair<Predicate, PredicateEvaluator> pair : predicatesEvaluatorMapping) {
       if (pair.getKey() == predicate) {
-        return pair.getValue();
+        return toDictionaryBased(pair.getValue(), predicate, dataSource);
       }
     }
     return null;
   }
 
-  /**
-   * Returns a {@link BaseProjectOperator} when the filter can be solved with star-tree, or {@code null} otherwise.
-   */
+  /// Star-tree traversal reads dictionary ids; a raw-value evaluator (built when the forward index is RAW and no
+  /// dict-consuming scan operator was available) would throw from `getMatchingDictIds` / `applySV(int)`. Rebuild
+  /// against the segment dictionary when needed.
+  @VisibleForTesting
+  static PredicateEvaluator toDictionaryBased(PredicateEvaluator evaluator, Predicate predicate,
+      DataSource dataSource) {
+    if (evaluator.isDictionaryBased()) {
+      return evaluator;
+    }
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+        dataSource.getDataSourceMetadata().getDataType(), null);
+  }
+
+  /// Returns a [BaseProjectOperator] when the filter can be solved with star-tree, or `null` otherwise.
   @Nullable
   public static BaseProjectOperator<?> createStarTreeBasedProjectOperator(IndexSegment indexSegment,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,

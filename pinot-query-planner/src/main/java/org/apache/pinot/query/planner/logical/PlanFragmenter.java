@@ -27,7 +27,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -47,17 +46,15 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * PlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a {@link SubPlan} into multiple
- * {@link PlanFragment}s.
- *
- * The fragmenting process is as follows:
- * 1. Traverse the plan tree in a depth-first manner;
- * 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into {@link MailboxReceiveNode} and
- * {@link MailboxSendNode} pair;
- * 3. Assign current PlanFragment ID to {@link MailboxReceiveNode};
- * 4. Increment current PlanFragment ID by one and assign it to the {@link MailboxSendNode}.
- */
+/// PlanFragmenter is an implementation of [PlanNodeVisitor] to fragment a
+/// [org.apache.pinot.query.planner.SubPlan] into multiple [PlanFragment]s.
+///
+/// The fragmenting process is as follows:
+/// 1. Traverse the plan tree in a depth-first manner;
+/// 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into [MailboxReceiveNode] and
+/// [MailboxSendNode] pair;
+/// 3. Assign current PlanFragment ID to [MailboxReceiveNode];
+/// 4. Increment current PlanFragment ID by one and assign it to the [MailboxSendNode].
 public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context>,
                                        EquivalentStagesReplacer.OnSubstitution {
   private final Int2ObjectOpenHashMap<PlanFragment> _planFragmentMap = new Int2ObjectOpenHashMap<>();
@@ -128,6 +125,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     return process(node, context);
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);

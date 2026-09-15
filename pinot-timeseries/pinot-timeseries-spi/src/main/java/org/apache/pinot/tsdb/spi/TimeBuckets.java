@@ -23,13 +23,11 @@ import java.util.Arrays;
 import java.util.Objects;
 
 
-/**
- * Time buckets used for query execution. Each element (say x) in the {@link #getTimeBuckets()} array represents a
- * time-range which is half open on the left side: (x - bucketSize.getSeconds(), x]. Some query languages allow some
- * operators to mutate the time-buckets on the fly, so it is not guaranteed that the time resolution and/or range
- * will be the same across all operators. For instance, Uber's M3QL supports a "summarize 1h sum" operator which will
- * change the bucket resolution to 1 hour for all subsequent operators.
- */
+/// Time buckets used for query execution. Each element (say x) in the [#getTimeBuckets()] array represents a
+/// time-range which is half open on the left side: (x - bucketSize.getSeconds(), x\]. Some query languages allow some
+/// operators to mutate the time-buckets on the fly, so it is not guaranteed that the time resolution and/or range
+/// will be the same across all operators. For instance, Uber's M3QL supports a "summarize 1h sum" operator which will
+/// change the bucket resolution to 1 hour for all subsequent operators.
 public class TimeBuckets {
   private final Long[] _timeBuckets;
   private final Duration _bucketSize;
@@ -93,17 +91,18 @@ public class TimeBuckets {
     return result;
   }
 
-  /**
-   * Creates time-buckets, with the first value in the bucket being firstBucketValue (FBV). The time range represented
-   * by the buckets are:
-   * <pre>
-   *   (FBV - bucketSize.getSeconds(), FBV + (numElements - 1) * bucketSize.getSeconds()]
-   * </pre>
-   * The raw Long[] time values are:
-   * <pre>
-   *   FBV, FBV + bucketSize.getSeconds(), ... , FBV + (numElements - 1) * bucketSize.getSeconds()
-   * </pre>
-   */
+  /// Creates time-buckets, with the first value in the bucket being firstBucketValue (FBV). The time range represented
+  /// by the buckets are:
+  ///
+  /// ```
+  /// (FBV - bucketSize.getSeconds(), FBV + (numElements - 1) * bucketSize.getSeconds()]
+  /// ```
+  ///
+  /// The raw Long\[\] time values are:
+  ///
+  /// ```
+  /// FBV, FBV + bucketSize.getSeconds(), ... , FBV + (numElements - 1) * bucketSize.getSeconds()
+  /// ```
   public static TimeBuckets ofSeconds(long firstBucketValue, Duration bucketSize, int numElements) {
     long stepSize = bucketSize.getSeconds();
     Long[] timeBuckets = new Long[numElements];

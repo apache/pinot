@@ -22,10 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 
-/**
- * Class to represent the lineage entry.
- *
- */
+/// Class to represent the lineage entry.
 public class LineageEntry {
   private final List<String> _segmentsFrom;
   private final List<String> _segmentsTo;

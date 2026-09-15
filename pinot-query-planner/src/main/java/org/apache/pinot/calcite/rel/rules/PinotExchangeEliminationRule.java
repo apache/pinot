@@ -21,17 +21,14 @@ package org.apache.pinot.calcite.rel.rules;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
-/**
- * Special rule for Pinot, this rule eliminates {@link PinotLogicalExchange} when {@link RelDistribution} traits
- * are the same at this exchange node and at the node prior to this exchange node.
- */
+/// Special rule for Pinot, this rule eliminates [org.apache.pinot.calcite.rel.logical.PinotLogicalExchange]
+/// when [org.apache.calcite.rel.RelDistribution] traits are the same at this exchange node and at the node
+/// prior to this exchange node.
 public class PinotExchangeEliminationRule extends RelOptRule {
   public static final PinotExchangeEliminationRule INSTANCE =
       new PinotExchangeEliminationRule(PinotRuleUtils.PINOT_REL_FACTORY);

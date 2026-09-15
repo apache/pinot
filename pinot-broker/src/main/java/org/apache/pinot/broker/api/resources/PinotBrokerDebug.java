@@ -264,10 +264,8 @@ public class PinotBrokerDebug {
     }
   }
 
-  /**
-   * API to get a snapshot of ServerRoutingStatsEntry for all the servers.
-   * @return String containing server name and the associated routing stats.
-   */
+  /// API to get a snapshot of ServerRoutingStatsEntry for all the servers.
+  /// @return String containing server name and the associated routing stats.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/serverRoutingStats")

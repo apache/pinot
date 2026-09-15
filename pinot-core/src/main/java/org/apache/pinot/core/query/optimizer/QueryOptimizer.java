@@ -50,9 +50,7 @@ public class QueryOptimizer {
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       List.of(new AggregateFunctionRewriteOptimizer());
 
-  /**
-   * Optimizes the given query.
-   */
+  /// Optimizes the given query.
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {

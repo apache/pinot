@@ -25,9 +25,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * The {@code DistinctTable} stores the distinct records for the distinct queries.
- */
+/// The `DistinctTable` stores the distinct records for the distinct queries.
 public abstract class DistinctTable {
   // TODO: Tune the initial capacity
   public static final int MAX_INITIAL_CAPACITY = 10000;
@@ -47,88 +45,60 @@ public abstract class DistinctTable {
     _limitWithoutNull = limit;
   }
 
-  /**
-   * Returns the {@link DataSchema} of the DistinctTable.
-   */
+  /// Returns the [DataSchema] of the DistinctTable.
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
-  /**
-   * Returns the limit of the DistinctTable.
-   */
+  /// Returns the limit of the DistinctTable.
   public int getLimit() {
     return _limit;
   }
 
-  /**
-   * Returns {@code true} if the DistinctTable has limit, {@code false} otherwise.
-   */
+  /// Returns `true` if the DistinctTable has limit, `false` otherwise.
   public boolean hasLimit() {
     return _limit != Integer.MAX_VALUE;
   }
 
-  /**
-   * Returns {@code true} if the DistinctTable has null handling enabled, {@code false} otherwise.
-   */
+  /// Returns `true` if the DistinctTable has null handling enabled, `false` otherwise.
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
 
-  /**
-   * Adds a null value into the DistinctTable.
-   */
+  /// Adds a null value into the DistinctTable.
   public void addNull() {
     assert _nullHandlingEnabled;
     _hasNull = true;
     _limitWithoutNull = _limit - 1;
   }
 
-  /**
-   * Returns {@code true} if the DistinctTable has null, {@code false} otherwise.
-   */
+  /// Returns `true` if the DistinctTable has null, `false` otherwise.
   public boolean hasNull() {
     return _hasNull;
   }
 
-  /**
-   * Returns {@code true} if the DistinctTable has order-by, {@code false} otherwise.
-   */
+  /// Returns `true` if the DistinctTable has order-by, `false` otherwise.
   public abstract boolean hasOrderBy();
 
-  /**
-   * Merges another DistinctTable into the DistinctTable.
-   */
+  /// Merges another DistinctTable into the DistinctTable.
   public abstract void mergeDistinctTable(DistinctTable distinctTable);
 
-  /**
-   * Merges a DataTable into the DistinctTable.
-   */
+  /// Merges a DataTable into the DistinctTable.
   public abstract boolean mergeDataTable(DataTable dataTable);
 
-  /**
-   * Returns the number of unique rows within the DistinctTable.
-   */
+  /// Returns the number of unique rows within the DistinctTable.
   public abstract int size();
 
-  /**
-   * Returns whether the DistinctTable is already satisfied.
-   */
+  /// Returns whether the DistinctTable is already satisfied.
   public abstract boolean isSatisfied();
 
-  /**
-   * Returns the intermediate result as a list of rows (limit and sorting are not guaranteed).
-   */
+  /// Returns the intermediate result as a list of rows (limit and sorting are not guaranteed).
   public abstract List<Object[]> getRows();
 
-  /**
-   * Returns the intermediate result as a DataTable (limit and sorting are not guaranteed).
-   */
+  /// Returns the intermediate result as a DataTable (limit and sorting are not guaranteed).
   public abstract DataTable toDataTable()
       throws IOException;
 
-  /**
-   * Returns the final result as a ResultTable (limit applied, sorted if ordering is required).
-   */
+  /// Returns the final result as a ResultTable (limit applied, sorted if ordering is required).
   public abstract ResultTable toResultTable();
 }

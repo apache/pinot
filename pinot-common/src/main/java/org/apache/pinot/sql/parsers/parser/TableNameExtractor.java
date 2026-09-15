@@ -38,18 +38,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class to extract table names from Calcite SqlNode tree.
- */
+/// Helper class to extract table names from Calcite SqlNode tree.
 public class TableNameExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableNameExtractor.class);
 
-  /**
-   * Returns the name of all the tables used in a sql query.
-   *
-   * @param query The SQL query string to analyze
-   * @return name of all the tables used in a sql query, or null if parsing fails
-   */
+  /// Returns the name of all the tables used in a sql query.
+  ///
+  /// @param query The SQL query string to analyze
+  /// @return name of all the tables used in a sql query, or null if parsing fails
   @Nullable
   public static String[] resolveTableName(String query) {
     try {
@@ -64,12 +60,10 @@ public class TableNameExtractor {
     }
   }
 
-  /**
-   * Extracts table names from a multi-stage query using Calcite SQL AST traversal.
-   *
-   * @param sqlNode The root SqlNode of the parsed query
-   * @return Set of table names found in the query
-   */
+  /// Extracts table names from a multi-stage query using Calcite SQL AST traversal.
+  ///
+  /// @param sqlNode The root SqlNode of the parsed query
+  /// @return Set of table names found in the query
   private static Set<String> extractTableNamesFromPinotQuery(SqlNode sqlNode) {
     TableNameExtractor extractor = new TableNameExtractor();
     extractor.extractTableNames(sqlNode);
@@ -80,14 +74,12 @@ public class TableNameExtractor {
   private final Set<String> _cteNames = new HashSet<>();
   private boolean _inFromClause = false;
 
-  /**
-   * Returns the set of table names extracted from the SQL node tree.
-   * <p>
-   * This method should be called after {@link #extractTableNames(SqlNode)} has been invoked
-   * to populate the set of table names.
-   *
-   * @return Set of table names found in the SQL node tree
-   */
+  /// Returns the set of table names extracted from the SQL node tree.
+  ///
+  /// This method should be called after [#extractTableNames(SqlNode)] has been invoked
+  /// to populate the set of table names.
+  ///
+  /// @return Set of table names found in the SQL node tree
   public Set<String> getTableNames() {
     return _tableNames;
   }
@@ -239,9 +231,7 @@ public class TableNameExtractor {
     }
   }
 
-  /**
-   * Visit a SqlNodeList by visiting each node in the list.
-   */
+  /// Visit a SqlNodeList by visiting each node in the list.
   private void visitNodeList(SqlNodeList nodeList) {
     if (nodeList != null) {
       for (SqlNode node : nodeList) {
@@ -252,9 +242,7 @@ public class TableNameExtractor {
     }
   }
 
-  /**
-   * Handle WITH clause (CTE - Common Table Expression).
-   */
+  /// Handle WITH clause (CTE - Common Table Expression).
   private void visitWithClause(SqlNode node) {
     try {
       // WITH clause typically has operands: [with_list, query]
@@ -272,9 +260,7 @@ public class TableNameExtractor {
     }
   }
 
-  /**
-   * Generic method to visit node operands when specific handling is not available.
-   */
+  /// Generic method to visit node operands when specific handling is not available.
   private void visitNodeOperands(SqlNode node) {
     try {
       // Try to access operands through common interface

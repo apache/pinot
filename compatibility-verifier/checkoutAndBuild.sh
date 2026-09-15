@@ -98,7 +98,10 @@ function build() {
   local buildTests=$2
   local buildId=$3
   local buildCompatibilityVerifier=$4
-  local versionOption="-Djdk.version=21"
+  # Build each tree with its own pom jdk.version default: old commits may target an
+  # older Java release than the current tree (e.g. release-1.5.0 targets 11, current
+  # targets 25), and javac supports all of them via --release.
+  local versionOption=""
   local maxRetry=5
   local repoId=${buildId}
 

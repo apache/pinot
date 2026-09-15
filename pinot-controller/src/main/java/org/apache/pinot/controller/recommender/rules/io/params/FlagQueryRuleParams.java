@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
 
 
-/**
- * Thresholds and parameters used in FlagQueryRule
- */
+/// Thresholds and parameters used in FlagQueryRule
 public class FlagQueryRuleParams {
   // Maximum x in predicate "LIMIT x" beyond that the query is too expensive
   public Long _thresholdMaxLimitSize = DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;

@@ -23,17 +23,13 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * The value reader for var-length values (STRING and BYTES). See {@link VarLengthValueWriter} for the file layout.
- */
+/// The value reader for var-length values (STRING and BYTES). See [VarLengthValueWriter] for the file layout.
 public class VarLengthValueReader implements ValueReader {
   private final PinotDataBuffer _dataBuffer;
   private final int _numValues;
 
-  /**
-   * The offset of the data section in the buffer/store. This info will be persisted in the header
-   * so it has to be read from the buffer while initializing the store in read cases.
-   */
+  /// The offset of the data section in the buffer/store. This info will be persisted in the header
+  /// so it has to be read from the buffer while initializing the store in read cases.
   private final int _dataSectionStartOffSet;
 
   public VarLengthValueReader(PinotDataBuffer dataBuffer) {

@@ -211,7 +211,7 @@ public class PinotBrokerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables/{tableName}")
-  @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = Actions.Table.GET_BROKER)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_BROKER)
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   public List<InstanceInfo> getBrokersForTableV2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,

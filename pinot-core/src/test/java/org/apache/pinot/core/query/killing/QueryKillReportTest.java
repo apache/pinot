@@ -25,9 +25,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link QueryKillReport}.
- */
+/// Unit tests for [QueryKillReport].
 public class QueryKillReportTest {
 
   @Test

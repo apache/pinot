@@ -23,66 +23,47 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * A value aggregator that pre-aggregates on the input values for a specific type of aggregation.
- *
- * @param <R> Type of the raw value (non-aggregated)
- * @param <A> Type of the aggregated value
- */
+/// A value aggregator that pre-aggregates on the input values for a specific type of aggregation.
+///
+/// @param <R> Type of the raw value (non-aggregated)
+/// @param <A> Type of the aggregated value
 public interface ValueAggregator<R, A> {
 
-  /**
-   * Returns the type of the aggregation.
-   */
+  /// Returns the type of the aggregation.
   AggregationFunctionType getAggregationType();
 
-  /**
-   * Returns the data type of the aggregated value.
-   */
+  /// Returns the data type of the aggregated value.
   DataType getAggregatedValueType();
 
-  /**
-   * Returns the initial aggregated value.
-   * <p>NOTE: rawValue can be null when the aggregator is used for ingestion aggregation, and the column is not
-   * specified in the schema.
-   */
+  /// Returns the initial aggregated value.
+  ///
+  /// NOTE: rawValue can be null when the aggregator is used for ingestion aggregation, and the column is not
+  /// specified in the schema.
   A getInitialAggregatedValue(@Nullable R rawValue);
 
-  /**
-   * Applies a raw value to the current aggregated value.
-   * <p>NOTE: if value is mutable, will directly modify the value.
-   */
+  /// Applies a raw value to the current aggregated value.
+  ///
+  /// NOTE: if value is mutable, will directly modify the value.
   A applyRawValue(A value, R rawValue);
 
-  /**
-   * Applies an aggregated value to the current aggregated value.
-   * <p>NOTE: if value is mutable, will directly modify the value.
-   */
+  /// Applies an aggregated value to the current aggregated value.
+  ///
+  /// NOTE: if value is mutable, will directly modify the value.
   A applyAggregatedValue(A value, A aggregatedValue);
 
-  /**
-   * Clones an aggregated value.
-   */
+  /// Clones an aggregated value.
   A cloneAggregatedValue(A value);
 
-  /**
-   * Returns whether the aggregated value is of fixed size. Value aggregator can be used for ingestion aggregation only
-   * when the aggregated value is of fixed size.
-   */
+  /// Returns whether the aggregated value is of fixed size. Value aggregator can be used for ingestion aggregation only
+  /// when the aggregated value is of fixed size.
   boolean isAggregatedValueFixedSize();
 
-  /**
-   * Returns the maximum size in bytes of the aggregated values seen so far.
-   */
+  /// Returns the maximum size in bytes of the aggregated values seen so far.
   int getMaxAggregatedValueByteSize();
 
-  /**
-   * Serializes an aggregated value into a byte array.
-   */
+  /// Serializes an aggregated value into a byte array.
   byte[] serializeAggregatedValue(A value);
 
-  /**
-   * De-serializes an aggregated value from a byte array.
-   */
+  /// De-serializes an aggregated value from a byte array.
   A deserializeAggregatedValue(byte[] bytes);
 }

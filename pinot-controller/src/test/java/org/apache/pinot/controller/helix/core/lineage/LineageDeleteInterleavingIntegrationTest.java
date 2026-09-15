@@ -55,23 +55,20 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Integration tests for the lineage-aware segment delete check at the REST layer and across an interleaved
- * start/end/revert lifecycle.
- *
- * <p>This test:
- * <ul>
- *   <li>Drives every step through the REST endpoints.</li>
- *   <li>Walks a single table through all three lineage states with a delete attempt at every step.</li>
- *   <li>Re-reads the lineage znode after every API call (success or failure) to verify failed requests never
- *       mutate the entry.</li>
- *   <li>Verifies the retention path silently skips lineage-locked segments and that the lineage-cleanup pass
- *       uses the bypass delete path.</li>
- * </ul>
- *
- * <p>Each test uses unique segment names so the asynchronous {@code SegmentDeletionManager} cleanup cannot
- * interfere with later tests.
- */
+/// Integration tests for the lineage-aware segment delete check at the REST layer and across an interleaved
+/// start/end/revert lifecycle.
+///
+/// This test:
+///
+/// - Drives every step through the REST endpoints.
+/// - Walks a single table through all three lineage states with a delete attempt at every step.
+/// - Re-reads the lineage znode after every API call (success or failure) to verify failed requests never
+///      mutate the entry.
+/// - Verifies the retention path silently skips lineage-locked segments and that the lineage-cleanup pass
+///      uses the bypass delete path.
+///
+/// Each test uses unique segment names so the asynchronous `SegmentDeletionManager` cleanup cannot
+/// interfere with later tests.
 public class LineageDeleteInterleavingIntegrationTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String RAW_TABLE_NAME = "lineageInterleavingTable";
@@ -117,10 +114,8 @@ public class LineageDeleteInterleavingIntegrationTest {
         controllerConf, mock(ControllerMetrics.class), brokerServiceHelper);
   }
 
-  /**
-   * Subclass that exposes the package-protected {@link RetentionManager#processTable(String)} so this test
-   * (in a different package) can drive a single retention pass against a single table.
-   */
+  /// Subclass that exposes the package-protected [RetentionManager#processTable(String)] so this test
+  /// (in a different package) can drive a single retention pass against a single table.
   private static final class TestableRetentionManager extends RetentionManager {
     TestableRetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
         LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,

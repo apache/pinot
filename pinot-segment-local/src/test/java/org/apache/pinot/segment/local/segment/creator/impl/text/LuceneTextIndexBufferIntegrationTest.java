@@ -37,13 +37,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-/**
- * Integration test for the complete Lucene text index buffer flow:
- * 1. Create Lucene text index files in a directory
- * 2. Combine files using LuceneTextIndexCombined
- * 3. Read combined file via PinotDataBuffer
- * 4. Verify document search using LuceneTextIndexReader
- */
+/// Integration test for the complete Lucene text index buffer flow:
+/// 1. Create Lucene text index files in a directory
+/// 2. Combine files using LuceneTextIndexCombined
+/// 3. Read combined file via PinotDataBuffer
+/// 4. Verify document search using LuceneTextIndexReader
 public class LuceneTextIndexBufferIntegrationTest {
   private static final String COLUMN_NAME = "textColumn";
   private static final int NUM_DOCS = 4;
@@ -90,9 +88,7 @@ public class LuceneTextIndexBufferIntegrationTest {
     verifyBufferBasedSearch();
   }
 
-  /**
-   * Step 1: Create Lucene text index files in directory structure
-   */
+  /// Step 1: Create Lucene text index files in directory structure
   private void createLuceneIndexFiles() throws Exception {
     System.out.println("Creating Lucene index files in: " + _indexDir.getAbsolutePath());
 
@@ -122,9 +118,7 @@ public class LuceneTextIndexBufferIntegrationTest {
     System.out.println("Index files created and combined into single buffer file");
   }
 
-  /**
-   * Step 2: Verify combined file was created during seal()
-   */
+  /// Step 2: Verify combined file was created during seal()
   private void combineLuceneFiles() throws Exception {
     System.out.println("Verifying combined file: " + _combinedFile.getAbsolutePath());
 
@@ -135,9 +129,7 @@ public class LuceneTextIndexBufferIntegrationTest {
     System.out.println("Combined file verified: " + _combinedFile.length() + " bytes");
   }
 
-  /**
-   * Step 3: Read via PinotDataBuffer and verify search functionality
-   */
+  /// Step 3: Read via PinotDataBuffer and verify search functionality
   private void verifyBufferBasedSearch() throws Exception {
     System.out.println("Verifying buffer-based search functionality");
 
@@ -172,9 +164,7 @@ public class LuceneTextIndexBufferIntegrationTest {
     }
   }
 
-  /**
-   * Helper method to test a search query and verify results
-   */
+  /// Helper method to test a search query and verify results
   private void testSearchQuery(LuceneTextIndexReader reader, String query, String description) {
     try {
       System.out.println("Testing query: '" + query + "' - " + description);

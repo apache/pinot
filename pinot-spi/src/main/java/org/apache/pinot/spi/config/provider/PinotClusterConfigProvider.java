@@ -24,30 +24,22 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 
 
-/**
- * Interface for ZK cluster config providers. Will be registered with Helix to listen on cluster config changes and
- * will propagate changes to all registered listeners
- */
+/// Interface for ZK cluster config providers. Will be registered with Helix to listen on cluster config changes and
+/// will propagate changes to all registered listeners
 public interface PinotClusterConfigProvider {
-  /**
-   * Get the cluster configs
-   * @return map of cluster configs
-   */
+  /// Get the cluster configs
+  /// @return map of cluster configs
   Map<String, String> getClusterConfigs();
 
-  /**
-   * Register cluster config change listener
-   * @param clusterConfigChangeListener change listener to be registered to obtain cluster config changes
-   * @return returns 'true' if the registration was successful
-   */
+  /// Register cluster config change listener
+  /// @param clusterConfigChangeListener change listener to be registered to obtain cluster config changes
+  /// @return returns 'true' if the registration was successful
   boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener);
 
-  /**
-   * Calculates the set of keys that changed in ZK cluster configs between the old and new
-   * @param oldProperties map of previously cached ZK cluster configs
-   * @param newProperties map of newly fetched ZK cluster configs
-   * @return set of changed (added/deleted/updated) cluster config keys
-   */
+  /// Calculates the set of keys that changed in ZK cluster configs between the old and new
+  /// @param oldProperties map of previously cached ZK cluster configs
+  /// @param newProperties map of newly fetched ZK cluster configs
+  /// @return set of changed (added/deleted/updated) cluster config keys
   default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
     if (MapUtils.isEmpty(oldProperties)) {
       return newProperties.keySet();

@@ -22,17 +22,15 @@ import java.util.TreeMap;
 import javax.annotation.Nullable;
 
 
-/**
- * MIN / MAX window aggregator backed by a sorted multiset (a {@link TreeMap} of value to occurrence count). Unlike the
- * monotonic-deque aggregators used for sliding-window MIN / MAX, this aggregator supports removal of arbitrary values
- * in any order — necessary for window frames with a non-default {@code EXCLUDE} clause. Add / remove / query are all
- * {@code O(log K)} where {@code K} is the number of distinct values currently in the window.
- *
- * <p>All non-null values added to a single instance must implement {@link Comparable} and share a runtime type that is
- * mutually comparable; mixing types (e.g. {@code Integer} and {@code Long}) is undefined. Callers obtain instances
- * through {@link WindowValueAggregatorFactory}, which guarantees this because window function values come from a single
- * typed input column. {@code removeValue} for a value not currently present is a no-op.
- */
+/// MIN / MAX window aggregator backed by a sorted multiset (a [TreeMap] of value to occurrence count). Unlike the
+/// monotonic-deque aggregators used for sliding-window MIN / MAX, this aggregator supports removal of arbitrary values
+/// in any order — necessary for window frames with a non-default `EXCLUDE` clause. Add / remove / query are all
+/// `O(log K)` where `K` is the number of distinct values currently in the window.
+///
+/// All non-null values added to a single instance must implement [Comparable] and share a runtime type that is
+/// mutually comparable; mixing types (e.g. `Integer` and `Long`) is undefined. Callers obtain instances
+/// through [WindowValueAggregatorFactory], which guarantees this because window function values come from a
+/// single typed input column. `removeValue` for a value not currently present is a no-op.
 public class SortedMultisetMinMaxWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final TreeMap<Object, Integer> _counts = new TreeMap<>(SortedMultisetMinMaxWindowValueAggregator::compare);

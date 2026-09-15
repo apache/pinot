@@ -55,9 +55,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement ImportData command.
- */
+/// Class to implement ImportData command.
 @SuppressWarnings("unused")
 @CommandLine.Command(name = "ImportData", mixinStandardHelpOptions = true)
 public class ImportDataCommand extends AbstractDatabaseBaseAdminCommand implements Command {

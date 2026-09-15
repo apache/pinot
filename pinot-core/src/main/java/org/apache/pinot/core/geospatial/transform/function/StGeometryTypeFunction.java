@@ -31,9 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Function that returns the type of the geometry as a string.
- */
+/// Function that returns the type of the geometry as a string.
 public class StGeometryTypeFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   public static final String FUNCTION_NAME = "ST_GEOMETRY_TYPE";

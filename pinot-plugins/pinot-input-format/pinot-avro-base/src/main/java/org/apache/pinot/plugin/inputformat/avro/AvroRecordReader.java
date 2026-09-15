@@ -30,9 +30,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Record reader for AVRO file.
- */
+/// Record reader for AVRO file.
 public class AvroRecordReader implements RecordReader {
   private File _dataFile;
   private AvroRecordExtractor _recordExtractor;

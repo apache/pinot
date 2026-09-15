@@ -23,10 +23,8 @@ import java.util.Map;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 
 
-/**
- * This class is used to capture resource utilization information for all instances. The periodic task,
- * <code>ResourceUtilizationChecker</code>, will update this information.
- */
+/// This class is used to capture resource utilization information for all instances. The periodic task,
+/// `ResourceUtilizationChecker`, will update this information.
 public class ResourceUtilizationInfo {
 
   private ResourceUtilizationInfo() {

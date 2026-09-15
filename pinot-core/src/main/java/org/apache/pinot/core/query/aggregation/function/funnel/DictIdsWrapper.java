@@ -27,15 +27,13 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Holds per-step RoaringBitmaps keyed by correlation dictionary IDs.
- *
- * <p>For single-key CORRELATE_BY, stores raw dictionary IDs directly in the bitmaps (compact, fits in one
- * RoaringBitmap container for typical segment sizes).
- *
- * <p>For multi-key CORRELATE_BY, composite IDs are assigned via stride-based arithmetic (when the combined key
- * space fits in int) or a HashMap fallback for large key spaces.
- */
+/// Holds per-step RoaringBitmaps keyed by correlation dictionary IDs.
+///
+/// For single-key CORRELATE_BY, stores raw dictionary IDs directly in the bitmaps (compact, fits in one
+/// RoaringBitmap container for typical segment sizes).
+///
+/// For multi-key CORRELATE_BY, composite IDs are assigned via stride-based arithmetic (when the combined key
+/// space fits in int) or a HashMap fallback for large key spaces.
 final class DictIdsWrapper {
   final Dictionary[] _dictionaries;
   final RoaringBitmap[] _stepsBitmaps;
@@ -109,10 +107,8 @@ final class DictIdsWrapper {
     return _compositeKeyMap != null;
   }
 
-  /**
-   * Maps a tuple of per-column dictionary IDs to a single composite int suitable for RoaringBitmap.
-   * Only used for multi-key; for single-key, callers should add the dictId directly.
-   */
+  /// Maps a tuple of per-column dictionary IDs to a single composite int suitable for RoaringBitmap.
+  /// Only used for multi-key; for single-key, callers should add the dictId directly.
   int getCompositeCorrelationId(int[] dictIds) {
     if (_strides != null) {
       int id = 0;
@@ -136,10 +132,8 @@ final class DictIdsWrapper {
     return id;
   }
 
-  /**
-   * Builds a collision-free composite string from dictionary values using length-prefix encoding.
-   * Each component is encoded as {@code length:value}, e.g. ("alice", "home") becomes "5:alice4:home".
-   */
+  /// Builds a collision-free composite string from dictionary values using length-prefix encoding.
+  /// Each component is encoded as `length:value`, e.g. ("alice", "home") becomes "5:alice4:home".
   static String toCompositeString(Dictionary[] dictionaries, int[] dictIds) {
     StringBuilder sb = new StringBuilder();
     for (int k = 0; k < dictionaries.length; k++) {
@@ -149,9 +143,7 @@ final class DictIdsWrapper {
     return sb.toString();
   }
 
-  /**
-   * Reverse-maps a composite ID back to per-column dictionary IDs.
-   */
+  /// Reverse-maps a composite ID back to per-column dictionary IDs.
   void reverseCompositeId(int compositeId, int[] outDictIds) {
     if (_strides != null) {
       int remaining = compositeId;

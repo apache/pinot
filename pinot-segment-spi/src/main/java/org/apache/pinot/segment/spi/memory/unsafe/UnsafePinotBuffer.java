@@ -24,12 +24,9 @@ import java.nio.ByteOrder;
 import org.apache.pinot.segment.spi.memory.ByteBufferUtil;
 import org.apache.pinot.segment.spi.memory.NonNativePinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import sun.misc.Unsafe;
 
 
-/**
- * A {@link PinotDataBuffer} that uses {@link Unsafe} and can only read native byte order.
- */
+/// A [PinotDataBuffer] that uses [sun.misc.Unsafe] and can only read native byte order.
 public class UnsafePinotBuffer extends PinotDataBuffer {
 
   private final long _address;

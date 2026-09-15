@@ -52,27 +52,25 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * The <code>ForwardIndexDisabledSingleValueQueriesTest</code> class sets up the index segment for the no forward
- * index single-value queries test.
- * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, FwdIndexDisabled: S1, S2, HasRangeIndex,
- *   HasDictionary
- *   <li>column1, METRIC, INT, 6582, F, F, F, F, F, T</li>
- *   <li>column3, METRIC, INT, 21910, F, F, F, F, F, T</li>
- *   <li>column5, DIMENSION, STRING, 1, T, F, F, F, F, T</li>
- *   <li>column6, DIMENSION, INT, 608, F, T, T, T, T, T</li>
- *   <li>column7, DIMENSION, INT, 146, F, T, T, F, F, T</li>
- *   <li>column9, DIMENSION, INT, 1737, F, F, F, F, F, F</li>
- *   <li>column11, DIMENSION, STRING, 5, F, T, F, F, F, T</li>
- *   <li>column12, DIMENSION, STRING, 5, F, F, F, F, F, T</li>
- *   <li>column17, METRIC, INT, 24, F, T, F, F, F, T, T</li>
- *   <li>column18, METRIC, INT, 1440, F, T, F, F, F, T</li>
- *   <li>daysSinceEpoch, TIME, INT, 2, T, F, F, F, F, T</li>
- * </ul>
- */
+/// The `ForwardIndexDisabledSingleValueQueriesTest` class sets up the index segment for the no forward
+/// index single-value queries test.
+///
+/// There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, FwdIndexDisabled: S1, S2, HasRangeIndex,
+///   HasDictionary
+/// - column1, METRIC, INT, 6582, F, F, F, F, F, T
+/// - column3, METRIC, INT, 21910, F, F, F, F, F, T
+/// - column5, DIMENSION, STRING, 1, T, F, F, F, F, T
+/// - column6, DIMENSION, INT, 608, F, T, T, T, T, T
+/// - column7, DIMENSION, INT, 146, F, T, T, F, F, T
+/// - column9, DIMENSION, INT, 1737, F, F, F, F, F, F
+/// - column11, DIMENSION, STRING, 5, F, T, F, F, F, T
+/// - column12, DIMENSION, STRING, 5, F, F, F, F, F, T
+/// - column17, METRIC, INT, 24, F, T, F, F, F, T, T
+/// - column18, METRIC, INT, 1440, F, T, F, F, F, T
+/// - daysSinceEpoch, TIME, INT, 2, T, F, F, F, F, T
 public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), ForwardIndexDisabledSingleValueQueriesTest.class.getSimpleName());

@@ -144,9 +144,7 @@ public class BenchmarkSplitPart {
     return StringFunctions.splitPart(_input, _delimiter, _index);
   }
 
-  /**
-   * Original implementation that allocates full String array
-   */
+  /// Original implementation that allocates full String array
   public static String splitPartOld(String input, String delimiter, int index) {
     String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
     if (index >= 0 && index < splitString.length) {

@@ -38,16 +38,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Scheduler implementation that supports query admission control based on workload-specific budgets.
- *
- * <p>This class integrates with the {@link WorkloadBudgetManager} to apply CPU and memory budget enforcement
- * for different workloads, including primary and secondary workloads.</p>
- *
- * <p>Secondary workload configuration is used for queries tagged as "secondary". Queries that exceed their budget
- * will be rejected.</p>
- *
- */
+/// Scheduler implementation that supports query admission control based on workload-specific budgets.
+///
+/// This class integrates with the [WorkloadBudgetManager] to apply CPU and memory budget enforcement
+/// for different workloads, including primary and secondary workloads.
+///
+/// Secondary workload configuration is used for queries tagged as "secondary". Queries that exceed their budget
+/// will be rejected.
 public class WorkloadScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadScheduler.class);
 

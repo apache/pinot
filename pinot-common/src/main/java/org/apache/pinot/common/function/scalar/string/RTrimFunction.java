@@ -28,10 +28,8 @@ public class RTrimFunction {
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
   private final Matcher _matcher = RTRIM.matcher("");
 
-  /**
-   * @param input input
-   * @return trim spaces from right side of the string
-   */
+  /// @param input input
+  /// @return trim spaces from right side of the string
   @ScalarFunction
   public String rtrim(String input) {
     return _matcher.reset(input).replaceAll("");

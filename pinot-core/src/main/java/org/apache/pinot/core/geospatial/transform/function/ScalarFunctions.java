@@ -30,33 +30,27 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
 
-/**
- * Geospatial scalar functions that can be used in transformation.
- */
+/// Geospatial scalar functions that can be used in transformation.
 public class ScalarFunctions {
   private ScalarFunctions() {
   }
 
-  /**
-   * Creates a point.
-   *
-   * @param x x
-   * @param y y
-   * @return the created point
-   */
+  /// Creates a point.
+  ///
+  /// @param x x
+  /// @param y y
+  /// @return the created point
   @ScalarFunction
   public static byte[] stPoint(double x, double y) {
     return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
   }
 
-  /**
-   * Creates a point.
-   *
-   * @param x x
-   * @param y y
-   * @param isGeography if it's geography
-   * @return the created point
-   */
+  /// Creates a point.
+  ///
+  /// @param x x
+  /// @param y y
+  /// @param isGeography if it's geography
+  /// @return the created point
   @ScalarFunction
   public static byte[] stPoint(double x, double y, Object isGeography) {
     Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y));
@@ -66,99 +60,79 @@ public class ScalarFunctions {
     return GeometrySerializer.serialize(point);
   }
 
-  /**
-   * Reads a geometry object from the WKT format.
-   */
+  /// Reads a geometry object from the WKT format.
   @ScalarFunction
   public static byte[] stGeomFromText(String wkt)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKT_READER.read(wkt));
   }
 
-  /**
-   * Reads a geography object from the WKT format.
-   */
+  /// Reads a geography object from the WKT format.
   @ScalarFunction
   public static byte[] stGeogFromText(String wkt)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKT_READER.read(wkt));
   }
 
-  /**
-   * Reads a geometry object from the GeoJSON format.
-   */
+  /// Reads a geometry object from the GeoJSON format.
   @ScalarFunction
   public static byte[] stGeomFromGeoJson(String geoJson)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_GEO_JSON_READER.read(geoJson));
   }
 
-  /**
-   * Reads a geography object from the GeoJSon format.
-   */
+  /// Reads a geography object from the GeoJSon format.
   @ScalarFunction
   public static byte[] stGeogFromGeoJson(String geoJson)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_GEO_JSON_READER.read(geoJson));
   }
 
-  /**
-   * Reads a geometry object from the WKB format.
-   */
+  /// Reads a geometry object from the WKB format.
   @ScalarFunction
   public static byte[] stGeomFromWKB(byte[] wkb)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKB_READER.read(wkb));
   }
 
-  /**
-   * Reads a geography object from the WKB format.
-   */
+  /// Reads a geography object from the WKB format.
   @ScalarFunction
   public static byte[] stGeogFromWKB(byte[] wkb)
       throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKB_READER.read(wkb));
   }
 
-  /**
-   * Saves the geometry object as WKT format.
-   *
-   * @param bytes the serialized geometry object
-   * @return the geometry in WKT
-   */
+  /// Saves the geometry object as WKT format.
+  ///
+  /// @param bytes the serialized geometry object
+  /// @return the geometry in WKT
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
     return GeometryUtils.WKT_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
-  /**
-   * Saves the geometry object in GeoJSON format.
-   *
-   * @param bytes the serialized geometry object
-   * @return the geometry in GeoJSON
-   */
+  /// Saves the geometry object in GeoJSON format.
+  ///
+  /// @param bytes the serialized geometry object
+  /// @return the geometry in GeoJSON
   @ScalarFunction
   public static String stAsGeoJson(byte[] bytes) {
     return GeometryUtils.GEO_JSON_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
-  /**
-   * Saves the geometry object as WKB format.
-   *
-   * @param bytes the serialized geometry object
-   * @return the geometry in WKB
-   */
+  /// Saves the geometry object as WKB format.
+  ///
+  /// @param bytes the serialized geometry object
+  /// @return the geometry in WKB
   @ScalarFunction
   public static byte[] stAsBinary(byte[] bytes) {
     return GeometryUtils.WKB_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
-  /**
-   * Converts a Geometry object to a spherical geography object.
-   *
-   * @param bytes the serialized geometry object
-   * @return the geographical object
-   */
+  /// Converts a Geometry object to a spherical geography object.
+  ///
+  /// @param bytes the serialized geometry object
+  /// @return the geographical object
   @ScalarFunction
   public static byte[] toSphericalGeography(byte[] bytes) {
     Geometry geometry = GeometrySerializer.deserialize(bytes);
@@ -166,12 +140,10 @@ public class ScalarFunctions {
     return GeometrySerializer.serialize(geometry);
   }
 
-  /**
-   * Converts a spherical geographical object to a Geometry object.
-   *
-   * @param bytes the serialized geographical object
-   * @return the geometry object
-   */
+  /// Converts a spherical geographical object to a Geometry object.
+  ///
+  /// @param bytes the serialized geographical object
+  /// @return the geometry object
   @ScalarFunction
   public static byte[] toGeometry(byte[] bytes) {
     Geometry geometry = GeometrySerializer.deserialize(bytes);
@@ -179,24 +151,20 @@ public class ScalarFunctions {
     return GeometrySerializer.serialize(geometry);
   }
 
-  /**
-   * Gets the H3 hexagon address from the location
-   * @param latitude latitude of the location
-   * @param longitude longitude of the location
-   * @param resolution H3 index resolution
-   * @return the H3 index address
-   */
+  /// Gets the H3 hexagon address from the location
+  /// @param latitude latitude of the location
+  /// @param longitude longitude of the location
+  /// @param resolution H3 index resolution
+  /// @return the H3 index address
   @ScalarFunction
   public static long geoToH3(double longitude, double latitude, int resolution) {
     return H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
   }
 
-  /**
-   * Gets the H3 hexagon address from the location
-   * @param geoBytes ST_point serialized bytes
-   * @param resolution H3 index resolution
-   * @return the H3 index address
-   */
+  /// Gets the H3 hexagon address from the location
+  /// @param geoBytes ST_point serialized bytes
+  /// @param resolution H3 index resolution
+  /// @return the H3 index address
   @ScalarFunction
   public static long geoToH3(byte[] geoBytes, int resolution) {
     Geometry geometry = GeometrySerializer.deserialize(geoBytes);
@@ -255,12 +223,10 @@ public class ScalarFunctions {
     return firstGeometry.within(secondGeometry) ? 1 : 0;
   }
 
-  /**
-   * Gets the grid distance between two H3 indexes by finding the minimum number of grid cells that must be traversed
-   * @param firstH3Index first H3 index
-   * @param secondH3Index second H3 index
-   * @return the grid distance between the two H3 indexes
-   */
+  /// Gets the grid distance between two H3 indexes by finding the minimum number of grid cells that must be traversed
+  /// @param firstH3Index first H3 index
+  /// @param secondH3Index second H3 index
+  /// @return the grid distance between the two H3 indexes
   @ScalarFunction
   public static long gridDistance(long firstH3Index, long secondH3Index) {
     if (firstH3Index == secondH3Index) {
@@ -269,14 +235,12 @@ public class ScalarFunctions {
     return H3Utils.H3_CORE.gridDistance(firstH3Index, secondH3Index);
   }
 
-  /**
-   * Returns all H3 indexes within a specified hexagonal grid distance from a given origin index. The function considers
-   * hexagonal traversal rules and accounts for wrapping around pentagons.
-   *
-   * @param origin The starting H3 index from which to compute the grid disk.
-   * @param k      The radius of the disk in hexagonal grid steps.
-   * @return An array of H3 indexes within the specified distance from the origin.
-   */
+  /// Returns all H3 indexes within a specified hexagonal grid distance from a given origin index. The function
+  /// considers hexagonal traversal rules and accounts for wrapping around pentagons.
+  ///
+  /// @param origin The starting H3 index from which to compute the grid disk.
+  /// @param k      The radius of the disk in hexagonal grid steps.
+  /// @return An array of H3 indexes within the specified distance from the origin.
   @ScalarFunction
   public static long[] gridDisk(long origin, int k) {
     List<Long> diskCells = H3Utils.H3_CORE.gridDisk(origin, k);

@@ -32,16 +32,14 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * The <code>PinotSegmentConvertCommand</code> class provides tools to convert Pinot segments into another format.
- * <p>Currently support converting Pinot segments to:
- * <ul>
- *   <li>AVRO format</li>
- *   <li>CSV format</li>
- *   <li>JSON format</li>
- *   <li>PARQUET format</li>
- * </ul>
- */
+/// The `PinotSegmentConvertCommand` class provides tools to convert Pinot segments into another format.
+///
+/// Currently support converting Pinot segments to:
+///
+/// - AVRO format
+/// - CSV format
+/// - JSON format
+/// - PARQUET format
 @SuppressWarnings("FieldCanBeLocal")
 @CommandLine.Command(name = "PinotSegmentConvert", mixinStandardHelpOptions = true)
 public class PinotSegmentConvertCommand extends AbstractBaseCommand implements Command {

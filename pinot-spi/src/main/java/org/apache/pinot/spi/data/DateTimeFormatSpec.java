@@ -33,9 +33,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
 
-/**
- * Class to represent format from {@link DateTimeFieldSpec}
- */
+/// Class to represent format from [DateTimeFieldSpec]
 public class DateTimeFormatSpec {
 
   // Colon format: 'size:timeUnit:timeFormat:pattern tz(timeZone)'
@@ -263,15 +261,12 @@ public class DateTimeFormatSpec {
     return _patternSpec;
   }
 
-  /**
-   * Converts the time in millis to the date time format.
-   * <ul>
-   *   <li>Given timeMs=1498892400000 and format='1:HOURS:EPOCH', returns 1498892400000/(1000*60*60)='416359'</li>
-   *   <li>Given timeMs=1498892400000 and format='5:MINUTES:EPOCH', returns 1498892400000/(1000*60*5)='4996308'</li>
-   *   <li>Given timeMs=1498892400000 and format='1:MILLISECONDS:TIMESTAMP', returns '2017-07-01 00:00:00.0'</li>
-   *   <li>Given timeMs=1498892400000 and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns '20170701'</li>
-   * </ul>
-   */
+  /// Converts the time in millis to the date time format.
+  ///
+  /// - Given timeMs=1498892400000 and format='1:HOURS:EPOCH', returns 1498892400000/(1000\*60\*60)='416359'
+  /// - Given timeMs=1498892400000 and format='5:MINUTES:EPOCH', returns 1498892400000/(1000\*60\*5)='4996308'
+  /// - Given timeMs=1498892400000 and format='1:MILLISECONDS:TIMESTAMP', returns '2017-07-01 00:00:00.0'
+  /// - Given timeMs=1498892400000 and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns '20170701'
   public String fromMillisToFormat(long timeMs) {
     switch (_patternSpec.getTimeFormat()) {
       case EPOCH:
@@ -290,16 +285,13 @@ public class DateTimeFormatSpec {
     }
   }
 
-  /**
-   * Converts the date time value to the time in millis.
-   * <ul>
-   *   <li>Given dateTimeValue='416359' and format='1:HOURS:EPOCH', returns 416359*(1000*60*60)=1498892400000</li>
-   *   <li>Given dateTimeValue='4996308' and format='5:MINUTES:EPOCH', returns 4996308*(1000*60*5)=1498892400000</li>
-   *   <li>Given dateTimeValue='2017-07-01 00:00:00' and format='1:MILLISECONDS:TIMESTAMP', returns 1498892400000</li>
-   *   <li>Given dateTimeValue='1498892400000' and format='1:DAYS:TIMESTAMP', returns 1498892400000</li>
-   *   <li>Given dateTimeValue='20170701' and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns 1498892400000</li>
-   * </ul>
-   */
+  /// Converts the date time value to the time in millis.
+  ///
+  /// - Given dateTimeValue='416359' and format='1:HOURS:EPOCH', returns 416359\*(1000\*60\*60)=1498892400000
+  /// - Given dateTimeValue='4996308' and format='5:MINUTES:EPOCH', returns 4996308\*(1000\*60\*5)=1498892400000
+  /// - Given dateTimeValue='2017-07-01 00:00:00' and format='1:MILLISECONDS:TIMESTAMP', returns 1498892400000
+  /// - Given dateTimeValue='1498892400000' and format='1:DAYS:TIMESTAMP', returns 1498892400000
+  /// - Given dateTimeValue='20170701' and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns 1498892400000
   public long fromFormatToMillis(String dateTimeValue) {
     switch (_patternSpec.getTimeFormat()) {
       case EPOCH:

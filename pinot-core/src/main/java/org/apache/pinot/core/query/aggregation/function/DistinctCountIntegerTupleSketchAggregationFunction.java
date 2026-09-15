@@ -30,8 +30,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerTupleSketchAggregationFunction {
 
   public DistinctCountIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments,
-      IntegerSummary.Mode mode) {
-    super(arguments, mode);
+      IntegerSummary.Mode mode, boolean nullHandlingEnabled) {
+    super(arguments, mode, nullHandlingEnabled);
   }
 
   // TODO if extra aggregation modes are supported, make this switch
@@ -47,6 +47,7 @@ public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerT
 
   @Override
   public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    // Nothing aggregated: an empty sketch estimates to 0 in either mode, so the counting answer is the same
     if (accumulator == null) {
       return 0L;
     }

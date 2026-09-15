@@ -23,9 +23,7 @@ import com.google.common.primitives.Chars;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Utility for converting regex patterns.
- */
+/// Utility for converting regex patterns.
 public class RegexpPatternConverterUtils {
   private RegexpPatternConverterUtils() {
   }
@@ -40,14 +38,12 @@ public class RegexpPatternConverterUtils {
   };
   public static final char BACK_SLASH = '\\';
 
-  /**
-   * Validates and converts a single character match parameter to case sensitivity.
-   * Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.
-   *
-   * @param matchParameter the match parameter string
-   * @return true if case-insensitive, false if case-sensitive
-   * @throws IllegalArgumentException if the parameter is invalid
-   */
+  /// Validates and converts a single character match parameter to case sensitivity.
+  /// Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.
+  ///
+  /// @param matchParameter the match parameter string
+  /// @return true if case-insensitive, false if case-sensitive
+  /// @throws IllegalArgumentException if the parameter is invalid
   public static boolean isCaseInsensitive(String matchParameter) {
     if (StringUtils.isEmpty(matchParameter)) {
       return false;
@@ -69,9 +65,7 @@ public class RegexpPatternConverterUtils {
     }
   }
 
-  /**
-   * Converts a LIKE pattern into REGEXP_LIKE pattern.
-   */
+  /// Converts a LIKE pattern into REGEXP_LIKE pattern.
   public static String likeToRegexpLike(String likePattern) {
     int start = 0;
     int end = likePattern.length();
@@ -108,17 +102,15 @@ public class RegexpPatternConverterUtils {
     return escapeMetaCharsAndWildcards(likePattern, prefix, suffix);
   }
 
-  /**
-   * Escapes the provided pattern by considering the following constraints:
-   * <ul>
-   *     <li> SQL wildcards escaping is handled (_, %) </li>
-   *     <li> Regex meta characters escaping is handled </li>
-   * </ul>
-   * @param input the provided input string
-   * @param prefix the prefix to be added to the output string
-   * @param suffix the suffix to be added to the output string
-   * @return the final output string
-   */
+  /// Escapes the provided pattern by considering the following constraints:
+  ///
+  /// - SQL wildcards escaping is handled (\_, %)
+  /// - Regex meta characters escaping is handled
+  ///
+  /// @param input the provided input string
+  /// @param prefix the prefix to be added to the output string
+  /// @param suffix the suffix to be added to the output string
+  /// @return the final output string
   private static String escapeMetaCharsAndWildcards(String input, String prefix, String suffix) {
     StringBuilder sb = new StringBuilder();
     sb.append(prefix);
@@ -180,9 +172,7 @@ public class RegexpPatternConverterUtils {
     return -1;
   }
 
-  /**
-   * Converts a REGEXP_LIKE pattern into Lucene REGEXP pattern.
-   */
+  /// Converts a REGEXP_LIKE pattern into Lucene REGEXP pattern.
   public static String regexpLikeToLuceneRegExp(String regexpLikePattern) {
     if (regexpLikePattern.isEmpty()) {
       return regexpLikePattern;

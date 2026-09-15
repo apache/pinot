@@ -27,9 +27,7 @@ import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
 
 
-/**
- * UDF for array function.
- */
+/// UDF for array function.
 @AutoService(Udf.class)
 public class ArrayUdf extends Udf.FromAnnotatedMethod {
   public ArrayUdf()

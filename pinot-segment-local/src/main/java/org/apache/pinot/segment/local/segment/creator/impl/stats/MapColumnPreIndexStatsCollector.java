@@ -41,20 +41,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for Map column type.
- *
- * The Map column type is different from other columns in that it is essentially recursive. It contains keys
- * and those keys are analogous to columns and, as such, have Key level statistics. So, this class keeps track of
- * Map column level statistics _and_ Key level statistics. The Key Level statistics can then be used during
- * the creation of the Immutable Segment to make decisions about how keys will be stored or what Map data structure
- * to use.
- *
- * Assumptions that are made:
- * 1. Each key has a single type for the value's associated with it across all documents.
- * 2. At this point in the  Pinot process, the type consistency of a key should already be enforced, so if a
- * heterogeneous value types for a key are encountered will construct the Map statistics it can be raised as a fault.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for Map column type.
+///
+/// The Map column type is different from other columns in that it is essentially recursive. It contains keys
+/// and those keys are analogous to columns and, as such, have Key level statistics. So, this class keeps track of
+/// Map column level statistics \_and\_ Key level statistics. The Key Level statistics can then be used during
+/// the creation of the Immutable Segment to make decisions about how keys will be stored or what Map data structure
+/// to use.
+///
+/// Assumptions that are made:
+/// 1. Each key has a single type for the value's associated with it across all documents.
+/// 2. At this point in the  Pinot process, the type consistency of a key should already be enforced, so if a
+/// heterogeneous value types for a key are encountered will construct the Map statistics it can be raised as a fault.
 public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(MapColumnPreIndexStatsCollector.class);
   private final Object2ObjectOpenHashMap<String, AbstractColumnStatisticsCollector> _keyStats =
@@ -276,12 +274,10 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
   }
 
-  /**
-   * Create a Stats Collector for each Key in the Map.
-   *
-   * NOTE: this could raise an issue if there are millions of keys with very few values (Sparse keys, in other words).
-   * So a less memory intensive option may be better for this.
-   */
+  /// Create a Stats Collector for each Key in the Map.
+  ///
+  /// NOTE: this could raise an issue if there are millions of keys with very few values (Sparse keys, in other words).
+  /// So a less memory intensive option may be better for this.
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, Object value) {
     // Get the type of the value
     PinotDataType type = PinotDataType.getSingleValueType(value);
@@ -352,10 +348,8 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     return stringKeyStats;
   }
 
-  /**
-   * Convert Map value data type to stored field type.
-   * Note that all unknown types are automatically converted to String type.
-   */
+  /// Convert Map value data type to stored field type.
+  /// Note that all unknown types are automatically converted to String type.
   private static FieldSpec.DataType convertToDataType(PinotDataType pinotDataType) {
     switch (pinotDataType) {
       case BOOLEAN:

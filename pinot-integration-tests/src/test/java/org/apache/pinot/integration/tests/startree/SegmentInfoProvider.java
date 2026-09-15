@@ -35,10 +35,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
-/**
- * Given a segment directory, pick all segments and read the dictionaries for all single-value dimension columns.
- * Here we will treat time column (if exists) as a single-value dimension column.
- */
+/// Given a segment directory, pick all segments and read the dictionaries for all single-value dimension columns.
+/// Here we will treat time column (if exists) as a single-value dimension column.
 public class SegmentInfoProvider {
   private static final String TMP_DIR = FileUtils.getTempDirectoryPath();
   private static final String SEGMENT_INFO_PROVIDER = "segmentInfoProvider";
@@ -47,14 +45,12 @@ public class SegmentInfoProvider {
   private final List<String> _metricColumns;
   private final Map<String, List<Object>> _singleValueDimensionValuesMap;
 
-  /**
-   * Assume that segments directory has at least one segment.
-   * - Gets all single-value dimension/metric columns from the directory.
-   * - Reads dictionaries for all single-value dimension columns.
-   *
-   * @param segmentDirName Name of directory containing tarred/untarred segments.
-   * @throws Exception
-   */
+  /// Assume that segments directory has at least one segment.
+  /// - Gets all single-value dimension/metric columns from the directory.
+  /// - Reads dictionaries for all single-value dimension columns.
+  ///
+  /// @param segmentDirName Name of directory containing tarred/untarred segments.
+  /// @throws Exception
   public SegmentInfoProvider(String segmentDirName)
       throws Exception {
     Set<String> uniqueMetrics = new HashSet<>();
@@ -75,18 +71,16 @@ public class SegmentInfoProvider {
     }
   }
 
-  /**
-   * Read the metadata of the given segmentFile and collect:
-   * - Unique metric columns
-   * - Unique single-value dimension columns
-   * - Unique values for each single-value dimension columns
-   *
-   * @param segmentFile segment file.
-   * @param uniqueMetrics unique metric columns buffer.
-   * @param uniqueSingleValueDimensions unique single-value dimension columns buffer.
-   * @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
-   * @throws Exception
-   */
+  /// Read the metadata of the given segmentFile and collect:
+  /// - Unique metric columns
+  /// - Unique single-value dimension columns
+  /// - Unique values for each single-value dimension columns
+  ///
+  /// @param segmentFile segment file.
+  /// @param uniqueMetrics unique metric columns buffer.
+  /// @param uniqueSingleValueDimensions unique single-value dimension columns buffer.
+  /// @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
+  /// @throws Exception
   private void readOneSegment(File segmentFile, Set<String> uniqueMetrics, Set<String> uniqueSingleValueDimensions,
       Map<String, Set<Object>> singleValueDimensionValuesMap)
       throws Exception {
@@ -138,13 +132,11 @@ public class SegmentInfoProvider {
     }
   }
 
-  /**
-   * Helper method to load values for a single-value dimension.
-   *
-   * @param indexSegment index segment.
-   * @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
-   * @param column single-value dimension name.
-   */
+  /// Helper method to load values for a single-value dimension.
+  ///
+  /// @param indexSegment index segment.
+  /// @param singleValueDimensionValuesMap single-value dimension columns to unique values map buffer.
+  /// @param column single-value dimension name.
   private void loadValuesForSingleValueDimension(IndexSegment indexSegment,
       Map<String, Set<Object>> singleValueDimensionValuesMap, String column) {
     Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
@@ -161,29 +153,23 @@ public class SegmentInfoProvider {
     }
   }
 
-  /**
-   * Return the list of single-value dimension columns.
-   *
-   * @return single-value dimension columns.
-   */
+  /// Return the list of single-value dimension columns.
+  ///
+  /// @return single-value dimension columns.
   public List<String> getSingleValueDimensionColumns() {
     return _singleValueDimensionColumns;
   }
 
-  /**
-   * Return the list of metric columns
-   *
-   * @return metric columns.
-   */
+  /// Return the list of metric columns
+  ///
+  /// @return metric columns.
   public List<String> getMetricColumns() {
     return _metricColumns;
   }
 
-  /**
-   * Return the map from single-value dimension names to values list for the column.
-   *
-   * @return map from single-value dimension names to values list for the column.
-   */
+  /// Return the map from single-value dimension names to values list for the column.
+  ///
+  /// @return map from single-value dimension names to values list for the column.
   public Map<String, List<Object>> getSingleValueDimensionValuesMap() {
     return _singleValueDimensionValuesMap;
   }

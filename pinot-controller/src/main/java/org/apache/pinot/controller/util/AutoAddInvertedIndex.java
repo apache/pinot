@@ -49,36 +49,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>AutoAddInvertedIndex</code> class can be used to automatically add inverted index to tables based on the
- * strategy and mode specified.
- * <p>Currently support:
- * <ul>
- *   <li>
- *     Strategy:
- *     <ul>
- *       <li>
- *         QUERY: add inverted index based on the query result
- *         <ul>
- *           <li>1. Get the table size, only add inverted index to large tables</li>
- *           <li>2. Get the latest timestamp, only get dimension DISTINCTCOUNT values for one timestamp</li>
- *           <li>3. Sort the DISTINCTCOUNT value for all dimensions</li>
- *           <li>4. Add inverted index to dimensions with large DISTINCTCOUNT value</li>
- *         </ul>
- *       </li>
- *     </ul>
- *   </li>
- *   <li>
- *     Mode:
- *     <ul>
- *       <li>NEW: apply only to tables without inverted index</li>
- *       <li>REMOVE: remove all auto-generated inverted index</li>
- *       <li>REFRESH: refresh the auto-generated inverted index</li>
- *       <li>APPEND: append to the auto-generated inverted index</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `AutoAddInvertedIndex` class can be used to automatically add inverted index to tables based on the
+/// strategy and mode specified.
+///
+/// Currently support:
+///
+/// - Strategy:
+///   - QUERY: add inverted index based on the query result
+///     - 1. Get the table size, only add inverted index to large tables
+///     - 2. Get the latest timestamp, only get dimension DISTINCTCOUNT values for one timestamp
+///     - 3. Sort the DISTINCTCOUNT value for all dimensions
+///     - 4. Add inverted index to dimensions with large DISTINCTCOUNT value
+/// - Mode:
+///   - NEW: apply only to tables without inverted index
+///   - REMOVE: remove all auto-generated inverted index
+///   - REFRESH: refresh the auto-generated inverted index
+///   - APPEND: append to the auto-generated inverted index
 public class AutoAddInvertedIndex {
   public enum Strategy {
     QUERY     // Add inverted index based on the query result

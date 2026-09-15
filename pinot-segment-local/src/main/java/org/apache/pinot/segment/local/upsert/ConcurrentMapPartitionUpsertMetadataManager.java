@@ -41,9 +41,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Implementation of {@link PartitionUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
- */
+/// Implementation of [PartitionUpsertMetadataManager] that is backed by a [ConcurrentHashMap].
 @SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
@@ -371,11 +369,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     int newDocId = recordInfo.getDocId();
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
-    // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (isTTLEnabled()) {
-      double comparisonValue = ((Number) newComparisonValue).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
-    }
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -411,6 +404,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             return new RecordLocation(segment, newDocId, newComparisonValue);
           }
         });
+    // Bump after the record is installed to avoid racing removeExpiredPrimaryKeys.
+    if (isTTLEnabled()) {
+      updateLargestSeenComparisonValue(((Number) newComparisonValue).doubleValue());
+    }
 
     updatePrimaryKeyGauge();
     return !isOutOfOrderRecord.get();

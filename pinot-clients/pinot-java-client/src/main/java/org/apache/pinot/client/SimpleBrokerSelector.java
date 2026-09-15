@@ -22,10 +22,8 @@ import java.util.List;
 import java.util.Random;
 
 
-/**
- * Picks a broker randomly from list of brokers provided. This assumes that all the provided brokers
- * are healthy. There is no health check done on the brokers
- */
+/// Picks a broker randomly from list of brokers provided. This assumes that all the provided brokers
+/// are healthy. There is no health check done on the brokers
 public class SimpleBrokerSelector implements BrokerSelector {
 
   private final List<String> _brokerList;

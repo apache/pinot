@@ -25,26 +25,21 @@ public class HashUtil {
   private HashUtil() {
   }
 
-  /** Tests show that even for smaller set sizes, setting the hash size to this min value
-   * improves performance at an insignificant increase of memory footprint.
-   */
+  /// Tests show that even for smaller set sizes, setting the hash size to this min value
+  /// improves performance at an insignificant increase of memory footprint.
   public static final int MIN_FASTUTIL_HASHSET_SIZE = 25;
 
-  /**
-   * Returns the min size for the fast-util hash-set given the expected size of
-   * values stored in the hash-set.
-   * @param expected the expected/actual number of values to be stored
-   * @return the optimal min value
-   */
+  /// Returns the min size for the fast-util hash-set given the expected size of
+  /// values stored in the hash-set.
+  /// @param expected the expected/actual number of values to be stored
+  /// @return the optimal min value
   public static int getMinHashSetSize(int expected) {
     return Math.max(MIN_FASTUTIL_HASHSET_SIZE, expected);
   }
 
-  /**
-   * Returns a capacity that is sufficient to keep the map from being resized as long as it grows no larger than
-   * expectedSize and the load factor is >= its default (0.75).
-   * NOTE: Borrowed from Guava's Maps library {@code int capacity(int expectedSize)}.
-   */
+  /// Returns a capacity that is sufficient to keep the map from being resized as long as it grows no larger than
+  /// expectedSize and the load factor is >= its default (0.75).
+  /// NOTE: Borrowed from Guava's Maps library `int capacity(int expectedSize)`.
   public static int getHashMapCapacity(int expectedSize) {
     if (expectedSize < 3) {
       return expectedSize + 1;

@@ -24,51 +24,41 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 
-/**
- * Represents the result of a watermark induction process, containing a list of watermarks.
- */
+/// Represents the result of a watermark induction process, containing a list of watermarks.
 public class WatermarkInductionResult {
 
   private List<Watermark> _watermarks;
 
-  /**
-   * The @JsonCreator annotation marks this constructor to be used for deserializing
-   * a JSON array back into a WaterMarks object.
-   *
-   * @param watermarks The list of watermarks.
-   */
+  /// The @JsonCreator annotation marks this constructor to be used for deserializing
+  /// a JSON array back into a WaterMarks object.
+  ///
+  /// @param watermarks The list of watermarks.
   @JsonCreator
   public WatermarkInductionResult(@JsonProperty("watermarks") List<Watermark> watermarks) {
     _watermarks = watermarks;
   }
 
-  /**
-   * Gets the list of watermarks.
-   *
-   * @return The list of watermarks.
-   */
+  /// Gets the list of watermarks.
+  ///
+  /// @return The list of watermarks.
   @JsonGetter("watermarks")
   public List<Watermark> getWatermarks() {
     return _watermarks;
   }
 
-  /**
-   * Represents a single watermark with its partitionGroupId, sequence, and offset.
-   */
+  /// Represents a single watermark with its partitionGroupId, sequence, and offset.
   public static class Watermark {
     private int _partitionGroupId;
     private int _sequenceNumber;
     private long _offset;
 
-    /**
-     * The @JsonCreator annotation tells Jackson to use this constructor to create
-     * a WaterMark instance from a JSON object. The @JsonProperty annotations
-     * map the keys in the JSON object to the constructor parameters.
-     *
-     * @param partitionGroupId The ID of the partition group.
-     * @param sequenceNumber The segment sequence number of the consuming segment.
-      * @param offset The first Kafka offset whose corresponding record has not yet sealed in Pinot
-     */
+    /// The @JsonCreator annotation tells Jackson to use this constructor to create
+    /// a WaterMark instance from a JSON object. The @JsonProperty annotations
+    /// map the keys in the JSON object to the constructor parameters.
+    ///
+    /// @param partitionGroupId The ID of the partition group.
+    /// @param sequenceNumber The segment sequence number of the consuming segment.
+    /// @param offset The first Kafka offset whose corresponding record has not yet sealed in Pinot
     @JsonCreator
     public Watermark(@JsonProperty("partitionGroupId") int partitionGroupId,
         @JsonProperty("sequenceNumber") int sequenceNumber, @JsonProperty("offset") long offset) {
@@ -77,32 +67,26 @@ public class WatermarkInductionResult {
       _offset = offset;
     }
 
-    /**
-     * Gets the partition group ID.
-     *
-     * @return The partition group ID.
-     */
+    /// Gets the partition group ID.
+    ///
+    /// @return The partition group ID.
     @JsonGetter("partitionGroupId")
     public int getPartitionGroupId() {
       return _partitionGroupId;
     }
 
-    /**
-     * Gets the segment sequence number of the most recent consuming segment.
-     *
-     * @return The segment sequence number.
-     */
+    /// Gets the segment sequence number of the most recent consuming segment.
+    ///
+    /// @return The segment sequence number.
     @JsonGetter("sequenceNumber")
     public int getSequenceNumber() {
       return _sequenceNumber;
     }
 
-    /**
-     * The high-watermark of the Kafka offsets. Any Kafka record with an offset greater than or equal to this
-     * value has not yet been sealed.
-     *
-     * @return The offset.
-     */
+    /// The high-watermark of the Kafka offsets. Any Kafka record with an offset greater than or equal to this
+    /// value has not yet been sealed.
+    ///
+    /// @return The offset.
     @JsonGetter("offset")
     public long getOffset() {
       return _offset;

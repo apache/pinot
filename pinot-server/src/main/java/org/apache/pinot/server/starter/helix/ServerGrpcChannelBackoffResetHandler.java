@@ -36,22 +36,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Listens for instance config changes and resets GRPC mailbox channel backoff when a server
- * completes startup (IS_SHUTDOWN_IN_PROGRESS transitions from true to false).
- *
- * <p>When a server restarts (gracefully or after a crash), the startup sequence is:
- * <ol>
- *   <li>updateInstanceConfigIfNeeded sets IS_SHUTDOWN_IN_PROGRESS=true (even after crash)</li>
- *   <li>Segments load, startup checks run</li>
- *   <li>Query/gRPC server starts listening</li>
- *   <li>IS_SHUTDOWN_IN_PROGRESS set to false (readiness signal)</li>
- * </ol>
- *
- * <p>This handler detects the transition in step 4 and resets the GRPC channel backoff for
- * that specific server, but only if the channel is currently in TRANSIENT_FAILURE state.
- * Channels in other states (READY, IDLE, CONNECTING) are left untouched.</p>
- */
+/// Listens for instance config changes and resets GRPC mailbox channel backoff when a server
+/// completes startup (IS_SHUTDOWN_IN_PROGRESS transitions from true to false).
+///
+/// When a server restarts (gracefully or after a crash), the startup sequence is:
+///
+/// 1. updateInstanceConfigIfNeeded sets IS_SHUTDOWN_IN_PROGRESS=true (even after crash)
+/// 2. Segments load, startup checks run
+/// 3. Query/gRPC server starts listening
+/// 4. IS_SHUTDOWN_IN_PROGRESS set to false (readiness signal)
+///
+/// This handler detects the transition in step 4 and resets the GRPC channel backoff for
+/// that specific server, but only if the channel is currently in TRANSIENT_FAILURE state.
+/// Channels in other states (READY, IDLE, CONNECTING) are left untouched.
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
 public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChangeListener {
@@ -95,9 +92,7 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     }
   }
 
-  /**
-   * Full cluster scan: used on INIT (first callback) and when instances are added/removed.
-   */
+  /// Full cluster scan: used on INIT (first callback) and when instances are added/removed.
   private void handleFullScan() {
     Set<String> currentShuttingDown = new HashSet<>();
     for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
@@ -118,10 +113,8 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     _shuttingDownServers.addAll(currentShuttingDown);
   }
 
-  /**
-   * Handles a single instance config change by reading only the changed instance's config
-   * from ZooKeeper, rather than scanning the entire cluster.
-   */
+  /// Handles a single instance config change by reading only the changed instance's config
+  /// from ZooKeeper, rather than scanning the entire cluster.
   private void handleSingleInstanceChange(String instance) {
     if (!InstanceTypeUtils.isServer(instance) || instance.equals(_selfInstanceId)) {
       return;

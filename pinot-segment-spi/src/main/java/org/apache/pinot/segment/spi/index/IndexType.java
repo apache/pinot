@@ -47,33 +47,26 @@ import org.apache.pinot.spi.data.Schema;
 /// consult the Javadoc on each method and pick a value consistent with whether their on-disk index references
 /// dictionary IDs.
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
-  /**
-   * Returns the {@link BuildLifecycle} for this index type. This is used to determine when the index should be built.
-   */
+  /// Returns the [BuildLifecycle] for this index type. This is used to determine when the index should be built.
   default BuildLifecycle getIndexBuildLifecycle() {
     return BuildLifecycle.DURING_SEGMENT_CREATION;
   }
 
-  /**
-   * The unique id that identifies this index type.
-   * <p>The returned value for each index should be constant across different Pinot versions as it is used as:</p>
-   *
-   * <ul>
-   *   <li>The key used when the index is registered in IndexService.</li>
-   *   <li>The internal identification in v1 files and metadata persisted on disk.</li>
-   *   <li>The default toString implementation.</li>
-   *   <li>The key that identifies the index config in the indexes section inside
-   *   {@link org.apache.pinot.spi.config.table.FieldConfig}, although specific index types may choose to read other
-   *   names (for example, <code>inverted_index</code> may read <code>inverted</code> key.</li>
-   * </ul>
-   */
+  /// The unique id that identifies this index type.
+  ///
+  /// The returned value for each index should be constant across different Pinot versions as it is used as:
+  ///
+  /// - The key used when the index is registered in IndexService.
+  /// - The internal identification in v1 files and metadata persisted on disk.
+  /// - The default toString implementation.
+  /// - The key that identifies the index config in the indexes section inside
+  ///   [org.apache.pinot.spi.config.table.FieldConfig], although specific index types may choose to read other
+  ///   names (for example, `inverted_index` may read `inverted` key.
   String getId();
 
   Class<C> getIndexConfigClass();
 
-  /**
-   * The default config when it is not explicitly defined by the user.
-   */
+  /// The default config when it is not explicitly defined by the user.
   C getDefaultConfig();
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
@@ -97,40 +90,32 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
     return true;
   }
 
-  /**
-   * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
-   * and configuration.
-   *
-   * The caller has the ownership of the creator and therefore it has to close it.
-   * @param context The object that stores all the contextual information related to the index creation. Like the
-   *                cardinality or the total number of documents.
-   * @param indexConfig The index specific configuration that should be used.
-   */
+  /// Returns the [IndexCreator] that can should be used to create an index of this type with the given context
+  /// and configuration.
+  ///
+  /// The caller has the ownership of the creator and therefore it has to close it.
+  /// @param context The object that stores all the contextual information related to the index creation. Like the
+  ///                cardinality or the total number of documents.
+  /// @param indexConfig The index specific configuration that should be used.
   IC createIndexCreator(IndexCreationContext context, C indexConfig)
       throws Exception;
 
-  /**
-   * Returns the {@link IndexReaderFactory} that should be used to return readers for this type.
-   */
+  /// Returns the [IndexReaderFactory] that should be used to return readers for this type.
   IndexReaderFactory<IR> getReaderFactory();
 
-  /**
-   * This method is used to extract a compatible reader from a given ColumnIndexContainer.
-   *
-   * Most implementations just return {@link ColumnIndexContainer#getIndex(IndexType)}, but some may try to reuse other
-   * indexes. For example, InvertedIndexType delegates on the ForwardIndexReader when it is sorted.
-   */
+  /// This method is used to extract a compatible reader from a given ColumnIndexContainer.
+  ///
+  /// Most implementations just return [ColumnIndexContainer#getIndex(IndexType)], but some may try to reuse other
+  /// indexes. For example, InvertedIndexType delegates on the ForwardIndexReader when it is sorted.
   @Nullable
   default IR getIndexReader(ColumnIndexContainer indexContainer) {
     return indexContainer.getIndex(this);
   }
 
-  /**
-   * Returns the possible file extensions for this index type.
-   *
-   * @param columnMetadata an optional filter. In case it is provided, the index type will do its best to try to filter
-   *                      which extensions are valid. See ForwardIndexType.
-   */
+  /// Returns the possible file extensions for this index type.
+  ///
+  /// @param columnMetadata an optional filter. In case it is provided, the index type will do its best to try to filter
+  ///                      which extensions are valid. See ForwardIndexType.
   List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata);
 
   // TODO: Consider passing in IndexLoadingConfig
@@ -197,44 +182,35 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   /// @param indexConfig the per-column config for this specific index type
   boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, C indexConfig);
 
-  /**
-   * This method is used to perform in place conversion of provided {@link TableConfig} to newer format
-   * related to the IndexType that implements it.
-   *
-   * {@link AbstractIndexType#convertToNewFormat(TableConfig, Schema)} ensures all the index information from old format
-   * is made available in the new format while it depends on the individual index types to handle the data cleanup from
-   * old format.
-   */
+  /// This method is used to perform in place conversion of provided [TableConfig] to newer format
+  /// related to the IndexType that implements it.
+  ///
+  /// [AbstractIndexType#convertToNewFormat(TableConfig, Schema)] ensures all the index information from old
+  /// format is made available in the new format while it depends on the individual index types to handle the data
+  /// cleanup from old format.
   void convertToNewFormat(TableConfig tableConfig, Schema schema);
 
-  /**
-   * Creates a mutable index.
-   *
-   * Implementations return null if the index type doesn't support mutable indexes. Some indexes may support mutable
-   * index only in some conditions. For example, they may only be supported if there is a dictionary or if the column is
-   * single-valued.
-   */
+  /// Creates a mutable index.
+  ///
+  /// Implementations return null if the index type doesn't support mutable indexes. Some indexes may support mutable
+  /// index only in some conditions. For example, they may only be supported if there is a dictionary or if the column
+  /// is single-valued.
   @Nullable
   default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
     return null;
   }
 
   enum BuildLifecycle {
-    /**
-     * The index will be built during segment creation, using the {@link IndexCreator#add} call for each of the column
-     * values being added.
-     */
+    /// The index will be built during segment creation, using the [IndexCreator#add] call for each of the column
+    /// values being added.
     DURING_SEGMENT_CREATION,
 
-    /**
-     * The index will be build post the segment file has been created, using the {@link IndexHandler#updateIndices} call
-     * This is useful for indexes that may need the entire prebuilt segment to be available before they can be built.
-     */
+    /// The index will be build post the segment file has been created, using the [IndexHandler#updateIndices]
+    /// call This is useful for indexes that may need the entire prebuilt segment to be available before they can be
+    /// built.
     POST_SEGMENT_CREATION,
 
-    /**
-     * The index's built lifecycle is managed in a custom manner.
-     */
+    /// The index's built lifecycle is managed in a custom manner.
     CUSTOM
   }
 }

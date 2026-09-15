@@ -27,12 +27,10 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * ColumnReader implementation that returns default values for new columns.
- *
- * <p>This reader is used when a column exists in the target schema but not in the source data.
- * It returns the default null value for the field spec for all document IDs.
- */
+/// ColumnReader implementation that returns default values for new columns.
+///
+/// This reader is used when a column exists in the target schema but not in the source data.
+/// It returns the default null value for the field spec for all document IDs.
 public class DefaultValueColumnReader implements ColumnReader {
 
   private final String _columnName;
@@ -51,13 +49,11 @@ public class DefaultValueColumnReader implements ColumnReader {
   private String[] _defaultStringMV;
   private byte[][] _defaultBytesMV;
 
-  /**
-   * Create a DefaultValueColumnReader for a new column.
-   *
-   * @param columnName Name of the new column
-   * @param numDocs Total number of documents
-   * @param fieldSpec Field specification for the new column
-   */
+  /// Create a DefaultValueColumnReader for a new column.
+  ///
+  /// @param columnName Name of the new column
+  /// @param numDocs Total number of documents
+  /// @param fieldSpec Field specification for the new column
   public DefaultValueColumnReader(String columnName, int numDocs, FieldSpec fieldSpec) {
     _columnName = columnName;
     _numDocs = numDocs;
@@ -240,12 +236,10 @@ public class DefaultValueColumnReader implements ColumnReader {
     return _defaultBytesMV;
   }
 
-  /**
-   * Validate that the document ID is within valid range.
-   *
-   * @param docId Document ID to validate
-   * @throws IndexOutOfBoundsException if docId is out of range
-   */
+  /// Validate that the document ID is within valid range.
+  ///
+  /// @param docId Document ID to validate
+  /// @throws IndexOutOfBoundsException if docId is out of range
   private void validateDocId(int docId) {
     if (docId < 0 || docId >= _numDocs) {
       throw new IndexOutOfBoundsException(

@@ -1319,21 +1319,19 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /**
-   * End-to-end "enable dictionary on a RAW column with a range index" scenario.
-   *
-   * <p>{@link org.apache.pinot.segment.local.segment.index.range.RangeIndexType#requiresDictionary} returns
-   * {@code true}: a range index is always built over dictionary IDs. A user who wants a range index on a RAW
-   * forward column must opt in to a shared standalone dictionary by adding {@code indexes.dictionary: {}} to the
-   * column's {@code FieldConfig}; on segment reload, {@code ForwardIndexHandler.ENABLE_DICTIONARY} materializes
-   * the dictionary on disk and {@link RangeIndexHandler} then builds the range index over those dict IDs.
-   *
-   * <p>This test pins down the full handler chain: starting from a RAW column with no dictionary and no range
-   * index, after the config change and one reload pass the column ends up with {@code hasDictionary=true} (forward
-   * index still RAW-encoded), a dictionary file on disk, and a freshly built dict-id-based range index. If a
-   * future change re-orders handlers, drops range from {@code DICTIONARY_BASED_INDEXES_TO_REWRITE}, or breaks the
-   * RAW-with-shared-dict path in either handler, this test catches the regression.
-   */
+  /// End-to-end "enable dictionary on a RAW column with a range index" scenario.
+  ///
+  /// [org.apache.pinot.segment.local.segment.index.range.RangeIndexType#requiresDictionary] returns
+  /// `true`: a range index is always built over dictionary IDs. A user who wants a range index on a RAW
+  /// forward column must opt in to a shared standalone dictionary by adding `indexes.dictionary: {}` to the
+  /// column's `FieldConfig`; on segment reload, `ForwardIndexHandler.ENABLE_DICTIONARY` materializes
+  /// the dictionary on disk and [RangeIndexHandler] then builds the range index over those dict IDs.
+  ///
+  /// This test pins down the full handler chain: starting from a RAW column with no dictionary and no range
+  /// index, after the config change and one reload pass the column ends up with `hasDictionary=true` (forward
+  /// index still RAW-encoded), a dictionary file on disk, and a freshly built dict-id-based range index. If a
+  /// future change re-orders handlers, drops range from `DICTIONARY_BASED_INDEXES_TO_REWRITE`, or breaks the
+  /// RAW-with-shared-dict path in either handler, this test catches the regression.
   @Test
   public void testEnableDictionaryAndRangeOnRawForwardColumn()
       throws Exception {
@@ -1416,17 +1414,15 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /**
-   * Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
-   * index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
-   * the dictionary; otherwise the table-config validation rejects the change.
-   *
-   * <p>This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
-   * range index, removing the column from both the dictionary set and the {@code rangeIndexColumns} set causes
-   * {@code ForwardIndexHandler.DISABLE_DICTIONARY} to drop the dictionary and (via
-   * {@code removeDictRelatedIndexes}) the now-stale range index. {@code RangeIndexHandler} then sees the column
-   * is no longer requested and stays a no-op.
-   */
+  /// Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
+  /// index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
+  /// the dictionary; otherwise the table-config validation rejects the change.
+  ///
+  /// This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
+  /// range index, removing the column from both the dictionary set and the `rangeIndexColumns` set causes
+  /// `ForwardIndexHandler.DISABLE_DICTIONARY` to drop the dictionary and (via
+  /// `removeDictRelatedIndexes`) the now-stale range index. `RangeIndexHandler` then sees the column
+  /// is no longer requested and stays a no-op.
   @Test
   public void testDisableDictionaryAndRangeIndexTogether()
       throws Exception {
@@ -1506,15 +1502,13 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /**
-   * Pins down the handler-ordering contract documented on InvertedIndexHandler: the dictionary file (created by
-   * ForwardIndexHandler under the ENABLE_DICTIONARY operation for a RAW forward column with an inverted index)
-   * must already exist on disk before InvertedIndexHandler attempts to build the dict-id-based inverted index.
-   *
-   * <p>If a future change reorders handlers so InvertedIndexHandler runs before ForwardIndexHandler, the
-   * Preconditions.checkState(columnMetadata.hasDictionary(), ...) inside InvertedIndexHandler.createInvertedIndex
-   * ForColumn fires and this test catches the regression.
-   */
+  /// Pins down the handler-ordering contract documented on InvertedIndexHandler: the dictionary file (created by
+  /// ForwardIndexHandler under the ENABLE_DICTIONARY operation for a RAW forward column with an inverted index)
+  /// must already exist on disk before InvertedIndexHandler attempts to build the dict-id-based inverted index.
+  ///
+  /// If a future change reorders handlers so InvertedIndexHandler runs before ForwardIndexHandler, the
+  /// Preconditions.checkState(columnMetadata.hasDictionary(), ...) inside InvertedIndexHandler.createInvertedIndex
+  /// ForColumn fires and this test catches the regression.
   @Test
   public void testHandlerOrderingForwardBeforeInvertedOnRawWithDictRequired()
       throws Exception {
@@ -1785,14 +1779,14 @@ public class ForwardIndexHandlerTest {
     };
   }
 
-  /// Regression test for enabling a dictionary on a raw column whose persisted metadata says {@code isSorted=false}
+  /// Regression test for enabling a dictionary on a raw column whose persisted metadata says `isSorted=false`
   /// but whose values happen to be monotonic (here, all identical). This is the shape produced by a realtime segment
-  /// committed while the column was raw: raw columns are persisted with {@code isSorted=false} regardless of the data.
+  /// committed while the column was raw: raw columns are persisted with `isSorted=false` regardless of the data.
   /// On reload the fresh stats collector reads the identical values and reports the column as sorted, so before the
-  /// fix the forward-index creator emitted a `.sv.sorted.fwd` index while {@link ForwardIndexHandler} derived the temp
-  /// file name from the metadata ({@code .sv.unsorted.fwd}) and never updated {@code isSorted}, throwing
-  /// {@link java.io.FileNotFoundException} and leaving a format/metadata mismatch for the next read. The fix forces
-  /// the creator to honor the persisted {@code isSorted} flag, keeping the written format, the file name, and the
+  /// fix the forward-index creator emitted a `.sv.sorted.fwd` index while [ForwardIndexHandler] derived the temp
+  /// file name from the metadata (`.sv.unsorted.fwd`) and never updated `isSorted`, throwing
+  /// [java.io.FileNotFoundException] and leaving a format/metadata mismatch for the next read. The fix forces
+  /// the creator to honor the persisted `isSorted` flag, keeping the written format, the file name, and the
   /// metadata consistent.
   @Test(dataProvider = "coincidentallySortedRawTypes")
   public void testEnableDictionaryForRawColumnWithCoincidentallySortedValues(DataType dataType, Object value)

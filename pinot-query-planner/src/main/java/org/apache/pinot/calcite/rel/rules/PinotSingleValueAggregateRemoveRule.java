@@ -27,10 +27,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
-/**
- * SingleValueAggregateRemoveRule that matches an Aggregate function SINGLE_VALUE and remove it
- *
- */
+/// SingleValueAggregateRemoveRule that matches an Aggregate function SINGLE_VALUE and remove it
 public class PinotSingleValueAggregateRemoveRule extends RelOptRule {
   public static final PinotSingleValueAggregateRemoveRule INSTANCE =
       new PinotSingleValueAggregateRemoveRule(PinotRuleUtils.PINOT_REL_FACTORY);

@@ -261,6 +261,47 @@ public class PinotSchemaRestletResourceTest {
   }
 
   @Test
+  public void testNonDeterministicSchemaTransformCreateAndLegacyUpdate()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    String schemaName = "legacyNonDeterministicSchemaTransform";
+    Schema schema = TEST_INSTANCE.createDummySchema(schemaName);
+    DimensionFieldSpec eventTimeField = new DimensionFieldSpec("eventTimeMs", DataType.LONG, true);
+    eventTimeField.setTransformFunction("now()");
+    schema.addField(eventTimeField);
+    try {
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().validateSchema(schema.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+
+      // Seed below the REST validation layer to model a schema persisted before this validation existed.
+      TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+
+      Schema update = adminClient.getSchemaClient().getSchemaObject(schemaName);
+      update.addField(new DimensionFieldSpec("newColumn", DataType.STRING, true));
+      adminClient.getSchemaClient().validateSchema(update.toSingleLineJsonString());
+      adminClient.getSchemaClient().updateSchema(schemaName, update.toSingleLineJsonString());
+
+      Schema stored = adminClient.getSchemaClient().getSchemaObject(schemaName);
+      assertTrue(stored.hasColumn("newColumn"));
+      assertEquals(stored.getFieldSpecFor("eventTimeMs").getTransformFunction(), "now()");
+
+      update.getFieldSpecFor("eventTimeMs").setTransformFunction("plus(now(), 1)");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().validateSchema(update.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().updateSchema(schemaName, update.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+    } finally {
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(schemaName);
+    }
+  }
+
+  @Test
   public void testSchemaDeletionWithLogicalTable()
       throws Exception {
     String logicalTableName = "logical_table";

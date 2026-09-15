@@ -178,7 +178,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
         "Execution Plan\n"
             + "PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[FINAL])\n"
             + "  PinotLogicalExchange(distribution=[hash])\n"
-            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($6)], aggType=[LEAF])\n"
+            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($11)], aggType=[LEAF])\n"
             + "      PinotLogicalTableScan(table=[[default, mytable]])\n");
 
     // Enable PinotAggregateFunctionRewriteRule through query option, ensure it overrides the broker config
@@ -186,7 +186,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
         "Execution Plan\n"
             + "PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($0)], aggType=[FINAL])\n"
             + "  PinotLogicalExchange(distribution=[hash])\n"
-            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($6)], aggType=[LEAF])\n"
+            + "    PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($11)], aggType=[LEAF])\n"
             + "      PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of("usePlannerRules", CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE));
 
@@ -197,7 +197,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
             + "  PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
             + "    PinotLogicalExchange(distribution=[hash])\n"
-            + "      PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($6)], agg#1=[COUNT()], aggType=[LEAF])\n"
+            + "      PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($11)], agg#1=[COUNT()], aggType=[LEAF])\n"
             + "        PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of("usePlannerRules", CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE + ","
             + CommonConstants.Broker.PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS));

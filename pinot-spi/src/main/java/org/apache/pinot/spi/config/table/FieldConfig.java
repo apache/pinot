@@ -80,12 +80,6 @@ public class FieldConfig extends BaseJsonConfig {
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
 
-  @Deprecated
-  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
-      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
-  }
-
   public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
     this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
@@ -128,27 +122,27 @@ public class FieldConfig extends BaseJsonConfig {
   // If null, there won't be any index
   // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
-    /** Inverted index mapping values to document IDs for efficient equality predicates. */
+    /// Inverted index mapping values to document IDs for efficient equality predicates.
     INVERTED,
-    /** Marks the column as the sort column; segments store values in sorted order. */
+    /// Marks the column as the sort column; segments store values in sorted order.
     SORTED,
-    /** Full-text search index over string columns. */
+    /// Full-text search index over string columns.
     TEXT,
-    /** Finite-state-transducer index for prefix and regex matching on string columns. */
+    /// Finite-state-transducer index for prefix and regex matching on string columns.
     FST,
-    /** Case-insensitive variant of the FST index. */
+    /// Case-insensitive variant of the FST index.
     IFST,
-    /** Geospatial index for H3 hexagonal grid lookups. */
+    /// Geospatial index for H3 hexagonal grid lookups.
     H3,
-    /** JSON-path index over JSON-typed columns. */
+    /// JSON-path index over JSON-typed columns.
     JSON,
-    /** Ignored — configure {@code timestampConfig} on the table instead. */
+    /// Ignored — configure `timestampConfig` on the table instead.
     TIMESTAMP,
-    /** Vector index for approximate-nearest-neighbor search. */
+    /// Vector index for approximate-nearest-neighbor search.
     VECTOR,
-    /** Range index for efficient inequality predicates on numeric/string columns. */
+    /// Range index for efficient inequality predicates on numeric/string columns.
     RANGE,
-    /** OPEN_STRUCT index storing semi-structured entries as per-key materialized columns. */
+    /// OPEN_STRUCT index storing semi-structured entries as per-key materialized columns.
     OPEN_STRUCT
   }
 

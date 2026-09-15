@@ -40,9 +40,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
-/**
- * The <code>SelectionPlanNode</code> class provides the execution plan for selection query on a single segment.
- */
+/// The `SelectionPlanNode` class provides the execution plan for selection query on a single segment.
 public class SelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;
@@ -142,23 +140,21 @@ public class SelectionPlanNode implements PlanNode {
     return projectOperator;
   }
 
-  /**
-   * This functions returns the number of expressions that are sorted by the implicit order in the index.
-   *
-   * This means that query that uses these expressions in its order by doesn't actually need to sort from 0 to the
-   * given number (excluded) of expressions, as they are returned in the correct order.
-   *
-   * This method supports ASC and DESC order and ensures that all prefix expressions follow the same order. For example,
-   * ORDER BY sorted_col1 ASC, sorted_col2 ASC and ORDER BY sorted_col1 DESC, sorted_col2 DESC will return 2 but
-   * ORDER BY sorted_col1 DESC, sorted_col2 ASC and ORDER BY sorted_col1 ASC, sorted_col2 DESC will return 1 while
-   * ORDER BY not_sorted, sorted_col1 will return 0 because the first column is not sorted.
-   *
-   * It doesn't make sense to add literal expressions in an order by expression, but if they are included, they are
-   * considered sorted and its ASC/DESC is ignored.
-   *
-   * @return the max number that guarantees that from the first expression to the returned number, the index is already
-   * sorted.
-   */
+  /// This functions returns the number of expressions that are sorted by the implicit order in the index.
+  ///
+  /// This means that query that uses these expressions in its order by doesn't actually need to sort from 0 to the
+  /// given number (excluded) of expressions, as they are returned in the correct order.
+  ///
+  /// This method supports ASC and DESC order and ensures that all prefix expressions follow the same order. For
+  /// example, ORDER BY sorted_col1 ASC, sorted_col2 ASC and ORDER BY sorted_col1 DESC, sorted_col2 DESC will return 2
+  /// but ORDER BY sorted_col1 DESC, sorted_col2 ASC and ORDER BY sorted_col1 ASC, sorted_col2 DESC will return 1 while
+  /// ORDER BY not_sorted, sorted_col1 will return 0 because the first column is not sorted.
+  ///
+  /// It doesn't make sense to add literal expressions in an order by expression, but if they are included, they are
+  /// considered sorted and its ASC/DESC is ignored.
+  ///
+  /// @return the max number that guarantees that from the first expression to the returned number, the index is already
+  /// sorted.
   private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
     boolean asc = orderByExpressions.get(0).isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {

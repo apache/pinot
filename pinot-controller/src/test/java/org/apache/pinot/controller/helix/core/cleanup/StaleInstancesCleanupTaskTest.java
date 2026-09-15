@@ -88,11 +88,9 @@ public class StaleInstancesCleanupTaskTest {
     _mocks.close();
   }
 
-  /**
-   * Verifies that an offline server still referenced in a table's IdealState
-   * is NOT attempted to be dropped, validating that getServerInstancesInUse()
-   * correctly extracts instances from segment-level partition keys.
-   */
+  /// Verifies that an offline server still referenced in a table's IdealState
+  /// is NOT attempted to be dropped, validating that getServerInstancesInUse()
+  /// correctly extracts instances from segment-level partition keys.
   @Test
   public void testServerInIdealStateIsNotDropped() {
     IdealState tableIdealState = buildTableIdealState(TABLE_NAME,
@@ -121,10 +119,8 @@ public class StaleInstancesCleanupTaskTest {
     verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
   }
 
-  /**
-   * Verifies that an offline server NOT referenced in any table's IdealState
-   * IS attempted to be dropped.
-   */
+  /// Verifies that an offline server NOT referenced in any table's IdealState
+  /// IS attempted to be dropped.
   @Test
   public void testServerNotInIdealStateIsDropped() {
     IdealState tableIdealState = buildTableIdealState(TABLE_NAME,
@@ -156,10 +152,8 @@ public class StaleInstancesCleanupTaskTest {
     verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
   }
 
-  /**
-   * Verifies behavior with multiple tables — a server referenced in ANY table's
-   * IdealState should be considered in use.
-   */
+  /// Verifies behavior with multiple tables — a server referenced in ANY table's
+  /// IdealState should be considered in use.
   @Test
   public void testServerInUseAcrossMultipleTables() {
     String table1 = "table1_OFFLINE";
@@ -201,9 +195,7 @@ public class StaleInstancesCleanupTaskTest {
     verify(_pinotHelixResourceManager).dropInstance(SERVER_NOT_IN_USE);
   }
 
-  /**
-   * Verifies that a null IdealState (e.g., table being deleted) is handled gracefully.
-   */
+  /// Verifies that a null IdealState (e.g., table being deleted) is handled gracefully.
   @Test
   public void testNullIdealStateIsHandledGracefully() {
     when(_pinotHelixResourceManager.getAllTables()).thenReturn(List.of(TABLE_NAME));
@@ -227,10 +219,8 @@ public class StaleInstancesCleanupTaskTest {
     verify(_pinotHelixResourceManager).dropInstance(SERVER_IN_USE);
   }
 
-  /**
-   * Verifies that a table with an empty IdealState (no segments) contributes
-   * nothing to the in-use set, rather than causing errors.
-   */
+  /// Verifies that a table with an empty IdealState (no segments) contributes
+  /// nothing to the in-use set, rather than causing errors.
   @Test
   public void testEmptyIdealStateDoesNotCauseErrors() {
     IdealState emptyIdealState = buildTableIdealState(TABLE_NAME, Map.of());

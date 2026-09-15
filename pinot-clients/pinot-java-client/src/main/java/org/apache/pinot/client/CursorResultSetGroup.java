@@ -20,21 +20,17 @@ package org.apache.pinot.client;
 
 import java.util.List;
 
-/**
- * A cursor-based result set group that delegates result set access to an internal ResultSetGroup
- * and provides cursor metadata access. This is a pure data container without navigation logic.
- *
- * <p><strong>Thread Safety:</strong> This class is immutable and thread-safe.
- */
+/// A cursor-based result set group that delegates result set access to an internal ResultSetGroup
+/// and provides cursor metadata access. This is a pure data container without navigation logic.
+///
+/// **Thread Safety:** This class is immutable and thread-safe.
 public class CursorResultSetGroup implements BaseResultSetGroup {
   private final ResultSetGroup _resultSetGroup;
   private final CursorAwareBrokerResponse _cursorResponse;
 
-  /**
-   * Creates a cursor result set group from a cursor-aware broker response.
-   *
-   * @param cursorResponse the cursor-aware broker response containing results and cursor metadata
-   */
+  /// Creates a cursor result set group from a cursor-aware broker response.
+  ///
+  /// @param cursorResponse the cursor-aware broker response containing results and cursor metadata
   public CursorResultSetGroup(CursorAwareBrokerResponse cursorResponse) {
     _cursorResponse = cursorResponse;
     _resultSetGroup = new ResultSetGroup(cursorResponse);
@@ -110,11 +106,9 @@ public class CursorResultSetGroup implements BaseResultSetGroup {
     return _resultSetGroup.getBrokerResponse();
   }
 
-  /**
-   * Gets the cursor-aware broker response for accessing cursor metadata.
-   *
-   * @return the cursor-aware broker response
-   */
+  /// Gets the cursor-aware broker response for accessing cursor metadata.
+  ///
+  /// @return the cursor-aware broker response
   public CursorAwareBrokerResponse getCursorResponse() {
     return _cursorResponse;
   }

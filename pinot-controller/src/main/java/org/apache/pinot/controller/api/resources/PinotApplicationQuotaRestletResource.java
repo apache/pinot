@@ -71,9 +71,7 @@ public class PinotApplicationQuotaRestletResource {
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
-  /**
-   * API to get application quota configs. Will return empty map if application quotas are not defined at all.
-   */
+  /// API to get application quota configs. Will return empty map if application quotas are not defined at all.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas")
@@ -88,9 +86,7 @@ public class PinotApplicationQuotaRestletResource {
     }
   }
 
-  /**
-   * API to get application quota config. Will return null if application quotas is not defined.
-   */
+  /// API to get application quota config. Will return null if application quotas is not defined.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas/{appName}")
@@ -114,9 +110,7 @@ public class PinotApplicationQuotaRestletResource {
     return defaultQuota != null ? Double.parseDouble(defaultQuota) : null;
   }
 
-  /**
-   * API to update the quota config for application.
-   */
+  /// API to update the quota config for application.
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)

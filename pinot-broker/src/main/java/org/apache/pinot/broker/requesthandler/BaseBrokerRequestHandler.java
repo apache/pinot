@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -49,6 +50,8 @@ import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlQueryOptionValidationMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -63,7 +66,6 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -100,13 +102,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Nullable
   protected final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  /**
-   * Maps broker-generated query id to the query string.
-   */
+  /// Maps broker-generated query id to the query string.
   protected final Map<Long, String> _queriesById;
-  /**
-   * Maps broker-generated query id to client-provided query id.
-   */
+  /// Maps broker-generated query id to client-provided query id.
   protected final Map<Long, String> _clientQueryIds;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
@@ -135,6 +133,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
     _enableAutoRewriteAggregationType =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
+    // Process-wide static because the SQL parser has no access to the broker config. Set here rather
+    // than parsed per query; a broker restart is needed to pick up a config change.
+    QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.valueOf(
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE,
+            Broker.DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE).trim().toUpperCase(Locale.ROOT)));
     if (_enableQueryCancellation) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
@@ -224,13 +227,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  /**
-   * Called after every successfully executed query with the fully-populated {@link RequestContext}
-   * and {@link BrokerResponse}. The default implementation fires the configured
-   * {@link org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener}. Subclasses may
-   * override to intercept the complete response (e.g. for async query-log pipelines) while still
-   * calling {@code super} to preserve the SPI listener behaviour.
-   */
+  /// Called after every successfully executed query with the fully-populated [RequestContext]
+  /// and [BrokerResponse]. The default implementation fires the configured
+  /// [org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener]. Subclasses may
+  /// override to intercept the complete response (e.g. for async query-log pipelines) while still
+  /// calling `super` to preserve the SPI listener behaviour.
   protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
     _brokerQueryEventListener.onQueryCompletion(requestContext);
   }
@@ -240,9 +241,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception;
 
-  /**
-   * Validates whether the requester has access to all the tables.
-   */
+  /// Validates whether the requester has access to all the tables.
   protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
@@ -273,15 +272,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return tableAuthorizationResult;
   }
 
-  /**
-   * Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
-   * Physical tables are cluster-specific and cannot be federated across clusters.
-   * Multi-cluster routing is only supported for logical tables.
-   *
-   * @param tableNames Set of table names to validate
-   * @param queryOptions Map of query options
-   * @throws QueryException if any physical table is queried with enableMultiClusterRouting=true
-   */
+  /// Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
+  /// Physical tables are cluster-specific and cannot be federated across clusters.
+  /// Multi-cluster routing is only supported for logical tables.
+  ///
+  /// @param tableNames Set of table names to validate
+  /// @param queryOptions Map of query options
+  /// @throws org.apache.pinot.spi.exception.QueryException if any physical table is queried with
+  ///         enableMultiClusterRouting=true
   protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
       Map<String, String> queryOptions) {
     Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
@@ -301,9 +299,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  /**
-   * Returns true if the QPS quota of query tables, database or application has been exceeded.
-   */
+  /// Returns true if the QPS quota of query tables, database or application has been exceeded.
   protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
       RequestContext requestContext) {
     if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
@@ -330,10 +326,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  /**
-   * Attempts to cancel an ongoing query identified by its broker-generated id.
-   * @return true if the query was successfully cancelled, false otherwise.
-   */
+  /// Attempts to cancel an ongoing query identified by its broker-generated id.
+  /// @return true if the query was successfully cancelled, false otherwise.
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
       throws Exception;
@@ -451,12 +445,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return sqlNodeAndOptions.getOptions().get(QueryOptionKey.CLIENT_QUERY_ID);
   }
 
-  /**
-   * Called when a query starts
-   * TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
-   *   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
-   *   query AND subquery, which means this method is called multiple times for the same query.
-   */
+  /// Called when a query starts
+  /// TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
+  ///   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
+  ///   query AND subquery, which means this method is called multiple times for the same query.
   protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
     if (isQueryCancellationEnabled()) {
       _queriesById.put(requestId, query);

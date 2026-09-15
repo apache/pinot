@@ -19,32 +19,24 @@
 package org.apache.pinot.core.operator.filter;
 
 
-/**
- * Describes how the vector ANN search interacts with non-vector filter predicates.
- *
- * <p>This enum is used in explain output and operator-level logging to indicate which
- * execution path was chosen for a given query.</p>
- */
+/// Describes how the vector ANN search interacts with non-vector filter predicates.
+///
+/// This enum is used in explain output and operator-level logging to indicate which
+/// execution path was chosen for a given query.
 public enum VectorSearchMode {
 
-  /**
-   * ANN search runs first without any filter, then results are intersected with the
-   * filter bitmap. This is the default mode and the only mode available before
-   * filter-aware ANN was introduced.
-   */
+  /// ANN search runs first without any filter, then results are intersected with the
+  /// filter bitmap. This is the default mode and the only mode available before
+  /// filter-aware ANN was introduced.
   POST_FILTER_ANN("ANN search first, then intersect with filter"),
 
-  /**
-   * The filter bitmap is computed first and passed into the ANN search so that only
-   * documents matching the filter are considered as candidates. This improves recall
-   * for selective filters.
-   */
+  /// The filter bitmap is computed first and passed into the ANN search so that only
+  /// documents matching the filter are considered as candidates. This improves recall
+  /// for selective filters.
   FILTER_THEN_ANN("Apply filter first, then ANN on filtered docs"),
 
-  /**
-   * Brute-force scan of all (or filtered) documents using exact distance computation.
-   * Used when the index is not available or when the filter is extremely selective.
-   */
+  /// Brute-force scan of all (or filtered) documents using exact distance computation.
+  /// Used when the index is not available or when the filter is extremely selective.
   EXACT_SCAN("Brute-force scan of all/filtered docs");
 
   private final String _description;
@@ -53,9 +45,7 @@ public enum VectorSearchMode {
     _description = description;
   }
 
-  /**
-   * Returns a human-readable description of this search mode.
-   */
+  /// Returns a human-readable description of this search mode.
   public String getDescription() {
     return _description;
   }

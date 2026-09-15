@@ -129,10 +129,8 @@ public class PinotDatabaseRestletResource {
     return new DeleteDatabaseResponse(deletedTables, failedTables, dryRun);
   }
 
-  /**
-   * API to update the quota configs for database
-   * If database config is not present it will be created implicitly
-   */
+  /// API to update the quota configs for database
+  /// If database config is not present it will be created implicitly
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
@@ -163,10 +161,8 @@ public class PinotDatabaseRestletResource {
     }
   }
 
-  /**
-   * API to get database quota configs.
-   * Will return null if database config is not defined or database quotas are not defined
-   */
+  /// API to get database quota configs.
+  /// Will return null if database config is not defined or database quotas are not defined
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/databases/{databaseName}/quotas")

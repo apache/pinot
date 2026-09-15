@@ -24,16 +24,14 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
-/**
- * EquivalentStageReplacer is used to replace equivalent stages in the query plan.
- *
- * Given a {@link org.apache.pinot.query.planner.plannode.PlanNode} and a
- * {@link GroupedStages}, modifies the plan node to replace equivalent stages.
- *
- * For each {@link MailboxReceiveNode} in the plan, if the sender is not the leader of the group,
- * replaces the sender with the leader.
- * The leader is also updated to include the receiver in its list of receivers.
- */
+/// EquivalentStageReplacer is used to replace equivalent stages in the query plan.
+///
+/// Given a [org.apache.pinot.query.planner.plannode.PlanNode] and a
+/// [GroupedStages], modifies the plan node to replace equivalent stages.
+///
+/// For each [MailboxReceiveNode] in the plan, if the sender is not the leader of the group,
+/// replaces the sender with the leader.
+/// The leader is also updated to include the receiver in its list of receivers.
 public class EquivalentStagesReplacer {
   private EquivalentStagesReplacer() {
   }
@@ -42,12 +40,10 @@ public class EquivalentStagesReplacer {
     replaceEquivalentStages(root, equivalentStages, OnSubstitution.NO_OP);
   }
 
-  /**
-   * Replaces the equivalent stages in the query plan.
-   *
-   * @param root Root plan node
-   * @param equivalentStages Equivalent stages
-   */
+  /// Replaces the equivalent stages in the query plan.
+  ///
+  /// @param root Root plan node
+  /// @param equivalentStages Equivalent stages
   public static void replaceEquivalentStages(PlanNode root, GroupedStages equivalentStages, OnSubstitution listener) {
     root.visit(new Replacer(listener), equivalentStages);
   }

@@ -28,9 +28,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Segment creation data source that is based on an in-memory realtime segment.
- */
+/// Segment creation data source that is based on an in-memory realtime segment.
 public class MutableSegmentCreationDataSource implements SegmentCreationDataSource {
   private final MutableSegment _mutableSegment;
   private final RecordReader _recordReader;
@@ -59,9 +57,7 @@ public class MutableSegmentCreationDataSource implements SegmentCreationDataSour
     return _recordReader;
   }
 
-  /**
-   * Returns the consumer directory of the realtime segment
-   */
+  /// Returns the consumer directory of the realtime segment
   public File getConsumerDir() {
     return _mutableSegment.getConsumerDir();
   }

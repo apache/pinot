@@ -35,9 +35,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-/**
- * StreamMetadataProvider implementation for the fake stream
- */
+/// StreamMetadataProvider implementation for the fake stream
 public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   private final int _numPartitions;
 

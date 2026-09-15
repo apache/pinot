@@ -74,11 +74,9 @@ public class LogicalTableExecutionInfoTest {
     }
   }
 
-  /**
-   * Verifies that for a logical table, all segments from all physical tables are collected and
-   * prune is invoked once (cross-table). With LIMIT 5 and segments of 10 docs each, only 1 segment
-   * should be selected across the whole logical table.
-   */
+  /// Verifies that for a logical table, all segments from all physical tables are collected and
+  /// prune is invoked once (cross-table). With LIMIT 5 and segments of 10 docs each, only 1 segment
+  /// should be selected across the whole logical table.
   @Test
   public void testGetSelectedSegmentsInfoPruneOnceAcrossTables() {
     // 3 tables, 2 segments each = 6 segments total; each segment has 10 docs
@@ -114,9 +112,7 @@ public class LogicalTableExecutionInfoTest {
         "Selected context should wrap the first (selected) segment");
   }
 
-  /**
-   * Verifies that when filter is constant false, prune is not called and no segments are selected.
-   */
+  /// Verifies that when filter is constant false, prune is not called and no segments are selected.
   @Test
   public void testGetSelectedSegmentsInfoConstantFalseFilterSkipsPrune() {
     List<IndexSegment> tableSegments = new ArrayList<>();
@@ -137,10 +133,8 @@ public class LogicalTableExecutionInfoTest {
     assertTrue(selectedSegmentsInfo.getSelectedSegmentContexts().isEmpty());
   }
 
-  /**
-   * Verifies that when a table has provided segment contexts (e.g. upsert), they are used instead of
-   * calling getSegmentContexts.
-   */
+  /// Verifies that when a table has provided segment contexts (e.g. upsert), they are used instead of
+  /// calling getSegmentContexts.
   @Test
   public void testGetSelectedSegmentsInfoUsesProvidedSegmentContextsWhenPresent() {
     List<IndexSegment> tableSegments = new ArrayList<>();
@@ -165,9 +159,7 @@ public class LogicalTableExecutionInfoTest {
     assertSame(selectedSegmentsInfo.getSelectedSegmentContexts().get(0).getIndexSegment(), seg1);
   }
 
-  /**
-   * Verifies that selected segment contexts are in the same order as the pruned segment list.
-   */
+  /// Verifies that selected segment contexts are in the same order as the pruned segment list.
   @Test
   public void testGetSelectedSegmentsInfoSegmentContextOrderPreserved() {
     // 2 tables, 2 segments each; LIMIT 25 so we need 3 segments (10+10+10 >= 25)
@@ -201,12 +193,11 @@ public class LogicalTableExecutionInfoTest {
 
   private static final String ORDER_BY_COLUMN = "orderByCol";
 
-  /**
-   * Verifies that for ORDER BY col DESC LIMIT 5, the pruner selects exactly two segments that have
-   * overlapping min/max (order-by column) and prunes the rest. Segments have 10 docs each; two segments
-   * overlap in range so both are kept; all others are out of range.
-   * <p>The pruner keeps an extra segment only when its max &gt; current min (strict). So Seg2 uses max=101.
-   */
+  /// Verifies that for ORDER BY col DESC LIMIT 5, the pruner selects exactly two segments that have
+  /// overlapping min/max (order-by column) and prunes the rest. Segments have 10 docs each; two segments
+  /// overlap in range so both are kept; all others are out of range.
+  ///
+  /// The pruner keeps an extra segment only when its max &gt; current min (strict). So Seg2 uses max=101.
   @Test
   public void testGetSelectedSegmentsInfoOrderByLimitTwoSegmentsOverlap() {
     // Seg1: [100, 100] 10 docs - first in DESC order, covers LIMIT 10
@@ -255,10 +246,8 @@ public class LogicalTableExecutionInfoTest {
     return indexSegment;
   }
 
-  /**
-   * Mocks an IndexSegment with min/max for the order-by column so SelectionQuerySegmentPruner can prune by range.
-   * Used for ORDER BY + LIMIT tests.
-   */
+  /// Mocks an IndexSegment with min/max for the order-by column so SelectionQuerySegmentPruner can prune by range.
+  /// Used for ORDER BY + LIMIT tests.
   private static IndexSegment mockIndexSegmentWithOrderByColumn(String orderByColumn, Comparable<?> minValue,
       Comparable<?> maxValue, int totalDocs) {
     IndexSegment indexSegment = mock(IndexSegment.class);

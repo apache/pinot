@@ -331,11 +331,9 @@ public class PinotTableReloadService {
   }
 
 
-  /**
-   * Resolves the effective table type for a reload request.
-   * When forceDownload is requested and no table type is specified (neither in the table name nor the request),
-   * defaults to OFFLINE since forceDownload only works with OFFLINE tables currently.
-   */
+  /// Resolves the effective table type for a reload request.
+  /// When forceDownload is requested and no table type is specified (neither in the table name nor the request),
+  /// defaults to OFFLINE since forceDownload only works with OFFLINE tables currently.
   private TableType resolveTableTypeForReload(String tableName, String tableTypeStr, boolean forceDownload) {
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
@@ -350,10 +348,8 @@ public class PinotTableReloadService {
     return tableTypeFromRequest;
   }
 
-  /**
-   * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
-   * name.
-   */
+  /// Helper method to find the existing table based on the given table name (with or without type suffix) and segment
+  /// name.
   private String getExistingTable(String tableName, String segmentName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {

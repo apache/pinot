@@ -82,11 +82,9 @@ public class StreamDataDecoderImplTest {
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.RECORD_SERIALIZED_VALUE_SIZE_KEY), value.length());
   }
 
-  /**
-   * Demonstrates that binary keys (e.g. Confluent Avro wire format with 0x00 magic byte)
-   * were previously corrupted when decoded as UTF-8 string, and now work correctly when
-   * the __key column is defined as BYTES type.
-   */
+  /// Demonstrates that binary keys (e.g. Confluent Avro wire format with 0x00 magic byte)
+  /// were previously corrupted when decoded as UTF-8 string, and now work correctly when
+  /// the \_\_key column is defined as BYTES type.
   @Test
   public void testBinaryKeyCorruptedAsString() {
     TestDecoder messageDecoder = new TestDecoder();

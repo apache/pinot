@@ -23,9 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/**
- * Http error info including error message and status code
- */
+/// Http error info including error message and status code
 public class SimpleHttpErrorInfo {
   private int _code;
   private String _error;

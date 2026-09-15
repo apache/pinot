@@ -34,12 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * UnnestOperator expands array/collection values per input row into zero or more output rows.
- * Supports multiple arrays, aligning them by index (like a zip operation).
- * If arrays have different lengths, shorter arrays are padded with null values.
- * The output schema is provided by the associated UnnestNode's data schema.
- */
+/// UnnestOperator expands array/collection values per input row into zero or more output rows.
+/// Supports multiple arrays, aligning them by index (like a zip operation).
+/// If arrays have different lengths, shorter arrays are padded with null values.
+/// The output schema is provided by the associated UnnestNode's data schema.
 public class UnnestOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnnestOperator.class);
   private static final String EXPLAIN_NAME = "UNNEST";
@@ -105,11 +103,9 @@ public class UnnestOperator extends MultiStageOperator {
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Produces zipped rows across the configured array expressions for each input row.
-   * If an expression evaluates to a scalar instead of an array/list, we intentionally treat it as a single-element
-   * array so the row still participates in UNNEST output instead of being dropped.
-   */
+  /// Produces zipped rows across the configured array expressions for each input row.
+  /// If an expression evaluates to a scalar instead of an array/list, we intentionally treat it as a single-element
+  /// array so the row still participates in UNNEST output instead of being dropped.
   @Override
   protected MseBlock getNextBlock() {
     MseBlock block = _input.nextBlock();
@@ -298,13 +294,9 @@ public class UnnestOperator extends MultiStageOperator {
       }
     },
     EMITTED_ROWS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

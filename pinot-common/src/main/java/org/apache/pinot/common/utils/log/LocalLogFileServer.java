@@ -26,14 +26,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
-/**
- * A real log file server.
- */
+/// A real log file server.
 public class LocalLogFileServer implements LogFileServer {
   private final File _logRootDir;
   private final Path _logRootDirPath;
@@ -49,8 +48,12 @@ public class LocalLogFileServer implements LogFileServer {
   public Set<String> getAllLogFilePaths()
       throws IOException {
     Set<String> allFiles = new TreeSet<>();
-    Files.walk(_logRootDirPath).filter(Files::isRegularFile).forEach(
-        f -> allFiles.add(f.toAbsolutePath().toString().replace(_logRootDirPath.toAbsolutePath() + "/", "")));
+    // Files.walk holds one or more DirectoryStreams; close it eagerly so this method does not leak
+    // file descriptors when invoked repeatedly (e.g. once per downloadLogFile call).
+    try (Stream<Path> paths = Files.walk(_logRootDirPath)) {
+      paths.filter(Files::isRegularFile).forEach(
+          f -> allFiles.add(f.toAbsolutePath().toString().replace(_logRootDirPath.toAbsolutePath() + "/", "")));
+    }
     return allFiles;
   }
 

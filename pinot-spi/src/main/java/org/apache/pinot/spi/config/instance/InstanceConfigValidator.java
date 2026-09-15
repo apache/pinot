@@ -21,22 +21,18 @@ package org.apache.pinot.spi.config.instance;
 import org.apache.pinot.spi.exception.ConfigValidationException;
 
 
-/**
- * SPI interface for validating instance config mutations (add, update, updateTags).
- * Implementations are registered via {@link InstanceConfigValidatorRegistry}
- * and invoked before instance config is persisted to Helix. Throw {@link ConfigValidationException} to reject.
- *
- * <p>Implementations must be thread-safe — they may be called concurrently from multiple request threads.</p>
- */
+/// SPI interface for validating instance config mutations (add, update, updateTags).
+/// Implementations are registered via [InstanceConfigValidatorRegistry]
+/// and invoked before instance config is persisted to Helix. Throw [ConfigValidationException] to reject.
+///
+/// Implementations must be thread-safe — they may be called concurrently from multiple request threads.
 public interface InstanceConfigValidator {
 
-  /**
-   * Validates the given instance before persistence.
-   *
-   * @param instance The instance being added or updated (for updateTags, this is reconstructed
-   *                 from the existing InstanceConfig with the new tags applied)
-   * @throws ConfigValidationException if the instance config violates validation rules
-   */
+  /// Validates the given instance before persistence.
+  ///
+  /// @param instance The instance being added or updated (for updateTags, this is reconstructed
+  ///                 from the existing InstanceConfig with the new tags applied)
+  /// @throws ConfigValidationException if the instance config violates validation rules
   void validate(Instance instance)
       throws ConfigValidationException;
 }

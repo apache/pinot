@@ -27,12 +27,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link PRelToPlanNodeConverter#convertToColumnDataType}. The v2 physical-optimizer converter
- * intentionally shares the same {@code SqlTypeName -> ColumnDataType} mapping as the v1
- * {@link org.apache.pinot.query.planner.logical.RelToPlanNodeConverter}; this test mirrors the unsigned-type coverage
- * in {@code RelToPlanNodeConverterTest} so the two converters cannot silently drift out of sync.
- */
+/// Unit tests for [PRelToPlanNodeConverter#convertToColumnDataType]. The v2 physical-optimizer converter
+/// intentionally shares the same `SqlTypeName -> ColumnDataType` mapping as the v1
+/// [org.apache.pinot.query.planner.logical.RelToPlanNodeConverter]; this test mirrors the unsigned-type coverage
+/// in `RelToPlanNodeConverterTest` so the two converters cannot silently drift out of sync.
 public class PRelToPlanNodeConverterTest {
 
   @Test
@@ -60,5 +58,15 @@ public class PRelToPlanNodeConverterTest {
         DataSchema.ColumnDataType.LONG_ARRAY);
     Assert.assertThrows(IllegalArgumentException.class, () -> PRelToPlanNodeConverter.convertToColumnDataType(
         new ArraySqlType(new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null), true)));
+  }
+
+  @Test
+  public void testConvertUuidTypes() {
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.UUID);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.UUID_ARRAY);
   }
 }

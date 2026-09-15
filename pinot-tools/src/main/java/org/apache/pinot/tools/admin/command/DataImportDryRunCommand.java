@@ -33,10 +33,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to do a dry run of data ingestion so that we can see how transformation functions and
- * complex config will be applied.
- */
+/// Class for command to do a dry run of data ingestion so that we can see how transformation functions and
+/// complex config will be applied.
 @CommandLine.Command(name = "DataImportDryRun", mixinStandardHelpOptions = true)
 public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataImportDryRunCommand.class);

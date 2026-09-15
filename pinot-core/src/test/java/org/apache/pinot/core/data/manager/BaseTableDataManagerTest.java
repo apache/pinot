@@ -24,9 +24,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +43,7 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -55,6 +58,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -78,15 +82,19 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
 public class BaseTableDataManagerTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseTableDataManagerTest");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "BaseTableDataManagerTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final File TABLE_DATA_DIR = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
@@ -943,6 +951,124 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  /// registerSegment must fire the post-registration lifecycle hook on the backing segment of a standalone manager.
+  /// A standalone ImmutableSegmentDataManager exposes its segment via getReportableSegments() (default), while
+  /// getSegments() defaults to empty — so iterating getSegments() here would silently skip the hook for the common
+  /// single-segment case. This is a regression guard for that: it fails if registerSegment iterates getSegments().
+  @Test
+  public void testRegisterSegmentFiresOnSegmentAddedForStandaloneSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
+    when(immutableSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    tableDataManager.registerSegment(SEGMENT_NAME, new ImmutableSegmentDataManager(immutableSegment));
+    verify(immutableSegment).onSegmentAdded();
+  }
+
+  /// registerSegment must fire the hook once per reportable segment for a multi-segment manager
+  @Test
+  public void testRegisterSegmentFiresOnSegmentAddedForEachReportableSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment segment1 = mock(ImmutableSegment.class);
+    ImmutableSegment segment2 = mock(ImmutableSegment.class);
+    SegmentDataManager multiSegmentManager = mock(SegmentDataManager.class);
+    when(multiSegmentManager.getSegmentName()).thenReturn(SEGMENT_NAME);
+    when(multiSegmentManager.getReportableSegments()).thenReturn(List.of(segment1, segment2));
+    // registerSegment holds a reference while the hook runs; a mock returns false unless stubbed.
+    when(multiSegmentManager.increaseReferenceCount()).thenReturn(true);
+    tableDataManager.registerSegment(SEGMENT_NAME, multiSegmentManager);
+    verify(segment1).onSegmentAdded();
+    verify(segment2).onSegmentAdded();
+  }
+
+  /// The hook fires after the segment is swapped into the serving set, so registerSegment must hold a reference while
+  /// it runs. A manager that has already been destroyed (reference count 0) cannot be referenced and has nothing left
+  /// to notify: firing the hook there would run it against a closed SegmentDirectory.
+  @Test
+  public void testRegisterSegmentSkipsOnSegmentAddedForDestroyedSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
+    when(immutableSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    ImmutableSegmentDataManager segmentDataManager = new ImmutableSegmentDataManager(immutableSegment);
+    // Drop the initial reference, mirroring a concurrent replaceSegment()/unregisterSegment() that destroyed it.
+    assertTrue(segmentDataManager.decreaseReferenceCount());
+
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+
+    verify(immutableSegment, never()).onSegmentAdded();
+  }
+
+  /// The hook must not leave a net reference behind: the segment stays acquirable after registration, and is not
+  /// destroyed by the reference registerSegment took while firing the hook.
+  @Test
+  public void testRegisterSegmentRestoresReferenceCountAfterFiringHook() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
+    when(immutableSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    ImmutableSegmentDataManager segmentDataManager = new ImmutableSegmentDataManager(immutableSegment);
+
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+
+    verify(immutableSegment).onSegmentAdded();
+    assertEquals(segmentDataManager.getReferenceCount(), 1);
+    verify(immutableSegment, never()).destroy();
+  }
+
+  /// A failing hook must not fail the registration: the segment is already serving by then, and propagating the
+  /// failure would abort the enclosing Helix state transition for a segment that is in fact up.
+  @Test
+  public void testRegisterSegmentSucceedsWhenOnSegmentAddedThrows() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
+    when(immutableSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    doThrow(new RuntimeException("boom")).when(immutableSegment).onSegmentAdded();
+    ImmutableSegmentDataManager segmentDataManager = new ImmutableSegmentDataManager(immutableSegment);
+
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+
+    assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+    assertEquals(segmentDataManager.getReferenceCount(), 1);
+  }
+
+  /// The default getReportableSegments() wraps getSegment(), so a custom manager exposing a null segment must not
+  /// abort registration.
+  @Test
+  public void testRegisterSegmentToleratesNullReportableSegment() {
+    BaseTableDataManager tableDataManager = createTableManager();
+    SegmentDataManager segmentDataManager = mock(SegmentDataManager.class);
+    when(segmentDataManager.getSegmentName()).thenReturn(SEGMENT_NAME);
+    when(segmentDataManager.increaseReferenceCount()).thenReturn(true);
+    when(segmentDataManager.getReportableSegments()).thenReturn(Arrays.asList(null, null));
+
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+
+    assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+  }
+
+  /// An upsert replacement with a consistency mode other than NONE registers the same new segment twice: first through
+  /// a DuoSegmentDataManager (whose default getReportableSegments() returns its primary, i.e. the new segment) and then
+  /// directly. The hook must reach the underlying SegmentDirectory only once, since implementations are not required to
+  /// be idempotent — a second call would e.g. upload a duplicate marker file.
+  @Test
+  public void testConsistencyModeReplacementFiresOnSegmentAddedOnce()
+      throws Exception {
+    BaseTableDataManager tableDataManager = createTableManager();
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    // A real ImmutableSegment (not a mock) so the at-most-once guard in the implementation is exercised.
+    EmptyIndexSegment newSegment = new EmptyIndexSegment(segmentMetadata, segmentDirectory);
+    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(newSegment);
+    ImmutableSegment oldSegment = mock(ImmutableSegment.class);
+    when(oldSegment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    ImmutableSegmentDataManager oldSegmentManager = new ImmutableSegmentDataManager(oldSegment);
+
+    // Mirrors BaseTableDataManager.replaceUpsertSegment() for a non-NONE consistency mode.
+    tableDataManager.registerSegment(SEGMENT_NAME, new DuoSegmentDataManager(newSegmentManager, oldSegmentManager));
+    tableDataManager.registerSegment(SEGMENT_NAME, newSegmentManager);
+
+    verify(segmentDirectory, times(1)).onSegmentAdded();
+  }
+
   protected BaseTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
@@ -968,22 +1094,18 @@ public class BaseTableDataManagerTest {
     return tableDataManager;
   }
 
-  /**
-   * Returns the concrete {@link BaseTableDataManager} instance under test. Default returns a stock
-   * {@link OfflineTableDataManager}; subclasses override to test a different implementation while inheriting
-   * all test bodies.
-   */
+  /// Returns the concrete [BaseTableDataManager] instance under test. Default returns a stock
+  /// [OfflineTableDataManager]; subclasses override to test a different implementation while inheriting
+  /// all test bodies.
   protected BaseTableDataManager newTableDataManager() {
     return new OfflineTableDataManager();
   }
 
-  /**
-   * Returns the {@link HelixManager} mock wired into the TDM under test. Default returns a bare Mockito mock
-   * (no property store stubbed) — fine for the inherited test bodies which never read ZK directly. Subclasses
-   * that exercise paths reading {@code _propertyStore} (e.g. {@code fetchZKMetadata}, {@code fetchIndexLoadingConfig})
-   * override to stub {@code helixManager.getHelixPropertyStore()} with a {@code FakePropertyStore} pre-seeded
-   * with table config + schema + per-segment ZK metadata.
-   */
+  /// Returns the [HelixManager] mock wired into the TDM under test. Default returns a bare Mockito mock
+  /// (no property store stubbed) — fine for the inherited test bodies which never read ZK directly. Subclasses
+  /// that exercise paths reading `_propertyStore` (e.g. `fetchZKMetadata`, `fetchIndexLoadingConfig`)
+  /// override to stub `helixManager.getHelixPropertyStore()` with a `FakePropertyStore` pre-seeded
+  /// with table config + schema + per-segment ZK metadata.
   protected HelixManager createHelixManagerMock() {
     return mock(HelixManager.class);
   }

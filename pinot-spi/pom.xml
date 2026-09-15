@@ -193,7 +193,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <forkCount>1</forkCount>
+          <!-- Keep this module's historical fork reuse, but honor the root parallel-fork knob. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>true</reuseForks>
         </configuration>
       </plugin>

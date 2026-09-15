@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tsdb.spi;
 
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
-
 
 public class PinotTimeSeriesConfiguration {
   private PinotTimeSeriesConfiguration() {
@@ -30,27 +28,22 @@ public class PinotTimeSeriesConfiguration {
   private static final String SERIES_BUILDER_FACTORY_SUFFIX = ".series.builder.factory";
   private static final String LOGICAL_PLANNER_CLASS_SUFFIX = ".logical.planner.class";
 
-  /**
-   * Config key that controls which time-series languages are enabled in a given Pinot cluster.
-   */
+  /// Config key that controls which time-series languages are enabled in a given Pinot cluster.
   public static String getEnabledLanguagesConfigKey() {
     return CONFIG_PREFIX + ENABLE_LANGUAGES_SUFFIX;
   }
 
-  /**
-   * Returns the config key which determines the class name for the {@link TimeSeriesBuilderFactory} to be used for a
-   * given language. Each language can have its own {@link TimeSeriesBuilderFactory}, which allows each language to
-   * support custom time-series functions.
-   */
+  /// Returns the config key which determines the class name for the
+  /// [org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory] to be used for a given language. Each language
+  /// can have its own [org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory], which allows each language to
+  /// support custom time-series functions.
   public static String getSeriesBuilderFactoryConfigKey(String language) {
     return CONFIG_PREFIX + "." + language + SERIES_BUILDER_FACTORY_SUFFIX;
   }
 
-  /**
-   * Returns config key which determines the class name for the {@link TimeSeriesLogicalPlanner} to be used for a given
-   * language. Pinot broker will load this logical planner on start-up dynamically. This is called for each language
-   * configured via {@link #getEnabledLanguagesConfigKey()}.
-   */
+  /// Returns config key which determines the class name for the [TimeSeriesLogicalPlanner] to be used for a given
+  /// language. Pinot broker will load this logical planner on start-up dynamically. This is called for each language
+  /// configured via [#getEnabledLanguagesConfigKey()].
   public static String getLogicalPlannerConfigKey(String language) {
     return CONFIG_PREFIX + "." + language + LOGICAL_PLANNER_CLASS_SUFFIX;
   }

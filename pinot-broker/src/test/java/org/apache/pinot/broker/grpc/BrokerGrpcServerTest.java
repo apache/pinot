@@ -256,9 +256,7 @@ public class BrokerGrpcServerTest {
         "true", "Without the metadata flag, the SQL-set option must be preserved");
   }
 
-  /**
-   * Helper method to create a mock StreamObserver that captures all responses.
-   */
+  /// Helper method to create a mock StreamObserver that captures all responses.
   private StreamObserver<Broker.BrokerResponse> createMockStreamObserver(List<Broker.BrokerResponse> responses) {
     @SuppressWarnings("unchecked")
     StreamObserver<Broker.BrokerResponse> observer = mock(StreamObserver.class);

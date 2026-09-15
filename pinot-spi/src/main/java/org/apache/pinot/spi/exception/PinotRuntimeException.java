@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.spi.exception;
 
-/**
- * The base runtime exception for Pinot.
- *
- * Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
- * {@link RuntimeException} directly. We should gradually migrate to this class.
- *
- */
+/// The base runtime exception for Pinot.
+///
+/// Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
+/// [RuntimeException] directly. We should gradually migrate to this class.
 public class PinotRuntimeException extends RuntimeException {
 
   public PinotRuntimeException() {

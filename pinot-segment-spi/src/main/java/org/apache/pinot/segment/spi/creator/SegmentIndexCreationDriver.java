@@ -23,43 +23,33 @@ import java.io.Serializable;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 
 
-/**
- * Driver that creates and writes index segments to disk from data that is stored on disk.
- * Nov 6, 2014
- */
+/// Driver that creates and writes index segments to disk from data that is stored on disk.
+/// Nov 6, 2014
 
 public interface SegmentIndexCreationDriver extends Serializable {
-  /**
-   * Configures the segment generator with the given segment generator configuration, which contains the input file
-   * location, format, schema and other necessary information to create an index segment.
-   *
-   * @param config The configuration to use when building an index segment
-   */
+  /// Configures the segment generator with the given segment generator configuration, which contains the input file
+  /// location, format, schema and other necessary information to create an index segment.
+  ///
+  /// @param config The configuration to use when building an index segment
   void init(SegmentGeneratorConfig config)
       throws Exception;
 
-  /**
-   * Builds an index segment and writes it to disk. The index segment creation extracts data from the input files,
-   * profiles each column and then builds indices based on the profiling information gathered.
-   */
+  /// Builds an index segment and writes it to disk. The index segment creation extracts data from the input files,
+  /// profiles each column and then builds indices based on the profiling information gathered.
   void build()
       throws Exception;
 
   String getSegmentName();
 
-  /**
-   *  Get the stats collector for a column
-   *
-   * @param columnName
-   * @return AbstractColumnStatisticsCollector for the column.
-   * @throws Exception
-   */
+  ///  Get the stats collector for a column
+  ///
+  /// @param columnName
+  /// @return AbstractColumnStatisticsCollector for the column.
+  /// @throws Exception
   ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception;
 
-  /**
-   * Returns the path of the output directory
-   */
+  /// Returns the path of the output directory
   File getOutputDirectory();
 
   IngestionSchemaValidator getIngestionSchemaValidator();

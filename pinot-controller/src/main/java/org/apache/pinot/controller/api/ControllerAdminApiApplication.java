@@ -158,10 +158,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     return _httpServer;
   }
 
-  /**
-   * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
-   * Instead, it uses a custom ThreadPoolProbe to count active threads.
-   */
+  /// Registers a gauge that tracks HTTP thread pool utilization without using reflection.
+  /// Instead, it uses a custom ThreadPoolProbe to count active threads.
   private void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
     NetworkListener listener = _httpServer.getListeners().iterator().next();
     ExecutorService executor = listener.getTransport().getWorkerThreadPool();
@@ -194,9 +192,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     return (ThreadPoolExecutor) Executors.newCachedThreadPool(threadFactory);
   }
 
-  /**
-   * Custom probe to track busy threads in Grizzly thread pools without using reflection.
-   */
+  /// Custom probe to track busy threads in Grizzly thread pools without using reflection.
   public static final class ActiveThreadProbe extends ThreadPoolProbe.Adapter {
     private final AtomicInteger _active = new AtomicInteger();
 
@@ -212,7 +208,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       _active.decrementAndGet();
     }
 
-    /** Current number of active threads. */
+    /// Current number of active threads.
     public int getActiveCount() {
       return _active.get();
     }

@@ -166,20 +166,18 @@ public class SegmentPushUtils implements Serializable {
     sendSegmentUris(spec, segmentUris, headers, parameters);
   }
 
-  /**
-   * This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in
-   * metadata mode.
-   * The steps are:
-   * 1. Download segment from tar file path;
-   * 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;
-   * 3. Tar this segment metadata directory into a tar file
-   * 4. Generate a POST request with segmentDownloadURI in header to push tar file to Pinot controller.
-   *
-   * @param spec is the segment generation job spec
-   * @param fileSystem is the PinotFs used to copy segment tar file
-   * @param segmentUriToTarPathMap contains the map of segment DownloadURI to segment tar file path
-   * @throws Exception
-   */
+  /// This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in
+  /// metadata mode.
+  /// The steps are:
+  /// 1. Download segment from tar file path;
+  /// 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;
+  /// 3. Tar this segment metadata directory into a tar file
+  /// 4. Generate a POST request with segmentDownloadURI in header to push tar file to Pinot controller.
+  ///
+  /// @param spec is the segment generation job spec
+  /// @param fileSystem is the PinotFs used to copy segment tar file
+  /// @param segmentUriToTarPathMap contains the map of segment DownloadURI to segment tar file path
+  /// @throws Exception
   public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap)
       throws Exception {
@@ -329,20 +327,18 @@ public class SegmentPushUtils implements Serializable {
     }
   }
 
-  /**
-   * This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in
-   * metadata mode.
-   * The steps are:
-   * 1. Download segment from tar file path;
-   * 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;
-   * 3. Tar this segment metadata directory into a tar file
-   * 4. Generate a POST request with segmentDownloadURI in header to push tar file to Pinot controller.
-   *
-   * @param spec is the segment generation job spec
-   * @param fileSystem is the PinotFs used to copy segment tar file
-   * @param segmentUriToTarPathMap contains the map of segment DownloadURI to segment tar file path
-   * @throws Exception
-   */
+  /// This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in
+  /// metadata mode.
+  /// The steps are:
+  /// 1. Download segment from tar file path;
+  /// 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;
+  /// 3. Tar this segment metadata directory into a tar file
+  /// 4. Generate a POST request with segmentDownloadURI in header to push tar file to Pinot controller.
+  ///
+  /// @param spec is the segment generation job spec
+  /// @param fileSystem is the PinotFs used to copy segment tar file
+  /// @param segmentUriToTarPathMap contains the map of segment DownloadURI to segment tar file path
+  /// @throws Exception
   public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
@@ -658,16 +654,13 @@ public class SegmentPushUtils implements Serializable {
     return segmentUriToTarPathMap;
   }
 
-  /**
-   * Generate a segment metadata only tar file, which contains only metadata.properties and creation.meta file.
-   * The purpose of this is to create a lean tar to push to Pinot controller for adding segments without downloading
-   * the complete segment and untar the segment tarball.
-   *
-   * 1. Download segment tar file to temp dir;
-   * 2. Extract only metadata.properties and creation.meta files from the segment tar file;
-   * 3. Tar both files into a segment metadata file.
-   *
-   */
+  /// Generate a segment metadata only tar file, which contains only metadata.properties and creation.meta file.
+  /// The purpose of this is to create a lean tar to push to Pinot controller for adding segments without downloading
+  /// the complete segment and untar the segment tarball.
+  ///
+  /// 1. Download segment tar file to temp dir;
+  /// 2. Extract only metadata.properties and creation.meta files from the segment tar file;
+  /// 3. Tar both files into a segment metadata file.
   public static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
       throws Exception {
     String uuid = UUID.randomUUID().toString();

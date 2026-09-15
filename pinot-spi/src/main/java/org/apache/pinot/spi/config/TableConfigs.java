@@ -32,10 +32,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Wrapper for all configs of a table, which include the offline table config, realtime table config and schema.
- * This helps look at and operate on the pinot table configs as a whole unit.
- */
+/// Wrapper for all configs of a table, which include the offline table config, realtime table config and schema.
+/// This helps look at and operate on the pinot table configs as a whole unit.
 public class TableConfigs extends BaseJsonConfig {
   private String _tableName;
   private final Schema _schema;

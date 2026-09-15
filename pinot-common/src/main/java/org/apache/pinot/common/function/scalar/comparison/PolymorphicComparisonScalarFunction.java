@@ -24,9 +24,7 @@ import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Base class for polymorphic comparison scalar functions
- */
+/// Base class for polymorphic comparison scalar functions
 public abstract class PolymorphicComparisonScalarFunction implements PinotScalarFunction {
 
   protected static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
@@ -58,17 +56,13 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
     return defaultFunctionInfo();
   }
 
-  /**
-   * Get the comparison scalar function's {@link FunctionInfo} for the given argument type. Comparison scalar functions
-   * take two arguments of the same type.
-   */
+  /// Get the comparison scalar function's [FunctionInfo] for the given argument type. Comparison scalar functions
+  /// take two arguments of the same type.
   protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
 
-  /**
-   * Get the comparison scalar function's default {@link FunctionInfo}. The default function is used when the argument
-   * types are mismatched or when the function info is retrieved based on the number of arguments rather than the
-   * argument types. This is in order to maintain backward compatibility.
-   */
+  /// Get the comparison scalar function's default [FunctionInfo]. The default function is used when the argument
+  /// types are mismatched or when the function info is retrieved based on the number of arguments rather than the
+  /// argument types. This is in order to maintain backward compatibility.
   protected FunctionInfo defaultFunctionInfo() {
     return functionInfoForType(ColumnDataType.DOUBLE);
   }

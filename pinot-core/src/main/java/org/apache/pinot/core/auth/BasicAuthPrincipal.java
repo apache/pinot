@@ -25,9 +25,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 
-/**
- * Container object for basic auth principal
- */
+/// Container object for basic auth principal
 public class BasicAuthPrincipal {
   private final String _name;
   private final String _token;
@@ -76,15 +74,18 @@ public class BasicAuthPrincipal {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
 
-  /**
-   * Gets the Row-Level Security (RLS) filter configured for the given table.
-   * The RLS filter is applied only if the user has access to the table
-   * (as determined by {@link #hasTable(String)}).
-   *
-   * @param tableName The name of the table.
-   * @return An {@link java.util.Optional} containing the RLS filter string if configured for this principal and table,
-   * otherwise {@link java.util.Optional#empty()}.
-   */
+  /// Returns whether this principal was explicitly granted the given permission.
+  public boolean hasExplicitPermission(String permission) {
+    return _permissions.contains(permission.toLowerCase());
+  }
+
+  /// Gets the Row-Level Security (RLS) filter configured for the given table.
+  /// The RLS filter is applied only if the user has access to the table
+  /// (as determined by [#hasTable(String)]).
+  ///
+  /// @param tableName The name of the table.
+  /// @return An [java.util.Optional] containing the RLS filter string if configured for this principal and table,
+  /// otherwise [java.util.Optional#empty()].
   public Optional<List<String>> getRLSFilters(String tableName) {
     return Optional.ofNullable(_rlsFilters.get(tableName));
   }

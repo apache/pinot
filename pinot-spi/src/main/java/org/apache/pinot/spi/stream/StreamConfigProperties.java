@@ -21,9 +21,7 @@ package org.apache.pinot.spi.stream;
 import com.google.common.base.Joiner;
 
 
-/**
- * Defines the keys for the stream config properties map
- */
+/// Defines the keys for the stream config properties map
 public class StreamConfigProperties {
   private StreamConfigProperties() {
   }
@@ -33,9 +31,7 @@ public class StreamConfigProperties {
   // TODO: this can be removed, check all properties before doing so
   public static final String LLC_SUFFIX = ".llc";
 
-  /**
-   * Generic properties
-   */
+  /// Generic properties
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_TOPIC_NAME = "topic.name";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
@@ -49,117 +45,89 @@ public class StreamConfigProperties {
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
   public static final String METADATA_POPULATE = "metadata.populate";
 
-  /**
-   * Time threshold that will keep the realtime segment open for before we complete the segment
-   */
+  /// Time threshold that will keep the realtime segment open for before we complete the segment
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 
-  /**
-   * @deprecated because the property key is confusing (says size but is actually rows). Use
-   * {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
-   *
-   * Row count flush threshold for realtime segments. This size is divided across all the segments assigned to a given
-   * server and is set on a per segment basis. Assuming a server is assigned four stream partitions to consume from and
-   * a flush size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for
-   * a total of two million rows in memory.
-   *
-   * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
-   * certain conditions (eg. if the number of servers, replicas of partitions changes) where partition
-   * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
-   *
-   * If this value is set to 0, then the consumers adjust the number of rows consumed by a partition such that
-   * the size of the completed segment is the desired size (see REALTIME_DESIRED_SEGMENT_SIZE), unless
-   * REALTIME_SEGMENT_FLUSH_TIME is reached first)
-   */
+  /// @deprecated because the property key is confusing (says size but is actually rows). Use
+  /// [StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS]
+  ///
+  /// Row count flush threshold for realtime segments. This size is divided across all the segments assigned to a given
+  /// server and is set on a per segment basis. Assuming a server is assigned four stream partitions to consume from and
+  /// a flush size of two million, then each consuming segment would have a flush size of five hundred thousand rows,
+  /// for a total of two million rows in memory.
+  ///
+  /// Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
+  /// certain conditions (eg. if the number of servers, replicas of partitions changes) where partition
+  /// to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
+  ///
+  /// If this value is set to 0, then the consumers adjust the number of rows consumed by a partition such that
+  /// the size of the completed segment is the desired size (see REALTIME_DESIRED_SEGMENT_SIZE), unless
+  /// REALTIME_SEGMENT_FLUSH_TIME is reached first)
   public static final String DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.size";
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
 
-  /**
-   * Config is similar to {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS} but independent of
-   * partition count. This is useful when we want to flush segment exactly based on number of rows in a segment
-   */
+  /// Config is similar to [StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS] but independent of
+  /// partition count. This is useful when we want to flush segment exactly based on number of rows in a segment
   public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS = "realtime.segment.flush.threshold.segment.rows";
 
-  /**
-   * @deprecated because the property key is confusing (desired size is not indicative of segment size).
-   * Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
-   *
-   * The desired size of a completed realtime segment.
-   * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE is set
-   * to 0. Default value of REALTIME_SEGMENT_FLUSH_SIZE is "200M". Values are parsed using DataSize class.
-   *
-   * The value for this configuration should be chosen based on the amount of memory available on consuming
-   * machines, the number of completed segments that are expected to be resident on the machine and the amount
-   * of memory used by consuming machines. In other words:
-   *
-   *    numPartitionsInMachine * (consumingPartitionMemory + numPartitionsRetained * REALTIME_DESIRED_SEGMENT_SIZE)
-   *
-   * must be less than or equal to the total memory available to store pinot data.
-   *
-   * Note that consumingPartitionMemory will vary depending on the rows that are consumed.
-   *
-   * Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
-   */
+  /// @deprecated because the property key is confusing (desired size is not indicative of segment size).
+  /// Use [StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE]
+  ///
+  /// The desired size of a completed realtime segment.
+  /// This config is used only if REALTIME_SEGMENT_FLUSH_SIZE is set
+  /// to 0. Default value of REALTIME_SEGMENT_FLUSH_SIZE is "200M". Values are parsed using DataSize class.
+  ///
+  /// The value for this configuration should be chosen based on the amount of memory available on consuming
+  /// machines, the number of completed segments that are expected to be resident on the machine and the amount
+  /// of memory used by consuming machines. In other words:
+  ///
+  ///    numPartitionsInMachine \* (consumingPartitionMemory + numPartitionsRetained \* REALTIME_DESIRED_SEGMENT_SIZE)
+  ///
+  /// must be less than or equal to the total memory available to store pinot data.
+  ///
+  /// Note that consumingPartitionMemory will vary depending on the rows that are consumed.
+  ///
+  /// Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
   public static final String DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE = "realtime.segment.flush.desired.size";
   public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE = "realtime.segment.flush.threshold.segment.size";
 
-  /**
-   * The variance fraction allowed for the segment size auto tuning. The valid value is [0.0, 0.5].
-   * By default 0.0 is used.
-   */
+  /// The variance fraction allowed for the segment size auto tuning. The valid value is \[0.0, 0.5\].
+  /// By default 0.0 is used.
   public static final String FLUSH_THRESHOLD_VARIANCE_FRACTION =
       "realtime.segment.flush.threshold.variance.fraction";
 
-  /**
-   * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
-   */
+  /// The initial num rows to use for segment size auto tuning. By default 100_000 is used.
   public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";
 
-  /**
-   * Time threshold that controller will wait for the segment to be built by the server.
-   */
+  /// Time threshold that controller will wait for the segment to be built by the server.
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
-  /**
-   * Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
-   */
+  /// Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
 
 
-  /**
-   * For pauseless consumption, the time in seconds that the server will wait for a segment to be ready for download.
-   * 600 seconds (10 minutes) by default.
-   */
+  /// For pauseless consumption, the time in seconds that the server will wait for a segment to be ready for download.
+  /// 600 seconds (10 minutes) by default.
   public static final String PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS =
       "realtime.segment.pauseless.download.timeoutSeconds";
 
-  /**
-   * Config used to enable offset auto reset during segment commit.
-   */
+  /// Config used to enable offset auto reset during segment commit.
   public static final String ENABLE_OFFSET_AUTO_RESET = "realtime.segment.offsetAutoReset.enable";
 
-  /**
-   * During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
-   * and (latestStreamOffset - latestIngestedOffset > thisValue)
-   */
+  /// During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
+  /// and (latestStreamOffset - latestIngestedOffset > thisValue)
   public static final String OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY =
       "realtime.segment.offsetAutoReset.offsetThreshold";
 
-  /**
-   * During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
-   * and (latestStreamOffset's timestamp - latestIngestedOffset's timestamp > thisValue)
-   */
+  /// During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
+  /// and (latestStreamOffset's timestamp - latestIngestedOffset's timestamp > thisValue)
   public static final String OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY =
       "realtime.segment.offsetAutoReset.timeThresholdSeconds";
 
-  /**
-   * Config used to indicate whether the topic is a temporary topic for offset auto reset backfilling
-   */
+  /// Config used to indicate whether the topic is a temporary topic for offset auto reset backfilling
   public static final String BACKFILL_TOPIC = "realtime.segment.isBackfillTopic";
 
-  /**
-   * Helper method to create a stream specific property
-   */
+  /// Helper method to create a stream specific property
   public static String constructStreamProperty(String streamType, String property) {
     return Joiner.on(DOT_SEPARATOR).join(STREAM_PREFIX, streamType, property);
   }

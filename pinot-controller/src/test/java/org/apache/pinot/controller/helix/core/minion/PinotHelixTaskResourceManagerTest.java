@@ -1652,9 +1652,7 @@ public class PinotHelixTaskResourceManagerTest {
     mgr.setTerminalStateExpireTimeMs(-1);
   }
 
-  /**
-   * Helper method to mock JobConfig and JobContext for a task
-   */
+  /// Helper method to mock JobConfig and JobContext for a task
   private void mockTaskJobConfigAndContext(TaskDriver taskDriver, String taskName, TaskPartitionState state) {
     String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
     JobConfig jobConfig = mock(JobConfig.class);

@@ -31,15 +31,13 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-/**
- * This class is used at startup time to have a more accurate estimate of the catchup period in which no query
- * execution happens and consumers try to catch up to the latest messages available in streams.
- * To achieve this, every time status check is called - {@link #getNumConsumingSegmentsNotReachedIngestionCriteria} -
- * for each consuming segment, we check if either:
- *   - the segment's minimum ingestion lag is within {@link #_minFreshnessMs}
- *   - the segment's latest ingested offset has reached the current stream offset
- *   - the segment has been idle longer than {@link #_idleTimeoutMs}
- */
+/// This class is used at startup time to have a more accurate estimate of the catchup period in which no query
+/// execution happens and consumers try to catch up to the latest messages available in streams.
+/// To achieve this, every time status check is called - [#getNumConsumingSegmentsNotReachedIngestionCriteria] -
+/// for each consuming segment, we check if either:
+///   - the segment's minimum ingestion lag is within [#_minFreshnessMs]
+///   - the segment's latest ingested offset has reached the current stream offset
+///   - the segment has been idle longer than [#_idleTimeoutMs]
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;

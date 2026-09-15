@@ -43,24 +43,22 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.*;
 
 
-/**
- * Recommend pinot number table partitions on realtime and/or offline side of the table
- * Recommend column to partition on:
- *  For a table whose QPS < Q (say 200 or 300) NO partitioning is needed
- *  For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
- *  The partitioned dimension D should appear frequently in EQ or IN, according to the
- *  PartitionSegmentPruner::isPartitionMatch():
- *  Should have sufficient cardinality to guarantee balanced partitioning
- * Number of partitions:
- *  Realtime:
- *    num of partitions for real time should be the same value as the number of kafka partitions
- *  Offline:
- *    **We are assuming one segment per partition per push on offline side and this is generally true in Pinot**
- *    Offline partition num is dependent on the amount of data coming in on a given day.
- *    Should give a reasonable partition value that makes the resulting partition size optimal
- *  Hybrid:
- *    The minimum of Realtime and Offline
- */
+/// Recommend pinot number table partitions on realtime and/or offline side of the table
+/// Recommend column to partition on:
+///  For a table whose QPS < Q (say 200 or 300) NO partitioning is needed
+///  For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
+///  The partitioned dimension D should appear frequently in EQ or IN, according to the
+///  PartitionSegmentPruner::isPartitionMatch():
+///  Should have sufficient cardinality to guarantee balanced partitioning
+/// Number of partitions:
+///  Realtime:
+///    num of partitions for real time should be the same value as the number of kafka partitions
+///  Offline:
+///    \*\*We are assuming one segment per partition per push on offline side and this is generally true in Pinot\*\*
+///    Offline partition num is dependent on the amount of data coming in on a given day.
+///    Should give a reasonable partition value that makes the resulting partition size optimal
+///  Hybrid:
+///    The minimum of Realtime and Offline
 public class PinotTablePartitionRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTablePartitionRule.class);
   PartitionRuleParams _params;
@@ -179,10 +177,8 @@ public class PinotTablePartitionRule extends AbstractRule {
         });
   }
 
-  /**
-   * Recursively parse the query and find out the dimensions partitions this query,
-   * See PartitionSegmentPruner
-   */
+  /// Recursively parse the query and find out the dimensions partitions this query,
+  /// See PartitionSegmentPruner
   public FixedLenBitset parseQuery(QueryContext queryContext) {
     FilterContext filter = queryContext.getFilter();
     if (filter == null || filter.isConstant()) {

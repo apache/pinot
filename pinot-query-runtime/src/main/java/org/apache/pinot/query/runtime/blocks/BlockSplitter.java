@@ -27,30 +27,23 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * Interface for splitting MSE blocks. This is used for ensuring
- * that the blocks that are sent along the wire play nicely with the
- * underlying transport.
- */
+/// Interface for splitting MSE blocks. This is used for ensuring
+/// that the blocks that are sent along the wire play nicely with the
+/// underlying transport.
 public interface BlockSplitter {
   BlockSplitter NO_OP = (block, maxBlockSize) -> Iterators.singletonIterator(block);
   BlockSplitter DEFAULT = new Default();
 
-  /**
-   * @return a list of blocks that was split from the original {@code block}
-   */
+  /// @return a list of blocks that was split from the original `block`
   Iterator<? extends MseBlock.Data> split(MseBlock.Data block, int maxBlockSize);
 
-  /**
-   *  Split a block into multiple block so that each block size is within maxBlockSize. Currently,
-   *  <ul>
-   *    <li>For row data block, we split for row type dataBlock.</li>
-   *    <li>For columnar data block, exceptions are thrown.</li>
-   *    <li>For metadata block, split is not supported.</li>
-   *  </ul>
-   *
-   * @return a list of data block chunks
-   */
+  ///  Split a block into multiple block so that each block size is within maxBlockSize. Currently,
+  ///
+  /// - For row data block, we split for row type dataBlock.
+  /// - For columnar data block, exceptions are thrown.
+  /// - For metadata block, split is not supported.
+  ///
+  /// @return a list of data block chunks
   class Default implements BlockSplitter, MseBlock.Data.Visitor<Iterator<MseBlock.Data>, Integer> {
     private static final int MEDIAN_COLUMN_SIZE_BYTES = 8;
 

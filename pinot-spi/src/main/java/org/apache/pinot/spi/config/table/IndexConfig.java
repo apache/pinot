@@ -25,21 +25,17 @@ import java.util.Objects;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * This is the base class used to configure indexes.
- *
- * The common logic between all indexes is that they can be enabled or disabled.
- *
- * Indexes that do not require extra configuration can directly use this class.
- */
+/// This is the base class used to configure indexes.
+///
+/// The common logic between all indexes is that they can be enabled or disabled.
+///
+/// Indexes that do not require extra configuration can directly use this class.
 public class IndexConfig extends BaseJsonConfig {
   public static final IndexConfig ENABLED = new IndexConfig(false);
   public static final IndexConfig DISABLED = new IndexConfig(true);
   private final boolean _disabled;
 
-  /**
-   * @param disabled whether the config is disabled. Null is considered enabled.
-   */
+  /// @param disabled whether the config is disabled. Null is considered enabled.
   @JsonCreator
   public IndexConfig(@JsonProperty("disabled") Boolean disabled) {
     _disabled = Boolean.TRUE.equals(disabled);

@@ -30,9 +30,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests to check transformation of time column using time field spec
- */
+/// Tests to check transformation of time column using time field spec
 public class ExpressionTransformerTimeTest {
 
   @Test

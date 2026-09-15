@@ -140,9 +140,7 @@ public class OperatorTestUtil {
     return opChainExecutionContext;
   }
 
-  /**
-   * Verifies that the last operator stats in the current stage stats is of the given key class and returns it.
-   */
+  /// Verifies that the last operator stats in the current stage stats is of the given key class and returns it.
   public static <K extends Enum<K> & StatMap.Key> StatMap<K> getStatMap(Class<K> keyClass, MultiStageQueryStats stats) {
     MultiStageQueryStats.StageStats stageStats = stats.getCurrentStats();
     Assert.assertEquals(stageStats.getLastOperatorStats().getKeyClass(), keyClass,

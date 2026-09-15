@@ -19,17 +19,15 @@
 package org.apache.pinot.tsdb.spi.operator;
 
 import java.util.List;
-import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * Every time-series operator takes in a {@link TimeSeriesBlock} and returns another {@link TimeSeriesBlock}.
- * Parent operators/callers must call {@link #nextBlock()} to get the next block from the child operators, and implement
- * {@link #getNextBlock()} to implement the business logic for their operator. Also see {@link BaseTimeSeriesPlanNode}.
- * TODO: Add common hierarchy with other operators like Multistage and Pinot core. This will likely require us to
- *   define a pinot-query-spi or add/move some abstractions to pinot-spi.
- */
+/// Every time-series operator takes in a [TimeSeriesBlock] and returns another [TimeSeriesBlock]. Parent
+/// operators/callers must call [#nextBlock()] to get the next block from the child operators, and implement
+/// [#getNextBlock()] to implement the business logic for their operator. Also see
+/// [org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode].
+/// TODO: Add common hierarchy with other operators like Multistage and Pinot core. This will likely require us to
+///   define a pinot-query-spi or add/move some abstractions to pinot-spi.
 public abstract class BaseTimeSeriesOperator {
   protected final List<BaseTimeSeriesOperator> _childOperators;
 
@@ -37,9 +35,7 @@ public abstract class BaseTimeSeriesOperator {
     _childOperators = childOperators;
   }
 
-  /**
-   * Called by parent time-series operators.
-   */
+  /// Called by parent time-series operators.
   public final TimeSeriesBlock nextBlock() {
     long startTime = System.currentTimeMillis();
     try {
@@ -53,13 +49,9 @@ public abstract class BaseTimeSeriesOperator {
     return _childOperators;
   }
 
-  /**
-   * Time series query languages can implement their own business logic in their operators.
-   */
+  /// Time series query languages can implement their own business logic in their operators.
   public abstract TimeSeriesBlock getNextBlock();
 
-  /**
-   * Name that will show up in the explain plan.
-   */
+  /// Name that will show up in the explain plan.
   public abstract String getExplainName();
 }

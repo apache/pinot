@@ -33,10 +33,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Integration tests for multi-cluster routing and federation.
- * Tests federation with different table names across clusters and various query modes.
- */
+/// Integration tests for multi-cluster routing and federation.
+/// Tests federation with different table names across clusters and various query modes.
 public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterIntegrationTest.class);
 
@@ -270,10 +268,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
     };
   }
 
-  /**
-   * Setup physical tables based on configuration. By default, creates different table names
-   * in each cluster. Subclasses can override to create same-named tables.
-   */
+  /// Setup physical tables based on configuration. By default, creates different table names
+  /// in each cluster. Subclasses can override to create same-named tables.
   protected void setupPhysicalTables() throws Exception {
     // Cluster 1 tables
     dropTableAndSchemaIfExists(getPhysicalTable1InCluster1(), _cluster1._controllerBaseApiUrl);

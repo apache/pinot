@@ -23,9 +23,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * The {@code BitmapDocIdIterator} is the bitmap-based iterator to iterate on a bitmap of matching document ids.
- */
+/// The `BitmapDocIdIterator` is the bitmap-based iterator to iterate on a bitmap of matching document ids.
 public final class BitmapDocIdIterator implements BitmapBasedDocIdIterator {
   private final ImmutableRoaringBitmap _docIds;
   private final PeekableIntIterator _docIdIterator;

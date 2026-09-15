@@ -32,15 +32,13 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.SortExchange;
 
 
-/**
- * Pinot's implementation of {@code SortExchange} which needs information about whether to sort on the sender
- * and/or receiver side of the exchange. Every {@code Exchange} is broken into a send and a receive node and the
- * decision on where to sort is made by the planner and this information has to be passed onto the send and receive
- * nodes for the correct execution.
- *
- * Note: This class does not extend {@code LogicalSortExchange} because its constructor which takes the list of
- * parameters is private.
- */
+/// Pinot's implementation of `SortExchange` which needs information about whether to sort on the sender
+/// and/or receiver side of the exchange. Every `Exchange` is broken into a send and a receive node and the
+/// decision on where to sort is made by the planner and this information has to be passed onto the send and receive
+/// nodes for the correct execution.
+///
+/// Note: This class does not extend `LogicalSortExchange` because its constructor which takes the list of
+/// parameters is private.
 public class PinotLogicalSortExchange extends SortExchange {
 
   protected final boolean _isSortOnSender;
@@ -60,9 +58,7 @@ public class PinotLogicalSortExchange extends SortExchange {
     _prePartitioned = prePartitioned;
   }
 
-  /**
-   * Creates a PinotLogicalSortExchange by parsing serialized output.
-   */
+  /// Creates a PinotLogicalSortExchange by parsing serialized output.
   public PinotLogicalSortExchange(RelInput input) {
     super(input);
     _exchangeType = PinotRelExchangeType.STREAMING;
@@ -83,17 +79,15 @@ public class PinotLogicalSortExchange extends SortExchange {
         isSortOnReceiver, prePartitioned);
   }
 
-  /**
-   * Creates a PinotLogicalSortExchange.
-   *
-   * @param input     Input relational expression
-   * @param distribution Distribution specification
-   * @param exchangeType Exchange type specification
-   * @param collation array of sort specifications
-   * @param isSortOnSender whether to sort on the sender
-   * @param isSortOnReceiver whether to sort on receiver
-   * @param prePartitioned whether the exchange is pre-partitioned
-   */
+  /// Creates a PinotLogicalSortExchange.
+  ///
+  /// @param input     Input relational expression
+  /// @param distribution Distribution specification
+  /// @param exchangeType Exchange type specification
+  /// @param collation array of sort specifications
+  /// @param isSortOnSender whether to sort on the sender
+  /// @param isSortOnReceiver whether to sort on receiver
+  /// @param prePartitioned whether the exchange is pre-partitioned
   public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution,
       PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender, boolean isSortOnReceiver,
       @Nullable Boolean prePartitioned) {

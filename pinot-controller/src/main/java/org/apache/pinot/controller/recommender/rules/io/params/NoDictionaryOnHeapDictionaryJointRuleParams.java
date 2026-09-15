@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.NoDictionaryOnHeapDictionaryJointRule.*;
 
 
-/**
- * Thresholds and parameters used in NoDictionaryOnHeapDictionaryJointRule
- */
+/// Thresholds and parameters used in NoDictionaryOnHeapDictionaryJointRule
 public class NoDictionaryOnHeapDictionaryJointRuleParams {
 
   // We won't consider on heap dictionaries if table QPS < this threshold

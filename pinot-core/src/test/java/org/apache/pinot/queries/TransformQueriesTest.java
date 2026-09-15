@@ -268,10 +268,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
     runAndVerifyInterSegmentQuery(query, 1.0);
   }
 
-  /**
-   * This test checks the groovy transform when generic raw data could have some values that can be used to
-   * ingest values into pinot column with a different name.
-   */
+  /// This test checks the groovy transform when generic raw data could have some values that can be used to
+  /// ingest values into pinot column with a different name.
   @Test
   public void testGroovyTransformQuery() {
     String query = "SELECT INT_COL1, INT_COL1_V2 FROM testTable";

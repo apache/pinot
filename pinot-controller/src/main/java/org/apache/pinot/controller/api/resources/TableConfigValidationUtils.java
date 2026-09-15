@@ -34,33 +34,36 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Utility class that encapsulates table config validation logic.
- *
- * <p>This lives in {@code pinot-controller} (not {@code pinot-segment-local}'s {@code TableConfigUtils})
- * because validation requires controller-level dependencies like {@link PinotHelixResourceManager},
- * {@link ControllerConf}, {@link PinotTaskManager}, and {@link TableRebalancer}.</p>
- */
+/// Utility class that encapsulates table config validation logic.
+///
+/// This lives in `pinot-controller` (not `pinot-segment-local`'s `TableConfigUtils`)
+/// because validation requires controller-level dependencies like [PinotHelixResourceManager],
+/// [ControllerConf], [PinotTaskManager], and [TableRebalancer].
 public final class TableConfigValidationUtils {
 
   private TableConfigValidationUtils() {
   }
 
-  /**
-   * Validates a table config against the given schema and controller configuration.
-   *
-   * @param tableConfig   the table config to validate
-   * @param schema        the schema for the table (must not be null)
-   * @param typesToSkip   comma-separated list of validation types to skip (ALL|TASK|UPSERT), or null
-   * @param resourceManager the Helix resource manager
-   * @param controllerConf  the controller configuration
-   * @param taskManager     the task manager, or null to skip task validation
-   */
+  /// Validates a table config against the given schema and controller configuration.
+  ///
+  /// @param tableConfig   the table config to validate
+  /// @param schema        the schema for the table (must not be null)
+  /// @param typesToSkip   comma-separated list of validation types to skip (ALL|TASK|UPSERT), or null
+  /// @param resourceManager the Helix resource manager
+  /// @param controllerConf  the controller configuration
+  /// @param taskManager     the task manager, or null to skip task validation
   public static void validateTableConfig(TableConfig tableConfig, Schema schema,
       @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
       ControllerConf controllerConf, @Nullable PinotTaskManager taskManager) {
+    validateTableConfig(tableConfig, schema, typesToSkip, resourceManager, controllerConf, taskManager, null);
+  }
+
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
+      @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+      @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
-    TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());
@@ -72,14 +75,12 @@ public final class TableConfigValidationUtils {
     TableConfigValidatorRegistry.validate(tableConfig, schema);
   }
 
-  /**
-   * Validates that every environment variable / system property referenced by the table config (via the
-   * {@code ${VAR}} template syntax, without a default value) can be resolved at the time the config is written.
-   *
-   * Table configs are stored as templates and resolved lazily every time they are read. If a referenced variable
-   * does not exist, the failure surfaces only at read time and can break operations (e.g. segment commit)
-   * Resolving here makes the write fail fast so the bad config is never persisted.
-   */
+  /// Validates that every environment variable / system property referenced by the table config (via the
+  /// `${VAR}` template syntax, without a default value) can be resolved at the time the config is written.
+  ///
+  /// Table configs are stored as templates and resolved lazily every time they are read. If a referenced variable
+  /// does not exist, the failure surfaces only at read time and can break operations (e.g. segment commit)
+  /// Resolving here makes the write fail fast so the bad config is never persisted.
   @VisibleForTesting
   static void validateEnvironmentVariables(TableConfig tableConfig) {
     try {

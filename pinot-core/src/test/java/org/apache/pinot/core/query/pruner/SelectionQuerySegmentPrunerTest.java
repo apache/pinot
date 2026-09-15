@@ -222,9 +222,7 @@ public class SelectionQuerySegmentPrunerTest {
     assertEquals(result.size(), 3);
   }
 
-  /**
-   * Range-partitioned, non-overlapping segments on {@code testColumn}: [0,9], [10,19], [20,29], [30,39], [40,49].
-   */
+  /// Range-partitioned, non-overlapping segments on `testColumn`: \[0,9\], \[10,19\], \[20,29\], \[30,39\], \[40,49\].
   private List<IndexSegment> rangePartitionedSegments() {
     return Arrays.asList(
         getIndexSegment(0L, 9L, 10),     // 0

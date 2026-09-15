@@ -19,17 +19,15 @@
 package org.apache.pinot.segment.local.function;
 
 
-/**
- * Deprecated forwarding interface that preserves the historical
- * {@code org.apache.pinot.segment.local.function} binary name for downstream callers.
- *
- * <p>Behavioral and thread-safety expectations are defined by
- * {@link org.apache.pinot.spi.function.FunctionEvaluator}.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.spi.function.FunctionEvaluator} instead.
- */
+/// Deprecated forwarding interface that preserves the historical
+/// `org.apache.pinot.segment.local.function` binary name for downstream callers.
+///
+/// Behavioral and thread-safety expectations are defined by
+/// [org.apache.pinot.spi.function.FunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.spi.function.FunctionEvaluator] instead.
 @Deprecated
 public interface FunctionEvaluator extends org.apache.pinot.spi.function.FunctionEvaluator {
 }

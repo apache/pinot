@@ -443,15 +443,6 @@ public class ControllerRequestURLBuilder {
     return forSegmentsMetadataFromServer(tableName, (List<String>) null);
   }
 
-  @Deprecated
-  public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
-    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
-    if (columns != null) {
-      url += "?columns=" + columns;
-    }
-    return url;
-  }
-
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
     return forSegmentsMetadataFromServer(tableName, columns, null);
   }
@@ -729,5 +720,9 @@ public class ControllerRequestURLBuilder {
 
   public String forBaseQueryWorkloadConfig(String config) {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
+  }
+
+  public String forPageCacheWarmupQueries(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "pagecache", "queries", tableName) + "?tableType=" + tableType;
   }
 }

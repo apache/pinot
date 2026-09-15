@@ -22,6 +22,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,10 +58,8 @@ public class TextIndexUtils {
   private TextIndexUtils() {
   }
 
-  /**
-   * Configuration change listener for Lucene max clause count.
-   * This allows updating the max clause count dynamically without server restart.
-   */
+  /// Configuration change listener for Lucene max clause count.
+  /// This allows updating the max clause count dynamically without server restart.
   public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -115,6 +114,59 @@ public class TextIndexUtils {
     //@formatter:on
   }
 
+  /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.
+  ///
+  /// Prefer this over calling [#hasTextIndex] in a loop over a segment's columns. It lists the
+  /// directory once rather than performing `columns × extensions` existence probes. Finding
+  /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
+  /// same.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Which of `columns` still have a deprecated native text index file in `segDir`.
+  ///
+  /// Listing-based for the same reason as [#getColumnsWithTextIndex]: the caller asks this for every
+  /// column of a segment on every reload check, including the overwhelmingly common case where no
+  /// column has ever had a native text index.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithLegacyNativeTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Names of the entries directly inside `dir`, files and directories alike (a Lucene text index is
+  /// a directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
+  }
+
   public static List<String> extractStopWordsInclude(String colName,
       Map<String, Map<String, String>> columnProperties) {
     return extractStopWordsInclude(columnProperties.getOrDefault(colName, null));
@@ -146,14 +198,13 @@ public class TextIndexUtils {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config)
       throws ReflectiveOperationException {
     String analyzerClassName = config.getLuceneAnalyzerClass();
@@ -173,15 +224,14 @@ public class TextIndexUtils {
     return getCustomAnalyzer(analyzerClassArgs, analyzerClassArgTypes, analyzerClassName);
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @param override column-specific configuration that overrides the shared configuration
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @param override column-specific configuration that overrides the shared configuration
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
       throws ReflectiveOperationException {
     String luceneAnalyzerClassName = firstNotNull(override.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClass());
@@ -249,12 +299,10 @@ public class TextIndexUtils {
     return v2;
   }
 
-  /**
-   * Parse the Java value type specified in the type string
-   * @param valueTypeString FQCN of the value type class or the name of the primitive value type
-   * @return Class object of the value type
-   * @throws ClassNotFoundException when the value type is not supported
-   */
+  /// Parse the Java value type specified in the type string
+  /// @param valueTypeString FQCN of the value type class or the name of the primitive value type
+  /// @return Class object of the value type
+  /// @throws ClassNotFoundException when the value type is not supported
   public static Class<?> parseSupportedTypes(String valueTypeString)
       throws ClassNotFoundException {
     try {
@@ -285,13 +333,11 @@ public class TextIndexUtils {
     }
   }
 
-  /**
-   * Attempt to coerce string into supported value type
-   * @param stringValue string representation of the value
-   * @param clazz of the value
-   * @return class object of the value, auto-boxed if it is a primitive type
-   * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
-   */
+  /// Attempt to coerce string into supported value type
+  /// @param stringValue string representation of the value
+  /// @param clazz of the value
+  /// @return class object of the value, auto-boxed if it is a primitive type
+  /// @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
   public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
       throws ReflectiveOperationException {
     try {
@@ -375,13 +421,11 @@ public class TextIndexUtils {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
-  /**
-   * Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
-   * luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
-   *
-   * @param indexDir directory where the properties file is saved
-   * @param config config to write to the properties file
-   */
+  /// Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
+  /// luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
+  ///
+  /// @param indexDir directory where the properties file is saved
+  /// @param config config to write to the properties file
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
     List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs()
@@ -403,15 +447,13 @@ public class TextIndexUtils {
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
   }
 
-  /**
-   * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
-   * The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
-   * and luceneQueryParserClass.
-   *
-   * @param file properties file to read from
-   * @param config config to update
-   * @return updated TextIndexConfig
-   */
+  /// Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+  /// The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
+  /// and luceneQueryParserClass.
+  ///
+  /// @param file properties file to read from
+  /// @param config config to update
+  /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);

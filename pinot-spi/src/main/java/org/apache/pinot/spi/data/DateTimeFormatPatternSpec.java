@@ -42,7 +42,7 @@ public class DateTimeFormatPatternSpec {
   public static final DateTimeFormatPatternSpec EPOCH = new DateTimeFormatPatternSpec(TimeFormat.EPOCH);
   public static final DateTimeFormatPatternSpec TIMESTAMP = new DateTimeFormatPatternSpec(TimeFormat.TIMESTAMP);
 
-  /** eg: yyyyMMdd tz(CST) or yyyyMMdd HH tz(GMT+0700) or yyyyMMddHH tz(America/Chicago) **/
+  /// eg: yyyyMMdd tz(CST) or yyyyMMdd HH tz(GMT+0700) or yyyyMMddHH tz(America/Chicago) \*
   private static final Pattern SDF_PATTERN_WITH_TIMEZONE = Pattern.compile("^(.+)( tz[ ]*\\((.+)\\))[ ]*");
   private static final int SDF_PATTERN_GROUP = 1;
   private static final int TIME_ZONE_GROUP = 3;

@@ -29,9 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * NOTE: All BOOLEAN values are represented as 0 (FALSE) and 1 (TRUE) internally.
- */
+/// NOTE: All BOOLEAN values are represented as 0 (FALSE) and 1 (TRUE) internally.
 public abstract class FilterOperand implements TransformOperand {
 
   @Override
@@ -180,17 +178,13 @@ public abstract class FilterOperand implements TransformOperand {
     private final boolean _requireCasting;
     private final ColumnDataType _commonCastType;
 
-    /**
-     * Predicate constructor also resolve data type,
-     * since we don't have an exhausted list of filter function signatures. we rely on type casting.
-     *
-     * <ul>
-     *   <li>if both RHS and LHS has null data type, exception occurs.</li>
-     *   <li>if either side is null or OBJECT, we best-effort cast data into the other side's data type.</li>
-     *   <li>if either side supertype of the other, we use the super type.</li>
-     *   <li>if we can't resolve a common data type, exception occurs.</li>
-     * </ul>
-     */
+    /// Predicate constructor also resolve data type,
+    /// since we don't have an exhausted list of filter function signatures. we rely on type casting.
+    ///
+    /// - if both RHS and LHS has null data type, exception occurs.
+    /// - if either side is null or OBJECT, we best-effort cast data into the other side's data type.
+    /// - if either side supertype of the other, we use the super type.
+    /// - if we can't resolve a common data type, exception occurs.
     public Predicate(List<RexExpression> operands, DataSchema dataSchema, IntPredicate comparisonResultPredicate) {
       Preconditions.checkState(operands.size() == 2, "Predicate takes 2 arguments, got: %s" + operands.size());
       _lhs = TransformOperandFactory.getTransformOperand(operands.get(0), dataSchema);

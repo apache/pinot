@@ -75,6 +75,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
@@ -178,9 +179,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return createCommittingSegmentDescriptor(segmentName, NEXT_OFFSET);
   }
 
-  /**
-   * Test cases for new table being created, and initial segments setup that follows.
-   */
+  /// Test cases for new table being created, and initial segments setup that follows.
   @Test
   public void testSetUpNewTable() {
     // Insufficient instances - 2 replicas, 1 instance, 4 partitions
@@ -691,11 +690,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  /**
-   * Test cases for the scenario where stream partitions increase, and the validation manager is attempting to create
-   * segments for new partitions. This test assumes that all other factors remain the same (no error conditions or
-   * inconsistencies in metadata and ideal state).
-   */
+  /// Test cases for the scenario where stream partitions increase, and the validation manager is attempting to create
+  /// segments for new partitions. This test assumes that all other factors remain the same (no error conditions or
+  /// inconsistencies in metadata and ideal state).
   @Test
   public void testSetUpNewPartitions() {
     // Set up a new table with 2 replicas, 5 instances, 0 partition
@@ -826,47 +823,45 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return clone;
   }
 
-  /**
-   * Tests that we can repair all invalid scenarios during segment completion.
-   *
-   * Segment completion takes place in 3 steps:
-   * 1. Update committing segment ZK metadata to status DONE
-   * 2. Create new segment ZK metadata with status IN_PROGRESS
-   * 3. Update ideal state (change committing segment state to ONLINE and create new segment with state CONSUMING)
-   *
-   * If a failure happens before step 1 or after step 3, we do not need to fix it.
-   * If a failure happens after step 1 is done and before step 3 completes, we will be left in an incorrect state, and
-   * should be able to fix it.
-   *
-   * Scenarios:
-   * 1. Step 3 failed - we will find new segment ZK metadata IN_PROGRESS but no segment in ideal state
-   * Correction: create new CONSUMING segment in ideal state, update previous CONSUMING segment (if exists) in ideal
-   * state to ONLINE
-   *
-   * 2. Step 2 failed - we will find segment ZK metadata DONE but ideal state CONSUMING
-   * Correction: create new segment ZK metadata with state IN_PROGRESS, create new CONSUMING segment in ideal state,
-   * update previous CONSUMING segment (if exists) in ideal state to ONLINE
-   *
-   * 3. All replicas of the new segment are OFFLINE
-   * Correction: create new segment ZK metadata with state IN_PROGRESS and consume from the previous start offset,
-   * create new CONSUMING segment in ideal state.
-   *
-   * 4. MaxSegmentCompletionTime: Segment completion has 5 minutes to retry and complete between steps 1 and 3.
-   * Correction: Do not correct the segments before the allowed time for segment completion
-   *
-   * End-of-shard case:
-   * Additionally, shards of some streams may be detected as reached end-of-life when committing.
-   * In such cases, step 2 is skipped, and step 3 is done partially (change committing segment state to ONLINE
-   * but don't create new segment with state CONSUMING)
-   *
-   * Scenarios:
-   * 1. Step 3 failed - we will find segment ZK metadata DONE, but ideal state CONSUMING
-   * Correction: Since shard has ended, do not create new segment ZK metadata, or new entry in ideal state.
-   * Simply update CONSUMING segment in ideal state to ONLINE
-   *
-   * 2. Shard which has reached EOL detected - we will find segment ZK metadata DONE and ideal state ONLINE
-   * Correction: No repair needed. Acceptable case.
-   */
+  /// Tests that we can repair all invalid scenarios during segment completion.
+  ///
+  /// Segment completion takes place in 3 steps:
+  /// 1. Update committing segment ZK metadata to status DONE
+  /// 2. Create new segment ZK metadata with status IN_PROGRESS
+  /// 3. Update ideal state (change committing segment state to ONLINE and create new segment with state CONSUMING)
+  ///
+  /// If a failure happens before step 1 or after step 3, we do not need to fix it.
+  /// If a failure happens after step 1 is done and before step 3 completes, we will be left in an incorrect state, and
+  /// should be able to fix it.
+  ///
+  /// Scenarios:
+  /// 1. Step 3 failed - we will find new segment ZK metadata IN_PROGRESS but no segment in ideal state
+  /// Correction: create new CONSUMING segment in ideal state, update previous CONSUMING segment (if exists) in ideal
+  /// state to ONLINE
+  ///
+  /// 2. Step 2 failed - we will find segment ZK metadata DONE but ideal state CONSUMING
+  /// Correction: create new segment ZK metadata with state IN_PROGRESS, create new CONSUMING segment in ideal state,
+  /// update previous CONSUMING segment (if exists) in ideal state to ONLINE
+  ///
+  /// 3. All replicas of the new segment are OFFLINE
+  /// Correction: create new segment ZK metadata with state IN_PROGRESS and consume from the previous start offset,
+  /// create new CONSUMING segment in ideal state.
+  ///
+  /// 4. MaxSegmentCompletionTime: Segment completion has 5 minutes to retry and complete between steps 1 and 3.
+  /// Correction: Do not correct the segments before the allowed time for segment completion
+  ///
+  /// End-of-shard case:
+  /// Additionally, shards of some streams may be detected as reached end-of-life when committing.
+  /// In such cases, step 2 is skipped, and step 3 is done partially (change committing segment state to ONLINE
+  /// but don't create new segment with state CONSUMING)
+  ///
+  /// Scenarios:
+  /// 1. Step 3 failed - we will find segment ZK metadata DONE, but ideal state CONSUMING
+  /// Correction: Since shard has ended, do not create new segment ZK metadata, or new entry in ideal state.
+  /// Simply update CONSUMING segment in ideal state to ONLINE
+  ///
+  /// 2. Shard which has reached EOL detected - we will find segment ZK metadata DONE and ideal state ONLINE
+  /// Correction: No repair needed. Acceptable case.
   @Test
   public void testRepairs() {
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
@@ -1061,10 +1056,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(oldInstanceStatesMap.get(consumingSegment), consumingSegmentInstanceStateMap);
   }
 
-  /**
-   * Removes the new CONSUMING segment and sets the latest committed (ONLINE) segment to CONSUMING if exists in the
-   * ideal state.
-   */
+  /// Removes the new CONSUMING segment and sets the latest committed (ONLINE) segment to CONSUMING if exists in the
+  /// ideal state.
   private void removeNewConsumingSegment(Map<String, Map<String, String>> instanceStatesMap, String consumingSegment,
       @Nullable String latestCommittedSegment) {
     // Consuming segment should have all instances in CONSUMING state
@@ -1084,9 +1077,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  /**
-   * Turns all instances for the new CONSUMING segment to OFFLINE in the ideal state.
-   */
+  /// Turns all instances for the new CONSUMING segment to OFFLINE in the ideal state.
   private void turnNewConsumingSegmentOffline(Map<String, Map<String, String>> instanceStatesMap,
       String consumingSegment) {
     Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
@@ -1098,9 +1089,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  /**
-   * Turns all instances for the segment to CONSUMING in the ideal state.
-   */
+  /// Turns all instances for the segment to CONSUMING in the ideal state.
   private void turnNewConsumingSegmentConsuming(Map<String, Map<String, String>> instanceStatesMap,
       String consumingSegment) {
     Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
@@ -1121,10 +1110,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     verifyRepairs(segmentManager, shardsEnded);
   }
 
-  /**
-   * Verifies that all entries in old ideal state are unchanged in the new ideal state (repair during the segment
-   * completion). There could be new entries in the ideal state if all instances are OFFLINE for the latest segment.
-   */
+  /// Verifies that all entries in old ideal state are unchanged in the new ideal state (repair during the segment
+  /// completion). There could be new entries in the ideal state if all instances are OFFLINE for the latest segment.
   private void verifyNoChangeToOldEntries(FakePinotLLCRealtimeSegmentManager segmentManager,
       Map<String, Map<String, String>> oldInstanceStatesMap) {
     Map<String, Map<String, String>> newInstanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
@@ -1499,14 +1486,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
         AccessOption.PERSISTENT);
   }
 
-  /**
-   * Test cases for fixing LLC segment by uploading to segment store if missing
-   */
+  /// Test cases for fixing LLC segment by uploading to segment store if missing
   @Test
   public void testUploadToSegmentStore()
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1563,8 +1550,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(
-        tempSegmentFileLocation.getPath());
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider)).thenReturn(tempSegmentFileLocation.getPath());
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1581,9 +1568,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider)).thenThrow(new HttpErrorStatusException("failed to upload segment",
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -1624,16 +1611,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider);
   }
 
-  /**
-   * Test cases for fixing LLC segment by uploading to segment store if missing
-   */
+  /// Test cases for fixing LLC segment by uploading to segment store if missing
   @Test
   public void testUploadToSegmentStoreV2()
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1693,9 +1684,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
-        new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L, 43210L,
-            tempSegmentFileLocation.getPath()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider))
+        .thenReturn(
+          new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L, 43210L,
+              tempSegmentFileLocation.getPath()));
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1712,9 +1705,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider))
+        .thenThrow(
+          new HttpErrorStatusException("failed to upload segment",
+              Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -1755,6 +1750,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider);
   }
 
   @Test
@@ -1762,6 +1761,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1834,7 +1835,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     uploadedCustomMap.put("segmentFileKey", "segmentFileValue");
     segmentZKMetadataCopy.setCustomMap(uploadedCustomMap);
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl0)).thenReturn(segmentZKMetadataCopy);
+        serverUploadRequestUrl0, serverAdminAuthProvider)).thenReturn(segmentZKMetadataCopy);
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1851,9 +1852,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl1, serverAdminAuthProvider))
+        .thenThrow(
+          new HttpErrorStatusException("failed to upload segment",
+              Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -1899,6 +1902,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl0, serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl1, serverAdminAuthProvider);
   }
 
   @Test
@@ -1922,7 +1929,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
     when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
             .build());
     PinotLLCRealtimeSegmentManager segmentManager =
@@ -1973,12 +1979,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(partitionIds.size(), 2);
   }
 
-  /**
-   * Verifies that {@code buildPartitionGroupConsumptionStatusFromZKMetadata} produces the same results as
-   * {@code getPartitionGroupConsumptionStatusList} for the common case where IdealState and ZK metadata are in sync.
-   * This validates that the optimization in {@code fetchPartitionGroupIdToSmallestOffset} (reusing the pre-computed
-   * latestSegmentZKMetadataMap instead of rescanning the entire IdealState) does not change behavior.
-   */
+  /// Verifies that `buildPartitionGroupConsumptionStatusFromZKMetadata` produces the same results as
+  /// `getPartitionGroupConsumptionStatusList` for the common case where IdealState and ZK metadata are in sync.
+  /// This validates that the optimization in `fetchPartitionGroupIdToSmallestOffset` (reusing the pre-computed
+  /// latestSegmentZKMetadataMap instead of rescanning the entire IdealState) does not change behavior.
   @Test
   public void testBuildPartitionGroupConsumptionStatusFromZKMetadataMatchesOriginal() {
     // Set up a table with 2 replicas, 5 instances, 4 partitions
@@ -2413,10 +2417,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
         "Uneven partition distribution across streams must return null");
   }
 
-  //////////////////////////////////////////////////////////////////////////////////
+  /// ///////////////////////////////////////////////////////////////////////////////
   // Fake classes
 
-  /////////////////////////////////////////////////////////////////////////////////
+  /// //////////////////////////////////////////////////////////////////////////////
 
   private static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
     static final ControllerConf CONTROLLER_CONF = new ControllerConf();

@@ -23,20 +23,16 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * This (Helix) message is sent from the controller to brokers when a request is received to update the table config.
- *
- * NOTE: We keep the table name as a separate key instead of using the Helix PARTITION_NAME so that this message can be
- *       used for any resource.
- */
+/// This (Helix) message is sent from the controller to brokers when a request is received to update the table config.
+///
+/// NOTE: We keep the table name as a separate key instead of using the Helix PARTITION_NAME so that this message can be
+///       used for any resource.
 public class TableConfigRefreshMessage extends Message {
   public static final String REFRESH_TABLE_CONFIG_MSG_SUB_TYPE = "REFRESH_TABLE_CONFIG";
 
   private static final String TABLE_NAME_KEY = "tableName";
 
-  /**
-   * Constructor for the sender.
-   */
+  /// Constructor for the sender.
   public TableConfigRefreshMessage(String tableNameWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_TABLE_CONFIG_MSG_SUB_TYPE);
@@ -48,9 +44,7 @@ public class TableConfigRefreshMessage extends Message {
     znRecord.setSimpleField(TABLE_NAME_KEY, tableNameWithType);
   }
 
-  /**
-   * Constructor for the receiver.
-   */
+  /// Constructor for the receiver.
   public TableConfigRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_TABLE_CONFIG_MSG_SUB_TYPE)) {

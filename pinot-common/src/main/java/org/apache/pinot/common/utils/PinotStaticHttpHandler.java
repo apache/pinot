@@ -23,9 +23,7 @@ import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 
 
-/**
- * A secure static HTTP handler that prevents path traversal attacks.
- */
+/// A secure static HTTP handler that prevents path traversal attacks.
 public class PinotStaticHttpHandler extends CLStaticHttpHandler {
   public PinotStaticHttpHandler(ClassLoader classLoader, String... docRoot) {
     super(classLoader, docRoot);
@@ -43,11 +41,9 @@ public class PinotStaticHttpHandler extends CLStaticHttpHandler {
     }
   }
 
-  /**
-   * Check if the path contains path traversal patterns.
-   * @param path The path to check
-   * @return True if the path contains path traversal patterns, false otherwise
-   */
+  /// Check if the path contains path traversal patterns.
+  /// @param path The path to check
+  /// @return True if the path contains path traversal patterns, false otherwise
   private boolean isPathTraversal(String path) {
     // Check for disallowed patterns and ensure the path doesn't contain suspicious protocols like 'file:///'
     return path.contains("file:") || path.contains("..");

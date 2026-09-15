@@ -58,18 +58,15 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for serialized bytes values.
- *
- * <p>Aggregation function that supports serialized bytes values:
- * <ul>
- *   <li>AVG</li>
- *   <li>DISTINCTCOUNTHLL</li>
- *   <li>MINMAXRANGE</li>
- *   <li>PERCENTILEEST</li>
- *   <li>PERCENTILETDIGEST</li>
- * </ul>
- */
+/// Tests for serialized bytes values.
+///
+/// Aggregation function that supports serialized bytes values:
+///
+/// - AVG
+/// - DISTINCTCOUNTHLL
+/// - MINMAXRANGE
+/// - PERCENTILEEST
+/// - PERCENTILETDIGEST
 public class SerializedBytesQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SerializedBytesQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

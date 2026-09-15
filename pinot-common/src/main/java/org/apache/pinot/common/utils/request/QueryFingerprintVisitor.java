@@ -36,28 +36,22 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlShuttle;
 
 
-/**
- * QueryFingerprintVisitor traverses the Calcite SqlNode AST and produces a normalized query fingerprint.
- * Implementation is based on Calcite 1.42.0 version. It may change in future versions of Calcite.
- *
- * <p>
- * <ul>
- *   <li>All data literals are replaced with dynamic parameters (?)</li>
- *   <li>IN/NOT IN clauses with multiple constants are squashed to a single parameter.</li>
- *   <li>EXPLAIN PLAN FOR is NOT preserved.</li>
- *   <li>Symbolic keywords (DISTINCT, ASC, DESC, etc.) and NULL literals are preserved.</li>
- *   <li>Hints are preserved.</li>
- *   <li>Window functions: window specification (operand 1) are preserved.</li>
- * </ul>
- * </p>
- *
- * <p><b>Note:</b> This visitor maintains internal state (dynamic parameter index) that is not reset between visits.
- * A new instance should be created for each query fingerprint.</p>
- *
- * <p>The visitor honors {@link SqlShuttle}'s non-mutating contract: the input {@link SqlNode} tree is left
- * unchanged and a new tree is returned. This matters because callers (the broker) compile the same SqlNode
- * to a PinotQuery after computing the fingerprint.</p>
- */
+/// QueryFingerprintVisitor traverses the Calcite SqlNode AST and produces a normalized query fingerprint.
+/// Implementation is based on Calcite 1.42.0 version. It may change in future versions of Calcite.
+///
+/// - All data literals are replaced with dynamic parameters (?)
+/// - IN/NOT IN clauses with multiple constants are squashed to a single parameter.
+/// - EXPLAIN PLAN FOR is NOT preserved.
+/// - Symbolic keywords (DISTINCT, ASC, DESC, etc.) and NULL literals are preserved.
+/// - Hints are preserved.
+/// - Window functions: window specification (operand 1) are preserved.
+///
+/// **Note:** This visitor maintains internal state (dynamic parameter index) that is not reset between visits.
+/// A new instance should be created for each query fingerprint.
+///
+/// The visitor honors [SqlShuttle]'s non-mutating contract: the input [SqlNode] tree is left
+/// unchanged and a new tree is returned. This matters because callers (the broker) compile the same SqlNode
+/// to a PinotQuery after computing the fingerprint.
 public class QueryFingerprintVisitor extends SqlShuttle {
   // SqlSelect operand index for hints, see {@link org.apache.calcite.sql.SqlSelect}.
   private static final int SQLSELECT_HINTS_OPERAND_INDEX = 11;
@@ -74,12 +68,10 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     this(false);
   }
 
-  /**
-   * Creates a QueryFingerprintVisitor with configurable NULL handling in IN-lists.
-   *
-   * @param squashNullInList if true, NULL values in IN/NOT IN lists are treated as data literals
-   *                         and squashed together with other values into a single placeholder.
-   */
+  /// Creates a QueryFingerprintVisitor with configurable NULL handling in IN-lists.
+  ///
+  /// @param squashNullInList if true, NULL values in IN/NOT IN lists are treated as data literals
+  ///                         and squashed together with other values into a single placeholder.
   public QueryFingerprintVisitor(boolean squashNullInList) {
     _squashNullInList = squashNullInList;
     _dynamicParamIndex = 0;
@@ -133,11 +125,9 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     return result;
   }
 
-  /**
-   * Rebuilds {@code original} with the supplied operands, mirroring the pattern used by Calcite's
-   * {@link SqlShuttle.CallCopyingArgHandler#result()}. This is what allows the visitor to honor the
-   * non-mutating {@link SqlShuttle} contract.
-   */
+  /// Rebuilds `original` with the supplied operands, mirroring the pattern used by Calcite's
+  /// [SqlShuttle.CallCopyingArgHandler#result()]. This is what allows the visitor to honor the
+  /// non-mutating [SqlShuttle] contract.
   private static SqlNode rebuild(SqlCall original, SqlNode... newOperands) {
     return original.getOperator().createCall(
         original.getFunctionQuantifier(), original.getParserPosition(), newOperands);
@@ -200,10 +190,8 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     return rebuild(with, new SqlNodeList(newList, with.withList.getParserPosition()), newBody);
   }
 
-  /**
-   * SqlWithItem always has four operands: name, columnList, query, recursive. We only rewrite
-   * columnList and query; name and recursive are preserved as-is.
-   */
+  /// SqlWithItem always has four operands: name, columnList, query, recursive. We only rewrite
+  /// columnList and query; name and recursive are preserved as-is.
   @Nullable
   private SqlNode visitWithItem(SqlWithItem withItem) {
     List<SqlNode> operands = withItem.getOperandList();
@@ -230,11 +218,9 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     return rebuild(withItem, newOperands);
   }
 
-  /**
-   * Window functions: only visit the aggregate function (operand 0). Skip the window specification
-   * (operand 1) due to its complex structure with ORDER BY and frame clauses. Literals in PARTITION BY,
-   * ORDER BY, and window frames are preserved rather than replaced.
-   */
+  /// Window functions: only visit the aggregate function (operand 0). Skip the window specification
+  /// (operand 1) due to its complex structure with ORDER BY and frame clauses. Literals in PARTITION BY,
+  /// ORDER BY, and window frames are preserved rather than replaced.
   @Nullable
   private SqlNode visitOver(SqlCall call) {
     List<SqlNode> operands = call.getOperandList();
@@ -253,28 +239,20 @@ public class QueryFingerprintVisitor extends SqlShuttle {
         orderBy.fetch != null ? orderBy.fetch.accept(this) : null);
   }
 
-  /**
-   * Visit IN/NOT IN clause and normalize data literals.
-   * <p>
-   * Three cases:
-   * <ul>
-   *   <li><b>Case 1:</b> All values are data literals → replace entire list with a single ?
-   *       <br>Example: IN (1, 2, 3) → IN (?)</li>
-   *   <li><b>Case 2:</b> Contains any of the following → visit each value individually and replace only data literals:
-   *       <ul>
-   *         <li>Expressions: IN (col1 + 1, 2) → IN (col1 + ?, ?)</li>
-   *         <li>Function calls: IN (UPPER('a'), LOWER('b')) → IN (UPPER(?), LOWER(?))</li>
-   *         <li>Subquery: IN (SELECT ...) → visits the subquery normally</li>
-   *       </ul>
-   *   </li>
-   *   <li><b>Case 3:</b> Contains NULL </li>
-   *       <ul>
-   *         <li>preserve NULL if _squashNullInList is false: IN (1, NULL, 3) → IN (1, NULL, 3)</li>
-   *         <li>squash NULL if _squashNullInList is true: IN (1, NULL, 3) → IN (?)</li>
-   *       </ul>
-   * </ul>
-   * </p>
-   */
+  /// Visit IN/NOT IN clause and normalize data literals.
+  ///
+  /// Three cases:
+  ///
+  /// - **Case 1:** All values are data literals → replace entire list with a single ?
+  ///
+  ///      Example: IN (1, 2, 3) → IN (?)
+  /// - **Case 2:** Contains any of the following → visit each value individually and replace only data literals:
+  ///   - Expressions: IN (col1 + 1, 2) → IN (col1 + ?, ?)
+  ///   - Function calls: IN (UPPER('a'), LOWER('b')) → IN (UPPER(?), LOWER(?))
+  ///   - Subquery: IN (SELECT ...) → visits the subquery normally
+  /// - **Case 3:** Contains NULL
+  ///   - preserve NULL if \_squashNullInList is false: IN (1, NULL, 3) → IN (1, NULL, 3)
+  ///   - squash NULL if \_squashNullInList is true: IN (1, NULL, 3) → IN (?)
   @Nullable
   private SqlNode visitIn(SqlCall inCall) {
     List<SqlNode> operands = inCall.getOperandList();
@@ -336,10 +314,8 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     return rebuild(inCall, newOperands);
   }
 
-  /**
-   * Check if a literal should be preserved.
-   * Currently, we preserve symbolic keywords (DISTINCT, ASC, DESC, etc.) and NULL literals.
-   */
+  /// Check if a literal should be preserved.
+  /// Currently, we preserve symbolic keywords (DISTINCT, ASC, DESC, etc.) and NULL literals.
   private boolean shouldPreserveLiteral(SqlLiteral literal) {
     return literal.getTypeName() == SqlTypeName.SYMBOL || literal.getTypeName() == SqlTypeName.NULL;
   }

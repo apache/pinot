@@ -21,11 +21,7 @@ package org.apache.pinot.tools;
 import java.util.concurrent.Callable;
 
 
-/**
- * Interface class for pinot-admin commands.
- *
- *
- */
+/// Interface class for pinot-admin commands.
 public interface Command extends Callable<Integer> {
 
   default Integer call() throws Exception {

@@ -35,12 +35,10 @@ public class SortUtils {
     private final int[] _multipliers;
     private final int[] _nullsMultipliers;
 
-    /**
-     * Sort comparator for use with priority queues.
-     *
-     * @param collations collations to sort on
-     * @param reverse 'true' if the opposite sort direction should be used as what is specified
-     */
+    /// Sort comparator for use with priority queues.
+    ///
+    /// @param collations collations to sort on
+    /// @param reverse 'true' if the opposite sort direction should be used as what is specified
     public SortComparator(List<RelFieldCollation> collations, boolean reverse) {
       _numFields = collations.size();
       _valueIndices = new int[_numFields];

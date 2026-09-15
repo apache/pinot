@@ -30,48 +30,46 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * Quickstart that demonstrates Materialized View (MV) creation and ingestion.
- *
- * <p>This quickstart:
- * <ol>
- *   <li>Loads the {@code airlineStats} base table (31 days of flight data, Jan 2014).</li>
- *   <li>Creates an empty {@code airlineStatsMv} table configured with a
- *       {@code MaterializedViewTask} that pre-aggregates daily carrier metrics.</li>
- *   <li>Triggers the minion task to materialize the MV and waits for completion.</li>
- *   <li>Runs each aggregation against both the base table and the MV table, prints both
- *       result sets, and asserts they agree (the MV is correct iff the re-aggregation over
- *       the MV's per-day-per-carrier rows reproduces the base table's answer).</li>
- * </ol>
- *
- * <p>The MV definition is:
- * <pre>
- *   SELECT DaysSinceEpoch, Carrier,
- *          SUM(ArrDelay) AS sum_ArrDelay,
- *          COUNT(*) AS flight_count,
- *          MIN(ArrDelay) AS min_ArrDelay,
- *          MAX(ArrDelay) AS max_ArrDelay,
- *          DISTINCTCOUNTRAWHLL(FlightNum) AS raw_hll_FlightNum,
- *          DISTINCTCOUNTRAWHLLPLUS(FlightNum) AS raw_hllplus_FlightNum
- *   FROM airlineStats
- *   GROUP BY DaysSinceEpoch, Carrier
- * </pre>
- *
- * <p>Broker query rewrite (so callers don't have to know about the MV) lands in a follow-up
- * PR; until then, callers query the MV table directly. The comparison step in this quickstart
- * uses the same re-aggregation pattern the rewrite engine will use:
- * {@code SUM} over {@code sum_ArrDelay}, {@code SUM} over {@code flight_count},
- * {@code MIN}/{@code MAX} over their stored mins/maxes, and {@code DISTINCTCOUNTHLL} /
- * {@code DISTINCTCOUNTHLLPLUS} applied directly to the raw-sketch columns (the sketch is
- * deserialized and merged in-place).
- *
- * <p>The example table config sets {@code maxTasksPerBatch=31} to backfill all 31 days of
- * the airlineStats fixture in a single scheduling cycle. Production deployments typically
- * leave the default of 1; raise it only when intentionally back-filling and after sizing
- * the minion pool to absorb the resulting concurrent task load.
- *
- * <p>Run via: {@code bin/pinot-admin.sh QuickStart -type MATERIALIZED_VIEW}
- */
+/// Quickstart that demonstrates Materialized View (MV) creation and ingestion.
+///
+/// This quickstart:
+///
+/// 1. Loads the `airlineStats` base table (31 days of flight data, Jan 2014).
+/// 2. Creates an empty `airlineStatsMv` table configured with a
+///       `MaterializedViewTask` that pre-aggregates daily carrier metrics.
+/// 3. Triggers the minion task to materialize the MV and waits for completion.
+/// 4. Runs each aggregation against both the base table and the MV table, prints both
+///       result sets, and asserts they agree (the MV is correct iff the re-aggregation over
+///       the MV's per-day-per-carrier rows reproduces the base table's answer).
+///
+/// The MV definition is:
+///
+/// ```
+/// SELECT DaysSinceEpoch, Carrier,
+///        SUM(ArrDelay) AS sum_ArrDelay,
+///        COUNT(*) AS flight_count,
+///        MIN(ArrDelay) AS min_ArrDelay,
+///        MAX(ArrDelay) AS max_ArrDelay,
+///        DISTINCTCOUNTRAWHLL(FlightNum) AS raw_hll_FlightNum,
+///        DISTINCTCOUNTRAWHLLPLUS(FlightNum) AS raw_hllplus_FlightNum
+/// FROM airlineStats
+/// GROUP BY DaysSinceEpoch, Carrier
+/// ```
+///
+/// Broker query rewrite (so callers don't have to know about the MV) lands in a follow-up
+/// PR; until then, callers query the MV table directly. The comparison step in this quickstart
+/// uses the same re-aggregation pattern the rewrite engine will use:
+/// `SUM` over `sum_ArrDelay`, `SUM` over `flight_count`,
+/// `MIN`/`MAX` over their stored mins/maxes, and `DISTINCTCOUNTHLL` /
+/// `DISTINCTCOUNTHLLPLUS` applied directly to the raw-sketch columns (the sketch is
+/// deserialized and merged in-place).
+///
+/// The example table config sets `maxTasksPerBatch=31` to backfill all 31 days of
+/// the airlineStats fixture in a single scheduling cycle. Production deployments typically
+/// leave the default of 1; raise it only when intentionally back-filling and after sizing
+/// the minion pool to absorb the resulting concurrent task load.
+///
+/// Run via: `bin/pinot-admin.sh QuickStart -type MATERIALIZED_VIEW`
 public class MaterializedViewQuickStart extends Quickstart {
 
   private static final String BASE_TABLE = "airlineStats";

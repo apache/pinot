@@ -37,17 +37,14 @@ import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGener
 import static org.testng.Assert.*;
 
 
-/**
- * Comprehensive tests for {@link ProtoBufRecordExtractor} field descriptor caching and optimization behavior.
- *
- * <p>These tests verify:
- * <ul>
- *   <li>Field descriptor caching works correctly across multiple extractions</li>
- *   <li>Subset field extraction works correctly</li>
- *   <li>Schema change detection and cache invalidation</li>
- *   <li>Edge cases like missing fields, empty fields set</li>
- * </ul>
- */
+/// Comprehensive tests for [ProtoBufRecordExtractor] field descriptor caching and optimization behavior.
+///
+/// These tests verify:
+///
+/// - Field descriptor caching works correctly across multiple extractions
+/// - Subset field extraction works correctly
+/// - Schema change detection and cache invalidation
+/// - Edge cases like missing fields, empty fields set
 public class ProtoBufRecordExtractorCachingTest {
 
   private ProtoBufRecordExtractor _extractor;
@@ -322,18 +319,16 @@ public class ProtoBufRecordExtractorCachingTest {
 
   // ==================== SCHEMA EVOLUTION (SAME FULL NAME, DIFFERENT DESCRIPTOR INSTANCE) ====================
 
-  /**
-   * Regression test for the bug introduced in PR #17593: when a Confluent Schema Registry schema evolves
-   * (e.g. a new column is added), KafkaProtobufDeserializer returns DynamicMessage instances built from a
-   * new Descriptor object even though the message's full name is unchanged. The old cache invalidation
-   * keyed on {@code descriptor.getFullName()} never detected this, so stale FieldDescriptors from the V1
-   * Descriptor were used against V2 DynamicMessages. Protobuf enforces strict identity between a
-   * FieldDescriptor and the Descriptor of the message it is applied to, so this threw
-   * {@code IllegalArgumentException: FieldDescriptor does not match message type}.
-   *
-   * <p>The fix uses object identity ({@code !=}) to detect descriptor changes, which correctly fires
-   * whenever the schema registry serves a new schema version.
-   */
+  /// Regression test for the bug introduced in PR #17593: when a Confluent Schema Registry schema evolves
+  /// (e.g. a new column is added), KafkaProtobufDeserializer returns DynamicMessage instances built from a
+  /// new Descriptor object even though the message's full name is unchanged. The old cache invalidation
+  /// keyed on `descriptor.getFullName()` never detected this, so stale FieldDescriptors from the V1
+  /// Descriptor were used against V2 DynamicMessages. Protobuf enforces strict identity between a
+  /// FieldDescriptor and the Descriptor of the message it is applied to, so this threw
+  /// `IllegalArgumentException: FieldDescriptor does not match message type`.
+  ///
+  /// The fix uses object identity (`!=`) to detect descriptor changes, which correctly fires
+  /// whenever the schema registry serves a new schema version.
   @Test
   public void testSchemaEvolutionSameFullNameDifferentDescriptorInstance()
       throws Descriptors.DescriptorValidationException {
@@ -371,14 +366,12 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row2.getValue("status"), "SHIPPED");
   }
 
-  /**
-   * Builds a simple "Order" DynamicMessage descriptor with fields id (string) and amount (int32).
-   * When {@code withStatus} is true, a third field "status" (string) is added, simulating a schema
-   * evolution where a new column was appended to the registry schema.
-   *
-   * <p>Each invocation produces a distinct {@link Descriptors.Descriptor} instance even though the
-   * full name is the same — exactly what Confluent Schema Registry does across schema versions.
-   */
+  /// Builds a simple "Order" DynamicMessage descriptor with fields id (string) and amount (int32).
+  /// When `withStatus` is true, a third field "status" (string) is added, simulating a schema
+  /// evolution where a new column was appended to the registry schema.
+  ///
+  /// Each invocation produces a distinct [Descriptors.Descriptor] instance even though the
+  /// full name is the same — exactly what Confluent Schema Registry does across schema versions.
   private static Descriptors.Descriptor buildOrderDescriptor(boolean withStatus)
       throws Descriptors.DescriptorValidationException {
     DescriptorProtos.DescriptorProto.Builder msgBuilder = DescriptorProtos.DescriptorProto.newBuilder()

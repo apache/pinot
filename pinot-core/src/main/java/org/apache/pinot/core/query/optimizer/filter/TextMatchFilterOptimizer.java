@@ -31,14 +31,12 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code TextMatchFilterOptimizer} merges `TEXT_MATCH` predicates on the same column within an `OR` or `AND`,
- * maximizing the amount of the query that can be pushed down to Lucene
- *
- * NOTE: This optimizer follows the {@link FlattenAndOrFilterOptimizer}, so all the AND/OR filters are already
- *       flattened.
- * NOTE: This optimizer does not optimize TEXT_MATCH expressions that have options (third parameter)
- */
+/// The `TextMatchFilterOptimizer` merges `TEXT_MATCH` predicates on the same column within an `OR` or `AND`,
+/// maximizing the amount of the query that can be pushed down to Lucene
+///
+/// NOTE: This optimizer follows the [FlattenAndOrFilterOptimizer], so all the AND/OR filters are already
+///       flattened.
+/// NOTE: This optimizer does not optimize TEXT_MATCH expressions that have options (third parameter)
 public class TextMatchFilterOptimizer implements FilterOptimizer {
   private static final String SPACE = " ";
 

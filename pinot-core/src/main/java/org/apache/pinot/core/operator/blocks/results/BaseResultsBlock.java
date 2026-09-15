@@ -33,9 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
-/**
- * The {@code BaseResultsBlock} class is the holder of the server side results.
- */
+/// The `BaseResultsBlock` class is the holder of the server side results.
 public abstract class BaseResultsBlock implements Block {
   public enum EarlyTerminationReason {
     NONE,
@@ -179,40 +177,28 @@ public abstract class BaseResultsBlock implements Block {
     _earlyTerminationReason = earlyTerminationReason;
   }
 
-  /**
-   * Returns the total size (number of rows) in this result block, without having to materialize the rows.
-   *
-   * @see BaseResultsBlock#getRows()
-   */
+  /// Returns the total size (number of rows) in this result block, without having to materialize the rows.
+  ///
+  /// @see BaseResultsBlock#getRows()
   public abstract int getNumRows();
 
-  /**
-   * Returns the query for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the query for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract QueryContext getQueryContext();
 
-  /**
-   * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the data schema for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract DataSchema getDataSchema();
 
-  /**
-   * Returns the rows for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the rows for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract List<Object[]> getRows();
 
-  /**
-   * Returns a data table without metadata or exception attached.
-   */
+  /// Returns a data table without metadata or exception attached.
   public abstract DataTable getDataTable()
       throws IOException;
 
-  /**
-   * Returns the metadata for the results.
-   */
+  /// Returns the metadata for the results.
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = new HashMap<>();
     metadata.put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(_numTotalDocs));

@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Client for Zookeeper utility endpoints exposed by the controller.
- */
+/// Client for Zookeeper utility endpoints exposed by the controller.
 public class ZookeeperAdminClient extends BaseServiceAdminClient {
 
   public ZookeeperAdminClient(PinotAdminTransport transport, String controllerAddress,

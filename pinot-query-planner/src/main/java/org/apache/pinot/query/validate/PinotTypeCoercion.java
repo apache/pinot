@@ -32,24 +32,22 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.implicit.TypeCoercionImpl;
 
 
-/**
- * Custom implementation of Calcite's default type coercion implementation to add Pinot specific type coercion rules.
- * Currently, the only additional rule we add is to for TIMESTAMP / BIGINT types. For binary arithmetic and binary
- * comparison operators, we add implicit casts between TIMESTAMP and BIGINT. For other standard operators, we add
- * implicit casts in both directions as and when needed (TIMESTAMP -> BIGINT and BIGINT -> TIMESTAMP).
- * <p>
- * This always works since Pinot's execution type for the TIMESTAMP SQL type is LONG (i.e., BIGINT). We add these
- * implicit casts for convenience since the single-stage engine already treats the two types as interchangeable and
- * many common user query patterns include things like TIMESTAMP + LONG or TIMESTAMP - LONG or TIMESTAMP > LONG.
- * <p>
- * For binary arithmetic, the cast is always added on the TIMESTAMP side so that the result is BIGINT (long) arithmetic
- * (e.g., TIMESTAMP - LONG -> BIGINT). For binary comparisons, we prefer to add the cast on the operand that is not a
- * column reference whenever possible. For example, given a TIMESTAMP column {@code ts} and a BIGINT literal {@code L},
- * {@code ts > L} is rewritten as {@code ts > CAST(L AS TIMESTAMP)} rather than {@code CAST(ts AS BIGINT) > L}. This
- * avoids wrapping the column in a per-row CAST (which is expensive on the query path and breaks index applicability)
- * while remaining semantically equivalent. If both sides are column references (or neither is), we fall back to
- * casting the TIMESTAMP side to BIGINT to preserve the long-standing default behavior.
- */
+/// Custom implementation of Calcite's default type coercion implementation to add Pinot specific type coercion rules.
+/// Currently, the only additional rule we add is to for TIMESTAMP / BIGINT types. For binary arithmetic and binary
+/// comparison operators, we add implicit casts between TIMESTAMP and BIGINT. For other standard operators, we add
+/// implicit casts in both directions as and when needed (TIMESTAMP -> BIGINT and BIGINT -> TIMESTAMP).
+///
+/// This always works since Pinot's execution type for the TIMESTAMP SQL type is LONG (i.e., BIGINT). We add these
+/// implicit casts for convenience since the single-stage engine already treats the two types as interchangeable and
+/// many common user query patterns include things like TIMESTAMP + LONG or TIMESTAMP - LONG or TIMESTAMP > LONG.
+///
+/// For binary arithmetic, the cast is always added on the TIMESTAMP side so that the result is BIGINT (long) arithmetic
+/// (e.g., TIMESTAMP - LONG -> BIGINT). For binary comparisons, we prefer to add the cast on the operand that is not a
+/// column reference whenever possible. For example, given a TIMESTAMP column `ts` and a BIGINT literal `L`,
+/// `ts > L` is rewritten as `ts > CAST(L AS TIMESTAMP)` rather than `CAST(ts AS BIGINT) > L`. This
+/// avoids wrapping the column in a per-row CAST (which is expensive on the query path and breaks index applicability)
+/// while remaining semantically equivalent. If both sides are column references (or neither is), we fall back to
+/// casting the TIMESTAMP side to BIGINT to preserve the long-standing default behavior.
 public class PinotTypeCoercion extends TypeCoercionImpl {
   public PinotTypeCoercion(RelDataTypeFactory typeFactory,
       SqlValidator validator) {

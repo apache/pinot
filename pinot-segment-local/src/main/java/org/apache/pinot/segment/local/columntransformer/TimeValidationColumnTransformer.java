@@ -26,26 +26,22 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Column transformer that validates time column values are within the valid range (1971-2071).
- * Invalid values are transformed to null.
- *
- * <p>This transformer should be applied after {@link DataTypeColumnTransformer} so that all values
- * follow the data types in FieldSpec, and before {@link NullValueColumnTransformer} so that
- * invalidated values can be filled with defaults.
- */
+/// Column transformer that validates time column values are within the valid range (1971-2071).
+/// Invalid values are transformed to null.
+///
+/// This transformer should be applied after [DataTypeColumnTransformer] so that all values
+/// follow the data types in FieldSpec, and before [NullValueColumnTransformer] so that
+/// invalidated values can be filled with defaults.
 public class TimeValidationColumnTransformer implements ColumnTransformer {
 
   @Nullable
   private final TimeValidationConfig _config;
 
-  /**
-   * Create a TimeValidationColumnTransformer for a specific column.
-   *
-   * @param tableConfig The table configuration
-   * @param schema The schema
-   * @param columnName The column name this transformer is being applied to
-   */
+  /// Create a TimeValidationColumnTransformer for a specific column.
+  ///
+  /// @param tableConfig The table configuration
+  /// @param schema The schema
+  /// @param columnName The column name this transformer is being applied to
   public TimeValidationColumnTransformer(TableConfig tableConfig, Schema schema, String columnName) {
     String timeColumnName = tableConfig.getValidationConfig() != null
         ? tableConfig.getValidationConfig().getTimeColumnName() : null;

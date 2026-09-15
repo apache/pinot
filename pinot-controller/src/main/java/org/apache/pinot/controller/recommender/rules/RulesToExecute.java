@@ -38,12 +38,10 @@ import org.apache.pinot.controller.recommender.rules.impl.VariedLengthDictionary
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*;
 
 
-/**
- * In this class we will have
- * RuleFactory: factory for all rules, please add constructor for new rules in this factory wen extending
- * booleans to dictate whether a rule needs to be fired
- * Rule: a enum with all the rule names
- */
+/// In this class we will have
+/// RuleFactory: factory for all rules, please add constructor for new rules in this factory wen extending
+/// booleans to dictate whether a rule needs to be fired
+/// Rule: a enum with all the rule names
 public class RulesToExecute {
   public static class RuleFactory {
     public static AbstractRule getRule(Rule rule, InputManager inputManager, ConfigManager outputManager) {

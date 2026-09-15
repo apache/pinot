@@ -27,10 +27,8 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 
 
-/**
- * Benchmark that writes a configurable amount of rows in Kafka and checks how much time it takes to consume all of
- * them.
- */
+/// Benchmark that writes a configurable amount of rows in Kafka and checks how much time it takes to consume all of
+/// them.
 public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTest {
   private static final int ROW_COUNT = 100_000;
   private static final long TIMEOUT_MILLIS = 20 * 60 * 1000L; // Twenty minutes

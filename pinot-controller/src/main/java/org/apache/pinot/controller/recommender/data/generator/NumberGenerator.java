@@ -24,9 +24,7 @@ import java.util.Random;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Sep 12, 2014
- */
+/// Sep 12, 2014
 
 public class NumberGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;

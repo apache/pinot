@@ -25,11 +25,9 @@ import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Base class for polymorphic integral shift scalar functions.
- *
- * <p>Implementations are stateless and thread-safe.
- */
+/// Base class for polymorphic integral shift scalar functions.
+///
+/// Implementations are stateless and thread-safe.
 abstract class BaseShiftScalarFunction implements PinotScalarFunction {
 
   @Nullable

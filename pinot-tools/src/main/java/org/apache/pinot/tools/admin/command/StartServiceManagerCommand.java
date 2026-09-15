@@ -43,15 +43,11 @@ import picocli.CommandLine;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
 
 
-/**
- * Starts services in the following order, and returns false on any startup failure:
- *
- * <p><ol>
- * <li>{@link PinotServiceManager}</li>
- * <li>Bootstrap services in role {@link ServiceRole#CONTROLLER}</li>
- * <li>All remaining bootstrap services in parallel</li>
- * </ol>
- */
+/// Starts services in the following order, and returns false on any startup failure:
+///
+/// 1. [PinotServiceManager]
+/// 2. Bootstrap services in role [ServiceRole#CONTROLLER]
+/// 3. All remaining bootstrap services in parallel
 @CommandLine.Command(name = "StartServiceManager", mixinStandardHelpOptions = true)
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
@@ -202,8 +198,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws SocketException, UnknownHostException {
     switch (serviceRole) {
       case CONTROLLER:
+        // Tenant isolation is left unset so the controller starter's own default applies.
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
-            ControllerConf.ControllerMode.DUAL, true);
+            ControllerConf.ControllerMode.DUAL, null);
       case BROKER:
         return PinotConfigUtils
             .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT,
@@ -221,9 +218,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  /**
-   * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
-   */
+  /// Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
   private boolean startBootstrapServices() {
     if (_bootstrapConfigurations.isEmpty()) {
       return true;
@@ -300,7 +295,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     return true;
   }
 
-  /** Creates millis precision unit of seconds. ex 1.002 */
+  /// Creates millis precision unit of seconds. ex 1.002
   private static float startOffsetSeconds() {
     return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - START_TICK) / 1000f;
   }

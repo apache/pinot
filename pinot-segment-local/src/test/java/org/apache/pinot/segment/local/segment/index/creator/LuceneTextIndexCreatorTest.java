@@ -117,10 +117,8 @@ public class LuceneTextIndexCreatorTest {
     }
   }
 
-  /**
-   * Regression test for the AIOOB triggered when a prior segment-conversion attempt left stale
-   * Lucene files at the v1 destination directory and the reuse-mutable-index path is taken.
-   */
+  /// Regression test for the AIOOB triggered when a prior segment-conversion attempt left stale
+  /// Lucene files at the v1 destination directory and the reuse-mutable-index path is taken.
   @Test
   public void testConvertMutableSegmentCleansStaleDestFiles()
       throws Exception {

@@ -25,12 +25,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Used to auto-tune the table indexing config. It takes the original table
- * config, table schema and adds the following to indexing config:
- * - Inverted indices for all dimensions
- * - No dictionary index for all metrics
- */
+/// Used to auto-tune the table indexing config. It takes the original table
+/// config, table schema and adds the following to indexing config:
+/// - Inverted indices for all dimensions
+/// - No dictionary index for all metrics
 @Tuner(name = "realtimeAutoIndexTuner")
 public class RealTimeAutoIndexTuner implements TableConfigTuner {
 

@@ -49,9 +49,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Default implementation of {@link TableDataManagerProvider}.
- */
+/// Default implementation of [TableDataManagerProvider].
 public class FailureInjectingTableDataManagerProvider implements TableDataManagerProvider {
   public static final String FAILURE_CONFIG_KEY = "failure.config";
 

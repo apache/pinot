@@ -18,25 +18,16 @@
  */
 package org.apache.pinot.spi.query;
 
-/**
- * Defines the behavior when query thread limits are exceeded in multistage engine
- */
+/// Defines the behavior when query thread limits are exceeded in multistage engine
 public enum QueryThreadExceedStrategy {
-  /**
-   * Wait for resources to become available
-   * @implNote Not supported by server
-   */
+  /// Wait for resources to become available
+  /// @implNote Not supported by server
   WAIT,
 
-  /**
-   * Throw an error immediately
-   * @implNote Not supported by broker
-   */
+  /// Throw an error immediately
+  /// @implNote Not supported by broker
   ERROR,
 
-  /**
-   * Logs warning when limits exceeded but allows operations to proceed
-   *
-   */
+  /// Logs warning when limits exceeded but allows operations to proceed
   LOG
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -38,7 +39,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -62,18 +62,74 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
   }
 
-  /**
-   * Returns the logger for the operator.
-   * <p>
-   * This method is used to generic multi-stage operator messages using the name of the specific operator.
-   * Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
-   * attribute.
-   */
+  /// The [#getNextBlock()] call currently running, or null when none is. See [#registerExecutionSoFar()].
+  ///
+  /// A single thread runs an opchain at a time and an operator never re-enters its own [#nextBlock()], so this is
+  /// only ever read and written from inside the call it describes.
+  @Nullable
+  private BlockExecution _blockExecution;
+
+  /// Returns the logger for the operator.
+  ///
+  /// This method is used to generic multi-stage operator messages using the name of the specific operator.
+  /// Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
+  /// attribute.
   protected abstract Logger logger();
 
   public abstract OperatorTypeDescriptor getOperatorType();
 
   public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
+
+  /// Accounts everything this operator has spent so far in the [#getNextBlock()] call currently running.
+  ///
+  /// [#nextBlock()] normally registers a block's usage only once [#getNextBlock()] has returned, which is too late
+  /// for an operator that has to report its own stats from inside that call: [MailboxSendOperator] serializes them
+  /// into the end-of-stream block it is about to send. Without this, that operator reports less time, memory and GC
+  /// than the inputs whose calls it contains, and the stats tree renders a negative self time for the stage.
+  ///
+  /// Whatever is left when the call returns is registered as usual, so the totals an operator ends up with are the
+  /// same either way. No rows are attributed here; they are counted from the block the call returns.
+  ///
+  /// Does nothing when called outside a [#nextBlock()] call.
+  protected void registerExecutionSoFar() {
+    BlockExecution blockExecution = _blockExecution;
+    if (blockExecution != null) {
+      blockExecution.registerUnaccounted(0);
+    }
+  }
+
+  /// What a single [#getNextBlock()] call has spent, and how much of that has already been handed to
+  /// [#registerExecution].
+  ///
+  /// The meters are created by [#nextBlock()] and passed in rather than created here, so that each of them keeps
+  /// measuring from exactly the point it always did.
+  private final class BlockExecution {
+    private final Stopwatch _stopwatch = Stopwatch.createStarted();
+    private final ThreadResourceSnapshot _resourceSnapshot;
+    private final long _preGcTimeMs;
+    private long _accountedTimeMs;
+    private long _accountedMemoryBytes;
+    private long _accountedGcTimeMs;
+
+    private BlockExecution(ThreadResourceSnapshot resourceSnapshot, long preGcTimeMs) {
+      _resourceSnapshot = resourceSnapshot;
+      _preGcTimeMs = preGcTimeMs;
+    }
+
+    /// Hands whatever this call has spent and not yet registered to [MultiStageOperator#registerExecution],
+    /// attributing `numRows` rows to it. Each invocation registers only what accrued since the previous one, which
+    /// is what lets the call report from the inside and still end up with exact totals.
+    private void registerUnaccounted(int numRows) {
+      long timeMs = _stopwatch.elapsed(TimeUnit.MILLISECONDS);
+      long memoryBytes = _resourceSnapshot.getAllocatedBytes();
+      long gcTimeMs = getGcTimeMillis() - _preGcTimeMs;
+      registerExecution(timeMs - _accountedTimeMs, numRows, memoryBytes - _accountedMemoryBytes,
+          gcTimeMs - _accountedGcTimeMs);
+      _accountedTimeMs = timeMs;
+      _accountedMemoryBytes = memoryBytes;
+      _accountedGcTimeMs = gcTimeMs;
+    }
+  }
 
   /// By default, it uses the active deadline, which is the one that should be used for most operators, but if the
   /// operator does not actively process data (ie both mailbox operators), it should override this method to use the
@@ -94,11 +150,9 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsProcessed, scope, getDeadlineMs());
   }
 
-  /**
-   * Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream (EOS)
-   * block when all the data is processed, or an error block if an error occurred. After it returns EOS or error block,
-   * no more call should be made.
-   */
+  /// Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream
+  /// (EOS) block when all the data is processed, or an error block if an error occurred. After it returns EOS or error
+  /// block, no more call should be made.
   @Override
   public MseBlock nextBlock() {
     if (logger().isDebugEnabled()) {
@@ -109,18 +163,22 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     long preBlockGcTime = getGcTimeMillis();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       MseBlock nextBlock;
-      Stopwatch executeStopwatch = Stopwatch.createStarted();
+      BlockExecution blockExecution = new BlockExecution(resourceSnapshot, preBlockGcTime);
+      _blockExecution = blockExecution;
       try {
         checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
         logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
         nextBlock = ErrorMseBlock.fromException(e);
+      } finally {
+        // Cleared even when getNextBlock() throws, so a later registerExecutionSoFar() cannot read a finished call.
+        _blockExecution = null;
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
-      long memoryUsedBytes = resourceSnapshot.getAllocatedBytes();
-      long gcTimeMs = getGcTimeMillis() - preBlockGcTime;
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows, memoryUsedBytes, gcTimeMs);
+      // Only what registerExecutionSoFar() left unaccounted, so the totals are the same whether or not the operator
+      // reported from inside the call.
+      blockExecution.registerUnaccounted(numRows);
 
       if (logger().isDebugEnabled()) {
         logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
@@ -133,14 +191,12 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   protected abstract MseBlock getNextBlock()
       throws Exception;
 
-  /**
-   * Signals the operator to terminate early.
-   *
-   * After this method is called, the operator should stop processing any more input and return a
-   * {@link SuccessMseBlock} block as soon as possible.
-   * This method should be called when the consumer of the operator does not need any more data and wants to stop the
-   * execution early to save resources.
-   */
+  /// Signals the operator to terminate early.
+  ///
+  /// After this method is called, the operator should stop processing any more input and return a
+  /// [org.apache.pinot.query.runtime.blocks.SuccessMseBlock] block as soon as possible.
+  /// This method should be called when the consumer of the operator does not need any more data and wants to stop the
+  /// execution early to save resources.
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
     for (MultiStageOperator child : getChildOperators()) {
@@ -151,12 +207,10 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   @Override
   public abstract List<MultiStageOperator> getChildOperators();
 
-  /**
-   * Calculates and returns the stats for the operator.
-   *
-   * Each time this method is called, a new instance of the stats is created. This is because the stats are mutable and
-   * can be updated by the operator or the caller after the stats are returned.
-   */
+  /// Calculates and returns the stats for the operator.
+  ///
+  /// Each time this method is called, a new instance of the stats is created. This is because the stats are mutable and
+  /// can be updated by the operator or the caller after the stats are returned.
   public final MultiStageQueryStats calculateStats() {
     MultiStageQueryStats upstreamStats = calculateUpstreamStats();
 
@@ -177,7 +231,59 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
   }
 
+  /// Returns the stats to report for this operator, as a copy that the caller is free to merge into.
+  ///
+  /// Implementations may derive extra stats here instead of only copying the ones they accumulated while running,
+  /// but this method is called several times per opchain and every call must return the same values: deriving a
+  /// stat whose merge function is not idempotent (a sum, for instance) must be done on the returned copy, never on
+  /// the stat map the operator keeps.
   public abstract StatMap<?> copyStatMaps();
+
+  /// Drops the per-query row and hash state this operator is holding — whatever it accumulated while running, plus
+  /// any input it is still pointing at — so that it becomes collectable even while the operator itself stays
+  /// reachable.
+  ///
+  /// Both [#close()] and [#cancel(Throwable)] call this, so the state is released on *every* termination path: end
+  /// of stream, error and cancellation alike. Operators that can release earlier (when they produce their
+  /// end-of-stream block, say) should keep doing that as well — this is the backstop, not the prompt path.
+  ///
+  /// **Threading.** Like the rest of teardown, this runs on the thread that executes the op chain (see [OpChain]) —
+  /// either the worker thread itself, via the scheduler's direct-executor callback, or a thread holding a chain that
+  /// never started. It is therefore safe to touch operator state without synchronization, and callers must not
+  /// invoke [#close()] or [#cancel(Throwable)] from anywhere else: nulling a field that a concurrently running
+  /// `getNextBlock()` is dereferencing would be a use-after-free, not a missed release.
+  ///
+  /// Rules for implementations:
+  ///
+  ///  1. **Be idempotent.** This can run more than once, and it runs after [#cancel(Throwable)] on the error path.
+  ///  2. **Leave the stats alone.** [#calculateStats()] and [#copyStatMaps()] are called after termination.
+  ///  3. **Never mutate something whose identity left the operator.** A block sitting in a local mailbox still
+  ///     points at the list it was built from, and emptying that list silently drops rows rather than failing.
+  ///     Drop or replace the reference; do not `clear()` in place. The same goes for state an external consumer
+  ///     reads after termination — see [org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator], whose
+  ///     buffer is its output and which therefore releases nothing.
+  ///  4. **Prefer replacing to clearing.** `clear()` drops the elements but keeps the backing table at whatever
+  ///     capacity it grew to — `HashMap`, `ObjectOpenHashSet`, `ArrayList` and `PriorityQueue` all behave this way,
+  ///     which for a large buffer leaves tens of megabytes of empty slots reachable. Assign a fresh, empty instance
+  ///     (or `null`) instead.
+  ///  5. **Do not let a released field double as control flow.** After release the operator is done, so a field that
+  ///     also serves as a mode discriminator or a "have I read the input yet" marker must not be the one being
+  ///     dropped. Keep the discriminator in a separate final field.
+  ///
+  /// An operator that overrides [#close()] or [#cancel(Throwable)] must chain to `super`, or its state is never
+  /// released — that is not a compile error, so it is on the implementer.
+  protected void releaseBuffers() {
+  }
+
+  /// Whether this operator is currently holding any of the state that [#releaseBuffers()] drops.
+  ///
+  /// The two are a pair: an operator that overrides one must override the other, and
+  /// `releaseBuffers(); assert !hasBufferedState();` must hold. It exists so the release invariant can be asserted
+  /// without reflecting into private fields; nothing in production reads it.
+  @VisibleForTesting
+  protected boolean hasBufferedState() {
+    return false;
+  }
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
@@ -191,6 +297,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
+    releaseBuffersSafely();
   }
 
   public void cancel(Throwable e) {
@@ -201,6 +308,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
+    }
+    releaseBuffersSafely();
+  }
+
+  private void releaseBuffersSafely() {
+    try {
+      releaseBuffers();
+    } catch (Throwable t) {
+      // Releasing buffers is best-effort cleanup; never let it break the rest of the teardown. Throwable rather than
+      // Exception so that an AssertionError from an implementation (tests run with -ea) cannot abort a parent's
+      // close loop and leave its siblings unclosed.
+      logger().error("Failed to release the buffers of operator: {}", this, t);
     }
   }
 
@@ -231,16 +350,14 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     return ThreadResourceUsageProvider.getGcTime();
   }
 
-  /**
-   * This enum is used to identify the operation type.
-   * <p>
-   * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
-   * to identify the type of the stats in an efficient way.
-   * <p>
-   * IMPORTANT: Each enum entry has an explicit {@code id} used for serialization. When adding new operator types,
-   * always append them at the end and assign the next available ID. Never reuse or change existing IDs as this
-   * would break backward compatibility with older versions.
-   */
+  /// This enum is used to identify the operation type.
+  ///
+  /// This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
+  /// to identify the type of the stats in an efficient way.
+  ///
+  /// IMPORTANT: Each enum entry has an explicit `id` used for serialization. When adding new operator types,
+  /// always append them at the end and assign the next available ID. Never reuse or change existing IDs as this
+  /// would break backward compatibility with older versions.
   public enum Type implements OperatorTypeDescriptor {
     AGGREGATE(0, AggregateOperator.StatKey.class) {
       @Override
@@ -439,10 +556,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         StatMap<UnnestOperator.StatKey> stats = (StatMap<UnnestOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(UnnestOperator.StatKey.EMITTED_ROWS));
       }
+    },
+    REPEAT(16, RepeatOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<RepeatOperator.StatKey> stats = (StatMap<RepeatOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(RepeatOperator.StatKey.EMITTED_ROWS));
+      }
     };
 
     // When adding new operator types, update MAX_ID if the new ID exceeds the current max
-    private static final int MAX_ID = 15;
+    private static final int MAX_ID = 16;
     private static final Type[] ID_TO_TYPE = new Type[MAX_ID + 1];
 
     static {
@@ -468,19 +593,15 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       _statKeyClass = statKeyClass;
     }
 
-    /**
-     * Returns the stable ID used for serialization.
-     * <p>
-     * This ID is guaranteed to remain constant across versions, unlike {@link #ordinal()} which can change
-     * if enum entries are reordered.
-     */
+    /// Returns the stable ID used for serialization.
+    ///
+    /// This ID is guaranteed to remain constant across versions, unlike [#ordinal()] which can change
+    /// if enum entries are reordered.
     public int getId() {
       return _id;
     }
 
-    /**
-     * Returns the Type for the given serialization ID, or null if no such type exists.
-     */
+    /// Returns the Type for the given serialization ID, or null if no such type exists.
     @Nullable
     public static Type fromId(int id) {
       if (id >= 0 && id < ID_TO_TYPE.length) {
@@ -489,22 +610,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       return null;
     }
 
-    /**
-     * Gets the class of the stat key for this operator type.
-     * <p>
-     * Notice that this is not including the generic type parameter, because Java generic types are not expressive
-     * enough indicate what we want to say, so generics here are more problematic than useful.
-     */
+    /// Gets the class of the stat key for this operator type.
+    ///
+    /// Notice that this is not including the generic type parameter, because Java generic types are not expressive
+    /// enough indicate what we want to say, so generics here are more problematic than useful.
     public Class getStatKeyClass() {
       return _statKeyClass;
     }
 
-    /**
-     * Merges the stats from the given map into the given broker response.
-     * <p>
-     * Each literal has its own implementation of this method, which assumes the given map is of the correct type
-     * (compatible with {@link #getStatKeyClass()}). This is a way to avoid casting in the caller.
-     */
+    /// Merges the stats from the given map into the given broker response.
+    ///
+    /// Each literal has its own implementation of this method, which assumes the given map is of the correct type
+    /// (compatible with [#getStatKeyClass()]). This is a way to avoid casting in the caller.
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
     public void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {

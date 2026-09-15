@@ -29,10 +29,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class PinotConfigUtilsTest {
@@ -59,6 +56,16 @@ public class PinotConfigUtilsTest {
     assertEquals(config.get(ControllerConf.DATA_DIR), dataDir);
     assertEquals(config.get(ControllerConf.CONTROLLER_VIP_HOST), controllerHost);
     assertEquals(config.get(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE), tenantIsolation);
+  }
+
+  @Test
+  public void testGenerateControllerConfWithoutTenantIsolation()
+      throws SocketException, UnknownHostException {
+    Map<String, Object> config = PinotConfigUtils.generateControllerConf(
+        "localhost:2181", "testCluster", "localhost", "9000", "/tmp/pinot", ControllerConf.ControllerMode.DUAL, null);
+
+    assertFalse(config.containsKey(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE));
+    assertEquals(config.get(ControllerConf.HELIX_CLUSTER_NAME), "testCluster");
   }
 
   @Test(expectedExceptions = RuntimeException.class)

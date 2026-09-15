@@ -43,21 +43,19 @@ public class JvmDefaultSslContext {
     throw new IllegalStateException("Should not instantiate JvmDefaultSslContext");
   }
 
-  /**
-   * Initialize the default SSL context based on the system properties.
-   * When either key store "javax.net.ssl.keyStore" or trust store "javax.net.ssl.trustStore" is specified in
-   * system property and they are files:
-   * set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
-   * SSLFactory when either key store or trust store file changes.
-   *
-   * <p>This method is called from a static block in {@code PinotAdministrator}. Failures here must not
-   * prevent the JVM from starting — for example when security providers are not yet registered or
-   * the keystore/truststore is temporarily unavailable. In such cases, a warning is logged and Pinot
-   * components will configure TLS individually during their own startup.</p>
-   *
-   * TODO: need to support "javax.net.ssl.keyStoreProvider", "javax.net.ssl.trustStoreProvider", "https.protocols" and
-   *  "https.cipherSuites" system properties.
-   */
+  /// Initialize the default SSL context based on the system properties.
+  /// When either key store "javax.net.ssl.keyStore" or trust store "javax.net.ssl.trustStore" is specified in
+  /// system property and they are files:
+  /// set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
+  /// SSLFactory when either key store or trust store file changes.
+  ///
+  /// This method is called from a static block in `PinotAdministrator`. Failures here must not
+  /// prevent the JVM from starting — for example when security providers are not yet registered or
+  /// the keystore/truststore is temporarily unavailable. In such cases, a warning is logged and Pinot
+  /// components will configure TLS individually during their own startup.
+  ///
+  /// TODO: need to support "javax.net.ssl.keyStoreProvider", "javax.net.ssl.trustStoreProvider", "https.protocols" and
+  ///  "https.cipherSuites" system properties.
   public static synchronized void initDefaultSslContext() {
     LOGGER.info("Trying to initialize jvm default SSL context");
     if (_initialized) {

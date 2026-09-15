@@ -37,15 +37,13 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Base class to be used by the various MailboxReceiveOperators such as the sorted and non-sorted versions. This
- * class contains the common logic needed for MailboxReceive
- *
- * BaseMailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
- * We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
- * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
- * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
- */
+/// Base class to be used by the various MailboxReceiveOperators such as the sorted and non-sorted versions. This
+/// class contains the common logic needed for MailboxReceive
+///
+/// BaseMailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
+/// We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
+/// When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
+/// When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _distributionType;
@@ -75,7 +73,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       for (String mailboxId : _mailboxIds) {
         ReceivingMailbox receivingMailbox = _mailboxService.getReceivingMailbox(mailboxId);
         receivingMailbox.registerReceiveOperatorThreadContext(QueryThreadContext.getIfAvailable());
-        ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, this);
+        ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, _mailboxService);
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
@@ -122,9 +120,16 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     return _multiConsumer.calculateStats();
   }
 
+  /// Returns a copy of this operator's stats, extended with [StatKey#NON_ACTIVE_WORKERS] for this single worker.
   @Override
   public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    // This operator hands downstream what it reads from its mailboxes, so having emitted no row means having
+    // received none.
+    if (statMap.getLong(StatKey.EMITTED_ROWS) == 0) {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    return statMap;
   }
 
   protected void onEos() {
@@ -159,13 +164,20 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _statMap.merge(StatKey.UPSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.WAIT_CPU_TIME_MS));
   }
 
+  /// Adapts a [ReceivingMailbox] to the [AsyncStream] the [BlockingMultiStreamConsumer] reads from.
+  ///
+  /// Deliberately holds the [MailboxService] and not the operator. The mailbox keeps this stream reachable through
+  /// the reader callback registered on it, and after a failed query the mailbox itself stays in the service's cache
+  /// until it expires (see [#poll()] for why it is not released earlier). A reference back to the operator from here
+  /// would keep the operator, its [OpChainExecutionContext] and everything reachable from them alive for that whole
+  /// time.
   private static class ReadMailboxAsyncStream implements AsyncStream<ReceivingMailbox.MseBlockWithStats> {
     final ReceivingMailbox _mailbox;
-    final BaseMailboxReceiveOperator _operator;
+    final MailboxService _mailboxService;
 
-    ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+    ReadMailboxAsyncStream(ReceivingMailbox mailbox, MailboxService mailboxService) {
       _mailbox = mailbox;
-      _operator = operator;
+      _mailboxService = mailboxService;
     }
 
     @Override
@@ -181,9 +193,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       if (blockWithStats != null) {
         MseBlock block = blockWithStats.getBlock();
 
-        // TODO: Check if we should also release mailbox on not successful EOS.
+        // Only a successful EOS releases the mailbox from the service's cache. After an error the senders may still
+        // be running, and they have to find the cancelled mailbox rather than recreate a fresh one that nobody reads.
+        // The cache expiry takes care of it, and this stream holds nothing that makes that wait expensive.
         if (block.isSuccess()) {
-          _operator._mailboxService.releaseReceivingMailbox(_mailbox);
+          _mailboxService.releaseReceivingMailbox(_mailbox);
         }
       }
       return blockWithStats;
@@ -205,6 +219,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     }
   }
 
+  /// The stats reported by this operator.
+  ///
+  /// New keys must be appended at the end of this enum: [StatMap] identifies keys by their ordinal on the wire, so
+  /// inserting, reordering or removing a constant breaks the compatibility with other versions.
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
@@ -218,55 +236,49 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * How many send mailboxes are being read by this receive operator.
-     * <p>
-     * Clock time will be proportional to this number and the parallelism of the stage.
-     */
+    /// How many send mailboxes are being read by this receive operator.
+    ///
+    /// Clock time will be proportional to this number and the parallelism of the stage.
     FAN_IN(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * How many messages have been received in heap format by this mailbox.
-     * <p>
-     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
-     */
+    /// How many messages have been received in heap format by this mailbox.
+    ///
+    /// The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
     IN_MEMORY_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many messages have been received in raw format and therefore deserialized by this mailbox.
-     * <p>
-     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
-     */
+    /// How many messages have been received in raw format and therefore deserialized by this mailbox.
+    ///
+    /// The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
     RAW_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many bytes have been deserialized by this mailbox.
-     * <p>
-     * A high number here indicates that the mailbox is receiving a lot of data from other servers.
-     */
+    /// How many bytes have been deserialized by this mailbox.
+    ///
+    /// A high number here indicates that the mailbox is receiving a lot of data from other servers.
     DESERIALIZED_BYTES(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
-     */
+    /// How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
     DESERIALIZATION_TIME_MS(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to offer the messages to downstream operator.
-     */
+    /// How long (in CPU time) it took to offer the messages to downstream operator.
     DOWNSTREAM_WAIT_MS(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
-     */
+    /// How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
     UPSTREAM_WAIT_MS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
-    GC_TIME_MS(StatMap.Type.LONG);
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// How many workers of this stage emitted no row out of this mailbox receive.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent when every worker
+    /// received something, which is the common case. This is what tells apart a worker that was handed no data at
+    /// all from one that was handed data and filtered it away downstream: compare it against the `parallelism` the
+    /// stats tree renders on this node, and against what the operators above and below report.
+    ///
+    /// This operator hands downstream what it reads, so emitting no row means having received none. The converse
+    /// can fail in two corner cases, where rows are read but never emitted: after the downstream operator has
+    /// early terminated, and when a sorted receive buffers its rows and then ends in error. Such a worker is
+    /// reported as idle despite having been given data.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT);
 
     private final StatMap.Type _type;
 

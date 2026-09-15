@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 ///       differs: `COUNT(col) -> SUM(materialized_view_count_col)`,
 ///       `COUNT(*) -> SUM(materialized_view_count_star_col)`
 ///
-///
 /// The [#matches] method requires the MV to store the same aggregation
 /// function as the user query (e.g. MV has `SUM(revenue)` for a user
 /// query with `SUM(revenue)`).

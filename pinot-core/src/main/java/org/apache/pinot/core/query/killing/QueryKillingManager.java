@@ -38,15 +38,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Central manager for scan-based query killing. Owns the guard rails and delegates the
- * actual kill decision to a {@link QueryKillingStrategy}.
- *
- * <p>The strategy is built once at init via a {@link QueryKillingStrategyFactory} and rebuilt when
- * cluster config changes via {@link #onChange}. The default factory is
- * {@link ScanEntriesThresholdStrategy.Factory}.</p>
- *
- */
+/// Central manager for scan-based query killing. Owns the guard rails and delegates the
+/// actual kill decision to a [QueryKillingStrategy].
+///
+/// The strategy is built once at init via a [QueryKillingStrategyFactory] and rebuilt when
+/// cluster config changes via [#onChange]. The default factory is
+/// [ScanEntriesThresholdStrategy.Factory].
 public class QueryKillingManager implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryKillingManager.class);
 
@@ -55,10 +52,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
   private final AtomicReference<QueryMonitorConfig> _configRef;
   private final ServerMetrics _serverMetrics;
 
-  /**
-   * Null if: killing is disabled, config is insufficient, or factory failed to load.
-   * Rebuilt when config changes via {@link #rebuildStrategy()}.
-   */
+  /// Null if: killing is disabled, config is insufficient, or factory failed to load.
+  /// Rebuilt when config changes via [#rebuildStrategy()].
   @Nullable
   private volatile QueryKillingStrategy _strategy;
 
@@ -67,10 +62,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     _serverMetrics = serverMetrics;
   }
 
-  /**
-   * Initializes the singleton instance and builds the strategy from config.
-   * Called once during server startup.
-   */
+  /// Initializes the singleton instance and builds the strategy from config.
+  /// Called once during server startup.
   public static QueryKillingManager init(PinotConfiguration schedulerConfig, ServerMetrics serverMetrics) {
     long maxHeapSize = Runtime.getRuntime().maxMemory();
     QueryMonitorConfig config = new QueryMonitorConfig(schedulerConfig, maxHeapSize);
@@ -86,10 +79,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     return _instance;
   }
 
-  /**
-   * Rebuilds the strategy from the current config. Called at init and when
-   * cluster config changes (via the same onChange path that rebuilds QueryMonitorConfig).
-   */
+  /// Rebuilds the strategy from the current config. Called at init and when
+  /// cluster config changes (via the same onChange path that rebuilds QueryMonitorConfig).
   public void rebuildStrategy() {
     QueryMonitorConfig config = _configRef.get();
     if (config == null || !config.isScanBasedKillingEnabled()) {
@@ -112,11 +103,9 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     }
   }
 
-  /**
-   * Loads the strategy factory from config. If a custom factory class name is configured,
-   * loads it by reflection (following the same pattern as {@code ThreadAccountantUtils.createAccountant()}).
-   * Otherwise, returns the default {@link ScanEntriesThresholdStrategy.Factory}.
-   */
+  /// Loads the strategy factory from config. If a custom factory class name is configured,
+  /// loads it by reflection (following the same pattern as `ThreadAccountantUtils.createAccountant()`).
+  /// Otherwise, returns the default [ScanEntriesThresholdStrategy.Factory].
   private QueryKillingStrategyFactory loadFactory(QueryMonitorConfig config) {
     String factoryClassName = config.getScanBasedKillingStrategyFactoryClassName();
     if (factoryClassName != null && !factoryClassName.isEmpty()) {
@@ -132,22 +121,18 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     return new ScanEntriesThresholdStrategy.Factory();
   }
 
-  /**
-   * Returns the active strategy. Visible for testing.
-   */
+  /// Returns the active strategy. Visible for testing.
   @Nullable
   public QueryKillingStrategy getActiveStrategy() {
     return _strategy;
   }
 
-  /**
-   * Handles ZK cluster config changes. Rebuilds the {@link QueryMonitorConfig} from the delta
-   * and refreshes the killing strategy if scan-killing-related keys changed.
-   *
-   * <p>Raw ZK keys arrive with the full {@value CommonConstants#PINOT_QUERY_SCHEDULER_PREFIX}
-   * prefix. We strip it before passing to {@link QueryMonitorConfig}, matching the key space
-   * the init constructor uses (which reads from a config already subsetted to that prefix).</p>
-   */
+  /// Handles ZK cluster config changes. Rebuilds the [QueryMonitorConfig] from the delta
+  /// and refreshes the killing strategy if scan-killing-related keys changed.
+  ///
+  /// Raw ZK keys arrive with the full {@value CommonConstants#PINOT_QUERY_SCHEDULER_PREFIX}
+  /// prefix. We strip it before passing to [QueryMonitorConfig], matching the key space
+  /// the init constructor uses (which reads from a config already subsetted to that prefix).
   @Override
   public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
@@ -183,10 +168,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
         newConfig.getScanBasedKillingMaxEntriesScannedPostFilter());
   }
 
-  /**
-   * Convenience overload called from {@link org.apache.pinot.core.operator.BaseOperator#checkTermination()}.
-   * Reads query context (table name, query id, cached strategy) from the execution context.
-   */
+  /// Convenience overload called from [org.apache.pinot.core.operator.BaseOperator#checkTermination()].
+  /// Reads query context (table name, query id, cached strategy) from the execution context.
   public void checkAndKillIfNeeded(QueryExecutionContext executionContext, QueryScanCostContext scanCostContext) {
     Object cached = executionContext.getCachedKillingStrategy();
     QueryKillingStrategy cachedStrategy;
@@ -202,12 +185,10 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
         executionContext.getQueryId(), executionContext.getTableName());
   }
 
-  /**
-   * Evaluates whether the query should be killed based on the active strategy.
-   *
-   * <p>Calls {@link QueryKillingStrategy#forQuery(QueryConfig, QueryMonitorConfig)}
-   * to resolve table-level overrides before evaluating.</p>
-   */
+  /// Evaluates whether the query should be killed based on the active strategy.
+  ///
+  /// Calls [QueryKillingStrategy#forQuery(QueryConfig, QueryMonitorConfig)]
+  /// to resolve table-level overrides before evaluating.
   public void checkAndKillIfNeeded(QueryExecutionContext executionContext,
       QueryScanCostContext scanCostContext, String queryId, String tableName,
       @Nullable QueryConfig queryConfig) {
@@ -236,10 +217,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     }
   }
 
-  /**
-   * Resolves a per-query strategy (applying table-level overrides from {@code queryConfig}).
-   * Returns null if killing is disabled. Caches the resolved strategy on the execution context.
-   */
+  /// Resolves a per-query strategy (applying table-level overrides from `queryConfig`).
+  /// Returns null if killing is disabled. Caches the resolved strategy on the execution context.
   @Nullable
   public QueryKillingStrategy resolveQueryStrategy(@Nullable QueryConfig queryConfig) {
     QueryKillingStrategy strategy = _strategy;
@@ -315,10 +294,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     }
   }
 
-  /**
-   * Emits a kill metric per-table when the table name is known, falling back to global emission
-   * when it is not.
-   */
+  /// Emits a kill metric per-table when the table name is known, falling back to global emission
+  /// when it is not.
   private void emitKillMetric(ServerMeter meter, @Nullable String tableName) {
     if (tableName != null && !tableName.isEmpty() && !"unknown".equals(tableName)) {
       _serverMetrics.addMeteredTableValue(tableName, meter, 1);

@@ -26,16 +26,13 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.PlanFragmenter;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 
 
-/**
- * ExchangeNode represents the exchange stage in the query plan.
- * It is used to exchange the data between the instances.
- * NOTE: ExchangeNode will be replaced by {@link PlanFragmenter} into {@link MailboxSendNode} and
- *       {@link MailboxReceiveNode} pair, so it is never serialized.
- */
+/// ExchangeNode represents the exchange stage in the query plan.
+/// It is used to exchange the data between the instances.
+/// NOTE: ExchangeNode will be replaced by [org.apache.pinot.query.planner.logical.PlanFragmenter] into
+///       [MailboxSendNode] and [MailboxReceiveNode] pair, so it is never serialized.
 public class ExchangeNode extends BasePlanNode {
   private final PinotRelExchangeType _exchangeType;
   private final RelDistribution.Type _distributionType;

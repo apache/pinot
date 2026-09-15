@@ -38,14 +38,12 @@ public class ResourceUtilizationManager {
     _utilizationCheckers = utilizationCheckers;
   }
 
-  /**
-   * Returns the status of the resource utilization check across all UtilizationCheckers
-   * @param tableNameWithType table name with type
-   * @param purpose the purpose of the utilization check
-   * @return CheckResult, FAIL if even one resource utilization checker has returned FALSE, UNDETERMINED if the result
-   *         cannot be determined for even one UtilizationChecker and all the others are also UNDETERMINED or PASS,
-   *         and PASS if resource utilization is within limits for all UtilizationCheckers
-   */
+  /// Returns the status of the resource utilization check across all UtilizationCheckers
+  /// @param tableNameWithType table name with type
+  /// @param purpose the purpose of the utilization check
+  /// @return CheckResult, FAIL if even one resource utilization checker has returned FALSE, UNDETERMINED if the result
+  ///         cannot be determined for even one UtilizationChecker and all the others are also UNDETERMINED or PASS,
+  ///         and PASS if resource utilization is within limits for all UtilizationCheckers
   public UtilizationChecker.CheckResult isResourceUtilizationWithinLimits(String tableNameWithType,
       UtilizationChecker.CheckPurpose purpose) {
     if (!_isResourceUtilizationCheckEnabled) {

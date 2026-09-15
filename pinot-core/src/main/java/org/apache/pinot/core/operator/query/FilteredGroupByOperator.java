@@ -55,10 +55,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>FilteredGroupByOperator</code> class provides the operator for group-by query on a single segment when
- * there are 1 or more filter expressions on aggregations.
- */
+/// The `FilteredGroupByOperator` class provides the operator for group-by query on a single segment when
+/// there are 1 or more filter expressions on aggregations.
 @SuppressWarnings("rawtypes")
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilteredGroupByOperator.class);

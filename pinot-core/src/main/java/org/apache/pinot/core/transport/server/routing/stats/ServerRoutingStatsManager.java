@@ -46,18 +46,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
- * Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
- * submitted to a server and when a server responds after processing a query.
- *
- * <p>Thread safety: {@code onChange} is invoked on the Helix config-change callback thread.
- * {@code exportStatsAsMetrics} runs on the single-threaded {@code _periodicTaskExecutor}.
- * {@code _enableStatsMetricExport} and {@code _statsMetricExportIntervalMs} are {@code volatile} so
- * writes from the Helix callback thread are immediately visible to the export thread. All other config
- * fields ({@code _alpha}, {@code _autoDecayWindowMs}, etc.) are written once during {@code init()}
- * before any executor threads start, so no additional synchronization is needed for those.
- */
+/// `ServerRoutingStatsManager` manages the query routing stats for each server and used by the Adaptive
+/// Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
+/// submitted to a server and when a server responds after processing a query.
+///
+/// Thread safety: `onChange` is invoked on the Helix config-change callback thread.
+/// `exportStatsAsMetrics` runs on the single-threaded `_periodicTaskExecutor`.
+/// `_enableStatsMetricExport` and `_statsMetricExportIntervalMs` are `volatile` so
+/// writes from the Helix callback thread are immediately visible to the export thread. All other config
+/// fields (`_alpha`, `_autoDecayWindowMs`, etc.) are written once during `init()`
+/// before any executor threads start, so no additional synchronization is needed for those.
 public class ServerRoutingStatsManager implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
 
@@ -228,7 +226,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     }
   }
 
-  /// Callers are expected to run on a thread with a {@link QueryThreadContext} set.
+  /// Callers are expected to run on a thread with a [QueryThreadContext] set.
   /// If absent, defaults to the SSE stats map with a warning.
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap() {
     QueryThreadContext qtc = QueryThreadContext.getIfAvailable();
@@ -239,9 +237,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return getStatsMap(qtc.getExecutionContext().getQueryType());
   }
 
-  /**
-   * Called just before submitting a query to a server. Updates stats corresponding to query submission.
-   */
+  /// Called just before submitting a query to a server. Updates stats corresponding to query submission.
   public void recordStatsForQuerySubmission(long requestId, String serverInstanceId) {
     if (!_isEnabled) {
       return;
@@ -272,9 +268,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     }
   }
 
-  /**
-   * Called when a query response is received from the server. Updates stats related to query completion.
-   */
+  /// Called when a query response is received from the server. Updates stats related to query completion.
   public void recordStatsUponResponseArrival(long requestId, String serverInstanceId, long latency) {
     if (!_isEnabled) {
       return;
@@ -315,9 +309,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return getStatsMap(queryType);
   }
 
-  /**
-   * Returns ServerRoutingStatsStr for debugging/logging.
-   */
+  /// Returns ServerRoutingStatsStr for debugging/logging.
   public String getServerRoutingStatsStr() {
     return getServerRoutingStatsStr(QueryType.SSE);
   }
@@ -367,9 +359,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
    * ===================================================================================================================
    */
 
-  /**
-   * Returns a list containing each server and the corresponding number of in-flight requests active on the server.
-   */
+  /// Returns a list containing each server and the corresponding number of in-flight requests active on the server.
   public List<Pair<String, Integer>> fetchNumInFlightRequestsForAllServers() {
     List<Pair<String, Integer>> response = new ArrayList<>();
     if (!_isEnabled) {
@@ -391,9 +381,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return response;
   }
 
-  /**
-   * Same as above but returns the number of inflight requests for the input server.
-   */
+  /// Same as above but returns the number of inflight requests for the input server.
   public Integer fetchNumInFlightRequestsForServer(String server) {
     if (!_isEnabled) {
       return null;
@@ -412,9 +400,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     }
   }
 
-  /**
-   * Returns a list containing each server and the corresponding EMA latency seen for queries on the server.
-   */
+  /// Returns a list containing each server and the corresponding EMA latency seen for queries on the server.
   public List<Pair<String, Double>> fetchEMALatencyForAllServers() {
     List<Pair<String, Double>> response = new ArrayList<>();
     if (!_isEnabled) {
@@ -436,9 +422,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return response;
   }
 
-  /**
-   * Same as above but returns the EMA latency for the input server.
-   */
+  /// Same as above but returns the EMA latency for the input server.
   public Double fetchEMALatencyForServer(String server) {
     if (!_isEnabled) {
       return null;
@@ -457,10 +441,8 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     }
   }
 
-  /**
-   * Returns a list containing each server and the corresponding Hybrid score for each server. The Hybrid score is
-   * calculated based on https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf.
-   */
+  /// Returns a list containing each server and the corresponding Hybrid score for each server. The Hybrid score is
+  /// calculated based on https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf.
   public List<Pair<String, Double>> fetchHybridScoreForAllServers() {
     List<Pair<String, Double>> response = new ArrayList<>();
     if (!_isEnabled) {
@@ -482,9 +464,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     return response;
   }
 
-  /**
-   * Same as above but returns the score for a single server.
-   */
+  /// Same as above but returns the score for a single server.
   public Double fetchHybridScoreForServer(String server) {
     if (!_isEnabled) {
       return null;

@@ -22,14 +22,11 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 
 
-/**
- * A RuleExecutor that runs a DFS and processes the tree in the following order:
- * <ol>
- *   <li>First process the leftmost subtree input (if any)</li>
- *   <li>Then process the current node</li>
- *   <li>Then process all the other inputs</li>
- * </ol>
- */
+/// A RuleExecutor that runs a DFS and processes the tree in the following order:
+///
+/// 1. First process the leftmost subtree input (if any)
+/// 2. Then process the current node
+/// 3. Then process all the other inputs
 public class LeftInputFirstRuleExecutor extends RuleExecutor {
   private final PRelOptRule _rule;
   private final PhysicalPlannerContext _physicalPlannerContext;

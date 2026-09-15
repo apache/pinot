@@ -31,7 +31,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -49,10 +48,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code TimeBoundaryManager} class manages the time boundary information for a table.
- * <p>TODO: Support SDF (simple date format) time column
- */
+/// The `TimeBoundaryManager` class manages the time boundary information for a table.
+///
+/// TODO: Support SDF (simple date format) time column
 public class TimeBoundaryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeBoundaryManager.class);
   private static final long INVALID_TIME_MS = -1;
@@ -102,13 +100,13 @@ public class TimeBoundaryManager {
         _timeColumn, dateTimeSpec.getFormat(), isHourlyTable, _offlineTableName);
   }
 
-  /**
-   * Initializes the time boundary manager with the ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
-   * only once before calling other methods.
-   * <p>NOTE: {@code idealState} and {@code externalView} are unused, but intentionally passed in in case they are
-   * needed in the future.
-   */
+  /// Initializes the time boundary manager with the ideal state, external view and online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]). Should be called only once before
+  /// calling other methods.
+  ///
+  /// NOTE: `idealState` and `externalView` are unused, but intentionally passed in in case they are
+  /// needed in the future.
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     updateExplicitlySetTimeBoundary(idealState);
@@ -195,13 +193,14 @@ public class TimeBoundaryManager {
     }
   }
 
-  /**
-   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
-   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   * <p>NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-   * ones. The refreshed segment ZK metadata change won't be picked up.
-   * <p>NOTE: {@code idealState} is unused, but intentionally passed in in case it is needed in the future.
-   */
+  /// Processes the segment assignment (ideal state or external view) change based on the given online segments
+  /// (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]).
+  ///
+  /// NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
+  /// ones. The refreshed segment ZK metadata change won't be picked up.
+  ///
+  /// NOTE: `idealState` is unused, but intentionally passed in in case it is needed in the future.
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
@@ -228,9 +227,7 @@ public class TimeBoundaryManager {
     return maxEndTimeMs;
   }
 
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
+  /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));

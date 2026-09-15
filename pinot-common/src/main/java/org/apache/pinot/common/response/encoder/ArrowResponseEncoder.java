@@ -107,6 +107,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case STRING:
         case JSON:
         case BYTES:
+        case UUID:
         case OBJECT:
           field = new Field(colName, FieldType.nullable(new ArrowType.Utf8()), null);
           vector = new VarCharVector(colName, ALLOCATOR);
@@ -181,6 +182,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case TIMESTAMP_ARRAY:
         case STRING_ARRAY:
         case BYTES_ARRAY:
+        case UUID_ARRAY:
           // Define the inner field for a string element.
           children = List.of(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
           // Define the field for the list column.
@@ -234,6 +236,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case UUID:
             case OBJECT:
               byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
@@ -345,6 +348,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
+            case UUID_ARRAY:
               ListVector listVector = (ListVector) vector;
               String[] stringArray = (String[]) value;
               // Start a new list entry for the current row.
@@ -411,6 +415,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case UUID:
             case OBJECT:
               row[col] = new String(((VarCharVector) vector).get(i), StandardCharsets.UTF_8);
               break;
@@ -469,6 +474,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
+            case UUID_ARRAY:
               ListVector listVector = (ListVector) vector;
               List<?> arrayValues = listVector.getObject(i);
               String[] array = new String[arrayValues.size()];

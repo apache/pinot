@@ -173,10 +173,8 @@ public class RealtimeSegmentConverter {
     return validDocIds != null ? validDocIds.getMutableRoaringBitmap().toRoaringBitmap() : null;
   }
 
-  /**
-   * Publishes segment build metrics including common metrics (always published) and compaction-specific metrics
-   * (published only when compaction is enabled)
-   */
+  /// Publishes segment build metrics including common metrics (always published) and compaction-specific metrics
+  /// (published only when compaction is enabled)
   private void publishCompactionMetrics(int preCommitRowCount, SegmentIndexCreationDriverImpl driver,
       long buildStartTime) {
     try {
@@ -206,9 +204,7 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  /**
-   * Common method to build segment with the provided record reader
-   */
+  /// Common method to build segment with the provided record reader
   private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
       RecordReader recordReader, int[] sortedDocIds, @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds)
       throws Exception {
@@ -224,9 +220,7 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  /**
-   * Returns a new schema containing only physical columns
-   */
+  /// Returns a new schema containing only physical columns
   @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
     return original.withoutVirtualColumns();

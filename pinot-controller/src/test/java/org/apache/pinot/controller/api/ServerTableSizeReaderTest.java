@@ -53,7 +53,7 @@ public class ServerTableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
   private static final String LOOPBACK_HOST = "127.0.0.1";
-  private static final String URI_PATH = "/table/";
+  private static final String URI_PATH = "/tables/";
   private static final String TABLE_NAME = "myTable";
   private static final int TIMEOUT_MSEC = 5000;
   private static final int SERVER_COUNT = 6;

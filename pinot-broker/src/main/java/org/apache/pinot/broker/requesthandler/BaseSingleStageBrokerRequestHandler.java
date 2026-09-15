@@ -55,6 +55,7 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -107,7 +108,9 @@ import org.apache.pinot.materializedview.handler.MaterializedViewSplitExecutionC
 import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -148,6 +151,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
+  /// Canonical name (see [RequestUtils#canonicalizeFunctionName]) of the `lookup()` transform function, which reads a
+  /// dimension table named by a string literal argument instead of by the FROM clause.
+  private static final String LOOKUP_FUNCTION = "lookup";
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
@@ -166,6 +172,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
   protected final boolean _enableQueryFingerprinting;
+  protected final AuthProvider _serverAdminAuthProvider;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
@@ -191,6 +198,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     _materializedViewHandler = materializedViewHandler;
+    _serverAdminAuthProvider = AuthProviderUtils.extractAuthProvider(config, Broker.SERVER_ADMIN_AUTH_PREFIX);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -210,8 +218,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
-    _enableQueryFingerprinting = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+    boolean fingerprintingConfigured = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -299,9 +314,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //  we can get the cid from QueryThreadContext
       serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
-    LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
+    LOGGER.debug("Cancelling the query: {} via server urls: {}", _queryLogger.redactQuery(queryServers._query),
+        serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, timeoutMs, "DELETE", HttpDelete::new);
+        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, _serverAdminAuthProvider, timeoutMs,
+            "DELETE", HttpDelete::new);
     List<String> errMsgs = new ArrayList<>(serverUrls.size());
     for (int i = 0; i < serverUrls.size(); i++) {
       MultiHttpRequestResponse httpRequestResponse = null;
@@ -321,7 +338,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to cancel query: {}", queryServers._query, e);
+        LOGGER.error("Failed to cancel query: {}", _queryLogger.redactQuery(queryServers._query), e);
         // Can't just throw exception from here as there is a need to release the other connections.
         // So just collect the error msg to throw them together after the for-loop.
         errMsgs.add(e.getMessage());
@@ -342,20 +359,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
-
+    QueryFingerprint queryFingerprint = null;
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
       try {
-        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
         if (queryFingerprint != null) {
           queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
         }
       } catch (Exception e) {
-        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId,
+            _queryLogger.redactQuery(query), e.getMessage());
       }
     }
+
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query, queryFingerprint);
 
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
@@ -377,28 +396,29 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * CompileResult holds the result of the compilation phase. Compilation may or may not be successful. If compilation
-   * is successful then all member variables other than BrokerResponse will be available. If compilation is not
-   * successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
-   * It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
-   * The only exception is that a BrokerResponse is returned for a literal-only query.
-   */
+  /// CompileResult holds the result of the compilation phase. Compilation may or may not be successful. If compilation
+  /// is successful then all member variables other than BrokerResponse will be available. If compilation is not
+  /// successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
+  /// It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
+  /// The only exception is that a BrokerResponse is returned for a literal-only query.
   private static class CompileResult {
     final PinotQuery _pinotQuery;
     final PinotQuery _serverPinotQuery;
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
+    /// Dimension tables read by `lookup()` calls, which are not part of the data source
+    final Set<String> _lookupTableNames;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName) {
+        String rawTableName, Set<String> lookupTableNames) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
+      _lookupTableNames = lookupTableNames;
       _errorOrLiteralOnlyBrokerResponse = null;
     }
 
@@ -408,6 +428,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = null;
       _tableName = null;
       _rawTableName = null;
+      _lookupTableNames = Set.of();
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
@@ -473,6 +494,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
 
+    // A `lookup()` dimension table is not part of the data source, so neither the logical-table check nor the
+    // BrokerRequest based check below covers it. Authorize it here, for both branches.
+    Set<String> lookupTableNames = compileResult._lookupTableNames;
+    if (!lookupTableNames.isEmpty()) {
+      AuthorizationResult lookupAuthorizationResult =
+          hasTableAccess(requesterIdentity, lookupTableNames, requestContext, httpHeaders);
+      if (!lookupAuthorizationResult.hasAccess()) {
+        throwAccessDeniedError(requestId, query, requestContext, tableName, lookupAuthorizationResult);
+      }
+      if (_enableRowColumnLevelAuth) {
+        // `lookup()` resolves a row by primary key against the dimension table's in-memory data and never evaluates a
+        // filter against that table, so an RLS filter on it cannot be applied. Reject the query instead of returning
+        // rows the principal is not allowed to see.
+        for (String lookupTableName : lookupTableNames) {
+          List<String> rowFilters =
+              accessControl.getRowColFilters(requesterIdentity, lookupTableName).getRLSFilters().orElse(null);
+          if (rowFilters != null && !rowFilters.isEmpty()) {
+            throwAccessDeniedError(requestId, query, requestContext, tableName,
+                new TableAuthorizationResult(Set.of(lookupTableName)));
+          }
+        }
+      }
+    }
+
     TableRouteProvider routeProvider;
 
     AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
@@ -487,14 +532,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Validate QPS
       if (!_queryQuotaManager.acquireDatabase(database)) {
         String errorMessage =
-            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId,
+                _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), database);
         LOGGER.info(errorMessage);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
       if (!_queryQuotaManager.acquireLogicalTable(tableName)) {
         String errorMessage =
-            String.format("Request %d: %s exceeds query quota for table: %s.", requestId, query, tableName);
+            String.format("Request %d: %s exceeds query quota for table: %s.", requestId,
+                _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), tableName);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
@@ -544,14 +591,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Validate QPS quota
       if (!_queryQuotaManager.acquireDatabase(database)) {
         String errorMessage =
-            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId,
+                _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), database);
         LOGGER.info(errorMessage);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
       if (!_queryQuotaManager.acquire(tableName)) {
         String errorMessage =
-            String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
+            String.format("Request %d: %s exceeds query quota for table: %s", requestId,
+                _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), tableName);
         LOGGER.info(errorMessage);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
@@ -602,13 +651,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
 
     if (!routeInfo.isExists()) {
-      LOGGER.info("Table not found for request {}: {}", requestId, query);
+      LOGGER.info("Table not found for request {}: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
       return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
 
     if (!routeInfo.isRouteExists()) {
-      LOGGER.info("No table matches for request {}: {}", requestId, query);
+      LOGGER.info("No table matches for request {}: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
@@ -632,7 +683,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     try {
       validateRequest(serverPinotQuery, _queryResponseLimit);
     } catch (Exception e) {
-      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
@@ -648,7 +700,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Attempt to add the query to the compile queue; drop if queue is full
       if (!_multistageCompileQueryQueue.offer(Pair.of(query, database))) {
         LOGGER.trace("Not compiling query `{}` using the multi-stage query engine because the query queue is full",
-            query);
+            _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       }
     }
 
@@ -755,7 +807,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (disabledTableNames != null) {
       for (String name : disabledTableNames) {
         String errorMessage = String.format("%s Table is disabled", name);
-        LOGGER.info("{}: {}", errorMessage, query);
+        LOGGER.info("{}: {}", errorMessage, _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
         errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
       }
     }
@@ -784,7 +836,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         QueryProcessingException firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"
             : "1 exception found";
-        LOGGER.info("No server found for request {}: {}. {} {}", requestId, query, logTail, firstErrorMsg);
+        LOGGER.info("No server found for request {}: {}. {} {}", requestId,
+            _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), logTail, firstErrorMsg);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
         return BrokerResponseNative.fromBrokerErrors(errorMsgs);
       } else {
@@ -823,7 +876,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     } catch (TimeoutException e) {
       String errorMessage = e.getMessage();
-      LOGGER.info("{} {}: {}", errorMessage, requestId, query);
+      LOGGER.info("{} {}: {}", errorMessage, requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
       errorMsgs.add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, errorMessage));
       return BrokerResponseNative.fromBrokerErrors(errorMsgs);
@@ -1048,7 +1102,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       // Check if the query is a v2 supported query
@@ -1080,7 +1135,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     if (isLiteralOnlyQuery(pinotQuery)) {
-      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
+      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       try {
         if (pinotQuery.isExplain()) {
           // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
@@ -1090,25 +1146,28 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } catch (Exception e) {
         // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
         LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
-            query, e.getMessage());
+            _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
       }
     }
 
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     DataSource dataSource = serverPinotQuery.getDataSource();
     if (dataSource == null) {
-      LOGGER.info("Data source (FROM clause) not found in request {}: {}", requestId, query);
+      LOGGER.info("Data source (FROM clause) not found in request {}: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
       return new CompileResult(new BrokerResponseNative(
           QueryErrorCode.QUERY_VALIDATION, "Data source (FROM clause) not found"));
     }
     if (dataSource.getJoin() != null) {
-      LOGGER.info("JOIN is not supported in request {}: {}", requestId, query);
+      LOGGER.info("JOIN is not supported in request {}: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
       return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "JOIN is not supported"));
     }
     if (dataSource.getTableName() == null) {
-      LOGGER.info("Table name not found in request {}: {}", requestId, query);
+      LOGGER.info("Table name not found in request {}: {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
       return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Table name not found"));
     }
@@ -1117,8 +1176,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
           accessControl);
     } catch (Exception e) {
-      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
-          e.getMessage());
+      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
       requestContext.setErrorCode(QueryErrorCode.QUERY_EXECUTION);
       return new CompileResult(
           new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
@@ -1131,7 +1190,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
               _tableCache);
     } catch (DatabaseConflictException e) {
-      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
+      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
       return new CompileResult(
@@ -1148,6 +1208,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
+    // A `lookup()` dimension table is named by a literal argument rather than by the FROM clause, so it is absent from
+    // the data source. Collect it here so that `doHandleRequest` can authorize it alongside the queried table.
+    Set<String> lookupTableNames = extractLookupTableNames(serverPinotQuery);
+    if (serverPinotQuery != pinotQuery) {
+      // For a gapfill query the two differ, and only the stripped one was walked above
+      lookupTableNames.addAll(extractLookupTableNames(pinotQuery));
+    }
+
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -1156,15 +1224,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } catch (Exception e) {
       // Throw exceptions with column in-existence error.
       if (e instanceof BadQueryRequestException) {
-        LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
-            e.getMessage());
+        LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId,
+            _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
         requestContext.setErrorCode(QueryErrorCode.UNKNOWN_COLUMN);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
         return new CompileResult(
             new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
       }
-      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
-          e.getMessage());
+      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId,
+          _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
     }
 
     if (_defaultHllLog2m > 0) {
@@ -1182,7 +1250,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
   }
 
   /// Mutable holder returned from [#applyMaterializedViewRewriteAtCompile] — Java has no out
@@ -1357,13 +1425,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     serverPinotQuery.setQueryOptions(queryOptions);
     CalciteSqlParser.queryRewrite(serverPinotQuery, RlsFiltersRewriter.class);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName, query);
+    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName,
+        _queryLogger.redactQuery(query));
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
       AuthorizationResult authorizationResult) {
     _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-    LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
+    LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId,
+        _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), tableName,
         authorizationResult.getFailureMessage());
 
     requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
@@ -1524,10 +1594,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return tableConfig.getTenantConfig().getServer();
   }
 
-  /**
-   * Handles the subquery in the given query.
-   * <p>Currently only supports subquery within the filter.
-   */
+  /// Handles the subquery in the given query.
+  ///
+  /// Currently only supports subquery within the filter.
   private void handleSubquery(PinotQuery pinotQuery, long requestId, JsonNode jsonRequest,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders,
       AccessControl accessControl)
@@ -1539,13 +1608,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Handles the subquery in the given expression.
-   * <p>When subquery is detected, first executes the subquery and gets the response, then rewrites the expression with
-   * the subquery response.
-   * <p>Currently only supports ID_SET subquery within the IN_SUBQUERY transform function, which will be rewritten to an
-   * IN_ID_SET transform function.
-   */
+  /// Handles the subquery in the given expression.
+  ///
+  /// When subquery is detected, first executes the subquery and gets the response, then rewrites the expression with
+  /// the subquery response.
+  ///
+  /// Currently only supports ID_SET subquery within the IN_SUBQUERY transform function, which will be rewritten to an
+  /// IN_ID_SET transform function.
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders,
       AccessControl accessControl)
@@ -1603,14 +1672,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Resolves the actual table name for:
-   * - Case-insensitive cluster
-   *
-   * @param tableName the table name in the query
-   * @param tableCache the table case-sensitive cache
-   * @return table name if the table name is found in Pinot registry.
-   */
+  /// Resolves the actual table name for:
+  /// - Case-insensitive cluster
+  ///
+  /// @param tableName the table name in the query
+  /// @param tableCache the table case-sensitive cache
+  /// @return table name if the table name is found in Pinot registry.
   @VisibleForTesting
   static String getActualTableName(String tableName, TableCache tableCache) {
     String actualTableName = tableCache.getActualTableName(tableName);
@@ -1621,14 +1688,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return actualTableName != null ? actualTableName : tableName;
   }
 
-  /**
-   * Retrieve segment partitioned columns for a table.
-   * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
-   *
-   * @param tableCache
-   * @param tableName
-   * @return segment partitioned columns belong to both offline and realtime tables.
-   */
+  /// Retrieve segment partitioned columns for a table.
+  /// For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
+  ///
+  /// @param tableCache
+  /// @param tableName
+  /// @return segment partitioned columns belong to both offline and realtime tables.
   private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
     final TableConfig offlineTableConfig =
         tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
@@ -1662,18 +1727,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return segmentPartitionedColumns;
   }
 
-  /**
-   * Sets the table name in the given broker request.
-   * NOTE: Set table name in broker request because it is used for access control, query routing etc.
-   */
+  /// Sets the table name in the given broker request.
+  /// NOTE: Set table name in broker request because it is used for access control, query routing etc.
   private void setTableName(BrokerRequest brokerRequest, String tableName) {
     brokerRequest.getQuerySource().setTableName(tableName);
     brokerRequest.getPinotQuery().getDataSource().setTableName(tableName);
   }
 
-  /**
-   * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given query.
-   */
+  /// Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given query.
   private static void handleHLLLog2mOverride(PinotQuery pinotQuery, int hllLog2mOverride) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
@@ -1692,9 +1753,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given expression.
-   */
+  /// Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given expression.
   private static void handleHLLLog2mOverride(Expression expression, int hllLog2mOverride) {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -1717,9 +1776,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Overrides the LIMIT of the given query if it exceeds the query limit.
-   */
+  /// Overrides the LIMIT of the given query if it exceeds the query limit.
   @VisibleForTesting
   static void handleQueryLimitOverride(PinotQuery pinotQuery, int queryLimit) {
     if (queryLimit > 0 && pinotQuery.getLimit() > queryLimit) {
@@ -1727,9 +1784,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given query.
-   */
+  /// Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given query.
   @VisibleForTesting
   static void handleSegmentPartitionedDistinctCountOverride(PinotQuery pinotQuery,
       Set<String> segmentPartitionedColumns) {
@@ -1753,9 +1808,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given expression.
-   */
+  /// Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given expression.
   private static void handleSegmentPartitionedDistinctCountOverride(Expression expression,
       Set<String> segmentPartitionedColumns) {
     Function function = expression.getFunctionCall();
@@ -1775,9 +1828,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given query.
-   */
+  /// Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given query.
   private static void handleDistinctCountBitmapOverride(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
       handleDistinctCountBitmapOverride(expression);
@@ -1795,9 +1846,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given expression.
-   */
+  /// Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given expression.
   private static void handleDistinctCountBitmapOverride(Expression expression) {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -1863,9 +1912,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Verifies that no groovy is present in the PinotQuery when disabled.
-   */
+  /// Verifies that no groovy is present in the PinotQuery when disabled.
   @VisibleForTesting
   static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
@@ -1922,11 +1969,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     GroovyFunctionEvaluator.parseGroovyScript(String.format("groovy({%s})", script));
   }
 
-  /**
-   * Rewrites potential expensive functions to their approximation counterparts.
-   * - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
-   * - PERCENTILE -> PERCENTILE_SMART_TDIGEST
-   */
+  /// Rewrites potential expensive functions to their approximation counterparts.
+  /// - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
+  /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
   @VisibleForTesting
   static void handleApproximateFunctionOverride(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
@@ -2021,9 +2066,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return expression;
   }
 
-  /**
-   * Returns {@code true} if the given query only contains literals, {@code false} otherwise.
-   */
+  /// Returns `true` if the given query only contains literals, `false` otherwise.
   @VisibleForTesting
   static boolean isLiteralOnlyQuery(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
@@ -2034,9 +2077,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return true;
   }
 
-  /**
-   * Processes the literal only query.
-   */
+  /// Processes the literal only query.
   private BrokerResponseNative processLiteralOnlyQuery(long requestId, PinotQuery pinotQuery,
       RequestContext requestContext) {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
@@ -2089,9 +2130,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     values[index] = typeAndValue.getRight();
   }
 
-  /**
-   * Fixes the column names to the actual column names in the given query.
-   */
+  /// Fixes the column names to the actual column names in the given query.
   @VisibleForTesting
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
       Map<String, String> columnNameMap) {
@@ -2158,9 +2197,51 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     pinotQuery.setSelectList(newSelections);
   }
 
-  /**
-   * Fixes the column names to the actual column names in the given expression.
-   */
+  /// Returns the dimension tables read by the `lookup()` calls in the given query.
+  ///
+  /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
+  /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
+  /// it. The names are returned exactly as written, which is how `LookupTransformFunction` resolves them on the
+  /// server, so the authorized table is always the one actually read.
+  @VisibleForTesting
+  static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
+    Set<String> lookupTableNames = new HashSet<>();
+    for (Expression expression : pinotQuery.getSelectList()) {
+      collectLookupTableNames(expression, lookupTableNames);
+    }
+    collectLookupTableNames(pinotQuery.getFilterExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getHavingExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getGroupByList(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getOrderByList(), lookupTableNames);
+    return lookupTableNames;
+  }
+
+  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames) {
+    if (expressions != null) {
+      for (Expression expression : expressions) {
+        collectLookupTableNames(expression, lookupTableNames);
+      }
+    }
+  }
+
+  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames) {
+    if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
+      return;
+    }
+    Function functionCall = expression.getFunctionCall();
+    List<Expression> operands = functionCall.getOperands();
+    if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
+      Literal tableName = operands.get(0).getLiteral();
+      // A non-literal table name is rejected by LookupTransformFunction on the server
+      if (tableName != null && tableName.isSetStringValue()) {
+        lookupTableNames.add(tableName.getStringValue());
+      }
+    }
+    // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
+    collectLookupTableNames(operands, lookupTableNames);
+  }
+
+  /// Fixes the column names to the actual column names in the given expression.
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
       boolean ignoreCase) {
     ExpressionType expressionType = expression.getType();
@@ -2173,7 +2254,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         case "as":
           fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
           break;
-        case "lookup":
+        case LOOKUP_FUNCTION:
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:
@@ -2185,12 +2266,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Returns the actual column name for the given column name for:
-   * - Case-insensitive cluster
-   * - Column name in the format of [{@code rawTableName}].[column_name]
-   * - Column name in the format of [logical_table_name].[column_name] while {@code rawTableName} is a translated name
-   */
+  /// Returns the actual column name for the given column name for:
+  /// - Case-insensitive cluster
+  /// - Column name in the format of [`rawTableName`].\[column_name\]
+  /// - Column name in the format of \[logical_table_name\].\[column_name\] while `rawTableName` is a translated name
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
       boolean ignoreCase) {
@@ -2233,12 +2312,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return columnName;
   }
 
-  /**
-   * Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
-   * milliseconds.
-   * <p>For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
-   * timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
-   */
+  /// Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
+  /// milliseconds.
+  ///
+  /// For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
+  /// timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
   private long setQueryTimeout(String tableNameWithType, Long logicalTableQueryTimeout,
       Map<String, String> queryOptions, long timeSpentMs)
       throws TimeoutException {
@@ -2273,18 +2351,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return remainingTimeMs;
   }
 
-  /**
-   * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
-   * is measured for the serialized response.
-   *
-   * The overriding order of priority is:
-   * 1. QueryOption  -> maxServerResponseSizeBytes
-   * 2. QueryOption  -> maxQueryResponseSizeBytes
-   * 3. TableConfig  -> maxServerResponseSizeBytes
-   * 4. TableConfig  -> maxQueryResponseSizeBytes
-   * 5. BrokerConfig -> maxServerResponseSizeBytes
-   * 6. BrokerConfig -> maxServerResponseSizeBytes
-   */
+  /// Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
+  /// is measured for the serialized response.
+  ///
+  /// The overriding order of priority is:
+  /// 1. QueryOption  -> maxServerResponseSizeBytes
+  /// 2. QueryOption  -> maxQueryResponseSizeBytes
+  /// 3. TableConfig  -> maxServerResponseSizeBytes
+  /// 4. TableConfig  -> maxQueryResponseSizeBytes
+  /// 5. BrokerConfig -> maxServerResponseSizeBytes
+  /// 6. BrokerConfig -> maxServerResponseSizeBytes
   private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
       @Nullable QueryConfig queryConfig) {
     // QueryOption
@@ -2327,16 +2403,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Broker side validation on the query.
-   * <p>Throw exception if query does not pass validation.
-   * <p>Current validations are:
-   * <ul>
-   *   <li>Value for 'LIMIT' <= configured value</li>
-   *   <li>Query options must be set to SQL mode</li>
-   *   <li>Check if numReplicaGroupsToQuery option provided is valid</li>
-   * </ul>
-   */
+  /// Broker side validation on the query.
+  ///
+  /// Throw exception if query does not pass validation.
+  ///
+  /// Current validations are:
+  ///
+  /// - Value for 'LIMIT' <= configured value
+  /// - Query options must be set to SQL mode
+  /// - Check if numReplicaGroupsToQuery option provided is valid
   @VisibleForTesting
   static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit) {
     // Verify LIMIT
@@ -2534,16 +2609,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return union;
   }
 
-  /**
-   * Prepares the offline/realtime broker requests for the base table route based on
-   * whether the base table is hybrid, offline-only, or realtime-only.
-   * This mirrors the logic in the main doHandleRequest flow but operates on a pre-existing
-   * routeInfo for the base table.  Per-branch `handleExpressionOverride` /
-   * `handleTimestampIndexOverride` are applied so the SPLIT base-table branches receive the
-   * same expression-override and `$ts$DAY` timestamp-index hints as the non-split path —
-   * without these, table-level overrides configured on the base table would be silently
-   * dropped on the SPLIT path, producing divergent results vs. the base fallback path.
-   */
+  /// Prepares the offline/realtime broker requests for the base table route based on
+  /// whether the base table is hybrid, offline-only, or realtime-only.
+  /// This mirrors the logic in the main doHandleRequest flow but operates on a pre-existing
+  /// routeInfo for the base table.  Per-branch `handleExpressionOverride` /
+  /// `handleTimestampIndexOverride` are applied so the SPLIT base-table branches receive the
+  /// same expression-override and `$ts$DAY` timestamp-index hints as the non-split path —
+  /// without these, table-level overrides configured on the base table would be silently
+  /// dropped on the SPLIT path, producing divergent results vs. the base fallback path.
   private ImplicitHybridTableRouteInfo prepareBaseTableHybridRoute(BrokerRequest baseBrokerRequest,
       TableRouteInfo baseRouteInfo, Schema schema) {
     Preconditions.checkState(baseRouteInfo instanceof ImplicitHybridTableRouteInfo,
@@ -2620,20 +2693,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
 
-  /**
-   * Processes the optimized broker requests for both OFFLINE and REALTIME table.
-   * TODO: Directly take PinotQuery
-   */
+  /// Processes the optimized broker requests for both OFFLINE and REALTIME table.
+  /// TODO: Directly take PinotQuery
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
-  /**
-   * Returns the segments to report as unavailable for this query. The default returns the route's unavailable
-   * segments unchanged. A subclass may narrow the set, e.g. to the segments the query will actually read after
-   * routing-level pruning, so the "segments unavailable" warning does not include segments the query never touches.
-   */
+  /// Returns the segments to report as unavailable for this query. The default returns the route's unavailable
+  /// segments unchanged. A subclass may narrow the set, e.g. to the segments the query will actually read after
+  /// routing-level pruning, so the "segments unavailable" warning does not include segments the query never touches.
   protected List<String> getUnavailableSegments(BrokerRequest serverBrokerRequest, TableRouteInfo routeInfo) {
     return routeInfo.getUnavailableSegments();
   }
@@ -2680,9 +2749,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Helper class to pass the per server statistics.
-   */
+  /// Helper class to pass the per server statistics.
   public static class ServerStats {
     private String _serverStats;
 
@@ -2695,9 +2762,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Helper class to track the query plaintext and the requested servers.
-   */
+  /// Helper class to track the query plaintext and the requested servers.
   private static class QueryServers {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();

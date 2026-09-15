@@ -32,13 +32,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Enriches the record with CLP encoded fields.
- * For a column 'x', it adds three new columns to the record:
- * 1. 'x_logtype' - The logtype of the encoded message
- * 2. 'x_dictVars' - The dictionary variables of the encoded message
- * 3. 'x_encodedVars' - The encoded variables of the encoded message
- */
+/// Enriches the record with CLP encoded fields.
+/// For a column 'x', it adds three new columns to the record:
+/// 1. 'x_logtype' - The logtype of the encoded message
+/// 2. 'x_dictVars' - The dictionary variables of the encoded message
+/// 3. 'x_encodedVars' - The encoded variables of the encoded message
 public class CLPEncodingEnricher implements RecordEnricher {
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPEncodingEnricher.class);
   private final CLPEncodingEnricherConfig _config;

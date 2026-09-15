@@ -156,9 +156,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     LOGGER.info("Initialized BrokerGrpcServer on port: {}", portToUse);
   }
 
-  /**
-   * Registers buffer metrics for the given allocator.
-   */
+  /// Registers buffer metrics for the given allocator.
   private void registerBufferMetrics(PooledByteBufAllocator bufAllocator, BrokerMetrics brokerMetrics) {
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
     brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);

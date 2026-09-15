@@ -21,23 +21,15 @@ package org.apache.pinot.core.query.reduce.filter;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Value extractor for the post-aggregation function or pre-aggregation gap fill.
- */
+/// Value extractor for the post-aggregation function or pre-aggregation gap fill.
 public interface ValueExtractor {
 
-  /**
-   * Returns the column name for the value extracted.
-   */
+  /// Returns the column name for the value extracted.
   String getColumnName();
 
-  /**
-   * Returns the ColumnDataType of the value extracted.
-   */
+  /// Returns the ColumnDataType of the value extracted.
   ColumnDataType getColumnDataType();
 
-  /**
-   * Extracts the value from the given row.
-   */
+  /// Extracts the value from the given row.
   Object extract(Object[] row);
 }

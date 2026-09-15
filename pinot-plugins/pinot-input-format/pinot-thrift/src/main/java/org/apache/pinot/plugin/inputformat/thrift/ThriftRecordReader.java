@@ -39,9 +39,7 @@ import org.apache.thrift.transport.TIOStreamTransport;
 import org.apache.thrift.transport.TTransportException;
 
 
-/**
- * Record reader for Thrift file.
- */
+/// Record reader for Thrift file.
 public class ThriftRecordReader implements RecordReader {
   private File _dataFile;
   private ThriftRecordExtractor _recordExtractor;

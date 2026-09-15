@@ -22,9 +22,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Config for {@link ThriftRecordExtractor}
- */
+/// Config for [ThriftRecordExtractor]
 public class ThriftRecordExtractorConfig implements RecordExtractorConfig {
 
   private Map<String, Integer> _fieldIds;

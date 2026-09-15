@@ -67,9 +67,7 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
     return value;
   }
 
-  /**
-   * Adds a raw value (single value or multi-value array) to the RoaringBitmap.
-   */
+  /// Adds a raw value (single value or multi-value array) to the RoaringBitmap.
   protected void addToValue(RoaringBitmap bitmap, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;

@@ -35,17 +35,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link StreamingQuerySession}. Covers the broker-side accumulator, early completion (returns true
- * as soon as all expected opchains have reported, without waiting for the timeout), timeout fall-through, and
- * fan-out cancel behaviour.
- */
+/// Unit tests for [StreamingQuerySession]. Covers the broker-side accumulator, early completion (returns true
+/// as soon as all expected opchains have reported, without waiting for the timeout), timeout fall-through, and
+/// fan-out cancel behaviour.
 public class StreamingQuerySessionTest {
 
-  /**
-   * Early completion: when all expected opchains report before the wait window, awaitCompletion returns true
-   * immediately rather than burning the full timeout.
-   */
+  /// Early completion: when all expected opchains report before the wait window, awaitCompletion returns true
+  /// immediately rather than burning the full timeout.
   @Test
   public void testEarlyCompletion()
       throws Exception {
@@ -63,10 +59,8 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
-  /**
-   * Timeout fall-through: awaitCompletion returns false when the timeout fires before all opchains have reported,
-   * and the per-stage coverage shows the missing opchains.
-   */
+  /// Timeout fall-through: awaitCompletion returns false when the timeout fires before all opchains have reported,
+  /// and the per-stage coverage shows the missing opchains.
   @Test
   public void testTimeoutFallThrough()
       throws Exception {
@@ -82,9 +76,7 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 0);
   }
 
-  /**
-   * Cross-worker stats sum: two opchains for the same stage merge into one accumulator entry by tree-shape match.
-   */
+  /// Cross-worker stats sum: two opchains for the same stage merge into one accumulator entry by tree-shape match.
   @Test
   public void testStatsAccumulationAcrossWorkers()
       throws Exception {
@@ -101,15 +93,13 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 12);
   }
 
-  /**
-   * Regression for the snapshot data race: {@link StreamingQuerySession#snapshotCoverage()} must hand back a snapshot
-   * isolated from the live accumulator, and a late {@link StreamingQuerySession#recordOpChainComplete} arriving after
-   * the broker stopped waiting must NOT mutate it. Before the fix, snapshotCoverage shallow-copied the map, so the
-   * returned {@code StageStatsTreeNode}/{@code StatMap} were aliased to the live ones; a post-snapshot merge (which
-   * happens on the success-partial path, where open streams are not cancelled) mutated the very {@code StatMap} the
-   * broker was concurrently flattening/serializing — a real data race. This asserts the observable consequence
-   * deterministically: the snapshot value stays put and the late report is ignored.
-   */
+  /// Regression for the snapshot data race: [StreamingQuerySession#snapshotCoverage()] must hand back a snapshot
+  /// isolated from the live accumulator, and a late [StreamingQuerySession#recordOpChainComplete] arriving after
+  /// the broker stopped waiting must NOT mutate it. Before the fix, snapshotCoverage shallow-copied the map, so the
+  /// returned `StageStatsTreeNode`/`StatMap` were aliased to the live ones; a post-snapshot merge (which
+  /// happens on the success-partial path, where open streams are not cancelled) mutated the very `StatMap` the
+  /// broker was concurrently flattening/serializing — a real data race. This asserts the observable consequence
+  /// deterministically: the snapshot value stays put and the late report is ignored.
   @Test
   @SuppressWarnings("unchecked")
   public void testSnapshotIsolatedFromLateReports()
@@ -140,10 +130,8 @@ public class StreamingQuerySessionTest {
         "responded count must not advance after finalize");
   }
 
-  /**
-   * A failed opchain (success=false) records as merge-failed-or-responded depending on whether stats are present,
-   * and triggers fan-out cancel exactly once across remaining streams.
-   */
+  /// A failed opchain (success=false) records as merge-failed-or-responded depending on whether stats are present,
+  /// and triggers fan-out cancel exactly once across remaining streams.
   @Test
   public void testFanOutCancelOnPeerError()
       throws Exception {
@@ -166,10 +154,8 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(cancelCalls.get(), 3);
   }
 
-  /**
-   * Stream onError (transport failure) drains the latch and triggers fan-out cancel; the dispatcher's
-   * remainingExpected variant lets it account for opchains that the dead server still owed.
-   */
+  /// Stream onError (transport failure) drains the latch and triggers fan-out cancel; the dispatcher's
+  /// remainingExpected variant lets it account for opchains that the dead server still owed.
   @Test
   public void testStreamErrorDrainsLatchAndCancels()
       throws Exception {
@@ -189,9 +175,7 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(cancelCalls.get(), 1, "fan-out cancel should hit only 'other' (dead removed first)");
   }
 
-  /**
-   * Concurrent opchain reports across many threads: latch drains correctly with no lost updates.
-   */
+  /// Concurrent opchain reports across many threads: latch drains correctly with no lost updates.
   @Test
   public void testConcurrentReports()
       throws Exception {
@@ -228,12 +212,10 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), n);
   }
 
-  /**
-   * An opchain whose stats tree contains an operator type id absent from {@link
-   * org.apache.pinot.query.runtime.operator.OperatorTypeRegistry} (simulating a newer server carrying a plugin
-   * the broker has not installed) must not abort the query. The session marks the stage merge-failed and drains
-   * the completion latch so the query result is returned normally.
-   */
+  /// An opchain whose stats tree contains an operator type id absent from
+  /// [org.apache.pinot.query.runtime.operator.OperatorTypeRegistry] (simulating a newer server carrying a plugin
+  /// the broker has not installed) must not abort the query. The session marks the stage merge-failed and drains
+  /// the completion latch so the query result is returned normally.
   @Test
   public void testDecodeFailedUnknownTypeIdDoesNotAbortQuery()
       throws Exception {
@@ -254,18 +236,16 @@ public class StreamingQuerySessionTest {
         "first worker's valid stats should remain in the accumulator");
   }
 
-  /**
-   * When two workers report the same stage with incompatible tree shapes (different operator types), the second
-   * merge throws {@link StageStatsTreeNode.ShapeMismatchException}. Because {@code StageStatsTreeNode.merge}
-   * mutates the existing node before recursing into children, the partially-merged node is discarded from the
-   * accumulator (it may be corrupt), the stage is poisoned, and the query still completes.
-   *
-   * <p>A shape mismatch means the workers of the stage disagree on the tree shape (typically version skew), so no
-   * merged result for the stage can be trusted: the first worker's report — whose data was dropped along with the
-   * tree — is reclassified from {@code responded} to {@code mergeFailed}, and any later report for the stage also
-   * counts as {@code mergeFailed} instead of re-seeding the accumulator. {@code responded + mergeFailed} still
-   * reconciles with the expected opchain count, and {@code responded} never overstates what the response contains.
-   */
+  /// When two workers report the same stage with incompatible tree shapes (different operator types), the second
+  /// merge throws [StageStatsTreeNode.ShapeMismatchException]. Because `StageStatsTreeNode.merge`
+  /// mutates the existing node before recursing into children, the partially-merged node is discarded from the
+  /// accumulator (it may be corrupt), the stage is poisoned, and the query still completes.
+  ///
+  /// A shape mismatch means the workers of the stage disagree on the tree shape (typically version skew), so no
+  /// merged result for the stage can be trusted: the first worker's report — whose data was dropped along with the
+  /// tree — is reclassified from `responded` to `mergeFailed`, and any later report for the stage also
+  /// counts as `mergeFailed` instead of re-seeding the accumulator. `responded + mergeFailed` still
+  /// reconciles with the expected opchain count, and `responded` never overstates what the response contains.
   @Test
   public void testShapeMismatchDoesNotAbortQuery()
       throws Exception {
@@ -292,11 +272,9 @@ public class StreamingQuerySessionTest {
         "the partially-merged stage entry should be discarded from the accumulator after the failed merge");
   }
 
-  /**
-   * After a shape mismatch poisons a stage, a later report that decodes cleanly must NOT re-seed the accumulator:
-   * its data alone would misrepresent the stage (the pre-mismatch merges were already dropped), so it is counted as
-   * merge-failed and the stage stays absent from the accumulator.
-   */
+  /// After a shape mismatch poisons a stage, a later report that decodes cleanly must NOT re-seed the accumulator:
+  /// its data alone would misrepresent the stage (the pre-mismatch merges were already dropped), so it is counted as
+  /// merge-failed and the stage stays absent from the accumulator.
   @Test
   public void testPoisonedStageIgnoresLaterReports()
       throws Exception {
@@ -319,12 +297,10 @@ public class StreamingQuerySessionTest {
         "a poisoned stage must not be re-seeded by a later clean report");
   }
 
-  /**
-   * When a stat-map payload is unreadable (truncated bytes — not enough data for even the count header), the
-   * decoder wraps the resulting {@link java.io.EOFException} as a
-   * {@link org.apache.pinot.query.runtime.plan.MultiStageStatsTreeDecoder.DecodeFailedException}. The session
-   * absorbs the failure, marks the stage merge-failed, and drains the latch. The query result is unaffected.
-   */
+  /// When a stat-map payload is unreadable (truncated bytes — not enough data for even the count header), the
+  /// decoder wraps the resulting [java.io.EOFException] as a
+  /// [org.apache.pinot.query.runtime.plan.MultiStageStatsTreeDecoder.DecodeFailedException]. The session
+  /// absorbs the failure, marks the stage merge-failed, and drains the latch. The query result is unaffected.
   @Test
   public void testCorruptedStatBytesDoesNotAbortQuery()
       throws Exception {
@@ -395,7 +371,7 @@ public class StreamingQuerySessionTest {
         .build();
   }
 
-  /** Serialised empty {@link StatMap} — one zero byte representing zero entries. */
+  /// Serialised empty [StatMap] — one zero byte representing zero entries.
   private static ByteString emptyStatBytes()
       throws IOException {
     return serialize(new StatMap<>(AggregateOperator.StatKey.class));

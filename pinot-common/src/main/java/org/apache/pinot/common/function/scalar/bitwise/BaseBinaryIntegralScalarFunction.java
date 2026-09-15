@@ -25,11 +25,9 @@ import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Base class for polymorphic binary integral scalar functions.
- *
- * <p>Implementations are stateless and thread-safe.
- */
+/// Base class for polymorphic binary integral scalar functions.
+///
+/// Implementations are stateless and thread-safe.
 abstract class BaseBinaryIntegralScalarFunction implements PinotScalarFunction {
 
   @Nullable

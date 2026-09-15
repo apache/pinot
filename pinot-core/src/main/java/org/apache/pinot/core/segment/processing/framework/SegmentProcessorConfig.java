@@ -34,9 +34,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
-/**
- * Config for configuring the phases of {@link SegmentProcessorFramework}
- */
+/// Config for configuring the phases of [SegmentProcessorFramework]
 public class SegmentProcessorConfig {
   private static final MergeType DEFAULT_MERGE_TYPE = MergeType.CONCAT;
 
@@ -74,51 +72,37 @@ public class SegmentProcessorConfig {
     _customCreationTime = customCreationTime;
   }
 
-  /**
-   * The Pinot table config
-   */
+  /// The Pinot table config
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
 
-  /**
-   * The Pinot schema
-   */
+  /// The Pinot schema
   public Schema getSchema() {
     return _schema;
   }
 
-  /**
-   * The time handler config for the SegmentProcessorFramework
-   */
+  /// The time handler config for the SegmentProcessorFramework
   public TimeHandlerConfig getTimeHandlerConfig() {
     return _timeHandlerConfig;
   }
 
-  /**
-   * The PartitioningConfig for the SegmentProcessorFramework's map phase
-   */
+  /// The PartitioningConfig for the SegmentProcessorFramework's map phase
   public List<PartitionerConfig> getPartitionerConfigs() {
     return _partitionerConfigs;
   }
 
-  /**
-   * The merge type for the SegmentProcessorFramework
-   */
+  /// The merge type for the SegmentProcessorFramework
   public MergeType getMergeType() {
     return _mergeType;
   }
 
-  /**
-   * The aggregator types for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
-   */
+  /// The aggregator types for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
   public Map<String, AggregationFunctionType> getAggregationTypes() {
     return _aggregationTypes;
   }
 
-  /**
-   * The aggregation function parameters for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
-   */
+  /// The aggregation function parameters for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
   public Map<String, Map<String, String>> getAggregationFunctionParameters() {
     return _aggregationFunctionParameters;
   }
@@ -139,9 +123,7 @@ public class SegmentProcessorConfig {
     return false;
   }
 
-  /**
-   * The SegmentConfig for the SegmentProcessorFramework's reduce phase
-   */
+  /// The SegmentConfig for the SegmentProcessorFramework's reduce phase
   public SegmentConfig getSegmentConfig() {
     return _segmentConfig;
   }
@@ -166,9 +148,7 @@ public class SegmentProcessorConfig {
         + ", _segmentNameGenerator=" + _segmentNameGenerator + ", _customCreationTime=" + _customCreationTime + '}';
   }
 
-  /**
-   * Builder for SegmentProcessorConfig
-   */
+  /// Builder for SegmentProcessorConfig
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;

@@ -27,11 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Contains cluster level config for certain table config attributes.
- * This is useful for enabling/disabling certain features across the cluster
- * Each individual config will have its own precedence rules.
- */
+/// Contains cluster level config for certain table config attributes.
+/// This is useful for enabling/disabling certain features across the cluster
+/// Each individual config will have its own precedence rules.
 public final class ClusterConfigForTable {
 
   // Controls whether to use NoDictColumnStatisticsCollector for no-dictionary columns globally.
@@ -46,7 +44,7 @@ public final class ClusterConfigForTable {
   // if a key isn't present, it means it is not set at cluster level
   private static final Map<String, Boolean> CLUSTER_BOOLEAN_FLAGS = new ConcurrentHashMap<>();
 
-  /** Listener that updates the cached cluster override on config changes. */
+  /// Listener that updates the cached cluster override on config changes.
   public static class ConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -76,7 +74,7 @@ public final class ClusterConfigForTable {
     }
   }
 
-  /** Returns whether we should use the optimized collector, applying cluster-level override if set. */
+  /// Returns whether we should use the optimized collector, applying cluster-level override if set.
   public static boolean useOptimizedNoDictCollector(TableConfig tableConfig) {
     Boolean override = CLUSTER_BOOLEAN_FLAGS.get(OPTIMISE_NO_DICT_STATS_COLLECTION_CONF);
     if (override != null) {

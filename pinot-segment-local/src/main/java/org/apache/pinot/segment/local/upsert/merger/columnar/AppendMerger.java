@@ -18,16 +18,12 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-/**
- * Merges 2 records and returns the merged record.
- * Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
- * Append merger allows duplicated records in the multi-value field.
- */
+/// Merges 2 records and returns the merged record.
+/// Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
+/// Append merger allows duplicated records in the multi-value field.
 public class AppendMerger implements PartialUpsertColumnMerger {
 
-  /**
-   * Append the new value from incoming row to the given multi-value field of previous record.
-   */
+  /// Append the new value from incoming row to the given multi-value field of previous record.
   @Override
   public Object merge(Object previousValue, Object currentValue) {
     return append((Object[]) previousValue, (Object[]) currentValue);

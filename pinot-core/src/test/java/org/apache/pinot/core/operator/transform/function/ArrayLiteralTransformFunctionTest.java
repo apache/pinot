@@ -22,8 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -121,6 +124,28 @@ public class ArrayLiteralTransformFunctionTest {
     Assert.assertEquals(stringArray.getStringArrayLiteral(), new String[]{
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
     });
+  }
+
+  @Test
+  public void testBytesArrayLiteralTransformFunction() {
+    byte[][] expected = {BytesUtils.toBytes("00"), BytesUtils.toBytes("deadbeef")};
+    List<ExpressionContext> arrayExpressions = List.of(
+        ExpressionContext.forLiteral(DataType.BYTES, expected[0]),
+        ExpressionContext.forLiteral(DataType.BYTES, expected[1]));
+
+    List<ArrayLiteralTransformFunction> bytesArrays = List.of(new ArrayLiteralTransformFunction(arrayExpressions),
+        new ArrayLiteralTransformFunction(new LiteralContext(RequestUtils.getLiteral(expected))));
+    for (ArrayLiteralTransformFunction bytesArray : bytesArrays) {
+      Assert.assertEquals(bytesArray.getResultMetadata().getDataType(), DataType.BYTES);
+      Assert.assertFalse(bytesArray.getResultMetadata().isSingleValue());
+      Assert.assertEquals(bytesArray.getBytesArrayLiteral(), expected);
+
+      byte[][][] values = bytesArray.transformToBytesValuesMV(_projectionBlock);
+      Assert.assertEquals(values.length, NUM_DOCS);
+      for (byte[][] value : values) {
+        Assert.assertEquals(value, expected);
+      }
+    }
   }
 
   @Test

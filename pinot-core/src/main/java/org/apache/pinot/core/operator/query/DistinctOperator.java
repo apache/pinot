@@ -35,9 +35,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * Operator for distinct queries on a single segment.
- */
+/// Operator for distinct queries on a single segment.
 public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT";
 

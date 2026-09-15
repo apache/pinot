@@ -19,9 +19,7 @@
 package org.apache.pinot.query.runtime.operator.factory;
 
 
-/**
- * Default provider that exposes the built-in Pinot query operator factories.
- */
+/// Default provider that exposes the built-in Pinot query operator factories.
 public class DefaultQueryOperatorFactoryProvider implements QueryOperatorFactoryProvider {
   public static final DefaultQueryOperatorFactoryProvider INSTANCE = new DefaultQueryOperatorFactoryProvider();
 

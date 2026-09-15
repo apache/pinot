@@ -39,9 +39,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link SegmentGenerationAndPushTaskExecutor}
- */
+/// Tests for [SegmentGenerationAndPushTaskExecutor]
 public class SegmentGenerationAndPushTaskExecutorTest {
 
   @Test

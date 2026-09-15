@@ -39,39 +39,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
- * the entries are variable length.
- *
- * <p>The layout of the file is as follows:
- * <ul>
- *   <li>Header Section
- *   <ul>
- *     <li>File format version (int)</li>
- *     <li>Target decompressed chunk size (int)</li>
- *     <li>Compression type enum value (int)</li>
- *     <li>Start offset of chunk data (int)</li>
- *     <li>Data header (for each chunk)
- *     <ul>
- *       <li>First docId in the chunk (int), where MSB is used to mark huge chunk</li>
- *       <li>Start offset of the chunk (unsigned int)</li>
- *     </ul>
- *     </li>
- *   </ul>
- *   </li>
- *   <li>Individual Chunks
- *   <ul>
- *     <li>Regular chunk
- *     <ul>
- *       <li>Header Section: start offsets (stored as int) of the entry within the data section</li>
- *       <li>Data Section</li>
- *     </ul>
- *     </li>
- *     <li>Huge chunk: contains one single value</li>
- *   </ul>
- *   </li>
- * </ul>
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
+/// the entries are variable length.
+///
+/// The layout of the file is as follows:
+///
+/// - Header Section
+///   - File format version (int)
+///   - Target decompressed chunk size (int)
+///   - Compression type enum value (int)
+///   - Start offset of chunk data (int)
+///   - Data header (for each chunk)
+///     - First docId in the chunk (int), where MSB is used to mark huge chunk
+///     - Start offset of the chunk (unsigned int)
+/// - Individual Chunks
+///   - Regular chunk
+///     - Header Section: start offsets (stored as int) of the entry within the data section
+///     - Data Section
+///   - Huge chunk: contains one single value
 @NotThreadSafe
 public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
@@ -265,11 +250,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     clearChunkBuffer();
   }
 
-  /**
-   * Writes the per-entry metadata into the chunk buffer header (positions 4 through (numDocs+1)*4).
-   * V4 writes cumulative byte offsets for O(1) random access.
-   * Subclasses (e.g. V6) may override to delta-encode offsets into individual entry sizes.
-   */
+  /// Writes the per-entry metadata into the chunk buffer header (positions 4 through (numDocs+1)\*4).
+  /// V4 writes cumulative byte offsets for O(1) random access.
+  /// Subclasses (e.g. V6) may override to delta-encode offsets into individual entry sizes.
   protected void writeChunkHeader(int numDocs, int[] offsets, int limit) {
     _chunkBuffer.position(Integer.BYTES);
     _chunkBuffer.asIntBuffer().put(offsets);

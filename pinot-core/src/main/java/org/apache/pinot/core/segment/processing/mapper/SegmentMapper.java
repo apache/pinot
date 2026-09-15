@@ -57,14 +57,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Mapper phase of the SegmentProcessorFramework.
- * Reads the input records and creates partitioned generic row files.
- * Performs:
- * - record filtering
- * - column transformations
- * - partitioning
- */
+/// Mapper phase of the SegmentProcessorFramework.
+/// Reads the input records and creates partitioned generic row files.
+/// Performs:
+/// - record filtering
+/// - column transformations
+/// - partitioning
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
   private final ThrottledLogger _throttledLogger;
@@ -134,10 +132,8 @@ public class SegmentMapper {
             processorConfig.getSegmentConfig().getMaxDiskUsagePercentage(), mapperOutputDir);
   }
 
-  /**
-   * Reads the input records and generates partitioned generic row files into the mapper output directory.
-   * Records for each partition are put into a directory of the partition name within the mapper output directory.
-   */
+  /// Reads the input records and generates partitioned generic row files into the mapper output directory.
+  /// Records for each partition are put into a directory of the partition name within the mapper output directory.
   public Map<String, GenericRowFileManager> map()
       throws Exception {
     try {

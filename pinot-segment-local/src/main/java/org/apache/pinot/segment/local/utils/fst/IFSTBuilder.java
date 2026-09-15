@@ -35,10 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Builds case-insensitive FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the
- * key/values be added in sorted order.
- */
+/// Builds case-insensitive FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the
+/// key/values be added in sorted order.
 public class IFSTBuilder {
   public static final Logger LOGGER = LoggerFactory.getLogger(IFSTBuilder.class);
 
@@ -99,12 +97,10 @@ public class IFSTBuilder {
     return FST.fromFSTReader(_ifstCompiler.compile(), _ifstCompiler.getFSTReader());
   }
 
-  /**
-   * Helper method to serialize a List<Integer> into a BytesRef.
-   * Uses simple format: [4-byte count][4-byte value1][4-byte value2]...
-   * @param integerList The list of integers to serialize.
-   * @return A BytesRef containing the serialized integers.
-   */
+  /// Helper method to serialize a List<Integer> into a BytesRef.
+  /// Uses simple format: \[4-byte count\]\[4-byte value1\]\[4-byte value2\]...
+  /// @param integerList The list of integers to serialize.
+  /// @return A BytesRef containing the serialized integers.
   public static BytesRef serializeIntegerList(List<Integer> integerList) {
     if (integerList == null) {
       throw new IllegalArgumentException("Cannot serialize null integer list");

@@ -59,13 +59,12 @@ public class CrcUtils {
     return crcForFiles(dataFiles);
   }
 
-  /**
-   * Helper method to get files in the directory to later compute CRC for them.
-   * <p>NOTE: do not include the segment creation meta file.
-   * @param dir the directory to collect files from
-   * @param files the list to add collected files to
-   * @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
-   */
+  /// Helper method to get files in the directory to later compute CRC for them.
+  ///
+  /// NOTE: do not include the segment creation meta file.
+  /// @param dir the directory to collect files from
+  /// @param files the list to add collected files to
+  /// @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
   private static void collectFiles(File dir, List<File> files, boolean dataFilesOnly) {
     File[] dirFiles = dir.listFiles();
     Preconditions.checkNotNull(dirFiles);
@@ -91,9 +90,7 @@ public class CrcUtils {
     }
   }
 
-  /**
-   * Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
-   */
+  /// Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
   private static boolean isDataFile(String fileName) {
     for (String ext : DATA_FILE_EXTENSIONS) {
       if (fileName.endsWith(ext)) {

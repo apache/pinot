@@ -21,9 +21,7 @@ package org.apache.pinot.query.runtime.operator.window.aggregate;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for AVG window function.
- */
+/// Window value aggregator for AVG window function.
 public class AvgWindowValueAggregator implements WindowValueAggregator<Object> {
   private double _sum = 0.0;
   private int _count = 0;

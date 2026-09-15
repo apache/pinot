@@ -21,11 +21,9 @@ package com.google.protobuf;
 public class ProtobufInternalUtils {
   private ProtobufInternalUtils() {
   }
-  /**
-   * The protocol buffer compiler generates a set of accessor methods for each field defined within the message in the
-   * .proto file. The method name is determined by converting the .proto names to camel case using the
-   *  SchemaUtil.toCamelCase(). We need this to generate the method name to call.
-   */
+  /// The protocol buffer compiler generates a set of accessor methods for each field defined within the message in the
+  /// .proto file. The method name is determined by converting the .proto names to camel case using the
+  ///  SchemaUtil.toCamelCase(). We need this to generate the method name to call.
   public static String underScoreToCamelCase(String name, boolean capNext) {
     return SchemaUtil.toCamelCase(name, capNext);
   }

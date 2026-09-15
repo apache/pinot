@@ -31,10 +31,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>IdentifierTransformFunction</code> class is a special transform function which is a wrapper on top of an
- * IDENTIFIER (column), and directly return the column value without any transformation.
- */
+/// The `IdentifierTransformFunction` class is a special transform function which is a wrapper on top of an
+/// IDENTIFIER (column), and directly return the column value without any transformation.
 public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
   private final Dictionary _dictionary;

@@ -26,12 +26,10 @@ public class BytesUtils {
   private BytesUtils() {
   }
 
-  /**
-   * Converts a Hex encoded string to a byte array.
-   *
-   * @param stringValue Hex encoded string
-   * @return Decoded byte array
-   */
+  /// Converts a Hex encoded string to a byte array.
+  ///
+  /// @param stringValue Hex encoded string
+  /// @return Decoded byte array
   public static byte[] toBytes(String stringValue) {
     try {
       return Hex.decodeHex(stringValue.toCharArray());
@@ -40,22 +38,18 @@ public class BytesUtils {
     }
   }
 
-  /**
-   * Converts a Hex encoded string to a {@link ByteArray}.
-   *
-   * @param stringValue Hex encoded string
-   * @return Decoded {@link ByteArray}
-   */
+  /// Converts a Hex encoded string to a [ByteArray].
+  ///
+  /// @param stringValue Hex encoded string
+  /// @return Decoded [ByteArray]
   public static ByteArray toByteArray(String stringValue) {
     return new ByteArray(toBytes(stringValue));
   }
 
-  /**
-   * Converts the byte array to a Hex encoded string.
-   *
-   * @param bytes byte array
-   * @return Hex encoded string
-   */
+  /// Converts the byte array to a Hex encoded string.
+  ///
+  /// @param bytes byte array
+  /// @return Hex encoded string
   public static String toHexString(byte[] bytes) {
     return Hex.encodeHexString(bytes);
   }

@@ -306,10 +306,8 @@ public class CrcUtilsTest {
     }
   }
 
-  /**
-   * Helper method to read the 'dataOnlyCrc' from the creation.meta file if it exists.
-   * Returns null if data CRC was not written to the file.
-   */
+  /// Helper method to read the 'dataOnlyCrc' from the creation.meta file if it exists.
+  /// Returns null if data CRC was not written to the file.
   private Long readDataOnlyCrcFromMetaIfPresent(File indexDir) throws IOException {
     File metaFile = new File(indexDir, V1Constants.SEGMENT_CREATION_META);
 

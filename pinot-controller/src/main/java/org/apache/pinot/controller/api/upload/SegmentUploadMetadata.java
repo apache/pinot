@@ -26,20 +26,18 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
-/**
- * Data object used while adding or updating segments. It's comprised of the following fields:
- * <ol>
- *   <li>segmentDownloadURIStr – The segment download URI persisted into the ZK metadata.</li>
- *   <li>sourceDownloadURIStr – The URI from where the segment could be downloaded.</li>
- *   <li>finalSegmentLocationURI – The final location of the segment in the deep-store.</li>
- *   <li>segmentSizeInBytes – The segment size in bytes.</li>
- *   <li>segmentMetadata – The segment metadata as defined in {@link org.apache.pinot.segment.spi.SegmentMetadata}.</li>
- *   <li>encryptionInfo – A pair consisting of the crypter class used to encrypt the segment, and the encrypted segment
- *   file.</li>
- *   <li>segmentMetadataZNRecord – The segment metadata represented as a helix
- *   {@link org.apache.helix.zookeeper.datamodel.ZNRecord}.</li>
- * </ol>
- */
+/// Data object used while adding or updating segments. It's comprised of the following fields:
+///
+/// 1. segmentDownloadURIStr – The segment download URI persisted into the ZK metadata.
+/// 2. sourceDownloadURIStr – The URI from where the segment could be downloaded.
+/// 3. finalSegmentLocationURI – The final location of the segment in the deep-store.
+/// 4. segmentSizeInBytes – The segment size in bytes.
+/// 5. segmentMetadata – The segment metadata as defined in
+///    [org.apache.pinot.segment.spi.SegmentMetadata].
+/// 6. encryptionInfo – A pair consisting of the crypter class used to encrypt the segment, and the encrypted segment
+///    file.
+/// 7. segmentMetadataZNRecord – The segment metadata represented as a helix
+///    [org.apache.helix.zookeeper.datamodel.ZNRecord].
 public class SegmentUploadMetadata {
   private final String _segmentDownloadURIStr;
   private final String _sourceDownloadURIStr;

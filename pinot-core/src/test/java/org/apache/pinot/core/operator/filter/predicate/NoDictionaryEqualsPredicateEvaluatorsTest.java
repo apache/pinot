@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -27,14 +30,13 @@ import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for no-dictionary based Eq and NEq predicate evaluators.
- */
+/// Unit test for no-dictionary based Eq and NEq predicate evaluators.
 public class NoDictionaryEqualsPredicateEvaluatorsTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int NUM_MULTI_VALUES = 100;
@@ -322,6 +324,45 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
           ArrayUtils.contains(randomBytesArray, stringValue));
       Assert.assertEquals(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomBytesArray, stringValue));
+    }
+  }
+
+  @Test
+  public void testUuidPredicateEvaluators() {
+    UUID uuidValue = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    byte[] uuidBytes = UuidUtils.toBytes(uuidValue);
+    // Predicate literals reach the evaluator as UUID strings. Use an upper-cased one to pin down that the hex digits
+    // are matched case-insensitively rather than compared as raw strings.
+    String stringValue = uuidValue.toString().toUpperCase(Locale.ROOT);
+
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.UUID);
+
+    NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.UUID);
+
+    // getDataType() reports the type applySV consumes, not the column's logical type -- exactly as a TIMESTAMP
+    // column's evaluator reports LONG. UUID literals are converted to their 16-byte stored form up front, so the
+    // BYTES raw evaluator is reused as-is and reports BYTES.
+    Assert.assertEquals(eqPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(neqPredicateEvaluator.getDataType(), FieldSpec.DataType.BYTES);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(uuidBytes));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(uuidBytes));
+
+    // A UUID differing only in the last byte must not match, guarding against a truncated comparison.
+    byte[] nearMissBytes = Arrays.copyOf(uuidBytes, uuidBytes.length);
+    nearMissBytes[nearMissBytes.length - 1] ^= 0x01;
+    Assert.assertFalse(eqPredicateEvaluator.applySV(nearMissBytes));
+    Assert.assertTrue(neqPredicateEvaluator.applySV(nearMissBytes));
+
+    for (int i = 0; i < 100; i++) {
+      byte[] randomUuidBytes = UuidUtils.toBytes(UUID.randomUUID());
+      boolean matches = Arrays.equals(randomUuidBytes, uuidBytes);
+      Assert.assertEquals(eqPredicateEvaluator.applySV(randomUuidBytes), matches);
+      Assert.assertEquals(neqPredicateEvaluator.applySV(randomUuidBytes), !matches);
     }
   }
 }

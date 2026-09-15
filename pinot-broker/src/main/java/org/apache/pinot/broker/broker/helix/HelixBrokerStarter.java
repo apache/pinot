@@ -20,52 +20,17 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-/**
- * Startable implementation for Pinot broker.
- * Contains methods to start and stop a Pinot broker
- */
+/// Startable implementation for Pinot broker.
+/// Contains methods to start and stop a Pinot broker
 @SuppressWarnings("unused")
 public class HelixBrokerStarter extends BaseBrokerStarter {
 
   public HelixBrokerStarter() {
-  }
-
-  @Deprecated
-  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
-      throws Exception {
-    init(applyBrokerConfigs(brokerConf, clusterName, zkServer, null));
-  }
-
-  @Deprecated
-  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer,
-      @Nullable String brokerHost)
-      throws Exception {
-    init(applyBrokerConfigs(brokerConf, clusterName, zkServer, brokerHost));
-  }
-
-  @Deprecated
-  private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName,
-      String zkServers, @Nullable String brokerHost) {
-    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkServers);
-    if (brokerHost == null) {
-      brokerConf.clearProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
-    } else {
-      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, brokerHost);
-    }
-    return brokerConf;
-  }
-
-  @Deprecated
-  public HelixBrokerStarter(PinotConfiguration brokerConf)
-      throws Exception {
-    init(brokerConf);
   }
 
   public static HelixBrokerStarter getDefault()

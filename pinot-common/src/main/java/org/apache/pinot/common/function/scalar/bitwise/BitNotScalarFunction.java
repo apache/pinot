@@ -22,11 +22,9 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic bitwise NOT scalar function.
- *
- * <p>This implementation is stateless and thread-safe.
- */
+/// Polymorphic bitwise NOT scalar function.
+///
+/// This implementation is stateless and thread-safe.
 @ScalarFunction
 public class BitNotScalarFunction extends BaseUnaryIntegralScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;

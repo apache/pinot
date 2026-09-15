@@ -18,22 +18,20 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
- * This class contains all information which describes the latest state of a partition group.
- * It is constructed by looking at the segment zk metadata of the latest segment of each partition group.
- * It consists of:
- * 1. partitionGroupId - A unique ID for the partitionGroup
- * 2. streamPartitionId - Partition ID of the stream that this partitionGroup belongs to.
- * 3. sequenceNumber - The sequenceNumber this partitionGroup is currently at
- * 4. startOffset - The start offset that the latest segment started consuming from
- * 5. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment
- * and recorded the end
- * offset)
- * 6. status - the consumption status IN_PROGRESS/DONE
- *
- * This information is needed by the stream, when grouping the partitions/shards into new partition groups.
- */
+/// A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
+/// This class contains all information which describes the latest state of a partition group.
+/// It is constructed by looking at the segment zk metadata of the latest segment of each partition group.
+/// It consists of:
+/// 1. partitionGroupId - A unique ID for the partitionGroup
+/// 2. streamPartitionId - Partition ID of the stream that this partitionGroup belongs to.
+/// 3. sequenceNumber - The sequenceNumber this partitionGroup is currently at
+/// 4. startOffset - The start offset that the latest segment started consuming from
+/// 5. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment
+/// and recorded the end
+/// offset)
+/// 6. status - the consumption status IN_PROGRESS/DONE
+///
+/// This information is needed by the stream, when grouping the partitions/shards into new partition groups.
 public class PartitionGroupConsumptionStatus {
   private final int _partitionGroupId;
   private final int _streamPartitionId;

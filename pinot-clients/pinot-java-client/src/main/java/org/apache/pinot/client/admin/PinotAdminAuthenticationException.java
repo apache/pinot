@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
-/**
- * Exception thrown when authentication fails for admin operations.
- */
+/// Exception thrown when authentication fails for admin operations.
 public class PinotAdminAuthenticationException extends PinotAdminException {
 
   public PinotAdminAuthenticationException(String message) {

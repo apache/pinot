@@ -62,10 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code InstanceRequestHandler} is the Netty inbound handler on Pinot Server side to handle the serialized
- * instance requests sent from Pinot Broker.
- */
+/// The `InstanceRequestHandler` is the Netty inbound handler on Pinot Server side to handle the serialized
+/// instance requests sent from Pinot Broker.
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
@@ -150,10 +148,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  /**
-   * Submit query for execution and register callback for execution results.
-   * If query cancellation is enabled, the query future is tracked as well.
-   */
+  /// Submit query for execution and register callback for execution results.
+  /// If query cancellation is enabled, the query future is tracked as well.
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
@@ -234,13 +230,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         new Exception(message, cause));
   }
 
-  /**
-   * Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
-   * after calling this method. This method can be called multiple times.
-   *
-   * @param queryId a unique Id to find the query
-   * @return true if a running query exists for the given queryId.
-   */
+  /// Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
+  /// after calling this method. This method can be called multiple times.
+  ///
+  /// @param queryId a unique Id to find the query
+  /// @return true if a running query exists for the given queryId.
   public boolean cancelQuery(String queryId) {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     QueryExecutionContext executionContext = _executionContexts.get(queryId);
@@ -258,17 +252,13 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return true;
   }
 
-  /**
-   * @return list of ids of the queries currently running on the server.
-   */
+  /// @return list of ids of the queries currently running on the server.
   public Set<String> getRunningQueryIds() {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_executionContexts.keySet());
   }
 
-  /**
-   * Send an exception back to broker as response to the query request.
-   */
+  /// Send an exception back to broker as response to the query request.
   private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
       long queryArrivalTimeMs, DataTable dataTable, Exception e) {
     boolean cancelled = (e instanceof CancellationException);
@@ -295,9 +285,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  /**
-   * Send a response (either query results or exception) back to broker as response to the query request.
-   */
+  /// Send a response (either query results or exception) back to broker as response to the query request.
   private void sendResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
       long queryArrivalTimeMs, byte[] serializedDataTable) {
     long sendResponseStartTimeMs = System.currentTimeMillis();

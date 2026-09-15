@@ -32,11 +32,9 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Utility for extracting and constructing BasicAuth principals
- * from configuration and user metadata, including permissions,
- * table access rules, and row-level security (RLS) filters.
- */
+/// Utility for extracting and constructing BasicAuth principals
+/// from configuration and user metadata, including permissions,
+/// table access rules, and row-level security (RLS) filters.
 public final class BasicAuthPrincipalUtils {
   private static final String PASSWORD = "password";
   private static final String PERMISSIONS = "permissions";
@@ -49,23 +47,21 @@ public final class BasicAuthPrincipalUtils {
     // left blank
   }
 
-  /**
-   * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
-   * .principals".
-   *
-   * <pre>
-   *     Example:
-   *     my.prefix.access.control.principals=admin123,user456
-   *     my.prefix.access.control.principals.admin123.password=verysecret
-   *     my.prefix.access.control.principals.user456.password=kindasecret
-   *     my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
-   *     my.prefix.access.control.principals.user456.permissions=read,update
-   * </pre>
-   *
-   * @param configuration pinot configuration
-   * @param prefix configuration namespace
-   * @return list of BasicAuthPrincipals
-   */
+  /// Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
+  /// .principals".
+  ///
+  /// ```
+  /// Example:
+  /// my.prefix.access.control.principals=admin123,user456
+  /// my.prefix.access.control.principals.admin123.password=verysecret
+  /// my.prefix.access.control.principals.user456.password=kindasecret
+  /// my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
+  /// my.prefix.access.control.principals.user456.permissions=read,update
+  /// ```
+  ///
+  /// @param configuration pinot configuration
+  /// @param prefix configuration namespace
+  /// @return list of BasicAuthPrincipals
   public static List<BasicAuthPrincipal> extractBasicAuthPrincipals(PinotConfiguration configuration, String prefix) {
     String principalNames = configuration.getProperty(prefix);
     Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");

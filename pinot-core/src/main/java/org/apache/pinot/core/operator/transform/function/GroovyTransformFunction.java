@@ -40,19 +40,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * The GroovyTransformFunction executes groovy expressions
- * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG",
- * "isSingleValue":false}'
- * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 +
- * arg1.toList().max() + arg2' etc
- * rest of the arguments - identifiers/functions to the groovy script
- *
- * Sample queries:
- * SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
- * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM
- * bob
- */
+/// The GroovyTransformFunction executes groovy expressions
+/// 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG",
+/// "isSingleValue":false}'
+/// 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 +
+/// arg1.toList().max() + arg2' etc
+/// rest of the arguments - identifiers/functions to the groovy script
+///
+/// Sample queries:
+/// SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
+/// SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 \* arg1 \* 10', arraylength(units), columnB ) FROM
+/// bob
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";
 

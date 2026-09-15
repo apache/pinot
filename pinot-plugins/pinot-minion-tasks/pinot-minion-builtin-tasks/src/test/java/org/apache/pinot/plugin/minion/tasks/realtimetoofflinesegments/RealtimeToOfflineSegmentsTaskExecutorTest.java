@@ -65,9 +65,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the {@link RealtimeToOfflineSegmentsTaskExecutor}
- */
+/// Tests for the [RealtimeToOfflineSegmentsTaskExecutor]
 public class RealtimeToOfflineSegmentsTaskExecutorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "RealtimeToOfflineSegmentTaskExecutorTest");

@@ -28,9 +28,7 @@ import org.joda.time.chrono.ISOChronology;
 
 public class DateTimeFormatUnitSpec {
 
-  /**
-   * Time unit enum with range from MILLISECONDS to YEARS
-   */
+  /// Time unit enum with range from MILLISECONDS to YEARS
   public enum DateTimeTransformUnit {
 
     MILLISECONDS {
@@ -89,12 +87,10 @@ public class DateTimeFormatUnitSpec {
       }
     };
 
-    /**
-     * Convert the given millisecond since epoch into the desired time unit.
-     *
-     * @param millisSinceEpoch Millisecond since epoch
-     * @return Time since epoch of desired time unit
-     */
+    /// Convert the given millisecond since epoch into the desired time unit.
+    ///
+    /// @param millisSinceEpoch Millisecond since epoch
+    /// @return Time since epoch of desired time unit
     public abstract long fromMillis(long millisSinceEpoch);
   }
 

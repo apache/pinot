@@ -108,23 +108,10 @@ public class PinotReflectionUtils {
     }
   }
 
-  /**
-   * Executes the given runnable within the reflection lock.
-   */
+  /// Executes the given runnable within the reflection lock.
   public static void runWithLock(Runnable runnable) {
     synchronized (REFLECTION_LOCK) {
       runnable.run();
     }
-  }
-
-  /**
-   * Due to the multi-threading issue in org.reflections.vfs.ZipDir, we need to put a lock before calling the
-   * reflection related methods.
-   *
-   * Deprecated: use {@link #runWithLock(Runnable)} instead
-   */
-  @Deprecated
-  public static Object getReflectionLock() {
-    return REFLECTION_LOCK;
   }
 }

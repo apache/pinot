@@ -35,19 +35,16 @@ import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Builds the {@code stageStats} JSON tree of the broker response.
- *
- * <p>Two rendering modes per stage:
- * <ul>
- *   <li><b>Explicit tree</b> (stream-mode stats): when a {@link StageStatsTreeNode} is available for the stage, the
- *   JSON is rendered directly from it. This is the only mode that can faithfully render plugin-defined operator
- *   types (ids &gt;= 256), whose shape cannot be re-derived by pairing the flat stats list against the stage's
- *   {@link PlanNode} tree.</li>
- *   <li><b>Plan-node pairing</b> (legacy): the flat per-stage stats list is paired positionally against the stage's
- *   PlanNode tree via {@link InStageStatsTreeBuilder}.</li>
- * </ul>
- */
+/// Builds the `stageStats` JSON tree of the broker response.
+///
+/// Two rendering modes per stage:
+///
+/// - **Explicit tree** (stream-mode stats): when a [StageStatsTreeNode] is available for the stage, the
+///   JSON is rendered directly from it. This is the only mode that can faithfully render plugin-defined operator
+///   types (ids &gt;= 256), whose shape cannot be re-derived by pairing the flat stats list against the stage's
+///   [PlanNode] tree.
+/// - **Plan-node pairing** (legacy): the flat per-stage stats list is paired positionally against the stage's
+///   PlanNode tree via [InStageStatsTreeBuilder].
 public class MultiStageStatsTreeBuilder {
   private final Map<Integer, PlanNode> _planNodes;
   private final List<? extends MultiStageQueryStats.StageStats> _queryStats;
@@ -97,11 +94,9 @@ public class MultiStageStatsTreeBuilder {
     return planNode.visit(treeBuilder, new InStageStatsTreeBuilder.Context(1));
   }
 
-  /**
-   * Renders a stage's explicit stats tree. The shape (and any plugin operator types) come straight from the decoded
-   * tree; the stage's PlanNode tree is consulted only to resolve which plan nodes are {@link MailboxReceiveNode}s so
-   * the sender stage's tree can be nested under them, mirroring the legacy renderer's cross-stage nesting.
-   */
+  /// Renders a stage's explicit stats tree. The shape (and any plugin operator types) come straight from the decoded
+  /// tree; the stage's PlanNode tree is consulted only to resolve which plan nodes are [MailboxReceiveNode]s so
+  /// the sender stage's tree can be nested under them, mirroring the legacy renderer's cross-stage nesting.
   private ObjectNode jsonFromStatsTree(StageStatsTreeNode statsTree, int stage) {
     Map<Integer, PlanNode> planNodesById = new HashMap<>();
     PlanNode fragmentRoot = _planNodes.get(stage);
@@ -193,13 +188,11 @@ public class MultiStageStatsTreeBuilder {
     return json;
   }
 
-  /**
-   * Sums a named stat field across the direct non-pipeline-breaker children of a node.
-   *
-   * <p>PIPELINE_BREAKER children are skipped entirely, mirroring {@link InStageStatsTreeBuilder}'s
-   * {@code adjustWithChildren=false} path for LEAF nodes: the breaker runs pre-stage, so its
-   * cumulative time is not part of the parent's time budget and must not be subtracted.
-   */
+  /// Sums a named stat field across the direct non-pipeline-breaker children of a node.
+  ///
+  /// PIPELINE_BREAKER children are skipped entirely, mirroring [InStageStatsTreeBuilder]'s
+  /// `adjustWithChildren=false` path for LEAF nodes: the breaker runs pre-stage, so its
+  /// cumulative time is not part of the parent's time budget and must not be subtracted.
   private static long sumChildrenStat(StageStatsTreeNode node, String statKey) {
     long sum = 0;
     for (StageStatsTreeNode child : node.getChildren()) {
@@ -214,10 +207,8 @@ public class MultiStageStatsTreeBuilder {
     return sum;
   }
 
-  /**
-   * Pre-order id assignment identical to the server-side walk in {@code PlanNodeToOpChain#assignPlanNodeIds}, so the
-   * ids carried by the stats tree resolve to the same plan nodes here.
-   */
+  /// Pre-order id assignment identical to the server-side walk in `PlanNodeToOpChain#assignPlanNodeIds`, so the
+  /// ids carried by the stats tree resolve to the same plan nodes here.
   private static void assignPlanNodeIds(PlanNode node, Map<Integer, PlanNode> planNodesById, int[] counter) {
     planNodesById.put(counter[0]++, node);
     for (PlanNode child : node.getInputs()) {

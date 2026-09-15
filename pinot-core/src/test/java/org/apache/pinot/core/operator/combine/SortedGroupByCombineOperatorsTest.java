@@ -57,9 +57,7 @@ import static org.testng.Assert.assertEquals;
 
 
 public class SortedGroupByCombineOperatorsTest {
-  /**
-   * Test for {@link SortedGroupByCombineOperator} and {@link SequentialSortedGroupByCombineOperator}.
-   */
+  /// Test for [SortedGroupByCombineOperator] and [SequentialSortedGroupByCombineOperator].
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SortedGroupByCombineOperatorTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_PREFIX = "testSegment_";

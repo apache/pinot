@@ -42,9 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentValidationUtils provides utility methods to validate the segment during segment upload.
- */
+/// SegmentValidationUtils provides utility methods to validate the segment during segment upload.
 public class SegmentValidationUtils {
   private SegmentValidationUtils() {
   }

@@ -40,10 +40,8 @@ import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 
 
-/**
- * An efficient serde that implements {@link DataBlockSerde.Version#V1_V2} using trying to make as fewer copies as
- * possible.
- */
+/// An efficient serde that implements [DataBlockSerde.Version#V1_V2] using trying to make as fewer copies as
+/// possible.
 public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   /// The error metadata version is used to identify the format of the error metadata.
@@ -108,11 +106,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return builder.build();
   }
 
-  /**
-   * Serialize the exceptions map into the {@link PinotOutputStream} current position.
-   * <p>
-   * the header object is modified to update {@link Header#_exceptionsLength}
-   */
+  /// Serialize the exceptions map into the [PinotOutputStream] current position.
+  ///
+  /// the header object is modified to update [Header#_exceptionsLength]
   private void serializeExceptions(DataBlock dataBlock, PinotOutputStream into)
       throws IOException {
 

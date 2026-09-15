@@ -24,9 +24,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import static com.google.common.base.Preconditions.checkArgument;
 
 
-/**
- * Serialized and comparable version of QuantileDigest. Compares QuantileDigest for a specific percentile value.
- */
+/// Serialized and comparable version of QuantileDigest. Compares QuantileDigest for a specific percentile value.
 public class SerializedQuantileDigest implements Comparable<SerializedQuantileDigest> {
   private final double _percentile;
   private final QuantileDigest _quantileDigest;

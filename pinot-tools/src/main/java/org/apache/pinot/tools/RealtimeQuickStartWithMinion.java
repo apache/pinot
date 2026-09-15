@@ -27,10 +27,8 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
- * tasks continuously optimize segments as data gets ingested into Realtime table.
- */
+/// This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
+/// tasks continuously optimize segments as data gets ingested into Realtime table.
 public class RealtimeQuickStartWithMinion extends HybridQuickstart {
   @Override
   public List<String> types() {

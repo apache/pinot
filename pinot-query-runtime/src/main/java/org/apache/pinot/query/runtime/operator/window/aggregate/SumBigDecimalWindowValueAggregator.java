@@ -22,10 +22,8 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for SUM window function over BIG_DECIMAL types.
- * Accumulates as {@link BigDecimal} to preserve full precision.
- */
+/// Window value aggregator for SUM window function over BIG_DECIMAL types.
+/// Accumulates as [BigDecimal] to preserve full precision.
 public class SumBigDecimalWindowValueAggregator implements WindowValueAggregator<Object> {
   private BigDecimal _sum = BigDecimal.ZERO;
   private int _count = 0;

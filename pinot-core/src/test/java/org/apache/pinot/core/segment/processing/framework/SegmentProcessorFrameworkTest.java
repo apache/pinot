@@ -50,9 +50,7 @@ import static org.testng.Assert.*;
 import static org.testng.Assert.assertFalse;
 
 
-/**
- * End-to-end tests for SegmentProcessorFramework using RecordReader-based processing.
- */
+/// End-to-end tests for SegmentProcessorFramework using RecordReader-based processing.
 public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFrameworkTest {
 
   @Override
@@ -69,11 +67,9 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
     return framework.process();
   }
 
-  /**
-   * Test lazy initialization of record readers. Here we create
-   * RecoderReaderFileConfig and the actual reader is initialized during the
-   * map phase.
-   */
+  /// Test lazy initialization of record readers. Here we create
+  /// RecoderReaderFileConfig and the actual reader is initialized during the
+  /// map phase.
   @Test
   public void testRecordReaderFileConfigInit() throws Exception {
     File workingDir = new File(TEMP_DIR, "segmentOutput");

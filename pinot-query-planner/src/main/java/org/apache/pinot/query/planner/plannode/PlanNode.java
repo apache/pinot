@@ -22,17 +22,13 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
-import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 
 
-/**
- * PlanNode is a serializable version of the {@link RelNode}. See {@link PlanNodeSerializer} and
- * {@link PlanNodeDeserializer} for details.
- */
+/// PlanNode is a serializable version of the [org.apache.calcite.rel.RelNode]. See
+/// [org.apache.pinot.query.planner.serde.PlanNodeSerializer] and
+/// [org.apache.pinot.query.planner.serde.PlanNodeDeserializer] for details.
 public interface PlanNode {
 
   int getStageId();
@@ -46,19 +42,15 @@ public interface PlanNode {
 
   List<PlanNode> getInputs();
 
-  /**
-   * Explain this plan node as expected by EXPLAIN IMPLEMENTATION PLAN FOR.
-   *
-   * In this mode, each worker is represented as a sub-tree in the plan.
-   */
+  /// Explain this plan node as expected by EXPLAIN IMPLEMENTATION PLAN FOR.
+  ///
+  /// In this mode, each worker is represented as a sub-tree in the plan.
   String explain();
 
   <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context);
 
-  /**
-   * Returns a new plan node that is equal to the receiver in all aspects but the inputs, which will be replaced by the
-   * given inputs.
-   */
+  /// Returns a new plan node that is equal to the receiver in all aspects but the inputs, which will be replaced by the
+  /// given inputs.
   PlanNode withInputs(List<PlanNode> inputs);
 
   class NodeHint {
@@ -92,9 +84,7 @@ public interface PlanNode {
       return _hintOptions;
     }
 
-    /**
-     * Creates a new instance that shares the hint options with the receiver, but with the given key-value pair added.
-     */
+    /// Creates a new instance that shares the hint options with the receiver, but with the given key-value pair added.
     public NodeHint with(String key, Map<String, String> value) {
       Map<String, Map<String, String>> newHintOptions = Maps.newHashMap(_hintOptions);
       newHintOptions.put(key, value);

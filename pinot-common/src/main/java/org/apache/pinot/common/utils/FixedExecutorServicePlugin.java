@@ -25,16 +25,14 @@ import org.apache.pinot.spi.executor.ExecutorServiceProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * This is the plugin for the fixed executor service.
- *
- * The fixed executor service plugin creates a new fixed thread pool.
- * The number of threads is defined in the configuration with the {@code <prefix>.numThreads} property.
- * This executor service is recommended for cases where the tasks are long-lived or CPU bound, but it may need changes
- * to the code to avoid deadlocks.
- *
- * @see org.apache.pinot.spi.executor.ExecutorServiceUtils
- */
+/// This is the plugin for the fixed executor service.
+///
+/// The fixed executor service plugin creates a new fixed thread pool.
+/// The number of threads is defined in the configuration with the `<prefix>.numThreads` property.
+/// This executor service is recommended for cases where the tasks are long-lived or CPU bound, but it may need changes
+/// to the code to avoid deadlocks.
+///
+/// @see org.apache.pinot.spi.executor.ExecutorServiceUtils
 @AutoService(ExecutorServicePlugin.class)
 public class FixedExecutorServicePlugin implements ExecutorServicePlugin {
   @Override

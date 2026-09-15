@@ -24,15 +24,13 @@ import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 
 
-/**
- * Captures the runtime execution plan for a vector query within a single segment.
- *
- * <p>This context is populated by the query planner (in {@code FilterPlanNode}) and carried
- * through to the filter operator so that execution decisions are explicit and reportable.
- * It is also surfaced in explain/debug output.</p>
- *
- * <p>The context is immutable once created. Use the {@link Builder} to construct instances.</p>
- */
+/// Captures the runtime execution plan for a vector query within a single segment.
+///
+/// This context is populated by the query planner (in `FilterPlanNode`) and carried
+/// through to the filter operator so that execution decisions are explicit and reportable.
+/// It is also surfaced in explain/debug output.
+///
+/// The context is immutable once created. Use the [Builder] to construct instances.
 public final class VectorQueryExecutionContext {
 
   private final VectorExecutionMode _executionMode;
@@ -123,20 +121,17 @@ public final class VectorQueryExecutionContext {
     return sb.toString();
   }
 
-  /**
-   * Selects the execution mode for a vector query based on query shape.
-   *
-   * <p>This is the centralized decision point. The rules are conservative and explicit:</p>
-   * <ol>
-   *   <li>No vector index -> EXACT_SCAN</li>
-   *   <li>Threshold query + filter -> ANN_THRESHOLD_THEN_FILTER</li>
-   *   <li>Threshold query (no filter) -> ANN_THRESHOLD_SCAN</li>
-   *   <li>Filter + rerank -> ANN_THEN_FILTER_THEN_RERANK</li>
-   *   <li>Filter (no rerank) -> ANN_THEN_FILTER</li>
-   *   <li>Rerank (no filter) -> ANN_TOP_K_WITH_RERANK</li>
-   *   <li>Plain top-K -> ANN_TOP_K</li>
-   * </ol>
-   */
+  /// Selects the execution mode for a vector query based on query shape.
+  ///
+  /// This is the centralized decision point. The rules are conservative and explicit:
+  ///
+  /// 1. No vector index -> EXACT_SCAN
+  /// 2. Threshold query + filter -> ANN_THRESHOLD_THEN_FILTER
+  /// 3. Threshold query (no filter) -> ANN_THRESHOLD_SCAN
+  /// 4. Filter + rerank -> ANN_THEN_FILTER_THEN_RERANK
+  /// 5. Filter (no rerank) -> ANN_THEN_FILTER
+  /// 6. Rerank (no filter) -> ANN_TOP_K_WITH_RERANK
+  /// 7. Plain top-K -> ANN_TOP_K
   public static VectorExecutionMode selectExecutionMode(boolean hasVectorIndex,
       boolean hasMetadataFilter, boolean hasThresholdPredicate, boolean exactRerank) {
     if (!hasVectorIndex) {

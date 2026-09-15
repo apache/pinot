@@ -30,21 +30,15 @@ public class CopyTablePayload {
 
   private String _sourceClusterUri;
   private Map<String, String> _headers;
-  /**
-   * Broker tenant for the new table.
-   * MUST NOT contain the tenant type suffix, i.e. _BROKER.
-   */
+  /// Broker tenant for the new table.
+  /// MUST NOT contain the tenant type suffix, i.e. \_BROKER.
   private String _brokerTenant;
-  /**
-   * Server tenant for the new table.
-   * MUST NOT contain the tenant type suffix, i.e. _REALTIME or _OFFLINE.
-   */
+  /// Server tenant for the new table.
+  /// MUST NOT contain the tenant type suffix, i.e. \_REALTIME or \_OFFLINE.
   private String _serverTenant;
 
-  /**
-   * The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
-   * the replacement relation from source cluster's full tenant to target cluster's full tenant.
-   */
+  /// The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
+  /// the replacement relation from source cluster's full tenant to target cluster's full tenant.
   private Map<String, String> _tagPoolReplacementMap;
 
   @JsonCreator

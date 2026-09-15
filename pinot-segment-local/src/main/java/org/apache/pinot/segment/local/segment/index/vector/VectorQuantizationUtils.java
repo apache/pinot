@@ -27,11 +27,9 @@ import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 
 
-/**
- * Utility methods for offline vector quantization.
- *
- * <p>Shared by the IVF_PQ creator, reader, and benchmark harness.</p>
- */
+/// Utility methods for offline vector quantization.
+///
+/// Shared by the IVF_PQ creator, reader, and benchmark harness.
 public final class VectorQuantizationUtils {
   private VectorQuantizationUtils() {
   }
@@ -107,13 +105,11 @@ public final class VectorQuantizationUtils {
     }
   }
 
-  /**
-   * Computes the non-negative distance used for centroid initialization and k-means training.
-   *
-   * <p>K-means minimizes Euclidean distance by construction. For cosine distance we normalize first so
-   * Euclidean distance reflects angular separation. For inner/dot-product search we still use Euclidean
-   * training distance because the raw similarity score is not suitable as a k-means++ sampling weight.</p>
-   */
+  /// Computes the non-negative distance used for centroid initialization and k-means training.
+  ///
+  /// K-means minimizes Euclidean distance by construction. For cosine distance we normalize first so
+  /// Euclidean distance reflects angular separation. For inner/dot-product search we still use Euclidean
+  /// training distance because the raw similarity score is not suitable as a k-means++ sampling weight.
   public static float computeTrainingDistance(float[] a, float[] b,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     if (distanceFunction == VectorIndexConfig.VectorDistanceFunction.COSINE) {
@@ -199,10 +195,8 @@ public final class VectorQuantizationUtils {
     return copy;
   }
 
-  /**
-   * Resolves the configured quantizer type from index properties.
-   * Defaults to {@link VectorQuantizerType#FLAT} for backward compatibility.
-   */
+  /// Resolves the configured quantizer type from index properties.
+  /// Defaults to [VectorQuantizerType#FLAT] for backward compatibility.
   public static VectorQuantizerType resolveQuantizerType(@Nullable Map<String, String> properties) {
     if (properties == null) {
       return VectorQuantizerType.FLAT;
@@ -214,12 +208,10 @@ public final class VectorQuantizationUtils {
     return VectorQuantizerType.fromString(value);
   }
 
-  /**
-   * Creates a trained quantizer for write-time usage.
-   *
-   * <p>For scalar quantizers, if training vectors are empty this method creates a valid
-   * deterministic quantizer with zero min/max bounds so empty indexes can still be serialized.</p>
-   */
+  /// Creates a trained quantizer for write-time usage.
+  ///
+  /// For scalar quantizers, if training vectors are empty this method creates a valid
+  /// deterministic quantizer with zero min/max bounds so empty indexes can still be serialized.
   public static VectorQuantizer createWriteQuantizer(VectorQuantizerType quantizerType, int dimension,
       @Nullable float[][] trainingVectors) {
     switch (quantizerType) {
@@ -234,9 +226,7 @@ public final class VectorQuantizationUtils {
     }
   }
 
-  /**
-   * Creates a read-time quantizer instance from serialized parameters.
-   */
+  /// Creates a read-time quantizer instance from serialized parameters.
   public static VectorQuantizer createReadQuantizer(VectorQuantizerType quantizerType, int dimension,
       @Nullable byte[] serializedParams) {
     switch (quantizerType) {
@@ -252,9 +242,7 @@ public final class VectorQuantizationUtils {
     }
   }
 
-  /**
-   * Serializes quantizer parameters for persistence in the index header.
-   */
+  /// Serializes quantizer parameters for persistence in the index header.
   public static byte[] serializeQuantizerParams(VectorQuantizer quantizer) {
     if (quantizer instanceof ScalarQuantizer) {
       return ((ScalarQuantizer) quantizer).serialize();

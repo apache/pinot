@@ -35,9 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is the base reduce service.
- */
+/// This is the base reduce service.
 @ThreadSafe
 public abstract class BaseReduceService {
 

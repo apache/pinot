@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -40,9 +42,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for {@link VectorIndexUtils}.
- */
+/// Tests for [VectorIndexUtils].
 public class VectorIndexUtilsTest {
   private static final String COLUMN = "embedding";
 
@@ -193,11 +193,9 @@ public class VectorIndexUtilsTest {
         "present typed entry must be returned as-is");
   }
 
-  /**
-   * The HNSW extract path unpacks into temp artifacts ({@code .vector.extract-tmp},
-   * {@code .vector.hnsw.extract-tmp-dir}) and relies on {@code removeIndex} → {@code cleanupVectorIndex}
-   * NOT deleting them. Pin that invariant against the real cleanup, independent of the handler's stub.
-   */
+  /// The HNSW extract path unpacks into temp artifacts (`.vector.extract-tmp`,
+  /// `.vector.hnsw.extract-tmp-dir`) and relies on `removeIndex` → `cleanupVectorIndex`
+  /// NOT deleting them. Pin that invariant against the real cleanup, independent of the handler's stub.
   @Test
   public void testCleanupVectorIndexLeavesExtractTempArtifacts()
       throws IOException {
@@ -255,12 +253,10 @@ public class VectorIndexUtilsTest {
     Assert.assertNull(VectorIndexUtils.detectConsolidatedVectorBackend(emptyReader, COLUMN));
   }
 
-  /**
-   * V1/V2 {@code FilePerIndexDirectory} resolves a still-present legacy HNSW Lucene DIRECTORY as
-   * the vector artifact and throws {@code IllegalArgumentException(... must be a regular file)}
-   * from {@code mapForReads}. A directory can never be a packed typed entry, so the probe must map
-   * that to null ("no consolidated entry") instead of killing the caller's segment load.
-   */
+  /// V1/V2 `FilePerIndexDirectory` resolves a still-present legacy HNSW Lucene DIRECTORY as
+  /// the vector artifact and throws `IllegalArgumentException(... must be a regular file)`
+  /// from `mapForReads`. A directory can never be a packed typed entry, so the probe must map
+  /// that to null ("no consolidated entry") instead of killing the caller's segment load.
   @Test
   public void testGetConsolidatedVectorEntryTreatsUnmappableDirectoryAsAbsent()
       throws IOException {
@@ -290,6 +286,16 @@ public class VectorIndexUtilsTest {
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_FLAT), VectorBackendType.IVF_FLAT);
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.IVF_PQ), VectorBackendType.IVF_PQ);
     Assert.assertEquals(VectorIndexUtils.storageFormatOf(VectorBackendType.HNSW), VectorBackendType.HNSW);
+  }
+
+  /// A directory that cannot be listed, including one that does not exist or is not there at all, holds no index.
+  @Test
+  public void testUnlistableDirectoryHasNoColumnsWithIndex() {
+    List<String> columns = List.of("colA", "colB");
+    File missingDir = new File(_tempDir, "doesNotExist");
+
+    Assert.assertEquals(VectorIndexUtils.getColumnsWithVectorIndex(missingDir, columns), Set.of());
+    Assert.assertEquals(VectorIndexUtils.getColumnsWithVectorIndex(null, columns), Set.of());
   }
 
   private static VectorBackendType sniff(byte[] payload)

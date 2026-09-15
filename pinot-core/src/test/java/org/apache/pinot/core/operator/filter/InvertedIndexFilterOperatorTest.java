@@ -32,10 +32,8 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Targeted tests for {@link InvertedIndexFilterOperator#getNumMatchingDocs()}. Five tests cover every
- * distinct code branch (SV loop, MV switch arms {0, 2, default}, and exclusive arithmetic)
- */
+/// Targeted tests for [InvertedIndexFilterOperator#getNumMatchingDocs()]. Five tests cover every
+/// distinct code branch (SV loop, MV switch arms {0, 2, default}, and exclusive arithmetic)
 public class InvertedIndexFilterOperatorTest {
   private static final int NUM_DOCS = 1000;
 

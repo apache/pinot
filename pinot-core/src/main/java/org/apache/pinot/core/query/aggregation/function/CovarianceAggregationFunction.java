@@ -22,6 +22,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -36,27 +37,27 @@ import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function which returns the population covariance of 2 expressions.
- * COVAR_POP(exp1, exp2) = mean(exp1 * exp2) - mean(exp1) * mean(exp2)
- * COVAR_SAMP(exp1, exp2) = (sum(exp1 * exp2) - sum(exp1) * sum(exp2)) / (count - 1)
- *
- * Population covariance between two random variables X and Y is defined as either
- * covarPop(X,Y) = E[(X - E[X]) * (Y - E[Y])] or
- * covarPop(X,Y) = E[X*Y] - E[X] * E[Y],
- * here E[X] represents mean of X
- * @see <a href="https://en.wikipedia.org/wiki/Covariance">Covariance</a>
- * The calculations here are based on the second definition shown above.
- * Sample covariance = covarPop(X, Y) * besselCorrection
- * @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
- */
-public class CovarianceAggregationFunction implements AggregationFunction<CovarianceTuple, Double> {
+/// Aggregation function which returns the population covariance of 2 expressions.
+/// COVAR_POP(exp1, exp2) = mean(exp1 \* exp2) - mean(exp1) \* mean(exp2)
+/// COVAR_SAMP(exp1, exp2) = (sum(exp1 \* exp2) - sum(exp1) \* sum(exp2)) / (count - 1)
+///
+/// Population covariance between two random variables X and Y is defined as either
+/// covarPop(X,Y) = E\[(X - E\[X\]) \* (Y - E\[Y\])\] or
+/// covarPop(X,Y) = E\[X\*Y\] - E\[X\] \* E\[Y\],
+/// here E\[X\] represents mean of X
+/// @see <a href="https://en.wikipedia.org/wiki/Covariance">Covariance</a>
+/// The calculations here are based on the second definition shown above.
+/// Sample covariance = covarPop(X, Y) \* besselCorrection
+/// @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
+public class CovarianceAggregationFunction extends BaseAggregationFunction<CovarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;
   protected final ExpressionContext _expression2;
   protected final boolean _isSample;
 
-  public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample) {
+  public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample,
+      boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     _expression1 = arguments.get(0);
     _expression2 = arguments.get(1);
     _isSample = isSample;
@@ -99,16 +100,25 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     double[] values1 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression1);
     double[] values2 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression2);
 
-    double sumX = 0.0;
-    double sumY = 0.0;
-    double sumXY = 0.0;
+    CovarianceTuple tuple = new CovarianceTuple(0.0, 0.0, 0.0, 0L);
+    forEachNotNull(length, blockValSetMap.get(_expression1), blockValSetMap.get(_expression2), (from, to) -> {
+      double sumX = 0.0;
+      double sumY = 0.0;
+      double sumXY = 0.0;
+      for (int i = from; i < to; i++) {
+        sumX += values1[i];
+        sumY += values2[i];
+        sumXY += values1[i] * values2[i];
+      }
+      tuple.apply(sumX, sumY, sumXY, to - from);
+    });
 
-    for (int i = 0; i < length; i++) {
-      sumX += values1[i];
-      sumY += values2[i];
-      sumXY += values1[i] * values2[i];
+    // Leaving the holder untouched is how "nothing was aggregated" reaches extractFinalResult
+    if (_nullHandlingEnabled && tuple.getCount() == 0L) {
+      return;
     }
-    setAggregationResult(aggregationResultHolder, sumX, sumY, sumXY, length);
+    setAggregationResult(aggregationResultHolder, tuple.getSumX(), tuple.getSumY(), tuple.getSumXY(),
+        tuple.getCount());
   }
 
   protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double sumX, double sumY,
@@ -136,9 +146,11 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values1 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression1);
     double[] values2 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression2);
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupKeyArray[i], groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
-    }
+    forEachNotNull(length, blockValSetMap.get(_expression1), blockValSetMap.get(_expression2), (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupKeyArray[i], groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
+      }
+    });
   }
 
   @Override
@@ -146,23 +158,22 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values1 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression1);
     double[] values2 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression2);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupKey, groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
+    forEachNotNull(length, blockValSetMap.get(_expression1), blockValSetMap.get(_expression2), (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupKey, groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
+        }
       }
-    }
+    });
   }
 
+  @Nullable
   @Override
   public CovarianceTuple extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    CovarianceTuple covarianceTuple = aggregationResultHolder.getResult();
-    if (covarianceTuple == null) {
-      return new CovarianceTuple(0.0, 0.0, 0.0, 0L);
-    } else {
-      return covarianceTuple;
-    }
+    return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public CovarianceTuple extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -195,18 +206,23 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(CovarianceTuple covarianceTuple) {
-    long count = covarianceTuple.getCount();
+  public Double extractFinalResult(@Nullable CovarianceTuple covarianceTuple) {
+    // A null intermediate result means nothing was aggregated, and so does a zero count, which is what a
+    // deserialized peer can still carry. With null handling enabled the covariance of nothing is NULL; with it
+    // disabled it is what an untouched tuple renders to, which is the sentinel below.
+    long count = covarianceTuple != null ? covarianceTuple.getCount() : 0L;
     if (count == 0L) {
-      return DEFAULT_FINAL_RESULT;
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     } else {
       double sumX = covarianceTuple.getSumX();
       double sumY = covarianceTuple.getSumY();
       double sumXY = covarianceTuple.getSumXY();
       if (_isSample) {
+        // A sample covariance divides by count - 1, so a single contributing row leaves it undefined
         if (count - 1 == 0L) {
-          return DEFAULT_FINAL_RESULT;
+          return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
         }
         // sample cov = population cov * (count / (count - 1))
         return (sumXY / (count - 1)) - (sumX * sumY) / (count * (count - 1));

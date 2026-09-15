@@ -27,9 +27,7 @@ public class PartialUpsertMergerFactory {
   private PartialUpsertMergerFactory() {
   }
 
-  /**
-   * Returns the default partial upsert merger or a custom implementation from a given class name in the config.
-   */
+  /// Returns the default partial upsert merger or a custom implementation from a given class name in the config.
   public static PartialUpsertMerger getPartialUpsertMerger(List<String> primaryKeyColumns,
       List<String> comparisonColumns, UpsertConfig upsertConfig) {
     String customMergerClassName = upsertConfig.getPartialUpsertMergerClass();

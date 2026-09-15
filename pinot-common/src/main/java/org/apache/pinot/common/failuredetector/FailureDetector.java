@@ -29,78 +29,54 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * The {@code FailureDetector} detects unhealthy servers based on the query responses. When it detects an unhealthy
- * server, it will notify the listener via a callback, and schedule a delay to retry the unhealthy server later via
- * another callback.
- */
+/// The `FailureDetector` detects unhealthy servers based on the query responses. When it detects an unhealthy
+/// server, it will notify the listener via a callback, and schedule a delay to retry the unhealthy server later via
+/// another callback.
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 @ThreadSafe
 public interface FailureDetector {
 
-  /**
-   * Initializes the failure detector.
-   */
+  /// Initializes the failure detector.
   void init(PinotConfiguration config, BrokerMetrics brokerMetrics);
 
-  /**
-   * Registers a function that will be periodically called to retry unhealthy servers. The function is called with the
-   * instanceId of the unhealthy server and should return {@link ServerState#HEALTHY} if the server is now healthy,
-   * {@link ServerState#UNHEALTHY} if the server is still unhealthy, and {@link ServerState#UNKNOWN} if the retrier
-   * does not know about this server.
-   */
+  /// Registers a function that will be periodically called to retry unhealthy servers. The function is called with the
+  /// instanceId of the unhealthy server and should return [ServerState#HEALTHY] if the server is now healthy,
+  /// [ServerState#UNHEALTHY] if the server is still unhealthy, and [ServerState#UNKNOWN] if the retrier
+  /// does not know about this server.
   void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier);
 
-  /**
-   * Registers a consumer that will be called with the instanceId of a server that is detected as healthy.
-   */
+  /// Registers a consumer that will be called with the instanceId of a server that is detected as healthy.
   void registerHealthyServerNotifier(Consumer<String> healthyServerNotifier);
 
-  /**
-   * Registers a consumer that will be called with the instanceId of a server that is detected as unhealthy.
-   */
+  /// Registers a consumer that will be called with the instanceId of a server that is detected as unhealthy.
   void registerUnhealthyServerNotifier(Consumer<String> unhealthyServerNotifier);
 
-  /**
-   * Starts the failure detector.
-   */
+  /// Starts the failure detector.
   void start();
 
-  /**
-   * Marks a server as healthy.
-   */
+  /// Marks a server as healthy.
   @Deprecated
   default void markServerHealthy(String instanceId) {
     markServerHealthy(instanceId, null);
   };
 
-  /**
-   * Marks a server as healthy.
-   */
+  /// Marks a server as healthy.
   void markServerHealthy(String instanceId, @Nullable String hostName);
 
-  /**
-   * Marks a server as unhealthy.
-   */
+  /// Marks a server as unhealthy.
   @Deprecated
   default void markServerUnhealthy(String instanceId) {
     markServerUnhealthy(instanceId, null);
   };
 
-  /**
-   * Marks a server as unhealthy.
-   */
+  /// Marks a server as unhealthy.
   void markServerUnhealthy(String instanceId, @Nullable String hostName);
 
-  /**
-   * Returns all the unhealthy servers.
-   */
+  /// Returns all the unhealthy servers.
   Set<String> getUnhealthyServers();
 
-  /**
-   * Stops the failure detector.
-   */
+  /// Stops the failure detector.
   void stop();
 
   enum ServerState {

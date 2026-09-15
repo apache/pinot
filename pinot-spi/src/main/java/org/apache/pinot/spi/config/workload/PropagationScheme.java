@@ -26,64 +26,57 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Defines how configuration settings are propagated across workloads.
- * <p>
- * A PropagationScheme determines the scope and specific values (e.g., tables or tenants)
- * to which workload settings should be applied. This allows selective cascading
- * of resource and query limits across different instances.
- * </p>
- *
- * <p>
- * Please note that for the propagation type and the corresponding propagationEntity should be consistent.
- * For example, if the propagation type is TABLE, then the propagationEntity should contain table names, the table name
- * can be with or without type suffix, e.g. "myTable_OFFLINE" or "myTable". If the table name is without type suffix,
- * then the cost will be split to both OFFLINE and REALTIME tables.
- *
- * Similarly, if the propagation type is TENANT, then the propagationEntity should contain tenant names.
- * </p>
- *
- * <p>
- * In the below example, the propagation type is set to TABLE, indicating that
- * the settings will be applied at the individual table level. The costSplits
- * define specific CPU and memory costs allocated to each table.
- * </p>
- *
- * Example configurations:
- * <pre>
- *   {
- *   "propagationType": "TABLE",
- *   "costSplits":
- *    [
- *      {
- *      "propagationEntity": "table1_OFFLINE",
- *      "cpuCostNs" : 100,
- *      "memoryCostBytes" : 100
- *      },
- *      {
- *      "propagationEntity": "table2_OFFLINE",
- *      "cpuCostNs" : 200,
- *      "memoryCostBytes" : 200
- *      }
- *    ]
- *   }
- * </pre>
- * @see QueryWorkloadConfig
- * @see NodeConfig
- */
+/// Defines how configuration settings are propagated across workloads.
+///
+/// A PropagationScheme determines the scope and specific values (e.g., tables or tenants)
+/// to which workload settings should be applied. This allows selective cascading
+/// of resource and query limits across different instances.
+///
+/// Please note that for the propagation type and the corresponding propagationEntity should be consistent.
+/// For example, if the propagation type is TABLE, then the propagationEntity should contain table names, the table name
+/// can be with or without type suffix, e.g. "myTable_OFFLINE" or "myTable". If the table name is without type suffix,
+/// then the cost will be split to both OFFLINE and REALTIME tables.
+///
+/// Similarly, if the propagation type is TENANT, then the propagationEntity should contain tenant names.
+///
+/// In the below example, the propagation type is set to TABLE, indicating that
+/// the settings will be applied at the individual table level. The costSplits
+/// define specific CPU and memory costs allocated to each table.
+///
+/// Example configurations:
+///
+/// ```
+/// {
+/// "propagationType": "TABLE",
+/// "costSplits":
+///  [
+///    {
+///    "propagationEntity": "table1_OFFLINE",
+///    "cpuCostNs" : 100,
+///    "memoryCostBytes" : 100
+///    },
+///    {
+///    "propagationEntity": "table2_OFFLINE",
+///    "cpuCostNs" : 200,
+///    "memoryCostBytes" : 200
+///    }
+///  ]
+/// }
+/// ```
+///
+/// @see QueryWorkloadConfig
+/// @see NodeConfig
 public class PropagationScheme extends BaseJsonConfig {
 
-  /**
-   * Enumerates the propagation scheme types that control the scope of propagation.
-   * <p>
-   * - TABLE: Propagate settings at the per-table level.<br>
-   * - TENANT: Propagate settings at the tenant (logical group) level.
-   * </p>
-   */
+  /// Enumerates the propagation scheme types that control the scope of propagation.
+  ///
+  /// - TABLE: Propagate settings at the per-table level.
+  ///
+  /// - TENANT: Propagate settings at the tenant (logical group) level.
   public enum Type {
-    /** Propagate workload settings to individual tables. */
+    /// Propagate workload settings to individual tables.
     TABLE("table"),
-    /** Propagate workload settings to all tables under a tenant. */
+    /// Propagate workload settings to all tables under a tenant.
     TENANT("tenant");
 
     private final String _value;
@@ -92,26 +85,21 @@ public class PropagationScheme extends BaseJsonConfig {
       _value = value;
     }
 
-    /**
-     * Returns the JSON string representation of this propagation type.
-     *
-     * @return the JSON value corresponding to this Type (e.g., "table", "tenant")
-     */
+    /// Returns the JSON string representation of this propagation type.
+    ///
+    /// @return the JSON value corresponding to this Type (e.g., "table", "tenant")
     @JsonValue
     public String getJsonValue() {
       return _value;
     }
 
-    /**
-     * Parses a JSON string into the corresponding Type enum.
-     * <p>
-     * Accepts case-insensitive and trimmed input matching defined JSON values.
-     * </p>
-     *
-     * @param value JSON string to parse (may be null)
-     * @return the matching Type enum, or null if input is null
-     * @throws IllegalArgumentException if the input does not match any Type
-     */
+    /// Parses a JSON string into the corresponding Type enum.
+    ///
+    /// Accepts case-insensitive and trimmed input matching defined JSON values.
+    ///
+    /// @param value JSON string to parse (may be null)
+    /// @return the matching Type enum, or null if input is null
+    /// @throws IllegalArgumentException if the input does not match any Type
     @JsonCreator
     public static Type forValue(String value) {
       if (value == null) {
@@ -130,21 +118,17 @@ public class PropagationScheme extends BaseJsonConfig {
   private static final String PROPAGATION_TYPE = "propagationType";
   private static final String PROPAGATION_ENTITIES = "propagationEntities";
 
-  /**
-   * The type of propagation to apply (per-table or per-tenant).
-   */
+  /// The type of propagation to apply (per-table or per-tenant).
   @JsonPropertyDescription("Describes the type of propagation scheme")
   private Type _propagationType;
 
   @JsonPropertyDescription("Describes the cost splits for the propagation scheme")
   private List<PropagationEntity> _propagationEntities;
 
-  /**
-   * Constructs a PropagationScheme with the given type and target values.
-   *
-   * @param propagationType the Type of propagation (TABLE or TENANT)
-   *  @param propagationEntities the list of CostSplit defining specific allocations
-   */
+  /// Constructs a PropagationScheme with the given type and target values.
+  ///
+  /// @param propagationType the Type of propagation (TABLE or TENANT)
+  ///  @param propagationEntities the list of CostSplit defining specific allocations
   @JsonCreator
   public PropagationScheme(@JsonProperty(PROPAGATION_TYPE) Type propagationType,
       @Nullable @JsonProperty(PROPAGATION_ENTITIES) List<PropagationEntity> propagationEntities) {
@@ -152,38 +136,30 @@ public class PropagationScheme extends BaseJsonConfig {
     _propagationEntities = propagationEntities;
   }
 
-  /**
-   * Returns the configured propagation type.
-   *
-   * @return the Type enum indicating propagation scope
-   */
+  /// Returns the configured propagation type.
+  ///
+  /// @return the Type enum indicating propagation scope
   public Type getPropagationType() {
     return _propagationType;
   }
 
-  /**
-   * Returns the cost splits for the propagation scheme.
-   *
-   * @return list of cost splits with their propagation entities
-   */
+  /// Returns the cost splits for the propagation scheme.
+  ///
+  /// @return list of cost splits with their propagation entities
   public List<PropagationEntity> getPropagationEntities() {
     return _propagationEntities;
   }
 
-  /**
-   * Sets the propagation type.
-   *
-   * @param propagationType new Type to define propagation scope
-   */
+  /// Sets the propagation type.
+  ///
+  /// @param propagationType new Type to define propagation scope
   public void setPropagationType(Type propagationType) {
     _propagationType = propagationType;
   }
 
-  /**
-   * Sets the cost splits for the propagation entities.
-   *
-   * @param propagationEntities list of cost splits to apply
-   */
+  /// Sets the cost splits for the propagation entities.
+  ///
+  /// @param propagationEntities list of cost splits to apply
   public void setPropagationEntities(List<PropagationEntity> propagationEntities) {
     _propagationEntities = propagationEntities;
   }

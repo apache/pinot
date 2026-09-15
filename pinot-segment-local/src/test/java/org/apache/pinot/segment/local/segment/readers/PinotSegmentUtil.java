@@ -40,9 +40,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * Util class for pinot segment
- */
+/// Util class for pinot segment
 public class PinotSegmentUtil {
   private PinotSegmentUtil() {
   }

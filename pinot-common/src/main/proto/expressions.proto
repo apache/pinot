@@ -44,6 +44,8 @@ enum ColumnDataType {
   UNKNOWN = 19;
   MAP = 20;
   BIG_DECIMAL_ARRAY = 21;
+  UUID = 22;
+  UUID_ARRAY = 23;
 }
 
 message InputRef {

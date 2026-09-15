@@ -21,11 +21,9 @@ package org.apache.pinot.broker.api.resources;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 
-/**
- * Response for the {@code POST /query/sql/validateSyntax} broker endpoint. Reports whether a SQL
- * query was accepted by Pinot's Calcite-based parser, along with an error message when parsing
- * failed.
- */
+/// Response for the `POST /query/sql/validateSyntax` broker endpoint. Reports whether a SQL
+/// query was accepted by Pinot's Calcite-based parser, along with an error message when parsing
+/// failed.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SqlSyntaxValidationResponse {
 

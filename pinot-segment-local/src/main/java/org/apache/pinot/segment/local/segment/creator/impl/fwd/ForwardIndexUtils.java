@@ -24,15 +24,13 @@ public class ForwardIndexUtils {
   private ForwardIndexUtils() {
   }
 
-  /**
-   * Get the dynamic target chunk size based on the maximum length of the values, target number of documents per chunk.
-   *
-   * If targetDocsPerChunk is negative, the target chunk size is the targetMaxChunkSizeBytes and chunk size
-   * shall not be dynamically chosen
-   * @param maxLength max length of the values
-   * @param targetDocsPerChunk target number of documents to store per chunk
-   * @param targetMaxChunkSizeBytes target max chunk size in bytes
-   */
+  /// Get the dynamic target chunk size based on the maximum length of the values, target number of documents per chunk.
+  ///
+  /// If targetDocsPerChunk is negative, the target chunk size is the targetMaxChunkSizeBytes and chunk size
+  /// shall not be dynamically chosen
+  /// @param maxLength max length of the values
+  /// @param targetDocsPerChunk target number of documents to store per chunk
+  /// @param targetMaxChunkSizeBytes target max chunk size in bytes
   public static int getDynamicTargetChunkSize(int maxLength, int targetDocsPerChunk, int targetMaxChunkSizeBytes) {
     if (targetDocsPerChunk < 0 || (long) maxLength * targetDocsPerChunk > Integer.MAX_VALUE) {
       return Math.max(targetMaxChunkSizeBytes, TARGET_MIN_CHUNK_SIZE);

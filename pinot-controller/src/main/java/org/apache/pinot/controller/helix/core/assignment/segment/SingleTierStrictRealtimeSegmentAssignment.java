@@ -30,12 +30,10 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
-/**
- * This segment assignment policy doesn't allow the table to have multiple tiers. The upsert table has to use this
- * today. Because moving upsert table's segments that are out of TTL needs to move the segments' associated
- * validDocIds bitmaps as well for the upsert data to stay correct on the new tiers. Once moving bitmaps is
- * supported later, the upsert table can use the MultiTierStrictRealtimeSegmentAssignment to use multi tiers too.
- */
+/// This segment assignment policy doesn't allow the table to have multiple tiers. The upsert table has to use this
+/// today. Because moving upsert table's segments that are out of TTL needs to move the segments' associated
+/// validDocIds bitmaps as well for the upsert data to stay correct on the new tiers. Once moving bitmaps is
+/// supported later, the upsert table can use the MultiTierStrictRealtimeSegmentAssignment to use multi tiers too.
 public class SingleTierStrictRealtimeSegmentAssignment extends BaseStrictRealtimeSegmentAssignment {
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,

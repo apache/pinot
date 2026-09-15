@@ -35,9 +35,7 @@ public class PrimaryKeyCount {
   private PrimaryKeyCount() {
   }
 
-  /**
-   * Computes the number of primary keys for this instance
-   */
+  /// Computes the number of primary keys for this instance
   public static PrimaryKeyCountInfo computeNumberOfPrimaryKeys(String instanceId,
       InstanceDataManager instanceDataManager) {
     if (StringUtils.isEmpty(instanceId)) {

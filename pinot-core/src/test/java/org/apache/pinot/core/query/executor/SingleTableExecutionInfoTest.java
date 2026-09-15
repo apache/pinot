@@ -47,12 +47,10 @@ public class SingleTableExecutionInfoTest {
 
   private static final String TABLE_NAME_WITH_TYPE = "testTable_REALTIME";
 
-  /**
-   * For a {@link DuoSegmentDataManager}, both the primary (immutable) segment and the secondary (mutable) segment
-   * must appear in the index segment list used for query execution. The primary segment alone is not enough — a
-   * mutable consuming segment continues to receive rows after the immutable was committed, and those rows must
-   * still be queryable for the duration of the duo window.
-   */
+  /// For a [DuoSegmentDataManager], both the primary (immutable) segment and the secondary (mutable) segment
+  /// must appear in the index segment list used for query execution. The primary segment alone is not enough — a
+  /// mutable consuming segment continues to receive rows after the immutable was committed, and those rows must
+  /// still be queryable for the duration of the duo window.
   @Test
   public void testCreateExpandsDuoSegmentDataManagerForNonUpsertTable()
       throws TableNotFoundException {
@@ -84,11 +82,9 @@ public class SingleTableExecutionInfoTest {
     assertEquals(info.getNumSegmentsAcquired(), 2);
   }
 
-  /**
-   * When a {@link DuoSegmentDataManager}'s secondary segment has been released (refCount=0),
-   * {@link DuoSegmentDataManager#getSegments()} only returns the live primary segment. The execution info should
-   * include just that one segment for the duo manager — no nulls, no stale references.
-   */
+  /// When a [DuoSegmentDataManager]'s secondary segment has been released (refCount=0),
+  /// [DuoSegmentDataManager#getSegments()] only returns the live primary segment. The execution info should
+  /// include just that one segment for the duo manager — no nulls, no stale references.
   @Test
   public void testCreateExpandsDuoSegmentDataManagerWithReleasedSecondary()
       throws TableNotFoundException {
@@ -110,10 +106,8 @@ public class SingleTableExecutionInfoTest {
     assertSame(indexSegments.get(0), primarySegment);
   }
 
-  /**
-   * Plain (non-duo) {@link SegmentDataManager} instances are still handled correctly: each one contributes
-   * exactly one segment to the index segment list, matching the pre-multi-segment behavior.
-   */
+  /// Plain (non-duo) [SegmentDataManager] instances are still handled correctly: each one contributes
+  /// exactly one segment to the index segment list, matching the pre-multi-segment behavior.
   @Test
   public void testCreateKeepsSingleSegmentBehaviorWhenNoMultiSegments()
       throws TableNotFoundException {
@@ -134,10 +128,8 @@ public class SingleTableExecutionInfoTest {
     assertSame(indexSegments.get(1), seg2);
   }
 
-  /**
-   * {@link SingleTableExecutionInfo#create} throws {@link TableNotFoundException} when the requested table
-   * is not registered with the instance data manager.
-   */
+  /// [SingleTableExecutionInfo#create] throws [TableNotFoundException] when the requested table
+  /// is not registered with the instance data manager.
   @Test
   public void testCreateThrowsTableNotFoundWhenTableMissing() {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);

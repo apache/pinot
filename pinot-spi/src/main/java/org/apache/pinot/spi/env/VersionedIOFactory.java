@@ -26,11 +26,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWrite
 import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-/**
- * VersionedIOFactory extends the DefaultIOFactory
- * <p>
- * Purpose: factory class for creating the custom versioned property configuration reader and writer.
- */
+/// VersionedIOFactory extends the DefaultIOFactory
+///
+/// Purpose: factory class for creating the custom versioned property configuration reader and writer.
 class VersionedIOFactory extends DefaultIOFactory {
   @Override
   public PropertiesReader createPropertiesReader(Reader reader) {

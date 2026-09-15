@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /// Backward-compatibility shim for inverted-index files written by the now-deleted
 /// `RawValueBitmapInvertedIndexCreator` (introduced in PR #17060, reverted in PR #18410).
 ///
-/// <h2>What this exists for</h2>
+/// # What this exists for
 ///
 /// PR #17060 added a creator that wrote a non-standard "embedded-dictionary" inverted-index file directly into
 /// the column's `bitmap.inv` slot. PR #18410 reverted the creator. Any segment built between those two PRs that
@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 ///    legacy file from the segment directory, so the standard [InvertedIndexHandler] can rebuild it (with a
 ///    shared dictionary auto-created by `ForwardIndexHandler` if the column is still RAW).
 ///
-/// <h2>Sunset</h2>
+/// # Sunset
 ///
 /// **Safe to delete after Pinot 1.7 is released.** By then, every segment in the wild that was built with the
 /// reverted creator has had multiple opportunities to be reloaded and migrated. Removing this class — along with

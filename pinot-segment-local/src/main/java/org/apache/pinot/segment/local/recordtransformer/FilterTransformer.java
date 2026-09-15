@@ -31,10 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Based on filter config, decide whether to skip or allow this record.
- * If record should be skipped, puts a special key in the record.
- */
+/// Based on filter config, decide whether to skip or allow this record.
+/// If record should be skipped, puts a special key in the record.
 public class FilterTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterTransformer.class);
 

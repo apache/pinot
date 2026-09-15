@@ -21,10 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the timers exposed by the Pinot server.
- *
- */
+/// Enumeration containing all the timers exposed by the Pinot server.
 public enum ServerTimer implements AbstractMetrics.Timer {
   FRESHNESS_LAG_MS("freshnessLagMs", false, "Tracks the freshness lag for consuming segments. "
       + "Computed as the time-period between when the data was last updated in the table and the current time."),
@@ -70,32 +67,22 @@ public enum ServerTimer implements AbstractMetrics.Timer {
       "Time spent while waiting on previous segment to be registered."),
 
   // Multi-stage
-  /**
-   * Time spent building the hash table for the join.
-   * This is the sum of all time spent by all workers in the stage.
-   */
+  /// Time spent building the hash table for the join.
+  /// This is the sum of all time spent by all workers in the stage.
   HASH_JOIN_BUILD_TABLE_CPU_TIME_MS("millis", true),
-  /**
-   * Time spent serializing blocks into bytes to be sent to the next stage.
-   * This is the sum of all time spent by all workers in the stage.
-   */
+  /// Time spent serializing blocks into bytes to be sent to the next stage.
+  /// This is the sum of all time spent by all workers in the stage.
   MULTI_STAGE_SERIALIZATION_CPU_TIME_MS("millis", true),
-  /**
-   * Time spent deserializing bytes into blocks to be processed by the stage.
-   * This is the sum of all time spent by all workers in the stage.
-   */
+  /// Time spent deserializing bytes into blocks to be processed by the stage.
+  /// This is the sum of all time spent by all workers in the stage.
   MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS("millis", true),
-  /**
-   * Time waiting on the receive mailbox for its parent operator to consume the data.
-   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
-   * reading from. This is the sum of all time waiting.
-   */
+  /// Time waiting on the receive mailbox for its parent operator to consume the data.
+  /// Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+  /// reading from. This is the sum of all time waiting.
   RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS("millis", true),
-  /**
-   * Time waiting on the receive mailbox waiting for the child operator to produce the data.
-   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
-   * reading from. This is the sum of all time waiting.
-   */
+  /// Time waiting on the receive mailbox waiting for the child operator to produce the data.
+  /// Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+  /// reading from. This is the sum of all time waiting.
   RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("millis", true),
@@ -132,11 +119,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
     return _timerName;
   }
 
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
+  /// Returns true if the timer is global (not attached to a particular resource)
+  ///
+  /// @return true if the timer is global
   @Override
   public boolean isGlobal() {
     return _global;

@@ -97,10 +97,8 @@ public class BigDecimalTypeTest extends CustomDataQueryClusterIntegrationTest {
         .build();
   }
 
-  /**
-   * For doc {@code i}, SV = {@code i.5} and MV = {@code [i.0, i.25, i.5]}. The values are chosen so that min/max and
-   * sum-style aggregations yield exact BigDecimal results without double-precision rounding.
-   */
+  /// For doc `i`, SV = `i.5` and MV = `[i.0, i.25, i.5]`. The values are chosen so that min/max and
+  /// sum-style aggregations yield exact BigDecimal results without double-precision rounding.
   private static BigDecimal svValue(int i) {
     return new BigDecimal(i + ".5");
   }

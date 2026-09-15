@@ -22,35 +22,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 
-/**
- * Factory for a stream which provides a consumer and a metadata provider for the stream
- */
+/// Factory for a stream which provides a consumer and a metadata provider for the stream
 public abstract class StreamConsumerFactory {
   private static final AtomicInteger CLIENT_ID_SEQ = new AtomicInteger(0);
 
   protected StreamConfig _streamConfig;
 
-  /**
-   * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamConfig the stream config object from the table config
-   */
+  /// Initializes the stream consumer factory with the stream metadata for the table
+  /// @param streamConfig the stream config object from the table config
   protected void init(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
   }
 
-  /**
-   * Creates a metadata provider which provides partition specific metadata
-   * @param clientId a client id to identify the creator of this consumer
-   * @param partition the partition id of the partition for which this metadata provider is being created
-   * @return
-   */
+  /// Creates a metadata provider which provides partition specific metadata
+  /// @param clientId a client id to identify the creator of this consumer
+  /// @param partition the partition id of the partition for which this metadata provider is being created
+  /// @return
   public abstract StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition);
 
-  /**
-   * Creates a metadata provider which provides stream specific metadata
-   * @param clientId a client id to identify the creator of this consumer
-   * @return
-   */
+  /// Creates a metadata provider which provides stream specific metadata
+  /// @param clientId a client id to identify the creator of this consumer
+  /// @return
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
   public StreamMetadataProvider createStreamMetadataProvider(String clientId, boolean concurrentAccessExpected) {

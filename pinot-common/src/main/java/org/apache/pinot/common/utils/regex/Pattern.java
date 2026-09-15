@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.common.utils.regex;
 
-/**
- * Interface for different regex library Pattern implementations. Since no regex library is optimal in all cases,
- * this is used to allow regex libraries to be configured. This class maintains the same semantics to java.util.regex
- *
- * Patterns should be created via @link{PatternFactory.compile(String regex)}
- */
+/// Interface for different regex library Pattern implementations. Since no regex library is optimal in all cases,
+/// this is used to allow regex libraries to be configured. This class maintains the same semantics to java.util.regex
+///
+/// Patterns should be created via @link{PatternFactory.compile(String regex)}
 public interface Pattern {
   Matcher matcher(CharSequence input);
 }

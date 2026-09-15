@@ -41,11 +41,9 @@ import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * MinionClient is the client-side APIs for Pinot Controller tasks APIs.
- * Minion feature is still in beta development mode, so those APIs may change frequently.
- * Please use this client in caution.
- */
+/// MinionClient is the client-side APIs for Pinot Controller tasks APIs.
+/// Minion feature is still in beta development mode, so those APIs may change frequently.
+/// Please use this client in caution.
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MinionClient {

@@ -35,9 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Rebuilds the broker resource if the instance set has changed
- */
+/// Rebuilds the broker resource if the instance set has changed
 public class BrokerResourceValidationManager extends ControllerPeriodicTask<BrokerResourceValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceValidationManager.class);
 

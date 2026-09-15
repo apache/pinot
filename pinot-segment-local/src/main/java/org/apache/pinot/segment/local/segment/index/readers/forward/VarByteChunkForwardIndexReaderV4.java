@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
@@ -39,17 +40,17 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
- * (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
- *
- * TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte[] first
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
+/// (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
+///
+/// For data layout, please refer to the documentation for [VarByteChunkForwardIndexWriterV4]
+///
+/// TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte\[\] first
 public class VarByteChunkForwardIndexReaderV4
     implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexReaderV4.class);
@@ -137,6 +138,23 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public Map<String, Object> getMap(int docId, ReaderContext context) {
     return MapUtils.deserializeMap(context.getValue(docId));
+  }
+
+  @Override
+  public String getMapAsJsonString(int docId, ReaderContext context) {
+    return MapUtils.frameToJsonString(context.getValue(docId));
+  }
+
+  @Nullable
+  @Override
+  public Object getMapEntryValue(int docId, ReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValue(context.getValue(docId), key);
+  }
+
+  @Nullable
+  @Override
+  public String getMapEntryValueAsString(int docId, ReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(context.getValue(docId)), key);
   }
 
   @Override
@@ -417,10 +435,8 @@ public class VarByteChunkForwardIndexReaderV4
       return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
     }
 
-    /**
-     * Decompresses a regular chunk and reads the number of docs. Subclasses (e.g. V6) can override
-     * to perform additional transformations (e.g. converting sizes to offsets) after decompression.
-     */
+    /// Decompresses a regular chunk and reads the number of docs. Subclasses (e.g. V6) can override
+    /// to perform additional transformations (e.g. converting sizes to offsets) after decompression.
     protected void decompressChunk(ByteBuffer compressed)
         throws IOException {
       _chunkDecompressor.decompress(compressed, _decompressedBuffer);

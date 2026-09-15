@@ -36,16 +36,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority
- */
+/// Schedules queries from a [SchedulerGroup] with highest number of tokens on priority
 public abstract class PriorityScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PriorityScheduler.class);
 
-  /**
-   * A {@link Semaphore} subclass that supports adjusting the number of permits at runtime.
-   * This is needed because {@link Semaphore#reducePermits(int)} is protected.
-   */
+  /// A [Semaphore] subclass that supports adjusting the number of permits at runtime.
+  /// This is needed because [Semaphore#reducePermits(int)] is protected.
   @VisibleForTesting
   static class ResizableSemaphore extends Semaphore {
     ResizableSemaphore(int permits) {

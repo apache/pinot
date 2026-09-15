@@ -20,9 +20,7 @@ package org.apache.pinot.client;
 
 import javax.annotation.Nullable;
 
-/**
- * Shared implementation between the different ResultSets.
- */
+/// Shared implementation between the different ResultSets.
 public abstract class AbstractResultSet implements ResultSet {
 
   @Override

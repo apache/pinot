@@ -27,21 +27,17 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * This base class acts as a helper for any optimizer that is effectively removing filter conditions.
- * It provides TRUE/FALSE literal classes that can be used to replace filter expressions that are always true/false.
- * It provides an optimization implementation for AND/OR/NOT expressions.
- */
+/// This base class acts as a helper for any optimizer that is effectively removing filter conditions.
+/// It provides TRUE/FALSE literal classes that can be used to replace filter expressions that are always true/false.
+/// It provides an optimization implementation for AND/OR/NOT expressions.
 public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer {
 
   protected static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   protected static final Expression FALSE = RequestUtils.getLiteralExpression(false);
 
-  /**
-   * This recursively optimizes each part of the filter expression. For any AND/OR/NOT,
-   * we optimize each child, then we optimize the remaining statement. If there is only
-   * a child statement, we optimize that.
-   */
+  /// This recursively optimizes each part of the filter expression. For any AND/OR/NOT,
+  /// we optimize each child, then we optimize the remaining statement. If there is only
+  /// a child statement, we optimize that.
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
     if (!canBeOptimized(filterExpression, schema)) {
@@ -67,18 +63,14 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
 
   abstract boolean canBeOptimized(Expression filterExpression, @Nullable Schema schema);
 
-  /**
-   * Optimize any cases that are not AND/OR/NOT. This should be done by converting any cases
-   * that are always true to TRUE or always false to FALSE.
-   */
+  /// Optimize any cases that are not AND/OR/NOT. This should be done by converting any cases
+  /// that are always true to TRUE or always false to FALSE.
   abstract Expression optimizeChild(Expression filterExpression, @Nullable Schema schema);
 
-  /**
-   * If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
-   * "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
-   * of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
-   * remove all the "false" operands of the OR function.
-   */
+  /// If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
+  /// "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
+  /// of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
+  /// remove all the "false" operands of the OR function.
   protected Expression optimizeCurrent(Expression expression) {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
@@ -122,7 +114,7 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
     return expression;
   }
 
-  /** Change the expression value to boolean literal with given value. */
+  /// Change the expression value to boolean literal with given value.
   protected static Expression getExpressionFromBoolean(boolean value) {
     return value ? TRUE : FALSE;
   }

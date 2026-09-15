@@ -47,9 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A grpc connection to Pinot, normally created through calls to the {@link org.apache.pinot.client.ConnectionFactory}.
- */
+/// A grpc connection to Pinot, normally created through calls to the [org.apache.pinot.client.ConnectionFactory].
 public class GrpcConnection implements AutoCloseable {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   static final String CONNECTION_VALIDATION_QUERY = "select 1;";
@@ -135,36 +133,30 @@ public class GrpcConnection implements AutoCloseable {
     return requestMetadata;
   }
 
-  /**
-   * Creates a prepared statement, to escape query parameters.
-   *
-   * @param query The query for which to create a prepared statement
-   * @return A prepared statement for this connection
-   */
+  /// Creates a prepared statement, to escape query parameters.
+  ///
+  /// @param query The query for which to create a prepared statement
+  /// @return A prepared statement for this connection
   public GrpcPreparedStatement prepareStatement(String query) {
     return new GrpcPreparedStatement(this, query);
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public ResultSetGroup execute(String query)
       throws PinotClientException, IOException {
     return execute(query, new HashMap<>());
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @param metadataMap The query metadata
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @param metadataMap The query metadata
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public ResultSetGroup execute(String query, Map<String, String> metadataMap)
       throws PinotClientException, IOException {
     BrokerResponse brokerResponse = BrokerResponse.fromJson(getJsonResponse(query, metadataMap));
@@ -174,51 +166,43 @@ public class GrpcConnection implements AutoCloseable {
     return new ResultSetGroup(brokerResponse);
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public GrpcResultSetGroup executeGrpc(String query)
       throws PinotClientException, IOException {
     return executeGrpc(query, new HashMap<>());
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @param metadataMap The query metadata
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @param metadataMap The query metadata
+  /// @return The result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public GrpcResultSetGroup executeGrpc(String query, Map<String, String> metadataMap)
       throws PinotClientException, IOException {
     Iterator<Broker.BrokerResponse> brokerResponseIterator = executeWithIterator(query, metadataMap);
     return new GrpcResultSetGroup(brokerResponseIterator);
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public CompletableFuture<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
     return executeAsync(query, new HashMap<>());
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public CompletableFuture<ResultSetGroup> executeAsync(String query, Map<String, String> metadataMap)
       throws PinotClientException {
     return CompletableFuture.supplyAsync(() -> {
@@ -230,14 +214,12 @@ public class GrpcConnection implements AutoCloseable {
     });
   }
 
-  /**
-   * Executes a query.
-   *
-   * @param query The query to execute
-   * @param metadataMap The query metadata
-   * @return The JsonNode result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query.
+  ///
+  /// @param query The query to execute
+  /// @param metadataMap The query metadata
+  /// @return The JsonNode result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public JsonNode getJsonResponse(String query, Map<String, String> metadataMap)
       throws IOException {
     Iterator<org.apache.pinot.common.proto.Broker.BrokerResponse> response = executeWithIterator(query, metadataMap);
@@ -275,25 +257,21 @@ public class GrpcConnection implements AutoCloseable {
     return brokerResponseJson;
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public Iterator<Broker.BrokerResponse> executeWithIterator(String query)
       throws PinotClientException {
     return executeWithIterator(query, new HashMap<>());
   }
 
-  /**
-   * Executes a query asynchronously.
-   *
-   * @param query The query to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
+  /// Executes a query asynchronously.
+  ///
+  /// @param query The query to execute
+  /// @return A future containing the result of the query
+  /// @throws PinotClientException If an exception occurs while processing the query
   public Iterator<Broker.BrokerResponse> executeWithIterator(String query, Map<String, String> metadata)
       throws PinotClientException {
     String[] tableNames = Connection.resolveTableName(query);
@@ -310,11 +288,9 @@ public class GrpcConnection implements AutoCloseable {
     return _grpcQueryClient.submit(brokerHost, brokerPort, brokerRequest);
   }
 
-  /**
-   * Close the connection for further processing
-   *
-   * @throws PinotClientException when connection is already closed
-   */
+  /// Close the connection for further processing
+  ///
+  /// @throws PinotClientException when connection is already closed
   @Override
   public void close()
       throws PinotClientException {
@@ -322,12 +298,10 @@ public class GrpcConnection implements AutoCloseable {
     _brokerSelector.close();
   }
 
-  /**
-   * Provides access to the underlying grpc clients for this connection.
-   * There may be client metrics useful for monitoring and other observability goals.
-   *
-   * @return pinot client.
-   */
+  /// Provides access to the underlying grpc clients for this connection.
+  /// There may be client metrics useful for monitoring and other observability goals.
+  ///
+  /// @return pinot client.
   public BrokerStreamingQueryClient getGrpcQueryClient() {
     return _grpcQueryClient;
   }
