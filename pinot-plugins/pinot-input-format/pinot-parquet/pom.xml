@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <dependencies>
     <dependency>
@@ -54,7 +53,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-client-runtime</artifactId>
+      <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
@@ -78,13 +77,4 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <profiles>
-    <profile>
-      <id>pinot-fastdev</id>
-      <properties>
-        <shade.phase.prop>none</shade.phase.prop>
-      </properties>
-    </profile>
-  </profiles>
 </project>
