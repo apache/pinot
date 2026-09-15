@@ -28,10 +28,6 @@ import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 
 
 /// The `ColumnMetadata` class holds the column level management information and data statistics.
-///
-/// Field specs returned by [#getFieldSpec()] may be shared across loaded segments and tables whose columns parse
-/// to equal specs. Treat each shared spec and its nested values as read-only; deserialize its `toJsonObject()`
-/// to make a copy before modifying it. Use `equals` to compare specs.
 @InterfaceAudience.Private
 public interface ColumnMetadata extends ColumnShape {
   int UNAVAILABLE = -1;
