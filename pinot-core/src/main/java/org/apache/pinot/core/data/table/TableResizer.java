@@ -329,7 +329,7 @@ public class TableResizer {
   /// This method is to be called from individual segment if the intermediate results need to be trimmed.
   public List<IntermediateRecord> sortInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
-    // getNumKeys() does not count nulls
+    // NOTE: getNumKeys() counts every group, including the null group when null handling is enabled
     assert groupKeyGenerator.getNumKeys() <= size;
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
 

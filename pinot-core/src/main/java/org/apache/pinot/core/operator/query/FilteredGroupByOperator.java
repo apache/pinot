@@ -135,6 +135,23 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       resultHolderIndexMap.put(_aggregationFunctions[i], i);
     }
 
+    GroupKeyGenerator[] createdGroupKeyGenerator = new GroupKeyGenerator[1];
+    try {
+      return processAndBuildResultsBlock(groupByResultHolders, resultHolderIndexMap, createdGroupKeyGenerator);
+    } catch (Throwable t) {
+      // Release group-by resources (including off-heap key tables and result holders) that would otherwise leak.
+      // Close is idempotent on all generators; on the success path the generator is either closed on the trim/sort
+      // paths below or handed to the combine operator, which closes it after the merge.
+      if (createdGroupKeyGenerator[0] != null) {
+        createdGroupKeyGenerator[0].close();
+      }
+      throw t;
+    }
+  }
+
+  private GroupByResultsBlock processAndBuildResultsBlock(GroupByResultHolder[] groupByResultHolders,
+      IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap,
+      GroupKeyGenerator[] createdGroupKeyGenerator) {
     GroupKeyGenerator groupKeyGenerator = null;
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
@@ -160,6 +177,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
       // loop iterations i.e. across all aggs.
       groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
+      createdGroupKeyGenerator[0] = groupKeyGenerator;
 
       int numDocsScanned = 0;
       ValueBlock valueBlock;
