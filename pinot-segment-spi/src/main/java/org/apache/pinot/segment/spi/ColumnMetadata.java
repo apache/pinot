@@ -25,22 +25,16 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /// The `ColumnMetadata` class holds the column level management information and data statistics.
+///
+/// Field specs returned by [#getFieldSpec()] may be shared across loaded segments and tables whose columns parse
+/// to equal specs. Treat each shared spec and its nested values as read-only; deserialize its `toJsonObject()`
+/// to make a copy before modifying it. Use `equals` to compare specs.
 @InterfaceAudience.Private
 public interface ColumnMetadata extends ColumnShape {
   int UNAVAILABLE = -1;
-
-  /// Returns the [FieldSpec] of the column.
-  ///
-  /// A spec derived from segment metadata (`metadata.properties`) may be shared across loaded segments and tables
-  /// whose columns parse to an equal spec. Treat the spec and its nested values as read-only; deserialize
-  /// [FieldSpec#toJsonObject()] to make a copy before modifying it. Compare specs with
-  /// [FieldSpec#equals], never by identity.
-  @Override
-  FieldSpec getFieldSpec();
 
   /// Returns `true` when the column has a dictionary, `false` otherwise.
   @JsonProperty("hasDictionary")
