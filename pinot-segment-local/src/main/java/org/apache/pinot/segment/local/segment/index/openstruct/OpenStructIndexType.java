@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.openstruct.OpenStructColumnSplitter;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -88,6 +89,36 @@ public class OpenStructIndexType
           fieldSpec.getName());
       validatePerKeyIndexes(config);
       validateIgnoredKeys(config, fieldSpec);
+      if (fieldSpec instanceof ComplexFieldSpec) {
+        validateChildFieldSpecTypes((ComplexFieldSpec) fieldSpec);
+      }
+    }
+  }
+
+  /// Rejects a declared child key type that the consuming and sealed-build paths cannot coerce a
+  /// value to (e.g. STRUCT, LIST, nested OPEN_STRUCT, UNKNOWN — [ColumnDataType#fromDataTypeSV] or
+  /// the resulting [ColumnDataType#toPinotDataType] throws for these). Catching this at config
+  /// validation, rather than surfacing it as an uncaught exception on the first row ingested for
+  /// such a key, keeps a bad declared type from taking down the whole consuming thread.
+  private void validateChildFieldSpecTypes(ComplexFieldSpec fieldSpec) {
+    Map<String, FieldSpec> childFieldSpecs = fieldSpec.getChildFieldSpecs();
+    if (childFieldSpecs == null) {
+      return;
+    }
+    for (Map.Entry<String, FieldSpec> entry : childFieldSpecs.entrySet()) {
+      FieldSpec.DataType storedType = entry.getValue().getDataType().getStoredType();
+      Preconditions.checkState(isCoercible(storedType),
+          "OPEN_STRUCT column '%s': child key '%s' declares type '%s', which cannot be coerced for indexing",
+          fieldSpec.getName(), entry.getKey(), storedType);
+    }
+  }
+
+  private static boolean isCoercible(FieldSpec.DataType storedType) {
+    try {
+      ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
+      return true;
+    } catch (Exception e) {
+      return false;
     }
   }
 

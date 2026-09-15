@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.datasource;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -93,6 +95,30 @@ public interface OpenStructDataSource extends DataSource {
   default Map<String, Object> getMapValue(int docId) {
     throw new UnsupportedOperationException(
         "Per-doc OPEN_STRUCT map reconstruction is not supported by this implementation");
+  }
+
+  /// Opens a [MapValueReader] scoped to one sequential scan of this data source, e.g. a full
+  /// segment read by the seal path or a minion task's record reader. Implementations backed by
+  /// per-key forward-index readers (immutable segments) can cache those readers for the life of
+  /// the returned instance instead of reconstructing one per key per doc; the default just
+  /// delegates each call to [#getMapValue(int)], which is already O(1) for in-memory mutable
+  /// segments.
+  ///
+  /// Not thread-safe: the returned reader is for one single-threaded sequential scan, not for
+  /// concurrent callers sharing this data source.
+  default MapValueReader openMapValueReader() {
+    return this::getMapValue;
+  }
+
+  /// A [#getMapValue(int)] reader scoped to one scan; see [#openMapValueReader()].
+  interface MapValueReader extends Closeable {
+    @Nullable
+    Map<String, Object> getMapValue(int docId);
+
+    @Override
+    default void close()
+        throws IOException {
+    }
   }
 
   /// Whether the per-key dictionary's contents correspond exactly to the values readable from
