@@ -5853,4 +5853,46 @@
       }
     ]
   }
+  ,
+  "qualify_window_function_filter": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "city", "type": "STRING"},
+          {"name": "category", "type": "STRING"},
+          {"name": "order_date", "type": "INT"}
+        ],
+        "inputs": [
+          ["Athens", "Office Supplies", 3],
+          ["Athens", "Technology", 1],
+          ["Madrid", "Technology", 5],
+          ["Madrid", "Office Supplies", 2],
+          ["Springfield", "Furniture", 7]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "QUALIFY keeps only the latest row per city",
+        "notes": "The single-stage engine rejects QUALIFY (it has no window functions), so this is the only engine that runs it",
+        "sql": "SELECT city, category FROM {tbl} QUALIFY ROW_NUMBER() OVER(PARTITION BY city ORDER BY order_date DESC) = 1 ORDER BY city",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["Athens", "Office Supplies"],
+          ["Madrid", "Technology"],
+          ["Springfield", "Furniture"]
+        ]
+      },
+      {
+        "description": "QUALIFY on a SELECT-list window alias",
+        "sql": "SELECT city, ROW_NUMBER() OVER(PARTITION BY city ORDER BY order_date DESC) AS rn FROM {tbl} QUALIFY rn = 1 ORDER BY city",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["Athens", 1],
+          ["Madrid", 1],
+          ["Springfield", 1]
+        ]
+      }
+    ]
+  }
 }

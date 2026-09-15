@@ -30,6 +30,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.sql.parsers.CalciteSqlParser.CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests for CalciteSqlParser.
@@ -254,5 +256,40 @@ public class CalciteSqlParserTest {
     Expression filterExpr = pinotQuery.getFilterExpression();
     Function function = filterExpr.getFunctionCall();
     assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "It's fine");
+  }
+
+  /// QUALIFY used to be parsed and then silently dropped, so a query relying on it returned every row instead of the
+  /// filtered ones. The single-stage engine cannot evaluate it, so it must fail loudly.
+  @Test
+  public void testQualifyIsRejected() {
+    // The idiom from the bug report: keep the latest row per partition.
+    assertQualifyRejected("SELECT city, category FROM myTable "
+        + "QUALIFY ROW_NUMBER() OVER (PARTITION BY city ORDER BY orderDate DESC) = 1 ORDER BY 1, 2 LIMIT 100");
+    // The same idiom written against a SELECT-list alias, which is the more common spelling. It reaches the check
+    // only because toExpression() compiles the SqlWindow operand to a literal instead of throwing; assert on the
+    // QUALIFY message so tightening that branch cannot silently downgrade this to "Unsupported sql node".
+    assertQualifyRejected("SELECT city, ROW_NUMBER() OVER (PARTITION BY city ORDER BY orderDate DESC) AS rn "
+        + "FROM myTable QUALIFY rn = 1");
+    // Without a window function QUALIFY is still rejected: the single-stage engine only applies HAVING to GROUP BY
+    // queries, so folding the predicate into HAVING would drop it just as silently for the other query shapes.
+    // These shapes are not valid SQL either -- the multi-stage engine rejects them with "QUALIFY expression must
+    // contain a window function" -- which is why the message conditions its two remedies on whether the predicate
+    // references a window function rather than recommending either one outright.
+    assertQualifyRejected("SELECT city FROM myTable QUALIFY city > 'a'");
+    assertQualifyRejected("SELECT city, COUNT(*) FROM myTable GROUP BY city QUALIFY COUNT(*) > 5");
+    // A QUALIFY next to a HAVING must not be swallowed by the HAVING being present.
+    assertQualifyRejected(
+        "SELECT city, COUNT(*) FROM myTable GROUP BY city HAVING COUNT(*) > 3 QUALIFY COUNT(*) > 5");
+    // Subqueries are compiled through the same path.
+    assertQualifyRejected("SELECT city FROM (SELECT city FROM myTable QUALIFY city > 'a') AS t");
+    // EXPLAIN unwraps to the same SELECT node.
+    assertQualifyRejected("EXPLAIN PLAN FOR SELECT city FROM myTable QUALIFY city > 'a'");
+  }
+
+  private void assertQualifyRejected(String query) {
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(query));
+    assertTrue(e.getMessage().contains("QUALIFY is not supported by the single-stage query engine"),
+        "Unexpected message for query '" + query + "': " + e.getMessage());
   }
 }
