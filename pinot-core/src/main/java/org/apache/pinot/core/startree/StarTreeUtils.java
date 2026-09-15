@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -88,9 +89,14 @@ public class StarTreeUtils {
   /// the list are implicitly ANDed together. Any OR and NOT predicates are nested within a CompositePredicate.
   ///
   /// A map from predicates to their evaluators is passed in to accelerate the computation.
+  ///
+  /// A predicate that is always true over a column's values is left out of the map, unless null handling is enabled
+  /// and the column holds nulls: a null row is UNKNOWN rather than true, so the predicate is kept, and the column stays
+  /// visible to the null checks that decide whether a star-tree can serve the query.
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
-      @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
+      @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping,
+      boolean nullHandlingEnabled) {
     if (filter == null) {
       return Map.of();
     }
@@ -106,7 +112,7 @@ public class StarTreeUtils {
           break;
         case OR:
           Pair<String, CompositePredicateEvaluator> pair =
-              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping);
+              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping, nullHandlingEnabled);
           if (pair == null) {
             return null;
           }
@@ -133,7 +139,8 @@ public class StarTreeUtils {
                 return null;
               }
               // Skip adding always true predicate
-              if ((predicateEvaluator.isAlwaysTrue() && !negated) || (predicateEvaluator.isAlwaysFalse() && negated)) {
+              if (isAlwaysTrue(predicateEvaluator, negated, indexSegment, predicate.getLhs().getIdentifier(),
+                  nullHandlingEnabled)) {
                 break;
               }
               predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
@@ -157,7 +164,8 @@ public class StarTreeUtils {
           if (predicateEvaluator == null || predicateEvaluator.isAlwaysFalse()) {
             return null;
           }
-          if (!predicateEvaluator.isAlwaysTrue()) {
+          if (!isAlwaysTrue(predicateEvaluator, false, indexSegment, predicate.getLhs().getIdentifier(),
+              nullHandlingEnabled)) {
             predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
                 .add(new CompositePredicateEvaluator(List.of(ObjectBooleanPair.of(predicateEvaluator, false))));
           }
@@ -215,7 +223,8 @@ public class StarTreeUtils {
   ///         clause cannot be solved with star-tree; a pair of nulls if the OR clause always evaluates to true.
   @Nullable
   private static Pair<String, CompositePredicateEvaluator> isOrClauseValidForStarTree(IndexSegment indexSegment,
-      FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
+      FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping,
+      boolean nullHandlingEnabled) {
     assert filter.getType() == FilterContext.Type.OR;
 
     List<ObjectBooleanPair<Predicate>> predicates = new ArrayList<>();
@@ -234,7 +243,8 @@ public class StarTreeUtils {
       }
       boolean negated = predicate.rightBoolean();
       // Use a pair of null values to represent always true
-      if ((predicateEvaluator.isAlwaysTrue() && !negated) || (predicateEvaluator.isAlwaysFalse() && negated)) {
+      if (isAlwaysTrue(predicateEvaluator, negated, indexSegment, predicate.left().getLhs().getIdentifier(),
+          nullHandlingEnabled)) {
         return Pair.of(null, null);
       }
       // Skip the always false predicate
@@ -300,6 +310,18 @@ public class StarTreeUtils {
       }
     }
     return true;
+  }
+
+  /// Returns whether the predicate is always true for the query, so that the star-tree filter can drop it.
+  ///
+  /// The evaluator's verdict is over the column's real values. With null handling enabled a null row is UNKNOWN rather
+  /// than true, so the predicate is only always true when the column holds no null. Kept in the map otherwise, the
+  /// column reaches the null checks that decide whether a star-tree can serve the query.
+  private static boolean isAlwaysTrue(PredicateEvaluator predicateEvaluator, boolean negated, IndexSegment indexSegment,
+      String column, boolean nullHandlingEnabled) {
+    boolean alwaysTrueOverValues = negated ? predicateEvaluator.isAlwaysFalse() : predicateEvaluator.isAlwaysTrue();
+    return alwaysTrueOverValues
+        && !(nullHandlingEnabled && FilterOperatorUtils.hasNulls(indexSegment.getDataSource(column)));
   }
 
   /// Returns the predicate evaluator for the given predicate, or `null` if the predicate cannot be solved with
@@ -373,7 +395,7 @@ public class StarTreeUtils {
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-        extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators);
+        extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators, queryContext.isNullHandlingEnabled());
     if (predicateEvaluatorsMap == null) {
       return null;
     }
@@ -394,9 +416,7 @@ public class StarTreeUtils {
           if (!inputExpressions.isEmpty()) {
             if (inputExpressions.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
               DataSource dataSource = indexSegment.getDataSource(inputExpressions.get(0).getIdentifier());
-              if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector()
-                  .getNullBitmap()
-                  .isEmpty()) {
+              if (FilterOperatorUtils.hasNulls(dataSource)) {
                 return null;
               }
             }
@@ -411,7 +431,7 @@ public class StarTreeUtils {
           LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' does not exist", column);
           return null;
         }
-        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+        if (FilterOperatorUtils.hasNulls(dataSource)) {
           LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
           return null;
         }
@@ -423,7 +443,7 @@ public class StarTreeUtils {
           LOGGER.debug("Cannot use star-tree index because filter column: '{}' does not exist", column);
           return null;
         }
-        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+        if (FilterOperatorUtils.hasNulls(dataSource)) {
           LOGGER.debug("Cannot use star-tree index because filter column: '{}' has null values", column);
           return null;
         }
@@ -441,7 +461,7 @@ public class StarTreeUtils {
           LOGGER.debug("Cannot use star-tree index because group-by column: '{}' does not exist", column);
           return null;
         }
-        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+        if (FilterOperatorUtils.hasNulls(dataSource)) {
           LOGGER.debug("Cannot use star-tree index because group-by column: '{}' has null values", column);
           return null;
         }
