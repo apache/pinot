@@ -22,12 +22,14 @@ import java.io.File;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -38,12 +40,17 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -994,6 +1001,73 @@ public class LoaderTest {
         VECTOR_INDEX_COL_NAME + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
     assertEquals(vectorIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
+  }
+
+  /// Lazy column materialization must be observationally identical to the eager mode on a real segment: same columns,
+  /// same index presence, same values, and star-tree dimensions materialized at load sharing their dictionary with the
+  /// column's own data source.
+  @Test
+  public void testLazyColumnMaterializationParity()
+      throws Exception {
+    constructV1Segment();
+    Schema schema = createSchema();
+    List<String> starTreeDimensions = List.of("column1", "column5");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setSegmentVersion("v3").setInvertedIndexColumns(List.of("column1")).setStarTreeIndexConfigs(
+            List.of(new StarTreeIndexConfig(starTreeDimensions, null, List.of("COUNT__*"), null, 100))).build();
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+
+    // The eager load converts the segment to v3 and builds the star-tree and the inverted index; the lazy load of the
+    // same directory then finds nothing pending
+    ImmutableSegment eager = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER);
+    IndexLoadingConfig lazyIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    lazyIndexLoadingConfig.setLazyColumnMaterialization(true);
+    ImmutableSegment lazy = ImmutableSegmentLoader.load(_indexDir, lazyIndexLoadingConfig,
+        SEGMENT_OPERATIONS_THROTTLER);
+    try {
+      assertEquals(lazy.getSegmentMetadata().getVersion(), SegmentVersion.v3);
+      assertEquals(lazy.getColumnNames(), eager.getColumnNames());
+      assertEquals(lazy.getPhysicalColumnNames(), eager.getPhysicalColumnNames());
+
+      List<StarTreeV2> lazyStarTrees = lazy.getStarTrees();
+      assertNotNull(lazyStarTrees);
+      assertEquals(lazyStarTrees.size(), 1);
+      assertEquals(eager.getStarTrees().size(), 1);
+      for (String dimension : starTreeDimensions) {
+        assertSame(lazyStarTrees.get(0).getDataSource(dimension).getDictionary(), lazy.getDictionary(dimension));
+        assertSame(eager.getStarTrees().get(0).getDataSource(dimension).getDictionary(),
+            eager.getDictionary(dimension));
+      }
+
+      List<IndexType<?, ?, ?>> indexTypes = IndexService.getInstance().getAllIndexes();
+      for (String column : eager.getColumnNames()) {
+        DataSource eagerDataSource = eager.getDataSource(column);
+        DataSource lazyDataSource = lazy.getDataSource(column);
+        DataSourceMetadata eagerMetadata = eagerDataSource.getDataSourceMetadata();
+        DataSourceMetadata lazyMetadata = lazyDataSource.getDataSourceMetadata();
+        assertEquals(lazyMetadata.getFieldSpec(), eagerMetadata.getFieldSpec(), column);
+        assertEquals(lazyMetadata.getNumDocs(), eagerMetadata.getNumDocs(), column);
+        assertEquals(lazyMetadata.getCardinality(), eagerMetadata.getCardinality(), column);
+        assertEquals(lazyMetadata.isSorted(), eagerMetadata.isSorted(), column);
+        assertEquals(lazyMetadata.getMinValue(), eagerMetadata.getMinValue(), column);
+        assertEquals(lazyMetadata.getMaxValue(), eagerMetadata.getMaxValue(), column);
+        for (IndexType<?, ?, ?> indexType : indexTypes) {
+          assertEquals(lazyDataSource.getIndex(indexType) != null, eagerDataSource.getIndex(indexType) != null,
+              column + " " + indexType);
+        }
+        try (PinotSegmentColumnReader eagerReader = new PinotSegmentColumnReader(eager, column);
+            PinotSegmentColumnReader lazyReader = new PinotSegmentColumnReader(lazy, column)) {
+          for (int docId = 0; docId < 20; docId++) {
+            assertTrue(Objects.deepEquals(lazyReader.getValue(docId), eagerReader.getValue(docId)),
+                column + " docId " + docId);
+          }
+        }
+      }
+    } finally {
+      lazy.destroy();
+      eager.destroy();
+    }
   }
 
   private void verifyIndexDirIsV3(File indexDir) {
