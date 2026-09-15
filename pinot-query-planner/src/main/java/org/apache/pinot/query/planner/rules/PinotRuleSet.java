@@ -21,11 +21,8 @@ package org.apache.pinot.query.planner.rules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
@@ -72,7 +69,7 @@ public final class PinotRuleSet {
     _rulesByPhase = Collections.unmodifiableMap(frozen);
   }
 
-  /// Discovers every [RuleSetCustomizer] via [ServiceLoader] and builds a
+  /// Discovers every [RuleSetCustomizer] via [PluginManager#loadServiceProviders(Class)] and builds a
   /// rule set from them. Used by [#defaultInstance()] and by callers that
   /// don't have an externally-managed customizer list.
   ///
@@ -83,24 +80,15 @@ public final class PinotRuleSet {
   ///    picks up customizers registered in plugin JARs via
   ///    `META-INF/services/org.apache.pinot.query.planner.spi.RuleSetCustomizer`.
   ///
+  /// Customizers visible through overlapping classloaders are de-duplicated by class name.
+  ///
   /// Call after all plugins have been loaded via [PluginManager]; plugins loaded
   /// after this method returns will not be included.
   public static PinotRuleSet loadFromServiceLoader() {
     List<RuleSetCustomizer> customizers = new ArrayList<>();
-    // Dedup by class name: the context classloader and a plugin classloader may both see the same
-    // META-INF/services file if their classpaths overlap (e.g. fat-jar + plugin realm).
-    Set<String> seen = new LinkedHashSet<>();
-    for (RuleSetCustomizer customizer : ServiceLoader.load(RuleSetCustomizer.class)) {
-      if (seen.add(customizer.getClass().getName())) {
-        customizers.add(customizer);
-      }
-    }
-    for (ClassLoader pluginClassLoader : PluginManager.get().getPluginClassLoaders()) {
-      for (RuleSetCustomizer customizer : ServiceLoader.load(RuleSetCustomizer.class, pluginClassLoader)) {
-        if (seen.add(customizer.getClass().getName())) {
-          customizers.add(customizer);
-        }
-      }
+    for (PluginManager.ServiceProvider<RuleSetCustomizer> discovered : PluginManager.get()
+        .loadServiceProviders(RuleSetCustomizer.class)) {
+      customizers.add(discovered.getProvider());
     }
     return new PinotRuleSet(customizers);
   }
