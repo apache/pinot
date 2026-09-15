@@ -166,6 +166,12 @@ public class LiteralContext {
           "Expected byte[] or byte[][], got: %s", value.getClass());
       return componentType == byte.class ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
     }
+    if (type == DataType.VARIANT) {
+      // A single Variant value is itself a byte[] envelope, mirroring the BYTES arm; there is no VARIANT array.
+      Preconditions.checkState(value.getClass().getComponentType() == byte.class,
+          "Expected a byte[] Variant envelope, got: %s", value.getClass());
+      return PinotDataType.VARIANT;
+    }
     boolean singleValue = !value.getClass().isArray();
     switch (type) {
       case BOOLEAN:

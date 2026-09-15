@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.net.URI;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminTransport;
@@ -34,11 +35,12 @@ import org.slf4j.LoggerFactory;
     @JsonSubTypes.Type(value = SegmentOp.class, name = "segmentOp"),
     @JsonSubTypes.Type(value = TableOp.class, name = "tableOp"),
     @JsonSubTypes.Type(value = QueryOp.class, name = "queryOp"),
-    @JsonSubTypes.Type(value = StreamOp.class, name = "streamOp")
+    @JsonSubTypes.Type(value = StreamOp.class, name = "streamOp"),
+    @JsonSubTypes.Type(value = FileContainsOp.class, name = "fileContainsOp")
 })
 public abstract class BaseOp {
   enum OpType {
-    TABLE_OP, SEGMENT_OP, QUERY_OP, STREAM_OP,
+    TABLE_OP, SEGMENT_OP, QUERY_OP, STREAM_OP, FILE_CONTAINS_OP,
   }
 
   private String _name;
@@ -48,6 +50,10 @@ public abstract class BaseOp {
   protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   protected static final String CONFIG_PLACEHOLDER = "/config/";
   private String _parentDir;
+  @Nullable
+  private String _runIfSystemProperty;
+  @Nullable
+  private String _runIfSystemPropertyValue;
 
   protected BaseOp(OpType opType) {
     _opType = opType;
@@ -81,7 +87,45 @@ public abstract class BaseOp {
     return _parentDir + CONFIG_PLACEHOLDER + fileName;
   }
 
+  /// Returns the system property that gates this operation, or {@code null} when the operation is unconditional.
+  @Nullable
+  public String getRunIfSystemProperty() {
+    return _runIfSystemProperty;
+  }
+
+  public void setRunIfSystemProperty(@Nullable String runIfSystemProperty) {
+    _runIfSystemProperty = runIfSystemProperty;
+  }
+
+  /// Returns the exact property value required to run this operation, or {@code null} when the operation is
+  /// unconditional.
+  @Nullable
+  public String getRunIfSystemPropertyValue() {
+    return _runIfSystemPropertyValue;
+  }
+
+  public void setRunIfSystemPropertyValue(@Nullable String runIfSystemPropertyValue) {
+    _runIfSystemPropertyValue = runIfSystemPropertyValue;
+  }
+
   public boolean run(int generationNumber) {
+    if ((_runIfSystemProperty == null) != (_runIfSystemPropertyValue == null)
+        || _runIfSystemProperty != null && (_runIfSystemProperty.isBlank() || _runIfSystemPropertyValue.isBlank())) {
+      LOGGER.error("Both runIfSystemProperty and a non-blank runIfSystemPropertyValue must be configured together");
+      return false;
+    }
+    if (_runIfSystemProperty != null) {
+      String actualValue = System.getProperty(_runIfSystemProperty);
+      if (actualValue == null) {
+        LOGGER.error("Required system property {} is not configured", _runIfSystemProperty);
+        return false;
+      }
+      if (!_runIfSystemPropertyValue.equals(actualValue)) {
+        LOGGER.info("Skipping OpType {} because system property {} is '{}', expected '{}'", _opType,
+            _runIfSystemProperty, actualValue, _runIfSystemPropertyValue);
+        return true;
+      }
+    }
     LOGGER.info("Running OpType {} : {}", _opType.toString(), getDescription());
     return runOp(generationNumber);
   }

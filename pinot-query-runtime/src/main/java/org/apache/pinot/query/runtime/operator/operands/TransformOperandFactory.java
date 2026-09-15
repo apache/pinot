@@ -20,11 +20,19 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class TransformOperandFactory {
+  private static final String IS_DISTINCT_FROM =
+      FunctionRegistry.canonicalize(TransformFunctionType.IS_DISTINCT_FROM.getName());
+  private static final String IS_NOT_DISTINCT_FROM =
+      FunctionRegistry.canonicalize(TransformFunctionType.IS_NOT_DISTINCT_FROM.getName());
+  private static final String CAST = FunctionRegistry.canonicalize(TransformFunctionType.CAST.getName());
+
   private TransformOperandFactory() {
   }
 
@@ -43,6 +51,31 @@ public class TransformOperandFactory {
   private static TransformOperand getTransformOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
+    String canonicalName = FunctionRegistry.canonicalize(functionCall.getFunctionName());
+    if (VariantOperand.isSupported(canonicalName)) {
+      return new VariantOperand(functionCall, dataSchema, canonicalName);
+    }
+    if (LiteralParseJsonOperand.isSupported(canonicalName) && numOperands == 1
+        && operands.get(0) instanceof RexExpression.Literal) {
+      return new LiteralParseJsonOperand(functionCall, canonicalName);
+    }
+    if (canonicalName.equals(IS_DISTINCT_FROM) || canonicalName.equals(IS_NOT_DISTINCT_FROM)) {
+      Preconditions.checkState(numOperands == 2, "%s takes 2 arguments, got: %s", functionCall.getFunctionName(),
+          numOperands);
+      for (RexExpression operand : operands) {
+        // Reject raw VARIANT operands only; preserve existing distinct-from behavior for all other types.
+        Preconditions.checkArgument(getResultType(operand, dataSchema) != DataSchema.ColumnDataType.VARIANT,
+            "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
+      }
+      return new FunctionOperand(functionCall, dataSchema);
+    }
+    if (canonicalName.equals(CAST) && numOperands >= 1) {
+      // Casting the raw envelope would leak encoding bytes as STRING/JSON/BYTES and bypass the opacity contract.
+      // Calcite validation rejects some cast shapes from its native VARIANT type, but its coercion rules are not
+      // this contract's to rely on; the runtime enforces the rejection regardless of what the planner admits.
+      Preconditions.checkArgument(getResultType(operands.get(0), dataSchema) != DataSchema.ColumnDataType.VARIANT,
+          "Raw VARIANT values do not support CAST; extract a typed path with variantGet first");
+    }
     switch (functionCall.getFunctionName()) {
       case "AND":
         Preconditions.checkState(numOperands >= 2, "AND takes >=2 arguments, got: %s", numOperands);
@@ -80,5 +113,18 @@ public class TransformOperandFactory {
       default:
         return new FunctionOperand(functionCall, dataSchema);
     }
+  }
+
+  static DataSchema.ColumnDataType getResultType(RexExpression rexExpression, DataSchema dataSchema) {
+    if (rexExpression instanceof RexExpression.InputRef) {
+      return dataSchema.getColumnDataType(((RexExpression.InputRef) rexExpression).getIndex());
+    }
+    if (rexExpression instanceof RexExpression.Literal) {
+      return ((RexExpression.Literal) rexExpression).getDataType();
+    }
+    if (rexExpression instanceof RexExpression.FunctionCall) {
+      return ((RexExpression.FunctionCall) rexExpression).getDataType();
+    }
+    throw new UnsupportedOperationException("Unsupported RexExpression: " + rexExpression);
   }
 }

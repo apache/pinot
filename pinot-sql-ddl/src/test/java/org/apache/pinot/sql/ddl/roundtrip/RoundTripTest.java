@@ -85,6 +85,18 @@ public class RoundTripTest {
   }
 
   @Test
+  public void variantOfflineTable() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("payload", DataType.VARIANT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .build();
+    assertRoundTrip(schema, config);
+  }
+
+  @Test
   public void offlineTableWithRetentionAndTenants() {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("events")

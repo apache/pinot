@@ -92,6 +92,8 @@ public class QueryContext {
   // Other properties to be shared across all the segments
   // Latest table schema at query time
   private Schema _schema;
+  // Cached when the schema is assigned so per-segment planning can skip VARIANT-only validation for other tables.
+  private boolean _hasVariantColumns;
   // End time in milliseconds for the query
   private long _endTimeMs;
   // Whether to enable prefetch for the query
@@ -357,6 +359,12 @@ public class QueryContext {
 
   public void setSchema(Schema schema) {
     _schema = schema;
+    _hasVariantColumns = schema != null && schema.hasVariantColumn();
+  }
+
+  /// Returns whether the schema assigned to this query contains a VARIANT column.
+  public boolean hasVariantColumns() {
+    return _hasVariantColumns;
   }
 
   public long getEndTimeMs() {
