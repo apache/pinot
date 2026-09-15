@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentmetadata;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -28,6 +29,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /// `SegmentZkMetadataFetcher` is used to cache [ZNRecord] stored in [ZkHelixPropertyStore] for
@@ -80,7 +82,9 @@ public class SegmentZkMetadataFetcher {
           listener.init(idealState, externalView, segments, znRecords);
         }
         for (int i = 0; i < numSegments; i++) {
-          if (znRecords.get(i) != null) {
+          // Only cache segments that are both non-consuming in EV and have a non-null ZNRecord. Consuming
+          // segments are left uncached so they are re-evaluated on the next onAssignmentChange once committed.
+          if (!isConsumingInExternalView(externalView, segments.get(i)) && znRecords.get(i) != null) {
             _onlineSegmentsCached.add(segments.get(i));
           }
         }
@@ -96,10 +100,16 @@ public class SegmentZkMetadataFetcher {
       List<String> segments = new ArrayList<>();
       List<String> segmentZKMetadataPaths = new ArrayList<>();
       for (String segment : onlineSegments) {
-        if (!_onlineSegmentsCached.contains(segment)) {
-          segments.add(segment);
-          segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+        if (_onlineSegmentsCached.contains(segment)) {
+          continue;
         }
+        // Skip segments still in CONSUMING state — they'll be re-evaluated on the next EV change
+        // when they transition to ONLINE (i.e., when they commit).
+        if (isConsumingInExternalView(externalView, segment)) {
+          continue;
+        }
+        segments.add(segment);
+        segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
       }
       List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
       for (SegmentZkMetadataFetchListener listener : _listeners) {
@@ -127,5 +137,13 @@ public class SegmentZkMetadataFetcher {
         _onlineSegmentsCached.remove(segment);
       }
     }
+  }
+
+  /// Returns true if the segment is in CONSUMING state on any server in the ExternalView.
+  /// Such segments should not be cached in {@code _onlineSegmentsCached} — they will be re-evaluated
+  /// on the next ExternalView change, at which point they will have transitioned to ONLINE (committed).
+  private static boolean isConsumingInExternalView(ExternalView externalView, String segment) {
+    Map<String, String> stateMap = externalView.getStateMap(segment);
+    return stateMap != null && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
   }
 }
