@@ -63,11 +63,41 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   private int _index;
   private static final String CHILDREN_KEY = "children";
   private final IntFunction<ObjectNode> _jsonStatsByStage;
+  /// Row counts the optimizer estimated, keyed by plan node. Empty unless the caller asked for
+  /// them, which is what keeps the extra field off every query's stats.
+  private final Map<PlanNode, Double> _estimatedRowCounts;
 
-  public InStageStatsTreeBuilder(MultiStageQueryStats.StageStats stageStats, IntFunction<ObjectNode> jsonStatsByStage) {
+  public InStageStatsTreeBuilder(MultiStageQueryStats.StageStats stageStats,
+      IntFunction<ObjectNode> jsonStatsByStage, Map<PlanNode, Double> estimatedRowCounts) {
     _stageStats = stageStats;
     _index = stageStats.getLastOperatorIndex();
     _jsonStatsByStage = jsonStatsByStage;
+    _estimatedRowCounts = estimatedRowCounts;
+  }
+
+  /// Adds the optimizer's estimate for `planNode` to `json`, in place, next to the actual counts
+  /// already there.
+  ///
+  /// Because this builder visits the plan itself, no id lookup is needed to find the estimate — but
+  /// it does not follow that any JSON object reaching this method describes `planNode`. Call it only
+  /// where the object being annotated is the one built for that node; the paths that hand back a
+  /// child's object, or a synthetic container standing for no operator at all, must not. Pairing one
+  /// operator's estimate with another's emitted rows is worse than reporting nothing.
+  ///
+  /// In a leaf stage the engine compiles the whole pushed-down subtree into one operator, so the
+  /// estimate belonging on it is the subtree root's — that is what its emitted-row count represents.
+  ///
+  /// A node with no recorded estimate adds no field, rather than a zero a reader would take for a
+  /// real prediction of no rows.
+  private ObjectNode withEstimatedRows(ObjectNode json, PlanNode planNode) {
+    if (_estimatedRowCounts.isEmpty()) {
+      return json;
+    }
+    Double estimate = _estimatedRowCounts.get(planNode);
+    if (estimate != null) {
+      json.put("estimatedRows", estimate);
+    }
+    return json;
   }
 
   private ObjectNode selfNode(OperatorTypeDescriptor type, Context context) {
@@ -206,6 +236,12 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     return joinNode.getJoinType() == JoinRelType.SEMI || joinNode.getJoinType() == JoinRelType.ANTI;
   }
 
+  /// Renders `node` and its children.
+  ///
+  /// Estimates are attached only on the paths that actually render `node` itself. The paths taken
+  /// when the stats and the plan disagree do not: with one input the child's own JSON is returned
+  /// unchanged, and with none or several the result is a synthetic container that stands for no
+  /// operator. Annotating those would pair one operator's estimate with another's emitted rows.
   private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType, Context context) {
     OperatorTypeDescriptor type = _stageStats.getOperatorType(_index);
     /*
@@ -220,10 +256,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
         int selfIndex = _index;
         ObjectNode pipelineBreakerResultNode = extractPipelineBreakerResult(node, context);
         if (pipelineBreakerResultNode != null) {
-          return selfNode(
-              MultiStageOperator.Type.LEAF, context, selfIndex, new JsonNode[] {pipelineBreakerResultNode}, false);
+          return withEstimatedRows(selfNode(
+              MultiStageOperator.Type.LEAF, context, selfIndex, new JsonNode[] {pipelineBreakerResultNode}, false),
+              node);
         }
-        return selfNode(MultiStageOperator.Type.LEAF, context, _index, new JsonNode[0]);
+        return withEstimatedRows(selfNode(MultiStageOperator.Type.LEAF, context, _index, new JsonNode[0]), node);
       }
       List<PlanNode> inputs = node.getInputs();
       int childrenSize = inputs.size();
@@ -251,7 +288,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     JsonNode[] childrenArr = new JsonNode[size];
     if (size > _index) {
       LOGGER.warn("Operator {} has {} inputs but only {} stats are left", type, size, _index);
-      return selfNode(type, context);
+      return withEstimatedRows(selfNode(type, context), node);
     }
     for (int i = size - 1; i >= 0; i--) {
       PlanNode planNode = inputs.get(i);
@@ -261,7 +298,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       childrenArr[i] = child;
     }
 
-    return selfNode(type, context, selfIndex, childrenArr);
+    return withEstimatedRows(selfNode(type, context, selfIndex, childrenArr), node);
   }
 
   @Override
@@ -292,7 +329,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Override
   public ObjectNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
-    ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context);
+    ObjectNode json = withEstimatedRows(selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context), node);
 
     ArrayNode children = JsonUtils.newArrayNode();
     int senderStageId = node.getSenderStageId();

@@ -1750,4 +1750,70 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
     assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
   }
+
+  /// The estimates must survive the whole planning chain -- converter, SubPlan, dispatch planner --
+  /// and arrive on the DispatchableSubPlan the broker holds. Every hop is a place they could be
+  /// silently dropped, and the unit tests either side of the chain would still pass if they were.
+  @Test
+  public void testEstimatedRowCountsReachTheDispatchableSubPlan() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SET includeEstimatedRows=true; SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 0");
+
+    Map<PlanNode, Double> estimates = dispatchableSubPlan.getEstimatedRowCounts();
+    assertFalse(estimates.isEmpty(), "Estimates were captured during conversion but did not reach "
+        + "the DispatchableSubPlan -- a hop in the planning chain is dropping them");
+
+    // Estimates are row counts: never negative, and a real plan has at least one positive one.
+    boolean anyPositive = false;
+    for (Map.Entry<PlanNode, Double> entry : estimates.entrySet()) {
+      assertTrue(entry.getValue() >= 0,
+          "Negative row estimate for " + entry.getKey().getClass().getSimpleName() + ": " + entry.getValue());
+      anyPositive |= entry.getValue() > 0;
+    }
+    assertTrue(anyPositive, "Every estimate was zero, which no real plan produces");
+  }
+
+  /// Every stage root must carry an estimate, not merely some node somewhere in the plan.
+  ///
+  /// Stage roots are the mailbox nodes, and those are the one kind fragmentation does not preserve:
+  /// it discards each ExchangeNode and builds a fresh pair, so without the copy in
+  /// PinotLogicalQueryPlanner the field would be missing from exactly the nodes a reader looks at
+  /// first -- while an assertion that merely found *an* estimated node somewhere would still pass.
+  @Test
+  public void testEveryStageRootCarriesAnEstimate() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SET includeEstimatedRows=true; SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1");
+
+    Map<PlanNode, Double> estimates = dispatchableSubPlan.getEstimatedRowCounts();
+    List<String> uncovered = new ArrayList<>();
+    for (Map.Entry<Integer, DispatchablePlanFragment> entry : dispatchableSubPlan.getQueryStageMap().entrySet()) {
+      PlanNode fragmentRoot = entry.getValue().getPlanFragment().getFragmentRoot();
+      if (!estimates.containsKey(fragmentRoot)) {
+        uncovered.add("stage " + entry.getKey() + " (" + fragmentRoot.getClass().getSimpleName() + ")");
+      }
+    }
+    assertTrue(uncovered.isEmpty(),
+        "These stage roots have no estimate, so identity was lost on the exchange boundary: " + uncovered);
+  }
+
+  /// Nothing is captured unless the query asks. The estimate is obtained by walking Calcite's
+  /// metadata handlers, which the multi-stage planner otherwise barely touches, so a query that did
+  /// not ask for estimates must not pay for them.
+  @Test
+  public void testNoEstimatesCapturedUnlessRequested() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 0");
+    assertTrue(dispatchableSubPlan.getEstimatedRowCounts().isEmpty(),
+        "Estimates were captured for a query that did not request them");
+  }
+
+  /// Statistics are not required for this to be useful: without them Calcite still supplies its own
+  /// row-count estimates, so estimate-versus-actual works on a broker with no CBO configured.
+  @Test
+  public void testEstimatesPresentWithoutStatistics() {
+    DispatchableSubPlan dispatchableSubPlan =
+        _queryEnvironment.planQuery("SET includeEstimatedRows=true; SELECT col1 FROM a");
+    assertFalse(dispatchableSubPlan.getEstimatedRowCounts().isEmpty(),
+        "Calcite's default estimates should be captured even with no statistics provider");
+  }
 }

@@ -377,4 +377,19 @@ public class QueryOptionsUtilsTest {
     queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
     assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
   }
+
+  /// The option is a user-facing key, so it has to survive the case-insensitive resolution every
+  /// query option goes through, and it has to default to off when absent. A typo in the constant or
+  /// an inverted read would leave every renderer test green while the option did nothing.
+  @Test
+  public void testIncludeEstimatedRows() {
+    assertTrue(QueryOptionsUtils.isIncludeEstimatedRows(
+        QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("INCLUDEESTIMATEDROWS", "true"))));
+    assertTrue(QueryOptionsUtils.isIncludeEstimatedRows(
+        QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("includeEstimatedRows", "true"))));
+    assertFalse(QueryOptionsUtils.isIncludeEstimatedRows(
+        QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("includeEstimatedRows", "false"))));
+    assertFalse(QueryOptionsUtils.isIncludeEstimatedRows(Map.of()),
+        "estimates must be off unless asked for");
+  }
 }

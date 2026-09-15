@@ -849,8 +849,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
+      // Already empty unless the query asked for estimates: `includeEstimatedRows` is honoured where
+      // the estimates are captured, during planning, so that a query that did not ask for them does
+      // not pay for them either. Nothing to gate a second time here.
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
-          queryResults.getStageCoverage(), queryResults.getStageStatsTrees());
+          queryResults.getStageCoverage(), queryResults.getStageStatsTrees(),
+          dispatchableSubPlan.getEstimatedRowCounts());
 
       if (QueryOptionsUtils.isStreamStats(query.getOptions(), _streamStatsDefault)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
@@ -974,12 +978,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan,
       @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage,
-      @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
+      @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees, Map<PlanNode, Double> estimatedRowCounts) {
     try {
       Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
 
       MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats,
-          stageStatsTrees);
+          stageStatsTrees, estimatedRowCounts);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats
