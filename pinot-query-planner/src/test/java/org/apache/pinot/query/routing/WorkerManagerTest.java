@@ -46,6 +46,7 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -575,6 +576,7 @@ public class WorkerManagerTest {
   // Broker pruning: partitioned leaf path
   // ---------------------------------------------------------------------------
 
+  private static final String LOGICAL_TABLE = "logicalTable";
   private static final String PARTITIONED_TABLE = "testTable";
   private static final String PARTITIONED_TABLE_OFFLINE = "testTable_OFFLINE";
 
@@ -1079,6 +1081,103 @@ public class WorkerManagerTest {
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  /// `inferTableOptions` must return null when routing is absent, never propagate.
+  ///
+  /// This is the contract the implicit table-hint rule depends on, and the reason those sites throw
+  /// `IllegalStateException` rather than using `Preconditions` — documented on
+  /// `checkNoSegmentsWithInvalidPartition`. A typed `QueryException` is not an
+  /// `IllegalStateException`, so raising one for missing routing escapes this method unless it is
+  /// caught explicitly.
+  ///
+  /// The case that makes this mandatory rather than defensive is a **logical table**, which never
+  /// has a routing entry at all: `_routingEntryMap` is populated only by `buildRouting` for physical
+  /// tables, while `buildRoutingForLogicalTable` merely attaches time-boundary managers to the
+  /// physical ones. Logical tables are routed at plan time by `LogicalTableRouteProvider`, which
+  /// never consults `routingExists`. So `routingExists` is false for both typed names of a table
+  /// that is entirely healthy — and with the exception escaping, `compile()` fails for a query that
+  /// works today.
+  @Test
+  public void testInferTableOptionsDegradesQuietlyWhenRoutingIsAbsent() {
+    // No partition info for any table, so routingExists is false for both typed names — the same
+    // state a healthy logical table is always in.
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3,
+        new PartitionedRoutingManager(Map.of(), Map.of(), Map.of(), false));
+
+    assertNull(workerManager.inferTableOptions("logicalTable"));
+  }
+
+  /// The end-to-end case from review: a **healthy** logical table must keep compiling with the implicit table hint
+  /// enabled.
+  ///
+  /// A logical table never has a routing entry. `_routingEntryMap` is populated only by `buildRouting` for physical
+  /// tables; `buildRoutingForLogicalTable` installs only time-boundary managers, and the table is routed at plan time
+  /// by `LogicalTableRouteProvider` from `DispatchablePlanVisitor#visitTableScan`, which never consults
+  /// `routingExists`. So `routingExists` is false for both typed names of a table that is entirely fine — "no routing
+  /// entry" is the normal, healthy state here, not a fault.
+  ///
+  /// `PinotImplicitTableHintRule` still fires (no explicit hint, so `getHintOptionsToRewrite` returns an empty
+  /// non-null map) and reaches `inferTableOptions` during `compile()`. If a typed `QueryException` escapes that
+  /// method it leaves the rule, leaves the `HepProgram`, and reaches `QueryEnvironment#optimize`, whose only handler
+  /// relabels it `QUERY_PLANNING` — so a query that works today stops compiling.
+  @Test
+  public void testHealthyLogicalTableStillCompilesWithInferPartitionHint() {
+    QueryEnvironment queryEnvironment =
+        newLogicalTableQueryEnvironment(new PartitionedRoutingManager(Map.of(), Map.of(), Map.of(), false));
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET inferPartitionHint=true; SELECT col2 FROM " + LOGICAL_TABLE + " WHERE col1 = 'foo'")) {
+      assertNotNull(compiledQuery);
+    }
+  }
+
+  /// A `QueryEnvironment` whose only table is a logical one, shaped as the table cache reports it: absent from the
+  /// physical name map, present in the logical one. That absence is what sends `PinotCatalog` and
+  /// `DispatchablePlanVisitor` down the logical branch, and what leaves `routingExists` false.
+  private static QueryEnvironment newLogicalTableQueryEnvironment(RoutingManager routingManager) {
+    LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
+    logicalTableConfig.setTableName(LOGICAL_TABLE);
+    logicalTableConfig.setPhysicalTableConfigMap(Map.of());
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(Map.of());
+    when(tableCache.getActualTableName(anyString())).thenReturn(null);
+    when(tableCache.getLogicalTableNameMap()).thenReturn(Map.of(LOGICAL_TABLE, LOGICAL_TABLE));
+    when(tableCache.getActualLogicalTableName(LOGICAL_TABLE)).thenReturn(LOGICAL_TABLE);
+    when(tableCache.getLogicalTableConfig(LOGICAL_TABLE)).thenReturn(logicalTableConfig);
+    when(tableCache.getSchema(LOGICAL_TABLE)).thenReturn(getSchemaBuilder(LOGICAL_TABLE).build());
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  /// The implicit table-hint path must keep degrading quietly, not fail the query with a different
+  /// error.
+  ///
+  /// `PinotImplicitTableHintRule` calls `inferTableOptions`, which deliberately swallows a
+  /// partition-layout failure and returns null so planning continues without the hint — a shuffled
+  /// plan rather than an error. That contract is documented on
+  /// `checkNoSegmentsWithInvalidPartition`, and is why those sites throw `IllegalStateException`
+  /// rather than using `Preconditions`.
+  ///
+  /// A typed `QueryException` is not an `IllegalStateException`, so raising one for missing routing
+  /// escapes the rule, escapes the HepProgram, and reaches `QueryEnvironment#optimize`, which
+  /// relabels it `QUERY_PLANNING` — 720, a BAD_REQUEST, and in CRITICAL_ERROR_CODES. That blames
+  /// the caller for a server-side routing condition. The query must still fail, but as
+  /// `BROKER_RESOURCE_MISSING` from worker assignment, exactly as it does with the hint path off.
+  @Test
+  public void testImplicitHintPathStillReportsBrokerResourceMissing() {
+    // No tableOptions hint, so getHintOptionsToRewrite returns an empty (non-null) map and the rule
+    // fires; inferPartitionHint=true is what supplies the WorkerManager the rule needs.
+    PartitionedRoutingManager routingManager =
+        new PartitionedRoutingManager(Map.of(), Map.of(), Map.of(), false);
+    QueryEnvironment queryEnvironment = newPartitionedTableQueryEnvironment(routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET inferPartitionHint=true; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      QueryException e = expectThrows(QueryException.class, () -> compiledQuery.planQuery(0));
+      assertEquals(e.getErrorCode(), QueryErrorCode.BROKER_RESOURCE_MISSING);
+    }
   }
 
   @Test
@@ -2724,7 +2823,7 @@ public class WorkerManagerTest {
 
     @Override
     public boolean routingExists(String tableNameWithType) {
-      return true;
+      return _emptyRoutingTable != null;
     }
 
     @Nullable

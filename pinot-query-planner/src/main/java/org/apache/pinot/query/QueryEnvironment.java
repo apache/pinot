@@ -518,6 +518,8 @@ public class QueryEnvironment {
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
+    } catch (QueryException e) {
+      throw e;
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_PLANNING.asException("Error optimizing query: " + e.getMessage(), e);
     }

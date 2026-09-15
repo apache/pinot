@@ -61,6 +61,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -1777,7 +1778,7 @@ public class WorkerManager {
           .partitionFunction(partitionTableInfo._partitionFunction)
           .partitionSize(partitionTableInfo._partitionInfoMap.length)
           .build();
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException | QueryException e) {
       return null;
     }
   }
