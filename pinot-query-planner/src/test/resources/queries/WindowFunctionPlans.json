@@ -583,6 +583,21 @@
         ]
       },
       {
+        "description": "QUALIFY desugars to a filter over the window, keeping the top row per partition",
+        "notes": "QUALIFY is rejected by the single-stage engine (it has no window functions), so this is the only engine that runs it",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col2 FROM a QUALIFY ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col3 DESC) = 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1])",
+          "\n  LogicalFilter(condition=[=($3, 1)])",
+          "\n    LogicalWindow(window#0=[window(partition {1} order by [2 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY) only with alias",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2) AS sum FROM a",
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
