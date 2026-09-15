@@ -36,9 +36,8 @@ public interface ColumnMetadata extends ColumnShape {
   /// Returns the [FieldSpec] of the column.
   ///
   /// A spec derived from segment metadata (`metadata.properties`) may be shared across loaded segments and tables
-  /// whose columns parse to an equal spec. Shared specs are frozen: setters throw [IllegalStateException], and
-  /// mutable default values are protected from changes through their getters. Deserialize [FieldSpec#toJsonObject()]
-  /// to make a mutable copy before editing a shared spec. Compare specs with
+  /// whose columns parse to an equal spec. Treat the spec and its nested values as read-only; deserialize
+  /// [FieldSpec#toJsonObject()] to make a copy before modifying it. Compare specs with
   /// [FieldSpec#equals], never by identity.
   @Override
   FieldSpec getFieldSpec();

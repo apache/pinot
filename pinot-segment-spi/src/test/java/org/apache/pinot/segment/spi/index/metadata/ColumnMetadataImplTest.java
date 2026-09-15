@@ -509,50 +509,6 @@ public class ColumnMetadataImplTest {
   }
 
   @Test
-  public void sharedSpecsRejectMutationWithoutChangingInternerKeys() {
-    for (FieldType fieldType : List.of(FieldType.DIMENSION, FieldType.METRIC)) {
-      FieldSpec first = parse(fieldType, DataType.INT, "-17");
-      FieldSpec second = parse(fieldType, DataType.INT, "-17");
-      assertSame(second, first);
-      JsonNode before = first.toJsonObject();
-      int hash = first.hashCode();
-
-      expectThrows(IllegalStateException.class, () -> first.setName("renamed"));
-      expectThrows(IllegalStateException.class, () -> first.setDataType(DataType.LONG));
-      expectThrows(IllegalStateException.class, () -> first.setDefaultNullValue(19));
-      expectThrows(IllegalStateException.class, () -> first.setMaxLength(10));
-      expectThrows(IllegalStateException.class, () -> first.setTransformFunction("other + 1"));
-
-      assertEquals(second.toJsonObject(), before);
-      assertEquals(second.hashCode(), hash);
-      assertSame(parse(fieldType, DataType.INT, "-17"), first,
-          "Rejected mutations must leave the canonical instance reachable under its original key");
-    }
-  }
-
-  @Test
-  public void sharedByteDefaultsCannotBeChangedThroughReturnedArrays() {
-    Map<DataType, String> defaults = Map.of(DataType.BYTES, "abcdef", DataType.UUID,
-        "123e4567-e89b-12d3-a456-426614174000");
-    defaults.forEach((dataType, literal) -> {
-      FieldSpec first = parse(FieldType.DIMENSION, dataType, literal);
-      FieldSpec second = parse(FieldType.DIMENSION, dataType, literal);
-      assertSame(second, first);
-      int hash = first.hashCode();
-      byte[] expected = (byte[]) dataType.convert(literal);
-      byte[] exposed = (byte[]) first.getDefaultNullValue();
-
-      exposed[0] ^= 1;
-
-      assertEquals((byte[]) first.getDefaultNullValue(), expected, dataType.name());
-      assertEquals((byte[]) second.getDefaultNullValue(), expected, dataType.name());
-      assertEquals(second.getDefaultNullValueString(), literal, dataType.name());
-      assertEquals(second.hashCode(), hash, dataType.name());
-      assertSame(parse(FieldType.DIMENSION, dataType, literal), first, dataType.name());
-    });
-  }
-
-  @Test
   public void sharedByteDefaultsRoundTripThroughSchemaJson()
       throws Exception {
     for (DataType dataType : List.of(DataType.BYTES, DataType.UUID)) {
@@ -572,52 +528,6 @@ public class ColumnMetadataImplTest {
         assertEquals(JsonUtils.objectToString(parsed), JsonUtils.objectToString(expected), dataType.name());
       }
     }
-  }
-
-  @Test
-  public void sharedTimeSpecsProtectNestedGranularity() {
-    PropertiesConfiguration config = configFor(FieldType.TIME, DataType.INT, null);
-    config.setProperty(Segment.TIME_UNIT, "HOURS");
-    TimeFieldSpec first = (TimeFieldSpec) ColumnMetadataImpl.extractFieldSpec("col", config);
-    TimeFieldSpec second = (TimeFieldSpec) ColumnMetadataImpl.extractFieldSpec("col", config);
-    assertSame(second, first);
-    JsonNode before = first.toJsonObject();
-    int hash = first.hashCode();
-    TimeGranularitySpec replacement = new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "other");
-
-    expectThrows(IllegalStateException.class, () -> first.setIncomingGranularitySpec(replacement));
-    expectThrows(IllegalStateException.class, () -> first.setOutgoingGranularitySpec(replacement));
-    expectThrows(IllegalStateException.class, () -> first.getIncomingGranularitySpec().setName("renamed"));
-    expectThrows(IllegalStateException.class, () -> first.getIncomingGranularitySpec().setDataType(DataType.LONG));
-    expectThrows(IllegalStateException.class, () -> first.getIncomingGranularitySpec().setTimeType(TimeUnit.DAYS));
-    expectThrows(IllegalStateException.class, () -> first.getIncomingGranularitySpec().setTimeUnitSize(2));
-    expectThrows(IllegalStateException.class, () -> first.getOutgoingGranularitySpec().setTimeunitSize(2));
-    expectThrows(IllegalStateException.class,
-        () -> first.getOutgoingGranularitySpec().setTimeFormat("SIMPLE_DATE_FORMAT:yyyyMMdd"));
-
-    assertEquals(second.toJsonObject(), before);
-    assertEquals(second.hashCode(), hash);
-    assertSame(ColumnMetadataImpl.extractFieldSpec("col", config), first);
-  }
-
-  @Test
-  public void sharedDateTimeSpecsProtectFormatAndGranularity() {
-    DateTimeFieldSpec first = (DateTimeFieldSpec) parse(FieldType.DATE_TIME, DataType.LONG, "0");
-    DateTimeFieldSpec second = (DateTimeFieldSpec) parse(FieldType.DATE_TIME, DataType.LONG, "0");
-    assertSame(second, first);
-    JsonNode before = first.toJsonObject();
-    int hash = first.hashCode();
-
-    expectThrows(IllegalStateException.class, () -> first.setFormat("1:SECONDS:EPOCH"));
-    expectThrows(IllegalStateException.class, () -> first.setGranularity("1:SECONDS"));
-    expectThrows(IllegalStateException.class, () -> first.setSampleValue("123"));
-    expectThrows(IllegalStateException.class, () -> first.setDataType(DataType.TIMESTAMP));
-    assertEquals(second.getFormatSpec().fromFormatToMillis("123"), 123L);
-    assertEquals(second.getGranularitySpec().granularityToMillis(), 1L);
-
-    assertEquals(second.toJsonObject(), before);
-    assertEquals(second.hashCode(), hash);
-    assertSame(parse(FieldType.DATE_TIME, DataType.LONG, "0"), first);
   }
 
   @Test
@@ -707,15 +617,6 @@ public class ColumnMetadataImplTest {
     assertSame(narrower.getChildFieldSpec("cpu"), first.getChildFieldSpec("cpu"));
     assertEquals(first.getChildFieldSpec("cpu"),
         new DimensionFieldSpec(ComplexFieldSpec.getFullChildName("metrics", "cpu"), DataType.DOUBLE, true));
-
-    FieldSpec child = first.getChildFieldSpec("cpu");
-    int hash = child.hashCode();
-    expectThrows(IllegalStateException.class, () -> child.setDefaultNullValue(3.0));
-    assertEquals(second.getChildFieldSpec("cpu").getDefaultNullValue(),
-        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-    assertEquals(second.getChildFieldSpec("cpu").hashCode(), hash);
-    assertSame(ColumnMetadataImpl.extractFieldSpec(ComplexFieldSpec.getFullChildName("metrics", "cpu"), twoChildren),
-        child);
   }
 
   /// A COMPLEX parent with DOUBLE children, written the way the segment creator writes it.

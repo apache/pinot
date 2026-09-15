@@ -70,9 +70,8 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 /// the type default is not handed to the [FieldSpec] at all, so the spec carries the shared static
 /// `FieldSpec.DEFAULT_*` constant and never retains the literal. The [FieldSpec] itself is then interned through
 /// [#FIELD_SPEC_INTERNER], so every segment of a table (and every table with an identical column definition) shares
-/// one instance per distinct spec instead of retaining its own. Specs are frozen before interning: setters reject
-/// mutation and mutable default values are protected, keeping other segments and the interner's keys unchanged.
-/// Deserialize [FieldSpec#toJsonObject()] to make a mutable copy before editing a shared spec.
+/// one instance per distinct spec instead of retaining its own. Callers must treat shared specs and their nested
+/// values as read-only. Deserialize [FieldSpec#toJsonObject()] to make a copy before editing a spec.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
@@ -514,9 +513,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   /// Parses the [FieldSpec] of the given column. DIMENSION, METRIC, TIME and DATE_TIME specs are returned from
   /// [#FIELD_SPEC_INTERNER], so the instance is shared with every other segment whose column parses to an equal spec
-  /// and is frozen before publication. A COMPLEX spec is not interned: [ComplexFieldSpec] does not override
+  /// and must not be mutated. A COMPLEX spec is not interned: [ComplexFieldSpec] does not override
   /// [FieldSpec#equals], so two structs with different children would alias; its children are parsed through this
   /// method and are interned.
+  @SuppressWarnings("deprecation") // Preserve the field type when loading legacy TIME column metadata.
   public static FieldSpec extractFieldSpec(String column, PropertiesConfiguration config) {
     // The name is retained by the FieldSpec, the segment Schema and every per-segment column map, and it recurs in
     // every segment of the table: intern it so all of them alias one JVM-wide instance. When COLUMN_NAME is absent
@@ -538,20 +538,19 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     switch (fieldType) {
       case DIMENSION:
         return FIELD_SPEC_INTERNER.intern(new DimensionFieldSpec(fieldName, dataType, isSingleValue, maxLength,
-            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLengthExceedStrategy).freeze());
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLengthExceedStrategy));
       case METRIC:
         return FIELD_SPEC_INTERNER.intern(new MetricFieldSpec(fieldName, dataType,
             canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLength,
-            maxLengthExceedStrategy).freeze());
+            maxLengthExceedStrategy));
       case TIME:
         TimeUnit timeUnit = TimeUnit.valueOf(config.getString(Segment.TIME_UNIT, "DAYS").toUpperCase());
-        return FIELD_SPEC_INTERNER.intern(
-            new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName)).freeze());
+        return FIELD_SPEC_INTERNER.intern(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName)));
       case DATE_TIME:
         String format = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_FORMAT)));
         String granularity = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_GRANULARITY)));
         return FIELD_SPEC_INTERNER.intern(new DateTimeFieldSpec(fieldName, dataType, format, granularity,
-            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), null).freeze());
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), null));
       case COMPLEX:
         List<String> childFieldNames =
             config.getList(String.class, Column.getKeyFor(column, Column.COMPLEX_CHILD_FIELD_NAMES));
