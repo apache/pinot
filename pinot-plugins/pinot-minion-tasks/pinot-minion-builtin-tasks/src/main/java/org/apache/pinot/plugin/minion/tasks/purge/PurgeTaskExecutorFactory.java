@@ -19,20 +19,13 @@
 package org.apache.pinot.plugin.minion.tasks.purge;
 
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.MinionConf;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
 @TaskExecutorFactory
-public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
-
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
-  }
-
+public class PurgeTaskExecutorFactory extends BaseTaskExecutorFactory {
   @Override
   public String getTaskType() {
     return MinionConstants.PurgeTask.TASK_TYPE;
@@ -40,6 +33,6 @@ public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
 
   @Override
   public PinotTaskExecutor create() {
-    return new PurgeTaskExecutor();
+    return new PurgeTaskExecutor(getIngestionGroovyPolicy());
   }
 }
