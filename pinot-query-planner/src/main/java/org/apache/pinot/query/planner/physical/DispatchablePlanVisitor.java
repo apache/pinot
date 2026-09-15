@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -81,6 +82,17 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
     dispatchablePlanMetadata.setRequireSingleton(node.getKeys().isEmpty());
+    return null;
+  }
+
+  @Override
+  public Void visitMatch(MatchNode node, DispatchablePlanContext context) {
+    node.getInputs().get(0).visit(this, context);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    // Same reasoning as WindowNode: MATCH_RECOGNIZE without PARTITION BY sees the whole input as a single ordered
+    // partition, so it has to run on a singleton node. With PARTITION BY the work can be distributed, since matches
+    // never span partitions.
+    dispatchablePlanMetadata.setRequireSingleton(node.getPartitionKeys().isEmpty());
     return null;
   }
 

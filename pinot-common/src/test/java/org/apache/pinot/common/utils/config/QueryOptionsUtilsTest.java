@@ -38,7 +38,7 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, MAX_ROWS_IN_MATCH_PARTITION);
   private static final List<String> NON_NEGATIVE_INT_KEYS =
       List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
@@ -50,7 +50,8 @@ public class QueryOptionsUtilsTest {
       addAll(UNBOUNDED_INT_KEYS);
     }};
   private static final List<String> POSITIVE_LONG_KEYS =
-      List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
+      List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES,
+          MAX_STEPS_PER_MATCH_ATTEMPT);
 
   @Test
   public void shouldConvertCaseInsensitiveMapToUseCorrectValues() {
@@ -334,6 +335,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
+      case MAX_ROWS_IN_MATCH_PARTITION:
+        return QueryOptionsUtils.getMaxRowsInMatchPartition(map);
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
@@ -357,6 +360,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxServerResponseSizeBytes(map);
       case MAX_QUERY_RESPONSE_SIZE_BYTES:
         return QueryOptionsUtils.getMaxQueryResponseSizeBytes(map);
+      case MAX_STEPS_PER_MATCH_ATTEMPT:
+        return QueryOptionsUtils.getMaxStepsPerMatchAttempt(map);
       default:
         throw new IllegalArgumentException("Unexpected key!");
     }

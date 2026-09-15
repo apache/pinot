@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.validation;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -29,6 +30,8 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -142,6 +145,28 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Function 'ArrayToMv' is not supported in WINDOW Intermediate Stage");
+    }
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitMatch(MatchNode node, Boolean isIntermediateStage) {
+    if (isIntermediateStage) {
+      // MEASURES expressions and DEFINE predicates are both evaluated by the MATCH_RECOGNIZE operator itself.
+      List<RexExpression> expressions = new ArrayList<>(node.getMeasures().size() + node.getPatternSymbols().size());
+      for (MatchNode.Measure measure : node.getMeasures()) {
+        expressions.add(measure.getExpression());
+      }
+      for (PatternSymbol symbol : node.getPatternSymbols()) {
+        if (symbol.getDefinition() != null) {
+          expressions.add(symbol.getDefinition());
+        }
+      }
+      if (containsArrayToMv(expressions)) {
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "Function 'ArrayToMv' is not supported in MATCH_RECOGNIZE Intermediate Stage");
+      }
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
