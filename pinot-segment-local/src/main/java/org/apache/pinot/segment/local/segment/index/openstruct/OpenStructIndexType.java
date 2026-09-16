@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.openstruct.OpenStructColumnSplitter;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -95,11 +94,11 @@ public class OpenStructIndexType
     }
   }
 
-  /// Rejects a declared child key type that the consuming and sealed-build paths cannot coerce a
-  /// value to (e.g. STRUCT, LIST, nested OPEN_STRUCT, UNKNOWN — [ColumnDataType#fromDataTypeSV] or
-  /// the resulting [ColumnDataType#toPinotDataType] throws for these). Catching this at config
-  /// validation, rather than surfacing it as an uncaught exception on the first row ingested for
-  /// such a key, keeps a bad declared type from taking down the whole consuming thread.
+  /// Rejects a declared child key type that a key column cannot actually store (e.g. STRUCT, LIST, MAP, nested
+  /// OPEN_STRUCT, UNKNOWN — [FieldSpec#getDefaultNullValue(FieldSpec.FieldType,FieldSpec.DataType,String)] has no
+  /// DIMENSION case for these). Catching this at config validation, rather than surfacing it as an uncaught
+  /// exception on the first row ingested for such a key, keeps a bad declared type from taking down the whole
+  /// consuming thread.
   private void validateChildFieldSpecTypes(ComplexFieldSpec fieldSpec) {
     Map<String, FieldSpec> childFieldSpecs = fieldSpec.getChildFieldSpecs();
     if (childFieldSpecs == null) {
@@ -115,7 +114,10 @@ public class OpenStructIndexType
 
   private static boolean isCoercible(FieldSpec.DataType storedType) {
     try {
-      ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
+      // The exact call allocateKeyColumn() makes to compute a key column's default null value; a declared type
+      // that fails it here (e.g. MAP, OPEN_STRUCT, which ColumnDataType conversion alone accepts) would otherwise
+      // throw uncaught on the consuming thread instead of being rejected at config validation time.
+      FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
       return true;
     } catch (Exception e) {
       return false;

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource.MapValueReader;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -60,6 +62,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -68,6 +71,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ImmutableOpenStructDataSourceTest {
@@ -520,6 +524,84 @@ public class ImmutableOpenStructDataSourceTest {
     assertNotNull(doc0);
     assertEquals(doc0.get("clicks"), 10);
     assertEquals(doc0.get("rare_key"), "val");
+  }
+
+  /// A dense child key literally named the same as the parent OPEN_STRUCT column (e.g. `{"event": {"event": 1,
+  /// "region": "us"}}`) must not shadow the sparse blob reader in the per-key reader cache: the sparse reader is
+  /// keyed by parent field name, same as this dense key. Exercised through [ImmutableOpenStructDataSource
+  /// #openMapValueReader()] directly — the bug only lives in the cached reader a real scan uses, not in the
+  /// unscoped [ImmutableOpenStructDataSource#getMapValue(int)] this test's data flowed through before it started
+  /// delegating to the same cached reader.
+  @Test
+  public void testOpenMapValueReaderChildKeyMatchingParentNameDoesNotShadowSparseReader() throws Exception {
+    DataSource eventKeyDs = mockDenseDataSource(DataType.INT, 5, false);
+    DataSource sparseDs = mockSparseDataSource("{\"region\":\"us\"}", false);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of("event", eventKeyDs), sparseDs, 2, null);
+
+    try (MapValueReader reader = ds.openMapValueReader()) {
+      Map<String, Object> doc0 = reader.getMapValue(0);
+      assertNotNull(doc0);
+      assertEquals(doc0.get("event"), 5);
+      assertEquals(doc0.get("region"), "us");
+    }
+  }
+
+  @Test
+  public void testGetMapValueMalformedSparseJsonThrowsWithDocContext() {
+    DataSource sparseDs = mockSparseDataSource("not-json", false);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of(), sparseDs, 2, null);
+
+    RuntimeException e = expectThrows(RuntimeException.class, () -> ds.getMapValue(0));
+    assertTrue(e.getMessage().contains("docId 0"));
+  }
+
+  @Test
+  public void testOpenMapValueReaderCloseCollectsAndSuppressesReaderCloseFailures() throws Exception {
+    ForwardIndexReaderContext ctx1 = mock(ForwardIndexReaderContext.class);
+    doThrow(new IOException("reader1 failed")).when(ctx1).close();
+    DataSource ds1 = mockDenseDataSourceWithFailingClose(1, ctx1);
+
+    ForwardIndexReaderContext ctx2 = mock(ForwardIndexReaderContext.class);
+    doThrow(new IOException("reader2 failed")).when(ctx2).close();
+    DataSource ds2 = mockDenseDataSourceWithFailingClose(2, ctx2);
+
+    Map<String, DataSource> perKey = new HashMap<>();
+    perKey.put("a", ds1);
+    perKey.put("b", ds2);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), perKey, null, 1, null);
+
+    MapValueReader reader = ds.openMapValueReader();
+    reader.getMapValue(0);
+
+    IOException e = expectThrows(IOException.class, reader::close);
+    assertEquals(e.getSuppressed().length, 1);
+  }
+
+  /// A dense INT column whose forward index reader context throws on close, so [PinotSegmentColumnReader#close]
+  /// propagates a failure to exercise the caching reader's close()-collects-failures behavior.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static DataSource mockDenseDataSourceWithFailingClose(int valueAtDoc0, ForwardIndexReaderContext ctx) {
+    DataSource ds = mock(DataSource.class);
+    ForwardIndexReader fwdReader = mock(ForwardIndexReader.class);
+    when(fwdReader.createContext()).thenReturn(ctx);
+    when(fwdReader.getStoredType()).thenReturn(DataType.INT);
+    when(fwdReader.isSingleValue()).thenReturn(true);
+    when(fwdReader.isDictionaryEncoded()).thenReturn(false);
+    when(fwdReader.getInt(eq(0), eq(ctx))).thenReturn(valueAtDoc0);
+    when(ds.getDictionary()).thenReturn(null);
+    when(ds.getForwardIndex()).thenReturn(fwdReader);
+
+    NullValueVectorReader nullReader = mock(NullValueVectorReader.class);
+    when(nullReader.isNull(0)).thenReturn(false);
+    when(ds.getNullValueVector()).thenReturn(nullReader);
+
+    return ds;
   }
 
   @Test

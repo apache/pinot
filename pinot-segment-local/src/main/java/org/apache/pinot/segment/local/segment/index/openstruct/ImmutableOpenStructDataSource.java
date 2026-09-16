@@ -144,59 +144,13 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
   }
 
-  @SuppressWarnings("unchecked")
   @Nullable
   @Override
   public Map<String, Object> getMapValue(int docId) {
-    Map<String, Object> result = null;
-
-    for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
-      Object value = readValue(entry.getKey(), entry.getValue(), docId);
-      if (value != null) {
-        if (result == null) {
-          result = new HashMap<>();
-        }
-        result.put(entry.getKey(), value);
-      }
-    }
-
-    if (_sparseDataSource != null) {
-      Object sparseValue = readValue(_fieldSpec.getName(), _sparseDataSource, docId);
-      if (sparseValue instanceof String) {
-        String json = (String) sparseValue;
-        if (!json.isEmpty()) {
-          try {
-            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
-            if (result == null) {
-              result = new HashMap<>();
-            }
-            result.putAll(sparseMap);
-          } catch (IOException e) {
-            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
-          }
-        }
-      }
-    }
-
-    return result;
-  }
-
-  /// Reads the value of `key` at `docId`, or `null` when the doc is null or the column has no
-  /// forward index. Delegates the null-vector check and the dictionary/raw per-type read dispatch to
-  /// [PinotSegmentColumnReader] rather than re-deriving them here, so this path cannot drift from the
-  /// reader every other column read in the engine already goes through. OPEN_STRUCT child columns are
-  /// always single-valued, hence the 0 maxNumValuesPerMVEntry.
-  @Nullable
-  private static Object readValue(String key, DataSource dataSource, int docId) {
-    ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
-    if (fwdReader == null) {
-      return null;
-    }
-    try (PinotSegmentColumnReader reader = new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
-        dataSource.getNullValueVector(), 0)) {
-      return reader.isNull(docId) ? null : reader.getValue(docId);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to read value from OPEN_STRUCT key forward index", e);
+    try (MapValueReader reader = openMapValueReader()) {
+      return reader.getMapValue(docId);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to close OPEN_STRUCT map value reader", e);
     }
   }
 
@@ -205,14 +159,23 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return new CachingMapValueReader();
   }
 
-  /// Caches one [PinotSegmentColumnReader] per key for the life of the reader, instead of the
-  /// per-call construct-and-close [#readValue]/[#getMapValue] does. For a raw, chunk-compressed
-  /// column (e.g. the sparse blob), a fresh reader per doc means a fresh decompression buffer and,
-  /// depending on access order, redundant re-decompression of the same chunk; reusing the reader
-  /// across a sequential scan lets it carry its decoded-chunk state forward. Not thread-safe — for
-  /// one single-threaded scan only, per [OpenStructDataSource#openMapValueReader()].
+  /// Caches one [PinotSegmentColumnReader] per key for the life of the reader, instead of
+  /// constructing one per call the way an unscoped [#getMapValue(int)] would. For a raw,
+  /// chunk-compressed column (e.g. the sparse blob), a fresh reader per doc means a fresh
+  /// decompression buffer and, depending on access order, redundant re-decompression of the same
+  /// chunk; reusing the reader across a sequential scan lets it carry its decoded-chunk state
+  /// forward. Not thread-safe — for one single-threaded scan only, per
+  /// [OpenStructDataSource#openMapValueReader()].
   private final class CachingMapValueReader implements MapValueReader {
     private final Map<String, PinotSegmentColumnReader> _readers = new HashMap<>();
+    // Kept out of _readers: a child key that happens to match the parent field name would otherwise share the
+    // same map entry as the sparse blob reader, silently shadowing it.
+    @Nullable
+    private final PinotSegmentColumnReader _sparseReader;
+
+    CachingMapValueReader() {
+      _sparseReader = _sparseDataSource != null ? createReader(_fieldSpec.getName(), _sparseDataSource) : null;
+    }
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -230,20 +193,17 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
         }
       }
 
-      if (_sparseDataSource != null) {
-        Object sparseValue = readValue(_fieldSpec.getName(), _sparseDataSource, docId);
-        if (sparseValue instanceof String) {
-          String json = (String) sparseValue;
-          if (!json.isEmpty()) {
-            try {
-              Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
-              if (result == null) {
-                result = new HashMap<>();
-              }
-              result.putAll(sparseMap);
-            } catch (IOException e) {
-              throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+      if (_sparseReader != null) {
+        Object sparseValue = readValue(_sparseReader, docId);
+        if (sparseValue instanceof String json && !json.isEmpty()) {
+          try {
+            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+            if (result == null) {
+              result = new HashMap<>();
             }
+            result.putAll(sparseMap);
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
           }
         }
       }
@@ -253,11 +213,12 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
 
     @Nullable
     private Object readValue(String key, DataSource dataSource, int docId) {
-      PinotSegmentColumnReader reader = _readers.computeIfAbsent(key, k -> createReader(k, dataSource));
-      if (reader == null) {
-        return null;
-      }
-      return reader.isNull(docId) ? null : reader.getValue(docId);
+      return readValue(_readers.computeIfAbsent(key, k -> createReader(k, dataSource)), docId);
+    }
+
+    @Nullable
+    private Object readValue(@Nullable PinotSegmentColumnReader reader, int docId) {
+      return reader == null ? null : reader.isNull(docId) ? null : reader.getValue(docId);
     }
 
     @Nullable
@@ -273,8 +234,31 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     @Override
     public void close()
         throws IOException {
+      IOException firstException = null;
       for (PinotSegmentColumnReader reader : _readers.values()) {
+        firstException = closeQuietly(reader, firstException);
+      }
+      if (_sparseReader != null) {
+        firstException = closeQuietly(_sparseReader, firstException);
+      }
+      if (firstException != null) {
+        throw firstException;
+      }
+    }
+
+    // Closes every reader even when an earlier one throws, instead of leaking the rest; extra failures are
+    // attached as suppressed on the first exception, mirroring try-with-resources semantics.
+    @Nullable
+    private static IOException closeQuietly(PinotSegmentColumnReader reader, @Nullable IOException firstException) {
+      try {
         reader.close();
+        return firstException;
+      } catch (IOException e) {
+        if (firstException == null) {
+          return e;
+        }
+        firstException.addSuppressed(e);
+        return firstException;
       }
     }
   }
