@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -71,6 +72,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -2022,6 +2024,70 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       assertTrue(processor.needProcess());
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+  }
+
+  /// The all-index preprocess throttler must only cover the single-column index steps. Star-tree and multi-column
+  /// text index builds have their own throttlers, and holding the all-index permit across them would block every
+  /// other segment preprocessing for the whole duration of those builds.
+  @Test
+  public void testAllIndexPreprocessThrottlerReleasedBeforeStarTreeAndMultiColTextIndex()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    buildTestSegment(tableConfig, schema, stringValues, longValues);
+
+    // Add both a star-tree index and a multi-column text index so that both throttled steps actually run
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    indexingConfig.setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of("stringCol")));
+
+    SegmentOperationsThrottler allIndexThrottler = new SegmentOperationsThrottler(1, 1, true);
+    AtomicInteger permitsOnStarTreeAcquire = new AtomicInteger(-1);
+    AtomicInteger permitsOnMultiColTextAcquire = new AtomicInteger(-1);
+    SegmentOperationsThrottlerSet throttlerSet = new SegmentOperationsThrottlerSet(allIndexThrottler,
+        new PermitRecordingThrottler(allIndexThrottler, permitsOnStarTreeAcquire),
+        new SegmentOperationsThrottler(1, 1, true),
+        new PermitRecordingThrottler(allIndexThrottler, permitsOnMultiColTextAcquire));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
+            new IndexLoadingConfig(tableConfig, schema))) {
+      assertTrue(processor.needProcess());
+      processor.process(throttlerSet);
+    }
+
+    // Both steps must have run, and the all-index permit must have been released before either of them started
+    assertEquals(permitsOnStarTreeAcquire.get(), 1);
+    assertEquals(permitsOnMultiColTextAcquire.get(), 1);
+    // The all-index permit is released exactly once
+    assertEquals(allIndexThrottler.availablePermits(), 1);
+  }
+
+  /// Throttler that records the available permits of another throttler whenever it is acquired, so that tests can
+  /// assert which throttlers are held at the same time.
+  private static class PermitRecordingThrottler extends SegmentOperationsThrottler {
+    private final SegmentOperationsThrottler _observedThrottler;
+    private final AtomicInteger _observedPermitsOnAcquire;
+
+    PermitRecordingThrottler(SegmentOperationsThrottler observedThrottler, AtomicInteger observedPermitsOnAcquire) {
+      super(1, 1, true);
+      _observedThrottler = observedThrottler;
+      _observedPermitsOnAcquire = observedPermitsOnAcquire;
+    }
+
+    @Override
+    public void acquire()
+        throws InterruptedException {
+      _observedPermitsOnAcquire.set(_observedThrottler.availablePermits());
+      super.acquire();
     }
   }
 
