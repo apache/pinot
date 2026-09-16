@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -307,34 +308,19 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    IOException firstException = null;
+    IOException closeException = null;
     if (_columnReaderMap != null) {
-      for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
-        firstException = closeCollectingException(columnReader, firstException);
+      try {
+        FileUtils.close(_columnReaderMap.values());
+      } catch (IOException e) {
+        closeException = e;
       }
     }
     if (_destroySegmentOnClose && _indexSegment != null) {
       _indexSegment.destroy();
     }
-    if (firstException != null) {
-      throw firstException;
-    }
-  }
-
-  /// Closes every reader even when an earlier one throws, instead of leaking the rest; extra failures are
-  /// attached as suppressed on the first exception, mirroring try-with-resources semantics.
-  @Nullable
-  private static IOException closeCollectingException(PinotSegmentColumnReader reader,
-      @Nullable IOException firstException) {
-    try {
-      reader.close();
-      return firstException;
-    } catch (IOException e) {
-      if (firstException == null) {
-        return e;
-      }
-      firstException.addSuppressed(e);
-      return firstException;
+    if (closeException != null) {
+      throw closeException;
     }
   }
 }
