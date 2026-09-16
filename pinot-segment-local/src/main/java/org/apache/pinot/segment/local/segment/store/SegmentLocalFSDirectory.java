@@ -182,12 +182,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     // check that v3 subdirectory exists since the format may not have been converted
     if (_segmentDirectory != null && _segmentDirectory.exists()) {
-      try {
-        return FileUtils.sizeOfDirectory(_segmentDirectory.toPath().toFile());
-      } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for directory: {}", _segmentDirectory.getAbsolutePath());
-        return -1;
-      }
+      // A concurrent reload may be rewriting this directory in place, so use the delete-tolerant walk.
+      return org.apache.pinot.common.utils.FileUtils.sizeOfDirectory(_segmentDirectory);
     } else {
       if (!SegmentDirectoryPaths.isV3Directory(_segmentDirectory)) {
         LOGGER

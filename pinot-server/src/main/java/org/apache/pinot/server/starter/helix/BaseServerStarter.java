@@ -39,7 +39,6 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -68,6 +67,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -940,6 +940,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       try {
         for (File consumerDir : instanceConsumerDirs) {
           if (consumerDir.exists()) {
+            // Consuming segments write to this directory continuously, so use the delete-tolerant walk.
             totalSize += FileUtils.sizeOfDirectory(consumerDir);
           }
         }
