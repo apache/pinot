@@ -21,6 +21,59 @@
 
 # Upgrading the Pinot Helm Chart
 
+## From 1.0.x to 1.0.1
+
+### Continuous JFR profiling moved from cluster config to JVM arguments
+
+The chart can now run a continuous Java Flight Recorder recording per role, started by
+`-XX:StartFlightRecording` in `JAVA_OPTS`. Enable it with `<role>.jfr.enabled` and tune the shared
+`jfr` block; see the "Continuous profiling with Java Flight Recorder" section of the README.
+
+JFR is off by default, so upgrading changes nothing until you opt in.
+
+#### Enabling it is in-place; keeping recordings on a volume is not
+
+With the defaults, `<role>.jfr.enabled: true` only changes `spec.template`, so it applies with a
+normal rolling restart. Recordings go to an `emptyDir` and are lost when the pod is rescheduled.
+
+Setting `jfr.persistence.enabled: true` is the part that cannot be done in place: it adds an entry
+to that StatefulSet's `volumeClaimTemplates`, and **Kubernetes forbids changing that field**, so
+`helm upgrade` fails with:
+
+```
+updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template',
+'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden
+```
+
+Turning it back off fails the same way. If you need the PersistentVolume, delete the StatefulSet
+without touching the pods, then upgrade:
+
+```bash
+kubectl delete statefulset <release>-pinot-server --cascade=orphan
+helm upgrade <release> ./helm/pinot \
+  --set server.jfr.enabled=true --set jfr.persistence.enabled=true
+```
+
+`--cascade=orphan` leaves the running pods alone; the recreated StatefulSet adopts them, and the new
+`jfr` volume is attached as each pod is rolled. Do this per role. A role's existing `data` PVCs are
+untouched either way.
+
+#### If you use the `pinot.jfr.*` cluster configs
+
+Those are deprecated and will be removed in a future Pinot release. They still work, but they start
+the recording only after the component has connected to Helix — so JVM startup is never captured —
+and changing any `pinot.jfr.*` key restarts the recording, which discards all history recorded so
+far.
+
+**Remove the `pinot.jfr.*` cluster configs before enabling `<role>.jfr.enabled`.** This is a
+prerequisite, not a preference. Running both means the old code path issues
+`JFR.configure repositorypath=...`, which is JVM-global: it relocates the recording the JVM started,
+off the volume the chart provisioned for it.
+
+Pinot 1.6.0 and later detect this and ignore the deprecated configs with a warning. **Earlier images
+do not** — and the chart happily renders the JVM arguments for whatever `image.tag` you have pinned,
+so on a pre-1.6.0 image the collision above is exactly what you get.
+
 ## From 0.x to 1.0.0
 
 Version 1.0.0 replaces the Bitnami ZooKeeper subchart with native Helm

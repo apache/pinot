@@ -59,8 +59,7 @@ spec:
 {{ toYaml .Values.server.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.server.tolerations | indent 8 }}
-      initContainers:
-{{ toYaml .Values.server.initContainers | indent 8 }}
+{{- include "pinot.jfr.initContainers" (dict "ctx" . "role" .Values.server) }}
       containers:
       - name: server
         securityContext:
@@ -75,7 +74,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.server.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.server.log4j2ConfFile }} -Dplugins.dir={{ .Values.server.pluginsDir }}"
+            value: "{{ .Values.server.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.server.log4j2ConfFile }} -Dplugins.dir={{ .Values.server.pluginsDir }}{{ if .Values.server.jfr.enabled }} {{ include "pinot.jfr.javaOpts" (dict "ctx" . "role" .Values.server) }}{{ end }}"
 {{- if .Values.server.extraEnv }}
 {{ toYaml .Values.server.extraEnv | indent 10 }}
 {{- end}}
@@ -129,6 +128,9 @@ spec:
             mountPath: /var/pinot/server/config
           - name: data
             mountPath: "{{ .Values.server.persistence.mountPath }}"
+          {{- if .Values.server.jfr.enabled }}
+          {{- include "pinot.jfr.volumeMount" . | nindent 10 }}
+          {{- end }}
           {{- if ne (len .Values.server.persistence.extraVolumeMounts) 0 }}
 {{ toYaml .Values.server.persistence.extraVolumeMounts | indent 10 }}
           {{- end }}
@@ -143,11 +145,16 @@ spec:
         - name: data
           emptyDir: {}
       {{- end }}
+      {{- if and .Values.server.jfr.enabled (not .Values.jfr.persistence.enabled) }}
+        {{- include "pinot.jfr.emptyDirVolume" . | nindent 8 }}
+      {{- end }}
       {{- if ne (len .Values.server.persistence.extraVolumes) 0 }}
 {{ toYaml .Values.server.persistence.extraVolumes | indent 8 }}
       {{- end }}
-  {{- if .Values.server.persistence.enabled }}
+  {{- $jfrClaim := and .Values.server.jfr.enabled .Values.jfr.persistence.enabled }}
+  {{- if or .Values.server.persistence.enabled $jfrClaim }}
   volumeClaimTemplates:
+    {{- if .Values.server.persistence.enabled }}
     - metadata:
         name: data
       spec:
@@ -163,4 +170,8 @@ spec:
         resources:
           requests:
             storage: {{ .Values.server.persistence.size }}
-  {{ end }}
+    {{- end }}
+    {{- if $jfrClaim }}
+    {{- include "pinot.jfr.volumeClaimTemplate" . | nindent 4 }}
+    {{- end }}
+  {{- end }}

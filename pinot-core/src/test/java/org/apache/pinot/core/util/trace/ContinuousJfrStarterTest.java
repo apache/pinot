@@ -33,9 +33,12 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.assertj.core.api.Assertions;
 import org.testng.SkipException;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
+/// Covers the deprecated `pinot.jfr.*` cluster config path, which is kept working until it is removed.
+@SuppressWarnings("removal")
 public class ContinuousJfrStarterTest {
   private static final long DEFAULT_MAX_SIZE_BYTES = DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE);
   private static final long DEFAULT_MAX_AGE_MILLIS = 7L * 24 * 60 * 60 * 1000;
@@ -420,6 +423,65 @@ public class ContinuousJfrStarterTest {
     return false;
   }
 
+  /// When the JVM was started with `-XX:StartFlightRecording` the JVM owns the recorder, and this
+  /// class must not touch it. Issuing `JFR.configure repositorypath=...` here would relocate the
+  /// JVM's recording, typically off the volume it was meant to be written to.
+  @Test
+  public void standsDownWhenTheJvmAlreadyStartedARecording() {
+    _continuousJfrStarter.setStartedByJvmArgument(true);
+
+    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true",
+        "pinot.jfr.directory", "/some/where/else"));
+
+    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands())
+        .describedAs("No JFR command may be issued when the JVM already owns the recording")
+        .isEmpty();
+    Assertions.assertThat(_continuousJfrStarter.isRunning())
+        .describedAs("This class is not managing the JVM's recording")
+        .isFalse();
+  }
+
+  @DataProvider(name = "jvmArguments")
+  public Object[][] jvmArguments() {
+    return new Object[][]{
+        {List.of(), false},
+        {List.of("-Xmx1g", "-XX:+UseG1GC"), false},
+        // Both forms of both flags. -XX:FlightRecorderOptions matters even on its own: it is what
+        // sets repositorypath, which is what the stand-down exists to protect.
+        {List.of("-XX:StartFlightRecording=name=pinot-continuous,disk=true"), true},
+        {List.of("-XX:StartFlightRecording:name=pinot-continuous"), true},
+        {List.of("-XX:StartFlightRecording"), true},
+        {List.of("-XX:FlightRecorderOptions=repository=/var/pinot/jfr"), true},
+        {List.of("-XX:FlightRecorderOptions:repository=/var/pinot/jfr"), true},
+        // What the Helm chart actually renders.
+        {List.of("-Xmx1g", "-XX:FlightRecorderOptions=repository=/var/pinot/jfr,preserve-repository=true",
+            "-XX:StartFlightRecording=name=pinot-continuous,settings=default,disk=true"), true},
+        // A JFR flag quoted inside an unrelated property must not count.
+        {List.of("-Dsomething=-XX:StartFlightRecording"), false},
+        {List.of("-Dpinot.jfr.enabled=true"), false},
+    };
+  }
+
+  @Test(dataProvider = "jvmArguments")
+  public void detectsRecordingConfiguredByJvmArgument(List<String> arguments, boolean expected) {
+    Assertions.assertThat(ContinuousJfrStarter.isRecordingConfiguredByJvmArgument(arguments))
+        .describedAs("JVM arguments %s", arguments)
+        .isEqualTo(expected);
+  }
+
+  /// The stand-down must not leak into the normal path.
+  @Test
+  public void startsNormallyWhenTheJvmDidNotConfigureARecording() {
+    _continuousJfrStarter.setStartedByJvmArgument(false);
+
+    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+
+    Assertions.assertThat(_continuousJfrStarter.isRunning()).isTrue();
+    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands())
+        .containsExactly("jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize="
+            + DEFAULT_MAX_SIZE_BYTES + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+  }
+
   private static boolean isRecordingPresent(String recordingName) {
     try {
       MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
@@ -436,6 +498,7 @@ public class ContinuousJfrStarterTest {
     private final List<String> _executedCommands = new ArrayList<>();
     private final Set<String> _failingCommands = new HashSet<>();
     private boolean _mBeanAvailable = true;
+    private boolean _startedByJvmArgument;
 
     @Override
     protected boolean executeDiagnosticCommand(String operationName, String... arguments) {
@@ -455,6 +518,15 @@ public class ContinuousJfrStarterTest {
     @Override
     protected boolean isRepositoryCleanupEnabled() {
       return false;
+    }
+
+    @Override
+    protected boolean isRecordingConfiguredByJvmArgument() {
+      return _startedByJvmArgument;
+    }
+
+    private void setStartedByJvmArgument(boolean startedByJvmArgument) {
+      _startedByJvmArgument = startedByJvmArgument;
     }
 
     private void setMBeanAvailable(boolean mBeanAvailable) {

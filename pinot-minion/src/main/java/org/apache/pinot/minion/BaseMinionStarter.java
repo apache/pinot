@@ -141,6 +141,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
 
+    // Deprecated: kept so existing `pinot.jfr.*` cluster configs keep working. New deployments should
+    // start JFR with JVM arguments instead; see ContinuousJfrStarter for the replacement.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
   }
 

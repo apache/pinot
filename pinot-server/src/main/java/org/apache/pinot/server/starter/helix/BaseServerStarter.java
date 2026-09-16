@@ -290,6 +290,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
+    // Deprecated: kept so existing `pinot.jfr.*` cluster configs keep working. New deployments should
+    // start JFR with JVM arguments instead; see ContinuousJfrStarter for the replacement.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
 
