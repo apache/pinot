@@ -34,6 +34,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -209,6 +210,28 @@ public class AndDocIdSetPushdownTest {
     }
   }
 
+  /// Deferring a composite child is only worth it when the subtree still has a scan to restrict. An index-only OR
+  /// produces the same bitmap either way, so deferring it would only add an intersection per branch.
+  @Test
+  public void testOnlyScanBearingSubtreesAreDeferred() {
+    BlockDocIdSet indexOnlyOr = new OrDocIdSet(
+        List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS), new BitmapDocIdSet(range(20, 30), NUM_DOCS)), NUM_DOCS);
+    assertFalse(indexOnlyOr.isApplyAndDeferrable(), "An index-only OR gains nothing from a candidate set");
+
+    BlockDocIdSet scanBearingOr = new OrDocIdSet(
+        List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS), new CountingScanDocIdSet(range(20, 30))), NUM_DOCS);
+    assertTrue(scanBearingOr.isApplyAndDeferrable());
+
+    // The scan two levels down still counts: that is the shape from the issue
+    BlockDocIdSet nested = new OrDocIdSet(List.of(new BitmapDocIdSet(range(0, 10), NUM_DOCS),
+        new AndDocIdSet(List.of(new BitmapDocIdSet(range(20, 30), NUM_DOCS),
+            new CountingScanDocIdSet(range(20, 30))), null, true)), NUM_DOCS);
+    assertTrue(nested.isApplyAndDeferrable());
+
+    assertFalse(new NotDocIdSet(new BitmapDocIdSet(range(0, 10), NUM_DOCS), NUM_DOCS).isApplyAndDeferrable());
+    assertTrue(new NotDocIdSet(new CountingScanDocIdSet(range(0, 10)), NUM_DOCS).isApplyAndDeferrable());
+  }
+
   private static BlockDocIdSet orBranchTree(boolean pushdownEnabled, BlockDocIdSet scan,
       ImmutableRoaringBitmap selective, ImmutableRoaringBitmap indexedInBranch, ImmutableRoaringBitmap otherBranch) {
     BlockDocIdSet branch =
@@ -333,6 +356,11 @@ public class AndDocIdSetPushdownTest {
     @Override
     public ScanBasedDocIdIterator iterator() {
       return _iterator;
+    }
+
+    @Override
+    public boolean isScanBased() {
+      return true;
     }
 
     @Override

@@ -56,13 +56,26 @@ public interface BlockDocIdSet {
     return this;
   }
 
+  /// Returns whether evaluating this DocIdSet costs time proportional to the number of documents it is asked about,
+  /// i.e. whether the subtree still has a scan- or expression-based predicate left to evaluate.
+  ///
+  /// Only such a subtree gains anything from being handed a candidate set. An index-only subtree produces the same
+  /// bitmap either way, so restricting it just adds intersection work. Note this is a property of the *DocIdSet*, not
+  /// of the operator that built it: an operator that scans internally and hands back a bitmap -- a non-exact range
+  /// index, an H3 index -- has already paid for the scan by the time its DocIdSet exists, and correctly reports
+  /// `false`.
+  default boolean isScanBased() {
+    return false;
+  }
+
   /// Returns whether a parent AND may defer calling [#iterator] on this DocIdSet and reach it through [#applyAnd]
   /// instead.
   ///
-  /// Composite DocIdSets (AND, OR, NOT) return `true`: forwarding a candidate set to their own children is how a
-  /// restriction from an enclosing AND reaches a scan-based predicate nested inside an OR, which would otherwise be
-  /// evaluated against every document that OR branch matches. Leaf DocIdSets return `false`: their index lookup has
-  /// already happened by the time the DocIdSet exists, so deferring them buys nothing.
+  /// True only for a composite DocIdSet (AND, OR, NOT) whose subtree is still scan-based. Forwarding a candidate set
+  /// to its children is how a restriction from an enclosing AND reaches a scan-based predicate nested inside an OR,
+  /// which would otherwise be evaluated against every document that branch matches. A leaf is never deferrable: its
+  /// index lookup has already happened, and a scan-based leaf is already reached through
+  /// [ScanBasedDocIdIterator#applyAnd] by the enclosing AND.
   ///
   /// This says nothing about whether [#applyAnd] may be called -- every DocIdSet supports it.
   default boolean isApplyAndDeferrable() {

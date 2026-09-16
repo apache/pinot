@@ -45,8 +45,13 @@ public class NotDocIdSet implements BlockDocIdSet {
   }
 
   @Override
+  public boolean isScanBased() {
+    return _childDocIdSet.isScanBased();
+  }
+
+  @Override
   public boolean isApplyAndDeferrable() {
-    return true;
+    return isScanBased();
   }
 
   @Override

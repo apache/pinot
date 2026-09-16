@@ -139,8 +139,22 @@ public final class OrDocIdSet implements BlockDocIdSet {
   }
 
   @Override
+  public boolean isScanBased() {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    if (docIdSets == null) {
+      return false;
+    }
+    for (BlockDocIdSet docIdSet : docIdSets) {
+      if (docIdSet.isScanBased()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
   public boolean isApplyAndDeferrable() {
-    return true;
+    return isScanBased();
   }
 
   /// Unions the branches, each restricted to the candidate document ids.
