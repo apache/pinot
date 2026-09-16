@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.query.routing;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,10 +34,24 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// This utility class serialize/deserialize between [Worker.StagePlan] elements to Planner elements.
+///
+/// The leaf-stage segment maps of a [WorkerMetadata] have two wire encodings, picked per request by the broker:
+///
+/// - **proto**: the native `tableSegmentsMap` / `logicalTableSegmentsMap` fields of [Worker.WorkerMetadata].
+/// - **legacy JSON**: a JSON string under the [WorkerMetadata#TABLE_SEGMENTS_MAP_KEY] /
+///   [WorkerMetadata#LOGICAL_TABLE_SEGMENTS_MAP_KEY] custom property, which is all that servers predating the proto
+///   fields understand.
+///
+/// Decoding accepts both, so a server always understands every broker; the broker enables the proto encoding only
+/// when every server does (see the `protoSegmentList` query option).
 public class QueryPlanSerDeUtils {
+  private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
+  };
+
   private QueryPlanSerDeUtils() {
   }
 
@@ -54,15 +73,55 @@ public class QueryPlanSerDeUtils {
     return new StageMetadata(protoStageMetadata.getStageId(), workerMetadataList, customProperties);
   }
 
-  private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata)
+  @VisibleForTesting
+  static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata)
       throws InvalidProtocolBufferException {
     Map<Integer, ByteString> protoMailboxInfosMap = protoWorkerMetadata.getMailboxInfosMap();
     Map<Integer, MailboxInfos> mailboxInfosMap = Maps.newHashMapWithExpectedSize(protoMailboxInfosMap.size());
     for (Map.Entry<Integer, ByteString> entry : protoMailboxInfosMap.entrySet()) {
       mailboxInfosMap.put(entry.getKey(), fromProtoMailboxInfos(entry.getValue()));
     }
-    return new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap,
-        protoWorkerMetadata.getCustomPropertyMap());
+    // A broker using the legacy encoding ships the segment maps as JSON custom properties. Decode them once here and
+    // drop the raw strings so that the metadata never carries two copies of the same segments.
+    Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
+    String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
+    String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
+      customProperties = new HashMap<>(customProperties);
+      customProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
+      customProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    }
+    WorkerMetadata workerMetadata =
+        new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap, customProperties);
+    if (protoWorkerMetadata.hasTableSegmentsMap()) {
+      workerMetadata.setTableSegmentsMap(fromProtoSegmentsMap(protoWorkerMetadata.getTableSegmentsMap()));
+    } else if (tableSegmentsJson != null) {
+      workerMetadata.setTableSegmentsMap(decodeSegmentsMapJson(tableSegmentsJson));
+    }
+    if (protoWorkerMetadata.hasLogicalTableSegmentsMap()) {
+      workerMetadata.setLogicalTableSegmentsMap(
+          fromProtoSegmentsMap(protoWorkerMetadata.getLogicalTableSegmentsMap()));
+    } else if (logicalTableSegmentsJson != null) {
+      workerMetadata.setLogicalTableSegmentsMap(decodeSegmentsMapJson(logicalTableSegmentsJson));
+    }
+    return workerMetadata;
+  }
+
+  private static Map<String, List<String>> fromProtoSegmentsMap(Worker.SegmentsMap protoSegmentsMap) {
+    Map<String, Worker.SegmentList> protoSegments = protoSegmentsMap.getSegmentsMap();
+    Map<String, List<String>> segmentsMap = Maps.newHashMapWithExpectedSize(protoSegments.size());
+    for (Map.Entry<String, Worker.SegmentList> entry : protoSegments.entrySet()) {
+      segmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue().getSegmentList()));
+    }
+    return segmentsMap;
+  }
+
+  private static Map<String, List<String>> decodeSegmentsMapJson(String segmentsMapJson) {
+    try {
+      return JsonUtils.stringToObject(segmentsMapJson, SEGMENTS_MAP_TYPE);
+    } catch (IOException e) {
+      throw new RuntimeException("Unable to deserialize segments map: " + segmentsMapJson, e);
+    }
   }
 
   private static MailboxInfos fromProtoMailboxInfos(ByteString protoMailboxInfos)
@@ -76,15 +135,60 @@ public class QueryPlanSerDeUtils {
     return Worker.Properties.parseFrom(protoProperties).getPropertyMap();
   }
 
-  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
-    return workerMetadataList.stream().map(QueryPlanSerDeUtils::toProtoWorkerMetadata).collect(Collectors.toList());
+  /// Encodes the worker metadata for the wire, with the leaf-stage segment maps as native proto fields when
+  /// `protoSegmentList` is set and as legacy JSON custom properties otherwise (see the class documentation).
+  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(List<WorkerMetadata> workerMetadataList,
+      boolean protoSegmentList) {
+    List<Worker.WorkerMetadata> protoWorkerMetadataList = new ArrayList<>(workerMetadataList.size());
+    for (WorkerMetadata workerMetadata : workerMetadataList) {
+      protoWorkerMetadataList.add(toProtoWorkerMetadata(workerMetadata, protoSegmentList));
+    }
+    return protoWorkerMetadataList;
   }
 
-  private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
-    Map<Integer, ByteString> mailboxInfosMap = workerMetadata.getMailboxInfosMap().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toProtoBytes()));
-    return Worker.WorkerMetadata.newBuilder().setWorkedId(workerMetadata.getWorkerId())
-        .putAllMailboxInfos(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties()).build();
+  private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata,
+      boolean protoSegmentList) {
+    Worker.WorkerMetadata.Builder builder = Worker.WorkerMetadata.newBuilder()
+        .setWorkedId(workerMetadata.getWorkerId())
+        .putAllCustomProperty(workerMetadata.getCustomProperties());
+    for (Map.Entry<Integer, MailboxInfos> entry : workerMetadata.getMailboxInfosMap().entrySet()) {
+      builder.putMailboxInfos(entry.getKey(), entry.getValue().toProtoBytes());
+    }
+    Map<String, List<String>> tableSegmentsMap = workerMetadata.getTableSegmentsMap();
+    if (tableSegmentsMap != null) {
+      if (protoSegmentList) {
+        builder.setTableSegmentsMap(toProtoSegmentsMap(tableSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, encodeSegmentsMapJson(tableSegmentsMap));
+      }
+    }
+    Map<String, List<String>> logicalTableSegmentsMap = workerMetadata.getLogicalTableSegmentsMap();
+    if (logicalTableSegmentsMap != null) {
+      if (protoSegmentList) {
+        builder.setLogicalTableSegmentsMap(toProtoSegmentsMap(logicalTableSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
+            encodeSegmentsMapJson(logicalTableSegmentsMap));
+      }
+    }
+    return builder.build();
+  }
+
+  private static Worker.SegmentsMap toProtoSegmentsMap(Map<String, List<String>> segmentsMap) {
+    Worker.SegmentsMap.Builder builder = Worker.SegmentsMap.newBuilder();
+    for (Map.Entry<String, List<String>> entry : segmentsMap.entrySet()) {
+      builder.putSegments(entry.getKey(), Worker.SegmentList.newBuilder().addAllSegment(entry.getValue()).build());
+    }
+    return builder.build();
+  }
+
+  /// JSON-encodes a segments map as `{"OFFLINE":["seg1","seg2"]}` for the legacy encoding.
+  private static String encodeSegmentsMapJson(Map<String, List<String>> segmentsMap) {
+    try {
+      return JsonUtils.objectToString(segmentsMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Unable to serialize segments map: " + segmentsMap, e);
+    }
   }
 
   public static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {

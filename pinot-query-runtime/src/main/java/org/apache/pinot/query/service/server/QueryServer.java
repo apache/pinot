@@ -423,8 +423,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
         ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
         StageMetadata metadata = explainPlan.getStageMetadata();
+        // This response travels server -> broker, so it cannot negotiate an encoding with its requester. The
+        // broker only reads the plan nodes of an explain response today, but the legacy encoding is the one
+        // every broker can decode, so use it here rather than assume the requester understands the proto
+        // fields.
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList());
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList(), false);
         builder.addStagePlan(Worker.StagePlan.newBuilder()
             .setRootNode(rootAsBytes)
             .setStageMetadata(Worker.StageMetadata.newBuilder()
