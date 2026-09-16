@@ -133,4 +133,26 @@ public class FileUtils {
       }
     }
   }
+
+  /// Returns the total size in bytes of the regular files under `dir`, or `0` if `dir` does not exist. Symbolic links
+  /// are not followed.
+  ///
+  /// Use this for a directory that another thread may be writing to while it is measured. It walks with the `File`
+  /// API, whose `listFiles()` and `length()` report a concurrently deleted entry as `null` / `0` instead of throwing,
+  /// so a delete racing with the walk cannot fail the whole computation. The trade-off is that an unreadable directory
+  /// is also counted as `0`. For a directory nothing else is writing to, prefer
+  /// `org.apache.commons.io.FileUtils#sizeOfDirectory` so that a genuine I/O error surfaces.
+  public static long sizeOfDirectory(File dir) {
+    long size = 0;
+    File[] files = dir.listFiles();
+    if (files != null) {
+      for (File file : files) {
+        if (Files.isSymbolicLink(file.toPath())) {
+          continue;
+        }
+        size += file.isDirectory() ? sizeOfDirectory(file) : file.length();
+      }
+    }
+    return size;
+  }
 }
