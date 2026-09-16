@@ -487,6 +487,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
+  protected void untrackSegment(IndexSegment segment) {
+    super.untrackSegment(segment);
+    // Purge any entries pointing at this segment; its data buffers will soon be unmapped by destroy().
+    _previousKeyToRecordLocationMap.entrySet().removeIf(entry -> entry.getValue().getSegment() == segment);
+  }
+
+  @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
