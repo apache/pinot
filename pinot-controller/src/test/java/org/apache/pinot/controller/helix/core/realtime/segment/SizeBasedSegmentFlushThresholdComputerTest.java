@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
@@ -123,6 +124,54 @@ public class SizeBasedSegmentFlushThresholdComputerTest {
     int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     assertEquals(threshold, committingSegmentSizeThreshold);
+  }
+
+  @Test
+  public void testUseLastSegmentsThresholdIfSegmentIsCommittingDueToForceCommitReasonCode() {
+    long committingSegmentSizeBytes = 500_000L;
+    long committedRows = 100_000L;
+    int committingSegmentSizeThreshold = 25_000;
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
+
+    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
+    when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(committingSegmentSizeBytes);
+    when(committingSegmentDescriptor.getStopReasonCode()).thenReturn(
+        SegmentCompletionProtocol.ReasonCode.FORCE_COMMIT_MESSAGE_RECEIVED);
+
+    SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(committedRows);
+    when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(committingSegmentSizeThreshold);
+
+    StreamConfig streamConfig = mock(StreamConfig.class);
+
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
+
+    assertEquals(threshold, committingSegmentSizeThreshold);
+  }
+
+  @Test
+  public void testComputeThresholdIfSegmentIsNotCommittingDueToForceCommitReasonCode() {
+    long committingSegmentSizeBytes = 500_000L;
+    long committedRows = 100_000L;
+    int committingSegmentSizeThreshold = 25_000;
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
+
+    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
+    when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(committingSegmentSizeBytes);
+    when(committingSegmentDescriptor.getStopReasonCode()).thenReturn(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+
+    SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(committedRows);
+    when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(committingSegmentSizeThreshold);
+
+    StreamConfig streamConfig = mock(StreamConfig.class);
+    when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(2_000_000L);
+
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
+
+    assertEquals(threshold, 150_000);
   }
 
   @Test
