@@ -519,7 +519,9 @@ public class CommonConstants {
     /// is added, so the aggregation function defaults apply. The two functions reject each other's parameter names,
     /// hence one key each.
     ///
-    /// Worst-case memory for a group-by is `threshold` values per group, so size this together with
+    /// Before conversion a group holds up to `threshold` values; after it, a sketch whose registers are allocated
+    /// eagerly, around 2.7 KB at `log2m=12`. A low threshold therefore trades raw values for sketches and can raise
+    /// group-by memory rather than lower it, so size `threshold` together with `log2m` or `compression` and with
     /// `pinot.server.query.executor.num.groups.limit` rather than in isolation.
     public static final String APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS =
         "pinot.broker.approximate.function.distinct.count.params";

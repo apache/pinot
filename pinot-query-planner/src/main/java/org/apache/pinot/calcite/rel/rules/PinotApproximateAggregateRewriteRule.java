@@ -93,9 +93,14 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
     String percentileParams = hasPercentile ? envConfig.approximateFunctionPercentileParams() : "";
 
     // The parameters must be input fields, because an aggregate call holds field indices rather than inline literals,
-    // so they are projected underneath the aggregate. Placing them in the immediate project is what lets
-    // PinotAggregateExchangeNodeInsertRule inline them back into the pushed-down call. With no parameters configured
-    // the plan keeps the shape it had before, with no extra project.
+    // so they are projected underneath the aggregate. With no parameters configured the plan keeps the shape it had
+    // before, with no extra project.
+    //
+    // Invariant: this project has to stay directly beneath the aggregate. Both PinotAggregateExchangeNodeInsertRule
+    // and AggregatePushdownRule inline the literal only through findImmediateProjects(input), so anything that puts a
+    // node between them would leave the leaf with a column reference where the function expects a parameter string.
+    // Nothing in the later phases does: AggregateProjectMergeRule needs an all-input-ref project and the literals
+    // block it, and ProjectMergeRule collapses into a single project that stays adjacent.
     RelNode newInput = input;
     int distinctCountParamsIndex = -1;
     int percentileParamsIndex = -1;

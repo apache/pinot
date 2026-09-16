@@ -132,9 +132,12 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGEST("percentileRawTDigest", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
+  // The final return type is redundant with the standard return type above, and is declared because
+  // PinotApproximateAggregateRewriteRule pins the rewritten call to PERCENTILE's type, which is ARG0. Without it a
+  // leaf that returns the final result is typed from that pinned type and truncates on a non-DOUBLE column.
   PERCENTILESMARTTDIGEST("percentileSmartTDigest", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 2),
-      SqlTypeName.OTHER),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   PERCENTILEKLL("percentileKLL", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),

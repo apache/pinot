@@ -70,9 +70,8 @@ public class ApproximateFunctionOverrideProvider implements PinotClusterConfigCh
     }
     // A key the cluster config does not set, or that was removed from it, falls back to the broker conf value. The
     // fallback is the broker conf rather than the last good live value, so a broker that restarts resolves the same.
-    String enabled = clusterConfigs.get(Broker.USE_APPROXIMATE_FUNCTION);
     Settings updated = new Settings(
-        enabled != null ? Boolean.parseBoolean(enabled) : _brokerConfSettings._enabled,
+        validatedEnabled(clusterConfigs.get(Broker.USE_APPROXIMATE_FUNCTION)),
         validated(clusterConfigs.get(Broker.APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS),
             Broker.APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS, _brokerConfSettings._distinctCountParams,
             ApproximateFunctionOverrideProvider::probeDistinctCount),
@@ -88,6 +87,23 @@ public class ApproximateFunctionOverrideProvider implements PinotClusterConfigCh
   /// come from the same version of the config.
   public Settings getSettings() {
     return _settings;
+  }
+
+  /// Anything that is not true or false keeps the broker conf value. Silently reading a typo as `false` would turn
+  /// the guard rail off, which is the worse direction to fail in.
+  private boolean validatedEnabled(@Nullable String enabled) {
+    if (enabled == null) {
+      return _brokerConfSettings._enabled;
+    }
+    if ("true".equalsIgnoreCase(enabled.trim())) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(enabled.trim())) {
+      return false;
+    }
+    LOGGER.error("Ignoring invalid value '{}' for {}, falling back to '{}'", enabled,
+        Broker.USE_APPROXIMATE_FUNCTION, _brokerConfSettings._enabled);
+    return _brokerConfSettings._enabled;
   }
 
   /// Parses the value with the aggregation function itself, so an unknown key or a non-numeric value is caught here

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -35,6 +36,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
+@SuppressWarnings("rawtypes")
 public class DistinctCountSmartHLLAggregationFunctionTest {
 
   @Test
@@ -211,14 +213,17 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
     DistinctCountSmartHLLAggregationFunction function = newFunctionWithThreshold(3);
     ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
     int[][] groupKeysArray = {{0, 1}, {0, 1}, {0, 1}, {0, 1}};
+    ExpressionContext column = ExpressionContext.forIdentifier("col");
 
     function.aggregateGroupByMV(4, groupKeysArray, holder,
-        Map.of(ExpressionContext.forIdentifier("col"), SyntheticBlockValSets.Int.create(null, new int[]{1, 2, 3, 4})));
+        Map.of(column, SyntheticBlockValSets.Int.create(null, new int[]{1, 2, 3, 4})));
+    function.aggregateGroupByMV(4, groupKeysArray, holder,
+        Map.of(column, SyntheticBlockValSets.Int.create(null, new int[]{5, 6, 7, 8})));
 
     for (int groupKey = 0; groupKey < 2; groupKey++) {
       Object result = function.extractGroupByResult(holder, groupKey);
       assertTrue(result instanceof HyperLogLog, "Group " + groupKey + " was not converted: " + result);
-      assertEquals(function.extractFinalResult(result), 4);
+      assertEquals(function.extractFinalResult(result), 8);
     }
   }
 
@@ -233,14 +238,56 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
 
     function.aggregateGroupBySV(3, groupKeys, holder, Map.of(column,
         SyntheticBlockValSets.Bytes.create(null, new byte[][]{{1}, {2}, {3}})));
-    assertTrue(function.extractGroupByResult(holder, 0) instanceof HyperLogLog);
 
-    // Values that arrive after the conversion must reach the same sketch, and must be hashed the same way.
+    // The conversion happens on the first touch after the threshold is crossed, and values that arrive after it must
+    // reach the same sketch, hashed the same way.
     function.aggregateGroupBySV(3, groupKeys, holder, Map.of(column,
         SyntheticBlockValSets.Bytes.create(null, new byte[][]{{3}, {4}, {5}})));
     Object result = function.extractGroupByResult(holder, 0);
     assertTrue(result instanceof HyperLogLog);
     assertEquals(function.extractFinalResult(result), 5);
+  }
+
+  /// The other two sketch families have their own hashing, and UltraLogLog drops values its hasher rejects, so a
+  /// post-conversion value has to be seen to land. STRING is the other ObjectOpenHashSet branch. The counts are large
+  /// enough that a dropped batch would halve the estimate, well outside the error of these sketches.
+  @Test
+  public void testRawValueGroupByConvertsForEverySketchFamilyAndStringColumns() {
+    ExpressionContext column = ExpressionContext.forIdentifier("col");
+    ExpressionContext params = ExpressionContext.forLiteral(DataType.STRING, "threshold=10");
+    List<AggregationFunction> functions = List.of(
+        new DistinctCountSmartHLLAggregationFunction(List.of(column, params), false),
+        new DistinctCountSmartHLLPlusAggregationFunction(List.of(column, params), false),
+        new DistinctCountSmartULLAggregationFunction(List.of(column, params), false));
+    int[] first = new int[50];
+    int[] second = new int[50];
+    String[] firstStrings = new String[50];
+    String[] secondStrings = new String[50];
+    for (int i = 0; i < 50; i++) {
+      first[i] = i;
+      second[i] = 50 + i;
+      firstStrings[i] = "v" + i;
+      secondStrings[i] = "v" + (50 + i);
+    }
+    int[] groupKeys = new int[50];
+
+    for (AggregationFunction function : functions) {
+      for (BlockValSet[] batches : List.of(
+          new BlockValSet[]{
+              SyntheticBlockValSets.Int.create(null, first), SyntheticBlockValSets.Int.create(null, second)},
+          new BlockValSet[]{
+              SyntheticBlockValSets.Str.create(null, firstStrings),
+              SyntheticBlockValSets.Str.create(null, secondStrings)})) {
+        ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
+        function.aggregateGroupBySV(50, groupKeys, holder, Map.of(column, batches[0]));
+        function.aggregateGroupBySV(50, groupKeys, holder, Map.of(column, batches[1]));
+
+        Object result = function.extractGroupByResult(holder, 0);
+        assertFalse(result instanceof Set, function.getType() + " did not convert: " + result);
+        int estimate = ((Number) function.extractFinalResult(result)).intValue();
+        assertTrue(estimate >= 90 && estimate <= 110, function.getType() + " estimated " + estimate + ", expected 100");
+      }
+    }
   }
 
   private static DistinctCountSmartHLLAggregationFunction newFunctionWithThreshold(int threshold) {

@@ -91,6 +91,23 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
     assertTrue(both.contains("threshold=23;compression=50"), both);
   }
 
+  /// The parameter literal has to stay in the project directly beneath the aggregate, or the split rules cannot
+  /// inline it. These shapes put a join and a subquery under the aggregate, unlike the single-table cases above.
+  @Test
+  public void testAppendsParamsUnderAJoinAndASubquery() {
+    QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23");
+
+    String join = explain(env,
+        "SELECT a.col2, DISTINCTCOUNT(a.col1) FROM a JOIN b ON a.col1 = b.col1 GROUP BY a.col2");
+    assertRewritten(join, "distinctcountsmarthll");
+    assertTrue(join.contains("threshold=17"), join);
+
+    String subquery = explain(env,
+        "SELECT col2, PERCENTILE(col3, 90) FROM (SELECT col2, col3 FROM a WHERE col3 > 0) GROUP BY col2");
+    assertRewritten(subquery, "percentilesmarttdigest");
+    assertTrue(subquery.contains("threshold=23"), subquery);
+  }
+
   /// The physical optimizer splits aggregates in its own rule, which also keys the leaf-to-final intermediate format
   /// off the function name, so the rewrite has to hold on that path too.
   @Test
