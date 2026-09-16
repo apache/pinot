@@ -82,6 +82,31 @@ public class TableConfigTest {
   }
 
   @Test
+  // Exercise the deprecated entry point used by callers compiled before page-cache warmup was added.
+  @SuppressWarnings("deprecation")
+  public void testConstructorWithoutPageCacheWarmupConfig() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setAggregateMetrics(true)
+        .setNumReplicas(2)
+        .setIsMaterializedView(true)
+        .setTableSamplers(List.of(new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "10"))))
+        .build();
+
+    TableConfig legacyConfig = new TableConfig(config.getTableName(), config.getTableType().name(),
+        config.getValidationConfig(), config.getTenantConfig(), config.getIndexingConfig(), config.getCustomConfig(),
+        config.getQuotaConfig(), config.getTaskConfig(), config.getRoutingConfig(), config.getQueryConfig(),
+        config.getInstanceAssignmentConfigMap(), config.getFieldConfigList(), config.getUpsertConfig(),
+        config.getDedupConfig(), config.getDimensionTableConfig(), config.getIngestionConfig(),
+        config.getTierConfigsList(), config.isDimTable(), config.getTunerConfigsList(),
+        config.getInstancePartitionsMap(), config.getSegmentAssignmentConfigMap(), config.getTableSamplers(),
+        config.isMaterializedView());
+
+    assertTrue(legacyConfig.isMaterializedView());
+    assertThat(legacyConfig.getPageCacheWarmupConfig()).isNull();
+    assertEquals(legacyConfig, config);
+  }
+
+  @Test
   public void testCopyConstructor() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);

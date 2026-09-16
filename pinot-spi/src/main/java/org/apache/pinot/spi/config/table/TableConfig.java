@@ -167,6 +167,30 @@ public class TableConfig extends BaseJsonConfig {
         segmentAssignmentConfigMap, tableSamplers, /*materializedView=*/ false, /*pageCacheWarmupConfig=*/ null);
   }
 
+  /// Legacy constructor preserved for binary backward-compatibility on the public SPI surface.
+  /// Callers compiled against the pre-`pageCacheWarmupConfig` signature still link against this entry
+  /// point; it forwards to the canonical constructor with `pageCacheWarmupConfig=null`. Prefer the
+  /// [TableConfigBuilder] or the canonical constructor below for new code.
+  @Deprecated
+  public TableConfig(String tableName, String tableType,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
+      IndexingConfig indexingConfig, TableCustomConfig customConfig, @Nullable QuotaConfig quotaConfig,
+      @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable QueryConfig queryConfig,
+      @Nullable Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+      @Nullable List<FieldConfig> fieldConfigList, @Nullable UpsertConfig upsertConfig,
+      @Nullable DedupConfig dedupConfig, @Nullable DimensionTableConfig dimensionTableConfig,
+      @Nullable IngestionConfig ingestionConfig, @Nullable List<TierConfig> tierConfigsList, boolean dimTable,
+      @Nullable List<TunerConfig> tunerConfigList,
+      @Nullable Map<InstancePartitionsType, String> instancePartitionsMap,
+      @Nullable Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
+      @Nullable List<TableSamplerConfig> tableSamplers, boolean materializedView) {
+    this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
+        routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig, dedupConfig,
+        dimensionTableConfig, ingestionConfig, tierConfigsList, dimTable, tunerConfigList, instancePartitionsMap,
+        segmentAssignmentConfigMap, tableSamplers, materializedView, /*pageCacheWarmupConfig=*/ null);
+  }
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
