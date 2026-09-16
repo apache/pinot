@@ -365,10 +365,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               }
               // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
-              // Skip if prevSegment has been offloaded; its data buffers are unmapped.
-              if (!_trackedSegments.contains(prevSegment)) {
-                return null;
-              }
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
               if (prevValidDocIds != null) {
                 try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
