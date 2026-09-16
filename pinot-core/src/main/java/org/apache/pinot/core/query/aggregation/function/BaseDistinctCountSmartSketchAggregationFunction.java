@@ -61,6 +61,10 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
   protected abstract Object convertSetToSketch(Set valueSet, DataType storedType);
 
+  /// Adds every value of the set into a sketch that [#convertSetToSketch] already created. Used to fold the values
+  /// that arrive after a group has been converted, without building a second sketch.
+  protected abstract void addSetToSketch(Object sketch, Set valueSet, DataType storedType);
+
   protected abstract Object convertToSketch(DictIdsWrapper dictIdsWrapper);
 
   protected abstract IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue);
@@ -586,9 +590,16 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
     if (result instanceof DictIdsWrapper) {
       return convertToValueSet((DictIdsWrapper) result);
-    } else {
-      return result;
     }
+    if (result instanceof SketchWithPendingValues) {
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (!converted._pendingValues.isEmpty()) {
+        addSetToSketch(converted._sketch, converted._pendingValues, converted._storedType);
+        converted._pendingValues.clear();
+      }
+      return converted._sketch;
+    }
+    return result;
   }
 
   /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
@@ -643,14 +654,38 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /// Returns the value set for the given group key or creates a new one if it does not exist.
-  protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
-    Set valueSet = groupByResultHolder.getResult(groupKey);
-    if (valueSet == null) {
-      valueSet = getValueSet(valueType);
+  /// Returns the value set for the given group key, creating one if it does not exist, and converting the group to a
+  /// sketch once its set has grown past the threshold. A group that already converted returns its pending set, which
+  /// this folds into the sketch. Without any of this the per-group sets of a non-dictionary column grow for the whole
+  /// segment, because the only other check runs at merge time.
+  ///
+  /// The check runs here, on a set that has just been fetched anyway, rather than as a second pass over the batch. It
+  /// therefore converts on the first touch after the threshold is crossed, which bounds a group at the threshold plus
+  /// one batch of values.
+  protected final Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      Set valueSet = getValueSet(valueType);
       groupByResultHolder.setValueForKey(groupKey, valueSet);
+      return valueSet;
     }
-    return valueSet;
+    int threshold = getThreshold();
+    if (result instanceof SketchWithPendingValues) {
+      SketchWithPendingValues converted = (SketchWithPendingValues) result;
+      if (converted._pendingValues.size() > threshold) {
+        addSetToSketch(converted._sketch, converted._pendingValues, valueType);
+        converted._pendingValues.clear();
+      }
+      return converted._pendingValues;
+    }
+    Set valueSet = (Set) result;
+    if (valueSet.size() <= threshold) {
+      return valueSet;
+    }
+    SketchWithPendingValues converted =
+        new SketchWithPendingValues(convertSetToSketch(valueSet, valueType), getValueSet(valueType), valueType);
+    groupByResultHolder.setValueForKey(groupKey, converted);
+    return converted._pendingValues;
   }
 
   /// Helper method to set dictionary id for the given group keys into the result holder.
@@ -662,42 +697,42 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   }
 
   /// Helper method to set INT value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
       ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
     }
   }
 
   /// Helper method to set LONG value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
     for (int groupKey : groupKeys) {
       ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
     }
   }
 
   /// Helper method to set FLOAT value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
     for (int groupKey : groupKeys) {
       ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
     }
   }
 
   /// Helper method to set DOUBLE value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
     for (int groupKey : groupKeys) {
       ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
     }
   }
 
   /// Helper method to set STRING value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
     }
   }
 
   /// Helper method to set BYTES value for the given group keys into the result holder.
-  protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
+  protected final void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       ByteArray value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
@@ -807,6 +842,20 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
           groupByResultHolder.setValueForKey(groupKey, convertToSketch(dictIdsWrapper));
         }
       }
+    }
+  }
+
+  /// Per-group state after a group converted to a sketch. New values keep landing in a plain set, which the next
+  /// threshold check folds into the sketch, so the typed aggregation loops never see a sketch.
+  private static final class SketchWithPendingValues {
+    final Object _sketch;
+    final DataType _storedType;
+    final Set _pendingValues;
+
+    SketchWithPendingValues(Object sketch, Set pendingValues, DataType storedType) {
+      _sketch = sketch;
+      _pendingValues = pendingValues;
+      _storedType = storedType;
     }
   }
 

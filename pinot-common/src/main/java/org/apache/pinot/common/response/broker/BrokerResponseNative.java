@@ -42,7 +42,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached",
+    "maxRowsWithoutChangeInDistinctReached",
     "maxExecutionTimeInDistinctReached", "timeUsedMs",
     "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter",
@@ -56,7 +57,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed", "materializedViewQueried", "serverStats"
+    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "materializedViewQueried",
+    "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -120,6 +122,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  private boolean _approximateFunctionApplied = false;
 
   @Nullable
   private String _materializedViewQueried;
@@ -634,6 +637,18 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("approximateFunctionApplied")
+  @Override
+  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
+    _approximateFunctionApplied = approximateFunctionApplied;
+  }
+
+  @JsonProperty("approximateFunctionApplied")
+  @Override
+  public boolean isApproximateFunctionApplied() {
+    return _approximateFunctionApplied;
   }
 
   @JsonProperty("materializedViewQueried")
