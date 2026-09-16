@@ -315,16 +315,18 @@ public class CalciteSqlParser {
       return;
     }
     Set<Expression> groupedExprs = hasGroupByClause ? groupByExprs : Set.of();
-    if (expressionOutsideGroupByList(havingExpression, groupedExprs)) {
-      throw new SqlCompilationException("'" + RequestUtils.prettyPrint(havingExpression) + "' in HAVING clause must "
-          + (hasGroupByClause ? "be an aggregate or functionally dependent on the columns used in GROUP BY clause."
-              : "be an aggregate: with no GROUP BY clause the whole table is a single group."));
+    Expression ungrouped = findUngroupedReference(havingExpression, groupedExprs);
+    if (ungrouped != null) {
+      throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungrouped) + "' in HAVING clause must "
+          + (hasGroupByClause ? "be inside an aggregate or functionally dependent on the columns used in GROUP BY "
+              + "clause." : "be inside an aggregate: with no GROUP BY clause the whole table is a single group."));
     }
     if (!hasGroupByClause) {
       for (Expression selectExpression : pinotQuery.getSelectList()) {
-        if (expressionOutsideGroupByList(selectExpression, groupedExprs)) {
-          throw new SqlCompilationException("'" + RequestUtils.prettyPrint(selectExpression) + "' must be an aggregate:"
-              + " with a HAVING clause and no GROUP BY clause the whole table is a single group.");
+        Expression ungroupedSelect = findUngroupedReference(selectExpression, groupedExprs);
+        if (ungroupedSelect != null) {
+          throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungroupedSelect) + "' must be inside an "
+              + "aggregate: with a HAVING clause and no GROUP BY clause the whole table is a single group.");
         }
       }
       return;
@@ -333,6 +335,47 @@ public class CalciteSqlParser {
       throw new SqlCompilationException("HAVING is not supported on a GROUP BY query without an aggregation in the "
           + "single-stage query engine. Move the predicate to the WHERE clause, or use the multi-stage query engine.");
     }
+  }
+
+  /// Returns the first identifier the engine cannot resolve once rows have been grouped: one that is neither a
+  /// grouping column nor an argument of an aggregation. Returns `null` when every reference is resolvable.
+  ///
+  /// This deliberately differs from [#expressionOutsideGroupByList], which accepts an expression as soon as it
+  /// *contains* an aggregation anywhere. That is too permissive for HAVING: `HAVING COUNT(*) > amount` contains
+  /// COUNT(*), but `amount` still has no single value per group, and the reducer fails on it at run time with a
+  /// message naming the GROUP BY clause the user did not write.
+  @Nullable
+  private static Expression findUngroupedReference(Expression expr, Set<Expression> groupByExprs) {
+    if (expr.getType() == ExpressionType.LITERAL || groupByExprs.contains(expr)) {
+      return null;
+    }
+    Function function = expr.getFunctionCall();
+    if (function == null) {
+      // An identifier that is not a grouping column.
+      return expr;
+    }
+    if (AggregationFunctionType.isAggregationFunction(function.getOperator())) {
+      // Arguments are aggregated away, so they do not have to be grouping columns.
+      return null;
+    }
+    if (function.getOperator().equalsIgnoreCase(SqlKind.FILTER.lowerName)) {
+      // A filtered aggregation, COUNT(*) FILTER (WHERE ...). The engine resolves it like any other aggregation, and
+      // its predicate is evaluated per row while aggregating, so it may reference columns that are not grouped.
+      return null;
+    }
+    List<Expression> operands = function.getOperands();
+    if (operands == null) {
+      return null;
+    }
+    // For an alias only the aliased value matters; the alias itself is not a column reference.
+    List<Expression> toCheck = function.getOperator().equals("as") ? operands.subList(0, 1) : operands;
+    for (Expression operand : toCheck) {
+      Expression ungrouped = findUngroupedReference(operand, groupByExprs);
+      if (ungrouped != null) {
+        return ungrouped;
+      }
+    }
+    return null;
   }
 
   /// Returns `true` if an aggregation appears anywhere the engine would compute one: the SELECT list, the HAVING

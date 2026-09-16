@@ -123,6 +123,16 @@ public class HavingQueriesTest {
     assertRejected("SELECT DISTINCT city FROM testTable HAVING COUNT(*) > 1");
     assertRejected("SELECT COUNT(*) FROM testTable HAVING amount > 1");
     assertRejected("SELECT city FROM testTable GROUP BY city HAVING amount > 1");
+    // An aggregate elsewhere in the predicate does not make a bare column resolvable: the reducer has no single value
+    // per group for it, and used to fail at run time naming a GROUP BY clause the user never wrote.
+    assertRejected("SELECT COUNT(*) FROM testTable HAVING COUNT(*) > amount");
+    assertRejected("SELECT city FROM testTable GROUP BY city HAVING COUNT(*) > amount");
+    assertRejected("SELECT city, COUNT(*) FROM testTable GROUP BY city HAVING COUNT(*) > amount");
+    // A column inside an aggregate stays legal, and so does a grouping column next to one.
+    givenTable().whenQuery("SELECT city, COUNT(*) FROM testTable GROUP BY city HAVING SUM(amount) > MIN(amount)")
+        .thenResultIs(new Object[]{"Athens", 4L}, new Object[]{"Madrid", 2L});
+    givenTable().whenQuery("SELECT city, COUNT(*) FROM testTable GROUP BY city HAVING COUNT(*) > 2 AND city > 'B'")
+        .thenResultIs(new Object[0][]);
   }
 
   /// A GROUP BY with no aggregation anywhere has no grouping operator to filter: the query becomes a DISTINCT, whose
