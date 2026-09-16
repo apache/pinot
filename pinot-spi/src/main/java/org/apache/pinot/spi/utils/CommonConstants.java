@@ -785,6 +785,8 @@ public class CommonConstants {
       public static final String QUERY = "query";
 
       public static class QueryOptionKey {
+        /// Opt-in borrowed-buffer input path for DISTINCTCOUNTBITMAP over projected serialized bitmaps. Default false.
+        public static final String USE_BUFFER_BACKED_DISTINCT_COUNT_BITMAP = "useBufferBackedDistinctCountBitmap";
         public static final String TIMEOUT_MS = "timeoutMs";
         /// Per-query override of [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION], outranking both the table config
         /// and the cluster or broker default. `false` forces exact results, `true` opts one expensive query in.
