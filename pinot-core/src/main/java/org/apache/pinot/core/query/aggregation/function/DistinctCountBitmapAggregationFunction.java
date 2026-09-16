@@ -38,6 +38,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
@@ -76,6 +78,18 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          MutableRoaringBitmap bitmap = aggregationResultHolder.getResult();
+          if (bitmap == null) {
+            bitmap = new MutableRoaringBitmap();
+            aggregationResultHolder.setValue(bitmap);
+          }
+          // or() copies incoming containers into owned storage; no borrowed buffer escapes this callback.
+          bitmap.or(new ImmutableRoaringBitmap(buffer));
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -263,6 +277,18 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          int groupKey = groupKeyArray[index];
+          MutableRoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+          if (bitmap == null) {
+            bitmap = new MutableRoaringBitmap();
+            groupByResultHolder.setValueForKey(groupKey, bitmap);
+          }
+          bitmap.or(new ImmutableRoaringBitmap(buffer));
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -448,6 +474,20 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     boolean singleValue = blockValSet.isSingleValue();
     if (dataType == DataType.BYTES && singleValue) {
+      if (blockValSet.isBytesBufferEnabled()) {
+        forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          ImmutableRoaringBitmap value = new ImmutableRoaringBitmap(buffer);
+          for (int groupKey : groupKeysArray[index]) {
+            MutableRoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+            if (bitmap == null) {
+              bitmap = new MutableRoaringBitmap();
+              groupByResultHolder.setValueForKey(groupKey, bitmap);
+            }
+            bitmap.or(value);
+          }
+        }));
+        return;
+      }
       // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -651,6 +691,10 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       return new RoaringBitmap();
     }
 
+    if (result instanceof MutableRoaringBitmap) {
+      // Preserve the existing intermediate type and wire format. The holder continues to own its mutable accumulator.
+      return ((MutableRoaringBitmap) result).toRoaringBitmap();
+    }
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
@@ -673,6 +717,10 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       return new RoaringBitmap();
     }
 
+    if (result instanceof MutableRoaringBitmap) {
+      // Preserve the existing intermediate type and wire format. The holder continues to own its mutable accumulator.
+      return ((MutableRoaringBitmap) result).toRoaringBitmap();
+    }
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
