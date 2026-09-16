@@ -86,6 +86,7 @@ import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -672,6 +673,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Wiring up cluster config change handler with helix");
     _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    // Registered before the query endpoints start so that the cluster configs are applied before the first query
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
@@ -741,9 +746,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     startWarmup();
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
 
     NettyInspector.registerMetrics(_brokerMetrics);
 

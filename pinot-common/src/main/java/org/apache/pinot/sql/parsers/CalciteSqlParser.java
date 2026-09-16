@@ -68,6 +68,7 @@ import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
@@ -121,9 +122,19 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
+    List<String> options = List.of();
+    SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
       sql = removeOptionsFromSql(sql);
+    } else {
+      options = extractOptionsFromSql(sql);
+      if (!options.isEmpty()) {
+        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+              + "'SET <key> = <value>;' statements instead: " + options);
+        }
+        sql = removeOptionsFromSql(sql);
+      }
     }
 
     try (StringReader inStream = new StringReader(sql)) {

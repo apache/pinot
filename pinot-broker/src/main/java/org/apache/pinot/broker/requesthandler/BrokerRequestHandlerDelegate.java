@@ -119,8 +119,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
     }
 

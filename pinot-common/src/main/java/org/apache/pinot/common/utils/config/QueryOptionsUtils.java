@@ -21,9 +21,11 @@ package org.apache.pinot.common.utils.config;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -53,6 +56,19 @@ public class QueryOptionsUtils {
     /// Unknown keys are preserved, but logged once per distinct key with a typo suggestion.
     WARN,
     /// Unknown keys fail the query with a typo suggestion.
+    REJECT
+  }
+
+  /// How query options embedded in the SQL text are handled, as opposed to options passed through the request
+  /// payload. Shared by the brokers' legacy `OPTION(...)` syntax policy
+  /// ([CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE]) and the per-request
+  /// [QueryOptionKey#SQL_OPTIONS_MODE].
+  public enum SqlOptionsMode {
+    /// The options are applied. Default.
+    ALLOW,
+    /// The options are dropped.
+    IGNORE,
+    /// The statement fails.
     REJECT
   }
 
@@ -83,6 +99,7 @@ public class QueryOptionsUtils {
 
   private static volatile SqlQueryOptionValidationMode _sqlQueryOptionValidationMode =
       SqlQueryOptionValidationMode.NONE;
+  private static volatile SqlOptionsMode _legacyOptionSyntaxMode = SqlOptionsMode.ALLOW;
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -140,11 +157,35 @@ public class QueryOptionsUtils {
     return _sqlQueryOptionValidationMode;
   }
 
-  /// Sets the validation mode applied to SQL-supplied query option keys. Called once per process at
-  /// broker startup from [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE], and
-  /// by tests to restore [SqlQueryOptionValidationMode#NONE].
+  /// Sets the validation mode applied to SQL-supplied query option keys, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE].
   public static void setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode mode) {
     _sqlQueryOptionValidationMode = mode;
+  }
+
+  public static SqlOptionsMode getLegacyOptionSyntaxMode() {
+    return _legacyOptionSyntaxMode;
+  }
+
+  /// Sets how the legacy `OPTION(...)` query option suffix is handled, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE].
+  public static void setLegacyOptionSyntaxMode(SqlOptionsMode mode) {
+    _legacyOptionSyntaxMode = mode;
+  }
+
+  /// Returns the per-request [QueryOptionKey#SQL_OPTIONS_MODE], `ALLOW` when absent. Fails with
+  /// [QueryErrorCode#QUERY_VALIDATION] when the value is not a [SqlOptionsMode].
+  public static SqlOptionsMode getSqlOptionsMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.SQL_OPTIONS_MODE);
+    if (mode == null) {
+      return SqlOptionsMode.ALLOW;
+    }
+    try {
+      return SqlOptionsMode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid value '" + mode + "' for query option '"
+          + QueryOptionKey.SQL_OPTIONS_MODE + "', must be one of " + Arrays.toString(SqlOptionsMode.values()));
+    }
   }
 
   /// Registers an option key that [#validateSqlQueryOptions] accepts in addition to the keys
