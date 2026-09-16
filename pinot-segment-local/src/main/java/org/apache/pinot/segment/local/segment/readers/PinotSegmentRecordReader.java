@@ -307,13 +307,34 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
+    IOException firstException = null;
     if (_columnReaderMap != null) {
       for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
-        columnReader.close();
+        firstException = closeCollectingException(columnReader, firstException);
       }
     }
     if (_destroySegmentOnClose && _indexSegment != null) {
       _indexSegment.destroy();
+    }
+    if (firstException != null) {
+      throw firstException;
+    }
+  }
+
+  /// Closes every reader even when an earlier one throws, instead of leaking the rest; extra failures are
+  /// attached as suppressed on the first exception, mirroring try-with-resources semantics.
+  @Nullable
+  private static IOException closeCollectingException(PinotSegmentColumnReader reader,
+      @Nullable IOException firstException) {
+    try {
+      reader.close();
+      return firstException;
+    } catch (IOException e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+      return firstException;
     }
   }
 }
