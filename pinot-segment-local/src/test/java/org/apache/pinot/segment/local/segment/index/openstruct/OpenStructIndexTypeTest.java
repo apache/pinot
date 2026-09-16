@@ -141,6 +141,36 @@ public class OpenStructIndexTypeTest {
     StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
   }
 
+  /// A declared MAP child key passes ColumnDataType conversion (used to be the only check) but has no DIMENSION
+  /// case in FieldSpec#getDefaultNullValue, the call allocateKeyColumn() actually makes — must be rejected here
+  /// instead of throwing uncaught on the first row ingested for the key.
+  @Test
+  public void testValidateRejectsMapChildKeyType()
+      throws Exception {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("nested", new ComplexFieldSpec("nested", FieldSpec.DataType.MAP, true, Map.of())));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  /// Same gap as MAP, for a nested OPEN_STRUCT child key.
+  @Test
+  public void testValidateRejectsOpenStructChildKeyType()
+      throws Exception {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("nested", new ComplexFieldSpec("nested", FieldSpec.DataType.OPEN_STRUCT, true, Map.of())));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
   @Test
   public void testValidateSkipsIgnoredKeyChecksWhenIndexDisabled()
       throws Exception {
