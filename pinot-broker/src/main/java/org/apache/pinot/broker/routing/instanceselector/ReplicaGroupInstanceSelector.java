@@ -102,9 +102,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
 
-    // A query can select only optional/unavailable segments even if other table segments are online. Unlike HashMap,
-    // a flat map allocates its arrays eagerly, so wait until this query selects a required segment.
-    Map<String, String> segmentToSelectedInstanceMap = null;
+    Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
@@ -150,9 +148,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
-        if (segmentToSelectedInstanceMap == null) {
-          segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
-        }
         segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
@@ -166,8 +161,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
           BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
     }
-    return new InstanceMapping(segmentToSelectedInstanceMap != null ? segmentToSelectedInstanceMap : new HashMap<>(),
-        optionalSegmentToInstanceMap);
+    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private List<SegmentInstanceCandidate> fetchCandidateServersForQuery(List<String> segments,
