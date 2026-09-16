@@ -25,7 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
@@ -60,7 +60,7 @@ public class CLPForwardIndexCreatorV1 implements CompressionStatsTrackingForward
   private final int _numDocs;
   private final File _intermediateFilesDir;
   private final FileChannel _dataFile;
-  private final ByteBuffer _fileBuffer;
+  private final MappedByteBuffer _fileBuffer;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
   private final StringColumnPreIndexStatsCollector.CLPStats _clpStats;
@@ -282,8 +282,12 @@ public class CLPForwardIndexCreatorV1 implements CompressionStatsTrackingForward
   @Override
   public void close()
       throws IOException {
+    try {
+      org.apache.pinot.common.utils.FileUtils.forceMappedBuffers(_fileBuffer);
+    } finally {
+      org.apache.pinot.common.utils.FileUtils.syncAndClose(_dataFile);
+    }
     // Delete all temp files
-    _dataFile.close();
     FileUtils.deleteDirectory(_intermediateFilesDir);
   }
 }

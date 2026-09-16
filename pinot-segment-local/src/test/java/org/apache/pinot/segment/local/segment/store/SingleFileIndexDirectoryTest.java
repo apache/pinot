@@ -22,6 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,6 +58,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodCheckRule {
@@ -349,6 +351,36 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
         + "baz.inverted_index.startOffset = 1124\nbaz.inverted_index.size = 200\n"
         + "\\=special.inverted_index.startOffset = 1324\n\\=special.inverted_index.size = 200\n"
         + "period.\\:colon.inverted_index.startOffset = 1524\nperiod.\\:colon.inverted_index.size = 200\n");
+  }
+
+  @Test
+  public void testCloseAggregatesBufferFailures()
+      throws Exception {
+    SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
+    PinotDataBuffer buf1 = Mockito.mock(PinotDataBuffer.class);
+    PinotDataBuffer buf2 = Mockito.mock(PinotDataBuffer.class);
+    Mockito.doThrow(new RuntimeException("flush failed")).when(buf1).close();
+    Mockito.doThrow(new IOException("close failed")).when(buf2).close();
+
+    Field allocBuffersField = SingleFileIndexDirectory.class.getDeclaredField("_allocBuffers");
+    allocBuffersField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    List<PinotDataBuffer> allocBuffers = (List<PinotDataBuffer>) allocBuffersField.get(sfd);
+    allocBuffers.add(buf1);
+    allocBuffers.add(buf2);
+
+    try {
+      sfd.close();
+      fail("Expected IOException");
+    } catch (IOException e) {
+      assertEquals(e.getCause().getMessage(), "flush failed");
+      assertEquals(e.getCause().getSuppressed().length, 1);
+      assertEquals(e.getCause().getSuppressed()[0].getMessage(), "close failed");
+    }
+
+    // Every close is attempted, so a failure in one buffer does not leak the remaining buffers.
+    Mockito.verify(buf1).close();
+    Mockito.verify(buf2).close();
   }
 
   @Test

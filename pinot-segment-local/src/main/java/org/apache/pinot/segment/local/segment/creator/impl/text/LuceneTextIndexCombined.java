@@ -120,6 +120,7 @@ public class LuceneTextIndexCombined {
 
       // Write file data
       writeFileData(outputChannel, fileInfoMap);
+      outputChannel.force(true);
     }
 
     LOGGER.info("Successfully combined {} files into file: {} (size: {} bytes)", fileCount, outputFilePath, totalSize);

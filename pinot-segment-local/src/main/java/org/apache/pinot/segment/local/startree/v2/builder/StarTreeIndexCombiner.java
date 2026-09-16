@@ -89,6 +89,6 @@ public class StarTreeIndexCombiner implements Closeable {
   @Override
   public void close()
       throws IOException {
-    _fileChannel.close();
+    org.apache.pinot.common.utils.FileUtils.syncAndClose(_fileChannel);
   }
 }
