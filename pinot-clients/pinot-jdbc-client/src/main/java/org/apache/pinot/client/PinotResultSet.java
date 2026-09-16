@@ -297,7 +297,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     validateColumn(columnIndex);
 
     String val = _resultSet.getString(_currentRow, columnIndex - 1);
-    if (checkIsNull(val)) {
+    if (checkIsNull(columnIndex, val)) {
       return null;
     }
 
@@ -316,6 +316,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
 
     switch (dataType) {
       case "STRING":
+      case "VARIANT":
         return getString(columnIndex);
       case "INT":
         return getInt(columnIndex);
@@ -352,8 +353,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return super.getObject(columnLabel, type);
   }
 
-  private boolean checkIsNull(String val) {
-    if (val == null || val.toLowerCase().contentEquals(NULL_STRING)) {
+  private boolean checkIsNull(int columnIndex, String val) {
+    if (val == null) {
+      _wasNull = true;
+      return true;
+    }
+    // A VARIANT null is a non-SQL-null value whose canonical JSON representation is the text "null".
+    // The underlying ResultTableResultSet preserves a JSON null as Java null, so these two cases remain distinct.
+    if (!"VARIANT".equals(_columnDataTypes.get(columnIndex)) && val.equalsIgnoreCase(NULL_STRING)) {
       _wasNull = true;
       return true;
     }

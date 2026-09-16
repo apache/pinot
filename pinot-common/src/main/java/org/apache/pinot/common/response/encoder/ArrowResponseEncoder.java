@@ -107,6 +107,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case STRING:
         case JSON:
         case BYTES:
+        case VARIANT:
         case UUID:
         case OBJECT:
           field = new Field(colName, FieldType.nullable(new ArrowType.Utf8()), null);
@@ -236,6 +237,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case VARIANT:
             case UUID:
             case OBJECT:
               byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
@@ -415,6 +417,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case STRING:
             case JSON:
             case BYTES:
+            case VARIANT:
             case UUID:
             case OBJECT:
               row[col] = new String(((VarCharVector) vector).get(i), StandardCharsets.UTF_8);
