@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -1912,5 +1914,65 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     _helixResourceManager.deleteRealtimeTable(rawTableName);
     deleteSchema(rawTableName);
+  }
+
+  /// The post-delete audit must actually detect leftover metadata, not just return empty. A live table is the
+  /// cleanest source of "leftovers": every artifact the audit looks for is present, so this exercises the
+  /// detection branches, and deleting the table then proves it reports nothing for a clean delete.
+  @Test
+  public void testFindLeftoverTableMetadataDetectsAndClears()
+      throws Exception {
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
+    _helixResourceManager.addTable(offlineTableConfig);
+
+    List<String> leftovers =
+        _helixResourceManager.findLeftoverTableMetadata(OFFLINE_TABLE_NAME, TableType.OFFLINE);
+    assertTrue(leftovers.contains("IdealState"), "A live table's IdealState should be detected, got: " + leftovers);
+    assertTrue(leftovers.contains("TableConfig"), "A live table's config should be detected, got: " + leftovers);
+
+    _helixResourceManager.deleteOfflineTable(OFFLINE_TABLE_NAME);
+
+    assertTrue(_helixResourceManager.findLeftoverTableMetadata(OFFLINE_TABLE_NAME, TableType.OFFLINE).isEmpty(),
+        "A completed delete should leave no audited metadata behind");
+    // NOTE: the RAW_TABLE_NAME schema is created once in setUp() and shared by the rest of this class, so it must
+    // not be deleted here.
+  }
+
+  /// A deletion marker must block both a re-create and a second concurrent delete, and must report CONFLICT
+  /// rather than a generic server error, since both are expected retryable conditions.
+  @Test
+  public void testDeletionMarkerBlocksCreateAndConcurrentDelete()
+      throws Exception {
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+
+    // Simulate a delete that is in flight on some other controller.
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_helixResourceManager.getPropertyStore(),
+        OFFLINE_TABLE_NAME, "Controller_other_9000"));
+    try {
+      ControllerApplicationException createFailure = expectThrows(ControllerApplicationException.class,
+          () -> _helixResourceManager.addTable(offlineTableConfig));
+      assertEquals(createFailure.getResponse().getStatus(), Response.Status.CONFLICT.getStatusCode(),
+          "Creating a table whose deletion is in flight should be a conflict, not a server error");
+
+      ControllerApplicationException deleteFailure = expectThrows(ControllerApplicationException.class,
+          () -> _helixResourceManager.deleteOfflineTable(OFFLINE_TABLE_NAME));
+      assertEquals(deleteFailure.getResponse().getStatus(), Response.Status.CONFLICT.getStatusCode(),
+          "A second concurrent delete should be a conflict, not a server error");
+    } finally {
+      ZKMetadataProvider.removeTableDeletionMarker(_helixResourceManager.getPropertyStore(), OFFLINE_TABLE_NAME,
+          "Controller_other_9000");
+    }
+
+    // With the marker gone the table can be created and deleted normally again.
+    _helixResourceManager.addTable(offlineTableConfig);
+    _helixResourceManager.deleteOfflineTable(OFFLINE_TABLE_NAME);
+    // NOTE: the RAW_TABLE_NAME schema is shared across this class; leave it in place.
   }
 }
