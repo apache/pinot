@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -307,13 +308,19 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
+    IOException closeException = null;
     if (_columnReaderMap != null) {
-      for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
-        columnReader.close();
+      try {
+        FileUtils.close(_columnReaderMap.values());
+      } catch (IOException e) {
+        closeException = e;
       }
     }
     if (_destroySegmentOnClose && _indexSegment != null) {
       _indexSegment.destroy();
+    }
+    if (closeException != null) {
+      throw closeException;
     }
   }
 }
