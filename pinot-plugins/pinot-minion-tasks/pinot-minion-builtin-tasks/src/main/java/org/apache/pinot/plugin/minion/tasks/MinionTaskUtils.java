@@ -327,27 +327,16 @@ public class MinionTaskUtils {
     return defaultValue;
   }
 
-  /// Returns the validDocIds bitmap for the segment resolved across the server(s) hosting it, per the consensus mode
-  /// (`comparisonModeStr` is the task config value):
-  /// - `UNSAFE`: the first usable server bitmap; servers that fail, mismatch the CRC, or are not READY are skipped.
+  /// Returns the validDocIds bitmap for the segment, resolved across the servers hosting it. A server contributes
+  /// its bitmap only when its CRC matches `expectedCrc`, or - when segment CRCs differ - when `expectedDataCrc`
+  /// matches (see [#crcMatches]). `comparisonModeStr` selects the resolution mode:
+  /// - `UNSAFE`: first usable bitmap; failing / mismatched / non-READY servers are skipped.
   /// - `EQUAL` (default): the bitmap every server agrees on.
   /// - `MOST_VALID_DOCS`: the bitmap with the highest valid-doc count.
   ///
-  /// Returns null when no server produced a usable bitmap (no server hosts the segment, or every server was skipped
-  /// in `UNSAFE` mode). In the non-`UNSAFE` modes any failure throws instead of being skipped:
-  /// - [NotFoundException] when a server has no validDocIds for the segment (e.g. the snapshot is not written yet, or
-  ///   the segment is not hosted) — a distinct condition that callers may handle with a documented fallback.
-  /// - [IllegalStateException] for any other fetch failure, a CRC mismatch (typically the server still reloading the
-  ///   segment), a server not in GOOD status, or an `EQUAL`-mode consensus failure.
-  @Nullable
-  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
-    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
-        expectedCrc, null, comparisonModeStr);
-  }
-
-  /// Variant that also matches on the expected data CRC (see [#crcMatches]), with the same return and exception
-  /// contract as [#getValidDocIdFromServerMatchingCrc(String, String, String, MinionContext, String, String)].
+  /// Returns null if no server produced a usable bitmap. Non-`UNSAFE` modes throw instead of skipping:
+  /// [NotFoundException] when a server has no validDocIds (e.g. snapshot not yet written); [IllegalStateException]
+  /// for other fetch failures, CRC mismatches, non-GOOD status, or `EQUAL`-mode consensus failures.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
