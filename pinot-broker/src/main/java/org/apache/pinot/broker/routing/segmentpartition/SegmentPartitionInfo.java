@@ -18,26 +18,33 @@
  */
 package org.apache.pinot.broker.routing.segmentpartition;
 
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 
 public class SegmentPartitionInfo {
+  // Canonicalize at metadata load/refresh time. Weak references allow unused configurations to be reclaimed.
+  private static final Interner<PartitionFunctionKey> PARTITION_FUNCTION_KEYS = Interners.newWeakInterner();
+
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final Set<Integer> _partitions;
   @Nullable
   private final Map<String, String> _partitionFunctionConfig;
-  private final int _partitionFunctionConfigHash;
+  @Nullable
+  private final PartitionFunctionKey _partitionFunctionKey;
 
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
       Set<Integer> partitions) {
-    this(partitionColumn, partitionFunction, partitions, null);
+    this(partitionColumn, partitionFunction, partitions,
+        partitionFunction != null ? partitionFunction.getFunctionConfig() : null);
   }
 
   /// Retains the constructor configuration even when a partition-function plugin does not expose it through its getter.
@@ -47,10 +54,19 @@ public class SegmentPartitionInfo {
     _partitionFunction = partitionFunction;
     _partitions = partitions;
     // Preserve null versus empty configuration, and allow null entries accepted by the metadata representation.
-    _partitionFunctionConfig = partitionFunctionConfig == null
+    Map<String, String> config = partitionFunctionConfig == null
         ? null
         : Collections.unmodifiableMap(new HashMap<>(partitionFunctionConfig));
-    _partitionFunctionConfigHash = Objects.hashCode(_partitionFunctionConfig);
+    // The invalid-metadata sentinel has no partition function.
+    if (partitionFunction == null) {
+      _partitionFunctionKey = null;
+      _partitionFunctionConfig = config;
+    } else {
+      _partitionFunctionKey = PARTITION_FUNCTION_KEYS.intern(new PartitionFunctionKey(partitionFunction.getClass(),
+          partitionFunction.getName(), partitionFunction.getNumPartitions(),
+          partitionFunction.getPartitionIdNormalizer(), config));
+      _partitionFunctionConfig = _partitionFunctionKey.functionConfig();
+    }
   }
 
   public String getPartitionColumn() {
@@ -70,7 +86,15 @@ public class SegmentPartitionInfo {
     return _partitionFunctionConfig;
   }
 
-  public int getPartitionFunctionConfigHash() {
-    return _partitionFunctionConfigHash;
+  /// Returns a shared immutable identity for equivalent partition functions, or null for invalid metadata.
+  /// Query-local caches can compare these keys by reference without inspecting configuration maps.
+  @Nullable
+  public Object getPartitionFunctionKey() {
+    return _partitionFunctionKey;
+  }
+
+  /// Immutable, thread-safe constructor-state snapshot. Full equality is used only during metadata canonicalization.
+  private record PartitionFunctionKey(Class<? extends PartitionFunction> functionClass, String name, int numPartitions,
+                                      PartitionIdNormalizer normalizer, @Nullable Map<String, String> functionConfig) {
   }
 }

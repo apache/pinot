@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.HashMap;
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
@@ -94,134 +96,93 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
-    if (filterExpression == null) {
+    if (filterExpression == null || segments.isEmpty()) {
       return segments;
     }
     Set<String> selectedSegments = new HashSet<>();
-    // A singleton has no repeated work to reuse. Keep its evaluation free of predicate/cache setup.
-    QueryPartitionMatcher matcher = segments.size() > 1 ? new QueryPartitionMatcher(filterExpression) : null;
+    QueryPartitionMatcher matcher = new QueryPartitionMatcher(filterExpression);
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO
-          || (matcher == null ? isPartitionMatch(filterExpression, partitionInfo) : matcher.matches(partitionInfo))) {
+          || matcher.matches(partitionInfo)) {
         selectedSegments.add(segment);
       }
     }
     return selectedSegments;
   }
 
-  private boolean isPartitionMatch(Expression filterExpression, SegmentPartitionInfo partitionInfo) {
-    Function function = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
-    List<Expression> operands = function.getOperands();
-    switch (filterKind) {
-      case AND:
-        for (Expression child : operands) {
-          if (!isPartitionMatch(child, partitionInfo)) {
-            return false;
-          }
-        }
-        return true;
-      case OR:
-        for (Expression child : operands) {
-          if (isPartitionMatch(child, partitionInfo)) {
-            return true;
-          }
-        }
-        return false;
-      case EQUALS: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        return identifier == null || !identifier.getName().equals(_partitionColumn)
-            || partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-                .getPartition(RequestContextUtils.getStringValue(operands.get(1))));
-      }
-      case IN: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier == null || !identifier.getName().equals(_partitionColumn)) {
-          return true;
-        }
-        for (int i = 1; i < operands.size(); i++) {
-          if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-              .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
-            return true;
-          }
-        }
-        return false;
-      }
-      default:
-        return true;
-    }
-  }
-
   /// All prepared predicates and hashes belong to one prune call; refreshes and other queries share none of this state.
   private final class QueryPartitionMatcher {
     private final Expression _filterExpression;
-    private final Map<PartitionFunctionKey, PreparedPredicate> _predicates = new HashMap<>();
-    private final PartitionFunctionLookup _lookup = new PartitionFunctionLookup();
-    private PreparedPredicate _lastPredicate;
+    private final Map<Object, PreparedPredicate> _predicates = new IdentityHashMap<>();
 
     private QueryPartitionMatcher(Expression filterExpression) {
       _filterExpression = filterExpression;
     }
 
     private boolean matches(SegmentPartitionInfo partitionInfo) {
-      // Segment metadata contains distinct function instances. Avoid allocating a key per segment for the common
-      // case where those instances have identical configuration.
-      if (_lastPredicate == null || !_lookup.matches(partitionInfo)) {
-        // This reusable lookup probe is never inserted. Only a previously unseen configuration allocates a stored key.
-        _lookup._partitionInfo = partitionInfo;
-        _lastPredicate = _predicates.get(_lookup);
-        if (_lastPredicate == null) {
-          _lastPredicate = new PreparedPredicate(_filterExpression, partitionInfo.getPartitionFunction());
-          _predicates.put(new CachedPartitionFunctionKey(partitionInfo), _lastPredicate);
-        }
+      Object key = partitionInfo.getPartitionFunctionKey();
+      PreparedPredicate predicate = _predicates.get(key);
+      if (predicate == null) {
+        predicate = new PreparedPredicate(_filterExpression, partitionInfo.getPartitionFunction());
+        _predicates.put(key, predicate);
       }
-      return _lastPredicate.matches(partitionInfo.getPartitions());
+      return predicate.matches(partitionInfo.getPartitions());
     }
   }
 
   /// Interprets each visited predicate once and hashes IN values only as far as short-circuit evaluation requires.
   private final class PreparedPredicate {
-    private final Expression _expression;
     private final PartitionFunction _partitionFunction;
     private final FilterKind _filterKind;
     private final List<Expression> _operands;
     private final PreparedPredicate[] _children;
-    private final Integer[] _partitionIds;
+    private final IntSet _partitionIds;
+    private final int _numValues;
+    private int _numEvaluatedValues;
 
     private PreparedPredicate(Expression expression, PartitionFunction partitionFunction) {
-      _expression = expression;
       _partitionFunction = partitionFunction;
-      Function function = _expression.getFunctionCall();
+      Function function = expression.getFunctionCall();
       _filterKind = FilterKind.valueOf(function.getOperator());
       _operands = function.getOperands();
-      _children = null;
-      _partitionIds = null;
-      if (_filterKind == FilterKind.AND || _filterKind == FilterKind.OR) {
-        _children = new PreparedPredicate[_operands.size()];
-        for (int i = 0; i < _children.length; i++) {
-          _children[i] = new PreparedPredicate(_operands.get(i), _partitionFunction);
-        }
-      } else if (_filterKind == FilterKind.EQUALS || _filterKind == FilterKind.IN) {
+      _children = _filterKind == FilterKind.AND || _filterKind == FilterKind.OR
+          ? new PreparedPredicate[_operands.size()]
+          : null;
+      if (_filterKind == FilterKind.EQUALS || _filterKind == FilterKind.IN) {
         Identifier identifier = _operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-          _partitionIds = new Integer[_filterKind == FilterKind.EQUALS ? 1 : _operands.size() - 1];
-        }
+        _partitionIds = identifier != null && identifier.getName().equals(_partitionColumn)
+            ? new IntOpenHashSet()
+            : null;
+        _numValues = _filterKind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
+      } else {
+        _partitionIds = null;
+        _numValues = 0;
       }
+    }
+
+    private PreparedPredicate child(int index) {
+      // Construct a child only when visited, preserving short-circuit behavior even for invalid later expressions.
+      PreparedPredicate child = _children[index];
+      if (child == null) {
+        child = new PreparedPredicate(_operands.get(index), _partitionFunction);
+        _children[index] = child;
+      }
+      return child;
     }
 
     private boolean matches(Set<Integer> partitions) {
       switch (_filterKind) {
         case AND:
-          for (PreparedPredicate child : _children) {
-            if (!child.matches(partitions)) {
+          for (int i = 0; i < _children.length; i++) {
+            if (!child(i).matches(partitions)) {
               return false;
             }
           }
           return true;
         case OR:
-          for (PreparedPredicate child : _children) {
-            if (child.matches(partitions)) {
+          for (int i = 0; i < _children.length; i++) {
+            if (child(i).matches(partitions)) {
               return true;
             }
           }
@@ -231,13 +192,16 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
           if (_partitionIds == null) {
             return true;
           }
-          for (int i = 0; i < _partitionIds.length; i++) {
-            Integer partitionId = _partitionIds[i];
-            if (partitionId == null) {
-              partitionId = _partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(i + 1)));
-              _partitionIds[i] = partitionId;
+          for (IntIterator iterator = _partitionIds.iterator(); iterator.hasNext();) {
+            if (partitions.contains(iterator.nextInt())) {
+              return true;
             }
-            if (partitions.contains(partitionId)) {
+          }
+          while (_numEvaluatedValues < _numValues) {
+            int partitionId = _partitionFunction.getPartition(
+                RequestContextUtils.getStringValue(_operands.get(_numEvaluatedValues + 1)));
+            _numEvaluatedValues++;
+            if (_partitionIds.add(partitionId) && partitions.contains(partitionId)) {
               return true;
             }
           }
@@ -245,63 +209,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         default:
           return true;
       }
-    }
-  }
-
-  /// Uses all recorded constructor inputs to identify equivalent partition functions.
-  private abstract static class PartitionFunctionKey {
-    abstract SegmentPartitionInfo getPartitionInfo();
-
-    final boolean matches(SegmentPartitionInfo partitionInfo) {
-      SegmentPartitionInfo current = getPartitionInfo();
-      PartitionFunction function = current.getPartitionFunction();
-      PartitionFunction otherFunction = partitionInfo.getPartitionFunction();
-      return function.getClass() == otherFunction.getClass() && function.getName().equals(otherFunction.getName())
-          && function.getNumPartitions() == otherFunction.getNumPartitions()
-          && function.getPartitionIdNormalizer() == otherFunction.getPartitionIdNormalizer()
-          && current.getPartitionFunctionConfigHash() == partitionInfo.getPartitionFunctionConfigHash()
-          && Objects.equals(current.getPartitionFunctionConfig(), partitionInfo.getPartitionFunctionConfig());
-    }
-
-    @Override
-    public final boolean equals(Object other) {
-      return other instanceof PartitionFunctionKey && matches(((PartitionFunctionKey) other).getPartitionInfo());
-    }
-
-    @Override
-    public final int hashCode() {
-      SegmentPartitionInfo partitionInfo = getPartitionInfo();
-      PartitionFunction function = partitionInfo.getPartitionFunction();
-      // Unlike Objects.hash, this creates neither a varargs array nor a boxed partition count on each lookup.
-      int hash = function.getClass().hashCode();
-      hash = 31 * hash + function.getName().hashCode();
-      hash = 31 * hash + function.getNumPartitions();
-      hash = 31 * hash + function.getPartitionIdNormalizer().hashCode();
-      return 31 * hash + partitionInfo.getPartitionFunctionConfigHash();
-    }
-  }
-
-  /// Immutable keys are retained only for configurations encountered during the current prune call.
-  private static final class CachedPartitionFunctionKey extends PartitionFunctionKey {
-    private final SegmentPartitionInfo _partitionInfo;
-
-    private CachedPartitionFunctionKey(SegmentPartitionInfo partitionInfo) {
-      _partitionInfo = partitionInfo;
-    }
-
-    @Override
-    SegmentPartitionInfo getPartitionInfo() {
-      return _partitionInfo;
-    }
-  }
-
-  /// Mutable lookup state owned by one query; never stored in the predicate map.
-  private static final class PartitionFunctionLookup extends PartitionFunctionKey {
-    private SegmentPartitionInfo _partitionInfo;
-
-    @Override
-    SegmentPartitionInfo getPartitionInfo() {
-      return _partitionInfo;
     }
   }
 }
