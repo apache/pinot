@@ -140,6 +140,7 @@ import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.ProtoBufDescriptorFallbackListener;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -284,6 +285,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info(
         "Registered ConsumingSegmentConsistencyModeListener change listener for dynamic force commit/reload control");
+    // Register configuration change listener for the protobuf descriptor fallback setting
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ProtoBufDescriptorFallbackListener.getInstance());
+    LOGGER.info("Registered ProtoBufDescriptorFallbackListener change listener for dynamic descriptor fallback"
+        + " control");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
