@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,11 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
@@ -48,6 +49,7 @@ import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -64,6 +66,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// {@code null} when the segment is exhausted, so that a downstream k-way-merge combine operator can pull from many
 /// segments lazily and stop early. It relies on the underlying project operator iterating the first order-by column in
 /// the query order (the caller must guarantee {@code projectOperator.isCompatibleWith(DocIdOrder.fromAsc(asc))}).
+///
+/// Every instance emits at least one block before {@code null}: a segment matching no rows emits a single empty block
+/// carrying the {@link DataSchema}, so consumers never have to reconstruct a schema the segment already knows.
 ///
 /// It runs in one of two emission modes:
 ///
@@ -118,6 +123,8 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
 
   /// Lazily built and cached; for two-phase it requires the transform operator's result column contexts
   private DataSchema _dataSchema;
+  /// Source column contexts for the phase-2 expressions; built only on the zero-match schema path (null otherwise)
+  private Map<String, ColumnContext> _phase2ColumnContextMap;
 
   // Forward-scan cursor state (used by the tail-to-sort mode)
   private ValueBlock _currentBlock;
@@ -131,6 +138,8 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   private boolean _projectExhausted;
 
   private boolean _exhausted;
+  /// Whether any block has been emitted yet; drives the zero-match segment's one schema-carrying empty block
+  private boolean _emittedAnyBlock;
   private int _numRowsEmitted;
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
@@ -200,8 +209,19 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     List<Object[]> rows = _tailToSort ? nextRun() : nextSortedRows();
     if (rows == null || rows.isEmpty()) {
       _exhausted = true;
-      return null;
+      if (_emittedAnyBlock) {
+        return null;
+      }
+      // Zero-match segment: emit one empty block carrying the schema before signalling end-of-stream, so consumers
+      // never have to reconstruct a schema the segment already knows. Two-phase leaves _dataSchema null until the
+      // first fetch, which never happens here, so build it from column metadata alone.
+      if (_twoPhase && _dataSchema == null) {
+        _dataSchema = buildTwoPhaseDataSchema(this::resolveResultColumnContext);
+      }
+      assert _dataSchema != null;
+      return new SelectionResultsBlock(_dataSchema, List.of(), _comparator, _queryContext);
     }
+    _emittedAnyBlock = true;
     if (_twoPhase) {
       fetchNonOrderByColumns(rows);
     }
@@ -211,14 +231,16 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   }
 
   /// No-tail-to-sort mode: the project operator already returns rows in final order, so emit the next project block,
-  /// trimmed to the remaining {@code limit + offset} budget. Returns {@code null} when exhausted.
+  /// trimmed to the remaining {@code limit + offset} budget. Returns {@code null} when exhausted, and otherwise a
+  /// non-empty list -- empty project blocks are skipped and the row budget is checked up front, so "no rows" always
+  /// means "no more rows".
   @Nullable
   private List<Object[]> nextSortedRows() {
     int remaining = _numRowsToKeep - _numRowsEmitted;
     if (remaining <= 0) {
       return null;
     }
-    ValueBlock valueBlock = _projectOperator.nextBlock();
+    ValueBlock valueBlock = nextNonEmptyBlock();
     if (valueBlock == null) {
       return null;
     }
@@ -297,40 +319,54 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   /// is exhausted.
   @Nullable
   private Object[] nextRow() {
-    while (true) {
-      if (_currentBlock == null || _currentPos >= _currentNumDocs) {
-        if (_projectExhausted) {
-          return null;
-        }
-        _currentBlock = _projectOperator.nextBlock();
-        if (_currentBlock == null) {
-          _projectExhausted = true;
-          return null;
-        }
-        BlockValSet[] blockValSets = new BlockValSet[_numPhase1Columns];
+    if (_currentBlock == null || _currentPos >= _currentNumDocs) {
+      if (_projectExhausted) {
+        return null;
+      }
+      _currentBlock = nextNonEmptyBlock();
+      if (_currentBlock == null) {
+        _projectExhausted = true;
+        return null;
+      }
+      BlockValSet[] blockValSets = new BlockValSet[_numPhase1Columns];
+      for (int i = 0; i < _numPhase1Columns; i++) {
+        blockValSets[i] = _currentBlock.getBlockValueSet(_phase1Expressions.get(i));
+      }
+      _currentFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      _currentNumDocs = _currentBlock.getNumDocs();
+      _currentDocIds = _twoPhase ? _currentBlock.getDocIds() : null;
+      if (_nullHandlingEnabled) {
+        _currentNullBitmaps = new RoaringBitmap[_numPhase1Columns];
         for (int i = 0; i < _numPhase1Columns; i++) {
-          blockValSets[i] = _currentBlock.getBlockValueSet(_phase1Expressions.get(i));
-        }
-        _currentFetcher = new RowBasedBlockValueFetcher(blockValSets);
-        _currentNumDocs = _currentBlock.getNumDocs();
-        _currentDocIds = _twoPhase ? _currentBlock.getDocIds() : null;
-        if (_nullHandlingEnabled) {
-          _currentNullBitmaps = new RoaringBitmap[_numPhase1Columns];
-          for (int i = 0; i < _numPhase1Columns; i++) {
-            _currentNullBitmaps[i] = blockValSets[i].getNullBitmap();
-          }
-        }
-        _currentPos = 0;
-        _numDocsScanned += _currentNumDocs;
-        _numEntriesScannedPostFilter += (long) _currentNumDocs * _projectOperator.getNumColumnsProjected();
-        reportScanCost(_currentNumDocs, (long) _currentNumDocs * _projectOperator.getNumColumnsProjected());
-        if (_currentNumDocs == 0) {
-          _currentBlock = null;
-          continue;
+          _currentNullBitmaps[i] = blockValSets[i].getNullBitmap();
         }
       }
-      int rowId = _currentPos++;
-      return materializeRow(_currentFetcher, _currentDocIds, _currentNullBitmaps, rowId);
+      _currentPos = 0;
+      _numDocsScanned += _currentNumDocs;
+      _numEntriesScannedPostFilter += (long) _currentNumDocs * _projectOperator.getNumColumnsProjected();
+      reportScanCost(_currentNumDocs, (long) _currentNumDocs * _projectOperator.getNumColumnsProjected());
+    }
+    int rowId = _currentPos++;
+    return materializeRow(_currentFetcher, _currentDocIds, _currentNullBitmaps, rowId);
+  }
+
+  /// Pulls the next project block carrying documents, skipping any that carry none. Returns {@code null} only when
+  /// the project operator is exhausted; an empty block means "nothing in this batch", not "end of segment", and
+  /// treating one as exhaustion would truncate the scan.
+  ///
+  /// No reachable doc-id-set operator emits an empty block today, so this normally returns on its first pull. The
+  /// skip stays because that is a convention of those implementations, not something
+  /// [org.apache.pinot.core.operator.BaseProjectOperator] enforces.
+  @Nullable
+  private ValueBlock nextNonEmptyBlock() {
+    while (true) {
+      ValueBlock valueBlock = _projectOperator.nextBlock();
+      if (valueBlock == null) {
+        return null;
+      }
+      if (valueBlock.getNumDocs() > 0) {
+        return valueBlock;
+      }
     }
   }
 
@@ -352,15 +388,23 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     return row;
   }
 
-  /// Drains a max-heap (created with the reversed comparator) into an ascending list, mutable so the second pass can
-  /// fill non-order-by values in place.
+  /// Drains a max-heap (created with the reversed comparator) into an ascending list. The second pass fills
+  /// non-order-by values in place, so the list must at least be settable.
+  ///
+  /// It is a growable `ArrayList` rather than a fixed-size view for defensive reasons: `SelectionResultsBlock` is a
+  /// shared type, and `SelectionOperatorUtils.mergeWithoutOrdering()` structurally adds to the row list of the block
+  /// it merges into. No current consumer of this operator takes that path - the streaming combine only reads the
+  /// rows - so this is hardening against a future one, not a fix for a reachable failure.
   private List<Object[]> drainAscending(PriorityQueue<Object[]> heap) {
     int numRows = heap.size();
-    Object[][] sortedRows = new Object[numRows][];
-    for (int i = numRows - 1; i >= 0; i--) {
-      sortedRows[i] = heap.poll();
+    // One exactly-sized backing array and no intermediate copy: drain in the heap's own (descending) order, then
+    // flip in place.
+    List<Object[]> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      rows.add(heap.poll());
     }
-    return Arrays.asList(sortedRows);
+    Collections.reverse(rows);
+    return rows;
   }
 
   /// Second pass of the two-phase fetch: fills the non-order-by expression values for the rows of a single emitted
@@ -417,7 +461,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       }
 
       if (_dataSchema == null) {
-        _dataSchema = buildTwoPhaseDataSchema(transformOperator);
+        _dataSchema = buildTwoPhaseDataSchema(transformOperator::getResultColumnContext);
       }
     }
   }
@@ -433,7 +477,24 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  private DataSchema buildTwoPhaseDataSchema(TransformOperator transformOperator) {
+  /// Resolves a non-order-by expression's result type without building the phase-2 pipeline, for the zero-match case
+  /// where there is nothing to fetch. This reproduces {@link TransformOperator#getResultColumnContext} exactly -- that
+  /// method resolves against its project operator's source column contexts, which for phase 2 are
+  /// {@link #_phase2DataSourceMap} -- so the schema is identical to the one the fetch path builds, at metadata cost
+  /// only. Worth the indirection because a selective filter can leave many segments of a table matching nothing, and
+  /// each would otherwise stand up a full projection and transform operator to read types it already knows.
+  private ColumnContext resolveResultColumnContext(ExpressionContext expression) {
+    if (_phase2ColumnContextMap == null) {
+      _phase2ColumnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(_phase2DataSourceMap.size()));
+      for (Map.Entry<String, DataSource> entry : _phase2DataSourceMap.entrySet()) {
+        _phase2ColumnContextMap.put(entry.getKey(), ColumnContext.fromDataSource(entry.getValue()));
+      }
+    }
+    return ColumnContext.fromTransformFunction(
+        TransformFunctionFactory.get(expression, _phase2ColumnContextMap, _queryContext));
+  }
+
+  private DataSchema buildTwoPhaseDataSchema(Function<ExpressionContext, ColumnContext> resultColumnContexts) {
     int numNonOrderByExpressions = _nonOrderByExpressions.size();
     String[] columnNames = new String[_numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_numExpressions];
@@ -445,7 +506,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
           _orderByColumnContexts[i].isSingleValue());
     }
     for (int i = 0; i < numNonOrderByExpressions; i++) {
-      ColumnContext columnContext = transformOperator.getResultColumnContext(_nonOrderByExpressions.get(i));
+      ColumnContext columnContext = resultColumnContexts.apply(_nonOrderByExpressions.get(i));
       columnDataTypes[_numOrderByExpressions + i] =
           DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
