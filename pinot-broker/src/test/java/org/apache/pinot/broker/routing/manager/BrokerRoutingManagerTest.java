@@ -77,21 +77,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class BrokerRoutingManagerTest {
@@ -206,7 +193,7 @@ public class BrokerRoutingManagerTest {
       assertEquals(enabledServers.size(), 1);
       assertSame(enabledServers.keySet().iterator().next(), requiredInstanceId);
       ServerInstance server = enabledServers.get(requiredInstanceId);
-      assertEquals(server.getInstanceId(), SERVER_INSTANCE_ID);
+      assertSame(server.getInstanceId(), requiredInstanceId);
       assertEquals(server.getHostname(), SERVER_HOST);
       assertEquals(server.getPort(), SERVER_PORT);
       // An equal ID on a later config refresh must still replace the server's configuration.

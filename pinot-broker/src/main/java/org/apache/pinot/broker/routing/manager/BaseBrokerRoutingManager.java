@@ -416,13 +416,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       String instanceId = instanceConfigZNRecord.getId();
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
-          // Join Jackson's JVM-interned IS/EV keys; a config-only Guava interner would use a separate pool.
-          instanceId = instanceId.intern();
-          enabledServers.add(instanceId);
-
           // Always refresh the server instance with the latest instance config in case it changes
           InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
           ServerInstance serverInstance = new ServerInstance(instanceConfig);
+          // Key the maps by the interned instance id so that lookups with the Jackson-interned instance ids from IS/EV
+          // hit the identity fast path
+          instanceId = serverInstance.getInstanceId();
+          enabledServers.add(instanceId);
           if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
             newEnabledServers.add(instanceId);
 
