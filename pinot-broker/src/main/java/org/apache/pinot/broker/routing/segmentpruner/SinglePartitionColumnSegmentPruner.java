@@ -100,35 +100,25 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       return segments;
     }
     Set<String> selectedSegments = new HashSet<>();
-    QueryPartitionMatcher matcher = new QueryPartitionMatcher(filterExpression);
+    // Prepared predicates and hashes are shared across equivalent functions only within this prune call.
+    Map<Object, PreparedPredicate> predicates = new IdentityHashMap<>();
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-      if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO
-          || matcher.matches(partitionInfo)) {
+      if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+        selectedSegments.add(segment);
+        continue;
+      }
+      Object key = partitionInfo.getPartitionFunctionKey();
+      PreparedPredicate predicate = predicates.get(key);
+      if (predicate == null) {
+        predicate = new PreparedPredicate(filterExpression, partitionInfo.getPartitionFunction());
+        predicates.put(key, predicate);
+      }
+      if (predicate.matches(partitionInfo.getPartitions())) {
         selectedSegments.add(segment);
       }
     }
     return selectedSegments;
-  }
-
-  /// All prepared predicates and hashes belong to one prune call; refreshes and other queries share none of this state.
-  private final class QueryPartitionMatcher {
-    private final Expression _filterExpression;
-    private final Map<Object, PreparedPredicate> _predicates = new IdentityHashMap<>();
-
-    private QueryPartitionMatcher(Expression filterExpression) {
-      _filterExpression = filterExpression;
-    }
-
-    private boolean matches(SegmentPartitionInfo partitionInfo) {
-      Object key = partitionInfo.getPartitionFunctionKey();
-      PreparedPredicate predicate = _predicates.get(key);
-      if (predicate == null) {
-        predicate = new PreparedPredicate(_filterExpression, partitionInfo.getPartitionFunction());
-        _predicates.put(key, predicate);
-      }
-      return predicate.matches(partitionInfo.getPartitions());
-    }
   }
 
   /// Interprets each visited predicate once and hashes IN values only as far as short-circuit evaluation requires.
