@@ -35,6 +35,7 @@ import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmapLazyUnion;
 
 
 public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
@@ -145,10 +146,13 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
               _invertedIndexReader.getDocIds(dictIds[1]));
           break;
         default:
+          // Union lazily and repair once at the end: the fold still materializes the union, but skips per-union
+          // cardinality maintenance
           MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
           for (int dictId : dictIds) {
-            bitmap.or(_invertedIndexReader.getDocIds(dictId));
+            MutableRoaringBitmapLazyUnion.lazyOr(bitmap, _invertedIndexReader.getDocIds(dictId));
           }
+          MutableRoaringBitmapLazyUnion.repair(bitmap);
           count = bitmap.getCardinality();
           break;
       }
