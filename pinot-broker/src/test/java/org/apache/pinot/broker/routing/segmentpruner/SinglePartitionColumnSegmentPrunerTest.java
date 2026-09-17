@@ -51,9 +51,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -122,7 +120,6 @@ public class SinglePartitionColumnSegmentPrunerTest {
     SegmentPartitionInfo secondInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "second", second);
     assertNotSame(firstInfo.getPartitionFunction(), secondInfo.getPartitionFunction());
     assertSame(firstInfo.getPartitionFunctionKey(), secondInfo.getPartitionFunctionKey());
-    assertSame(firstInfo.getPartitionFunctionConfig(), secondInfo.getPartitionFunctionConfig());
     SinglePartitionColumnSegmentPruner pruner = pruner(Map.of("first", first, "second", second));
     assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of("first"));
     assertEquals(pruner.prune(request(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
@@ -293,21 +290,20 @@ public class SinglePartitionColumnSegmentPrunerTest {
   public void testMetadataConfigurationSnapshotPreservesNullAndEmpty() {
     PartitionFunction function = new CountingPartitionFunction(8, null);
     SegmentPartitionInfo legacy = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
-    assertNull(legacy.getPartitionFunctionConfig());
     SegmentPartitionInfo knownNull = new SegmentPartitionInfo(COLUMN, function, Set.of(0), null);
-    assertNull(knownNull.getPartitionFunctionConfig());
     assertSame(legacy.getPartitionFunctionKey(), knownNull.getPartitionFunctionKey());
     SegmentPartitionInfo knownEmpty = new SegmentPartitionInfo(COLUMN, function, Set.of(0), Map.of());
-    assertEquals(knownEmpty.getPartitionFunctionConfig(), Map.of());
     assertNotSame(knownNull.getPartitionFunctionKey(), knownEmpty.getPartitionFunctionKey());
     Map<String, String> config = new HashMap<>();
     config.put("offset", "1");
     config.put("nullable", null);
     SegmentPartitionInfo snapshot = new SegmentPartitionInfo(COLUMN, function, Set.of(0), config);
+    Map<String, String> originalConfig = new HashMap<>(config);
     config.put("offset", "2");
-    assertEquals(snapshot.getPartitionFunctionConfig().get("offset"), "1");
-    assertTrue(snapshot.getPartitionFunctionConfig().containsKey("nullable"));
-    expectThrows(UnsupportedOperationException.class, () -> snapshot.getPartitionFunctionConfig().put("offset", "3"));
+    assertSame(snapshot.getPartitionFunctionKey(),
+        new SegmentPartitionInfo(COLUMN, function, Set.of(0), originalConfig).getPartitionFunctionKey());
+    assertNotSame(snapshot.getPartitionFunctionKey(),
+        new SegmentPartitionInfo(COLUMN, function, Set.of(0), config).getPartitionFunctionKey());
   }
 
   @Test
@@ -318,7 +314,6 @@ public class SinglePartitionColumnSegmentPrunerTest {
     SegmentPartitionInfo explicit = new SegmentPartitionInfo(COLUMN, function, Set.of(1), config);
     SegmentPartitionInfo defaults = new SegmentPartitionInfo(COLUMN,
         PartitionFunctionFactory.getPartitionFunction("Murmur", 97, null), Set.of(0));
-    assertEquals(implicit.getPartitionFunctionConfig(), config);
     assertSame(implicit.getPartitionFunctionKey(), explicit.getPartitionFunctionKey());
     assertNotSame(implicit.getPartitionFunctionKey(), defaults.getPartitionFunctionKey());
   }
