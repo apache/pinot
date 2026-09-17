@@ -37,8 +37,6 @@ public class SegmentPartitionInfo {
   private final PartitionFunction _partitionFunction;
   private final Set<Integer> _partitions;
   @Nullable
-  private final Map<String, String> _partitionFunctionConfig;
-  @Nullable
   private final PartitionFunctionKey _partitionFunctionKey;
 
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
@@ -47,7 +45,7 @@ public class SegmentPartitionInfo {
         partitionFunction != null ? partitionFunction.getFunctionConfig() : null);
   }
 
-  /// Retains the constructor configuration even when a partition-function plugin does not expose it through its getter.
+  /// Retains the metadata configuration independently of the partition function's getter.
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction, Set<Integer> partitions,
       @Nullable Map<String, String> partitionFunctionConfig) {
     _partitionColumn = partitionColumn;
@@ -58,15 +56,11 @@ public class SegmentPartitionInfo {
         ? null
         : Collections.unmodifiableMap(new HashMap<>(partitionFunctionConfig));
     // The invalid-metadata sentinel has no partition function.
-    if (partitionFunction == null) {
-      _partitionFunctionKey = null;
-      _partitionFunctionConfig = config;
-    } else {
-      _partitionFunctionKey = PARTITION_FUNCTION_KEYS.intern(new PartitionFunctionKey(partitionFunction.getClass(),
-          partitionFunction.getName(), partitionFunction.getNumPartitions(),
-          partitionFunction.getPartitionIdNormalizer(), config));
-      _partitionFunctionConfig = _partitionFunctionKey.functionConfig();
-    }
+    _partitionFunctionKey = partitionFunction == null
+        ? null
+        : PARTITION_FUNCTION_KEYS.intern(new PartitionFunctionKey(partitionFunction.getClass(),
+            partitionFunction.getName(), partitionFunction.getNumPartitions(),
+            partitionFunction.getPartitionIdNormalizer(), config));
   }
 
   public String getPartitionColumn() {
@@ -79,11 +73,6 @@ public class SegmentPartitionInfo {
 
   public Set<Integer> getPartitions() {
     return _partitions;
-  }
-
-  @Nullable
-  public Map<String, String> getPartitionFunctionConfig() {
-    return _partitionFunctionConfig;
   }
 
   /// Returns a shared immutable identity for equivalent partition functions, or null for invalid metadata.
