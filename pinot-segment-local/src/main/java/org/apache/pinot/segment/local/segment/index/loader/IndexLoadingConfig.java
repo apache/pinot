@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -50,6 +51,8 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+
+import static java.util.Objects.requireNonNull;
 
 
 /// Table level index loading config.
@@ -98,9 +101,18 @@ public class IndexLoadingConfig {
   /// TODO: Revisit the init handling. Currently it doesn't apply tiered config override
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+    this(instanceDataManagerConfig, tableConfig, schema, UnaryOperator.identity());
+  }
+
+  /// Chooses an equivalent shared schema after normalizing the supplied table config and schema.
+  public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
+      @Nullable TableConfig tableConfig, @Nullable Schema schema, UnaryOperator<Schema> schemaCanonicalizer) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _tableConfig = tableConfig;
-    _schema = schema;
+    if (tableConfig != null && schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
+    _schema = schema != null ? requireNonNull(schemaCanonicalizer.apply(schema)) : null;
     init();
   }
 
@@ -171,10 +183,6 @@ public class IndexLoadingConfig {
   }
 
   private void extractFromTableConfigAndSchema() {
-    if (_schema != null) {
-      TimestampIndexUtils.applyTimestampIndex(_tableConfig, _schema);
-    }
-
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
