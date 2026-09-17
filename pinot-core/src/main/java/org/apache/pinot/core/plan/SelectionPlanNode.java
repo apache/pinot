@@ -77,7 +77,7 @@ public class SelectionPlanNode implements PlanNode {
     int numOrderByExpressions = orderByExpressions.size();
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
     // expression the operator will return a block whose selection result is a priority queue.
-    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
+    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions);
     if (sortedColumnsPrefixSize > 0) {
       int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
       // The first order by expressions are sorted (either asc or desc).
@@ -95,15 +95,23 @@ public class SelectionPlanNode implements PlanNode {
       DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
 
       // Opt-in streaming path: emit one globally-sorted block at a time so a downstream k-way-merge combine can pull
-      // lazily. Only build it when the first order-by column is an identifier (kept consistent with the combine-side
-      // gate) and the forward-scan project is order-compatible; the DESC-incompatible sorted case still falls back to
-      // the materialized SelectionPartiallyOrderedByDescOperation below so global order stays correct.
+      // lazily. Reaching here means the leading order-by is already a sorted prefix, so it is either a LITERAL or a
+      // physically sorted IDENTIFIER; only the identifier case has a forward index to scan in order. The combine-side
+      // gate deliberately does not repeat this check -- it accepts materialized children too, which is how
+      // SortedSelectionMergeMode.ON forces the path for an expression order-by.
+      //
+      // The DESC-incompatible sorted case still falls back to the materialized SelectionPartiallyOrderedByDescOperation
+      // below so global order stays correct.
+
+      // Set when the streaming attempt below builds a project the materialized fallback can take over.
+      BaseProjectOperator<?> reusableSortedByProject = null;
       if (_queryContext.isSortedSelectionMergeEnabled()
           && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
         // When there are non-order-by output expressions, only fetch the order-by expressions during the forward scan
         // (the streaming operator fetches the rest in a second pass); otherwise fetch all expressions.
+        boolean projectsAllExpressions = expressions.size() <= numOrderByExpressions;
         List<ExpressionContext> projectExpressions = expressions;
-        if (expressions.size() > numOrderByExpressions) {
+        if (!projectsAllExpressions) {
           projectExpressions = new ArrayList<>(numOrderByExpressions);
           for (OrderByExpressionContext orderByExpression : orderByExpressions) {
             projectExpressions.add(orderByExpression.getExpression());
@@ -115,10 +123,18 @@ public class SelectionPlanNode implements PlanNode {
           return new StreamingSelectionOrderByOperator(_indexSegment, _queryContext, expressions,
               streamingProjectOperator, sortedColumnsPrefixSize);
         }
-        // DESC-incompatible: fall through to the materialized fallback (rebuilds the project over all expressions).
+        // The project cannot scan in the query's direction, which only a DESC query can hit. Fall through to the
+        // materialized fallback, reusing this project when it already covers the full expression list: that is what
+        // the fallback would rebuild, and it was never driven. A narrower one is dropped unclosed, per the standing
+        // TODO on ProjectPlanNode#run.
+        if (projectsAllExpressions) {
+          reusableSortedByProject = streamingProjectOperator;
+        }
       }
 
-      BaseProjectOperator<?> projectOperator = getSortedByProject(expressions, maxDocsPerCall, orderByExpressions);
+      BaseProjectOperator<?> projectOperator = reusableSortedByProject != null
+          ? reusableSortedByProject
+          : getSortedByProject(expressions, maxDocsPerCall, orderByExpressions);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
@@ -181,10 +197,10 @@ public class SelectionPlanNode implements PlanNode {
   ///
   /// @return the max number that guarantees that from the first expression to the returned number, the index is already
   /// sorted.
-  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
+  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions) {
     boolean asc = orderByExpressions.get(0).isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {
-      if (!isSorted(orderByExpressions.get(i), asc, isNullHandlingEnabled)) {
+      if (!isSorted(orderByExpressions.get(i), asc)) {
         return i;
       }
     }
@@ -192,7 +208,7 @@ public class SelectionPlanNode implements PlanNode {
     return orderByExpressions.size();
   }
 
-  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, boolean isNullHandlingEnabled) {
+  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc) {
     switch (orderByExpression.getExpression().getType()) {
       case LITERAL: {
         return true;
@@ -201,21 +217,40 @@ public class SelectionPlanNode implements PlanNode {
         if (!orderByExpression.isAsc() == asc) {
           return false;
         }
-        String column = orderByExpression.getExpression().getIdentifier();
-        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
-        // If there are null values, we cannot trust DataSourceMetadata.isSorted
-        if (isNullHandlingEnabled) {
-          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
-          if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
-            return false;
-          }
-        }
-        return dataSource.getDataSourceMetadata().isSorted();
+        return isColumnSorted(_indexSegment, _queryContext, orderByExpression.getExpression().getIdentifier());
       }
       case FUNCTION: // we could optimize monotonically increasing functions
       default: {
         return false;
       }
     }
+  }
+
+  /// Returns whether `column` can be relied on to be sorted (ascending) for this query in `segment`.
+  ///
+  /// This is [#isColumnPhysicallySorted] plus the null caveat: once null handling is on, the physical order is not
+  /// the order the query asks for, so a column carrying nulls is not usable as sorted. Reading the null bitmap
+  /// touches the segment's mapped buffer, so this must only be called once the segment has been acquired -- which is
+  /// why [AcquireReleaseColumnsSegmentPlanNode] defers the whole plan build until after `acquire()`.
+  public static boolean isColumnSorted(IndexSegment segment, QueryContext queryContext, String column) {
+    DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
+    // If there are null values, we cannot trust DataSourceMetadata.isSorted
+    if (queryContext.isNullHandlingEnabled()) {
+      NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+      if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+        return false;
+      }
+    }
+    return isColumnPhysicallySorted(segment, queryContext, column);
+  }
+
+  /// Returns whether `column` is physically sorted (ascending) in `segment`, ignoring nulls.
+  ///
+  /// Reads [org.apache.pinot.segment.spi.datasource.DataSourceMetadata] only, so it touches no column buffer and
+  /// needs no segment acquire. That is what lets
+  /// [org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2] resolve
+  /// [org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode#AUTO] before any plan node is built.
+  public static boolean isColumnPhysicallySorted(IndexSegment segment, QueryContext queryContext, String column) {
+    return segment.getDataSource(column, queryContext.getSchema()).getDataSourceMetadata().isSorted();
   }
 }
