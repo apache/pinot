@@ -30,16 +30,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -57,15 +61,21 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -1067,6 +1077,126 @@ public class BaseTableDataManagerTest {
     tableDataManager.registerSegment(SEGMENT_NAME, newSegmentManager);
 
     verify(segmentDirectory, times(1)).onSegmentAdded();
+  }
+
+  @Test
+  public void testFetchIndexLoadingConfigReusesSchemaAndRefreshes() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema original = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, original);
+    manager.updateCachedTableConfigAndSchema(table, original);
+    IndexLoadingConfig first = manager.fetchIndexLoadingConfig();
+    IndexLoadingConfig second = manager.fetchIndexLoadingConfig();
+    assertSame(first.getSchema(), original);
+    assertSame(second.getSchema(), original);
+    assertNotSame(first.getTableConfig(), second.getTableConfig());
+
+    Schema changed = createSchemaReuseSchema();
+    changed.getFieldSpecFor("id").setDefaultNullValue(-2);
+    ZKMetadataProvider.setSchema(manager._propertyStore, changed);
+    Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
+    assertNotSame(refreshed, original);
+    assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
+    assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
+    assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
+    assertSame(manager.fetchIndexLoadingConfig().getSchema(), refreshed);
+
+    manager.updateCachedTableConfigAndSchema(table, changed);
+    assertSame(manager.fetchIndexLoadingConfig().getSchema(), changed);
+  }
+
+  @Test
+  public void testFetchIndexLoadingConfigNormalizesTimestampBeforeReuse() {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    Schema first = manager.fetchIndexLoadingConfig().getSchema();
+    IndexLoadingConfig second = manager.fetchIndexLoadingConfig();
+    assertSame(second.getSchema(), first);
+    assertTrue(first.hasColumn("$ts$DAY"));
+    assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
+    assertEquals(second.getTableConfig().getIndexingConfig().getRangeIndexColumns(), List.of("$ts$DAY"));
+    assertEquals(second.getTableConfig().getIngestionConfig().getTransformConfigs().size(), 1);
+
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
+    Schema changed = manager.fetchIndexLoadingConfig().getSchema();
+    assertNotSame(changed, first);
+    assertTrue(changed.hasColumn("$ts$HOUR"));
+    assertFalse(changed.hasColumn("$ts$DAY"));
+    assertFalse(first.hasColumn("$ts$HOUR"));
+  }
+
+  @Test
+  public void testFetchIndexLoadingConfigObservesNestedSchemaChanges() {
+    Schema original = createComplexSchema(-1);
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), original);
+    Schema first = manager.fetchIndexLoadingConfig().getSchema();
+    assertSame(manager.fetchIndexLoadingConfig().getSchema(), first);
+
+    Schema changed = createComplexSchema(-2);
+    assertNotEquals(changed, original);
+    ZKMetadataProvider.setSchema(manager._propertyStore, changed);
+    Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
+    assertNotSame(refreshed, first);
+    ComplexFieldSpec nested = (ComplexFieldSpec) refreshed.getFieldSpecFor("nested");
+    assertEquals(((ComplexFieldSpec) nested.getChildFieldSpec("value")).getChildFieldSpec("value")
+        .getDefaultNullValue(), -2);
+    assertSame(manager.fetchIndexLoadingConfig().getSchema(), refreshed);
+  }
+
+  @Test
+  public void testFetchIndexLoadingConfigConcurrentlyReusesCachedSchema()
+      throws Exception {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    Schema shared = manager.fetchIndexLoadingConfig().getSchema();
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      List<Future<Schema>> results = new ArrayList<>();
+      for (int i = 0; i < 32; i++) {
+        results.add(executor.submit(() -> {
+          assertTrue(start.await(10, TimeUnit.SECONDS));
+          return manager.fetchIndexLoadingConfig().getSchema();
+        }));
+      }
+      start.countDown();
+      for (Future<Schema> result : results) {
+        assertSame(result.get(10, TimeUnit.SECONDS), shared);
+      }
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private static BaseTableDataManager createSchemaReuseManager(TableConfig table, Schema schema) {
+    BaseTableDataManager manager = new OfflineTableDataManager();
+    manager._propertyStore = new FakePropertyStore();
+    manager._tableNameWithType = OFFLINE_TABLE_NAME;
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, table);
+    ZKMetadataProvider.setSchema(manager._propertyStore, schema);
+    return manager;
+  }
+
+  private static Schema createSchemaReuseSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("id", DataType.INT, -1)
+        .addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+  }
+
+  private static Schema createComplexSchema(int defaultValue) {
+    Schema schema = createSchemaReuseSchema();
+    ComplexFieldSpec child = new ComplexFieldSpec("value", DataType.MAP, true,
+        Map.of("value", new DimensionFieldSpec("value", DataType.INT, true, defaultValue)));
+    schema.addField(new ComplexFieldSpec("nested", DataType.MAP, true, Map.of("value", child)));
+    return schema;
+  }
+
+  private static TableConfig createTimestampTable(TimestampIndexGranularity granularity) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setFieldConfigList(List.of(new FieldConfig.Builder("ts")
+            .withTimestampConfig(new TimestampConfig(List.of(granularity))).build())).build();
   }
 
   protected BaseTableDataManager createTableManager() {
