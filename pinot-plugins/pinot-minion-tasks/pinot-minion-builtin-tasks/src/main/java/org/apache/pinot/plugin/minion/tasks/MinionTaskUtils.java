@@ -341,15 +341,6 @@ public class MinionTaskUtils {
   ///   segment), a server not in GOOD status, or an `EQUAL`-mode consensus failure.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
-    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
-        expectedCrc, null, comparisonModeStr);
-  }
-
-  /// Variant that also matches on the expected data CRC (see [#crcMatches]), with the same return and exception
-  /// contract as [#getValidDocIdFromServerMatchingCrc(String, String, String, MinionContext, String, String)].
-  @Nullable
-  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
       String comparisonModeStr) {
     MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
