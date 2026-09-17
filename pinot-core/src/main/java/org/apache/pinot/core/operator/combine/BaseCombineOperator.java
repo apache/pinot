@@ -286,13 +286,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             + " on segment " + operator.getIndexSegment().getSegmentName()
         : "Caught exception while doing operator: " + operator.getClass();
 
-    QueryErrorCode errorCode;
-    if (e instanceof QueryException) {
-      QueryException queryException = (QueryException) e;
-      errorCode = queryException.getErrorCode();
-    } else {
-      errorCode = QueryErrorCode.QUERY_EXECUTION;
-    }
+    QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.QUERY_EXECUTION);
     // TODO: Only include exception message if it is a QueryException. Otherwise, it might expose sensitive information
     throw errorCode.asException(errorMessage + ": " + e.getMessage(), e);
   }

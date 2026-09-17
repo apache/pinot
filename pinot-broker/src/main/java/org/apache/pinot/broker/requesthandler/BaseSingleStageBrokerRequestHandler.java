@@ -1183,9 +1183,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } catch (Exception e) {
       LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId,
           _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), e.getMessage());
-      requestContext.setErrorCode(QueryErrorCode.QUERY_EXECUTION);
-      return new CompileResult(
-          new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.QUERY_EXECUTION);
+      requestContext.setErrorCode(errorCode);
+      return new CompileResult(new BrokerResponseNative(errorCode, e.getMessage()));
     }
 
     boolean ignoreCase = _tableCache.isIgnoreCase();
@@ -1640,8 +1640,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         sqlNodeAndOptions = RequestUtils.parseQuery(subquery, jsonRequest);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        throw new RuntimeException("Failed to parse subquery: " + subquery, e);
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        throw new QueryException(errorCode, "Failed to parse subquery: " + e.getMessage(), e);
       }
 
       // Add null handling option from broker config only if there is no override in the query
@@ -1665,7 +1665,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
               httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
-        throw new RuntimeException("Caught exception while executing subquery: " + subquery);
+        QueryProcessingException exception = response.getExceptions().get(0);
+        throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
+            "Caught exception while executing subquery: " + subquery + ": " + exception.getMessage());
       }
       String serializedIdSet = (String) response.getResultTable().getRows().get(0)[0];
       function.setOperator(IN_ID_SET);

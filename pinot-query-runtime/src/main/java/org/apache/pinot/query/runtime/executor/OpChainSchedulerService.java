@@ -48,7 +48,6 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -213,18 +212,14 @@ public class OpChainSchedulerService {
       public void onFailure(Throwable t) {
         String logMsg = "Failed to execute operator chain: " + t.getMessage();
         _metrics.onOpChainFinished(rootOperator);
-        if (t instanceof QueryException) {
-          switch (((QueryException) t).getErrorCode()) {
-            case UNKNOWN:
-            case INTERNAL:
-              LOGGER.error(logMsg, t);
-              break;
-            default:
-              LOGGER.warn(logMsg);
-              break;
-          }
-        } else {
-          LOGGER.error(logMsg, t);
+        switch (QueryErrorCode.fromThrowable(t, QueryErrorCode.UNKNOWN)) {
+          case UNKNOWN:
+          case INTERNAL:
+            LOGGER.error(logMsg, t);
+            break;
+          default:
+            LOGGER.warn(logMsg);
+            break;
         }
         decrementActiveOpChains(requestId);
         notifyCompletionListener(opChainId, operatorChain, statsRef.get(), t);

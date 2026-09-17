@@ -384,14 +384,22 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /// How query option keys supplied through SQL `SET` / `OPTION(...)` on DQL queries are validated.
-    /// Broker config key: `pinot.broker.query.option.validationMode`.
-    /// One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
-    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct
-    /// unknown key) or `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
+    /// Cluster config key: `pinot.broker.query.option.validationMode`, applied live and not read from the broker
+    /// instance config. One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
+    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct unknown key) or
+    /// `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
     /// `QueryOptionsUtils.registerSqlQueryOptionKey`.
     public static final String CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE =
         "pinot.broker.query.option.validationMode";
     public static final String DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE = "NONE";
+    /// How the legacy PQL-style `OPTION(key=value)` query option suffix is handled.
+    /// Cluster config key: `pinot.broker.query.option.legacySyntaxMode`, applied live and not read from the broker
+    /// instance config. One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
+    /// `IGNORE` strips the suffix and drops its options, `REJECT` fails the statement with an error pointing at
+    /// `SET`. Applies to every statement type, since `SET` covers them all.
+    public static final String CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE =
+        "pinot.broker.query.option.legacySyntaxMode";
+    public static final String DEFAULT_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE = "ALLOW";
     /// When true, the broker initializes the materialized view metadata cache and query rewrite
     /// engine.  When false (default), MV rewrite is disabled regardless of per-MV
     /// `rewriteEnabled` setting.
@@ -902,6 +910,13 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        /// How query options embedded in the SQL text (`SET` statements and the legacy `OPTION(...)` suffix) are
+        /// handled for this request, one of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) merges them with
+        /// precedence over the request options, as always; `IGNORE` drops them so that only the request options
+        /// apply; `REJECT` fails the query when it carries any. Only honored from the request payload
+        /// (`queryOptions`, gRPC metadata), never from the SQL itself, so a gateway that sets request options on
+        /// behalf of its users can guarantee the query text cannot override them.
+        public static final String SQL_OPTIONS_MODE = "sqlOptionsMode";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";

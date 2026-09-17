@@ -24,7 +24,6 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -50,8 +49,6 @@ import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlQueryOptionValidationMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -137,11 +134,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
     _enableAutoRewriteAggregationType =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
-    // Process-wide static because the SQL parser has no access to the broker config. Set here rather
-    // than parsed per query; a broker restart is needed to pick up a config change.
-    QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.valueOf(
-        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE,
-            Broker.DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE).trim().toUpperCase(Locale.ROOT)));
     if (_enableQueryCancellation) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
@@ -197,8 +189,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
     }
 

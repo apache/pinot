@@ -142,6 +142,12 @@ public enum QueryErrorCode {
     return queryErrorCode;
   }
 
+  /// Returns the error code carried by the given throwable when it is a [QueryException], or the given default
+  /// otherwise.
+  public static QueryErrorCode fromThrowable(Throwable t, QueryErrorCode defaultErrorCode) {
+    return t instanceof QueryException ? ((QueryException) t).getErrorCode() : defaultErrorCode;
+  }
+
   public static <T> Map<QueryErrorCode, T> fromKeyMap(Map<Integer, T> originalMap) {
     EnumMap<QueryErrorCode, T> newMap = new EnumMap<>(QueryErrorCode.class);
     for (Map.Entry<Integer, T> entry : originalMap.entrySet()) {
