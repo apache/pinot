@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtobufInternalUtils;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
@@ -39,6 +38,9 @@ public class ProtoBufUtils {
   private ProtoBufUtils() {
   }
 
+  /// Copies a remote file to a local temp directory and returns the local copy. Used by the codegen
+  /// decoder path for JAR files that must remain on disk for the lifetime of the classloader.
+  /// The caller is responsible for managing the lifetime of the returned file and its parent directory.
   public static File getFileCopiedToLocal(String filePath)
       throws Exception {
     URI fileURI = URI.create(filePath);
@@ -60,17 +62,28 @@ public class ProtoBufUtils {
     }
   }
 
-  public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
-      throws Exception {
-    return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
-  }
-
   public static File createLocalFile(URI srcURI, File dstDir) {
     String sourceURIPath = srcURI.getPath();
     File dstFile = new File(dstDir, new File(sourceURIPath).getName());
     LOGGER.debug("Created empty local temporary file {} to copy protocol "
         + "buffer descriptor {}", dstFile.getAbsolutePath(), srcURI);
     return dstFile;
+  }
+
+  /// Opens a descriptor file (local or remote) and returns a stream over its contents.
+  /// The caller is responsible for closing the returned stream. No temporary files are created.
+  ///
+  /// @param descriptorFilePath URI string pointing to a `.desc` protobuf descriptor file
+  /// @return an open [InputStream] over the descriptor file contents
+  public static InputStream openDescriptorFile(String descriptorFilePath)
+      throws Exception {
+    URI fileURI = URI.create(descriptorFilePath);
+    String scheme = fileURI.getScheme();
+    if (scheme == null) {
+      scheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+    }
+    PinotFS pinotFS = PinotFSFactory.create(scheme);
+    return pinotFS.open(fileURI);
   }
 
   public static String getFullJavaName(Descriptors.Descriptor descriptor) {
