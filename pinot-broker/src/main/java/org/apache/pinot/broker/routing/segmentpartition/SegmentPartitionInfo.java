@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpartition;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -32,6 +33,7 @@ public class SegmentPartitionInfo {
   private final Set<Integer> _partitions;
   @Nullable
   private final Map<String, String> _partitionFunctionConfig;
+  private final int _partitionFunctionConfigHash;
 
   public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
       Set<Integer> partitions) {
@@ -48,6 +50,7 @@ public class SegmentPartitionInfo {
     _partitionFunctionConfig = partitionFunctionConfig == null
         ? null
         : Collections.unmodifiableMap(new HashMap<>(partitionFunctionConfig));
+    _partitionFunctionConfigHash = Objects.hashCode(_partitionFunctionConfig);
   }
 
   public String getPartitionColumn() {
@@ -65,5 +68,9 @@ public class SegmentPartitionInfo {
   @Nullable
   public Map<String, String> getPartitionFunctionConfig() {
     return _partitionFunctionConfig;
+  }
+
+  public int getPartitionFunctionConfigHash() {
+    return _partitionFunctionConfigHash;
   }
 }

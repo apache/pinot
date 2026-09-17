@@ -184,20 +184,19 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final class PreparedPredicate {
     private final Expression _expression;
     private final PartitionFunction _partitionFunction;
-    private FilterKind _filterKind;
-    private List<Expression> _operands;
-    private PreparedPredicate[] _children;
-    private Integer[] _partitionIds;
+    private final FilterKind _filterKind;
+    private final List<Expression> _operands;
+    private final PreparedPredicate[] _children;
+    private final Integer[] _partitionIds;
 
     private PreparedPredicate(Expression expression, PartitionFunction partitionFunction) {
       _expression = expression;
       _partitionFunction = partitionFunction;
-    }
-
-    private void prepare() {
       Function function = _expression.getFunctionCall();
       _filterKind = FilterKind.valueOf(function.getOperator());
       _operands = function.getOperands();
+      _children = null;
+      _partitionIds = null;
       if (_filterKind == FilterKind.AND || _filterKind == FilterKind.OR) {
         _children = new PreparedPredicate[_operands.size()];
         for (int i = 0; i < _children.length; i++) {
@@ -212,9 +211,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     }
 
     private boolean matches(Set<Integer> partitions) {
-      if (_filterKind == null) {
-        prepare();
-      }
       switch (_filterKind) {
         case AND:
           for (PreparedPredicate child : _children) {
@@ -263,6 +259,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       return function.getClass() == otherFunction.getClass() && function.getName().equals(otherFunction.getName())
           && function.getNumPartitions() == otherFunction.getNumPartitions()
           && function.getPartitionIdNormalizer() == otherFunction.getPartitionIdNormalizer()
+          && current.getPartitionFunctionConfigHash() == partitionInfo.getPartitionFunctionConfigHash()
           && Objects.equals(current.getPartitionFunctionConfig(), partitionInfo.getPartitionFunctionConfig());
     }
 
@@ -280,7 +277,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       hash = 31 * hash + function.getName().hashCode();
       hash = 31 * hash + function.getNumPartitions();
       hash = 31 * hash + function.getPartitionIdNormalizer().hashCode();
-      return 31 * hash + Objects.hashCode(partitionInfo.getPartitionFunctionConfig());
+      return 31 * hash + partitionInfo.getPartitionFunctionConfigHash();
     }
   }
 
