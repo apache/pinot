@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.config;
 
-import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.ClusterConfigChangeListener;
@@ -32,44 +32,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Bridges Helix cluster config callbacks to [PinotClusterConfigChangeListener]s. All access is serialized on this
+/// instance, so a listener sees the snapshot handed to it at registration and every later change in order.
 @BatchMode(enabled = false)
 public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeListener, PinotClusterConfigProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultClusterConfigChangeHandler.class);
 
-  private volatile Map<String, String> _properties;
-  private final CopyOnWriteArrayList<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
-
-  public DefaultClusterConfigChangeHandler() {
-    _properties = Map.of();
-    _clusterConfigChangeListeners = new CopyOnWriteArrayList<>();
-  }
+  private final List<PinotClusterConfigChangeListener> _listeners = new ArrayList<>();
+  private Map<String, String> _clusterConfigs = Map.of();
 
   @Override
-  public void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext notificationContext) {
-    LOGGER.info("Handling Cluster ConfigChanges: CALLBACK START");
-    process(clusterConfig.getRecord().getSimpleFields());
-    LOGGER.info("Handling Cluster ConfigChanges: CALLBACK DONE");
-  }
-
-  private synchronized void process(Map<String, String> properties) {
-    Set<String> changedProperties = ImmutableSet.copyOf(getChangedProperties(_properties, properties));
-    _properties = Map.copyOf(properties);
-    for (PinotClusterConfigChangeListener listener : _clusterConfigChangeListeners) {
-      listener.onChange(changedProperties, _properties);
+  public synchronized void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
+    Map<String, String> clusterConfigs = Map.copyOf(clusterConfig.getRecord().getSimpleFields());
+    Set<String> changedConfigs = getChangedProperties(_clusterConfigs, clusterConfigs);
+    LOGGER.info("Cluster configs changed: {}", changedConfigs);
+    _clusterConfigs = clusterConfigs;
+    for (PinotClusterConfigChangeListener listener : _listeners) {
+      listener.onChange(changedConfigs, clusterConfigs);
     }
   }
 
   @Override
-  public Map<String, String> getClusterConfigs() {
-    return _properties;
+  public synchronized Map<String, String> getClusterConfigs() {
+    return _clusterConfigs;
   }
 
   @Override
-  public boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener) {
-    _clusterConfigChangeListeners.add(clusterConfigChangeListener);
-    LOGGER.info("Registering clusterConfigChangeListener: {}", clusterConfigChangeListener.getClass().getName());
-    // On registration, we want all keys to be treated as newly added, so pass changed properties as the keySet()
-    clusterConfigChangeListener.onChange(_properties.keySet(), _properties);
+  public synchronized boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener listener) {
+    LOGGER.info("Registering cluster config change listener: {}", listener.getClass().getName());
+    _listeners.add(listener);
+    // Treat every key as newly added so that the listener picks up the current values
+    listener.onChange(_clusterConfigs.keySet(), _clusterConfigs);
     return true;
   }
 }
