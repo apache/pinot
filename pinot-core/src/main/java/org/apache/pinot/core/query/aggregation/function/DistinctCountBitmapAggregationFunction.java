@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapLazyUnion;
 
 
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
@@ -89,7 +90,9 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           aggregationResultHolder.setValue(valueBitmap);
         }
         for (; i < to; i++) {
-          valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+          // Lazy union defers cardinality maintenance; extract*Result() repairs the accumulator
+          // before it escapes this function
+          RoaringBitmapLazyUnion.lazyOr(valueBitmap, RoaringBitmapUtils.deserialize(bytesValues[i]));
         }
       });
       return;
@@ -275,7 +278,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           int groupKey = groupKeyArray[i];
           RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
           if (valueBitmap != null) {
-            valueBitmap.or(value);
+            RoaringBitmapLazyUnion.lazyOr(valueBitmap, value);
           } else {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
@@ -463,7 +466,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           for (int groupKey : groupKeysArray[i]) {
             RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
             if (bitmap != null) {
-              bitmap.or(value);
+              RoaringBitmapLazyUnion.lazyOr(bitmap, value);
             } else {
               // Clone a bitmap for the group
               groupByResultHolder.setValueForKey(groupKey, value.clone());
@@ -662,8 +665,11 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
     } else {
-      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap
-      return (RoaringBitmap) result;
+      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap.
+      // The serialized RoaringBitmap path unions lazily, so repair the accumulator before it escapes.
+      RoaringBitmap valueBitmap = (RoaringBitmap) result;
+      RoaringBitmapLazyUnion.repair(valueBitmap);
+      return valueBitmap;
     }
   }
 
@@ -678,8 +684,11 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
     } else {
-      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap
-      return (RoaringBitmap) result;
+      // For serialized RoaringBitmap and non-dictionary-encoded expression, directly return the value bitmap.
+      // The serialized RoaringBitmap path unions lazily, so repair the accumulator before it escapes.
+      RoaringBitmap valueBitmap = (RoaringBitmap) result;
+      RoaringBitmapLazyUnion.repair(valueBitmap);
+      return valueBitmap;
     }
   }
 
