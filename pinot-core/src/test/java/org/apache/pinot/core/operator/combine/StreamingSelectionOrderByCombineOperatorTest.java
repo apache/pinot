@@ -29,11 +29,11 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -55,6 +55,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.intellij.lang.annotations.Language;
@@ -63,8 +64,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Combine-level tests for {@link StreamingSelectionOrderByCombineOperator} (step-3 operator) and its wiring into
@@ -73,7 +77,7 @@ import static org.testng.Assert.assertTrue;
 /// <p>The streaming combine must return the same globally-sorted top-K rows as the default
 /// {@link MinMaxValueBasedSelectionOrderByCombineOperator}, only (in streaming mode) spread across several bounded
 /// blocks. Each functional test therefore asserts <b>streaming-vs-non-streaming parity</b>: it runs the identical query
-/// twice over the same in-memory segments - once with {@code sortedSelectionMergeEnabled=true} (asserting the new
+/// twice over the same in-memory segments - once with {@code sortedSelectionMergeMode=ON} (asserting the new
 /// operator was actually selected) and once with the hint off (asserting the {@code MinMax} operator was selected) -
 /// then checks the two row sets are equal as a multiset and that the streaming output is fully sorted by the order-by
 /// comparator.
@@ -128,9 +132,21 @@ public class StreamingSelectionOrderByCombineOperatorTest {
   /// A mix of sorted (streaming child) and physically-unsorted (single materialized top-K block child) segments,
   /// exercising both SegmentCursor backings in one merge.
   private List<IndexSegment> _mixedSegments;
+  /// Physically sorted on the leading order-by column, but that column also carries real nulls. `isSorted()` on the
+  /// metadata still says true, so only the null-bitmap check separates these from [#_sortedSegments].
+  private List<IndexSegment> _nullBearingSortedSegments;
+  /// No segment is physically sorted on the leading order-by column, so every child is a materializing top-K operator.
+  /// This is the shape AUTO must refuse and the shape ON must still get right.
+  private List<IndexSegment> _unsortedSegments;
   /// Very low cardinality primary column (4 distinct values across 100 rows) so each value is a long run: exercises the
   /// run/heap path in the streaming children and ties on the primary key at the prune boundary.
   private List<IndexSegment> _lowCardSegments;
+
+  /// A sparse segment plus one beginning inside its first gap; see [#buildGapFillingSortedRecords].
+  private List<IndexSegment> _interleavedSegments;
+
+  /// Two segments whose rows tie on every order-by expression; see [#buildTiedSortedRecords].
+  private List<IndexSegment> _tiedSegments;
 
   @BeforeClass
   public void setUp()
@@ -147,6 +163,19 @@ public class StreamingSelectionOrderByCombineOperatorTest {
       _disjointSegments.add(buildSegment(SORTED_TABLE_CONFIG, "disjoint_" + i, buildDisjointSortedRecords(i), false));
     }
 
+    _unsortedSegments = new ArrayList<>(NUM_SEGMENTS);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      _unsortedSegments.add(buildSegment(UNSORTED_TABLE_CONFIG, "unsorted_" + i, buildUnsortedRecords(i), false));
+    }
+
+    // Nulls occupy the lowest stored values (INT null default is Integer.MIN_VALUE), so sortedCol still ascends and
+    // the segment is still built as physically sorted -- exactly the shape where isSorted() alone is not trustworthy.
+    _nullBearingSortedSegments = new ArrayList<>(NUM_SEGMENTS);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      _nullBearingSortedSegments.add(
+          buildSegment(SORTED_TABLE_CONFIG, "nullSorted_" + i, buildNullBearingSortedRecords(i), true));
+    }
+
     _lowCardSegments = new ArrayList<>(NUM_SEGMENTS);
     for (int i = 0; i < NUM_SEGMENTS; i++) {
       _lowCardSegments.add(buildSegment(SORTED_TABLE_CONFIG, "lowCard_" + i, buildLowCardinalityRecords(i), false));
@@ -158,6 +187,81 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     _mixedSegments.add(buildSegment(SORTED_TABLE_CONFIG, "mixedSorted_1", buildOverlappingSortedRecords(1), false));
     _mixedSegments.add(buildSegment(UNSORTED_TABLE_CONFIG, "mixedUnsorted_0", buildUnsortedRecords(2), false));
     _mixedSegments.add(buildSegment(UNSORTED_TABLE_CONFIG, "mixedUnsorted_1", buildUnsortedRecords(3), false));
+
+    // Two segments whose rows are identical on the full order-by key; see #testFullOrderByKeyTiesAcrossSegments.
+    _tiedSegments = new ArrayList<>(2);
+    _tiedSegments.add(buildSegment(SORTED_TABLE_CONFIG, "tied_0", buildTiedSortedRecords("a"), false));
+    _tiedSegments.add(buildSegment(SORTED_TABLE_CONFIG, "tied_1", buildTiedSortedRecords("b"), false));
+
+    // Sparse segment plus a dense one starting inside its first gap; see #testLateActivatedCursorWinsImmediately.
+    _interleavedSegments = new ArrayList<>(2);
+    _interleavedSegments.add(buildSegment(SORTED_TABLE_CONFIG, "sparse_0", buildSparseSortedRecords(), false));
+    _interleavedSegments.add(buildSegment(SORTED_TABLE_CONFIG, "denseGap_0", buildGapFillingSortedRecords(), false));
+  }
+
+  /// Leading order-by values `0, 1000, 2000, ...`: gaps wide enough for another segment's entire range to sit between
+  /// two consecutive rows, with no value shared with it.
+  private static List<GenericRow> buildSparseSortedRecords() {
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(SORTED_COL, i * 1000);
+      record.putValue(TAIL_COL, i);
+      // Globally unique against the gap-filling segment below, so the two never tie on the full order-by key.
+      record.putValue(VAL_COL, 2_000_000 + i);
+      record.putValue(NULLABLE_COL, i);
+      record.putValue(LONG_COL, 10_000_000_000L + i);
+      record.putValue(STR_COL, "sp_" + i);
+      records.add(record);
+    }
+    return records;
+  }
+
+  /// Rows that are identical on both order-by expressions across every segment built from this, differing only in a
+  /// non-order-by column, so the merge's tie branch is reached on every single row.
+  private static List<GenericRow> buildTiedSortedRecords(String tag) {
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(SORTED_COL, i);
+      record.putValue(TAIL_COL, i);
+      // Deliberately NOT unique across segments: sortedCol and valCol are the order-by key, so every row of one
+      // segment ties exactly with a row of the other.
+      record.putValue(VAL_COL, i);
+      record.putValue(NULLABLE_COL, i);
+      record.putValue(LONG_COL, 10_000_000_000L + i);
+      record.putValue(STR_COL, tag + "_" + i);
+      records.add(record);
+    }
+    return records;
+  }
+
+  /// Leading order-by values `5, 6, ..., 104`: the whole range sits inside the sparse segment's first gap (between its
+  /// rows 0 and 1000), so this segment is pruned at the start and activated only once the frontier passes 5.
+  private static List<GenericRow> buildGapFillingSortedRecords() {
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(SORTED_COL, 5 + i);
+      record.putValue(TAIL_COL, i);
+      record.putValue(VAL_COL, 3_000_000 + i);
+      record.putValue(NULLABLE_COL, i);
+      record.putValue(LONG_COL, 20_000_000_000L + i);
+      record.putValue(STR_COL, "gf_" + i);
+      records.add(record);
+    }
+    return records;
+  }
+
+  /// Like [#buildOverlappingSortedRecords] but the leading order-by column itself is null in the first few rows.
+  private static List<GenericRow> buildNullBearingSortedRecords(int index) {
+    List<GenericRow> records = buildOverlappingSortedRecords(index);
+    for (int i = 0; i < 3; i++) {
+      GenericRow record = records.get(i);
+      record.putValue(SORTED_COL, null);
+      record.addNullValueField(SORTED_COL);
+    }
+    return records;
   }
 
   private static List<GenericRow> buildOverlappingSortedRecords(int index) {
@@ -264,8 +368,9 @@ public class StreamingSelectionOrderByCombineOperatorTest {
 
   @Test
   public void testDescIncompatibleFallbackParity() {
-    // allowReverseOrder=false + DESC -> the streaming child cannot scan descending, so SelectionPlanNode emits the
-    // materialized DESC top-K block; the combine still routes to the streaming combine and merges single-block cursors.
+    // ON forces the path unconditionally, so allowReverseOrder=false + DESC still reaches the streaming combine over
+    // materialized DESC top-K blocks -- slower than the baseline, but it must stay correct. AUTO refuses this shape
+    // (see testAutoDoesNotSelectStreamingForDescWithoutReverseOrder).
     assertParity(_sortedSegments,
         "SET allowReverseOrder=false; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC "
             + "LIMIT 50", false);
@@ -340,7 +445,7 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     // Disjoint, globally-increasing ranges + small LIMIT: only the lowest segment can contribute, the rest are pruned
     // (never acquired or scanned), so far fewer than all docs are scanned.
     Result result = run(_disjointSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 5",
-        true, false, false, 0);
+        true, false, true, 0);
     assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
     assertEquals(result._rows.size(), 5);
     for (int i = 0; i < 5; i++) {
@@ -353,56 +458,213 @@ public class StreamingSelectionOrderByCombineOperatorTest {
         "Only the lowest-range segment should be scanned, but docs scanned was: " + result._numDocsScanned);
   }
 
+  /// A cursor activated *late* can hold a smaller row than the retained leader. Two things must be right for it to
+  /// land in the correct place: the leader is re-compared after `activateEligibleCursors()` rather than before, and
+  /// the pruning frontier is the row about to be emitted rather than the last one emitted. Either mistake emits the
+  /// leader's larger row first.
+  ///
+  /// The sparse segment runs `0, 1000, 2000, ...` and the gap filler `5, 6, ..., 104`, so the filler is pruned while
+  /// the frontier is 0 and becomes eligible only when the leader reaches 1000 -- where its head (5) must displace it at
+  /// once. The ranges share no value, so the expected sequence below is a strict total order with no tie to mask a
+  /// misordering. Parity does not cover this: [#assertMultisetEquals] normalises the reordering away, hence the
+  /// positional assertion.
   @Test
-  public void testEmptyResultSchemaFallback() {
-    // A filter that matches nothing: every streaming child returns no rows, so the combine rebuilds the result schema
-    // from the segment metadata (order-by expressions first) rather than from a child block.
+  public void testLateActivatedCursorWinsImmediately() {
+    @Language("sql") String query =
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 8";
+    Result result = run(_interleavedSegments, query, true, false, true, 3);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    // 0 from the sparse segment, then the gap filler's 5, 6, 7, ... -- its next row (1000) comes far later.
+    int[] expected = {0, 5, 6, 7, 8, 9, 10, 11};
+    assertEquals(result._rows.size(), expected.length);
+    for (int i = 0; i < expected.length; i++) {
+      assertEquals((int) result._rows.get(i)[0], expected[i],
+          "Unexpected value at position " + i + "; a late-activated cursor was not given the lead immediately");
+    }
+    assertParity(_interleavedSegments, query, false);
+  }
+
+  /// Pruning must survive leader retention: one cursor serving a long run leaves the heap empty, and a frontier read
+  /// from the heap alone would call that "unknown" and activate every remaining segment -- switching pruning off on
+  /// exactly the near-disjoint shape this operator exists for. [#testPruningSkipsOutOfTopKSegments] retains the leader
+  /// only a few times; this limit spans several blocks, widening the empty-heap window.
+  @Test
+  public void testPruningSurvivesALongRetainedRun() {
+    Result result = run(_disjointSegments,
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 60", true, false, true, 7);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(result._rows.size(), 60);
+    assertTrue(result._numBlocks > 1, "Fixture must span several blocks, else the retained run is too short");
+    for (int i = 0; i < 60; i++) {
+      assertEquals((int) result._rows.get(i)[0], i, "Unexpected value at position " + i);
+    }
+    assertTrue(result._numDocsScanned <= NUM_RECORDS_PER_SEGMENT,
+        "All 60 rows come from the lowest-range segment, so no other segment may be activated; docs scanned was: "
+            + result._numDocsScanned);
+  }
+
+  /// The merge cedes the lead only on a strict loss, so a tie keeps the incumbent -- a branch no other fixture reaches,
+  /// because they all give `valCol` a globally unique value precisely to avoid ties. Here every row of one segment ties
+  /// with a row of the other on the complete order-by key.
+  ///
+  /// What is asserted is that ties are *harmless*: nothing is dropped, duplicated or emitted out of order. Which of two
+  /// fully-tied rows comes first is deliberately not pinned -- the incumbent-wins rule is an artefact of leader
+  /// retention, the heap's own tie-breaking was arbitrary before it, and neither path promises stability. Asserting it
+  /// would freeze behaviour the operator does not guarantee.
+  /// The DESC counterpart of [#testPruningSurvivesALongRetainedRun]. The pruning test in `sortsBeyond` flips its
+  /// comparison on `_asc`, and every other live-pruning test runs ASC only -- so a sign flip or swapped operand in the
+  /// DESC half would otherwise go unnoticed, silently either over-scanning or, worse, pruning a segment that still had
+  /// rows to give.
+  @Test
+  public void testPruningSurvivesALongRetainedRunDesc() {
+    Result result = run(_disjointSegments,
+        "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC "
+            + "LIMIT 60", true, false, true, 7);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(result._rows.size(), 60);
+    assertTrue(result._numBlocks > 1, "Fixture must span several blocks, else the retained run is too short");
+    // DESC activates the highest-range segment first; its top value counts down from there.
+    int top = (NUM_SEGMENTS - 1) * 1000 + NUM_RECORDS_PER_SEGMENT - 1;
+    for (int i = 0; i < 60; i++) {
+      assertEquals((int) result._rows.get(i)[0], top - i, "Unexpected value at position " + i);
+    }
+    assertTrue(result._numDocsScanned <= NUM_RECORDS_PER_SEGMENT,
+        "All 60 rows come from the highest-range segment, so no other segment may be activated; docs scanned was: "
+            + result._numDocsScanned);
+  }
+
+  @Test
+  public void testFullOrderByKeyTiesAcrossSegments() {
+    // Explicit limit: the default of 10 would stop the merge long before most ties are reached.
+    @Language("sql") String query =
+        "SELECT sortedCol, valCol, strCol FROM testTable ORDER BY sortedCol, valCol LIMIT 200";
+    assertParity(_tiedSegments, query, false);
+
+    Result streamed = run(_tiedSegments, query, true, false, true, 5);
+    assertEquals(streamed._rows.size(), 2 * NUM_RECORDS_PER_SEGMENT, "Every tied row must survive the merge");
+    for (int i = 0; i < streamed._rows.size(); i++) {
+      // Both segments contribute one row per sortedCol value, so the merged sequence is each value twice.
+      assertEquals((int) streamed._rows.get(i)[0], i / 2, "Unexpected value at position " + i);
+    }
+  }
+
+  @Test
+  public void testEmptyResultOnStreamingPath() {
+    // A filter that matches nothing. Every streaming child still emits one empty schema-carrying block, so the combine
+    // does capture a DataSchema -- but no rows ever reach the output buffer, so it never flushes a data block and
+    // exits through the terminal MetadataResultsBlock, whose schema is unconditionally null.
+    // Carrying the schema end-to-end therefore means changing that terminal-block convention, which is shared by every
+    // BaseStreamingCombineOperator subclass; both the MSE leaf and the gRPC streaming reduce tolerate the null today,
+    // so it is pinned here rather than left free to change unnoticed.
+    // TODO: revisit if the terminal block ever carries a schema -- the per-child guarantee that would need is now in
+    //       place. See https://github.com/apache/pinot/pull/19120#discussion_r3871714002
     Result result = run(_sortedSegments,
         "SELECT sortedCol, valCol FROM testTable WHERE sortedCol < 0 ORDER BY sortedCol, valCol LIMIT 10", true, false,
-        false, 0);
+        true, 0);
     assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
     assertTrue(result._rows.isEmpty(), "Expected an empty result, got: " + result._rows.size() + " rows");
-    assertEquals(result._schema, new DataSchema(new String[]{SORTED_COL, VAL_COL},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT}));
+    assertNull(result._schema, "A zero-match streaming query carries no schema today; see the comment above");
+  }
+
+  @Test
+  public void testZeroMatchSegmentsMergedAlongsideAMatchingSegment() {
+    // Disjoint segment i covers [i * 1000, i * 1000 + 100), so this filter matches every row of the first segment and
+    // nothing at all in the rest. Each zero-match child still emits its empty schema-carrying block, so the merge runs
+    // cursors that never set a head alongside one that does -- the shape this feature targets once pruning or
+    // colocation leaves only part of the fan-out in range.
+    @Language("sql") String query =
+        "SELECT sortedCol, valCol FROM testTable WHERE sortedCol < 1000 ORDER BY sortedCol, valCol LIMIT 5";
+    assertParity(_disjointSegments, query, false);
+    Result streamed = run(_disjointSegments, query, true, false, true, 3);
+    assertFalse(streamed._rows.isEmpty(), "The in-range segment must contribute rows, else the test is vacuous");
+    assertNotNull(streamed._schema, "A merge that produced rows must carry a schema");
+  }
+
+  /// The operator passes a null merger to the base class and replaces the base streaming loop wholesale. The two base
+  /// entry points that would dereference that merger must fail loud, so a future change routing back through them
+  /// breaks at the seam instead of with an NPE at query time.
+  @Test
+  public void testBaseWorkerEntryPointsFailLoud() {
+    Operator<?> combineOperator = planCombineOperator(_sortedSegments,
+        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50"), true);
+    assertTrue(combineOperator instanceof StreamingSelectionOrderByCombineOperator,
+        "Expected the streaming combine operator, got: " + combineOperator.getClass().getSimpleName());
+    StreamingSelectionOrderByCombineOperator streamingCombine =
+        (StreamingSelectionOrderByCombineOperator) combineOperator;
+    expectThrows(IllegalStateException.class, () -> streamingCombine.isQuerySatisfied(null, null));
+    expectThrows(IllegalStateException.class, streamingCombine::processSegments);
   }
 
   @Test
   public void testHintOffSelectsMinMaxOperator() {
     // Default behavior is unchanged when the hint is off: the classic MinMax operator is still selected.
-    Result result = run(_sortedSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50",
-        false, false, false, 0);
-    assertTrue(result._combineOperator instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Operator<?> combineOperator = planCombineOperator(_sortedSegments, queryContext, true);
+    assertTrue(combineOperator instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
         "Hint off must keep the default MinMax combine operator, got: "
-            + result._combineOperator.getClass().getSimpleName());
+            + combineOperator.getClass().getSimpleName());
   }
 
   @Test
-  public void testNonIdentifierOrderByFallsBack() {
-    // Even with the hint on, a non-identifier first order-by expression falls back to SelectionOrderByCombineOperator
-    // (the streaming operator and its segment-level counterpart only support a leading identifier).
-    Result result = run(_sortedSegments,
-        "SELECT sortedCol, valCol FROM testTable ORDER BY ADD(sortedCol, 1), valCol LIMIT 50", true, false, false, 0);
-    assertEquals(result._combineOperator.getClass(), SelectionOrderByCombineOperator.class,
-        "Non-identifier first order-by must fall back to SelectionOrderByCombineOperator, got: "
-            + result._combineOperator.getClass().getSimpleName());
+  public void testHintOnBlockingPathKeepsMinMaxOperator() {
+    // The merge can only stream where there is a ResultsBlockStreamer. With none, the hint must not select it: the
+    // blocking caller takes a single nextBlock(), so the merge could never flush more than one block.
+    Operator<?> combineOperator = planCombineOperator(_sortedSegments,
+        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50"), false);
+    assertTrue(combineOperator instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+        "Hint on the blocking path must keep the MinMax combine operator, got: "
+            + combineOperator.getClass().getSimpleName());
   }
 
-  /// Asserts streaming-vs-non-streaming parity for {@code query}. Runs the MinMax combine (hint off) as the reference,
-  /// then runs the streaming combine in BOTH single-block mode and bounded multi-block streaming mode, asserting each
-  /// selects the streaming operator and produces rows that are sorted by the order-by comparator and equal the MinMax
-  /// rows as a multiset. The streaming variant additionally checks the bounded-flush invariants.
+  @Test
+  public void testBlockingInstancePlanDisablesTheHint() {
+    // The leaf gate reads the same flag as the combine gate but cannot see the streamer, so the blocking instance
+    // plan clears the flag outright rather than leaving the option half-honored: streaming leaves swapped in under
+    // a blocking MinMax combine that cannot drive them.
+    QueryContext queryContext =
+        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50");
+    List<SegmentContext> segmentContexts = new ArrayList<>(_sortedSegments.size());
+    for (IndexSegment segment : _sortedSegments) {
+      segmentContexts.add(new SegmentContext(segment));
+    }
+    PLAN_MAKER.makeInstancePlan(segmentContexts, queryContext, EXECUTOR);
+    assertFalse(queryContext.isSortedSelectionMergeEnabled(),
+        "The blocking instance plan must disable the streaming selection merge for the whole plan");
+    // The observable consequence: leaves planned for this query are the materializing operators, not the multi-block
+    // streaming one that only the streaming combine knows how to drain.
+    Operator<?> leafOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContexts.get(0), queryContext).run();
+    assertFalse(leafOperator instanceof StreamingSelectionOrderByOperator,
+        "The blocking path must not plan a multi-block streaming leaf, got: "
+            + leafOperator.getClass().getSimpleName());
+  }
+
+  @Test
+  public void testNonIdentifierOrderByFallsBackWithTheModeOff() {
+    // Default behaviour for a non-identifier first order-by is unchanged: SelectionOrderByCombineOperator. Only an
+    // explicit ON reaches the streaming merge for this shape (see testOnForcesStreamingForAnExpressionOrderBy);
+    // AUTO refuses it (see testAutoDoesNotSelectStreamingForAnExpressionOrderBy).
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY ADD(sortedCol, 1), valCol LIMIT 50");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Operator<?> combineOperator = planCombineOperator(_sortedSegments, queryContext, true);
+    assertEquals(combineOperator.getClass(), SelectionOrderByCombineOperator.class,
+        "Non-identifier first order-by must fall back to SelectionOrderByCombineOperator, got: "
+            + combineOperator.getClass().getSimpleName());
+  }
+
+  /// Asserts streaming-vs-blocking parity for {@code query}. Runs the MinMax combine on the blocking path (hint off)
+  /// as the reference, then runs the streaming combine on the streaming path, asserting it selects the streaming
+  /// operator and produces rows that are sorted by the order-by comparator and equal the MinMax rows as a multiset,
+  /// plus the bounded-flush invariants. A small block size forces several bounded data blocks before the metadata
+  /// block, genuinely exercising the streaming flush path rather than a single trimmed block.
   private void assertParity(List<IndexSegment> segments, @Language("sql") String query, boolean nullHandling) {
     Result baseline = run(segments, query, false, nullHandling, false, 0);
     assertEquals(baseline._combineOperator.getClass(), MinMaxValueBasedSelectionOrderByCombineOperator.class,
         "Baseline must be the MinMax combine operator, got: " + baseline._combineOperator.getClass().getSimpleName());
     Comparator<Object[]> comparator = orderByComparator(query, nullHandling);
 
-    // Classic single-stage path (null streamer): the streaming combine flushes the whole merge as one block.
-    Result singleStage = run(segments, query, true, nullHandling, false, 0);
-    assertStreamingParity(singleStage, baseline, comparator, query, false, 0);
-
-    // MSE leaf path (non-null streamer): a small block size forces several bounded data blocks before the metadata
-    // block, genuinely exercising the streaming flush path rather than a single trimmed block.
     int blockSize = 3;
     Result streamed = run(segments, query, true, nullHandling, true, blockSize);
     assertStreamingParity(streamed, baseline, comparator, query, true, blockSize);
@@ -429,19 +691,11 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     }
   }
 
-  /// Runs one combine over {@code segments} and collects its rows, blocks, schema and docs-scanned stat.
-  private Result run(List<IndexSegment> segments, @Language("sql") String query, boolean hintOn, boolean nullHandling,
-      boolean streaming, int blockSize) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    queryContext.setNullHandlingEnabled(nullHandling);
-    if (hintOn) {
-      queryContext.setSortedSelectionMergeEnabled(true);
-      if (blockSize > 0) {
-        queryContext.setSortedSelectionMergeBlockSize(blockSize);
-      }
-    }
-    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-
+  /// Plans the combine operator that would run {@code queryContext} over {@code segments}, without driving it. Use
+  /// this for gate assertions: an operator that is not the streaming combine (the fallbacks) does not terminate with
+  /// a metadata block, so it cannot be driven by the streaming loop in [#run].
+  private static Operator<?> planCombineOperator(List<IndexSegment> segments, QueryContext queryContext,
+      boolean streaming) {
     List<PlanNode> planNodes = new ArrayList<>(segments.size());
     for (IndexSegment segment : segments) {
       SegmentContext segmentContext = new SegmentContext(segment);
@@ -450,10 +704,253 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     }
     ResultsBlockStreamer streamer = streaming ? block -> {
     } : null;
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, streamer);
+    return new CombinePlanNode(planNodes, queryContext, EXECUTOR, streamer).run();
+  }
+
+  @Test
+  public void testAutoSelectsStreamingWhenAllSegmentsAreSorted() {
+    // AUTO is resolved from segment metadata by the streaming instance plan, before any plan node is built.
+    QueryContext queryContext = modeContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50", SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "AUTO must resolve to ON when every segment is sorted on the leading order-by column");
+    assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
+            instanceof StreamingSelectionOrderByCombineOperator,
+        "The resolved mode must select the streaming combine");
+  }
+
+  @Test
+  public void testAutoSelectsMinMaxWhenNoSegmentIsSorted() {
+    // Every child would be a materializing SelectionOrderByOperator doing a full scan plus top-K synchronously on the
+    // consumer thread, one segment after another -- strictly worse than the parallel MinMax combine.
+    QueryContext queryContext = modeContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50", SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_unsortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "AUTO must resolve to OFF when no segment is sorted on the leading order-by column");
+    assertTrue(planCombineOperator(_unsortedSegments, queryContext, true)
+            instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+        "The resolved mode must keep the MinMax combine");
+  }
+
+  @Test
+  public void testAutoHonoursTheMinSortedRatioThreshold() {
+    // _mixedSegments is 2 sorted of 4, so a ratio of exactly 0.5 must pass and anything above it must fail. This pins
+    // the comparison as >= rather than >, and pins that the threshold is read from the query context.
+    String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50";
+
+    QueryContext atThreshold = modeContext(query, SortedSelectionMergeMode.AUTO);
+    atThreshold.setSortedSelectionMergeAutoMinSortedRatio(0.5);
+    makeStreamingInstancePlan(_mixedSegments, atThreshold);
+    assertEquals(atThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "A sorted ratio equal to the threshold must select the streaming merge");
+
+    QueryContext aboveThreshold = modeContext(query, SortedSelectionMergeMode.AUTO);
+    aboveThreshold.setSortedSelectionMergeAutoMinSortedRatio(0.75);
+    makeStreamingInstancePlan(_mixedSegments, aboveThreshold);
+    assertEquals(aboveThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "A sorted ratio below the threshold must keep the MinMax combine");
+  }
+
+  @Test
+  public void testAutoIgnoresNullsInTheLeadingColumn() {
+    // Pins the known gap documented by the TODO in InstancePlanMakerImplV2#isSortedEnoughForStreamingMerge, so it is
+    // enforced by CI rather than only described. AUTO resolves from physical sortedness alone, because the null check
+    // that SelectionPlanNode#isColumnSorted adds reads the segment's mapped buffer and AUTO runs before any acquire.
+    // So a null-bearing sorted column resolves to ON with null handling either off or on -- but with it on, the leaf
+    // gate then refuses to stream, and the merge runs over fully materialized children. Correct, just not fast.
+    //
+    // Tighten this to OFF for the null-handling case when the follow-up lands.
+    // See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
+    String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50";
+
+    QueryContext nullHandlingOff = modeContext(query, SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_nullBearingSortedSegments, nullHandlingOff);
+    assertEquals(nullHandlingOff.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "With null handling off the segments are sorted, so AUTO must select the streaming merge");
+
+    QueryContext nullHandlingOn = modeContext(query, SortedSelectionMergeMode.AUTO);
+    nullHandlingOn.setNullHandlingEnabled(true);
+    makeStreamingInstancePlan(_nullBearingSortedSegments, nullHandlingOn);
+    assertEquals(nullHandlingOn.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "AUTO currently reads physical sortedness only, so null handling does not change the decision");
+    // The leaf, which runs post-acquire and can afford the null check, still refuses to stream these segments.
+    List<SegmentContext> segmentContexts = new ArrayList<>(1);
+    segmentContexts.add(new SegmentContext(_nullBearingSortedSegments.get(0)));
+    Operator<?> leafOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContexts.get(0), nullHandlingOn).run();
+    assertFalse(leafOperator instanceof StreamingSelectionOrderByOperator,
+        "A null-bearing leading column must not produce a streaming leaf under null handling, got: "
+            + leafOperator.getClass().getSimpleName());
+  }
+
+  @Test
+  public void testAutoSelectsMinMaxWhenThereAreNoSegments() {
+    QueryContext queryContext = modeContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50", SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(List.of(), queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "An empty segment set must resolve to OFF rather than dividing by zero");
+  }
+
+  @Test
+  public void testUnresolvedAutoFallsBackToOff() {
+    // AUTO is a request for a decision, not a decision, but a gate reached before the plan maker resolved it must
+    // not fail the query either. isSortedSelectionMergeEnabled() degrades an unresolved AUTO to OFF (with a
+    // warning) rather than forcing the merge unconditionally and silently ignoring the ratio, so the gate should
+    // select the same fallback operator it would for OFF.
+    QueryContext queryContext = modeContext(
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50", SortedSelectionMergeMode.AUTO);
+    Operator<?> combineOperator = planCombineOperator(_sortedSegments, queryContext, true);
+    assertTrue(combineOperator instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+        "An unresolved AUTO must degrade to OFF, got: " + combineOperator.getClass().getSimpleName());
+  }
+
+  @Test
+  public void testAutoDoesNotSelectStreamingForAnExpressionOrderBy() {
+    // Sortedness is only defined for a physical column; forcing the merge over an expression is what ON is for.
+    QueryContext queryContext =
+        modeContext("SELECT sortedCol, valCol FROM testTable ORDER BY ADD(sortedCol, 1) LIMIT 50",
+            SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "AUTO must not select the streaming merge for a non-identifier leading order-by expression");
+  }
+
+  @Test
+  public void testAutoDoesNotSelectStreamingForDescWithoutReverseOrder() {
+    // DataSourceMetadata.isSorted() reports ascending physical order, so with allowReverseOrder off no leaf can scan
+    // sortedCol descending: every segment falls back to the materialized SelectionPartiallyOrderedByDescOperation.
+    // Resolving to ON here would install the streaming combine over children that each materialize their top-K
+    // serially, losing the MinMax combine's parallelism and its min/max segment pruning for no gain.
+    QueryContext queryContext =
+        modeContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC LIMIT 50",
+            SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "AUTO must not select the streaming merge for a DESC order-by that no leaf can stream");
+    assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
+            instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+        "The resolved mode must keep the MinMax combine");
+  }
+
+  @Test
+  public void testAutoSelectsStreamingForDescWithReverseOrder() {
+    // With allowReverseOrder on, getSortedByProject() hands the leaf a DESC-compatible project operator, so the
+    // streaming children this merge needs do get built and AUTO should take the path.
+    QueryContext queryContext = modeContext(
+        "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC "
+            + "LIMIT 50", SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "AUTO must select the streaming merge for DESC once reverse iteration is allowed");
+    assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
+            instanceof StreamingSelectionOrderByCombineOperator,
+        "The resolved mode must select the streaming combine");
+  }
+
+  @Test
+  public void testAutoHonoursTheMinSortedRatioThresholdForDesc() {
+    // The DESC gate is a precondition, not a replacement for the ratio check: once reverse iteration is allowed, a
+    // DESC query must still clear the same threshold an ASC one does. _mixedSegments is 2 sorted of 4, so 0.5 passes
+    // and 0.75 does not, exactly as in testAutoHonoursTheMinSortedRatioThreshold.
+    String query = "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, "
+        + "valCol DESC LIMIT 50";
+
+    QueryContext atThreshold = modeContext(query, SortedSelectionMergeMode.AUTO);
+    atThreshold.setSortedSelectionMergeAutoMinSortedRatio(0.5);
+    makeStreamingInstancePlan(_mixedSegments, atThreshold);
+    assertEquals(atThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "A DESC sorted ratio equal to the threshold must select the streaming merge");
+
+    QueryContext aboveThreshold = modeContext(query, SortedSelectionMergeMode.AUTO);
+    aboveThreshold.setSortedSelectionMergeAutoMinSortedRatio(0.75);
+    makeStreamingInstancePlan(_mixedSegments, aboveThreshold);
+    assertEquals(aboveThreshold.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF,
+        "A DESC sorted ratio below the threshold must keep the MinMax combine");
+  }
+
+  @Test
+  public void testAutoOnlyChecksTheLeadingOrderByDirection() {
+    // Only the leading expression rides the segment's physical order, so a DESC tail is sorted in memory and needs no
+    // reverse scan. Pins the gate as "leading expression is DESC", not "any expression is DESC".
+    QueryContext queryContext =
+        modeContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol DESC LIMIT 50",
+            SortedSelectionMergeMode.AUTO);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "An ASC leading expression must select the streaming merge regardless of the tail's direction");
+    assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
+            instanceof StreamingSelectionOrderByCombineOperator,
+        "The resolved mode must select the streaming combine");
+  }
+
+  @Test
+  public void testOnForcesStreamingForAnExpressionOrderBy() {
+    // ON takes the path unconditionally, expressions included, so it can be benchmarked against the default. There is
+    // no leading physical column, so frontier pruning is inert and every cursor is activated in plan order.
+    QueryContext queryContext =
+        modeContext("SELECT sortedCol, valCol FROM testTable ORDER BY ADD(sortedCol, 1) LIMIT 50",
+            SortedSelectionMergeMode.ON);
+    makeStreamingInstancePlan(_sortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.ON,
+        "ON must pass through the AUTO resolution untouched");
+    assertTrue(planCombineOperator(_sortedSegments, queryContext, true)
+            instanceof StreamingSelectionOrderByCombineOperator,
+        "ON must select the streaming combine even for an expression order-by");
+  }
+
+  @Test
+  public void testOnOverUnsortedSegmentsMatchesTheBaseline() {
+    // Forced over unsorted segments the merge runs on materialized SelectionOrderByOperator children. Slower, but it
+    // must still produce exactly the baseline result -- that is what makes it usable for A/B.
+    assertParity(_unsortedSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50",
+        false);
+  }
+
+  /// Runs the streaming instance plan for its side effect on {@code queryContext}: resolving AUTO from segment
+  /// metadata. The plan itself is discarded; the gate tests assert on the resolved mode and on the operator that
+  /// [#planCombineOperator] then selects.
+  private static void makeStreamingInstancePlan(List<IndexSegment> segments, QueryContext queryContext) {
+    List<SegmentContext> segmentContexts = new ArrayList<>(segments.size());
+    for (IndexSegment segment : segments) {
+      segmentContexts.add(new SegmentContext(segment));
+    }
+    PLAN_MAKER.makeStreamingInstancePlan(segmentContexts, queryContext, EXECUTOR, block -> {
+    });
+  }
+
+  /// Builds a query context for {@code query} with the streaming merge mode set to {@code mode}.
+  private static QueryContext modeContext(@Language("sql") String query, SortedSelectionMergeMode mode) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setSortedSelectionMergeMode(mode);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    return queryContext;
+  }
+
+  /// Builds a query context for {@code query} with the streaming merge hint on.
+  private static QueryContext hintedContext(@Language("sql") String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.ON);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    return queryContext;
+  }
+
+  /// Runs one combine over {@code segments} and collects its rows, blocks, schema and docs-scanned stat.
+  private Result run(List<IndexSegment> segments, @Language("sql") String query, boolean hintOn, boolean nullHandling,
+      boolean streaming, int blockSize) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setNullHandlingEnabled(nullHandling);
+    if (hintOn) {
+      queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.ON);
+      if (blockSize > 0) {
+        queryContext.setSortedSelectionMergeBlockSize(blockSize);
+      }
+    }
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
 
     Result result = new Result();
-    Operator<?> combineOperator = combinePlanNode.run();
+    Operator<?> combineOperator = planCombineOperator(segments, queryContext, streaming);
     result._combineOperator = combineOperator;
     result._rows = new ArrayList<>();
     result._blockSizes = new ArrayList<>();
@@ -533,7 +1030,8 @@ public class StreamingSelectionOrderByCombineOperatorTest {
   public void tearDown()
       throws IOException {
     EXECUTOR.shutdownNow();
-    for (List<IndexSegment> segments : List.of(_sortedSegments, _disjointSegments, _mixedSegments, _lowCardSegments)) {
+    for (List<IndexSegment> segments : List.of(_sortedSegments, _disjointSegments, _mixedSegments, _lowCardSegments,
+        _interleavedSegments, _tiedSegments)) {
       for (IndexSegment segment : segments) {
         segment.destroy();
       }

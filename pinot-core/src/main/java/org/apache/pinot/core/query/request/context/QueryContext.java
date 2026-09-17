@@ -46,6 +46,9 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The `QueryContext` class encapsulates all the query related information extracted from the wiring Object.
@@ -66,6 +69,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 ///   reduce the repetitive work for each segment.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryContext.class);
+
   private final String _tableName;
   private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
@@ -136,10 +141,17 @@ public class QueryContext {
   private int _streamingGroupByFlushThreshold;
   // Flush threshold for streaming distinct (0 = disabled)
   private int _streamingDistinctFlushThreshold;
-  /// Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments
-  private boolean _sortedSelectionMergeEnabled;
+  /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. `AUTO` is resolved to `ON`
+  /// or `OFF` by the plan maker before any plan node is built, so the plan-node gates only ever see a decided value.
+  private SortedSelectionMergeMode _sortedSelectionMergeMode = Server.DEFAULT_SORTED_SELECTION_MERGE_MODE;
+  /// Minimum fraction of sorted segments for `AUTO` to resolve to `ON`
+  private double _sortedSelectionMergeAutoMinSortedRatio =
+      Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
   /// Output block size (rows) for the streaming selection ORDER BY combine
   private int _sortedSelectionMergeBlockSize = Broker.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
+  // Guards the one-time warning in isSortedSelectionMergeEnabled() so that an unresolved AUTO does not log once per
+  // segment/combine call for the same query.
+  private volatile boolean _unresolvedSortedSelectionMergeModeWarned;
 
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
@@ -515,12 +527,44 @@ public class QueryContext {
     _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
   }
 
-  public boolean isSortedSelectionMergeEnabled() {
-    return _sortedSelectionMergeEnabled;
+  public SortedSelectionMergeMode getSortedSelectionMergeMode() {
+    return _sortedSelectionMergeMode;
   }
 
-  public void setSortedSelectionMergeEnabled(boolean sortedSelectionMergeEnabled) {
-    _sortedSelectionMergeEnabled = sortedSelectionMergeEnabled;
+  public void setSortedSelectionMergeMode(SortedSelectionMergeMode sortedSelectionMergeMode) {
+    _sortedSelectionMergeMode = sortedSelectionMergeMode;
+  }
+
+  /// Whether the plan should use the streaming selection ORDER BY merge.
+  ///
+  /// `AUTO` is a request for a decision, not a decision, and collapsing it to "enabled" would force the merge
+  /// unconditionally while silently ignoring [#getSortedSelectionMergeAutoMinSortedRatio()] -- the half-honored
+  /// failure the single-resolution design exists to prevent. The plan maker resolves it against segment metadata
+  /// before any plan node is built (see [org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2]), so this
+  /// accessor should normally only observe `ON` or `OFF`. If it is reached with the mode still `AUTO` -- meaning
+  /// the gate was reached out of order, before resolution -- it logs a warning and falls back to `OFF` rather than
+  /// failing the query. Callers that legitimately run before resolution must read
+  /// [#getSortedSelectionMergeMode()] instead.
+  public boolean isSortedSelectionMergeEnabled() {
+    if (_sortedSelectionMergeMode == SortedSelectionMergeMode.AUTO) {
+      // This accessor is called once per segment (and again for the combine), so warn only once per query rather
+      // than flooding the log if the "should never happen" unresolved AUTO is ever actually hit.
+      if (!_unresolvedSortedSelectionMergeModeWarned) {
+        _unresolvedSortedSelectionMergeModeWarned = true;
+        LOGGER.warn("Sorted selection merge mode was read before the plan maker resolved it from AUTO; "
+            + "treating as OFF");
+      }
+      return false;
+    }
+    return _sortedSelectionMergeMode != SortedSelectionMergeMode.OFF;
+  }
+
+  public double getSortedSelectionMergeAutoMinSortedRatio() {
+    return _sortedSelectionMergeAutoMinSortedRatio;
+  }
+
+  public void setSortedSelectionMergeAutoMinSortedRatio(double sortedSelectionMergeAutoMinSortedRatio) {
+    _sortedSelectionMergeAutoMinSortedRatio = sortedSelectionMergeAutoMinSortedRatio;
   }
 
   public int getSortedSelectionMergeBlockSize() {
