@@ -170,22 +170,10 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators(ready, minMaxSegmentSupplier());
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
-    // Single-stage mode: nextBlock() drives the whole merge synchronously on the (cancellable) caller thread.
+    // getNextBlock() drives the merge synchronously on the (cancellable) caller thread, so the interrupt-on-cancel
+    // path applies to the very first call and must surface an ExceptionResultsBlock.
     StreamingSelectionOrderByCombineOperator combineOperator =
-        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, false);
-    testCancelCombineOperator(combineOperator, ready, operators);
-  }
-
-  @Test
-  public void testCancelStreamingSelectionOrderByCombineOperatorStreamingMode() {
-    CountDownLatch ready = new CountDownLatch(1);
-    List<Operator> operators = getOperators(ready, minMaxSegmentSupplier());
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
-    queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
-    // Streaming (MSE-leaf) mode: the first getNextBlock() still drives the merge on the caller thread, so the same
-    // interrupt-on-cancel path applies and must surface an ExceptionResultsBlock.
-    StreamingSelectionOrderByCombineOperator combineOperator =
-        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, true);
+        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService);
     testCancelCombineOperator(combineOperator, ready, operators);
   }
 
@@ -195,11 +183,14 @@ public class CombineSlowOperatorsTest {
   /// from passing vacuously if the timeout came from somewhere else.
   @Test
   public void testStreamingSelectionOrderByCombineOperatorHonorsDeadline() {
-    List<Operator> operators = getOperators(null, minMaxSegmentSupplier());
+    // A real latch, never awaited: this test asserts that no child is driven at all, so there is nothing to wait
+    // for. It is passed only so every getOperators() call site in this class looks alike; SlowOperator null-guards
+    // the latch, so behaviour is the same either way.
+    List<Operator> operators = getOperators(new CountDownLatch(1), minMaxSegmentSupplier());
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() - 1);
     StreamingSelectionOrderByCombineOperator combineOperator =
-        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService, false);
+        new StreamingSelectionOrderByCombineOperator(operators, queryContext, _executorService);
     try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       BaseResultsBlock resultsBlock = combineOperator.nextBlock();
       assertTrue(resultsBlock instanceof ExceptionResultsBlock,
