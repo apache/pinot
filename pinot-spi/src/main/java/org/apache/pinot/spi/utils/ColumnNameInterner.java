@@ -26,10 +26,10 @@ import javax.annotation.Nullable;
 /// Shares equal column names across metadata readers without using the JVM string pool.
 /// The interner is thread-safe and holds names weakly, allowing unused names to be reclaimed.
 public final class ColumnNameInterner {
-  private static final Interner<String> INTERNER = Interners.newWeakInterner();
-
   private ColumnNameInterner() {
   }
+
+  private static final Interner<String> INTERNER = Interners.newWeakInterner();
 
   @Nullable
   public static String intern(@Nullable String columnName) {
