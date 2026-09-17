@@ -106,7 +106,8 @@ public abstract class FixedBitIntReader {
       case 31:
         return new Bit31Reader(dataBuffer);
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Illegal number of bits per value: " + numBitsPerValue + ", must be within 1 "
+            + "and 31");
     }
   }
 
