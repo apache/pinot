@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionInfo;
+import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -49,6 +50,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -93,6 +95,55 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner.prune(request(predicate("EQUALS", "11")), records.keySet()), Set.of("a", "b", "e"));
     assertEquals(CountingPartitionFunction.CALLS.get(), 3,
         "Interleaved segments with the same complete configuration must reuse hashes");
+  }
+
+  @Test
+  public void testDuplicateInPartitionsAndIncrementalEvaluation() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    records.put("first", metadata("first", "PrunerCounting", 8, Set.of(1), null));
+    records.put("second", metadata("second", "PrunerCounting", 8, Set.of(2), null));
+    records.put("miss", metadata("miss", "PrunerCounting", 8, Set.of(3, 4), null));
+    records.put("repeat", metadata("repeat", "PrunerCounting", 8, Set.of(1, 2), null));
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    CountingPartitionFunction.CALLS.set(0);
+    // The first segment evaluates only 1; the second extends the cached prefix past repeated partition 1 to 2.
+    assertEquals(pruner.prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()),
+        Set.of("first", "second", "repeat"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 4);
+  }
+
+  @Test
+  public void testLargeConfigurationsShareIdentityAcrossMetadataLoads() throws Exception {
+    String values = "first|" + "x".repeat(100_000);
+    Map<String, String> config = Map.of("columnValues", values, "columnValuesDelimiter", "|");
+    ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), config);
+    ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), config);
+    SegmentPartitionInfo firstInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "first", first);
+    SegmentPartitionInfo secondInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "second", second);
+    assertNotSame(firstInfo.getPartitionFunction(), secondInfo.getPartitionFunction());
+    assertSame(firstInfo.getPartitionFunctionKey(), secondInfo.getPartitionFunctionKey());
+    assertSame(firstInfo.getPartitionFunctionConfig(), secondInfo.getPartitionFunctionConfig());
+    SinglePartitionColumnSegmentPruner pruner = pruner(Map.of("first", first, "second", second));
+    assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of("first"));
+    assertEquals(pruner.prune(request(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
+        RequestUtils.getLiteralExpression("value"))), Set.of("first", "second")), Set.of("first", "second"));
+    pruner.refreshSegment("first", metadata("first", "BoundedColumnValue", 3, Set.of(2), config));
+    assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of());
+  }
+
+  @Test
+  public void testConfigurationHashCollisionsDoNotReusePartitionIds() throws Exception {
+    Map<String, String> firstConfig = Map.of("columnValues", "Aa|BB", "columnValuesDelimiter", "|");
+    Map<String, String> secondConfig = Map.of("columnValues", "BB|Aa", "columnValuesDelimiter", "|");
+    assertEquals(firstConfig.hashCode(), secondConfig.hashCode(),
+        "Fixture must exercise a configuration hash collision");
+    ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), firstConfig);
+    ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), secondConfig);
+    SegmentPartitionInfo firstInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "first", first);
+    SegmentPartitionInfo secondInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "second", second);
+    assertNotSame(firstInfo.getPartitionFunctionKey(), secondInfo.getPartitionFunctionKey());
+    Map<String, ZNRecord> records = Map.of("first", first, "second", second);
+    assertEquals(pruner(records).prune(request(predicate("EQUALS", "Aa")), records.keySet()), records.keySet());
   }
 
   @Test
@@ -148,6 +199,9 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner.prune(request(function("OR", predicate("EQUALS", "1"), invalidValue)), segments), segments);
     Expression invalidOperator = function("INVALID_OPERATOR");
     assertEquals(pruner.prune(request(function("OR", predicate("EQUALS", "1"), invalidOperator)), segments), segments);
+    assertEquals(pruner.prune(request(function("AND", predicate("EQUALS", "2"), invalidOperator)), segments), Set.of());
+    expectThrows(IllegalArgumentException.class,
+        () -> pruner.prune(request(function("OR", predicate("EQUALS", "2"), invalidOperator)), segments));
     expectThrows(IllegalArgumentException.class, () -> pruner.prune(request(invalidOperator), segments));
 
     Expression unsupported = predicate("GREATER_THAN", "100");
@@ -242,8 +296,10 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertNull(legacy.getPartitionFunctionConfig());
     SegmentPartitionInfo knownNull = new SegmentPartitionInfo(COLUMN, function, Set.of(0), null);
     assertNull(knownNull.getPartitionFunctionConfig());
+    assertSame(legacy.getPartitionFunctionKey(), knownNull.getPartitionFunctionKey());
     SegmentPartitionInfo knownEmpty = new SegmentPartitionInfo(COLUMN, function, Set.of(0), Map.of());
     assertEquals(knownEmpty.getPartitionFunctionConfig(), Map.of());
+    assertNotSame(knownNull.getPartitionFunctionKey(), knownEmpty.getPartitionFunctionKey());
     Map<String, String> config = new HashMap<>();
     config.put("offset", "1");
     config.put("nullable", null);
@@ -252,6 +308,19 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(snapshot.getPartitionFunctionConfig().get("offset"), "1");
     assertTrue(snapshot.getPartitionFunctionConfig().containsKey("nullable"));
     expectThrows(UnsupportedOperationException.class, () -> snapshot.getPartitionFunctionConfig().put("offset", "3"));
+  }
+
+  @Test
+  public void testThreeArgumentConstructorRetainsFunctionConfig() {
+    Map<String, String> config = Map.of("useRawBytes", "true");
+    PartitionFunction function = PartitionFunctionFactory.getPartitionFunction("Murmur", 97, config);
+    SegmentPartitionInfo implicit = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
+    SegmentPartitionInfo explicit = new SegmentPartitionInfo(COLUMN, function, Set.of(1), config);
+    SegmentPartitionInfo defaults = new SegmentPartitionInfo(COLUMN,
+        PartitionFunctionFactory.getPartitionFunction("Murmur", 97, null), Set.of(0));
+    assertEquals(implicit.getPartitionFunctionConfig(), config);
+    assertSame(implicit.getPartitionFunctionKey(), explicit.getPartitionFunctionKey());
+    assertNotSame(implicit.getPartitionFunctionKey(), defaults.getPartitionFunctionKey());
   }
 
   private static SinglePartitionColumnSegmentPruner pruner(Map<String, ZNRecord> records) {
