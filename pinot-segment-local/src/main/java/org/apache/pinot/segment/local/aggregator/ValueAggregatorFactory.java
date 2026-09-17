@@ -86,6 +86,8 @@ public class ValueAggregatorFactory {
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
         return new PercentileTDigestValueAggregator(arguments);
+      case ARRAYAGG:
+        return new ArrayAggDistinctValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
@@ -145,6 +147,8 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTULL:
       case DISTINCTCOUNTRAWULL:
         return DistinctCountULLValueAggregator.AGGREGATED_VALUE_TYPE;
+      case ARRAYAGG:
+        return ArrayAggDistinctValueAggregator.AGGREGATED_VALUE_TYPE;
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

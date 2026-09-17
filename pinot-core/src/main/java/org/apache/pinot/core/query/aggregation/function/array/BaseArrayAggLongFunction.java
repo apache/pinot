@@ -20,10 +20,14 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongCollection;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -40,6 +44,23 @@ public abstract class BaseArrayAggLongFunction<I extends LongCollection>
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet.getValueType() == DataType.BYTES && blockValSet.isSingleValue()) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          LongSet set = ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG));
+          LongIterator iterator = set.iterator();
+          while (iterator.hasNext()) {
+            setGroupByResult(groupByResultHolder, groupKey, iterator.nextLong());
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       long[] values = blockValSet.getLongValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -65,6 +86,24 @@ public abstract class BaseArrayAggLongFunction<I extends LongCollection>
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet.getValueType() == DataType.BYTES && blockValSet.isSingleValue()) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          LongSet set = ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG));
+          for (int groupKey : groupKeysArray[i]) {
+            LongIterator iterator = set.iterator();
+            while (iterator.hasNext()) {
+              setGroupByResult(groupByResultHolder, groupKey, iterator.nextLong());
+            }
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       long[] values = blockValSet.getLongValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
