@@ -18,13 +18,18 @@
  */
 package org.apache.pinot.perf;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -81,11 +86,14 @@ public class BenchmarkAndRestrictionPushdown {
   private static final int NUM_DOCS = 2_000_000;
   private static final int LIMIT = 10;
   private static final int NUM_DICT_IDS = 1024;
+  private static final int CHUNK_SIZE = 256;
 
-  @Param({"false", "true"})
-  private boolean _pushdown;
+  /// OFF is master's behaviour; EAGER is the push-down as #19408 ships it; STREAMING models the spike, where the
+  /// candidate set still reaches the scan but a chunk at a time, so nothing is materialized.
+  @Param({"OFF", "EAGER", "STREAMING"})
+  private String _strategy;
 
-  @Param({"SCAN_IN_OR", "SCAN_ONLY_OR", "INDEXED_OR"})
+  @Param({"SCAN_IN_OR", "SCAN_ONLY_OR"})
   private String _shape;
 
   @Param({"DRAIN", "LIMIT"})
@@ -131,6 +139,39 @@ public class BenchmarkAndRestrictionPushdown {
     _candidateDocIds = randomBitmap(random, _candidateSelectivity);
     _firstBranchDocIds = randomBitmap(random, 0.3);
     _secondBranchDocIds = randomBitmap(random, 0.2);
+
+    verifyStrategiesAgree();
+  }
+
+  /// A timing comparison between strategies only means something if they return the same documents. STREAMING in
+  /// particular is a hand-assembled model of the push-down, so a mistake there would show up as an impressive and
+  /// meaningless number.
+  private void verifyStrategiesAgree() {
+    String strategy = _strategy;
+    try {
+      _strategy = "OFF";
+      int[] off = drain(buildFilter().iterator());
+      _strategy = "EAGER";
+      int[] eager = drain(buildFilter().iterator());
+      _strategy = "STREAMING";
+      int[] streaming = drain(buildStreamingFilter());
+      if (!Arrays.equals(off, eager) || !Arrays.equals(off, streaming)) {
+        throw new IllegalStateException(
+            String.format("Strategies disagree for shape %s: off=%d, eager=%d, streaming=%d", _shape, off.length,
+                eager.length, streaming.length));
+      }
+    } finally {
+      _strategy = strategy;
+    }
+  }
+
+  private static int[] drain(BlockDocIdIterator docIdIterator) {
+    IntArrayList docIds = new IntArrayList();
+    int docId;
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+      docIds.add(docId);
+    }
+    return docIds.toIntArray();
   }
 
   @TearDown(Level.Trial)
@@ -142,7 +183,8 @@ public class BenchmarkAndRestrictionPushdown {
 
   @Benchmark
   public int evaluateFilter(Blackhole bh) {
-    BlockDocIdIterator docIdIterator = buildFilter().iterator();
+    BlockDocIdIterator docIdIterator =
+        "STREAMING".equals(_strategy) ? buildStreamingFilter() : buildFilter().iterator();
     int limit = "LIMIT".equals(_consume) ? LIMIT : Integer.MAX_VALUE;
     int numDocs = 0;
     int docId;
@@ -168,11 +210,38 @@ public class BenchmarkAndRestrictionPushdown {
     } else {
       // The reported shape: a scan sits next to an index-based predicate inside an OR branch
       BlockDocIdSet branch = new AndDocIdSet(
-          List.of(new BitmapDocIdSet(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, _pushdown);
+          List.of(new BitmapDocIdSet(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, isEager());
       orDocIdSet =
           new OrDocIdSet(List.of(branch, new BitmapDocIdSet(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
     }
-    return new AndDocIdSet(List.of(new BitmapDocIdSet(_candidateDocIds, NUM_DOCS), orDocIdSet), null, _pushdown);
+    return new AndDocIdSet(List.of(new BitmapDocIdSet(_candidateDocIds, NUM_DOCS), orDocIdSet), null, isEager());
+  }
+
+  private boolean isEager() {
+    return "EAGER".equals(_strategy);
+  }
+
+  /// What a streaming push-down would produce. The spike's kernel is not wired into AndDocIdSet yet, so the tree is
+  /// assembled here by hand, using the same identities the push-down applies:
+  ///
+  /// - `AND(C, OR(s1, s2))` is `OR(s1 restricted to C, s2 restricted to C)`
+  /// - `AND(C, OR(AND(A, s), B))` is `OR(s restricted to C AND A, C AND B)`
+  ///
+  /// so the scans see exactly the candidate documents the eager push-down would give them, only lazily.
+  private BlockDocIdIterator buildStreamingFilter() {
+    if ("SCAN_ONLY_OR".equals(_shape)) {
+      return new OrDocIdIterator(
+          new BlockDocIdIterator[]{restrictedScan(_candidateDocIds), restrictedScan(_candidateDocIds)});
+    }
+    ImmutableRoaringBitmap firstBranchCandidates = ImmutableRoaringBitmap.and(_candidateDocIds, _firstBranchDocIds);
+    ImmutableRoaringBitmap secondBranchDocIds = ImmutableRoaringBitmap.and(_candidateDocIds, _secondBranchDocIds);
+    return new OrDocIdIterator(new BlockDocIdIterator[]{
+        restrictedScan(firstBranchCandidates), new RangelessBitmapDocIdIterator(secondBranchDocIds)});
+  }
+
+  private BlockDocIdIterator restrictedScan(ImmutableRoaringBitmap candidateDocIds) {
+    return new RestrictedScanDocIdIterator(new RangelessBitmapDocIdIterator(candidateDocIds),
+        new SVScanDocIdIterator(_predicateEvaluator, _forwardIndexReader, NUM_DOCS), CHUNK_SIZE);
   }
 
   private BlockDocIdSet newScanDocIdSet() {
