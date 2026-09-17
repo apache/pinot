@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.sql.Timestamp;
+import java.util.UUID;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,6 +30,20 @@ public class ArrayFunctionsTest {
   @Test
   public void testBytesArrayValueConstructor() {
     byte[][] expected = {{0}, {1, 2}};
+
+    Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
+  }
+
+  @Test
+  public void testTimestampArrayValueConstructor() {
+    Timestamp[] expected = {new Timestamp(1000L), new Timestamp(2000L)};
+
+    Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
+  }
+
+  @Test
+  public void testUuidArrayValueConstructor() {
+    UUID[] expected = {UUID.randomUUID(), UUID.randomUUID()};
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }

@@ -91,6 +91,7 @@ public class FunctionUtils {
       put(Timestamp[].class, ColumnDataType.TIMESTAMP_ARRAY);
       put(String[].class, ColumnDataType.STRING_ARRAY);
       put(byte[][].class, ColumnDataType.BYTES_ARRAY);
+      put(UUID[].class, ColumnDataType.UUID_ARRAY);
       put(Object.class, ColumnDataType.OBJECT);
     }};
 
