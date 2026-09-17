@@ -132,16 +132,16 @@ public class CombinePlanNode implements PlanNode {
         // Use streaming operator only for non-empty selection-only query
         return createStreamingSelectionOnlyCombineOperator(operators);
       }
-      // Streaming selection order-by (opt-in via the sortedSelectionMergeEnabled hint). Selection-only already
-      // returned above, so reaching here with a non-empty limit and an order-by present implies selection order-by.
+      // Streaming selection order-by (opt-in via the sortedSelectionMergeMode hint). Selection-only already returned
+      // above, so reaching here with a non-empty limit and an order-by present implies selection order-by.
+      //
+      // No sortedness check here: InstancePlanMakerImplV2 has already resolved AUTO against segment metadata, and a
+      // leading order-by expression is deliberately allowed because that is what ON is for. The merge handles a
+      // non-identifier leading expression by giving up frontier pruning, see
+      // StreamingSelectionOrderByCombineOperator.
       if (_queryContext.isSortedSelectionMergeEnabled() && QueryContextUtils.isSelectionQuery(_queryContext)
-          && _queryContext.getLimit() != 0) {
-        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
-        if (orderByExpressions != null
-            && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-          return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService,
-              true /* streaming */);
-        }
+          && _queryContext.getLimit() != 0 && _queryContext.getOrderByExpressions() != null) {
+        return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
       // Streaming flushes partial results, so it needs an aggregation above to merge them back together.
       // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.
@@ -198,10 +198,6 @@ public class CombinePlanNode implements PlanNode {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-      if (_queryContext.isSortedSelectionMergeEnabled()) {
-        return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService,
-            false /* streaming */);
-      }
       return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
     }
     return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
