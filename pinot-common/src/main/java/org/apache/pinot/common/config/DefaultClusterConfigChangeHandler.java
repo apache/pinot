@@ -43,7 +43,7 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
 
   @Override
   public synchronized void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
-    Map<String, String> clusterConfigs = Map.copyOf(clusterConfig.getRecord().getSimpleFields());
+    Map<String, String> clusterConfigs = copyWithoutNullValues(clusterConfig.getRecord().getSimpleFields());
     Set<String> changedConfigs = getChangedProperties(_clusterConfigs, clusterConfigs);
     LOGGER.info("Cluster configs changed: {}", changedConfigs);
     _clusterConfigs = clusterConfigs;
