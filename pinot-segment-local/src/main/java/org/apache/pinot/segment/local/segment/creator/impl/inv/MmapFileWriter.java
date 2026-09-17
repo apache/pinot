@@ -23,15 +23,17 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.function.Consumer;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 
 public class MmapFileWriter implements Closeable {
 
   private final FileChannel _fileChannel;
-  private final ByteBuffer _buffer;
+  private final MappedByteBuffer _buffer;
 
   public MmapFileWriter(File file, int size)
       throws IOException {
@@ -46,10 +48,17 @@ public class MmapFileWriter implements Closeable {
   @Override
   public void close()
       throws IOException {
-    _fileChannel.close();
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-      cleaner.freeBuffer(_buffer);
+    try {
+      FileUtils.forceMappedBuffers(_buffer);
+    } finally {
+      try {
+        FileUtils.syncAndClose(_fileChannel);
+      } finally {
+        if (CleanerUtil.UNMAP_SUPPORTED) {
+          CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
+          cleaner.freeBuffer(_buffer);
+        }
+      }
     }
   }
 }
