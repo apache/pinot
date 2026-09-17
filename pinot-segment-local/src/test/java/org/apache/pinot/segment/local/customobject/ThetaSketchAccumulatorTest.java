@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.customobject;
 import java.util.stream.IntStream;
 import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -88,6 +89,38 @@ public class ThetaSketchAccumulatorTest {
     accumulator.apply(sketch2);
 
     Assert.assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+  }
+
+  @Test
+  public void testInputsSurviveRepeatedFlushes() {
+    for (int threshold = 1; threshold <= 4; threshold++) {
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, threshold);
+      ThetaUnion expected = _setOperationBuilder.buildUnion();
+      for (int i = 0; i < 7; i++) {
+        UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
+        int base = i * 1000;
+        IntStream.range(base, base + 1000).forEach(input::update);
+        ThetaSketch sketch = input.compact();
+        accumulator.apply(sketch);
+        expected.union(sketch);
+      }
+      Assert.assertEquals(accumulator.getResult().getEstimate(), expected.getResult().getEstimate(), 0.0,
+          "threshold " + threshold);
+    }
+  }
+
+  @Test
+  public void testRepeatedGetResultIsStable() {
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, 2);
+    for (int i = 0; i < 5; i++) {
+      UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
+      int base = i * 1000;
+      IntStream.range(base, base + 1000).forEach(input::update);
+      accumulator.apply(input.compact());
+    }
+    double first = accumulator.getResult().getEstimate();
+    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
+    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
   }
 
   @Test
