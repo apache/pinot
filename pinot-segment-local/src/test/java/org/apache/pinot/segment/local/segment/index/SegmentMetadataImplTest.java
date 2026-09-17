@@ -272,8 +272,7 @@ public class SegmentMetadataImplTest {
     assertSame(second.getSchema().getFieldSpecFor(column), second.getColumnMetadataFor(column).getFieldSpec());
   }
 
-  /// A COMPLEX parent is not interned (ComplexFieldSpec does not override equals, so two structs with different
-  /// children would alias), but its children and the materialized child columns are.
+  /// A COMPLEX parent retains its own child map, but its children and the materialized child columns are interned.
   @Test
   public void testOpenStructChildSpecsSharedButParentIsNot()
       throws Exception {

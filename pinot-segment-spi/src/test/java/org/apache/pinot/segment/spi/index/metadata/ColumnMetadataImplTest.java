@@ -661,8 +661,7 @@ public class ColumnMetadataImplTest {
     assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", otherGranularity), dateTime, "granularity");
   }
 
-  /// [ComplexFieldSpec] does not override equals/hashCode, so two structs with the same name but different children
-  /// are equal under [FieldSpec#equals]; interning the parent would alias them. Only the children are interned.
+  /// Complex parents retain independent child maps, while equal child specs are shared.
   @Test
   public void complexParentIsNotInternedWhileChildrenAre() {
     PropertiesConfiguration twoChildren = complexConfig("metrics", "cpu", "host");
@@ -672,8 +671,8 @@ public class ColumnMetadataImplTest {
         (ComplexFieldSpec) ColumnMetadataImpl.extractFieldSpec("metrics", complexConfig("metrics", "cpu"));
     assertNotSame(second, first);
     assertNotSame(narrower, first);
-    // The guard is real: the parents are equal despite their different children.
-    assertEquals(narrower, first);
+    assertEquals(second, first);
+    assertNotEquals(narrower, first);
     assertEquals(first.getChildFieldSpecs().keySet(), Set.of("cpu", "host"));
     assertEquals(narrower.getChildFieldSpecs().keySet(), Set.of("cpu"));
     assertSame(second.getChildFieldSpec("cpu"), first.getChildFieldSpec("cpu"));
