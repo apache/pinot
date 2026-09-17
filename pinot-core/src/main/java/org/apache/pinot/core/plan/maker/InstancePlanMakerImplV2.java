@@ -55,7 +55,9 @@ import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,6 +207,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
     applyQueryOptions(queryContext);
+    // No ResultsBlockStreamer here, so nothing can stream. SelectionPlanNode gates the streaming leaf on this same
+    // option and cannot see the streamer, so clear it for the whole plan rather than let it be half-honored.
+    // Read the mode directly rather than isSortedSelectionMergeEnabled(): this (non-streaming) plan never resolves
+    // AUTO at all, and that accessor would warn and fall back to OFF on an unresolved AUTO. Reading the mode
+    // directly avoids the spurious warning and is precise about intent here.
+    if (queryContext.getSortedSelectionMergeMode() != SortedSelectionMergeMode.OFF) {
+      LOGGER.debug("Ignoring {}={} for a non-streaming query: the merge requires a streaming-capable path",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, queryContext.getSortedSelectionMergeMode());
+      queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.OFF);
+    }
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -273,7 +285,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set streaming selection order-by options (opt-in; gated on selection queries to prevent accidental routing
     // if a downstream guard is ever missed)
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      queryContext.setSortedSelectionMergeEnabled(QueryOptionsUtils.isSortedSelectionMergeEnabled(queryOptions));
+      SortedSelectionMergeMode sortedSelectionMergeMode = QueryOptionsUtils.getSortedSelectionMergeMode(queryOptions);
+      if (sortedSelectionMergeMode != null) {
+        queryContext.setSortedSelectionMergeMode(sortedSelectionMergeMode);
+      }
+      Double sortedSelectionMergeAutoMinSortedRatio =
+          QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(queryOptions);
+      if (sortedSelectionMergeAutoMinSortedRatio != null) {
+        queryContext.setSortedSelectionMergeAutoMinSortedRatio(sortedSelectionMergeAutoMinSortedRatio);
+      }
       Integer sortedSelectionMergeBlockSize =
           QueryOptionsUtils.getSortedSelectionMergeBlockSize(queryOptions);
       if (sortedSelectionMergeBlockSize != null) {
@@ -386,6 +406,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
     applyQueryOptions(queryContext);
+    resolveSortedSelectionMergeMode(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -410,6 +431,94 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, streamer);
     return new GlobalPlanImplV0(
         new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
+  }
+
+  /// Resolves [SortedSelectionMergeMode#AUTO] to `ON` or `OFF` from segment metadata alone, before any plan node is
+  /// built. `ON` and `OFF` pass through untouched.
+  ///
+  /// This has to happen here rather than in the plan-node gates. [CombinePlanNode] builds every leaf operator before
+  /// it evaluates its own gate, so a decision taken there would arrive too late to stop streaming leaves from being
+  /// built underneath a non-streaming combine -- the half-honored pairing that
+  /// [org.apache.pinot.core.operator.combine.StreamingSelectionOrderByCombineOperator] exists to avoid. Deciding once
+  /// here leaves both gates reading a single settled value.
+  ///
+  /// The heuristic is the fraction of queried segments physically sorted on the leading ORDER BY column, compared
+  /// against [QueryContext#getSortedSelectionMergeAutoMinSortedRatio()]. A DESC leading expression additionally
+  /// requires `allowReverseOrder`, without which no leaf can stream in the query's direction. An unsorted child
+  /// forces a full scan plus top-K synchronously on the consumer thread, so it is the unsorted segments that cost
+  /// the query its `maxExecutionThreads` worth of parallelism. Reading
+  /// [org.apache.pinot.segment.spi.datasource.DataSourceMetadata] does not touch column buffers, so no segment is
+  /// acquired.
+  private void resolveSortedSelectionMergeMode(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.getSortedSelectionMergeMode() != SortedSelectionMergeMode.AUTO) {
+      return;
+    }
+    queryContext.setSortedSelectionMergeMode(
+        isSortedEnoughForStreamingMerge(segmentContexts, queryContext) ? SortedSelectionMergeMode.ON
+            : SortedSelectionMergeMode.OFF);
+  }
+
+  private boolean isSortedEnoughForStreamingMerge(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    int numSegments = segmentContexts.size();
+    if (numSegments == 0) {
+      return false;
+    }
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions == null || orderByExpressions.isEmpty()) {
+      return false;
+    }
+    ExpressionContext firstOrderByExpression = orderByExpressions.get(0).getExpression();
+    if (firstOrderByExpression.getType() != ExpressionContext.Type.IDENTIFIER) {
+      // Sortedness is only defined for a physical column. Forcing the merge over an expression is what ON is for.
+      LOGGER.debug("Not using {} for a non-identifier leading ORDER BY expression: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, firstOrderByExpression);
+      return false;
+    }
+    if (!orderByExpressions.get(0).isAsc() && !QueryOptionsUtils.isReverseOrderAllowed(
+        queryContext.getQueryOptions())) {
+      // DataSourceMetadata.isSorted() reports ascending physical order, so a DESC query can only stream when the
+      // project operator's docId scan is reversed, and SelectionPlanNode.getSortedByProject() only attempts that
+      // under allowReverseOrder. Without it every leaf falls back to the materialized
+      // SelectionPartiallyOrderedByDescOperation, and resolving to ON here would install the streaming combine over
+      // children that each materialize their top-K serially on the consumer thread -- losing both the MinMax
+      // combine's parallelism and its min/max segment pruning, in exchange for nothing.
+      //
+      // allowReverseOrder stays the user's lever rather than being implied here: ReverseDocIdSetOperator buffers the
+      // whole matching docId set into a RoaringBitmap before emitting its first block, which would trade away the
+      // bounded memory this merge exists to provide.
+      //
+      // TODO: allowReverseOrder=true still does not guarantee streaming leaves. getSortedByProject() swallows the
+      //       failure when a docId set cannot be reversed and returns the unreversed operator, so the leaf gate then
+      //       declines and AUTO has again resolved ON over materialized children. Same residual shape as the null
+      //       handling case below; a shared "can this segment actually stream in the query's direction" predicate
+      //       would close both. See https://github.com/apache/pinot/pull/19120#discussion_r3871713989
+      LOGGER.debug("Not using {} for a DESC leading ORDER BY expression without {}: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, QueryOptionKey.ALLOW_REVERSE_ORDER, firstOrderByExpression);
+      return false;
+    }
+    String column = firstOrderByExpression.getIdentifier();
+    int numSorted = 0;
+    for (SegmentContext segmentContext : segmentContexts) {
+      // TODO: This deliberately uses the physical-sortedness predicate rather than the full
+      //       SelectionPlanNode.isColumnSorted(), which additionally rejects a column carrying nulls when null
+      //       handling is on. That null check reads the segment's mapped buffer via the null value vector, and this
+      //       runs before any segment is acquired -- AcquireReleaseColumnsSegmentPlanNode defers the whole plan build
+      //       precisely so that no planner touches a buffer pre-acquire. Consequence: with null handling on and a
+      //       null-bearing leading column, AUTO can resolve to ON while the leaf gate then refuses to stream, giving
+      //       a k-way merge over fully materialized children -- correct, but slower than the MinMax combine. Handle
+      //       properly (an acquire-free nullability signal, or resolving AUTO per segment at acquire time) as a
+      //       follow-up. See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
+      if (SelectionPlanNode.isColumnPhysicallySorted(segmentContext.getIndexSegment(), queryContext, column)) {
+        numSorted++;
+      }
+    }
+    double sortedRatio = (double) numSorted / numSegments;
+    double minSortedRatio = queryContext.getSortedSelectionMergeAutoMinSortedRatio();
+    boolean enabled = sortedRatio >= minSortedRatio;
+    LOGGER.debug("{}=AUTO resolved to {}: {}/{} segments sorted on '{}' (ratio {}, threshold {})",
+        QueryOptionKey.SORTED_SELECTION_MERGE_MODE, enabled ? "ON" : "OFF", numSorted, numSegments, column,
+        sortedRatio, minSortedRatio);
+    return enabled;
   }
 
   @Override
