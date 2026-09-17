@@ -38,6 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapLazyUnion;
+import org.roaringbitmap.RoaringBitmapMerge;
 
 
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
@@ -694,7 +695,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
   @Override
   public RoaringBitmap merge(RoaringBitmap intermediateResult1, RoaringBitmap intermediateResult2) {
-    intermediateResult1.or(intermediateResult2);
+    RoaringBitmapMerge.or(intermediateResult1, intermediateResult2);
     return intermediateResult1;
   }
 

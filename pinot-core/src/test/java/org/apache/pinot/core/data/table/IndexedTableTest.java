@@ -41,13 +41,17 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 /// Tests the [Table] operations
@@ -56,6 +60,46 @@ public class IndexedTableTest {
   private static final int TRIM_SIZE = 10;
   private static final int TRIM_THRESHOLD = 20;
   private static final int INITIAL_CAPACITY = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
+
+  @Test
+  public void testBitmapMergeAfterCardinalityTrim() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT DISTINCTCOUNTBITMAP(m1) FROM testTable GROUP BY d1 ORDER BY DISTINCTCOUNTBITMAP(m1) DESC LIMIT 1");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "distinctcountbitmap(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT});
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      IndexedTable table = new ConcurrentIndexedTable(dataSchema, false, queryContext, 1, 2, 3, 3, executor);
+      for (int batch = 0; batch < 6; batch++) {
+        RoaringBitmap bitmap = new RoaringBitmap();
+        for (int value = batch * 2048; value < (batch + 1) * 2048; value += 2) {
+          bitmap.add(value);
+        }
+        table.upsert(new Record(new Object[]{"keep", bitmap}));
+      }
+      table.upsert(new Record(new Object[]{"runner-up", RoaringBitmap.bitmapOfRange(0, 5000)}));
+      table.upsert(new Record(new Object[]{"discard", RoaringBitmap.bitmapOf(0)}));
+      assertEquals(table.getNumResizes(), 1);
+      assertEquals(table.size(), 2);
+      // Trimming reads cardinality, but surviving accumulators must still accept later merges.
+      table.upsert(new Record(new Object[]{"keep", RoaringBitmap.bitmapOf(12288, 12290)}));
+      table.finish(false);
+      assertEquals(table.size(), 1);
+      Object[] row = table.iterator().next().getValues();
+      assertEquals(row[0], "keep");
+      RoaringBitmap bitmap = (RoaringBitmap) row[1];
+      assertEquals(bitmap.getCardinality(), 6146);
+      DistinctCountBitmapAggregationFunction function =
+          (DistinctCountBitmapAggregationFunction) queryContext.getAggregationFunctions()[0];
+      SerializedIntermediateResult serialized = function.serializeIntermediateResult(bitmap);
+      RoaringBitmap restored = function.deserializeIntermediateResult(
+          new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+      assertEquals(restored, bitmap);
+      assertEquals(function.extractFinalResult(restored).intValue(), 6146);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
 
   @Test
   public void testConcurrentIndexedTable()
