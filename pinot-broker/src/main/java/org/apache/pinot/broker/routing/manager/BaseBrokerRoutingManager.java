@@ -176,6 +176,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
   /// FailureDetector-driven exclusions are honored.
   private volatile Map<String, ServerInstance> _routableServerInstanceMap = Map.of();
+  // Published before an instance-config refresh mutates the enabled-server map and cleared only after all table
+  // routing entries have observed the new snapshot. The readiness endpoint reads this after containsKey(), which
+  // prevents a newly inserted server from being acknowledged during the routing-update window without taking a lock
+  // in the request path.
+  private volatile boolean _instanceConfigChangeInProgress;
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
@@ -392,8 +397,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private void processInstanceConfigChange() {
     _globalLock.writeLock().lock();
     try {
+      _instanceConfigChangeInProgress = true;
       processInstanceConfigChangeInternal();
     } finally {
+      _instanceConfigChangeInProgress = false;
       _globalLock.writeLock().unlock();
     }
   }
@@ -1349,6 +1356,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       return null;
     }
     return routingEntry._instanceSelector.getServingInstances();
+  }
+
+  /// Returns whether the broker sees the server as enabled.
+  public boolean isServerEnabled(String instanceId) {
+    // Read the map first. A new entry is inserted only after _instanceConfigChangeInProgress is set, and clearing the
+    // volatile flag publishes all routing-entry updates that precede it.
+    return _enabledServerInstanceMap.containsKey(instanceId) && !_instanceConfigChangeInProgress;
   }
 
   /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not

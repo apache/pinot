@@ -46,6 +46,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.client5.http.ssl.HttpsSupport;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.http.ClassicHttpRequest;
@@ -100,9 +101,15 @@ public class HttpClient implements AutoCloseable {
   }
 
   public HttpClient(HttpClientConfig httpClientConfig, @Nullable SSLContext sslContext) {
+    this(httpClientConfig, sslContext, false);
+  }
+
+  public HttpClient(HttpClientConfig httpClientConfig, @Nullable SSLContext sslContext, boolean verifyHostname) {
     SSLContext context = sslContext != null ? sslContext : TlsUtils.getSslContext();
-    // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
-    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(context, NoopHostnameVerifier.INSTANCE);
+    // Segment upload/download callers preserve the historical no-op verifier by default. Security-sensitive callers
+    // that send credentials can opt into standard HTTPS hostname verification.
+    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(context,
+        verifyHostname ? HttpsSupport.getDefaultHostnameVerifier() : NoopHostnameVerifier.INSTANCE);
     _httpClient = buildCloseableHttpClient(httpClientConfig, csf);
   }
 
@@ -135,6 +142,13 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
+    return sendGetRequest(uri, headers, authProvider, GET_REQUEST_SOCKET_TIMEOUT_MS,
+        DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS);
+  }
+
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
+      @Nullable AuthProvider authProvider, long socketTimeoutMs, long connectionRequestTimeoutMs)
+      throws IOException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
@@ -142,7 +156,17 @@ public class HttpClient implements AutoCloseable {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
     }
-    return sendRequest(requestBuilder.build(), GET_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build(), socketTimeoutMs, connectionRequestTimeoutMs);
+  }
+
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable List<Header> headers, long socketTimeoutMs,
+      long connectionRequestTimeoutMs)
+      throws IOException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (headers != null) {
+      headers.forEach(requestBuilder::addHeader);
+    }
+    return sendRequest(requestBuilder.build(), socketTimeoutMs, connectionRequestTimeoutMs);
   }
 
   /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
@@ -277,6 +301,12 @@ public class HttpClient implements AutoCloseable {
 
   public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs)
       throws IOException {
+    return sendRequest(request, socketTimeoutMs, DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS);
+  }
+
+  public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs,
+      long connectionRequestTimeoutMs)
+      throws IOException {
 
     // Besides the per-request response (socket) timeout, explicitly bound the connection-request
     // (pool checkout) wait instead of silently inheriting the Apache HttpClient default, so a
@@ -286,7 +316,7 @@ public class HttpClient implements AutoCloseable {
     RequestConfig requestConfig =
         RequestConfig.custom()
             .setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs))
-            .setConnectionRequestTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS))
+            .setConnectionRequestTimeout(Timeout.ofMilliseconds(connectionRequestTimeoutMs))
             .build();
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
@@ -554,6 +584,9 @@ public class HttpClient implements AutoCloseable {
 
     if (httpClientConfig.isDisableDefaultUserAgent()) {
       httpClientBuilder.disableDefaultUserAgent();
+    }
+    if (!httpClientConfig.isFollowRedirects()) {
+      httpClientBuilder.disableRedirectHandling();
     }
     return httpClientBuilder.build();
   }
