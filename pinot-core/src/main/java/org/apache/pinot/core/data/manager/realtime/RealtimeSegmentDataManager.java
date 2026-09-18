@@ -249,6 +249,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamDataDecoder _streamDataDecoder;
+  // Pre-computed key "<topic>.<partitionGroupId>.<simpleDecoderClassName>" for the CONSUMING_SEGMENT_DECODER gauge,
+  // or null when the decoder class is unavailable (emit + cleanup are skipped). Computed once at construction.
+  @Nullable
+  private final String _consumingSegmentDecoderKey;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final Schema _schema;
@@ -508,6 +512,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       }
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+      if (_consumingSegmentDecoderKey != null) {
+        // Re-emitted every tick (like LLC_PARTITION_CONSUMING above) so it self-heals if a prior consumer's offload
+        // races this emit at a segment-commit boundary. See #cleanupMetrics for the offload/emit race rationale.
+        _serverMetrics.setValueOfTableGauge(_tableNameWithType, _consumingSegmentDecoderKey,
+            ServerGauge.CONSUMING_SEGMENT_DECODER, 1L);
+      }
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
@@ -1240,7 +1250,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _defaultNullHandlingEnabled);
+              _defaultNullHandlingEnabled, getDecoderClassName());
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion);
@@ -1489,6 +1499,34 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// @return the FQCN of the {@link StreamMessageDecoder} actually instantiated on this consumer (the source of truth
+  ///         for what is decoding this segment), or {@code null} if decoder init has not completed.
+  @Nullable
+  public String getDecoderClassName() {
+    StreamDataDecoder decoder = _streamDataDecoder;
+    StreamMessageDecoder valueDecoder = decoder == null ? null : decoder.getValueDecoder();
+    return valueDecoder == null ? null : valueDecoder.getClass().getName();
+  }
+
+  /// Computes the CONSUMING_SEGMENT_DECODER gauge key `<topic>.<partitionGroupId>.<simpleDecoderClassName>`, or null if
+  /// the decoder class is unavailable. The simple (not fully-qualified) name is used because the composed metric name
+  /// is split on '.' downstream; a dotted topic is likewise sanitized to '_' (warned once, so no per-tick flood).
+  @Nullable
+  private String computeConsumingSegmentDecoderKey() {
+    String decoderClassName = getDecoderClassName();
+    if (decoderClassName == null) {
+      return null;
+    }
+    String decoderSimpleName = decoderClassName.substring(decoderClassName.lastIndexOf('.') + 1);
+    String topic = _streamConfig.getTopicName();
+    if (topic.indexOf('.') >= 0) {
+      _segmentLogger.warn("CONSUMING_SEGMENT_DECODER tagging will degrade for dotted topic '{}' on {} — replacing "
+          + "'.' with '_' in the emitted topic segment for stability", topic, _clientId);
+      topic = topic.replace('.', '_');
+    }
+    return topic + "." + _partitionGroupId + "." + decoderSimpleName;
+  }
+
   /// Cleans up the metrics that reflects the state of the realtime segment.
   /// This step is essential as the instance may not be the target location for some of the partitions.
   /// E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
@@ -1501,6 +1539,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED);
     _serverMetrics.removeTableMeter(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE);
+    if (_consumingSegmentDecoderKey != null) {
+      // Uses the (_tableNameWithType, key) shape the emit used, not the _clientId shape above. If this remove races
+      // the next consumer's emit, that consumer's in-loop re-emit restores the series (see consumeLoop).
+      _serverMetrics.removeTableGauge(_tableNameWithType, _consumingSegmentDecoderKey,
+          ServerGauge.CONSUMING_SEGMENT_DECODER);
+    }
   }
 
   protected void hold()
@@ -1984,6 +2028,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
     _streamDataDecoder = localStreamDataDecoder.get();
+    _consumingSegmentDecoderKey = computeConsumingSegmentDecoderKey();
 
     try {
       _transformPipeline = new TransformPipeline(tableConfig, schema);

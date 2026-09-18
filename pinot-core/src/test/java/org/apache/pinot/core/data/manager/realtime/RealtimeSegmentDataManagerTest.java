@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -111,6 +112,8 @@ public class RealtimeSegmentDataManagerTest {
 
   private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
       new ConcurrentHashMap<>();
+  // ServerMetrics instance handed to the most recently created fake manager, for reading emitted gauges in tests.
+  private ServerMetrics _capturedServerMetrics;
 
   private static TableConfig createTableConfig()
       throws Exception {
@@ -215,9 +218,57 @@ public class RealtimeSegmentDataManagerTest {
         new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    _capturedServerMetrics = serverMetrics;
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
+  }
+
+  @Test
+  public void testGetDecoderClassName()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      // Reports the actual instantiated decoder wrapped by StreamDataDecoderImpl, resolved via the SPI accessor.
+      Assert.assertEquals(segmentDataManager.getDecoderClassName(), FakeStreamMessageDecoder.class.getName());
+    }
+  }
+
+  @Test
+  public void testConsumingSegmentDecoderGaugeUsesSanitizedKey()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    // Override the stream topic with a dotted name to exercise the '.'->'_' sanitization in the gauge key.
+    tableConfig.getIndexingConfig().getStreamConfigs().entrySet().stream()
+        .filter(e -> e.getKey().endsWith(".topic.name"))
+        .forEach(e -> e.setValue("dotted.topic"));
+    // Composed as <gauge>.<tableNameWithType>.<sanitizedTopic>.<partitionGroupId>.<simpleDecoderClassName>. The manager
+    // derives tableNameWithType from the table config, so key off that rather than the segment's raw table.
+    String composedName = ServerGauge.CONSUMING_SEGMENT_DECODER.getGaugeName() + "." + tableConfig.getTableName()
+        + ".dotted_topic." + PARTITION_GROUP_ID + ".FakeStreamMessageDecoder";
+    // Drive the real consume loop (not the stub) so the in-loop gauge emit runs; a row-count-triggered COMMIT ends the
+    // loop deterministically, and commit never tears down the decoder gauge (only offload on close does).
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, new TimeSupplier(),
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", tableConfig)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params()
+              .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString())));
+
+      consumer.run();
+
+      Long gaugeValue = _capturedServerMetrics.getGaugeValue(composedName);
+      Assert.assertNotNull(gaugeValue, "decoder gauge should be emitted under the sanitized key");
+      Assert.assertEquals((long) gaugeValue, 1L);
+    }
+    // Closing the manager offloads it, which cleanupMetrics() uses to remove the decoder gauge.
+    Assert.assertNull(_capturedServerMetrics.getGaugeValue(composedName),
+        "decoder gauge should be removed after the segment is offloaded on close");
   }
 
   @BeforeClass

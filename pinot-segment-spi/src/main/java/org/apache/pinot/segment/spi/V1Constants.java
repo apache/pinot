@@ -111,6 +111,8 @@ public class V1Constants {
       public static final String COMPLEX_COLUMNS = "segment.complex.column.names";
 
       public static final String CUSTOM_SUBSET = "custom";
+      // Custom property (under CUSTOM_SUBSET) recording the decoder class that produced a realtime segment.
+      public static final String DECODER_CLASS = "decoder.class";
 
       // TODO: Remove it after 1.6 release
       @Deprecated

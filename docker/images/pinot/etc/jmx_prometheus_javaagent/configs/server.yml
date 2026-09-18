@@ -49,6 +49,22 @@ rules:
   labels:
     database: "$3"
     table: "$2$4"
+# consumingSegmentDecoder gauge: tableNameWithType + topic + partitionGroupId + decoderClass. Composed as
+# consumingSegmentDecoder.<db?>.<table>_(OFFLINE|REALTIME).<topic>.<partitionGroupId>.<SimpleClassName>, a
+# dot-separated extension of the "tableNameWithType + partitionId" shape below with topic and decoder-class
+# dimensions. MUST precede that rule: the extra trailing segments prevent it from matching there, but anchoring
+# on the literal metric name keeps this rule from shadowing any other gauge. topic is [-\w]+ (dots are mangled to
+# '_' at the emit site), partition is numeric, and the decoder class is a simple name ([\w$]+, '$' for inner classes).
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?ServerMetrics\"?, name=\"?pinot\\.server\\.consumingSegmentDecoder\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([-\\w]+)\\.(\\d+)\\.([\\w$]+)\"?><>(\\w+)"
+  name: "pinot_server_consumingSegmentDecoder_$8"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    topic: "$5"
+    partition: "$6"
+    decoderClass: "$7"
 # Gauges that accept tableNameWithType + partitionId
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$1_$7"
