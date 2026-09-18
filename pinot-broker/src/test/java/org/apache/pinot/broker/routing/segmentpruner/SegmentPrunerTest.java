@@ -520,21 +520,29 @@ public class SegmentPrunerTest extends ControllerTest {
     Set<String> onlineSegments = Set.of(segment);
     Set<String> input = Set.of(segment);
     IdealState idealState = Mockito.mock(IdealState.class);
+    ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    // Segment starts CONSUMING with no time-range metadata yet: should not be pruned (matches every query)
-    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, new SegmentZKMetadata(segment));
-    ExternalView consumingExternalView = Mockito.mock(ExternalView.class);
-    when(consumingExternalView.getStateMap(segment)).thenReturn(
-        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
-    segmentZkMetadataFetcher.init(idealState, consumingExternalView, onlineSegments);
+    // Segment starts CONSUMING (status IN_PROGRESS) with no time-range metadata yet: should not be pruned
+    // (matches every query), and must have actually been fetched/notified despite not being committed.
+    SegmentZKMetadata consumingSegmentZKMetadata = new SegmentZKMetadata(segment);
+    consumingSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, consumingSegmentZKMetadata);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest, input), input);
 
-    // Segment commits: real time-range metadata is written and the external view moves it to ONLINE
-    setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment, 50, 65, TimeUnit.DAYS);
-    ExternalView onlineExternalView = Mockito.mock(ExternalView.class);
-    when(onlineExternalView.getStateMap(segment)).thenReturn(
-        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
-    segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, onlineSegments);
+    // Still consuming: a subsequent assignment change must re-fetch (not permanently skip) the segment, since
+    // its own metadata has not reached a terminal status yet.
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest, input), input);
+
+    // Segment commits: real time-range metadata is written and status becomes DONE
+    SegmentZKMetadata committedSegmentZKMetadata = new SegmentZKMetadata(segment);
+    committedSegmentZKMetadata.setStartTime(50);
+    committedSegmentZKMetadata.setEndTime(65);
+    committedSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
+    committedSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, committedSegmentZKMetadata);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
 
     // Committed interval no longer overlaps the query range: segment should now be pruned
     assertEquals(segmentPruner.prune(brokerRequest, input), Set.of());

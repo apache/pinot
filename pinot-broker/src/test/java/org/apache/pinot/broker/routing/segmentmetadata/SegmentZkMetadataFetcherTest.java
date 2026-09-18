@@ -32,6 +32,7 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -155,7 +156,9 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
   }
 
   @Test
-  public void testSegmentZkMetadataFetcherShouldNotCacheConsumingSegmentUntilCommitted() {
+  public void testSegmentZkMetadataFetcherShouldFetchFirstSightEvenWhenConsuming() {
+    // Status of the ZNRecord returned for "segment"; mutated across calls to simulate its lifecycle.
+    Status[] segmentStatus = {Status.COMMITTING};
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
     when(mockPropertyStore.get(any(), any(), anyInt(), anyBoolean())).thenAnswer(inv -> {
       List<String> pathList = inv.getArgument(0);
@@ -163,7 +166,9 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
       for (String path : pathList) {
         String[] pathParts = path.split("/");
         String segmentName = pathParts[pathParts.length - 1];
-        result.add(new SegmentZKMetadata(segmentName).toZNRecord());
+        SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+        segmentZKMetadata.setStatus(segmentStatus[0]);
+        result.add(segmentZKMetadata.toZNRecord());
       }
       return result;
     });
@@ -175,26 +180,79 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     segmentZkMetadataFetcher.init(idealState, mock(ExternalView.class), Set.of());
     clearInvocations(mockPropertyStore);
 
-    // Segment is CONSUMING: onAssignmentChange should skip fetching and caching it
+    // Segment is CONSUMING from the very first time it is observed via onAssignmentChange (not init): it must
+    // still be fetched and listeners notified -- a segment must never be silently dropped just because it is
+    // already CONSUMING in the ExternalView the first time it is seen.
     ExternalView consumingExternalView = mock(ExternalView.class);
     when(consumingExternalView.getStateMap("segment")).thenReturn(
         Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, consumingExternalView, Set.of("segment"));
-    verify(mockPropertyStore, times(0)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
-    verify(pruner, times(0)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+    verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
 
-    // Segment commits and transitions to ONLINE: should now be fetched and cached
+    // Still CONSUMING according to the ExternalView, and already seen once: this is now a cheap-skip case, so no
+    // ZK read or listener notification should happen again while nothing has changed.
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, consumingExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+
+    // ExternalView no longer reports CONSUMING (e.g. moved to ONLINE): should re-fetch to check the real status,
+    // even though the segment isn't committed yet (pauseless COMMITTING window) and thus still isn't cached.
     ExternalView onlineExternalView = mock(ExternalView.class);
     when(onlineExternalView.getStateMap("segment")).thenReturn(
         Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, Set.of("segment"));
-    verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
-    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+    verify(mockPropertyStore, times(2)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(2)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+
+    // Segment commits (status becomes DONE): should be fetched, notified, and now cached
+    segmentStatus[0] = Status.DONE;
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(3)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(3)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
 
     // Already cached: subsequent assignment changes should not re-fetch or re-notify
     segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(3)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(3)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+  }
+
+  @Test
+  public void testSegmentZkMetadataFetcherShouldNotCachePreCommitZNRecordEvenWithoutExternalViewEntry() {
+    // Regression test for the event-ordering race: onlineSegments is derived from IdealState, so a brand-new
+    // segment can be observed here before its ExternalView entry exists (getStateMap returns null). The caching
+    // decision must not treat that as "not consuming" and cache the segment before it actually commits.
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPropertyStore.get(any(), any(), anyInt(), anyBoolean())).thenAnswer(inv -> {
+      List<String> pathList = inv.getArgument(0);
+      List<ZNRecord> result = new ArrayList<>(pathList.size());
+      for (String path : pathList) {
+        String[] pathParts = path.split("/");
+        String segmentName = pathParts[pathParts.length - 1];
+        SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+        segmentZKMetadata.setStatus(Status.COMMITTING);
+        result.add(segmentZKMetadata.toZNRecord());
+      }
+      return result;
+    });
+    SegmentPruner pruner = mock(SegmentPruner.class);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, mockPropertyStore);
+    segmentZkMetadataFetcher.register(pruner);
+    IdealState idealState = mock(IdealState.class);
+    segmentZkMetadataFetcher.init(idealState, mock(ExternalView.class), Set.of());
+    clearInvocations(mockPropertyStore);
+
+    // ExternalView has no entry at all for "segment" (as if IdealState discovered it first)
+    ExternalView externalViewMissingEntry = mock(ExternalView.class);
+    when(externalViewMissingEntry.getStateMap("segment")).thenReturn(null);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalViewMissingEntry, Set.of("segment"));
     verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
-    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+
+    // Since the ZNRecord itself still reports COMMITTING, the segment must not have been cached: a subsequent
+    // call must fetch it again instead of treating it as already-committed.
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalViewMissingEntry, Set.of("segment"));
+    verify(mockPropertyStore, times(2)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
   }
 
   private static class ListMatcher implements ArgumentMatcher<List<String>> {
