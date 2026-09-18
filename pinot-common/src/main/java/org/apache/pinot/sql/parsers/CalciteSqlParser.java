@@ -140,6 +140,7 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
+      sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
@@ -669,6 +670,7 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(expression)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       sqlNode = sqlParser.parseSqlExpressionEof();
+      sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
