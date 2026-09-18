@@ -26,7 +26,9 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -191,6 +193,32 @@ public class UpsertContext {
   @Nullable
   public TableDataManager getTableDataManager() {
     return _tableDataManager;
+  }
+
+  /// Acquires the [SegmentDataManager] for `segment` iff it is still the live one under `segment`'s name.
+  /// Returns null if the segment has been destroyed or replaced under the same name. When non-null, callers
+  /// must call [#releaseSegment(SegmentDataManager)] to drop the refcount.
+  @Nullable
+  public SegmentDataManager acquireIfSame(IndexSegment segment) {
+    if (_tableDataManager == null) {
+      return null;
+    }
+    SegmentDataManager sdm = _tableDataManager.acquireSegment(segment.getSegmentName());
+    if (sdm == null) {
+      return null;
+    }
+    // Identity check catches the "same name, different instance" race.
+    if (sdm.getSegment() != segment) {
+      _tableDataManager.releaseSegment(sdm);
+      return null;
+    }
+    return sdm;
+  }
+
+  public void releaseSegment(SegmentDataManager sdm) {
+    if (_tableDataManager != null) {
+      _tableDataManager.releaseSegment(sdm);
+    }
   }
 
   public File getTableIndexDir() {
