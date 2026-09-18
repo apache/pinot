@@ -516,9 +516,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   /// Parses the [FieldSpec] of the given column. DIMENSION, METRIC, TIME and DATE_TIME specs are returned from
   /// [#FIELD_SPEC_INTERNER], so the instance is shared with every other segment whose column parses to an equal spec
-  /// and must not be mutated. A COMPLEX spec is not interned: [ComplexFieldSpec] does not override
-  /// [FieldSpec#equals], so two structs with different children would alias; its children are parsed through this
-  /// method and are interned.
+  /// and must not be mutated. A COMPLEX spec retains its own mutable child map and is not interned; its children
+  /// are parsed through this method and are interned.
   @SuppressWarnings("deprecation") // Preserve the field type when loading legacy TIME column metadata.
   public static FieldSpec extractFieldSpec(String column, PropertiesConfiguration config) {
     // The name is retained by the FieldSpec, the segment Schema and every per-segment column map, and it recurs in
