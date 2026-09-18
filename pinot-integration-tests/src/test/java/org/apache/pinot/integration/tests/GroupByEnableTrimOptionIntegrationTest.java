@@ -105,7 +105,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
     final String trimEnabledPlan = "Execution Plan\n"
         + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
+        + "isSortOnReceiver=[false])\n"
         + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
         // 'collations' below is the important bit
         + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
@@ -164,7 +164,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
             // lack of 'collations' below is the important bit
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
