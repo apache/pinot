@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,8 +32,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionInfo;
-import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -50,12 +47,11 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 
-/// Exercises request-local predicate preparation with real metadata initialization and refresh, without ZooKeeper.
+/// Exercises query-local partition ID caching with real metadata initialization and refresh, without ZooKeeper.
 public class SinglePartitionColumnSegmentPrunerTest {
   private static final String COLUMN = "memberId";
   private static final String TABLE = "testTable_OFFLINE";
@@ -111,15 +107,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testLargeConfigurationsShareIdentityAcrossMetadataLoads() throws Exception {
+  public void testLargeConfigurationsAndUnrelatedPredicates() throws Exception {
     String values = "first|" + "x".repeat(100_000);
     Map<String, String> config = Map.of("columnValues", values, "columnValuesDelimiter", "|");
     ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), config);
     ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), config);
-    SegmentPartitionInfo firstInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "first", first);
-    SegmentPartitionInfo secondInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "second", second);
-    assertNotSame(firstInfo.getPartitionFunction(), secondInfo.getPartitionFunction());
-    assertSame(firstInfo.getPartitionFunctionKey(), secondInfo.getPartitionFunctionKey());
     SinglePartitionColumnSegmentPruner pruner = pruner(Map.of("first", first, "second", second));
     assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of("first"));
     assertEquals(pruner.prune(request(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
@@ -136,9 +128,6 @@ public class SinglePartitionColumnSegmentPrunerTest {
         "Fixture must exercise a configuration hash collision");
     ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), firstConfig);
     ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), secondConfig);
-    SegmentPartitionInfo firstInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "first", first);
-    SegmentPartitionInfo secondInfo = SegmentPartitionUtils.extractPartitionInfo(TABLE, COLUMN, "second", second);
-    assertNotSame(firstInfo.getPartitionFunctionKey(), secondInfo.getPartitionFunctionKey());
     Map<String, ZNRecord> records = Map.of("first", first, "second", second);
     assertEquals(pruner(records).prune(request(predicate("EQUALS", "Aa")), records.keySet()), records.keySet());
   }
@@ -260,7 +249,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testConcurrentQueriesKeepSeparatePreparedValues() throws Exception {
+  public void testConcurrentQueriesKeepSeparateCachedValues() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < 8; i++) {
       String segment = "segment_" + i;
@@ -284,38 +273,6 @@ public class SinglePartitionColumnSegmentPrunerTest {
     } finally {
       executor.shutdownNow();
     }
-  }
-
-  @Test
-  public void testMetadataConfigurationSnapshotPreservesNullAndEmpty() {
-    PartitionFunction function = new CountingPartitionFunction(8, null);
-    SegmentPartitionInfo legacy = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
-    SegmentPartitionInfo knownNull = new SegmentPartitionInfo(COLUMN, function, Set.of(0), null);
-    assertSame(legacy.getPartitionFunctionKey(), knownNull.getPartitionFunctionKey());
-    SegmentPartitionInfo knownEmpty = new SegmentPartitionInfo(COLUMN, function, Set.of(0), Map.of());
-    assertNotSame(knownNull.getPartitionFunctionKey(), knownEmpty.getPartitionFunctionKey());
-    Map<String, String> config = new HashMap<>();
-    config.put("offset", "1");
-    config.put("nullable", null);
-    SegmentPartitionInfo snapshot = new SegmentPartitionInfo(COLUMN, function, Set.of(0), config);
-    Map<String, String> originalConfig = new HashMap<>(config);
-    config.put("offset", "2");
-    assertSame(snapshot.getPartitionFunctionKey(),
-        new SegmentPartitionInfo(COLUMN, function, Set.of(0), originalConfig).getPartitionFunctionKey());
-    assertNotSame(snapshot.getPartitionFunctionKey(),
-        new SegmentPartitionInfo(COLUMN, function, Set.of(0), config).getPartitionFunctionKey());
-  }
-
-  @Test
-  public void testThreeArgumentConstructorRetainsFunctionConfig() {
-    Map<String, String> config = Map.of("useRawBytes", "true");
-    PartitionFunction function = PartitionFunctionFactory.getPartitionFunction("Murmur", 97, config);
-    SegmentPartitionInfo implicit = new SegmentPartitionInfo(COLUMN, function, Set.of(0));
-    SegmentPartitionInfo explicit = new SegmentPartitionInfo(COLUMN, function, Set.of(1), config);
-    SegmentPartitionInfo defaults = new SegmentPartitionInfo(COLUMN,
-        PartitionFunctionFactory.getPartitionFunction("Murmur", 97, null), Set.of(0));
-    assertSame(implicit.getPartitionFunctionKey(), explicit.getPartitionFunctionKey());
-    assertNotSame(implicit.getPartitionFunctionKey(), defaults.getPartitionFunctionKey());
   }
 
   private static SinglePartitionColumnSegmentPruner pruner(Map<String, ZNRecord> records) {
@@ -353,16 +310,18 @@ public class SinglePartitionColumnSegmentPrunerTest {
     return brokerRequest;
   }
 
-  /// Stateless test plugin with observable hash calls; deliberately inherits the null function-config getter.
+  /// Stateless partition function with observable hash calls.
   public static class CountingPartitionFunction implements PartitionFunction {
     private static final long serialVersionUID = 1L;
     private static final AtomicInteger CALLS = new AtomicInteger();
     private final int _numPartitions;
     private final int _offset;
+    private final Map<String, String> _functionConfig;
 
     public CountingPartitionFunction(int numPartitions, @Nullable Map<String, String> config) {
       _numPartitions = numPartitions;
       _offset = config == null ? 0 : Integer.parseInt(config.getOrDefault("offset", "0"));
+      _functionConfig = config;
     }
 
     @Override
@@ -379,6 +338,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
     @Override
     public int getNumPartitions() {
       return _numPartitions;
+    }
+
+    @Override
+    public Map<String, String> getFunctionConfig() {
+      return _functionConfig;
     }
 
     @Override
