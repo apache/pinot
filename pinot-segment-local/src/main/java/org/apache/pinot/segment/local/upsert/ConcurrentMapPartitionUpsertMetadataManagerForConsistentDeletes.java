@@ -203,7 +203,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
                       recordInfo);
                 } else {
-                  SegmentDataManager currentSdm = _context.acquireIfSame(currentSegment);
+                  SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
                   if (currentSdm == null) {
                     addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
                   } else {
@@ -211,7 +211,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
                           recordInfo);
                     } finally {
-                      _context.releaseSegment(currentSdm);
+                      _context.getTableDataManager().releaseSegment(currentSdm);
                     }
                   }
                 }
@@ -383,7 +383,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               // Block destroy on prevSegment while we open the reader and mutate its bitmaps.
-              SegmentDataManager prevSdm = _context.acquireIfSame(prevSegment);
+              SegmentDataManager prevSdm = _context.getTableDataManager().acquireIfSame(prevSegment);
               if (prevSdm == null) {
                 _logger.info("Previous segment: {} for primary key not present; dropping key",
                     prevSegment.getSegmentName());
@@ -416,7 +416,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   return null;
                 }
               } finally {
-                _context.releaseSegment(prevSdm);
+                _context.getTableDataManager().releaseSegment(prevSdm);
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
               // The consuming segment's key is in a different immutable segment
@@ -457,7 +457,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       if (_deletedKeysTTL > 0) {
         // Block destroy while we touch getQueryableDocIds / removeDocId; skip if segment is unreachable.
         IndexSegment cachedSegment = recordLocation.getSegment();
-        SegmentDataManager sdm = _context.acquireIfSame(cachedSegment);
+        SegmentDataManager sdm = _context.getTableDataManager().acquireIfSame(cachedSegment);
         if (sdm == null) {
           return;
         }
@@ -480,7 +480,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             }
           }
         } finally {
-          _context.releaseSegment(sdm);
+          _context.getTableDataManager().releaseSegment(sdm);
         }
       }
     });
@@ -560,7 +560,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
                       recordInfo);
                 } else {
-                  SegmentDataManager currentSdm = _context.acquireIfSame(currentSegment);
+                  SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
                   if (currentSdm == null) {
                     addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
                   } else {
@@ -568,7 +568,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
                           recordInfo);
                     } finally {
-                      _context.releaseSegment(currentSdm);
+                      _context.getTableDataManager().releaseSegment(currentSdm);
                     }
                   }
                 }
@@ -616,12 +616,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             if (currentSegment instanceof MutableSegment) {
               mergeIfPreviousLive(currentSegment, currentDocId, record);
             } else {
-              SegmentDataManager currentSdm = _context.acquireIfSame(currentSegment);
+              SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
               if (currentSdm != null) {
                 try {
                   mergeIfPreviousLive(currentSegment, currentDocId, record);
                 } finally {
-                  _context.releaseSegment(currentSdm);
+                  _context.getTableDataManager().releaseSegment(currentSdm);
                 }
               }
             }

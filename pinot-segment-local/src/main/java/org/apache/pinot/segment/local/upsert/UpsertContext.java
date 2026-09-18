@@ -26,9 +26,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -193,19 +191,6 @@ public class UpsertContext {
   @Nullable
   public TableDataManager getTableDataManager() {
     return _tableDataManager;
-  }
-
-  /// Null-safe convenience delegating to [TableDataManager#acquireIfSame(IndexSegment)]. Returns null when
-  /// no table data manager is available (e.g. contexts constructed outside a server for tests).
-  @Nullable
-  public SegmentDataManager acquireIfSame(IndexSegment segment) {
-    return _tableDataManager != null ? _tableDataManager.acquireIfSame(segment) : null;
-  }
-
-  public void releaseSegment(SegmentDataManager sdm) {
-    if (_tableDataManager != null) {
-      _tableDataManager.releaseSegment(sdm);
-    }
   }
 
   public File getTableIndexDir() {
