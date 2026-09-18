@@ -295,15 +295,15 @@ public class FileIngestionHelper {
     }
   }
 
-  /// Copy the file from the uploaded multipart to a local file
+  /// Copy the file from the uploaded multipart to a local file.
+  /// NOTE: multiPart.cleanup() is intentionally NOT called here. The calling REST endpoint owns the multipart
+  /// lifecycle and cleans it up in its outer finally block.
   public static void copyMultipartToLocal(FormDataMultiPart multiPart, File destFile)
       throws IOException {
     FormDataBodyPart formDataBodyPart = multiPart.getFields().values().iterator().next().get(0);
     try (InputStream inputStream = formDataBodyPart.getValueAs(InputStream.class);
         OutputStream outputStream = new FileOutputStream(destFile)) {
       IOUtils.copyLarge(inputStream, outputStream);
-    } finally {
-      multiPart.cleanup();
     }
   }
 
