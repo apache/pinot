@@ -195,24 +195,11 @@ public class UpsertContext {
     return _tableDataManager;
   }
 
-  /// Acquires the [SegmentDataManager] for `segment` iff it is still the live one under `segment`'s name.
-  /// Returns null if the segment has been destroyed or replaced under the same name. When non-null, callers
-  /// must call [#releaseSegment(SegmentDataManager)] to drop the refcount.
+  /// Null-safe convenience delegating to [TableDataManager#acquireIfSame(IndexSegment)]. Returns null when
+  /// no table data manager is available (e.g. contexts constructed outside a server for tests).
   @Nullable
   public SegmentDataManager acquireIfSame(IndexSegment segment) {
-    if (_tableDataManager == null) {
-      return null;
-    }
-    SegmentDataManager sdm = _tableDataManager.acquireSegment(segment.getSegmentName());
-    if (sdm == null) {
-      return null;
-    }
-    // Identity check catches the "same name, different instance" race.
-    if (sdm.getSegment() != segment) {
-      _tableDataManager.releaseSegment(sdm);
-      return null;
-    }
-    return sdm;
+    return _tableDataManager != null ? _tableDataManager.acquireIfSame(segment) : null;
   }
 
   public void releaseSegment(SegmentDataManager sdm) {

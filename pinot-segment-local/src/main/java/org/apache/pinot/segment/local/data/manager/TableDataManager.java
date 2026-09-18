@@ -222,6 +222,26 @@ public interface TableDataManager {
   @Nullable
   SegmentDataManager acquireSegment(String segmentName);
 
+  /// Acquires the [SegmentDataManager] for `segment` iff it is still the live one under `segment`'s name.
+  /// Returns null if the segment has been destroyed OR replaced under the same name. When non-null, callers
+  /// must call [#releaseSegment(SegmentDataManager)] to drop the refcount.
+  ///
+  /// Use this in place of [#acquireSegment(String)] when the caller holds a cached [IndexSegment] reference
+  /// (e.g. from a metadata map) and needs to confirm it acquired the refcount for that specific instance,
+  /// not a replacement segment under the same name.
+  @Nullable
+  default SegmentDataManager acquireIfSame(IndexSegment segment) {
+    SegmentDataManager sdm = acquireSegment(segment.getSegmentName());
+    if (sdm == null) {
+      return null;
+    }
+    if (sdm.getSegment() != segment) {
+      releaseSegment(sdm);
+      return null;
+    }
+    return sdm;
+  }
+
   /// Releases the acquired segment.
   ///
   /// @param segmentDataManager Segment data manager
