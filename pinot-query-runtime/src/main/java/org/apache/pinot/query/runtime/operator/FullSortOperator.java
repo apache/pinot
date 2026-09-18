@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -45,7 +46,10 @@ public class FullSortOperator extends SortOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(FullSortOperator.class);
 
   private final Comparator<Object[]> _comparator;
-  private final ArrayList<Object[]> _rows;
+  /// The buffered input. Handed downstream as a sublist view of itself, so releasing has to drop the reference
+  /// rather than empty the list.
+  @Nullable
+  private ArrayList<Object[]> _rows;
 
   FullSortOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema dataSchema, int offset,
       int numRowsToKeep, int maxRowsPerBlock, List<RelFieldCollation> collations, int defaultHolderCapacity) {
@@ -68,7 +72,19 @@ public class FullSortOperator extends SortOperator {
   }
 
   @Override
+  protected void releaseBuffers() {
+    super.releaseBuffers();
+    _rows = null;
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return super.hasBufferedState() || _rows != null;
+  }
+
+  @Override
   protected MseBlock produceNextBlock() {
+    assert _rows != null : "Rows must not be released while the operator is still producing";
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _rows.addAll(((MseBlock.Data) block).asRowHeap().getRows());

@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -43,7 +44,10 @@ public class TopNSortOperator extends SortOperator {
   private static final String EXPLAIN_NAME = "SORT_TOP_N";
   private static final Logger LOGGER = LoggerFactory.getLogger(TopNSortOperator.class);
 
-  private final PriorityQueue<Object[]> _priorityQueue;
+  /// The rows-to-keep heap. Never handed downstream - [#produceNextBlock()] drains it into a fresh array - so
+  /// releasing drops it outright instead of clearing it, which would keep the backing array alive.
+  @Nullable
+  private PriorityQueue<Object[]> _priorityQueue;
 
   TopNSortOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema dataSchema, int offset,
       int numRowsToKeep, int maxRowsPerBlock, List<RelFieldCollation> collations, int defaultHolderCapacity) {
@@ -65,7 +69,19 @@ public class TopNSortOperator extends SortOperator {
   }
 
   @Override
+  protected void releaseBuffers() {
+    super.releaseBuffers();
+    _priorityQueue = null;
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return super.hasBufferedState() || _priorityQueue != null;
+  }
+
+  @Override
   protected MseBlock produceNextBlock() {
+    assert _priorityQueue != null : "Priority queue must not be released while the operator is still producing";
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       for (Object[] row : ((MseBlock.Data) block).asRowHeap().getRows()) {

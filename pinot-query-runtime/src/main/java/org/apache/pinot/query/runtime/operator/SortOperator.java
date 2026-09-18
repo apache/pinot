@@ -143,12 +143,21 @@ public abstract class SortOperator extends MultiStageOperator {
   }
 
   @Override
-  public void cancel(Throwable e) {
+  public StatMap<StatKey> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  /// Drops the rows this operator is still holding to emit. Subclasses that buffer the input as well release theirs
+  /// on top of this. The choice of implementation lives in the class, not in a field, so releasing a buffer can never
+  /// change how the operator behaves.
+  @Override
+  protected void releaseBuffers() {
+    _pendingRows = null;
   }
 
   @Override
-  public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+  protected boolean hasBufferedState() {
+    return _pendingRows != null;
   }
 
   @Override

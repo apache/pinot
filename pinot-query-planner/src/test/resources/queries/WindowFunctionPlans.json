@@ -591,9 +591,10 @@
           "\nLogicalProject(col1=[$0], col2=[$1])",
           "\n  LogicalFilter(condition=[=($3, 1)])",
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      LogicalSort(sort0=[$2], dir0=[DESC])",
+          "\n        PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
