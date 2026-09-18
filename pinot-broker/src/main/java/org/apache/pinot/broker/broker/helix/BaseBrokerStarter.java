@@ -63,6 +63,7 @@ import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.common.Utils;
@@ -203,6 +204,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ScheduledExecutorService _responseStoreCleanupExecutor;
   protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
+  protected FailOpenPolicy _failOpenPolicy;
   protected ThreadAccountant _threadAccountant;
   /// Startup data-plane warmup config. Read once in `start()`.
   protected BrokerWarmupConfig _warmupConfig =
@@ -231,8 +233,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
+    // Capture the instance-level fallback before applying the cluster config overlay.
+    boolean brokerConfiguredFailOpenEnabled = brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_FAIL_OPEN,
+        Broker.DEFAULT_ENABLE_FAIL_OPEN);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
+    boolean startupFailOpenEnabled = brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_FAIL_OPEN,
+        Broker.DEFAULT_ENABLE_FAIL_OPEN);
+    _failOpenPolicy = new FailOpenPolicy(brokerConfiguredFailOpenEnabled, startupFailOpenEnabled);
     TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
     BrokerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_brokerConf));
 
@@ -439,6 +447,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Set up request handling classes
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_failOpenPolicy);
     initRoutingManager();
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_routingManager);
 
