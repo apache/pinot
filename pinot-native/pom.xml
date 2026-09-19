@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.6.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>pinot-native</artifactId>
+  <name>Pinot Native Acceleration (JNI bindings to Rust kernels)</name>
+  <url>https://pinot.apache.org/</url>
+
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+
+    <!-- Cargo workspace location, relative to this module. -->
+    <native.source.dir>${basedir}/native</native.source.dir>
+    <native.build.dir>${native.source.dir}/target/release</native.build.dir>
+
+    <!-- Cargo invocation. Override via -DcargoExecutable=... or skip via -DskipNativeBuild. -->
+    <cargo.executable>cargo</cargo.executable>
+    <skipNativeBuild>false</skipNativeBuild>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Pinned to Java 11 bytecode: matches pinot-segment-spi. We do not need any
+               Java 21 surface in this module. -->
+          <release>11</release>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>
+
+      <!-- Build the Rust workspace via Cargo. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>cargo-build</id>
+            <phase>process-resources</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${skipNativeBuild}</skip>
+              <executable>${cargo.executable}</executable>
+              <workingDirectory>${native.source.dir}</workingDirectory>
+              <arguments>
+                <argument>build</argument>
+                <argument>--release</argument>
+                <argument>--manifest-path</argument>
+                <argument>${native.source.dir}/Cargo.toml</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>cargo-test</id>
+            <phase>test</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${skipNativeBuild}</skip>
+              <executable>${cargo.executable}</executable>
+              <workingDirectory>${native.source.dir}</workingDirectory>
+              <arguments>
+                <argument>test</argument>
+                <argument>--release</argument>
+                <argument>--manifest-path</argument>
+                <argument>${native.source.dir}/Cargo.toml</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Make the freshly-built native library discoverable by surefire tests via the
+           pinot.native.lib.path system property. NativeLibLoader honors this property
+           and falls back to classpath resource extraction otherwise. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <pinot.native.lib.path>${native.build.dir}/${native.lib.filename}</pinot.native.lib.path>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- OS / arch classifier. Sets ${native.lib.filename} for the test classpath. -->
+    <profile>
+      <id>native-darwin-aarch64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <native.lib.filename>libpinot_native.dylib</native.lib.filename>
+        <native.os.arch>darwin-aarch64</native.os.arch>
+      </properties>
+    </profile>
+    <profile>
+      <id>native-darwin-x86_64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <native.lib.filename>libpinot_native.dylib</native.lib.filename>
+        <native.os.arch>darwin-x86_64</native.os.arch>
+      </properties>
+    </profile>
+    <profile>
+      <id>native-linux-x86_64</id>
+      <activation>
+        <os>
+          <family>unix</family>
+          <name>linux</name>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <native.lib.filename>libpinot_native.so</native.lib.filename>
+        <native.os.arch>linux-x86_64</native.os.arch>
+      </properties>
+    </profile>
+    <profile>
+      <id>native-linux-aarch64</id>
+      <activation>
+        <os>
+          <family>unix</family>
+          <name>linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <native.lib.filename>libpinot_native.so</native.lib.filename>
+        <native.os.arch>linux-aarch64</native.os.arch>
+      </properties>
+    </profile>
+  </profiles>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- Required by the package-info-maven-plugin configured at root pom, which
+         generates package-info.java with @ParametersAreNonnullByDefault and @NullMarked. -->
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>jsr305</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
