@@ -131,13 +131,17 @@ public final class GroupByUtils {
     // Grouping-set output schema: the base schema with the synthetic $groupingId INT column inserted right after
     // the union group-by columns (mirroring GroupByOperator's grouping-set schema layout).
     DataSchema groupingSetsSchema = insertGroupingIdColumn(baseTable.getDataSchema(), numUnionColumns);
-    int resultSize = queryContext.getNumGroupsLimit();
-    // Upper-bound the derived group count at numSets * base groups, clamped to avoid int overflow on large bases.
+    // The derive must not drop groups: it is a bounded transformation of the already-bounded base groups (whose
+    // count is capped at numGroupsLimit per segment), so the derived count is at most numGroupsLimit * numSets --
+    // a finite amount. Capping the derived table at numGroupsLimit would drop derived groups NON-DETERMINISTICALLY
+    // under the parallel upsert (whichever threads fill the quota first win), which can starve an entire
+    // low-magnitude grouping set such as the grand total. Use an unbounded result size here and defer the real
+    // ORDER BY + LIMIT to the broker (per-set trim below still bounds it when explicitly configured).
     int derivedUpperBound = (int) Math.min((long) baseTable.size() * numSets, Integer.MAX_VALUE);
-    int initialCapacity = getIndexedTableInitialCapacity(resultSize, derivedUpperBound,
+    int initialCapacity = getIndexedTableInitialCapacity(derivedUpperBound, derivedUpperBound,
         queryContext.getMinInitialIndexedTableCapacity());
-    IndexedTable derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext, resultSize,
-        initialCapacity, numTasks, executorService);
+    IndexedTable derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext,
+        Integer.MAX_VALUE, initialCapacity, numTasks, executorService);
 
     List<Map.Entry<Key, Record>> baseEntries = new ArrayList<>(baseTable.getRecordEntries());
     int numEntries = baseEntries.size();
