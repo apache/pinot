@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import com.sun.jna.platform.win32.WinDef;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
