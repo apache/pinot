@@ -43,6 +43,7 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -77,6 +78,23 @@ public class GrpcSendingMailboxTest {
       // Termination check at the top of send(MseBlock.Data) fires before the gRPC channel is touched.
       Assert.assertThrows(TerminationException.class, () -> mailbox.send(block));
       Mockito.verifyNoInteractions(channelManager);
+    }
+  }
+
+  @Test
+  public void sortedDataCarriesSenderConfirmationOnEveryChunk() {
+    ChannelManager channelManager = Mockito.mock(ChannelManager.class);
+    CapturingGrpcSendingMailbox mailbox = new CapturingGrpcSendingMailbox("sorted-mailbox", channelManager);
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      mailbox.send(block, true);
+    }
+
+    assertTrue(mailbox.getContents().size() > 1, "Expected the data block to be split across mailbox chunks");
+    for (MailboxContent content : mailbox.getContents()) {
+      assertEquals(content.getMetadataOrDefault(ChannelUtils.MAILBOX_METADATA_SORTED_ON_SENDER, ""), "true");
     }
   }
 
@@ -196,6 +214,32 @@ public class GrpcSendingMailboxTest {
 
     int getContentObserverCalls() {
       return _getContentObserverCalls.get();
+    }
+  }
+
+  private static final class CapturingGrpcSendingMailbox extends GrpcSendingMailbox {
+    private final List<MailboxContent> _contents = new ArrayList<>();
+    private final ClientCallStreamObserver<MailboxContent> _observer;
+
+    @SuppressWarnings("unchecked")
+    CapturingGrpcSendingMailbox(String id, ChannelManager channelManager) {
+      super(id, channelManager, "localhost", 0, Long.MAX_VALUE,
+          new StatMap<>(MailboxSendOperator.StatKey.class), 32, false);
+      _observer = Mockito.mock(ClientCallStreamObserver.class);
+      Mockito.when(_observer.isReady()).thenReturn(true);
+      Mockito.doAnswer(invocation -> {
+        _contents.add(invocation.getArgument(0));
+        return null;
+      }).when(_observer).onNext(Mockito.any());
+    }
+
+    @Override
+    ClientCallStreamObserver<MailboxContent> getContentObserver() {
+      return _observer;
+    }
+
+    List<MailboxContent> getContents() {
+      return _contents;
     }
   }
 

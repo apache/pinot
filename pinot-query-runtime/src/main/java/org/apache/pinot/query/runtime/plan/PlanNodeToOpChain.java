@@ -54,6 +54,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.SortedMailboxMergeReceiveOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
@@ -193,7 +194,9 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        if (node.isSort()) {
+        if (node.isSort() && node.isSortedOnSender()) {
+          return new SortedMailboxMergeReceiveOperator(context, node);
+        } else if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
           return new MailboxReceiveOperator(context, node);
@@ -205,7 +208,17 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitMailboxSend(MailboxSendNode node, OpChainExecutionContext context) {
-      return new MailboxSendOperator(context, visit(node.getInputs().get(0), context), node);
+      PlanNode inputNode = node.getInputs().get(0);
+      MultiStageOperator input = node.hasExplicitSortInput()
+          ? visitSenderFullSort((SortNode) inputNode, context) : visit(inputNode, context);
+      return new MailboxSendOperator(context, input, node);
+    }
+
+    private MultiStageOperator visitSenderFullSort(SortNode node, OpChainExecutionContext context) {
+      MultiStageOperator result = createSortOperator(node, context, true);
+      record(node, result);
+      _tracker.accept(node, result);
+      return result;
     }
 
     @Override
@@ -395,10 +408,14 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitSort(SortNode node, OpChainExecutionContext context) {
+      return createSortOperator(node, context, false);
+    }
+
+    private MultiStageOperator createSortOperator(SortNode node, OpChainExecutionContext context, boolean fullSort) {
       MultiStageOperator child = null;
       try {
         child = visit(node.getInputs().get(0), context);
-        return new SortOperator(context, child, node);
+        return fullSort ? SortOperator.createFullSort(context, child, node) : new SortOperator(context, child, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }

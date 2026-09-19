@@ -43,6 +43,16 @@ public interface SendingMailbox extends AutoCloseable {
   /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
   void send(MseBlock.Data data);
 
+  /// Sends a data block and tells the receiver whether the sender sorted its complete stream by the exchange
+  /// collation before emitting this block.
+  ///
+  /// The default keeps custom mailbox implementations source- and binary-compatible. Implementations that can carry
+  /// the confirmation to the receiver should override this method; otherwise a receiver that was asked to merge
+  /// sorted senders will safely fall back to buffering and sorting the complete input.
+  default void send(MseBlock.Data data, boolean sortedOnSender) {
+    send(data);
+  }
+
   /// Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
   /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
   /// an error sending the data, since that would allow

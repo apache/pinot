@@ -23,10 +23,26 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class SortUtils {
   private SortUtils() {
+  }
+
+  /// Wraps a comparator so a long in-memory sort cooperatively observes query termination, pause, deadline, and
+  /// resource-accounting requests without paying that cost on every comparison.
+  public static Comparator<Object[]> withTerminationAndUsageSampling(Comparator<Object[]> comparator, String scope,
+      long deadlineMs) {
+    return new Comparator<>() {
+      private int _numComparisons;
+
+      @Override
+      public int compare(Object[] left, Object[] right) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numComparisons++, scope, deadlineMs);
+        return comparator.compare(left, right);
+      }
+    };
   }
 
   public static class SortComparator implements Comparator<Object[]> {
