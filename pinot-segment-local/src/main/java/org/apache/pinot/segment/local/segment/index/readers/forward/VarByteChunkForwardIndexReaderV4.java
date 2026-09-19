@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ObjIntConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
@@ -50,7 +51,6 @@ import org.slf4j.LoggerFactory;
 ///
 /// For data layout, please refer to the documentation for [VarByteChunkForwardIndexWriterV4]
 ///
-/// TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte\[\] first
 public class VarByteChunkForwardIndexReaderV4
     implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexReaderV4.class);
@@ -128,6 +128,14 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public String getString(int docId, ReaderContext context) {
     return new String(context.getValue(docId), StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public void readBytesValues(int[] docIds, int from, int to, ObjIntConsumer<ByteBuffer> consumer,
+      ReaderContext context) {
+    for (int i = from; i < to; i++) {
+      context.consumeValue(docIds[i], i, consumer);
+    }
   }
 
   @Override
@@ -274,6 +282,8 @@ public class VarByteChunkForwardIndexReaderV4
     protected int _numDocsInCurrentChunk;
     protected long _chunkStartOffset;
     private List<ByteRange> _ranges;
+    private long _valueChunkOffset;
+    private long _valueChunkLimit;
 
     protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       _chunks = chunks;
@@ -302,6 +312,28 @@ public class VarByteChunkForwardIndexReaderV4
       }
     }
 
+    public void consumeValue(int docId, int index, ObjIntConsumer<ByteBuffer> consumer) {
+      if (_regularChunk && docId >= _docIdOffset && docId < _nextDocIdOffset) {
+        consumeSmallValue(docId, index, consumer);
+        return;
+      }
+      try {
+        prepareChunk(docId);
+        consumeChunk(docId, _valueChunkOffset, _valueChunkLimit, index, consumer);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to decompress BYTES value", e);
+      }
+    }
+
+    protected void consumeSmallValue(int docId, int index, ObjIntConsumer<ByteBuffer> consumer) {
+      consumer.accept(ByteBuffer.wrap(readSmallUncompressedValue(docId)).asReadOnlyBuffer(), index);
+    }
+
+    protected void consumeChunk(int docId, long offset, long limit, int index, ObjIntConsumer<ByteBuffer> consumer)
+        throws IOException {
+      consumer.accept(ByteBuffer.wrap(processChunkAndReadFirstValue(docId, offset, limit)).asReadOnlyBuffer(), index);
+    }
+
     protected long chunkIndexFor(int docId) {
       long low = 0;
       long high = (_metadata.size() / METADATA_ENTRY_SIZE) - 1;
@@ -327,6 +359,11 @@ public class VarByteChunkForwardIndexReaderV4
 
     private byte[] decompressAndRead(int docId)
         throws IOException {
+      prepareChunk(docId);
+      return processChunkAndReadFirstValue(docId, _valueChunkOffset, _valueChunkLimit);
+    }
+
+    private void prepareChunk(int docId) {
       long metadataEntry = chunkIndexFor(docId);
       int info = _metadata.getInt(metadataEntry);
       _docIdOffset = info & 0x7FFFFFFF;
@@ -340,7 +377,8 @@ public class VarByteChunkForwardIndexReaderV4
         _nextDocIdOffset = Integer.MAX_VALUE;
         limit = _chunks.size();
       }
-      return processChunkAndReadFirstValue(docId, offset, limit);
+      _valueChunkOffset = offset;
+      _valueChunkLimit = limit;
     }
 
     private void initAndRecordRangesForDocId(int docId, List<ByteRange> ranges) {
@@ -381,6 +419,25 @@ public class VarByteChunkForwardIndexReaderV4
       }
       _numDocsInCurrentChunk = _chunk.getInt(0);
       return readSmallUncompressedValue(docId);
+    }
+
+    @Override
+    protected void consumeChunk(int docId, long offset, long limit, int index, ObjIntConsumer<ByteBuffer> consumer) {
+      _chunk = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (_regularChunk) {
+        _numDocsInCurrentChunk = _chunk.getInt(0);
+        consumeSmallValue(docId, index, consumer);
+      } else {
+        consumer.accept(_chunk.asReadOnlyBuffer(), index);
+      }
+    }
+
+    @Override
+    protected void consumeSmallValue(int docId, int index, ObjIntConsumer<ByteBuffer> consumer) {
+      int row = docId - _docIdOffset;
+      int start = _chunk.getInt((row + 1) * Integer.BYTES);
+      int end = row == _numDocsInCurrentChunk - 1 ? _chunk.limit() : _chunk.getInt((row + 2) * Integer.BYTES);
+      consumer.accept(_chunk.slice(start, end - start).asReadOnlyBuffer(), index);
     }
 
     private byte[] readHugeValue() {
@@ -454,6 +511,36 @@ public class VarByteChunkForwardIndexReaderV4
       _decompressedBuffer.get(bytes);
       _decompressedBuffer.position(0);
       return bytes;
+    }
+
+    @Override
+    protected void consumeChunk(int docId, long offset, long limit, int index, ObjIntConsumer<ByteBuffer> consumer)
+        throws IOException {
+      ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (_regularChunk) {
+        _decompressedBuffer.clear();
+        decompressChunk(compressed);
+        consumeSmallValue(docId, index, consumer);
+      } else {
+        // Oversized values do not fit in the reusable chunk. Release their temporary direct storage on every exit.
+        ByteBuffer value = ByteBuffer.allocateDirect(_chunkDecompressor.decompressedLength(compressed))
+            .order(ByteOrder.LITTLE_ENDIAN);
+        try {
+          _chunkDecompressor.decompress(compressed, value);
+          consumer.accept(value.asReadOnlyBuffer(), index);
+        } finally {
+          CleanerUtil.cleanQuietly(value);
+        }
+      }
+    }
+
+    @Override
+    protected void consumeSmallValue(int docId, int index, ObjIntConsumer<ByteBuffer> consumer) {
+      int row = docId - _docIdOffset;
+      int start = _decompressedBuffer.getInt((row + 1) * Integer.BYTES);
+      int end = row == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
+          : _decompressedBuffer.getInt((row + 2) * Integer.BYTES);
+      consumer.accept(_decompressedBuffer.slice(start, end - start).asReadOnlyBuffer(), index);
     }
 
     private byte[] readHugeCompressedValue(ByteBuffer compressed, int decompressedLength)
