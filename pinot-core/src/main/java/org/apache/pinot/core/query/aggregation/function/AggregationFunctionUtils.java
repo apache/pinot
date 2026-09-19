@@ -63,6 +63,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
@@ -176,10 +177,18 @@ public class AggregationFunctionUtils {
   ///
   /// NOTE: We construct the map with original column name as the key but fetch BlockValSet with the aggregation
   ///          function pair so that the aggregation result column name is consistent with or without star-tree.
+  ///
+  /// For ARRAYAGG, the BlockValSet is wrapped in [StarTreePreAggregatedBlockValSet] so the function can recognize a
+  /// pre-aggregated column by provenance rather than by sniffing the block's value type, which is ambiguous when the
+  /// raw input type is also BYTES (e.g. distinct arrayAgg over a BYTES column). Other aggregations do not inspect the
+  /// marker, so they get the unwrapped BlockValSet.
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(
       AggregationFunctionColumnPair aggregationFunctionColumnPair, ValueBlock valueBlock) {
     ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
     BlockValSet blockValSet = valueBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
+    if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.ARRAYAGG) {
+      blockValSet = new StarTreePreAggregatedBlockValSet(blockValSet);
+    }
     return Map.of(expression, blockValSet);
   }
 

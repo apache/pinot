@@ -28,6 +28,8 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -38,12 +40,31 @@ public class ArrayAggDistinctBytesFunction extends BaseArrayAggBytesFunction<Obj
   }
 
   @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
+  }
+
+  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     ObjectOpenHashSet<ByteArray> valueSet =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
             : new ObjectOpenHashSet<>(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in. A raw
+    // BYTES source column produces the same block shape, which is why the provenance marker (not the value type)
+    // selects this branch.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.BYTES_SET_SER_DE.deserialize(
+              starTreeSetPayload(bytesValues[i], ElementType.BYTES)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       byte[][] values = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
