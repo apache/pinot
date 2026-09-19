@@ -24,6 +24,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -275,6 +280,25 @@ public class BrokerRoutingManagerTest {
 
     // Server should be re-enabled in the map
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testServerEnabledState() {
+    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
   }
 
   @Test
@@ -804,6 +828,39 @@ public class BrokerRoutingManagerTest {
     // Routable map contains the server again.
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testServerIsNotAcknowledgedUntilRoutingUpdateCompletes()
+      throws Exception {
+    CountDownLatch routingUpdateStarted = new CountDownLatch(1);
+    CountDownLatch releaseRoutingUpdate = new CountDownLatch(1);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    doAnswer(invocation -> {
+      routingUpdateStarted.countDown();
+      assertTrue(releaseRoutingUpdate.await(5, TimeUnit.SECONDS));
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> update = executor.submit(() -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+      assertTrue(routingUpdateStarted.await(5, TimeUnit.SECONDS));
+
+      assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+      assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
+      releaseRoutingUpdate.countDown();
+      update.get(5, TimeUnit.SECONDS);
+      assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    } finally {
+      releaseRoutingUpdate.countDown();
+      executor.shutdownNow();
+    }
   }
 
   /// Creates a ZNRecord representing an enabled server instance.
