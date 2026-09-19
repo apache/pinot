@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -111,6 +112,8 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final IndexLoadingConfig _indexLoadingConfig;
   private final TableConfig _tableConfig;
   private final Schema _schema;
+  // Captured during updateDefaultColumns() so processStarTrees can force a rebuild when derived values change.
+  private Set<String> _columnsWithChangedTransformValues = Set.of();
 
   public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     _segmentDirectory = segmentDirectory;
@@ -160,6 +163,9 @@ public class SegmentPreProcessor implements AutoCloseable {
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
               segmentWriter);
       defaultColumnHandler.updateDefaultColumns();
+      // Invalidate dependent indexes only for values that were actually regenerated. A tolerated column-build failure
+      // leaves the original values and their indexes valid.
+      _columnsWithChangedTransformValues = defaultColumnHandler.getColumnsWithChangedTransformValues();
       _segmentDirectory.reloadMetadata();
 
       // Resolve per-key index configs for OPEN_STRUCT child columns so index handlers don't strip
@@ -240,6 +246,13 @@ public class SegmentPreProcessor implements AutoCloseable {
   /// all types of indices and column min/max values are checked against what's set in table config and schema.
   public boolean needProcess()
       throws Exception {
+    return needProcess(true);
+  }
+
+  /// Same as [#needProcess()], with an option to ignore transform-function updates.
+  /// Record-replay rebuild handles those by recomputing the affected output fields.
+  public boolean needProcess(boolean includeTransformFunctionActions)
+      throws Exception {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {
       return false;
@@ -249,8 +262,13 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Check if there is need to update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(null, segmentMetadata, _indexLoadingConfig, null);
-      if (defaultColumnHandler.needUpdateDefaultColumns()) {
-        LOGGER.info("Found default columns need updates in segment: {}", segmentName);
+      if (includeTransformFunctionActions) {
+        if (defaultColumnHandler.needUpdateDefaultColumns()) {
+          LOGGER.info("Found default columns need updates in segment: {}", segmentName);
+          return true;
+        }
+      } else if (defaultColumnHandler.needStructuralDefaultColumnUpdates()) {
+        LOGGER.info("Found structural default columns need updates in segment: {}", segmentName);
         return true;
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
@@ -261,13 +279,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
       // Check if there is need to create/modify/remove star-trees.
-      if (needProcessStarTrees()) {
+      if (needProcessStarTrees(includeTransformFunctionActions, defaultColumnHandler)) {
         LOGGER.info("Found startree index needs updates in segment: {}", segmentName);
         return true;
       }
 
       // Check if there is need to create/modify/remove multi-col text index
-      if (needProcessMultiColumnTextIndex()) {
+      if (needProcessMultiColumnTextIndex(includeTransformFunctionActions
+          ? defaultColumnHandler.getColumnsWithPendingTransformValueChanges() : Set.of())) {
         LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
         return true;
       }
@@ -294,14 +313,18 @@ public class SegmentPreProcessor implements AutoCloseable {
     return columnMinMaxValueGenerator.columnMinMaxValueUpdates();
   }
 
-  private boolean needProcessStarTrees() {
+  private boolean needProcessStarTrees(boolean includeTransformFunctionValueChanges,
+      DefaultColumnHandler defaultColumnHandler) {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    boolean transformValuesChangedOnStarTreeColumns = includeTransformFunctionValueChanges
+        && StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList,
+        defaultColumnHandler.getColumnsWithPendingTransformValueChanges());
     // Check if there is need to create/modify/remove star-trees.
     if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-      // Star-trees left unreadable by a column encoding change are still removed, see processStarTrees().
-      return starTreeMetadataList != null && !StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList,
-          segmentMetadata).isEmpty();
+      // Star-trees left stale by a value change, or unreadable by a column encoding change, must still be removed.
+      return transformValuesChangedOnStarTreeColumns || starTreeMetadataList != null
+          && !StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList, segmentMetadata).isEmpty();
     }
 
     List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
@@ -312,15 +335,26 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // We need reprocessing if existing configs are to be removed, or new configs have been added
     if (starTreeMetadataList != null) {
-      return StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
+      if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+        return true;
+      }
+      // Config matches, but a star-tree column's stored values are about to change.
+      return transformValuesChangedOnStarTreeColumns;
     }
     return !starTreeBuilderConfigs.isEmpty();
   }
 
-  private boolean needProcessMultiColumnTextIndex() {
+  private boolean needProcessMultiColumnTextIndex(Set<String> columnsWithChangedTransformValues) {
     MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
     MultiColumnTextMetadata oldConfig = _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata();
-    return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig);
+    return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)
+        || usesChangedMultiColumnTextIndexColumn(newConfig, columnsWithChangedTransformValues);
+  }
+
+  @VisibleForTesting
+  static boolean usesChangedMultiColumnTextIndexColumn(@Nullable MultiColumnTextIndexConfig config,
+      Set<String> columnsWithChangedTransformValues) {
+    return config != null && config.getColumns().stream().anyMatch(columnsWithChangedTransformValues::contains);
   }
 
   private boolean processMultiColTextIndex(File indexDir, SegmentDirectory.Writer segmentWriter,
@@ -330,6 +364,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     String segmentName = segmentMetadata.getName();
     MultiColumnTextMetadata oldConfig = segmentMetadata.getMultiColumnTextMetadata();
     MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
+    boolean transformValuesChanged = usesChangedMultiColumnTextIndexColumn(newConfig,
+        _columnsWithChangedTransformValues);
     boolean remove = false;
     boolean create = newConfig != null;
 
@@ -337,7 +373,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (newConfig == null) {
         remove = true;
       } else {
-        if (MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
+        if (MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)
+            || transformValuesChanged) {
           LOGGER.info("Change detected in multi-column text index for segment: {}", segmentName);
         } else {
           create = false;
@@ -402,6 +439,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    boolean transformValuesChangedOnStarTreeColumns =
+        StarTreeBuilderUtils.usesAnyColumn(starTreeMetadataList, _columnsWithChangedTransformValues);
 
     if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
       // A star-tree whose dimension column is no longer dictionary-encoded (e.g. because the column was added to
@@ -412,12 +451,12 @@ public class SegmentPreProcessor implements AutoCloseable {
       Set<String> unloadableDimensions = starTreeMetadataList != null
           ? StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList, segmentMetadata)
           : Set.of();
-      if (unloadableDimensions.isEmpty()) {
+      if (unloadableDimensions.isEmpty() && !transformValuesChangedOnStarTreeColumns) {
         return false;
       }
-      LOGGER.warn("Removing star-trees from segment: {} because dimension columns: {} are no longer "
-              + "dictionary-encoded. Enable dynamic star-tree creation to have them rebuilt", segmentName,
-          unloadableDimensions);
+      LOGGER.warn("Removing star-trees from segment: {} because they are stale after transform changes in columns: {} "
+              + "or dimension columns: {} are no longer dictionary-encoded. Enable dynamic star-tree creation to "
+              + "have them rebuilt", segmentName, _columnsWithChangedTransformValues, unloadableDimensions);
       StarTreeBuilderUtils.removeStarTrees(indexDir);
       return true;
     }
@@ -433,9 +472,12 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (!shouldGenerateStarTree) {
         // Newer config does not have star-trees. Delete all existing star-trees.
         shouldRemoveStarTree = true;
-      } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-        // Existing and newer both have star-trees, but they don't match. Rebuild the star-trees.
-        LOGGER.info("Change detected in star-trees for segment: {}", segmentName);
+      } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)
+          || transformValuesChangedOnStarTreeColumns) {
+        // Existing and newer both have star-trees, but they don't match, or a star-tree column's values changed
+        // (UPDATE_*_TRANSFORM_FUNCTION).
+        LOGGER.info("Change detected in star-trees for segment: {} (transformValueChange={})", segmentName,
+            transformValuesChangedOnStarTreeColumns);
       } else {
         // Existing star-trees match the builder configs, no need to generate the star-trees
         shouldGenerateStarTree = false;
@@ -455,9 +497,11 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
-        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set
+        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set.
+        // Force rebuild when transform values changed: reuse would keep stale aggregates because star-tree
+        // config is unchanged after UPDATE_*_TRANSFORM_FUNCTION.
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig);
+            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig, transformValuesChangedOnStarTreeColumns);
         // We don't create the builder using the try-with-resources pattern because builder.close() performs
         // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
         // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
