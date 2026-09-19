@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /// This class implements group by aggregation.
@@ -98,13 +100,20 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     /// columns are single-valued. With base aggregation (the default), the segment instead aggregates the base
     /// grouping (union columns) exactly like a plain GROUP BY -- no forced MV path, no grouping-set key
     /// generator -- and the grouping-set records are derived afterwards from the base groups. Base aggregation
-    /// is disabled when any group-by column is multi-valued: an MV column fans a row across its values in the
-    /// base grouping, so rolling that column up would over-count the row (see
-    /// [QueryContext#isGroupingSetsBaseAggregation]).
-    boolean expandGroupingSets = queryContext.isGroupingSets()
-        && !(queryContext.isGroupingSetsBaseAggregation() && !hasMVGroupByExpression);
+    /// is disabled when:
+    ///   - any group-by column is multi-valued (an MV column fans a row across its values in the base grouping,
+    ///     so rolling that column up would over-count the row), or
+    ///   - the estimated base-group count (union columns' dictionary cardinality product) exceeds the
+    ///     configured max: base aggregation only pays off when rows collapse into far fewer base groups, so for
+    ///     high-cardinality union columns the per-row expansion path is faster (see
+    ///     [QueryContext#isGroupingSetsBaseAggregation] and #getGroupingSetsBaseAggregationMaxGroups).
+    boolean useBaseAggregation = queryContext.isGroupingSets() && queryContext.isGroupingSetsBaseAggregation()
+        && !hasMVGroupByExpression
+        && estimateBaseGroupCount(groupByExpressions, projectOperator)
+            <= queryContext.getGroupingSetsBaseAggregationMaxGroups();
+    boolean expandGroupingSets = queryContext.isGroupingSets() && !useBaseAggregation;
     _hasMVGroupByExpression = hasMVGroupByExpression || expandGroupingSets;
-    _groupingSetsBaseAggregation = queryContext.isGroupingSets() && !expandGroupingSets;
+    _groupingSetsBaseAggregation = useBaseAggregation;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
@@ -153,6 +162,35 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
       _mvGroupKeys = null;
     }
+  }
+
+  /// Estimates the number of BASE groups (distinct value combinations over the union group-by columns) as the
+  /// product of the columns' dictionary cardinalities, saturating at [Long#MAX_VALUE] on overflow. This is an
+  /// upper bound used only to decide base-aggregation vs. expansion; it is never used for correctness.
+  ///
+  /// Returns [Long#MAX_VALUE] (i.e. "assume too large", disabling base aggregation) if any union column is not
+  /// dictionary-encoded, since its cardinality -- and therefore how well the base grouping would collapse the
+  /// rows -- is unknown, and base aggregation regresses when the rows barely collapse.
+  @VisibleForTesting
+  static long estimateBaseGroupCount(ExpressionContext[] groupByExpressions,
+      BaseProjectOperator<?> projectOperator) {
+    long product = 1L;
+    for (ExpressionContext groupByExpression : groupByExpressions) {
+      ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+      Dictionary dictionary = columnContext.isDictionaryEncoded() ? columnContext.getDictionary() : null;
+      if (dictionary == null) {
+        return Long.MAX_VALUE;
+      }
+      int cardinality = dictionary.length();
+      if (cardinality <= 0) {
+        continue;
+      }
+      if (product > Long.MAX_VALUE / cardinality) {
+        return Long.MAX_VALUE;
+      }
+      product *= cardinality;
+    }
+    return product;
   }
 
   /// Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
