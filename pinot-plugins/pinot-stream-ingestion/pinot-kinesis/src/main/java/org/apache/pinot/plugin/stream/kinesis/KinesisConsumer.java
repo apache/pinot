@@ -23,13 +23,17 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.RateLimiter;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -52,24 +56,26 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private static final int INITIAL_RATE_LIMIT_BACKOFF_MS = 1000;
   private static final int MAX_RATE_LIMIT_BACKOFF_MS = 5000;
   private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
-  private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
+  private static final SharedKinesisRequestRateLimiter SHARED_REQUEST_RATE_LIMITER =
+      new SharedKinesisRequestRateLimiter();
   private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
   private final RequestRateLimiter _requestRateLimiter;
+  private boolean _closed;
 
   public KinesisConsumer(KinesisConfig config) {
     super(config);
-    _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER;
+    _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER.forConsumer(config);
     LOGGER.info("Created Kinesis consumer with topic: {}, RPS limit: {}, max records per fetch: {}",
         config.getStreamTopicName(), config.getRpsLimitPerSecond(), config.getNumMaxRecordsToFetch());
   }
 
   @VisibleForTesting
   public KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient) {
-    this(config, kinesisClient, SHARED_REQUEST_RATE_LIMITER);
+    this(config, kinesisClient, SHARED_REQUEST_RATE_LIMITER.forConsumer(config));
   }
 
   @VisibleForTesting
@@ -88,6 +94,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   /// This needs to be handled by the client based on appropriate retry strategy.
   @Override
   public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
+    if (_closed) {
+      throw new IllegalStateException("Kinesis consumer is closed");
+    }
     KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
     long deadlineMs = currentTimeMillis() + Math.max(timeoutMs, 0);
     int attempts = 0;
@@ -180,8 +189,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       Supplier<T> requestSupplier) {
     long remainingMs = deadlineMs - currentTimeMillis();
     if (remainingMs <= 0
-        || !_requestRateLimiter.tryAcquire(_config.getStreamTopicName(), shardId, requestType,
-            _config.getRpsLimitPerSecond(), remainingMs)) {
+        || !_requestRateLimiter.tryAcquire(shardId, requestType, remainingMs)) {
       throw new KinesisRequestTimeoutException(requestType);
     }
     try {
@@ -255,8 +263,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   @Override
-  public void close() {
-    super.close();
+  public synchronized void close() {
+    if (!_closed) {
+      _closed = true;
+      try {
+        super.close();
+      } finally {
+        _requestRateLimiter.close();
+      }
+    }
   }
 
   enum RequestType {
@@ -266,7 +281,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   @VisibleForTesting
   interface RequestRateLimiter {
-    boolean tryAcquire(String streamName, String shardId, RequestType requestType, double rpsLimit, long timeoutMs);
+    boolean tryAcquire(String shardId, RequestType requestType, long timeoutMs);
+
+    default void close() {
+    }
   }
 
   private static class KinesisRateLimitException extends RuntimeException {
@@ -299,58 +317,124 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  /// Shared per-JVM request limiter for Kinesis read operations.
-  ///
-  /// This class is thread-safe. Limiters are keyed by stream, shard, and operation so multiple consumers on the same
-  /// server share a single smooth request budget for the same AWS shard operation.
+  /// Shared per-JVM request budgets. Registrations and effective-rate changes are serialized per key; permit waits
+  /// happen outside the registry update. Entries live until their last registered consumer closes.
   @VisibleForTesting
-  static class SharedKinesisRequestRateLimiter implements RequestRateLimiter {
-    private static final int RATE_LIMITER_EXPIRATION_HOURS = 1;
-    private final Cache<RequestRateLimiterKey, RateLimiter> _rateLimiters;
+  static class SharedKinesisRequestRateLimiter {
+    private static final int IDLE_EXPIRATION_HOURS = 1;
+    private final ConcurrentHashMap<RequestRateLimiterKey, SharedLimiter> _rateLimiters = new ConcurrentHashMap<>();
+    // Preserve permit debt across short-lived consumers without retaining registrations after close.
+    private final Cache<RequestRateLimiterKey, RateLimiter> _idleRateLimiters =
+        CacheBuilder.newBuilder().expireAfterWrite(Duration.ofHours(IDLE_EXPIRATION_HOURS)).build();
 
-    SharedKinesisRequestRateLimiter() {
-      this(CacheBuilder.newBuilder().expireAfterAccess(RATE_LIMITER_EXPIRATION_HOURS, TimeUnit.HOURS).build());
+    RequestRateLimiter forConsumer(KinesisConfig config) {
+      return new ConsumerRequestRateLimiter(config);
     }
 
     @VisibleForTesting
-    SharedKinesisRequestRateLimiter(Cache<RequestRateLimiterKey, RateLimiter> rateLimiters) {
-      _rateLimiters = rateLimiters;
-    }
-
-    @Override
-    public boolean tryAcquire(String streamName, String shardId, RequestType requestType, double rpsLimit,
-        long timeoutMs) {
-      if (timeoutMs <= 0) {
-        return false;
-      }
-      RequestRateLimiterKey key = new RequestRateLimiterKey(streamName, shardId, requestType);
-      RateLimiter rateLimiter = _rateLimiters.asMap().computeIfAbsent(key, ignored -> RateLimiter.create(rpsLimit));
-      if (rpsLimit < rateLimiter.getRate()) {
-        rateLimiter.setRate(rpsLimit);
-      }
-      return rateLimiter.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS);
+    double getRateForTesting(KinesisConfig config, String shardId, RequestType requestType) {
+      SharedLimiter limiter = _rateLimiters.get(new RequestRateLimiterKey(config, shardId, requestType));
+      return limiter == null ? 0.0 : limiter._rateLimiter.getRate();
     }
 
     @VisibleForTesting
-    double getRateForTesting(String streamName, String shardId, RequestType requestType) {
-      RateLimiter rateLimiter =
-          _rateLimiters.getIfPresent(new RequestRateLimiterKey(streamName, shardId, requestType));
-      return rateLimiter == null ? 0.0 : rateLimiter.getRate();
-    }
-
-    @VisibleForTesting
-    long getLimiterCountForTesting() {
+    int getLimiterCountForTesting() {
       return _rateLimiters.size();
+    }
+
+    /// Each handle belongs to one consumer. Synchronization also makes close safe for direct users of the handle.
+    private class ConsumerRequestRateLimiter implements RequestRateLimiter {
+      private final KinesisConfig _config;
+      private final Map<RequestRateLimiterKey, SharedLimiter> _registrations = new HashMap<>();
+      private boolean _closed;
+
+      ConsumerRequestRateLimiter(KinesisConfig config) {
+        _config = config;
+      }
+
+      @Override
+      public synchronized boolean tryAcquire(String shardId, RequestType requestType, long timeoutMs) {
+        if (_closed) {
+          throw new IllegalStateException("Kinesis request limiter is closed");
+        }
+        if (timeoutMs <= 0) {
+          return false;
+        }
+        RequestRateLimiterKey key = new RequestRateLimiterKey(_config, shardId, requestType);
+        SharedLimiter limiter = _registrations.computeIfAbsent(key, ignored ->
+            _rateLimiters.compute(key, (unused, current) -> {
+              SharedLimiter shared = current;
+              if (shared == null) {
+                RateLimiter idle = _idleRateLimiters.asMap().remove(key);
+                shared = new SharedLimiter(idle == null ? RateLimiter.create(_config.getRpsLimitPerSecond()) : idle);
+              }
+              shared._consumers.put(this, _config.getRpsLimitPerSecond());
+              shared.updateRate();
+              return shared;
+            }));
+        return limiter._rateLimiter.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS);
+      }
+
+      @Override
+      public synchronized void close() {
+        if (_closed) {
+          return;
+        }
+        _closed = true;
+        for (RequestRateLimiterKey key : _registrations.keySet()) {
+          _rateLimiters.computeIfPresent(key, (unused, shared) -> {
+            shared._consumers.remove(this);
+            if (shared._consumers.isEmpty()) {
+              _idleRateLimiters.put(key, shared._rateLimiter);
+              return null;
+            }
+            shared.updateRate();
+            return shared;
+          });
+        }
+        _registrations.clear();
+      }
+    }
+
+    /// Access the registrations only inside the registry's per-key compute operations.
+    private static class SharedLimiter {
+      private final RateLimiter _rateLimiter;
+      private final Map<RequestRateLimiter, Double> _consumers = new HashMap<>();
+
+      SharedLimiter(RateLimiter rateLimiter) {
+        _rateLimiter = rateLimiter;
+      }
+
+      void updateRate() {
+        double rate = _consumers.values().stream().mapToDouble(Double::doubleValue).min().orElseThrow();
+        if (Double.compare(rate, _rateLimiter.getRate()) != 0) {
+          _rateLimiter.setRate(rate);
+        }
+      }
     }
   }
 
+  /// Configuration namespace for a stream. Never retains secret keys or temporary session credentials.
+  /// Different credential configurations are deliberately isolated without an extra AWS identity lookup.
   private static class RequestRateLimiterKey {
     private final String _streamName;
+    private final String _region;
+    private final String _endpoint;
+    private final String _credentialScope;
     private final String _shardId;
     private final RequestType _requestType;
 
-    RequestRateLimiterKey(String streamName, String shardId, RequestType requestType) {
-      _streamName = streamName;
+    RequestRateLimiterKey(KinesisConfig config, String shardId, RequestType requestType) {
+      _streamName = config.getStreamTopicName();
+      _region = config.getAwsRegion();
+      _endpoint = StringUtils.isBlank(config.getEndpoint()) ? "" : config.getEndpoint();
+      if (config.isIamRoleBasedAccess()) {
+        _credentialScope = "role:" + config.getRoleArn();
+      } else if (StringUtils.isNotBlank(config.getAccessKey()) && StringUtils.isNotBlank(config.getSecretKey())) {
+        _credentialScope = "access-key:" + config.getAccessKey();
+      } else {
+        _credentialScope = "default";
+      }
       _shardId = shardId;
       _requestType = requestType;
     }
@@ -364,13 +448,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         return false;
       }
       RequestRateLimiterKey that = (RequestRateLimiterKey) o;
-      return _streamName.equals(that._streamName) && _shardId.equals(that._shardId)
-          && _requestType == that._requestType;
+      return _streamName.equals(that._streamName) && _region.equals(that._region)
+          && _endpoint.equals(that._endpoint) && _credentialScope.equals(that._credentialScope)
+          && _shardId.equals(that._shardId) && _requestType == that._requestType;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_streamName, _shardId, _requestType);
+      return Objects.hash(_streamName, _region, _endpoint, _credentialScope, _shardId, _requestType);
     }
   }
 }
