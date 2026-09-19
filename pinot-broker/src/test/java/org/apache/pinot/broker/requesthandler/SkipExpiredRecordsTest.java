@@ -55,12 +55,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/// Tests for the {@code skipOutOfRetentionValues} query option in {@link BaseBrokerRequestHandler}.
+/// Tests for the {@code skipExpiredRecords} query option in {@link BaseBrokerRequestHandler}.
 /// <p>When the option is set the broker injects a lower-bound time filter derived from the table's
 /// retention config before the query reaches any server. Tests verify the injected filter's
 /// structure and value, and the skip conditions (option absent, no retention config, missing time
 /// column in schema, ORDER BY wrapper, existing WHERE clause).
-public class SkipOutOfRetentionValuesTest {
+public class SkipExpiredRecordsTest {
 
   private static final String RAW_TABLE = "myTable";
   private static final String OFFLINE_TABLE = "myTable_OFFLINE";
@@ -82,7 +82,7 @@ public class SkipOutOfRetentionValuesTest {
     BrokerRequest req = captured.get();
     Assert.assertNotNull(req);
     Assert.assertNull(req.getPinotQuery().getFilterExpression(),
-        "No filter should be injected when skipOutOfRetentionValues is not set");
+        "No filter should be injected when skipExpiredRecords is not set");
   }
 
   @Test
@@ -92,7 +92,7 @@ public class SkipOutOfRetentionValuesTest {
     BaseSingleStageBrokerRequestHandler handler = createHandler(buildTableCache(true, true), captured);
 
     long beforeMs = System.currentTimeMillis();
-    handler.handleRequest("SET skipOutOfRetentionValues='true'; SELECT * FROM " + RAW_TABLE);
+    handler.handleRequest("SET skipExpiredRecords='true'; SELECT * FROM " + RAW_TABLE);
     long afterMs = System.currentTimeMillis();
 
     BrokerRequest req = captured.get();
@@ -117,7 +117,7 @@ public class SkipOutOfRetentionValuesTest {
     BaseSingleStageBrokerRequestHandler handler = createHandler(buildTableCache(true, true), captured);
 
     handler.handleRequest(
-        "SET skipOutOfRetentionValues='true'; SELECT * FROM " + RAW_TABLE + " WHERE col = 'foo'");
+        "SET skipExpiredRecords='true'; SELECT * FROM " + RAW_TABLE + " WHERE col = 'foo'");
 
     BrokerRequest req = captured.get();
     Assert.assertNotNull(req);
@@ -142,7 +142,7 @@ public class SkipOutOfRetentionValuesTest {
 
     // ORDER BY causes the Calcite AST root to be SqlOrderBy, not SqlSelect.
     // The broker must unwrap it before injecting the filter.
-    handler.handleRequest("SET skipOutOfRetentionValues='true'; SELECT * FROM " + RAW_TABLE
+    handler.handleRequest("SET skipExpiredRecords='true'; SELECT * FROM " + RAW_TABLE
         + " ORDER BY " + TIME_COLUMN + " DESC LIMIT 10");
 
     BrokerRequest req = captured.get();
@@ -160,7 +160,7 @@ public class SkipOutOfRetentionValuesTest {
     // Table config has no retention values set
     BaseSingleStageBrokerRequestHandler handler = createHandler(buildTableCache(false, true), captured);
 
-    handler.handleRequest("SET skipOutOfRetentionValues='true'; SELECT * FROM " + RAW_TABLE);
+    handler.handleRequest("SET skipExpiredRecords='true'; SELECT * FROM " + RAW_TABLE);
 
     BrokerRequest req = captured.get();
     Assert.assertNotNull(req);
@@ -175,7 +175,7 @@ public class SkipOutOfRetentionValuesTest {
     // Table config declares a time column and retention, but the schema has no such column
     BaseSingleStageBrokerRequestHandler handler = createHandler(buildTableCache(true, false), captured);
 
-    handler.handleRequest("SET skipOutOfRetentionValues='true'; SELECT * FROM " + RAW_TABLE);
+    handler.handleRequest("SET skipExpiredRecords='true'; SELECT * FROM " + RAW_TABLE);
 
     BrokerRequest req = captured.get();
     Assert.assertNotNull(req);
