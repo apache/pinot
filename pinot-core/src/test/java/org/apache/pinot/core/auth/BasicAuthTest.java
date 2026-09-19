@@ -54,6 +54,12 @@ public class BasicAuthTest {
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable1"),
         ImmutableSet.of("read"))
         .hasTable("myTable"));
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", Set.of(), Set.of(), Set.of("read"))
+        .hasUnrestrictedTableAccess());
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", Set.of("myTable"), Set.of(), Set.of("read"))
+        .hasUnrestrictedTableAccess());
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", Set.of(), Set.of("myTable"), Set.of("read"))
+        .hasUnrestrictedTableAccess());
 
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("READ"))
