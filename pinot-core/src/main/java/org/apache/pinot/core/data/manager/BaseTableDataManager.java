@@ -431,9 +431,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema,
+        normalized -> {
+          Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
+          Schema shared = cached != null ? cached.getRight() : null;
+          return normalized.equals(shared) ? shared : normalized;
+        });
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    updateCachedTableConfigAndSchema(tableConfig, schema);
+    updateCachedTableConfigAndSchema(tableConfig, indexLoadingConfig.getSchema());
     return indexLoadingConfig;
   }
 
