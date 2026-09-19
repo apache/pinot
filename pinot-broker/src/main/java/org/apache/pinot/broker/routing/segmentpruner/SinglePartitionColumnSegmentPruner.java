@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,13 +36,14 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.sql.FilterKind;
 
 
 /// The `SinglePartitionColumnSegmentPruner` prunes segments based on their partition metadata stored in ZK. The
 /// pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
+  // Preparing predicates costs more than it saves for small inputs, especially with cheap partition functions.
+  private static final int MIN_SEGMENTS_FOR_PREPARATION = 256;
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
@@ -95,56 +95,100 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
-    if (filterExpression == null || segments.isEmpty()) {
+    if (filterExpression == null) {
       return segments;
     }
+    int numSegments = segments.size();
+    if (numSegments == 0) {
+      return segments;
+    }
+    if (numSegments >= MIN_SEGMENTS_FOR_PREPARATION) {
+      return pruneWithPreparedPredicate(filterExpression, segments);
+    }
     Set<String> selectedSegments = new HashSet<>();
-    // Reuse literal partition IDs across equivalent functions, but never across prune calls.
-    Map<PartitionFunctionKey, Map<Expression, Integer>> partitionIdCache = new HashMap<>();
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO || isPartitionMatch(
-          filterExpression, partitionInfo, partitionIdCache)) {
+          filterExpression, partitionInfo)) {
         selectedSegments.add(segment);
       }
     }
     return selectedSegments;
   }
 
-  private boolean isPartitionMatch(Expression filterExpression, SegmentPartitionInfo partitionInfo,
-      Map<PartitionFunctionKey, Map<Expression, Integer>> partitionIdCache) {
+  private static boolean hasDefaultConfig(PartitionFunction function) {
+    Map<String, String> config = function.getFunctionConfig();
+    return config == null || config.isEmpty();
+  }
+
+  private static boolean sameFunction(PartitionFunction first, PartitionFunction second) {
+    return first.getClass() == second.getClass() && first.getName().equals(second.getName())
+        && first.getNumPartitions() == second.getNumPartitions()
+        && first.getPartitionIdNormalizer() == second.getPartitionIdNormalizer();
+  }
+
+  private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
+    Set<String> selectedSegments = new HashSet<>();
+    PreparedPredicate predicate = null;
+    PartitionFunction cachedFunction = null;
+    for (String segment : segments) {
+      SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+      if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+        selectedSegments.add(segment);
+        continue;
+      }
+      PartitionFunction function = partitionInfo.getPartitionFunction();
+      if (predicate == null) {
+        predicate = new PreparedPredicate(filterExpression);
+        if (hasDefaultConfig(function)) {
+          cachedFunction = function;
+        }
+      }
+      // Reuse the filter structure even when IDs cannot be shared. Never compare configuration contents.
+      boolean reusePartitionIds = cachedFunction != null && hasDefaultConfig(function)
+          && sameFunction(cachedFunction, function);
+      if (predicate.matches(partitionInfo.getPartitions(), function, reusePartitionIds)) {
+        selectedSegments.add(segment);
+      }
+    }
+    return selectedSegments;
+  }
+
+  private boolean isPartitionMatch(Expression filterExpression, SegmentPartitionInfo partitionInfo) {
     Function function = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
     switch (filterKind) {
       case AND:
         for (Expression child : operands) {
-          if (!isPartitionMatch(child, partitionInfo, partitionIdCache)) {
+          if (!isPartitionMatch(child, partitionInfo)) {
             return false;
           }
         }
         return true;
       case OR:
         for (Expression child : operands) {
-          if (isPartitionMatch(child, partitionInfo, partitionIdCache)) {
+          if (isPartitionMatch(child, partitionInfo)) {
             return true;
           }
         }
         return false;
-      case EQUALS:
+      case EQUALS: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+          return partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
+              .getPartition(RequestContextUtils.getStringValue(operands.get(1))));
+        } else {
+          return true;
+        }
+      }
       case IN: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-          PartitionFunction partitionFunction = partitionInfo.getPartitionFunction();
-          PartitionFunctionKey key = new PartitionFunctionKey(partitionFunction.getClass(), partitionFunction.getName(),
-              partitionFunction.getNumPartitions(), partitionFunction.getPartitionIdNormalizer(),
-              partitionFunction.getFunctionConfig());
-          Map<Expression, Integer> partitionIds = partitionIdCache.computeIfAbsent(key, k -> new IdentityHashMap<>());
-          int numOperands = filterKind == FilterKind.EQUALS ? 2 : operands.size();
+          int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            int partitionId = partitionIds.computeIfAbsent(operands.get(i),
-                operand -> partitionFunction.getPartition(RequestContextUtils.getStringValue(operand)));
-            if (partitionInfo.getPartitions().contains(partitionId)) {
+            if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
+                .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
               return true;
             }
           }
@@ -158,8 +202,81 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     }
   }
 
-  /// Query-local cache key separating functions whose partition IDs may differ. Contains no segment-specific state.
-  private record PartitionFunctionKey(Class<? extends PartitionFunction> functionClass, String name, int numPartitions,
-                                      PartitionIdNormalizer normalizer, @Nullable Map<String, String> functionConfig) {
+  /// Lazily prepares only visited expressions and values. Instances belong to one prune call, never shared by queries.
+  private final class PreparedPredicate {
+    private final Expression _expression;
+    private FilterKind _kind;
+    private List<Expression> _operands;
+    private PreparedPredicate[] _children;
+    private List<Integer> _partitionIds;
+
+    private PreparedPredicate(Expression expression) {
+      _expression = expression;
+    }
+
+    private boolean matches(Set<Integer> partitions, PartitionFunction partitionFunction, boolean reusePartitionIds) {
+      if (_kind == null) {
+        Function function = _expression.getFunctionCall();
+        _kind = FilterKind.valueOf(function.getOperator());
+        _operands = function.getOperands();
+        if (_kind == FilterKind.AND || _kind == FilterKind.OR) {
+          _children = new PreparedPredicate[_operands.size()];
+          for (int i = 0; i < _children.length; i++) {
+            _children[i] = new PreparedPredicate(_operands.get(i));
+          }
+        } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
+          Identifier identifier = _operands.get(0).getIdentifier();
+          if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+            _partitionIds = new ArrayList<>(1);
+          }
+        }
+      }
+      switch (_kind) {
+        case AND:
+          for (PreparedPredicate child : _children) {
+            if (!child.matches(partitions, partitionFunction, reusePartitionIds)) {
+              return false;
+            }
+          }
+          return true;
+        case OR:
+          for (PreparedPredicate child : _children) {
+            if (child.matches(partitions, partitionFunction, reusePartitionIds)) {
+              return true;
+            }
+          }
+          return false;
+        case EQUALS:
+        case IN:
+          if (_partitionIds != null) {
+            int numValues = _kind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
+            if (!reusePartitionIds) {
+              for (int i = 0; i < numValues; i++) {
+                if (partitions.contains(
+                    partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(i + 1))))) {
+                  return true;
+                }
+              }
+              return false;
+            }
+            for (int i = 0; i < numValues; i++) {
+              Integer partitionId;
+              if (i < _partitionIds.size()) {
+                partitionId = _partitionIds.get(i);
+              } else {
+                partitionId = partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(i + 1)));
+                _partitionIds.add(partitionId);
+              }
+              if (partitions.contains(partitionId)) {
+                return true;
+              }
+            }
+            return false;
+          }
+          return true;
+        default:
+          return true;
+      }
+    }
   }
 }
