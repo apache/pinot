@@ -729,7 +729,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
         segmentName);
     // Revert the keys in the segment to previous location and remove the newly added keys
-    removeSegment(oldSegment, validDocIdsForOldSegment);
+    try {
+      removeSegment(oldSegment, validDocIdsForOldSegment);
+    } catch (RuntimeException e) {
+      String message = "UPSERT_METADATA_REVERT_FAILED: table=" + _tableNameWithType + ", partition=" + _partitionId
+          + ", segment=" + segmentName + ". Protected metadata revert did not complete; "
+          + "manual reconstruction and replay are required.";
+      _logger.error(message, e);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+      // Preserve the existing propagation of failures that the backend did not handle.
+      throw e;
+    }
     if (getPrevKeyToRecordLocationSize() == 0) {
       _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
       return;
