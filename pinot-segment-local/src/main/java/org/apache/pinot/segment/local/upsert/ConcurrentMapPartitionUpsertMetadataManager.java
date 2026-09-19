@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
@@ -164,7 +165,24 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               if (comparisonResult > 0 || (comparisonResult == 0 && shouldReplaceOnComparisonTie(segmentName,
                   currentSegmentName, getAuthoritativeUpdateOrCreationTime(segment),
                   getAuthoritativeUpdateOrCreationTime(currentSegment)))) {
-                replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
+                // Consuming segment is held alive by consumer ownership; immutable currents need the SDM
+                // refcount to block destroy while replaceDocId mutates the old segment's bitmap.
+                if (currentSegment instanceof MutableSegment) {
+                  replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
+                      recordInfo);
+                } else {
+                  SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
+                  if (currentSdm == null) {
+                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                  } else {
+                    try {
+                      replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
+                          recordInfo);
+                    } finally {
+                      _context.getTableDataManager().releaseSegment(currentSdm);
+                    }
+                  }
+                }
                 if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment) {
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                 }
@@ -240,25 +258,36 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               }
               // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
-              ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
-              if (prevValidDocIds != null) {
-                try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-                    _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-                  int prevDocId = prevLocation.getDocId();
-                  RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
-                      prevDocId, recordInfo);
-                  return prevLocation;
-                } catch (Exception e) {
-                  _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                      e);
-                  return null;
-                }
-              } else {
-                // Should not happen
-                _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
+              // Block destroy on prevSegment while we open the reader and mutate its bitmaps.
+              SegmentDataManager prevSdm = _context.getTableDataManager().acquireIfSame(prevSegment);
+              if (prevSdm == null) {
+                _logger.info("Previous segment: {} for primary key not present; dropping key",
                     prevSegment.getSegmentName());
                 return null;
+              }
+              try {
+                ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
+                if (prevValidDocIds != null) {
+                  try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                      _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+                    int prevDocId = prevLocation.getDocId();
+                    RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
+                    replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                        prevDocId, recordInfo);
+                    return prevLocation;
+                  } catch (Exception e) {
+                    _logger.error("Failed to revert to previous segment: {}, removing key",
+                        prevSegment.getSegmentName(), e);
+                    return null;
+                  }
+                } else {
+                  // Should not happen
+                  _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
+                      prevSegment.getSegmentName());
+                  return null;
+                }
+              } finally {
+                _context.getTableDataManager().releaseSegment(prevSdm);
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
               // The consuming segment's key is in a different immutable segment
@@ -308,19 +337,29 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
         numMetadataTTLKeysRemoved.getAndIncrement();
       } else if (_deletedKeysTTL > 0) {
-        ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
-        // if key not part of queryable doc id, it means it is deleted
-        if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
-          numTotalKeysMarkForDeletion.getAndIncrement();
-          if (comparisonValue >= deletedKeysThreshold) {
-            // If key is within the TTL window, do not remove it from the primary hashmap
-            numDeletedKeysWithinTTLWindow.getAndIncrement();
-          } else {
-            // delete key from primary hashmap
-            _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
-            removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
-            numDeletedTTLKeysRemoved.getAndIncrement();
+        // Block destroy while we touch getQueryableDocIds / removeDocId; skip if segment is unreachable.
+        IndexSegment cachedSegment = recordLocation.getSegment();
+        SegmentDataManager sdm = _context.getTableDataManager().acquireIfSame(cachedSegment);
+        if (sdm == null) {
+          return;
+        }
+        try {
+          ThreadSafeMutableRoaringBitmap currentQueryableDocIds = cachedSegment.getQueryableDocIds();
+          // if key not part of queryable doc id, it means it is deleted
+          if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
+            numTotalKeysMarkForDeletion.getAndIncrement();
+            if (comparisonValue >= deletedKeysThreshold) {
+              // If key is within the TTL window, do not remove it from the primary hashmap
+              numDeletedKeysWithinTTLWindow.getAndIncrement();
+            } else {
+              // delete key from primary hashmap
+              _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+              removeDocId(cachedSegment, recordLocation.getDocId());
+              numDeletedTTLKeysRemoved.getAndIncrement();
+            }
           }
+        } finally {
+          _context.getTableDataManager().releaseSegment(sdm);
         }
       }
     });
@@ -389,7 +428,24 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                     && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
-                replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
+                // Consuming segment is held alive by consumer ownership; immutable currents need the SDM
+                // refcount to block destroy while replaceDocId mutates the old segment's bitmap.
+                if (currentSegment instanceof MutableSegment) {
+                  replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
+                      recordInfo);
+                } else {
+                  SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
+                  if (currentSdm == null) {
+                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                  } else {
+                    try {
+                      replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId,
+                          recordInfo);
+                    } finally {
+                      _context.getTableDataManager().releaseSegment(currentSdm);
+                    }
+                  }
+                }
               }
               return newRecordLocation;
             } else {
@@ -425,21 +481,38 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           if (!recordInfo.isDeleteRecord()
               && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
             IndexSegment currentSegment = recordLocation.getSegment();
-            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
-            if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              try {
-                _reusePreviousRow.init(currentSegment, currentDocId);
-                _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
-              } finally {
-                _reuseMergeResultHolder.clear();
-                _reusePreviousRow.clear();
+            // Block destroy while LazyRow reads columns; consuming segment is held by consumer ownership.
+            if (currentSegment instanceof MutableSegment) {
+              mergeIfPreviousLive(currentSegment, currentDocId, record);
+            } else {
+              SegmentDataManager currentSdm = _context.getTableDataManager().acquireIfSame(currentSegment);
+              if (currentSdm != null) {
+                try {
+                  mergeIfPreviousLive(currentSegment, currentDocId, record);
+                } finally {
+                  _context.getTableDataManager().releaseSegment(currentSdm);
+                }
               }
             }
           }
           return recordLocation;
         });
     return record;
+  }
+
+  /// Caller must ensure `currentSegment` is alive for the duration of this call.
+  private void mergeIfPreviousLive(IndexSegment currentSegment, int currentDocId, GenericRow record) {
+    ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
+    if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
+      try {
+        _reusePreviousRow.init(currentSegment, currentDocId);
+        _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
+      } finally {
+        _reuseMergeResultHolder.clear();
+        _reusePreviousRow.clear();
+      }
+    }
   }
 
   @VisibleForTesting
