@@ -2852,6 +2852,7 @@
             <exclude>.cursor/**</exclude>
             <exclude>.openai/**</exclude>
             <exclude>.ollama/**</exclude>
+            <exclude>.agents/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
