@@ -49,6 +49,9 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
@@ -88,13 +91,15 @@ public class PinotEvaluateLiteralRule {
     List<RexNode> castedNewProjects = new ArrayList<>(numProjects);
     boolean needCast = false;
     for (int i = 0; i < numProjects; i++) {
-      RexNode oldNode = oldProjects.get(i);
       RexNode newNode = newProjects.get(i);
+      RelDataType expectedType = oldProject.getRowType().getFieldList().get(i).getType();
       // Need to cast the result to the original type if the literal type is changed, e.g. VARCHAR literal is typed as
-      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR.
-      if (!oldNode.getType().equals(newNode.getType())) {
+      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR. Use the project's declared row type
+      // instead of the original expression type because a nullable user-defined function can retain a non-null operand
+      // type while the validated projection is nullable.
+      if (!expectedType.equals(newNode.getType())) {
         needCast = true;
-        newNode = rexBuilder.makeCast(oldNode.getType(), newNode, true);
+        newNode = rexBuilder.makeAbstractCast(expectedType, newNode, false);
       }
       castedNewProjects.add(newNode);
     }
@@ -157,6 +162,15 @@ public class PinotEvaluateLiteralRule {
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
     Object[] arguments = new Object[numArguments];
+    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
+    // A SQL NULL JSON input or default becomes either SQL NULL or a type placeholder based on the query's
+    // null-handling option. This Calcite rule does not carry that option, so leave those calls for the
+    // leaf/intermediate runtime. A NULL path or result type is always NULL and remains safe to fold.
+    if (isJsonExtractScalar(canonicalName)
+        && (RexLiteral.isNullLiteral(operands.get(0))
+        || (numArguments == 4 && RexLiteral.isNullLiteral(operands.get(3))))) {
+      return rexCall;
+    }
     for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
       RexLiteral rexLiteral;
@@ -167,7 +181,13 @@ public class PinotEvaluateLiteralRule {
         return rexCall;
       }
       argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
-      arguments[i] = getLiteralValue(rexLiteral);
+      if (isJsonExtractScalar(canonicalName) && i == 3) {
+        RexExpression.Literal defaultLiteral = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral(rexLiteral);
+        argumentTypes[i] = defaultLiteral.getDataType();
+        arguments[i] = defaultLiteral.getValue();
+      } else {
+        arguments[i] = getLiteralValue(rexLiteral);
+      }
     }
 
     if (rexCall.getKind() == SqlKind.CAST) {
@@ -177,7 +197,6 @@ public class PinotEvaluateLiteralRule {
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
       arguments = new Object[]{arguments[0], RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name()};
     }
-    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
@@ -230,17 +249,21 @@ public class PinotEvaluateLiteralRule {
     }
     try {
       if (rexNodeType instanceof ArraySqlType) {
+        RelDataType componentType = rexNodeType.getComponentType();
+        // ArrayLiteralTransformFunction does not support BIG_DECIMAL components. Keep the function call so the
+        // jsonExtractScalar transform produces the BigDecimal array directly on the leaf.
+        if (componentType != null && componentType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+          return rexCall;
+        }
         List<Object> resultValues = new ArrayList<>();
-
-        // SQL FLOAT and DOUBLE literals are represented as Java double
-        if (resultValue instanceof double[]) {
-          for (double value: (double[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
-        } else {
-          for (Object value : (Object[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
+        for (Object value : toLiteralList(resultValue)) {
+          resultValues.add(convertResultValue(value, componentType));
+        }
+        if (resultValues.isEmpty()) {
+          // RexBuilder cannot make a typed literal from an empty Java list. A zero-operand ARRAY constructor would
+          // execute as Object[], which is incompatible with Pinot's primitive array result types, so keep the
+          // original call for runtime evaluation.
+          return rexCall;
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -254,6 +277,11 @@ public class PinotEvaluateLiteralRule {
   private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
     Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
     return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
+  }
+
+  private static boolean isJsonExtractScalar(String canonicalName) {
+    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
+        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
   }
 
   private static boolean isUnsignedIntegerType(SqlTypeName sqlTypeName) {
@@ -292,6 +320,10 @@ public class PinotEvaluateLiteralRule {
     if (resultValue == null) {
       return null;
     }
+    if (relDataType.getSqlTypeName() == SqlTypeName.BOOLEAN) {
+      // Scalar BOOLEAN is stored as Integer 0/1. Calcite literals need a Boolean.
+      return BooleanUtils.toBoolean(resultValue);
+    }
     if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
       // Return millis since epoch for TIMESTAMP
       if (resultValue instanceof Timestamp) {
@@ -321,5 +353,39 @@ public class PinotEvaluateLiteralRule {
     }
     // TODO: Add more type handling
     return resultValue;
+  }
+
+  /// Boxes a Java array so the folder can build a Calcite array literal. `jsonExtractScalar`
+  /// returns primitive arrays (`int[]`, `long[]`, `float[]`) and `double[]`; only `double[]` was
+  /// special-cased before, and the `Object[]` cast failed compilation for the rest.
+  private static List<Object> toLiteralList(Object resultValue) {
+    List<Object> values = new ArrayList<>();
+    if (resultValue instanceof Object[]) {
+      values.addAll(Arrays.asList((Object[]) resultValue));
+    } else if (resultValue instanceof int[]) {
+      for (int value : (int[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof long[]) {
+      for (long value : (long[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof float[]) {
+      for (float value : (float[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof double[]) {
+      for (double value : (double[]) resultValue) {
+        values.add(value);
+      }
+    } else if (resultValue instanceof boolean[]) {
+      // BOOLEAN_ARRAY is stored as int[] but may already be converted to boolean[] at the fold boundary.
+      for (boolean value : (boolean[]) resultValue) {
+        values.add(value);
+      }
+    } else {
+      throw new IllegalArgumentException("Unsupported array result type: " + resultValue.getClass().getName());
+    }
+    return values;
   }
 }

@@ -31,6 +31,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -128,8 +129,10 @@ public class LookupJoinOperator extends MultiStageOperator {
     Preconditions.checkState(nonEquiConditions.isEmpty() || _joinType.projectsRight(),
         "Lookup join type: %s does not support non-equi join conditions, got: %s", _joinType, nonEquiConditions);
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
-      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+      _nonEquiEvaluators.add(
+          TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema, nullHandlingEnabled));
     }
 
     KeyPlan keyPlan =

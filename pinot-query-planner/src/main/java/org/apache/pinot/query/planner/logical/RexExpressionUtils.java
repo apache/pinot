@@ -47,9 +47,12 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimeString;
 import org.apache.calcite.util.TimestampString;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -295,8 +298,63 @@ public class RexExpressionUtils {
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
             NegateScalarFunction.FUNCTION_NAME, fromRexNodes(rexCall.operands));
       default:
+        String functionName = getFunctionName(rexCall.op);
+        List<RexExpression> operands = fromRexNodes(rexCall.operands);
+        if (isJsonExtractScalarTransform(functionName) && rexCall.operands.size() == 4
+            && rexCall.operands.get(3) instanceof RexLiteral) {
+          operands.set(3, fromJsonExtractScalarDefaultLiteral((RexLiteral) rexCall.operands.get(3)));
+        }
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
-            getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));
+            functionName, operands);
+    }
+  }
+
+  private static boolean isJsonExtractScalarTransform(String functionName) {
+    switch (FunctionRegistry.canonicalize(functionName)) {
+      case "jsonextractscalar":
+      case "jsonextractscalarfast":
+      case "jsonextractscalarfirstmatch":
+      case "jsonextractscalarfory":
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// Converts a `jsonExtractScalar` default to the representation produced by `RequestUtils#getLiteral(SqlLiteral)`.
+  /// The single-stage parser keeps temporal and UUID literals as their canonical source text rather than their
+  /// internal epoch/byte representations. Numeric literals retain the parser's historical narrowing and overflow
+  /// behavior. Both constant folding and runtime Rex serialization must use this bridge to stay engine-compatible.
+  public static RexExpression.Literal fromJsonExtractScalarDefaultLiteral(RexLiteral rexLiteral) {
+    if (rexLiteral.isNull()) {
+      return fromRexLiteral(rexLiteral);
+    }
+    switch (rexLiteral.getTypeName()) {
+      case DATE:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(DateString.class)).toString());
+      case TIME:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(TimeString.class)).toString());
+      case TIMESTAMP:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(TimestampString.class)).toString());
+      case UUID:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(UUID.class)).toString());
+      case DECIMAL:
+        // Exact integers narrow through longValue() (including its historical overflow behavior), while exact
+        // non-integers become DOUBLE.
+        BigDecimal decimalValue = (BigDecimal) rexLiteral.getValue();
+        if (rexLiteral.getType().getScale() == 0) {
+          long longValue = decimalValue.longValue();
+          return longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE
+              ? new RexExpression.Literal(ColumnDataType.INT, (int) longValue)
+              : new RexExpression.Literal(ColumnDataType.LONG, longValue);
+        }
+        return new RexExpression.Literal(ColumnDataType.DOUBLE, decimalValue.doubleValue());
+      default:
+        return fromRexLiteral(rexLiteral);
     }
   }
 
