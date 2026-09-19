@@ -586,6 +586,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      // Registered here rather than with the listeners below so that it exists exactly when the handler does.
+      // The handler is wired to Helix later in this method, so this registration replays an empty config; the
+      // first real delivery reports every key as changed, which is what lets cluster config win over the static
+      // broker config seed.
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getProtoSegmentListPredicate());
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {

@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.query.routing;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// `WorkerMetadata` is used to send worker-level info about how to execute a stage on a particular worker.
@@ -36,20 +32,28 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// - the mailbox info required to construct data transfer linkages.
 /// - the partition mechanism of the data being execute on this worker.
 ///
+/// The segment maps are held as plain objects: they are only encoded for the wire in [QueryPlanSerDeUtils] when a
+/// request is built for the server that runs the worker, so the planner never pays for encoding on the compile path.
+///
 /// TODO: WorkerMetadata now doesn't have info directly about how to construct the mailboxes. instead it rely on
 /// MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
 public class WorkerMetadata {
+  /// Custom-property keys under which brokers that predate the proto segment list encoding ship the segment maps as
+  /// JSON strings. Still written (when the proto encoding is disabled) and read by [QueryPlanSerDeUtils] so that mixed
+  /// broker/server versions keep working; never present in [#getCustomProperties()] of a decoded instance.
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
 
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
   private final Map<String, String> _customProperties;
+  @Nullable
+  private Map<String, List<String>> _tableSegmentsMap;
+  @Nullable
+  private Map<String, List<String>> _logicalTableSegmentsMap;
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
-    _workerId = workerId;
-    _mailboxInfosMap = mailboxInfosMap;
-    _customProperties = new HashMap<>();
+    this(workerId, mailboxInfosMap, new HashMap<>());
   }
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap,
@@ -71,52 +75,30 @@ public class WorkerMetadata {
     return _customProperties;
   }
 
+  /// Segments to scan keyed by table type (`OFFLINE` / `REALTIME`), or `null` for a worker that scans no physical
+  /// table (intermediate stage, or a logical-table leaf).
   @Nullable
   public Map<String, List<String>> getTableSegmentsMap() {
-    return deserializeStringSegmentListMap(TABLE_SEGMENTS_MAP_KEY);
-  }
-
-  private Map<String, List<String>> deserializeStringSegmentListMap(String propertyKey) {
-    String tableSegmentsMapStr = _customProperties.get(propertyKey);
-    if (tableSegmentsMapStr != null) {
-      try {
-        return JsonUtils.stringToObject(tableSegmentsMapStr, new TypeReference<Map<String, List<String>>>() {
-        });
-      } catch (IOException e) {
-        throw new RuntimeException("Unable to deserialize " + propertyKey + " : " + tableSegmentsMapStr, e);
-      }
-    } else {
-      return null;
-    }
-  }
-
-  public boolean isLeafStageWorker() {
-    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY)
-        || _customProperties.containsKey(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    return _tableSegmentsMap;
   }
 
   public void setTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
-    String tableSegmentsMapStr;
-    try {
-      tableSegmentsMapStr = JsonUtils.objectToString(tableSegmentsMap);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Unable to serialize table segments map: " + tableSegmentsMap, e);
-    }
-    _customProperties.put(TABLE_SEGMENTS_MAP_KEY, tableSegmentsMapStr);
+    _tableSegmentsMap = tableSegmentsMap;
   }
 
+  /// Segments to scan keyed by physical table name (with type suffix), or `null` for a worker that scans no logical
+  /// table.
   @Nullable
   public Map<String, List<String>> getLogicalTableSegmentsMap() {
-    return deserializeStringSegmentListMap(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    return _logicalTableSegmentsMap;
   }
 
   public void setLogicalTableSegmentsMap(Map<String, List<String>> logicalTableSegmentsMap) {
-    String logicalTableSegmentsMapStr;
-    try {
-      logicalTableSegmentsMapStr = JsonUtils.objectToString(logicalTableSegmentsMap);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Unable to serialize table segments map: " + logicalTableSegmentsMap, e);
-    }
-    _customProperties.put(LOGICAL_TABLE_SEGMENTS_MAP_KEY, logicalTableSegmentsMapStr);
+    _logicalTableSegmentsMap = logicalTableSegmentsMap;
+  }
+
+  /// A leaf-stage worker carries a (possibly empty) segment map; an intermediate-stage worker carries none.
+  public boolean isLeafStageWorker() {
+    return _tableSegmentsMap != null || _logicalTableSegmentsMap != null;
   }
 }

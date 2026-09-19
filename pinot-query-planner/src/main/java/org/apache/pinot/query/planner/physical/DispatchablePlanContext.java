@@ -198,11 +198,19 @@ public class DispatchablePlanContext {
         QueryServerInstance queryServerInstance = serverEntry.getValue();
         serverInstanceToWorkerIdsMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);
         WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
+        // A leaf-stage worker is identified by carrying a (possibly empty) segment map, so every worker of a
+        // scanning stage has to be present in the map. Fail loudly here instead of letting the worker decay
+        // into an intermediate-stage worker on the server.
         if (workerIdToSegmentsMap != null) {
-          workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+          Map<String, List<String>> segmentsMap = workerIdToSegmentsMap.get(workerId);
+          Preconditions.checkNotNull(segmentsMap, "Missing segments map for worker id: %s", workerId);
+          workerMetadata.setTableSegmentsMap(segmentsMap);
         }
         if (workerIdToTableNameSegmentsMap != null) {
-          workerMetadata.setLogicalTableSegmentsMap(workerIdToTableNameSegmentsMap.get(workerId));
+          Map<String, List<String>> tableNameSegmentsMap = workerIdToTableNameSegmentsMap.get(workerId);
+          Preconditions.checkNotNull(tableNameSegmentsMap, "Missing logical table segments map for worker id: %s",
+              workerId);
+          workerMetadata.setLogicalTableSegmentsMap(tableNameSegmentsMap);
         }
         workerMetadataArray[workerId] = workerMetadata;
       }

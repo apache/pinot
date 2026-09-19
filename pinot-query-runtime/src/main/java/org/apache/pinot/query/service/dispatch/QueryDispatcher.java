@@ -133,26 +133,32 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
   /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
+  /// Cluster-level default for the proto encoding of leaf-stage segment lists. Used as the fallback when the query
+  /// does not carry an explicit [QueryOptionKey#PROTO_SEGMENT_LIST] override. Read per request because operators can
+  /// change it live through cluster config; see [ProtoSegmentListPredicate].
+  private final ProtoSegmentListPredicate _protoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
+        new ProtoSegmentListPredicate(CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST));
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
   /// disables keep-alive.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
-      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
+      ProtoSegmentListPredicate protoSegmentList) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs);
+        streamStatsDefault, statsDrainMs, protoSegmentList);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs) {
+      boolean streamStatsDefault, long statsDrainMs, ProtoSegmentListPredicate protoSegmentList) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -163,6 +169,7 @@ public class QueryDispatcher {
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
+    _protoSegmentList = protoSegmentList;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -359,8 +366,9 @@ public class QueryDispatcher {
     // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
     // before all opchains have responded.
     BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
+    boolean protoSegmentList = QueryOptionsUtils.isProtoSegmentList(queryOptions, _protoSegmentList.isEnabled());
     for (QueryServerInstance server : serversOut) {
-      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata);
+      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, protoSegmentList);
       int expectedForServer = 0;
       for (DispatchablePlanFragment stagePlan : plansWithoutRoot) {
         List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(server);
@@ -633,8 +641,9 @@ public class QueryDispatcher {
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
+    boolean protoSegmentList = QueryOptionsUtils.isProtoSegmentList(queryOptions, _protoSegmentList.isEnabled());
     BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
-        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata));
+        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, protoSegmentList));
 
     processResults(requestId, serverInstancesOut.size(), resultConsumer, deadline, dispatchCallbacks);
   }
@@ -698,8 +707,11 @@ public class QueryDispatcher {
     }
   }
 
+  /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'
+  /// metadata. The leaf-stage segment lists are encoded here, once per worker, rather than at plan time.
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
-      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata) {
+      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata,
+      boolean protoSegmentList) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
     requestBuilder.setVersion(PlanVersions.V1);
 
@@ -713,7 +725,7 @@ public class QueryDispatcher {
           workerMetadataList.add(stageWorkerMetadataList.get(workerId));
         }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList, protoSegmentList);
         StageInfo stageInfo = entry.getValue();
 
         Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()

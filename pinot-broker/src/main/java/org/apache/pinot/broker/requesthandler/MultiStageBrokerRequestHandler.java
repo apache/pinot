@@ -90,6 +90,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
+import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -145,6 +146,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
   private final boolean _streamStatsDefault;
+  /// Live cluster-config default for the proto segment list encoding. Registered as a cluster-config
+  /// listener by the broker starter so operators can flip it without restarting the brokers.
+  private final ProtoSegmentListPredicate _protoSegmentListPredicate;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
@@ -210,11 +214,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long streamStatsDrainMs = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS_DRAIN_MS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+    _protoSegmentListPredicate = ProtoSegmentListPredicate.create(_config);
     _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,
-            streamStatsDrainMs);
+            streamStatsDrainMs, _protoSegmentListPredicate);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -1103,5 +1108,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   public QueryDispatcher getQueryDispatcher() {
     return _queryDispatcher;
+  }
+
+  /// The live default for the proto segment list encoding, to be registered as a cluster-config change listener by
+  /// the broker starter.
+  public ProtoSegmentListPredicate getProtoSegmentListPredicate() {
+    return _protoSegmentListPredicate;
   }
 }

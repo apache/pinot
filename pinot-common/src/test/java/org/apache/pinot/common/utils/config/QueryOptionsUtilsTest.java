@@ -124,6 +124,14 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void testIsProtoSegmentList() {
+    assertFalse(QueryOptionsUtils.isProtoSegmentList(Map.of(), false));
+    assertTrue(QueryOptionsUtils.isProtoSegmentList(Map.of(), true));
+    assertTrue(QueryOptionsUtils.isProtoSegmentList(Map.of(PROTO_SEGMENT_LIST, "true"), false));
+    assertFalse(QueryOptionsUtils.isProtoSegmentList(Map.of(PROTO_SEGMENT_LIST, "false"), true));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);
