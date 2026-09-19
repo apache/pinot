@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -32,6 +33,11 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 /// Inbuilt array scalar functions. See [ArrayUtils] for details.
 public class ArrayFunctions {
+  /// Maximum number of elements the `generate*Array` functions may produce. Calls on literal arguments are folded
+  /// into the query plan as an array literal, so an unbounded range would exhaust broker memory rather than fail
+  /// cleanly. 100000 covers a minute resolution grid over 69 days, which is well past any practical time grid.
+  private static final int MAX_GENERATED_ARRAY_LENGTH = 100_000;
+
   private ArrayFunctions() {
   }
 
@@ -362,48 +368,114 @@ public class ArrayFunctions {
     return arr;
   }
 
+  /// Generates the sequence `start, start + inc, ...`, stopping at the last value that does not pass `end`. Both
+  /// bounds are inclusive when `end` lands exactly on a step, and `inc` may be negative to count down.
+  ///
+  /// The main use is building a dense time grid to `UNNEST` and left join a sparse time series onto, which is how gap
+  /// filling is expressed in the multi-stage engine:
+  /// ```sql
+  /// SELECT ts FROM UNNEST(generateArray(1633078800000, 1633089600000, 1800000)) AS grid(ts)
+  /// ```
+  /// `generateArray` selects the variant to call from its argument types; see
+  /// [org.apache.pinot.common.function.scalar.array.GenerateArrayScalarFunction].
+  ///
+  /// @throws IllegalArgumentException if `inc` is zero, if its sign does not lead from `start` to `end`, or if the
+  ///         sequence would hold more than [#MAX_GENERATED_ARRAY_LENGTH] elements
+  @ScalarFunction
+  public static long[] generateLongArray(long start, long end, long inc) {
+    long[] arr = new long[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
+    }
+    return arr;
+  }
+
+  /// Same as [#generateLongArray(long, long, long)] with a step of `1`, or `-1` when `end` is below `start`.
+  @ScalarFunction
+  public static long[] generateLongArray(long start, long end) {
+    return generateLongArray(start, end, end < start ? -1 : 1);
+  }
+
   @ScalarFunction
   public static int[] generateIntArray(int start, int end, int inc) {
-    int size = (end - start) / inc + 1;
-    int[] arr = new int[size];
-
-    for (int i = 0, value = start; i < size; i++, value += inc) {
-      arr[i] = value;
+    int[] arr = new int[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
   }
 
   @ScalarFunction
-  public static long[] generateLongArray(long start, long end, long inc) {
-    int size = (int) ((end - start) / inc + 1);
-    long[] arr = new long[size];
-
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
-    }
-    return arr;
+  public static int[] generateIntArray(int start, int end) {
+    return generateIntArray(start, end, end < start ? -1 : 1);
   }
 
   @ScalarFunction
   public static float[] generateFloatArray(float start, float end, float inc) {
-    int size = (int) ((end - start) / inc + 1);
-    float[] arr = new float[size];
-
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
+    float[] arr = new float[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
   }
 
   @ScalarFunction
-  public static double[] generateDoubleArray(double start, double end, double inc) {
-    int size = (int) ((end - start) / inc + 1);
-    double[] arr = new double[size];
+  public static float[] generateFloatArray(float start, float end) {
+    return generateFloatArray(start, end, end < start ? -1 : 1);
+  }
 
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
+  @ScalarFunction
+  public static double[] generateDoubleArray(double start, double end, double inc) {
+    double[] arr = new double[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
+  }
+
+  @ScalarFunction
+  public static double[] generateDoubleArray(double start, double end) {
+    return generateDoubleArray(start, end, end < start ? -1 : 1);
+  }
+
+  /// Length of the integral sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  private static int generatedArrayLength(long start, long end, long inc) {
+    Preconditions.checkArgument(inc != 0, "Increment must not be zero");
+    long span;
+    try {
+      span = Math.subtractExact(end, start);
+    } catch (ArithmeticException e) {
+      // The span does not fit in a long, so the sequence is far past the length limit whatever the increment is.
+      throw new IllegalArgumentException(
+          String.format("Range from %s to %s is too wide to generate an array from", start, end));
+    }
+    checkIncrementLeadsToEnd(Long.signum(span), Long.signum(inc), start, end, inc);
+    return checkGeneratedArrayLength(span / inc);
+  }
+
+  /// Length of the floating point sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  private static int generatedArrayLength(double start, double end, double inc) {
+    Preconditions.checkArgument(inc != 0 && !Double.isNaN(inc), "Increment must not be zero or NaN, got: %s", inc);
+    Preconditions.checkArgument(Double.isFinite(start) && Double.isFinite(end),
+        "Range from %s to %s must be finite", start, end);
+    double span = end - start;
+    checkIncrementLeadsToEnd((int) Math.signum(span), (int) Math.signum(inc), start, end, inc);
+    // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
+    return checkGeneratedArrayLength((long) Math.floor(span / inc));
+  }
+
+  private static void checkIncrementLeadsToEnd(int spanSignum, int incSignum, Number start, Number end, Number inc) {
+    // A zero span yields the single element sequence [start], so any non-zero increment is fine there.
+    Preconditions.checkArgument(spanSignum == 0 || spanSignum == incSignum,
+        "Increment: %s does not lead from start: %s to end: %s", inc, start, end);
+  }
+
+  /// Checks the length of a sequence taking `steps` increments to reach its end, and returns it. The check is on the
+  /// step count rather than on the length so that a span of `Long.MAX_VALUE` cannot overflow into a small length.
+  private static int checkGeneratedArrayLength(long steps) {
+    Preconditions.checkArgument(steps < MAX_GENERATED_ARRAY_LENGTH,
+        "Generating more than %s elements exceeds the maximum of %s", steps, MAX_GENERATED_ARRAY_LENGTH);
+    return (int) steps + 1;
   }
 
   @ScalarFunction
