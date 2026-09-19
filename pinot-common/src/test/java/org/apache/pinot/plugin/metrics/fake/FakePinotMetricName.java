@@ -23,14 +23,25 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
 public class FakePinotMetricName implements PinotMetricName {
+  /// Class-qualified, so that two `AbstractMetrics` sharing a metric prefix stay distinct keys -- mirroring the
+  /// yammer registry, where the owning class is part of the metric identity.
+  private final String _qualifiedName;
   private final String _name;
 
   public FakePinotMetricName(Class<?> clazz, String name) {
-    _name = clazz.getName() + "." + name;
+    _qualifiedName = clazz.getName() + "." + name;
+    _name = name;
   }
 
   @Override
   public Object getMetricName() {
+    return _qualifiedName;
+  }
+
+  /// The bare composed name. Must not include the class qualifier: callers use this to match a registered series
+  /// against a metric prefix, which the qualifier would push out of the way.
+  @Override
+  public String getName() {
     return _name;
   }
 
@@ -42,16 +53,16 @@ public class FakePinotMetricName implements PinotMetricName {
     if (!(o instanceof FakePinotMetricName)) {
       return false;
     }
-    return Objects.equals(_name, ((FakePinotMetricName) o)._name);
+    return Objects.equals(_qualifiedName, ((FakePinotMetricName) o)._qualifiedName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(_name);
+    return Objects.hashCode(_qualifiedName);
   }
 
   @Override
   public String toString() {
-    return _name;
+    return _qualifiedName;
   }
 }
