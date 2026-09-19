@@ -232,9 +232,12 @@ public class LLCSegmentCompletionHandlers {
     try {
       localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
       String rawTableName = new LLCSegmentName(segmentName).getTableName();
+      String tmpSegmentFileName = instanceId != null && !instanceId.isBlank()
+          ? SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, instanceId)
+          : SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
       URI segmentFileURI =
           URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-              URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
+              URIUtils.encode(tmpSegmentFileName));
       // Emit metrics related to deep-store upload operation
       long startTimeMs = System.currentTimeMillis();
       long segmentSizeBytes = localTempFile.length();
