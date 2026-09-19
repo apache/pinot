@@ -49,6 +49,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -141,17 +142,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
 
       // Perform aggregation group-by on all the blocks
-      DefaultGroupByExecutor groupByExecutor;
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
+      DefaultGroupByExecutor groupByExecutor = starTreeFunctionColumnPairs != null
+          ? new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+              starTreeFunctionColumnPairs, groupKeyGenerator)
+          : new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+              groupKeyGenerator);
 
-      if (aggregationInfo.isUseStarTree()) {
-        groupByExecutor =
-            new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
-      } else {
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
-      }
       // The group key generator should be shared across all AggregationFunctions so that agg results can be
       // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
       // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
