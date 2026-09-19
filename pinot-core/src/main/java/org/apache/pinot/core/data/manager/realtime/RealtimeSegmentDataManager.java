@@ -567,10 +567,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _currentOffset);
         }
         // We check this flag again further down
-      } else if (messageBatch.getUnfilteredMessageCount() > 0) {
+      } else if (messageBatch.getUnfilteredMessageCount() > 0
+          || messageBatch.getOffsetOfNextBatch().compareTo(_currentOffset) > 0) {
         _idleTimer.markEventConsumed();
-        // we consumed something from the stream but filtered all the content out,
-        // so we need to advance the offsets to avoid getting stuck
+        // Advance when next offset is ahead so filtered-all or empty tails cannot pin _currentOffset.
         StreamPartitionMsgOffset nextOffset = messageBatch.getOffsetOfNextBatch();
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("Skipped empty batch. Advancing from {} to {}", _currentOffset, nextOffset);
