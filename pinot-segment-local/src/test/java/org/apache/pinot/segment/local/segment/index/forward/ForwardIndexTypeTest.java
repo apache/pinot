@@ -453,7 +453,7 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void conflictingFieldConfigEncodingVsIndexesForward()
+    public void indexesForwardEncodingOverridesFieldConfigEncoding()
         throws IOException {
       addFieldIndexConfig(""
           + " {\n"
@@ -463,11 +463,22 @@ public class ForwardIndexTypeTest {
           + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
           + "    }\n"
           + " }");
-      IllegalStateException ex = expectThrows(IllegalStateException.class,
-          () -> getActualConfig("dimInt", StandardIndexes.forward()));
-      assertTrue(ex.getMessage().contains("dimInt"), "message must name the column: " + ex.getMessage());
-      assertTrue(ex.getMessage().contains("encoding"),
-          "message must identify encoding as the conflicting field: " + ex.getMessage());
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
+    }
+
+    @Test
+    public void indexesForwardEncodingOverridesNoDictionaryColumns()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
+          + "    }\n"
+          + " }");
+      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
     }
 
     @Test
