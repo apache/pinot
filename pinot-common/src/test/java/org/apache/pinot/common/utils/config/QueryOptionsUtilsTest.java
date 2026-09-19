@@ -317,6 +317,36 @@ public class QueryOptionsUtilsTest {
     }
   }
 
+  /// The join-reorder options cannot ride the shared POSITIVE_INT_KEYS harness: that harness
+  /// asserts an absent option reads back as `null`, whereas `joinReorderMaxJoins` falls back to a
+  /// caller-supplied default. The rejection cases are therefore spelled out here.
+  @Test
+  public void testJoinReorderOptions() {
+    assertFalse(QueryOptionsUtils.isUseJoinReorder(Map.of(), false), "Absent must take the default");
+    assertTrue(QueryOptionsUtils.isUseJoinReorder(Map.of(), true), "Absent must take the default");
+    assertTrue(QueryOptionsUtils.isUseJoinReorder(Map.of(USE_JOIN_REORDER, "true"), false),
+        "An explicit true must override a false default");
+    assertFalse(QueryOptionsUtils.isUseJoinReorder(Map.of(USE_JOIN_REORDER, "false"), true),
+        "An explicit false must override a true default");
+
+    assertFalse(QueryOptionsUtils.isJoinReorderFeedback(Map.of()), "Feedback must be opt-in");
+    assertTrue(QueryOptionsUtils.isJoinReorderFeedback(Map.of(JOIN_REORDER_FEEDBACK, "true")));
+
+    assertEquals(QueryOptionsUtils.getJoinReorderMaxJoins(Map.of(), 7), 7, "Absent must take the default");
+    assertEquals(QueryOptionsUtils.getJoinReorderMaxJoins(Map.of(JOIN_REORDER_MAX_JOINS, "3"), 7), 3);
+
+    // A value an operator got wrong must be rejected, not silently replaced by the default.
+    for (String value : new String[]{"0", "-1", "abc", "2147483648", "2.5"}) {
+      try {
+        QueryOptionsUtils.getJoinReorderMaxJoins(Map.of(JOIN_REORDER_MAX_JOINS, value), 7);
+        fail("Expected rejection of " + JOIN_REORDER_MAX_JOINS + "=" + value);
+      } catch (IllegalArgumentException e) {
+        assertTrue(e.getMessage().contains(JOIN_REORDER_MAX_JOINS),
+            "Message must name the offending option: " + e.getMessage());
+      }
+    }
+  }
+
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {
       // Positive ints

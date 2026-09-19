@@ -43,6 +43,9 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.metadata.RelMetadataQueryBase;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -57,6 +60,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
@@ -80,6 +84,7 @@ import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtils;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.logical.JoinReorderOptimizer;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
@@ -92,13 +97,17 @@ import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -149,6 +158,9 @@ public class QueryEnvironment {
   private final PinotCatalog _catalog;
   private final Set<String> _defaultDisabledPlannerRules;
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
+  /// Whether Pinot's statistics-backed metadata handlers replace Calcite's defaults for this
+  /// environment. Resolved once here rather than per query: it cannot change for a given config.
+  private final boolean _usePinotMetadataProvider;
 
   public QueryEnvironment(Config config) {
     this(config, null);
@@ -157,7 +169,7 @@ public class QueryEnvironment {
   public QueryEnvironment(Config config, MultiClusterRoutingContext multiClusterRoutingContext) {
     _envConfig = config;
     String database = config.getDatabase();
-    _catalog = new PinotCatalog(config.getTableCache(), database);
+    _catalog = new PinotCatalog(config.getTableCache(), database, config.getStatisticsProvider());
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     _config = Frameworks.newConfigBuilder()
         .traitDefs()
@@ -171,6 +183,7 @@ public class QueryEnvironment {
     // default optProgram with no skip rule options and no use rule options
     _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
     _multiClusterRoutingContext = multiClusterRoutingContext;
+    _usePinotMetadataProvider = config.getStatisticsProvider() != NoOpStatisticsProvider.INSTANCE;
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -458,6 +471,31 @@ public class QueryEnvironment {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      // Only displace Calcite's metadata provider when statistics can actually answer. With the
+      // no-op provider the Pinot handlers do a measurable amount of work per Filter and TableScan
+      // -- resolving the scan, allocating a column mapping, asking for table statistics -- purely
+      // to fall through to the same guess Calcite's default returns for free. Brokers that never
+      // enabled statistics should not pay that, nor run a different selectivity code path.
+      if (_usePinotMetadataProvider) {
+        // PinotDefaultRelMetadataProvider.INSTANCE is a global singleton — Janino compiles handler
+        // classes only once regardless of how many QueryEnvironment instances exist.
+        JaninoRelMetadataProvider janino =
+            JaninoRelMetadataProvider.of(PinotDefaultRelMetadataProvider.INSTANCE);
+        // Bind through the query supplier, not setMetadataProvider alone. That method publishes the
+        // provider by writing RelMetadataQueryBase.THREAD_PROVIDERS, a ThreadLocal on the CALLING
+        // thread, so the binding is thread-scoped while the cluster is not. Two ways that breaks:
+        // compilation and planning are submitted as separate tasks to the same executor and may run
+        // on different threads, and any later RelBuilder.create() on a pooled thread overwrites the
+        // entry with Calcite's default -- after which the next invalidateMetadataQuery() silently
+        // drops Pinot's handlers, with no error and no log. Re-asserting it inside the supplier
+        // makes the binding follow the cluster onto whichever thread asks for metadata.
+        cluster.setMetadataProvider(PinotDefaultRelMetadataProvider.INSTANCE);
+        cluster.setMetadataQuerySupplier(() -> {
+          RelMetadataQueryBase.THREAD_PROVIDERS.set(janino);
+          return RelMetadataQuery.instance();
+        });
+        cluster.invalidateMetadataQuery();
+      }
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
               PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
@@ -503,8 +541,10 @@ public class QueryEnvironment {
   /// optionally generate new nodes.
   ///
   /// The result of the method is an optimized tree of nodes that is semantically equivalent to the input tree, but
-  /// may be more efficient to execute. This doesn't mean that the query is ready to use. In fact, in fact it can be
-  /// further optimized by applying Pinot specific. But this is the further we can go with Calcite.
+  /// may be more efficient to execute. This doesn't mean the query is ready to run: it can be further optimized with
+  /// Pinot-specific rules. Within this method, the optional cost-based join reorder is applied after the standard
+  /// rule programs and before trait resolution — but this is the furthest we can go with Calcite's standard rule
+  /// sets.
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
     // TODO: add support for cost factory
     try {
@@ -515,6 +555,27 @@ public class QueryEnvironment {
       RelNode optimized = optPlanner.findBestExp();
       listener.printRuleTimings();
       listener.populateRuleTimings();
+      // Scoped, gated, cost-based join-reordering phase. Runs after the logical Hep program and
+      // before the trait phase. Off by default; when disabled or when its eligibility gates fail
+      // it returns the plan unchanged. It never throws — see JoinReorderOptimizer.maybeReorder.
+      if (QueryOptionsUtils.isUseJoinReorder(plannerContext.getOptions(),
+          _envConfig.defaultUseJoinReorder())) {
+        int maxJoins = QueryOptionsUtils.getJoinReorderMaxJoins(plannerContext.getOptions(),
+            _envConfig.defaultJoinReorderMaxJoins());
+        // Read before the call: the diagnostics the feedback entry reports each cost a full-tree
+        // metadata walk, so the optimizer only computes them when someone is listening.
+        boolean feedback = QueryOptionsUtils.isJoinReorderFeedback(plannerContext.getOptions());
+        JoinReorderOptimizer.Result reorderResult =
+            JoinReorderOptimizer.maybeReorder(optimized, maxJoins, feedback);
+        optimized = reorderResult.plan();
+        if (feedback) {
+          // Published here rather than inside the optimizer so the optimizer owns no response
+          // concern. The sink is propagated by reference across the compile/plan executors, so a
+          // write from this planning thread is visible when the broker assembles the response.
+          QueryThreadContext.addResponseBrokerMetadata(Request.JOIN_REORDER_RESPONSE_KEY,
+              reorderResult.toJson());
+        }
+      }
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
@@ -840,6 +901,29 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
     }
 
+    /// Whether to run the cost-based join-reordering phase by default.
+    ///
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
+    /// configuration.
+    /// This default value can be always overridden at query level by the query option
+    /// [CommonConstants.Broker.Request.QueryOptionKey#USE_JOIN_REORDER].
+    @Value.Default
+    default boolean defaultUseJoinReorder() {
+      return CommonConstants.Broker.DEFAULT_USE_JOIN_REORDER;
+    }
+
+    /// Maximum number of joins a plan may contain for the cost-based join-reordering phase to run.
+    /// Plans that exceed this cap skip the reorder phase.
+    ///
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
+    /// configuration.
+    /// This default value can be always overridden at query level by the query option
+    /// [CommonConstants.Broker.Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS].
+    @Value.Default
+    default int defaultJoinReorderMaxJoins() {
+      return CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS;
+    }
+
     /// Whether to use lite mode by default.
     ///
     /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
@@ -933,6 +1017,15 @@ public class QueryEnvironment {
     /// just to execute some static analysis on the query like parsing it or getting the tables involved in the query.
     @Nullable
     WorkerManager getWorkerManager();
+
+    /// Returns the statistics provider used to supply row-count and column statistics to the
+    /// Calcite planner. Defaults to [NoOpStatisticsProvider#INSTANCE], which causes the
+    /// planner to fall back to heuristic cost estimation as before this field was introduced.
+    /// Leave it unset for that behaviour; the builder rejects an explicit `null`.
+    @Value.Default
+    default PinotStatisticsProvider getStatisticsProvider() {
+      return NoOpStatisticsProvider.INSTANCE;
+    }
 
     /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
     @Value.Default
