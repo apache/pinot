@@ -60,9 +60,9 @@ public class SinglePartitionColumnSegmentPrunerTest {
   public void testHashesOnceAcrossDistinctMetadataInstancesPerQuery() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     Set<String> expected = new HashSet<>();
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < 256; i++) {
       String segment = "segment_" + i;
-      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(i % 8), Map.of("offset", "0")));
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(i % 8), i % 2 == 0 ? null : Map.of()));
       if (i % 8 == 3) {
         expected.add(segment);
       }
@@ -79,31 +79,55 @@ public class SinglePartitionColumnSegmentPrunerTest {
   @Test
   public void testInterleavedFunctionConfigurationsAndPartitionCounts() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
-    records.put("a", metadata("a", "PrunerCounting", 8, Set.of(3), Map.of("offset", "0")));
+    records.put("a", metadata("a", "PrunerCounting", 8, Set.of(3), null));
+    records.put("sameFunction", metadata("sameFunction", "PrunerCounting", 8, Set.of(2), null));
     records.put("b", metadata("b", "PrunerCounting", 8, Set.of(4), Map.of("offset", "1")));
-    records.put("c", metadata("c", "PrunerCounting", 8, Set.of(2), Map.of("offset", "0")));
+    records.put("c", metadata("c", "PrunerCounting", 8, Set.of(2), null));
     records.put("d", metadata("d", "PrunerCounting", 8, Set.of(3), Map.of("offset", "1")));
-    records.put("e", metadata("e", "PrunerCounting", 16, Set.of(11), Map.of("offset", "0")));
+    records.put("e", metadata("e", "PrunerCounting", 16, Set.of(11), null));
+    Set<String> expected = new HashSet<>(Set.of("a", "b", "e"));
+    for (int i = 0; i < 250; i++) {
+      String segment = "tail_" + i;
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(3), null));
+      expected.add(segment);
+    }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     CountingPartitionFunction.CALLS.set(0);
-    assertEquals(pruner.prune(request(predicate("EQUALS", "11")), records.keySet()), Set.of("a", "b", "e"));
+    assertEquals(pruner.prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 4,
+        "Only compatible default functions reuse IDs; configured functions never compare configuration contents");
+    records.put("b", metadata("b", "PrunerCounting", 16, Set.of(11), null));
+    records.put("d", metadata("d", "PrunerCounting", 8, Set.of(3), null));
+    expected.add("d");
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner(records).prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 3,
-        "Interleaved segments with the same complete configuration must reuse hashes");
+        "Different partition counts must not reuse partition IDs");
   }
 
   @Test
   public void testDuplicateInPartitionsAndIncrementalEvaluation() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     records.put("first", metadata("first", "PrunerCounting", 8, Set.of(1), null));
+    records.put("configured", metadata("configured", "PrunerCounting", 8, Set.of(3), Map.of("offset", "1")));
     records.put("second", metadata("second", "PrunerCounting", 8, Set.of(2), null));
     records.put("miss", metadata("miss", "PrunerCounting", 8, Set.of(3, 4), null));
     records.put("repeat", metadata("repeat", "PrunerCounting", 8, Set.of(1, 2), null));
+    Set<String> expected = new HashSet<>(Set.of("first", "configured", "second", "repeat"));
+    for (int i = 0; i < 252; i++) {
+      String segment = "repeat_" + i;
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(1, 2), null));
+      expected.add(segment);
+    }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     CountingPartitionFunction.CALLS.set(0);
-    // The first segment evaluates only 1; the second extends the cached prefix past repeated partition 1 to 2.
+    // The configured segment must not consume or extend the prefix cached by the first segment.
     assertEquals(pruner.prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()),
-        Set.of("first", "second", "repeat"));
-    assertEquals(CountingPartitionFunction.CALLS.get(), 4);
+        expected);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 8);
+    // A configured first segment must not seed IDs for later default-config segments.
+    records.put("first", metadata("first", "PrunerCounting", 8, Set.of(2), Map.of("offset", "1")));
+    assertEquals(pruner(records).prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()), expected);
   }
 
   @Test
@@ -138,8 +162,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
     moduloRecords.put("positive", metadata("positive", "Modulo", 8, Set.of(7), null));
     moduloRecords.put("abs", metadata("abs", "Modulo", 8, Set.of(1), Map.of("partitionIdNormalizer", "ABS")));
     moduloRecords.put("wrongAbs", metadata("wrongAbs", "Modulo", 8, Set.of(7), Map.of("partitionIdNormalizer", "ABS")));
+    Set<String> expected = new HashSet<>(Set.of("positive", "abs"));
+    for (int i = 0; i < 253; i++) {
+      String segment = "positive_" + i;
+      moduloRecords.put(segment, metadata(segment, "Modulo", 8, Set.of(7), null));
+      expected.add(segment);
+    }
     assertEquals(pruner(moduloRecords).prune(request(predicate("EQUALS", "-1")), moduloRecords.keySet()),
-        Set.of("positive", "abs"));
+        expected);
 
     String value = "80ff0102";
     Map<String, String> rawConfig = Map.of("useRawBytes", "true");
@@ -150,8 +180,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
     murmurRecords.put("text", metadata("text", "Murmur", 97, Set.of(textPartition), null));
     murmurRecords.put("raw", metadata("raw", "Murmur", 97, Set.of(rawPartition), rawConfig));
     murmurRecords.put("wrongRaw", metadata("wrongRaw", "Murmur", 97, Set.of(textPartition), rawConfig));
+    expected = new HashSet<>(Set.of("text", "raw"));
+    for (int i = 0; i < 253; i++) {
+      String segment = "text_" + i;
+      murmurRecords.put(segment, metadata(segment, "Murmur", 97, Set.of(textPartition), null));
+      expected.add(segment);
+    }
     assertEquals(pruner(murmurRecords).prune(request(predicate("EQUALS", value)), murmurRecords.keySet()),
-        Set.of("text", "raw"));
+        expected);
 
     Map<String, ZNRecord> lookupRecords = new LinkedHashMap<>();
     lookupRecords.put("first", metadata("first", "BoundedColumnValue", 3, Set.of(1),
@@ -165,7 +201,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
 
   @DataProvider
   public Object[][] candidateCounts() {
-    return new Object[][]{{1}, {2}};
+    return new Object[][]{{1}, {2}, {256}};
   }
 
   @Test(dataProvider = "candidateCounts")
@@ -228,14 +264,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {
       String segment = "segment_" + i;
-      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(3), Map.of("offset", "0")));
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(3), null));
     }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     Set<String> segments = records.keySet();
     BrokerRequest request = request(predicate("EQUALS", "3"));
     assertEquals(pruner.prune(request, segments), segments);
     for (String segment : segments) {
-      pruner.refreshSegment(segment, metadata(segment, "PrunerCounting", 8, Set.of(4), Map.of("offset", "0")));
+      pruner.refreshSegment(segment, metadata(segment, "PrunerCounting", 8, Set.of(4), null));
     }
     assertEquals(pruner.prune(request, segments), Set.of());
     for (String segment : segments) {
@@ -251,9 +287,9 @@ public class SinglePartitionColumnSegmentPrunerTest {
   @Test
   public void testConcurrentQueriesKeepSeparateCachedValues() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 256; i++) {
       String segment = "segment_" + i;
-      records.put(segment, metadata(segment, "Modulo", 8, Set.of(i), null));
+      records.put(segment, metadata(segment, "Modulo", 8, Set.of(i % 8), null));
     }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     ExecutorService executor = Executors.newFixedThreadPool(4);
@@ -261,9 +297,13 @@ public class SinglePartitionColumnSegmentPrunerTest {
       List<Callable<Void>> queries = new ArrayList<>();
       for (int i = 0; i < 32; i++) {
         int partition = i % 8;
+        Set<String> expected = new HashSet<>();
+        for (int segment = partition; segment < 256; segment += 8) {
+          expected.add("segment_" + segment);
+        }
         queries.add(() -> {
           assertEquals(pruner.prune(request(predicate("EQUALS", Integer.toString(partition))), records.keySet()),
-              Set.of("segment_" + partition));
+              expected);
           return null;
         });
       }
