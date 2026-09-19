@@ -17,7 +17,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -172,7 +171,7 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     assertNull(tableDataManager.lookupValue(key, "assetId"));
     assertNull(tableDataManager.lookupValue(key, "assetName"));
     assertNull(tableDataManager.lookupValue(key, "contentHash"));
-    assertNull(tableDataManager.lookupValues(key, new String[]{"assetId", "assetName","contentHash"}));
+    assertNull(tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"}));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
         SEGMENT_OPERATIONS_THROTTLER));
@@ -213,7 +212,7 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     assertNull(tableDataManager.lookupValue(key, "assetId"));
     assertNull(tableDataManager.lookupValue(key, "assetName"));
     assertNull(tableDataManager.lookupValue(key, "contentHash"));
-    assertNull(tableDataManager.lookupValues(key, new String[]{"assetId", "assetName","contentHash"}));
+    assertNull(tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"}));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
         SEGMENT_OPERATIONS_THROTTLER));

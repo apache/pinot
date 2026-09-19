@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import com.sun.jna.platform.win32.WinDef;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -47,6 +49,9 @@ public class PinotSegmentRecordReaderTest {
   private static final String M1 = "m1";
   private static final String M2 = "m2";
   private static final String TIME = "t";
+  private static final String D_SV_PK_1 = "d_sv_pk_1";
+  private static final String D_SV_PK_2 = "d_sv_pk_2";
+  private static final String D_SV_PK_3 = "d_sv_pk_3";
 
   private String _segmentOutputDir;
   private File _segmentIndexDir;
@@ -74,9 +79,13 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, DataType.STRING)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, DataType.STRING)
         .addMultiValueDimension(D_MV_1, DataType.STRING).addMetric(M1, DataType.INT).addMetric(M2, DataType.FLOAT)
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null).build();
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null)
+        .addSingleValueDimension(D_SV_PK_1, DataType.STRING).addSingleValueDimension(D_SV_PK_2, DataType.BYTES)
+        .addSingleValueDimension(D_SV_PK_3, DataType.INT).build();
+    schema.setPrimaryKeyColumns(List.of(D_SV_PK_1, D_SV_PK_2, D_SV_PK_3));
+    return schema;
   }
 
   private TableConfig createTableConfig() {
@@ -104,6 +113,9 @@ public class PinotSegmentRecordReaderTest {
       Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
       Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
       Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_1), row.getValue(D_SV_PK_1));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_2), row.getValue(D_SV_PK_2));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_3), row.getValue(D_SV_PK_3));
     }
   }
 
@@ -181,6 +193,32 @@ public class PinotSegmentRecordReaderTest {
       Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
       Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
       Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_1), row.getValue(D_SV_PK_1));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_2), row.getValue(D_SV_PK_2));
+      Assert.assertEquals(outputRow.getValue(D_SV_PK_3), row.getValue(D_SV_PK_3));
+    }
+  }
+
+  @Test
+  public void testPinotSegmentRecordReaderReadPrimaryKeysOnly()
+      throws Exception {
+    GenericRow outputRow = null;
+
+    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    pinotSegmentRecordReader.init(_segmentIndexDir, null, null, false, true, List.of(D_SV_PK_1, D_SV_PK_2, D_SV_PK_3));
+
+    try (pinotSegmentRecordReader) {
+      int docId = 0;
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRow = pinotSegmentRecordReader.next();
+        Object[] primaryKeys = pinotSegmentRecordReader.getPrimaryKeys(docId);
+        Assert.assertEquals(outputRow.getValue(D_SV_PK_1), primaryKeys[0]);
+        byte[] primaryKeyBytes = (byte[]) outputRow.getValue(D_SV_PK_2);
+        ByteArray byteArray = new ByteArray(primaryKeyBytes);
+        Assert.assertEquals(byteArray, primaryKeys[1]);
+        Assert.assertEquals(outputRow.getValue(D_SV_PK_3), primaryKeys[2]);
+        docId++;
+      }
     }
   }
 
