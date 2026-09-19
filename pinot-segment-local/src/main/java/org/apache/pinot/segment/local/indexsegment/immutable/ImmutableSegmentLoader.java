@@ -283,6 +283,15 @@ public class ImmutableSegmentLoader {
   /// segment format, adding new indices or updating default columns.
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    return needPreprocess(segmentDirectory, indexLoadingConfig, true);
+  }
+
+  /// Same as [#needPreprocess(SegmentDirectory, IndexLoadingConfig)], with an option to ignore transform-function
+  /// updates. RefreshSegment includes them and omits the affected output fields during record replay so they are
+  /// recomputed by the ingestion pipeline.
+  public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      boolean includeTransformFunctionActions)
+      throws Exception {
     if (indexLoadingConfig.isSkipSegmentPreprocess()) {
       return false;
     }
@@ -293,7 +302,10 @@ public class ImmutableSegmentLoader {
     if (indexLoadingConfig.getTableConfig() == null || indexLoadingConfig.getSchema() == null) {
       return false;
     }
-    return SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig).needProcess();
+    SegmentPreProcessor preProcessor = SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig);
+    // Keep the established no-argument dispatch for the normal loader path. Providers may return a subclass that
+    // overrides needProcess() to add plugin-specific checks; calling the newer overload directly would bypass it.
+    return includeTransformFunctionActions ? preProcessor.needProcess() : preProcessor.needProcess(false);
   }
 
   private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,

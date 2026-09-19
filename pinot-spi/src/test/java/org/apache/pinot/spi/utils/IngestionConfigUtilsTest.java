@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -31,9 +32,16 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 /// Tests for helper methods in [IngestionConfigUtils]
@@ -226,5 +234,53 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(0), new HashSet<>(Arrays.asList(2)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
+  }
+
+  // Exercises backward compatibility for deprecated schema-level transform functions.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testGetTransformFunctionByColumnPrefersIngestionConfigOverSchema() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("derived", DataType.INT, true));
+    schema.getFieldSpecFor("derived").setTransformFunction("plus(col, 1)");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("derived", "plus(col, 2)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    Map<String, String> transformFunctionByColumn =
+        IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, schema);
+    assertEquals(transformFunctionByColumn, Map.of("derived", "plus(col, 2)"));
+  }
+
+  // Exercises backward compatibility for deprecated schema-level transform functions.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testGetTransformFunctionByColumnFallsBackToSchema() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("derived", DataType.INT, true));
+    schema.getFieldSpecFor("derived").setTransformFunction("plus(col, 1)");
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    Map<String, String> transformFunctionByColumn =
+        IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, schema);
+    assertEquals(transformFunctionByColumn, Map.of("derived", "plus(col, 1)"));
+  }
+
+  // Exercises the deprecated TimeFieldSpec conversion path that still runs for backward-compatible schemas.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testGetTransformFunctionByColumnOmitsImplicitSchemaTransforms() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("attributes__KEYS", DataType.STRING)
+        .addMultiValueDimension("attributes__VALUES", DataType.STRING)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "incomingHours"),
+            new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "eventDays"))
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    assertEquals(IngestionConfigUtils.getTransformFunctionByColumn(tableConfig, schema), Map.of());
   }
 }
