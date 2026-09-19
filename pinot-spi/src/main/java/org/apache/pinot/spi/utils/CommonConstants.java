@@ -630,6 +630,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
+
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ({@link Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE}).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
+
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -904,6 +909,18 @@ public class CommonConstants {
         /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
         /// there is no such stage and the client would observe duplicate rows across flush windows.
         public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
+
+        /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. One of
+        /// [Server.SortedSelectionMergeMode] (case-insensitive); defaults to
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_MODE].
+        public static final String SORTED_SELECTION_MERGE_MODE = "sortedSelectionMergeMode";
+        /// Minimum fraction of segments that must be physically sorted on the leading ORDER BY column for
+        /// [Server.SortedSelectionMergeMode#AUTO] to select the streaming merge. Overrides
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+        public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+            "sortedSelectionMergeAutoMinSortedRatio";
+        /// Output block size (rows) for the streaming selection ORDER BY combine.
+        public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sortedSelectionMergeBlockSize";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
@@ -1574,6 +1591,38 @@ public class CommonConstants {
     // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
     public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
         Runtime.getRuntime().availableProcessors();
+
+    /// Selects the streaming k-way-merge selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_MODE]).
+    ///
+    /// The merge runs single-threaded on the consumer thread, so it trades `maxExecutionThreads` worth of parallel
+    /// segment processing for the ability to emit sorted blocks incrementally. That trade only pays off when the
+    /// segments are physically sorted on the leading ORDER BY column, since an unsorted child must do a full scan
+    /// plus top-K synchronously before the merge can take its first row.
+    public enum SortedSelectionMergeMode {
+      /// Never use the streaming merge. Selection ORDER BY keeps its existing combine operators.
+      OFF,
+      /// Always use the streaming merge, including when the leading ORDER BY expression is not an identifier and no
+      /// segment is sorted. Children then materialize their top-K eagerly and the merge is strictly slower than
+      /// [#OFF]; intended for benchmarking and A/B, not for production traffic.
+      ON,
+      /// Use the streaming merge only when at least
+      /// [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO] of the queried segments are
+      /// physically sorted on the leading ORDER BY column. Decided from segment metadata alone, without acquiring
+      /// any segment.
+      AUTO
+    }
+
+    public static final SortedSelectionMergeMode DEFAULT_SORTED_SELECTION_MERGE_MODE =
+        SortedSelectionMergeMode.OFF;
+
+    /// Default for [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+    ///
+    /// Consuming segments are never reported as sorted ([org.apache.pinot.segment.spi.datasource.DataSourceMetadata]
+    /// on a mutable segment hardcodes `isSorted()` to false), so a realtime table always has a few unsorted segments
+    /// among many sorted ones. This default is chosen to tolerate that while still rejecting a mostly-unsorted table.
+    /// It is a starting point rather than a measured optimum.
+    public static final double DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO = 0.8;
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;

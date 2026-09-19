@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -38,7 +39,7 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, SORTED_SELECTION_MERGE_BLOCK_SIZE);
   private static final List<String> NON_NEGATIVE_INT_KEYS =
       List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
@@ -51,6 +52,54 @@ public class QueryOptionsUtilsTest {
     }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
+
+  @Test
+  public void shouldParseSortedSelectionMergeMode() {
+    assertNull(QueryOptionsUtils.getSortedSelectionMergeMode(Map.of()),
+        "An unset mode must stay null so the caller keeps its default");
+    assertEquals(QueryOptionsUtils.getSortedSelectionMergeMode(Map.of(SORTED_SELECTION_MERGE_MODE, "on")),
+        SortedSelectionMergeMode.ON);
+    assertEquals(QueryOptionsUtils.getSortedSelectionMergeMode(Map.of(SORTED_SELECTION_MERGE_MODE, "OFF")),
+        SortedSelectionMergeMode.OFF);
+    assertEquals(QueryOptionsUtils.getSortedSelectionMergeMode(Map.of(SORTED_SELECTION_MERGE_MODE, " Auto ")),
+        SortedSelectionMergeMode.AUTO, "The value must be trimmed and matched case-insensitively");
+  }
+
+  @Test
+  public void shouldRejectUnknownSortedSelectionMergeMode() {
+    try {
+      QueryOptionsUtils.getSortedSelectionMergeMode(Map.of(SORTED_SELECTION_MERGE_MODE, "yes"));
+      fail("Expected an unknown mode to be rejected rather than silently ignored");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains(SORTED_SELECTION_MERGE_MODE) && e.getMessage().contains("[OFF, ON, AUTO]"),
+          "The message must name the option and list the valid values, got: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void shouldParseSortedSelectionMergeAutoMinSortedRatio() {
+    assertNull(QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(Map.of()));
+    assertEquals(
+        QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(
+            Map.of(SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO, "0.75")), 0.75);
+    // The closed range is meaningful: 0 means "any segment set" and 1 means "every segment must be sorted".
+    assertEquals(
+        QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(
+            Map.of(SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO, "0")), 0.0);
+    assertEquals(
+        QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(
+            Map.of(SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO, "1")), 1.0);
+    for (String invalid : List.of("-0.1", "1.1", "abc", "NaN")) {
+      try {
+        QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(
+            Map.of(SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO, invalid));
+        fail("Expected the ratio '" + invalid + "' to be rejected");
+      } catch (IllegalArgumentException e) {
+        assertTrue(e.getMessage().contains(SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO),
+            "The message must name the option, got: " + e.getMessage());
+      }
+    }
+  }
 
   @Test
   public void shouldConvertCaseInsensitiveMapToUseCorrectValues() {
@@ -334,6 +383,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
+      case SORTED_SELECTION_MERGE_BLOCK_SIZE:
+        return QueryOptionsUtils.getSortedSelectionMergeBlockSize(map);
       // Non-negative ints
       case MULTI_STAGE_LEAF_LIMIT:
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
