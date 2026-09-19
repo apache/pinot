@@ -397,13 +397,14 @@ public class StarTreeUtils {
 
     // A star-tree arrayAgg cell stores elements of the source column's stored type. A query declaring a different
     // element type (e.g. arrayAgg(intCol, 'LONG', true)) is only answerable through the raw path's read-time
-    // conversion, so fall back to a raw scan instead of misreading the cells.
+    // conversion, so fall back to a raw scan instead of misreading the cells. The declared element type is recovered
+    // from the array result type (e.g. LONG_ARRAY -> LONG).
     for (int i = 0; i < aggregationFunctions.length; i++) {
       if (aggregationFunctions[i] instanceof BaseArrayAggFunction) {
         String column = aggregationFunctionColumnPairs[i].getColumn();
         DataSource dataSource = indexSegment.getDataSourceNullable(column);
         if (dataSource == null || dataSource.getDataSourceMetadata().getDataType().getStoredType()
-            != ((BaseArrayAggFunction<?, ?>) aggregationFunctions[i]).getElementDataType().getStoredType()) {
+            != aggregationFunctions[i].getFinalResultColumnType().toDataType().getStoredType()) {
           LOGGER.debug("Cannot use star-tree index because arrayAgg element type does not match the stored type of "
               + "column: '{}'", column);
           return null;

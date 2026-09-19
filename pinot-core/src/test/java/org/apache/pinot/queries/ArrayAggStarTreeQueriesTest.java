@@ -102,7 +102,10 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(STRING_METRIC, DataType.STRING)
         .addSingleValueDimension(BYTES_METRIC, DataType.BYTES)
         .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    // The LONG metric is raw-encoded: arrayAgg star-tree aggregation supports both dictionary-encoded and raw
+    // single-value source columns, so the LONG tests double as raw-metric build/query coverage.
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of(LONG_METRIC)).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {

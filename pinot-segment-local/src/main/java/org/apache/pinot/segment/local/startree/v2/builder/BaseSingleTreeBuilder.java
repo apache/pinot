@@ -149,13 +149,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
         PinotSegmentColumnReader metricReader = new PinotSegmentColumnReader(segment, column);
-        // The distinct arrayAgg star-tree aggregator only supports single-value, dictionary-encoded source columns.
-        // See ArrayAggDistinctValueAggregator.
+        // The distinct arrayAgg star-tree aggregator only supports single-value source columns (dictionary-encoded or
+        // raw). See ArrayAggDistinctValueAggregator.
         if (_valueAggregators[index].getAggregationType() == AggregationFunctionType.ARRAYAGG) {
           Preconditions.checkState(metricReader.isSingleValue(),
               "Star-tree arrayAgg does not support multi-value column: %s", column);
-          Preconditions.checkState(metricReader.hasDictionary(),
-              "Star-tree arrayAgg requires a dictionary-encoded column: %s", column);
         }
         _metricReaders[index] = metricReader;
       }

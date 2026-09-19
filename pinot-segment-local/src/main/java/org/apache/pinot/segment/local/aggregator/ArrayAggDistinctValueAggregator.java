@@ -130,7 +130,9 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public ObjectSet<Object> applyRawValue(ObjectSet<Object> value, Object rawValue) {
-    TrackedSet set = asTrackedSet(value);
+    // Aggregated values are always produced by this aggregator (initialization, cloning or deserialization), so they
+    // are always TrackedSets.
+    TrackedSet set = (TrackedSet) value;
     if (rawValue != null) {
       addRawValue(set, rawValue);
       updateMaxByteSize(set);
@@ -140,7 +142,7 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public ObjectSet<Object> applyAggregatedValue(ObjectSet<Object> value, ObjectSet<Object> aggregatedValue) {
-    TrackedSet set = asTrackedSet(value);
+    TrackedSet set = (TrackedSet) value;
     for (Object element : aggregatedValue) {
       addElement(set, element);
     }
@@ -248,19 +250,6 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
     if (set.add(element) && fixedElementBytes(_elementType) == 0) {
       set._variableWidthPayloadBytes += Integer.BYTES + variableWidthEncodedLength(element);
     }
-  }
-
-  /// Returns a [TrackedSet] view of the aggregated value. Values produced by this aggregator already are one; the
-  /// fallback rebuild keeps the method total for defensively handling a foreign set.
-  private TrackedSet asTrackedSet(ObjectSet<Object> value) {
-    if (value instanceof TrackedSet) {
-      return (TrackedSet) value;
-    }
-    TrackedSet set = new TrackedSet(value.size());
-    for (Object element : value) {
-      addElement(set, element);
-    }
-    return set;
   }
 
   /// Fixed serialized width of an element in bytes, or `0` for variable-width element types.

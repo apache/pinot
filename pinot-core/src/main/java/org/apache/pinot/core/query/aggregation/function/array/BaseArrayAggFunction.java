@@ -36,19 +36,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
   private final DataSchema.ColumnDataType _resultColumnType;
-  private final DataType _elementDataType;
 
   public BaseArrayAggFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
-    _elementDataType = dataType;
-  }
-
-  /// Returns the element data type declared in the query (the 2nd `arrayAgg` argument). A star-tree cell stores the
-  /// source column's stored type, so star-tree selection must reject a query whose declared element stored type
-  /// differs from the column's — the raw path serves those through read-time conversion instead.
-  public DataType getElementDataType() {
-    return _elementDataType;
   }
 
   @Override
