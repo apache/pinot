@@ -99,6 +99,8 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   private final ResultsBlockStreamer _resultsBlockStreamer = this::addResultsBlock;
   @Nullable
   private final MultiStageQueryStats _pipelineBreakerStats;
+  private final boolean _skipExecution;
+  private final boolean _hasSegmentsAssigned;
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
@@ -120,9 +122,37 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
       QueryExecutor queryExecutor,
       ExecutorService executorService,
       @Nullable MultiStageQueryStats pipelineBreakerStats) {
+    this(context, requests, dataSchema, queryExecutor, executorService, pipelineBreakerStats, false);
+  }
+
+  /// Creates a leaf operator that skips SSE execution while retaining the normal MSE completion and statistics path.
+  ///
+  /// @param context op-chain execution context
+  /// @param dataSchema schema of the skipped leaf output
+  /// @param queryExecutor leaf query executor retained by the operator
+  /// @param executorService executor used by the operator lifecycle
+  /// @param pipelineBreakerStats upstream pipeline-breaker statistics to propagate
+  public static LeafOperator forSkippedExecution(
+      OpChainExecutionContext context,
+      DataSchema dataSchema,
+      QueryExecutor queryExecutor,
+      ExecutorService executorService,
+      @Nullable MultiStageQueryStats pipelineBreakerStats) {
+    return new LeafOperator(context, List.of(), dataSchema, queryExecutor, executorService, pipelineBreakerStats, true);
+  }
+
+  private LeafOperator(
+      OpChainExecutionContext context,
+      List<ServerQueryRequest> requests,
+      DataSchema dataSchema,
+      QueryExecutor queryExecutor,
+      ExecutorService executorService,
+      @Nullable MultiStageQueryStats pipelineBreakerStats,
+      boolean skipExecution) {
     super(context);
     int numRequests = requests.size();
-    Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
+    Preconditions.checkArgument(skipExecution ? numRequests == 0 : numRequests == 1 || numRequests == 2,
+        "Expected %s requests, got: %s", skipExecution ? "no" : "1 or 2", numRequests);
     _requests = requests;
     _dataSchema = dataSchema;
     _queryExecutor = queryExecutor;
@@ -134,6 +164,8 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
     _pipelineBreakerStats = pipelineBreakerStats;
+    _skipExecution = skipExecution;
+    _hasSegmentsAssigned = skipExecution ? hasSegmentsAssigned(context) : hasSegmentsAssigned(requests);
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -295,24 +327,27 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   @Override
   public StatMap<StatKey> copyStatMaps() {
     StatMap<StatKey> statMap = new StatMap<>(_statMap);
-    if (!hasSegmentsAssigned()) {
+    if (!_hasSegmentsAssigned) {
       statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
     }
     return statMap;
   }
 
-  /// Whether this worker was given at least one segment to read.
-  ///
-  /// Decided from the request rather than from anything the query produces, so that a worker whose segments are all
-  /// pruned, or all of whose rows are filtered out, still counts as having been given work. A hybrid table produces
-  /// one request per table type, and segments on either of them are enough.
-  private boolean hasSegmentsAssigned() {
-    for (ServerQueryRequest request : _requests) {
+  private static boolean hasSegmentsAssigned(List<ServerQueryRequest> requests) {
+    for (ServerQueryRequest request : requests) {
       if (request.hasSegmentsToQuery()) {
         return true;
       }
     }
     return false;
+  }
+
+  private static boolean hasSegmentsAssigned(OpChainExecutionContext context) {
+    Map<String, List<String>> tableSegmentsMap = context.getWorkerMetadata().getLogicalTableSegmentsMap();
+    if (tableSegmentsMap == null) {
+      tableSegmentsMap = context.getWorkerMetadata().getTableSegmentsMap();
+    }
+    return tableSegmentsMap != null && tableSegmentsMap.values().stream().anyMatch(segments -> !segments.isEmpty());
   }
 
   @Override
@@ -517,7 +552,9 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
 
   @VisibleForTesting
   void execute() {
-    if (_requests.size() == 1) {
+    if (_skipExecution) {
+      return;
+    } else if (_requests.size() == 1) {
       executeOneRequest(_requests.get(0), null);
     } else {
       // Hit 2 physical tables, one REALTIME and one OFFLINE
