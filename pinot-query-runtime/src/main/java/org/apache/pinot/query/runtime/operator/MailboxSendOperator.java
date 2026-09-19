@@ -25,6 +25,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.MseMetrics;
@@ -163,6 +164,18 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<RoutingInfo> routingInfos =
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);
+    if (node.isMaterialized()) {
+      Preconditions.checkState(distributionType == RelDistribution.Type.HASH_DISTRIBUTED,
+          "Materialized exchange only supports HASH_DISTRIBUTED, got: %s", distributionType);
+      List<SendingMailbox> sendingMailboxes = IntStream.range(0, routingInfos.size())
+          .mapToObj(logicalPartitionId -> mailboxService.getMaterializedSendingMailbox(requestId,
+              context.getStageId(), context.getWorkerId(), logicalPartitionId, statMap,
+              context::recordMaterializedOutput))
+          .collect(Collectors.toList());
+      statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
+      return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
+          node.getHashFunction());
+    }
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());

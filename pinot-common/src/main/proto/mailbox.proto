@@ -23,6 +23,8 @@ package org.apache.pinot.common.proto;
 
 service PinotMailbox {
   rpc open(stream MailboxContent) returns (stream MailboxStatus);
+
+  rpc readMaterializedPartition(MaterializedPartitionRequest) returns (stream MaterializedPartitionContent);
 }
 
 message MailboxStatus {
@@ -35,4 +37,17 @@ message MailboxContent {
   bytes payload = 2;
   map<string, string> metadata = 3;
   bool waitForMore = 4;
+}
+
+message MaterializedPartitionRequest {
+  int64 requestId = 1;
+  int32 producerStageId = 2;
+  int32 producerWorkerId = 3;
+  int32 logicalPartitionId = 4;
+  int64 deadlineMs = 5;
+}
+
+message MaterializedPartitionContent {
+  bytes payload = 1;
+  bool endOfBlock = 2;
 }
