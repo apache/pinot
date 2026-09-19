@@ -32,6 +32,7 @@ import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -41,6 +42,30 @@ import static org.testng.Assert.expectThrows;
 public class PartitionFunctionTest {
   private static final int NUM_ROUNDS = 1000;
   private static final int MAX_NUM_PARTITIONS = 100;
+
+  @Test
+  public void testPartitionIdReuse() {
+    PartitionFunction function = new MurmurPartitionFunction(8, null);
+    PartitionFunction emptyConfig = new MurmurPartitionFunction(8, Map.of());
+    assertTrue(function.hasEmptyConfig());
+    assertTrue(emptyConfig.hasEmptyConfig());
+    assertTrue(function.canReusePartitionIds(emptyConfig));
+    assertTrue(emptyConfig.canReusePartitionIds(function));
+    assertFalse(function.canReusePartitionIds(new MurmurPartitionFunction(16, null)));
+    assertFalse(function.canReusePartitionIds(new Murmur3PartitionFunction(8, null)));
+
+    PartitionFunction configured = new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"));
+    assertFalse(configured.hasEmptyConfig());
+    assertFalse(function.canReusePartitionIds(configured));
+    assertFalse(configured.canReusePartitionIds(function));
+    assertFalse(configured.canReusePartitionIds(new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"))));
+
+    PartitionFunction modulo = new ModuloPartitionFunction(8, null);
+    PartitionFunction abs = new ModuloPartitionFunction(8, Map.of("partitionIdNormalizer", "ABS"));
+    assertTrue(abs.hasEmptyConfig(), "An empty exposed config does not imply the default normalizer");
+    assertFalse(modulo.canReusePartitionIds(abs));
+    assertFalse(abs.canReusePartitionIds(modulo));
+  }
 
   /// Unit test for [ModuloPartitionFunction].
   ///
