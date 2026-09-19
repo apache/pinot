@@ -203,4 +203,28 @@ public class ArrayAggDistinctValueAggregatorTest {
     agg.applyRawValue(set, 2L);
     assertEquals(clone.size(), 1);
   }
+
+  /// Size tracking is incremental (never re-serializes the set), so it must stay exact through duplicates, merges and
+  /// clones for variable-width element types.
+  @Test
+  public void maxByteSizeStaysExactThroughDuplicatesAndMerges() {
+    ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
+    ObjectSet<Object> a = agg.getInitialAggregatedValue("alpha");
+    a = agg.applyRawValue(a, "beta");
+    a = agg.applyRawValue(a, "alpha"); // duplicate: must not inflate the tracked size
+    ObjectSet<Object> b = agg.getInitialAggregatedValue("beta"); // overlaps with a
+    b = agg.applyRawValue(b, "gamma");
+    ObjectSet<Object> merged = agg.applyAggregatedValue(agg.cloneAggregatedValue(a), b);
+    assertEquals(merged.size(), 3);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), agg.serializeAggregatedValue(merged).length);
+  }
+
+  @Test
+  public void maxByteSizeStaysExactForFixedWidthDuplicates() {
+    ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
+    ObjectSet<Object> set = agg.getInitialAggregatedValue(1L);
+    set = agg.applyRawValue(set, 1L);
+    set = agg.applyRawValue(set, 2L);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), agg.serializeAggregatedValue(set).length);
+  }
 }

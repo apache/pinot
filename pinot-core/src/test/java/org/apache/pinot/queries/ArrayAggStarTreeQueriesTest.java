@@ -60,6 +60,7 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String DIMENSION = "d";
+  private static final String INT_METRIC = "im";
   private static final String LONG_METRIC = "lm";
   private static final String STRING_METRIC = "sm";
   private static final String BYTES_METRIC = "bm";
@@ -96,6 +97,7 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension(DIMENSION, DataType.INT)
+        .addSingleValueDimension(INT_METRIC, DataType.INT)
         .addSingleValueDimension(LONG_METRIC, DataType.LONG)
         .addSingleValueDimension(STRING_METRIC, DataType.STRING)
         .addSingleValueDimension(BYTES_METRIC, DataType.BYTES)
@@ -107,6 +109,7 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
       GenericRow row = new GenericRow();
       int value = i % VALUE_CARDINALITY;
       row.putValue(DIMENSION, i % DIMENSION_CARDINALITY);
+      row.putValue(INT_METRIC, value);
       row.putValue(LONG_METRIC, (long) value);
       row.putValue(STRING_METRIC, "v" + value);
       row.putValue(BYTES_METRIC, new byte[]{(byte) value, (byte) (value + 1)});
@@ -123,6 +126,8 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of(DIMENSION), null, null,
         List.of(
+            new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(INT_METRIC, "arrayAgg", null, null, null,
+                null, null, null),
             new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(LONG_METRIC, "arrayAgg", null, null, null,
                 null, null, null),
             new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(STRING_METRIC, "arrayAgg", null, null, null,
@@ -181,6 +186,51 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
     assertStarTreeMatchesRawScan(
         String.format("SELECT %s, arrayAgg(%s, 'BYTES', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION,
             BYTES_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION));
+  }
+
+  /// A star-tree cell stores the source column's stored type. When the query declares a different element type (INT
+  /// column read as 'LONG'), selection must fall back to the raw scan — which converts at read time — instead of
+  /// misreading the INT-tagged cells with a LONG reader.
+  @Test
+  public void testDistinctArrayAggTypeMismatchFallsBackToRawScan() {
+    String query = String.format("SELECT %s, arrayAgg(%s, 'LONG', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION,
+        INT_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION);
+    BrokerResponseNative starTree = getBrokerResponse(query, STAR_TREE_ON);
+    BrokerResponseNative rawScan = getBrokerResponse(query, STAR_TREE_OFF);
+    assertEquals(starTree.getNumDocsScanned(), rawScan.getNumDocsScanned(),
+        "A type-mismatched arrayAgg must not use the star-tree, so it scans the same docs with the option on or off");
+    assertStarTreeMatchesRawScan(query);
+  }
+
+  /// Matching element type on the same INT column still gets the star-tree, proving the mismatch guard is not
+  /// over-rejecting.
+  @Test
+  public void testDistinctArrayAggIntUsesStarTree() {
+    String query = String.format("SELECT %s, arrayAgg(%s, 'INT', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION,
+        INT_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION);
+    BrokerResponseNative starTree = getBrokerResponse(query, STAR_TREE_ON);
+    BrokerResponseNative rawScan = getBrokerResponse(query, STAR_TREE_OFF);
+    assertTrue(starTree.getNumDocsScanned() < rawScan.getNumDocsScanned(),
+        "Expected the star-tree to serve the matching-type distinct arrayAgg query");
+    assertStarTreeMatchesRawScan(query);
+  }
+
+  /// Reading a BYTES column as 'STRING' converts each value to its hexadecimal form on the raw path. The star-tree
+  /// cells are BYTES-tagged, so the mismatch guard must route this to the raw scan; results must stay identical to a
+  /// scan with the star-tree disabled — both for the distinct and the non-distinct variant (the latter is never
+  /// star-tree eligible, and regression-covers raw BYTES conversion with a star-tree present).
+  @Test
+  public void testArrayAggBytesAsStringMatchesRawScan() {
+    String distinctQuery = String.format("SELECT %s, arrayAgg(%s, 'STRING', true) FROM %s GROUP BY %s ORDER BY %s",
+        DIMENSION, BYTES_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION);
+    BrokerResponseNative starTree = getBrokerResponse(distinctQuery, STAR_TREE_ON);
+    BrokerResponseNative rawScan = getBrokerResponse(distinctQuery, STAR_TREE_OFF);
+    assertEquals(starTree.getNumDocsScanned(), rawScan.getNumDocsScanned(),
+        "arrayAgg reading a BYTES column as STRING must not use the star-tree");
+    assertStarTreeMatchesRawScan(distinctQuery);
+    assertStarTreeMatchesRawScan(
+        String.format("SELECT %s, arrayAgg(%s, 'STRING') FROM %s GROUP BY %s ORDER BY %s", DIMENSION, BYTES_METRIC,
+            RAW_TABLE_NAME, DIMENSION, DIMENSION));
   }
 
   /// The star-tree must actually serve the BYTES distinct query, not silently fall back to the raw scan.

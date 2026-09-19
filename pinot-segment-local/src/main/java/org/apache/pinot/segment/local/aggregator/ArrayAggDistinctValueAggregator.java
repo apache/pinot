@@ -89,6 +89,21 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
     }
   }
 
+  /// Distinct value set carrying a running total of its variable-width serialized payload bytes, so cell-size
+  /// tracking is O(1) per insertion instead of re-serializing the growing set. Instances are only created by this
+  /// aggregator; callers see a plain ObjectSet with content-based equality, so the extra state is invisible to them.
+  private static class TrackedSet extends ObjectOpenHashSet<Object> {
+    // Sum over elements of (4-byte length prefix + encoded length); only maintained for variable-width element types.
+    private long _variableWidthPayloadBytes;
+
+    TrackedSet() {
+    }
+
+    TrackedSet(int expectedSize) {
+      super(expectedSize);
+    }
+  }
+
   @Nullable
   private ElementType _elementType;
   private int _maxByteSize;
@@ -105,7 +120,7 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public ObjectSet<Object> getInitialAggregatedValue(@Nullable Object rawValue) {
-    ObjectSet<Object> set = new ObjectOpenHashSet<>();
+    TrackedSet set = new TrackedSet();
     if (rawValue != null) {
       addRawValue(set, rawValue);
     }
@@ -115,23 +130,31 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public ObjectSet<Object> applyRawValue(ObjectSet<Object> value, Object rawValue) {
+    TrackedSet set = asTrackedSet(value);
     if (rawValue != null) {
-      addRawValue(value, rawValue);
-      updateMaxByteSize(value);
+      addRawValue(set, rawValue);
+      updateMaxByteSize(set);
     }
-    return value;
+    return set;
   }
 
   @Override
   public ObjectSet<Object> applyAggregatedValue(ObjectSet<Object> value, ObjectSet<Object> aggregatedValue) {
-    value.addAll(aggregatedValue);
-    updateMaxByteSize(value);
-    return value;
+    TrackedSet set = asTrackedSet(value);
+    for (Object element : aggregatedValue) {
+      addElement(set, element);
+    }
+    updateMaxByteSize(set);
+    return set;
   }
 
   @Override
   public ObjectSet<Object> cloneAggregatedValue(ObjectSet<Object> value) {
-    return new ObjectOpenHashSet<>(value);
+    TrackedSet clone = new TrackedSet(value.size());
+    for (Object element : value) {
+      addElement(clone, element);
+    }
+    return clone;
   }
 
   @Override
@@ -169,35 +192,40 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
   public ObjectSet<Object> deserializeAggregatedValue(byte[] bytes) {
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     ElementType elementType = ElementType.fromTag(byteBuffer.get());
+    if (_elementType == null) {
+      // A merge-only flow (e.g. re-merging stored cells) may deserialize before any raw value has been seen; the tag
+      // pins the element type so subsequent size tracking and serialization interpret elements correctly.
+      _elementType = elementType;
+    }
     int size = byteBuffer.getInt();
-    ObjectSet<Object> set = new ObjectOpenHashSet<>(size);
+    TrackedSet set = new TrackedSet(size);
     for (int i = 0; i < size; i++) {
       switch (elementType) {
         case INT:
-          set.add(byteBuffer.getInt());
+          addElement(set, byteBuffer.getInt());
           break;
         case LONG:
-          set.add(byteBuffer.getLong());
+          addElement(set, byteBuffer.getLong());
           break;
         case FLOAT:
-          set.add(byteBuffer.getFloat());
+          addElement(set, byteBuffer.getFloat());
           break;
         case DOUBLE:
-          set.add(byteBuffer.getDouble());
+          addElement(set, byteBuffer.getDouble());
           break;
         case BIG_DECIMAL: {
           byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          set.add(BigDecimalUtils.deserialize(valueBytes));
+          addElement(set, BigDecimalUtils.deserialize(valueBytes));
           break;
         }
         case STRING: {
           byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          set.add(new String(valueBytes, StandardCharsets.UTF_8));
+          addElement(set, new String(valueBytes, StandardCharsets.UTF_8));
           break;
         }
         case BYTES: {
           byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          set.add(new ByteArray(valueBytes));
+          addElement(set, new ByteArray(valueBytes));
           break;
         }
         default:
@@ -207,16 +235,72 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
     return set;
   }
 
-  private void addRawValue(ObjectSet<Object> set, Object rawValue) {
-    if (_elementType == null) {
-      _elementType = inferElementType(rawValue);
-    }
+  private void addRawValue(TrackedSet set, Object rawValue) {
     // Normalize BYTES to ByteArray so hashCode/equals work as a set key; other types are already value types.
-    if (rawValue instanceof byte[]) {
-      set.add(new ByteArray((byte[]) rawValue));
-    } else {
-      set.add(rawValue);
+    addElement(set, rawValue instanceof byte[] ? new ByteArray((byte[]) rawValue) : rawValue);
+  }
+
+  /// Adds an element to the set, maintaining the running variable-width payload total when the element is new.
+  private void addElement(TrackedSet set, Object element) {
+    if (_elementType == null) {
+      _elementType = inferElementType(element);
     }
+    if (set.add(element) && fixedElementBytes(_elementType) == 0) {
+      set._variableWidthPayloadBytes += Integer.BYTES + variableWidthEncodedLength(element);
+    }
+  }
+
+  /// Returns a [TrackedSet] view of the aggregated value. Values produced by this aggregator already are one; the
+  /// fallback rebuild keeps the method total for defensively handling a foreign set.
+  private TrackedSet asTrackedSet(ObjectSet<Object> value) {
+    if (value instanceof TrackedSet) {
+      return (TrackedSet) value;
+    }
+    TrackedSet set = new TrackedSet(value.size());
+    for (Object element : value) {
+      addElement(set, element);
+    }
+    return set;
+  }
+
+  /// Fixed serialized width of an element in bytes, or `0` for variable-width element types.
+  private static int fixedElementBytes(@Nullable ElementType elementType) {
+    if (elementType == null) {
+      return 0;
+    }
+    switch (elementType) {
+      case INT:
+      case FLOAT:
+        return Integer.BYTES;
+      case LONG:
+      case DOUBLE:
+        return Long.BYTES;
+      default:
+        return 0;
+    }
+  }
+
+  private long variableWidthEncodedLength(Object element) {
+    assert _elementType != null;
+    switch (_elementType) {
+      case BIG_DECIMAL:
+        return BigDecimalUtils.byteSize((BigDecimal) element);
+      case STRING:
+        return ((String) element).getBytes(StandardCharsets.UTF_8).length;
+      case BYTES:
+        return ((ByteArray) element).length();
+      default:
+        throw new IllegalStateException("Not a variable-width element type: " + _elementType);
+    }
+  }
+
+  /// Exact serialized size of the set, computed in O(1) from the element count (fixed-width types) or the running
+  /// payload total (variable-width types), instead of serializing the set.
+  private long serializedByteSize(TrackedSet set) {
+    int fixedElementBytes = fixedElementBytes(_elementType);
+    long payloadBytes =
+        fixedElementBytes != 0 ? (long) set.size() * fixedElementBytes : set._variableWidthPayloadBytes;
+    return TAG_BYTES + Integer.BYTES + payloadBytes;
   }
 
   private static ElementType inferElementType(Object rawValue) {
@@ -240,8 +324,8 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
     }
   }
 
-  private void updateMaxByteSize(ObjectSet<Object> value) {
-    _maxByteSize = Math.max(_maxByteSize, serializeAggregatedValue(value).length);
+  private void updateMaxByteSize(TrackedSet value) {
+    _maxByteSize = Math.max(_maxByteSize, Math.toIntExact(serializedByteSize(value)));
   }
 
   // Size of the leading element-type tag byte prepended to every serialized cell.

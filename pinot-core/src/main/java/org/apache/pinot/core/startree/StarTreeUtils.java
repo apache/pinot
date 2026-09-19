@@ -39,6 +39,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.array.BaseArrayAggFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -392,6 +393,22 @@ public class StarTreeUtils {
         extractAggregationFunctionPairs(aggregationFunctions);
     if (aggregationFunctionColumnPairs == null) {
       return null;
+    }
+
+    // A star-tree arrayAgg cell stores elements of the source column's stored type. A query declaring a different
+    // element type (e.g. arrayAgg(intCol, 'LONG', true)) is only answerable through the raw path's read-time
+    // conversion, so fall back to a raw scan instead of misreading the cells.
+    for (int i = 0; i < aggregationFunctions.length; i++) {
+      if (aggregationFunctions[i] instanceof BaseArrayAggFunction) {
+        String column = aggregationFunctionColumnPairs[i].getColumn();
+        DataSource dataSource = indexSegment.getDataSourceNullable(column);
+        if (dataSource == null || dataSource.getDataSourceMetadata().getDataType().getStoredType()
+            != ((BaseArrayAggFunction<?, ?>) aggregationFunctions[i]).getElementDataType().getStoredType()) {
+          LOGGER.debug("Cannot use star-tree index because arrayAgg element type does not match the stored type of "
+              + "column: '{}'", column);
+          return null;
+        }
+      }
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
