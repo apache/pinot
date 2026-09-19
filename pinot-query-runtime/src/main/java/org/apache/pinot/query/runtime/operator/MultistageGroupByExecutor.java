@@ -372,7 +372,7 @@ public class MultistageGroupByExecutor {
     int[] groupByKeys = generateGroupByKeys(block);
     int numRows = groupByKeys.length;
     int numFunctions = _aggFunctions.length;
-    Object[][] intermediateResults = new Object[numFunctions][numRows];
+    Object[][] intermediateResults = new Object[numFunctions][];
     for (int i = 0; i < numFunctions; i++) {
       intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
     }
@@ -446,16 +446,27 @@ public class MultistageGroupByExecutor {
   }
 
   private int[] generateGroupByKeys(DataBlock dataBlock) {
-    Object[] keys;
-    if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0]);
-    } else {
-      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds);
-    }
-    int numRows = keys.length;
+    int numRows = dataBlock.getNumberOfRows();
     int[] intKeys = new int[numRows];
-    for (int i = 0; i < numRows; i++) {
-      intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+    int numKeys = _groupKeyIds.length;
+    if (numKeys == 1) {
+      Object[] keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0]);
+      for (int i = 0; i < numRows; i++) {
+        intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+      }
+    } else {
+      Object[][] columns = new Object[numKeys][];
+      for (int i = 0; i < numKeys; i++) {
+        columns[i] = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[i]);
+      }
+      // Multi-column generators retain dictionary IDs, not this array, just as in the row-heap path.
+      Object[] key = new Object[numKeys];
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        for (int i = 0; i < numKeys; i++) {
+          key[i] = columns[i][rowId];
+        }
+        intKeys[rowId] = _groupIdGenerator.getGroupId(key);
+      }
     }
     return intKeys;
   }
