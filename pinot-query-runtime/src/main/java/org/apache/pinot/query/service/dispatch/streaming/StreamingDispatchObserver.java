@@ -150,9 +150,8 @@ public class StreamingDispatchObserver
           // Advance the reported counter so a subsequent onError (stream reset after DONE) sees remaining==0
           // and does not double-drain the latch.
           _opChainsReportedForThisServer = _expectedOpChainsForThisServer;
-        } else {
-          _session.unregisterStream(this);
         }
+        _session.unregisterStream(this);
         break;
       case PAYLOAD_NOT_SET:
       default:
