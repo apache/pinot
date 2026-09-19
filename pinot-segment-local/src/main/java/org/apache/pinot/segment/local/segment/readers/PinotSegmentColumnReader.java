@@ -650,6 +650,15 @@ public class PinotSegmentColumnReader implements Closeable {
     }
   }
 
+  public Object getInternalValue(int docId) {
+    assert _forwardIndexReader.isSingleValue();
+    Object value = getValue(docId);
+    if (_valueType == DataType.BYTES) {
+      return new ByteArray((byte[]) value);
+    }
+    return value;
+  }
+
   @Override
   public void close()
       throws IOException {
