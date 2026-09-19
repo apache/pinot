@@ -48,9 +48,8 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   }
 
   /// The star-tree index stores an arrayAgg cell as a serialized distinct set. Only the distinct variant is
-  /// associative under merge (set-union), so only distinct arrayAgg over supported single-value column types can be
-  /// served from a star-tree. Non-distinct and unsupported-type variants keep the default `false` and fall back to the
-  /// raw scan. See [ArrayAggDistinctValueAggregator].
+  /// associative under merge (set-union), so only distinct arrayAgg can be served from a star-tree. Non-distinct
+  /// variants keep the default `false` and fall back to the raw scan. See [ArrayAggDistinctValueAggregator].
   @Override
   public boolean canUseStarTree(Map<String, Object> functionParameters) {
     return false;

@@ -62,6 +62,7 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
   private static final String DIMENSION = "d";
   private static final String LONG_METRIC = "lm";
   private static final String STRING_METRIC = "sm";
+  private static final String BYTES_METRIC = "bm";
 
   private static final Map<String, String> STAR_TREE_ON = Map.of("useStarTree", "true");
   private static final Map<String, String> STAR_TREE_OFF = Map.of("useStarTree", "false");
@@ -97,15 +98,18 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(DIMENSION, DataType.INT)
         .addSingleValueDimension(LONG_METRIC, DataType.LONG)
         .addSingleValueDimension(STRING_METRIC, DataType.STRING)
+        .addSingleValueDimension(BYTES_METRIC, DataType.BYTES)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
+      int value = i % VALUE_CARDINALITY;
       row.putValue(DIMENSION, i % DIMENSION_CARDINALITY);
-      row.putValue(LONG_METRIC, (long) (i % VALUE_CARDINALITY));
-      row.putValue(STRING_METRIC, "v" + (i % VALUE_CARDINALITY));
+      row.putValue(LONG_METRIC, (long) value);
+      row.putValue(STRING_METRIC, "v" + value);
+      row.putValue(BYTES_METRIC, new byte[]{(byte) value, (byte) (value + 1)});
       rows.add(row);
     }
 
@@ -122,6 +126,8 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
             new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(LONG_METRIC, "arrayAgg", null, null, null,
                 null, null, null),
             new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(STRING_METRIC, "arrayAgg", null, null, null,
+                null, null, null),
+            new org.apache.pinot.spi.config.table.StarTreeAggregationConfig(BYTES_METRIC, "arrayAgg", null, null, null,
                 null, null, null)),
         100);
     try (MultipleTreesBuilder builder = new MultipleTreesBuilder(List.of(starTreeIndexConfig), false, indexDir,
@@ -159,6 +165,33 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
     assertStarTreeMatchesRawScan(
         String.format("SELECT %s, arrayAgg(%s, 'STRING', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION,
             STRING_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION));
+  }
+
+  /// BYTES raw values and star-tree cells are structurally identical (both BYTES-SV blocks); the provenance marker is
+  /// what routes each correctly. Parity between the two paths proves raw values are never misread as cells and cells
+  /// are never collected as raw values.
+  @Test
+  public void testDistinctArrayAggNoGroupByBytes() {
+    assertStarTreeMatchesRawScan(
+        String.format("SELECT arrayAgg(%s, 'BYTES', true) FROM %s", BYTES_METRIC, RAW_TABLE_NAME));
+  }
+
+  @Test
+  public void testDistinctArrayAggGroupByBytes() {
+    assertStarTreeMatchesRawScan(
+        String.format("SELECT %s, arrayAgg(%s, 'BYTES', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION,
+            BYTES_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION));
+  }
+
+  /// The star-tree must actually serve the BYTES distinct query, not silently fall back to the raw scan.
+  @Test
+  public void testDistinctArrayAggBytesUsesStarTree() {
+    String query = String.format("SELECT %s, arrayAgg(%s, 'BYTES', true) FROM %s GROUP BY %s", DIMENSION, BYTES_METRIC,
+        RAW_TABLE_NAME, DIMENSION);
+    BrokerResponseNative starTree = getBrokerResponse(query, STAR_TREE_ON);
+    BrokerResponseNative rawScan = getBrokerResponse(query, STAR_TREE_OFF);
+    assertTrue(starTree.getNumDocsScanned() < rawScan.getNumDocsScanned(),
+        "Expected the star-tree to serve the distinct BYTES group-by query from pre-aggregated documents");
   }
 
   /// The star-tree must actually be used for the distinct group-by query (fewer docs scanned than the raw scan),
@@ -211,12 +244,14 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
   }
 
   /// Normalizes an MV result cell (either an Object[] or a primitive array such as long[]) into a Set for
-  /// order-independent comparison.
+  /// order-independent comparison. byte[] elements are wrapped in [org.apache.pinot.spi.utils.ByteArray] so they
+  /// compare by content.
   private static Set<Object> asSet(Object array) {
     Set<Object> set = new HashSet<>();
     int length = java.lang.reflect.Array.getLength(array);
     for (int i = 0; i < length; i++) {
-      set.add(java.lang.reflect.Array.get(array, i));
+      Object element = java.lang.reflect.Array.get(array, i);
+      set.add(element instanceof byte[] ? new org.apache.pinot.spi.utils.ByteArray((byte[]) element) : element);
     }
     return set;
   }
