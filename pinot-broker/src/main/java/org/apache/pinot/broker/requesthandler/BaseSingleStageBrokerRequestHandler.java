@@ -116,7 +116,11 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -712,12 +716,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
 
+    boolean skipExpiredRecords = QueryOptionsUtils.isSkipExpiredRecords(serverPinotQuery.getQueryOptions());
     if (routeInfo.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(offlineTableConfig, schema, offlinePinotQuery);
+      }
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       // Re-optimize after attaching the time boundary filter so that filter optimizers (e.g. NumericalFilterOptimizer,
@@ -728,6 +736,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(realtimeTableConfig, schema, realtimePinotQuery);
+      }
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
@@ -739,6 +750,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(offlineTableConfig, schema, serverPinotQuery);
+        _queryOptimizer.optimize(serverPinotQuery, schema);
+      }
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
       offlineBrokerRequest = serverBrokerRequest;
@@ -748,6 +763,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(realtimeTableConfig, schema, serverPinotQuery);
+        _queryOptimizer.optimize(serverPinotQuery, schema);
+      }
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
       realtimeBrokerRequest = serverBrokerRequest;
@@ -1251,7 +1270,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(serverPinotQuery);
     }
-
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
@@ -1865,6 +1883,78 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       for (Expression operand : function.getOperands()) {
         handleDistinctCountBitmapOverride(operand);
       }
+    }
+  }
+
+  /// Attaches a `timeColumn >= (now - retention)` filter to the given query so records outside the table's retention
+  /// window are excluded, even if their segment has not yet been deleted (see issue #16689). Applied per-leg for hybrid
+  /// tables so the offline and realtime sides each use their own retention. No-ops (with a debug log) when the config,
+  /// time column, retention, or schema spec is missing/malformed, rather than failing the query.
+  @VisibleForTesting
+  static void handleSkipExpiredRecords(@Nullable TableConfig tableConfig, @Nullable Schema schema,
+      PinotQuery pinotQuery) {
+    if (tableConfig == null || schema == null) {
+      return;
+    }
+    String tableNameWithType = tableConfig.getTableName();
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig == null) {
+      LOGGER.debug("skipExpiredRecords: no validation config for table {}, skipping retention filter",
+          tableNameWithType);
+      return;
+    }
+
+    String timeColumnName = validationConfig.getTimeColumnName();
+    if (timeColumnName == null) {
+      LOGGER.debug("skipExpiredRecords: no time column configured for table {}, skipping retention filter",
+          tableNameWithType);
+      return;
+    }
+
+    Long retentionMs = getRetentionMs(validationConfig);
+    if (retentionMs == null) {
+      LOGGER.debug("skipExpiredRecords: no valid retention configured for table {}, skipping retention filter",
+          tableNameWithType);
+      return;
+    }
+    long cutOffMs = System.currentTimeMillis() - retentionMs;
+
+    DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+    if (timeFieldSpec == null) {
+      LOGGER.debug("skipExpiredRecords: time column {} not found in schema for table {}, skipping retention filter",
+          timeColumnName, tableNameWithType);
+      return;
+    }
+
+    DateTimeFormatSpec formatSpec = timeFieldSpec.getFormatSpec();
+    String cutOffValue = formatSpec.fromMillisToFormat(cutOffMs);
+    Expression cutOffLiteral = formatSpec.getTimeFormat() == TimeFormat.EPOCH
+        ? RequestUtils.getLiteralExpression(Long.parseLong(cutOffValue))
+        : RequestUtils.getLiteralExpression(cutOffValue);
+    Expression retentionFilter = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name(),
+        RequestUtils.getIdentifierExpression(timeColumnName), cutOffLiteral);
+
+    Expression existingFilter = pinotQuery.getFilterExpression();
+    pinotQuery.setFilterExpression(existingFilter != null
+        ? RequestUtils.getFunctionExpression(FilterKind.AND.name(), existingFilter, retentionFilter)
+        : retentionFilter);
+    LOGGER.debug("skipExpiredRecords: attached retention filter {} >= {} (cutOffMs={}) for table {}", timeColumnName,
+        cutOffValue, cutOffMs, tableNameWithType);
+  }
+
+  /// Parses the retention window in millis from the validation config, or `null` when retention is not configured or is
+  /// malformed (in which case no retention filter is applied rather than failing the query).
+  @Nullable
+  private static Long getRetentionMs(SegmentsValidationAndRetentionConfig validationConfig) {
+    String retentionUnit = validationConfig.getRetentionTimeUnit();
+    String retentionValue = validationConfig.getRetentionTimeValue();
+    if (StringUtils.isEmpty(retentionUnit) || StringUtils.isEmpty(retentionValue)) {
+      return null;
+    }
+    try {
+      return TimeUnit.valueOf(retentionUnit.toUpperCase()).toMillis(Long.parseLong(retentionValue));
+    } catch (IllegalArgumentException e) {
+      return null;
     }
   }
 
@@ -2672,6 +2762,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     TableConfig realtimeTableConfig = baseRouteInfo.getRealtimeTableConfig();
     TimeBoundaryInfo timeBoundaryInfo = baseRouteInfo.getTimeBoundaryInfo();
 
+    boolean skipExpiredRecords =
+        QueryOptionsUtils.isSkipExpiredRecords(baseBrokerRequest.getPinotQuery().getQueryOptions());
     if (baseRouteInfo.isHybrid()) {
       PinotQuery basePinotQuery = baseBrokerRequest.getPinotQuery();
 
@@ -2679,6 +2771,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
+      }
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(offlineTableConfig, schema, offlinePinotQuery);
       }
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
@@ -2690,6 +2785,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       }
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(realtimeTableConfig, schema, realtimePinotQuery);
+      }
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
@@ -2699,12 +2797,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       hybridRoute.setRealtimeBrokerRequest(realtimeBrokerRequest);
     } else if (baseRouteInfo.isOffline()) {
       setTableName(baseBrokerRequest, offlineTableName);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(offlineTableConfig, schema, baseBrokerRequest.getPinotQuery());
+        _queryOptimizer.optimize(baseBrokerRequest.getPinotQuery(), schema);
+      }
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
           _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), offlineTableConfig);
       hybridRoute.setOfflineBrokerRequest(baseBrokerRequest);
     } else {
       setTableName(baseBrokerRequest, realtimeTableName);
+      if (skipExpiredRecords) {
+        handleSkipExpiredRecords(realtimeTableConfig, schema, baseBrokerRequest.getPinotQuery());
+        _queryOptimizer.optimize(baseBrokerRequest.getPinotQuery(), schema);
+      }
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
           _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), realtimeTableConfig);
