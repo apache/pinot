@@ -751,6 +751,10 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
+    /// Controls whether expired records are excluded at query time. Defaults to False.
+    public static final String SKIP_EXPIRED_RECORDS = "pinot.broker.skip.expired.records";
+    public static final boolean DEFAULT_SKIP_EXPIRED_RECORDS = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";

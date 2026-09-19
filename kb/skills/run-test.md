@@ -5,16 +5,16 @@ Purpose: resolve a test class name to its Maven module and run only that test, w
 Usage:
 - `/run-test RangeIndexTest` — single class.
 - `/run-test RangeIndexTest#testSpecificMethod` — single method.
-- `/run-test OfflineClusterIntegrationTest` — integration test (auto-detected, adds the required flag).
+- `/run-test OfflineClusterIntegrationTest` — integration test (auto-detected for runtime expectations).
 
 ## Procedure
 
-1. **Parse the argument.** Split on `#` into `<className>` and optional `<methodName>`. If the class name contains a dot, treat it as FQN.
+1. **Parse the argument.** Split on `#` into `<className>` and optional `<methodName>`. If the class name contains a dot, retain it as the FQN selector and extract its simple class name for file lookup.
 
 2. **Locate the source file.**
-   - Glob for `**/<className>.java` under the repo.
+   - Glob for `**/<simpleClassName>.java` under the repo; verify the package declaration when the user supplied an FQN.
    - Prefer matches under `src/test/java/`.
-   - If multiple matches, list them (with module prefixes) and ask the user which one. Do not guess.
+   - Use the supplied module or established task scope to disambiguate matches. Ask with module-qualified candidates only if multiple matches remain.
    - If zero matches, report and stop.
 
 3. **Find the owning module.** Walk up from the test file until you find a `pom.xml` that is not the repo root. That's the module.
@@ -30,17 +30,19 @@ Usage:
 
 5. **Build the command.**
    ```
-   ./mvnw -pl <module> -am -Dtest=<className>[#<methodName>] -Dsurefire.failIfNoSpecifiedTests=false test
+   ./mvnw -pl <module> -am '-Dtest=<selector>' -Dsurefire.failIfNoSpecifiedTests=false test
    ```
-   - `-am` is intentional: the test needs upstream module JARs built.
+   - Use the class name or FQN as `<selector>`; append `#<methodName>` when a method is requested.
+   - Keep `-am` when current upstream dependencies are unverified. For module-only iteration, omit it only when the required artifacts are available to Maven and verified against the current source, dependency versions, JDK, and build configuration. A prior reactor `test` alone does not establish that dependency artifacts are installed for a module-only invocation.
    - `-Dsurefire.failIfNoSpecifiedTests=false` is always required when `-am` is set (see step 4).
 
-6. **Run and report.** Print the exact command before running so the user can copy/tweak it. On failure, show the last ~60 lines of the Maven output (or the Surefire report path under `<module>/target/surefire-reports/`) so the user can jump straight to the stack trace.
+6. **Run and report.** Print the exact command before running so the user can copy/tweak it. Long runs may execute asynchronously; retain the log and Maven exit code, report meaningful progress, and do independent work while they run. Await completion and verify that the requested test actually ran before reporting success. On failure, show the relevant Maven output or the Surefire report path under `<module>/target/surefire-reports/`.
 
 ## Notes
 
-- These runs can take 2–15 minutes depending on the module and whether deps are already built. Consider `run_in_background` only if the user says so — default is foreground so they see progress.
-- Never strip `-am`. The first run after a clean checkout will fail without it.
-- If the user wants to run without rebuilding upstream (faster iteration), suggest they add `-o` (offline) or drop `-am` after the first successful build — but don't do it automatically.
-- For repeat runs of the same test, suggest `-DfailIfNoTests=false` if the first run reported "No tests were executed" — usually a typo in the class name.
-- If the class is `abstract` or has no `@Test` methods (it's a base class), warn the user and suggest concrete subclasses found via grep.
+- These runs can take 2–15 minutes depending on the module and dependency state. Asynchronous execution does not require separate user authorization.
+- `-o` disables remote artifact resolution; it does not skip upstream reactor modules or replace `-am`. Use it only when all required artifacts are cached and offline execution is appropriate.
+- Reuse a passing test result if the tested sources, dependencies, JDK, and relevant configuration have not changed. Rerun only when changes or unresolved failures invalidate that evidence.
+- If the requested test did not execute, check the selector, source class, and Surefire reports. Do not suppress the missing-test failure to report success.
+- If the class is abstract, suggest concrete subclasses. Before treating a class with no declared `@Test` methods as a base class, check inherited tests and class-level test annotations.
+- Integration tests can start embedded Helix/ZK/Kafka and bind fixed localhost ports. Do not overlap runs that share ports or other exclusive resources.

@@ -116,7 +116,10 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -173,6 +176,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _useMSEToFillEmptyResponseSchema;
   protected final boolean _enableQueryFingerprinting;
   protected final AuthProvider _serverAdminAuthProvider;
+  protected final boolean _skipExpiredRecords;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
@@ -237,6 +241,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _implicitHybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
     _logicalTableRouteProvider = new LogicalTableRouteProvider(multiClusterRoutingContext);
+    _skipExpiredRecords = config.getProperty(Broker.SKIP_EXPIRED_RECORDS,
+        Broker.DEFAULT_SKIP_EXPIRED_RECORDS);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -1246,6 +1252,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(serverPinotQuery);
     }
+    if(_skipExpiredRecords) {
+      handleSkipExpiredRecords(_tableCache, serverPinotQuery);
+    }
 
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
@@ -1859,6 +1868,43 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         handleDistinctCountBitmapOverride(operand);
       }
     }
+  }
+
+  private static void handleSkipExpiredRecords(TableCache tableCache, PinotQuery pinotQuery) {
+    //get timestamp column
+    //get retention time for table
+    //compute time for cutoff based on this and add to query.
+    String tableNameWithType = pinotQuery.getDataSource().getTableName();
+    TableConfig tableConfig = tableCache.getTableConfig(tableNameWithType);
+    if (tableConfig == null || tableConfig.getValidationConfig() == null) {
+      return;
+    }
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    Schema schema = tableCache.getSchema(rawTableName);
+    if (schema == null) {
+      return;
+    }
+
+
+    String timeColumnName = validationConfig.getTimeColumnName();
+    if (timeColumnName == null) {
+      return;
+    }
+
+    //check the type of the table(for hybrid ones)
+    //make sure to convert time unit to the same unit as the timestamp column
+
+
+
+    long retentionMs = TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
+        .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+    long cutOffMs = System.currentTimeMillis() - retentionMs;
+
+    DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+
   }
 
   private HandlerContext getHandlerContext(@Nullable QueryConfig offlineTableQueryConfig,
