@@ -5,9 +5,9 @@ Purpose: when a change claims a performance impact (principle C6.7 — "performa
 Usage:
 - `/bench-compare BenchmarkDictionary` — compares current working tree vs. `merge-base HEAD upstream/master` (falls back to `origin/master` if upstream missing).
 - `/bench-compare BenchmarkDictionary <baseline-ref>` — compare against an explicit ref (commit, tag, branch).
-- `/bench-compare BenchmarkDictionary --args "-wi 1 -i 2 -f 1 -r 5s -w 5s"` — pass extra JMH args. **Always use short warmup/iteration flags for a first pass**; defaults run for hours or days.
+- `/bench-compare BenchmarkDictionary --args "-wi 1 -i 2 -f 1 -r 5s -w 5s"` — pass extra JMH args. Use short warmup/iteration flags for an exploratory first pass unless the user authorized a longer run; defaults can run for hours or days.
 
-**Time expectations.** Pinot benchmarks are not quick. Default JMH config in `pinot-perf` is 8 warmup × 60s + 8 measurement × 60s × 5 forks per parameter combination — a single benchmark method's `@Benchmark` can report an ETA of multiple days. The skill will refuse to run without either: (a) explicit `--args` that reduce warmup/iteration counts, or (b) the user confirming they really do want the full default run.
+**Time expectations.** Pinot benchmarks are not quick. Default JMH config in `pinot-perf` is 8 warmup × 60s + 8 measurement × 60s × 5 forks per parameter combination — a single benchmark method's `@Benchmark` can report an ETA of multiple days. Proceed with explicit bounded arguments or an already authorized time budget. Ask before an unbounded run or extending that budget; do not ask for the same authorization again.
 
 ## Procedure
 
@@ -15,52 +15,80 @@ Usage:
 
 2. **Resolve the baseline ref.**
    - Default: `git merge-base HEAD upstream/master`. If the `upstream` remote isn't defined, fall back to `origin/master`. If neither resolves, ask the user for an explicit ref.
-   - If the user passed a ref, validate it with `git rev-parse --verify <ref>`.
+   - If the user passed a ref, resolve it to a commit with `git rev-parse --verify '<ref>^{commit}'`. Record the resolved baseline SHA so both the build and report use the same commit.
 
-3. **Prepare output directory.** `mkdir -p .bench-compare/` and append it to the repo's `.gitignore` if not already there. Produce two files: `baseline-<short-sha>.txt` and `current-<short-sha-or-WIP>.txt`.
-
-4. **Warn and confirm.** Benchmarks take real time. Inspect `--args` — if the user hasn't passed iteration controls, warn that the default suite can take hours to days and suggest a starter like `-wi 1 -i 2 -f 1 -r 5s -w 5s`. Print an estimate of the pair of runs (rough: a 5s-warmup × 5s-measurement × 1 fork run takes ~30–120s per `@Benchmark` method after the Pinot-side `@Setup` completes; `@Setup` alone can run for 1–10 minutes for benchmarks that build segments). Ask the user to confirm.
-
-5. **Build pinot-perf in a baseline worktree.** This avoids touching the working tree:
+3. **Prepare a unique task directory outside the checkout.** Keep results separate from the temporary baseline worktree; do not modify the repository's `.gitignore` for local benchmark artifacts. The following examples share these variables; replace `<baseline-ref>` with the ref resolved in step 2:
+   ```sh
+   bench_repo=$(git rev-parse --show-toplevel) || exit 1
+   bench_baseline_sha=$(git rev-parse --verify '<baseline-ref>^{commit}') || exit 1
+   bench_run_dir=$(mktemp -d "${TMPDIR:-/tmp}/pinot-bench.XXXXXX") || exit 1
+   bench_worktree="$bench_run_dir/baseline"
+   bench_results_dir="$bench_run_dir/results"
+   bench_worktree_created=false
+   mkdir "$bench_results_dir" || exit 1
    ```
-   git worktree add /tmp/pinot-bench-baseline <baseline-ref>
-   (cd /tmp/pinot-bench-baseline && ./mvnw -pl pinot-perf -am package -DskipTests)
+   Retain build logs, benchmark output, commands, resolved SHAs, and the scope of any uncommitted changes in the results directory. Report its absolute path; cleanup in step 8 removes only the owned baseline worktree.
+
+4. **Check the run budget.** Inspect the selected methods, parameter combinations, forks, warmup, measurement, and setup cost; estimate both builds and both runs. If explicit short arguments or an existing budget cover the work, state the estimate and proceed. With only a time budget, choose bounded arguments that fit it. Otherwise suggest a starter like `-wi 1 -i 2 -f 1 -r 5s -w 5s` and ask for the missing budget. Setup can take 1–10 minutes for benchmarks that build segments. If the estimate or observed runtime exceeds the authorized budget, preserve partial output and ask before extending the run.
+
+5. **Build pinot-perf in the baseline worktree.** Record ownership only after this task successfully creates it. Stop dependent steps if creation fails; do not reuse or delete an existing path:
+   ```sh
+   if git -C "$bench_repo" worktree add --detach "$bench_worktree" "$bench_baseline_sha"; then
+     bench_worktree_created=true
+   else
+     exit 1
+   fi
+   (cd "$bench_worktree" && ./mvnw -pl pinot-perf -am package -DskipTests) \
+     > "$bench_results_dir/baseline-build.txt" 2>&1
    ```
    The package goal produces the jars, an appassembler-generated launcher (for ~21 blessed benchmark classes) at `pinot-perf/target/pinot-perf-pkg/bin/pinot-<BenchmarkClass>.sh`, and a fat `lib/` directory.
 
-6. **Run the baseline benchmark.** Two invocation styles, in order of preference:
+6. **Verify selection and run the baseline benchmark.** Before starting measurements, list the selected methods and parameters without invoking their setup:
+
+   ```sh
+   java -cp "$bench_worktree/pinot-perf/target/pinot-perf-pkg/lib/*" \
+     org.openjdk.jmh.Main -lp 'org.apache.pinot.perf.<BenchmarkClass>'
+   ```
+   Use `-l` instead of `-lp` when only method names are needed. Check the list against the budget from step 4; narrow the selector or parameters when needed. Do not invoke the benchmark's custom `main()` for discovery.
 
    **Preferred — always use JMH's own Main class:**
    ```
-   java -Xms4G -Xmx8G -cp '/tmp/pinot-bench-baseline/pinot-perf/target/pinot-perf-pkg/lib/*' \
+   (cd "$bench_worktree" && java -Xms4G -Xmx8G -cp "$bench_worktree/pinot-perf/target/pinot-perf-pkg/lib/*" \
      org.openjdk.jmh.Main 'org.apache.pinot.perf.<BenchmarkClass>' \
      -wi 1 -i 2 -f 1 -r 5s -w 5s \
-     -jvmArgsAppend='-XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true' \
-     > .bench-compare/baseline-<short-sha>.txt 2>&1
+     -jvmArgsAppend='-XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true') \
+     > "$bench_results_dir/baseline.txt" 2>&1
    ```
 
    Why not use the generated `pinot-<BenchmarkClass>.sh`?
    - It hard-codes `-Xms24G -Xmx24G` — OOMs on <32GB machines.
    - The benchmark's own `main()` (which the script invokes) typically constructs `OptionsBuilder` directly and **ignores CLI args**, so you can't override warmup/iterations or pass `-jvmArgsAppend`. Going through `org.openjdk.jmh.Main` bypasses the custom main and gets you JMH's standard CLI.
-   - The `--add-opens`/`--add-exports` flags are mandatory for any benchmark that extends `BaseClusterIntegrationTest` (i.e., spins up a Pinot cluster) on JDK 21 — without them, ZK startup fails with `InaccessibleObjectException` wrapped as `ExceptionInInitializerError`.
+   - Cluster-backed benchmarks can require `--add-opens`/`--add-exports` on the current JDK. Use the required flags consistently for both versions; diagnose module-access failures from their underlying exception.
 
    For the vector suite (`BenchmarkVectorIndex`) use the `exec:java` form from `pinot-perf/README.md`; it has its own quirks.
 
-7. **Build and run the current tree.** Two mandatory gotchas:
+7. **Build and run the current tree.** Verify dependency and packaging state before measuring:
 
-   - **Always clean first:** `./mvnw -pl pinot-perf clean package -DskipTests` (note the `clean`, no `-am` — see next bullet). If `pinot-perf/target/pinot-perf-pkg/` already exists from a prior build on a different branch/ref, incremental `package` leaves stale third-party jars in `lib/` when a dependency version changes upstream. Those stale jars sit on the classpath alongside the new ones (e.g. `zookeeper-3.9.4.jar` and `zookeeper-3.9.5.jar`) and cause `NoSuchMethodError` at runtime. Crucially, Helix/Pinot swallows the resulting `ExceptionInInitializerError` in ZK startup and surfaces a misleading `ZkTimeoutException: timeout: 1000` instead — which looks for all the world like a flaky port or timing issue. If you see that exception, **check `lib/` for duplicate versions of `zookeeper-*`, `helix-*`, `netty-*`, etc. first.**
+   - Existing appassembler output can retain old dependency jars after version changes. Inspect the build output and runtime classpath if versions changed or errors suggest a mismatch. If stale packaging is confirmed, clean only `pinot-perf` with `./mvnw -pl pinot-perf clean`, then run the package command below. Preserve prior diagnostic output before cleaning.
 
-   - **Use `-am` only on the first build.** After the first clean+package, upstream modules are populated; subsequent builds can skip `-am`. The worktree build in step 5 gets a fresh `target/` so doesn't have this problem.
+   - Keep `-am` unless dependency artifacts satisfy the evidence requirements in kb/skills/run-test.md. A prior reactor `package` alone does not install artifacts for a module-only invocation.
 
    Invocation is identical to step 6, just against the current tree's `lib/*`:
    ```
-   ./mvnw -pl pinot-perf clean package -DskipTests -am
-   java -Xms4G -Xmx8G -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' \
-     org.openjdk.jmh.Main 'org.apache.pinot.perf.<BenchmarkClass>' <same JMH + jvmArgsAppend flags> \
-     > .bench-compare/current-<sha-or-WIP>.txt 2>&1
+   (cd "$bench_repo" && ./mvnw -pl pinot-perf -am package -DskipTests) \
+     > "$bench_results_dir/current-build.txt" 2>&1
+   (cd "$bench_repo" && java -Xms4G -Xmx8G -cp "$bench_repo/pinot-perf/target/pinot-perf-pkg/lib/*" \
+     org.openjdk.jmh.Main 'org.apache.pinot.perf.<BenchmarkClass>' <same JMH + jvmArgsAppend flags>) \
+     > "$bench_results_dir/current.txt" 2>&1
    ```
 
-8. **Clean up the worktree.** `git worktree remove /tmp/pinot-bench-baseline --force`. Do this even if steps 6 or 7 failed.
+8. **Clean up only the worktree created by this run.** After measurements finish or fail, check `bench_worktree_created`, inspect `git -C "$bench_repo" worktree list --porcelain` and `git -C "$bench_worktree" status --porcelain`, and verify the registered path and baseline SHA match this run. Once all its processes have stopped and there are no unexpected changes, remove it with:
+   ```sh
+   if [ "$bench_worktree_created" = true ]; then
+     git -C "$bench_repo" worktree remove "$bench_worktree"
+   fi
+   ```
+   If ownership cannot be verified, unexpected changes exist, or removal refuses, retain the path and report the reason. Do not add `--force`, remove another run's directory, or delete the results directory.
 
 9. **Diff the results.** Parse JMH's table output (the `Benchmark ... Score Error Units` lines) from both files. Produce a table:
    ```
@@ -74,13 +102,13 @@ Usage:
 
 ## Notes
 
-- **Stale-jar trap is the #1 source of mysterious failures.** Pinot benchmarks that fail on a subsequent run of `/bench-compare` in the same repo almost always fail because of duplicate third-party jars in `pinot-perf/target/pinot-perf-pkg/lib/` — typically `zookeeper-X.jar` + `zookeeper-Y.jar` (or equivalent for helix, netty, guava) from different builds. The failure shows up as a deeply-wrapped `ZkTimeoutException: Unable to connect to zookeeper server within timeout: 1000` (or similar NoSuchMethodError swallowed into an infrastructure-looking error). First diagnostic when a second run fails: `ls pinot-perf/target/pinot-perf-pkg/lib/ | sort | awk -F- '{v=$NF; sub("\\.jar$","",v); k=$0; sub("-"v"\\.jar$","",k); print k}' | sort | uniq -d` to spot duplicates. The fix is always `./mvnw -pl pinot-perf clean package -DskipTests -am`, never `rm` individual jars.
-- Worktrees require a clean `.git`. If the repo is in the middle of a rebase/merge, abort with a clear message.
-- **JDK 21 needs the full `--add-opens` / `--add-exports` flag set** for any cluster-backed benchmark (extends `BaseClusterIntegrationTest`). Without them, ZK startup fails with `InaccessibleObjectException: ... module java.base does not "opens java.lang"`. Pass via `-jvmArgsAppend=...` to `org.openjdk.jmh.Main`; CI's `pinot_tests.yml` has the canonical list.
+- Long builds and benchmark runs may execute asynchronously. Preserve logs and each process's exit code, provide meaningful progress, and await completion before comparing results. Keep baseline and current measurements sequential to avoid resource contention.
+- Diagnose failures from the full exception chain, build logs, runtime classpath, and resource state. Duplicate dependency jars are one possible cause of linkage errors or wrapped ZK startup failures; a timeout alone does not establish that cause. Rebuild only when the evidence supports it, and retain unexplained failures as unresolved.
+- An uncommitted working tree is supported. If an in-progress merge/rebase leaves the intended source state ambiguous, resolve the scope before building; do not abort or alter that Git operation automatically.
+- Consult the current [integration-test workflow](../../.github/workflows/pinot_integration_tests.yml) for JVM module-access flags. Pass required benchmark-fork flags via `-jvmArgsAppend` to `org.openjdk.jmh.Main` using the same settings for baseline and current runs.
 - **The generated `pinot-<BenchmarkClass>.sh` scripts hard-code `-Xms24G -Xmx24G`.** Avoid them — use `java -cp 'lib/*' org.openjdk.jmh.Main <FQN>` directly with your own `-Xmx`.
 - **Not every benchmark has a generated script.** The appassembler programs list in `pinot-perf/pom.xml` covers ~21 of ~60 benchmark classes. The direct `java -cp` invocation works for any of them.
-- JMH's `-l` (list benchmarks) flag **does not help here** — Pinot benchmark classes have custom `main()` entry points that construct `OptionsBuilder` directly, ignore CLI args, and plunge straight into `Runner.run(...)` which in turn kicks off `@Setup`. For `BenchmarkDictionary` this `@Setup` alone burns 5+ minutes building dictionaries. There is no fast sanity-check short of actually running the benchmark through `org.openjdk.jmh.Main` (which at least accepts `-wi 1 -i 1 -r 1s -w 1s` to minimise it).
 - Benchmarks must run on the same hardware, same JDK, same OS load. Warn the user if they're on battery power or running other heavy processes.
-- Do not `sleep` between runs for "timing" reasons. If a second run fails, it is the stale-jar issue (above), not TIME_WAIT. I spent a long time chasing the timing hypothesis before spotting the classpath mismatch.
+- Do not insert arbitrary sleeps or retries after a failed run; first inspect the failure and verify that its processes and exclusive resources have been released.
 - If the benchmark's output format isn't plain JMH (e.g. `BenchmarkVectorIndex` writes a custom report), don't try to parse it — just save both outputs and tell the user where they are, with a note that manual comparison is needed.
 - Never use `git stash` instead of a worktree. Stash can be lost if the second build fails and the user doesn't know to pop it.

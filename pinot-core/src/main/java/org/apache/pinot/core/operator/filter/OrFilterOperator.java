@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -27,12 +26,12 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
-import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.core.operator.docidsets.ShortCircuitingDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
@@ -71,33 +70,29 @@ public class OrFilterOperator extends BaseFilterOperator {
     return new OrDocIdSet(blockDocIdSets, _numDocs);
   }
 
+  /// A disjunction is not false where some child is not false: the union of the children's not-false documents.
   @Override
-  protected BlockDocIdSet getFalses() {
-    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+  protected BlockDocIdSet getNotFalses() {
+    List<BlockDocIdSet> notFalses = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      BlockDocIdSet trues = filterOperator.getTrues();
-      if (trues instanceof MatchAllDocIdSet) {
-        return EmptyDocIdSet.getInstance();
+      BlockDocIdSet childNotFalses = filterOperator.getNotFalses();
+      if (childNotFalses instanceof MatchAllDocIdSet) {
+        return new MatchAllDocIdSet(_numDocs);
       }
-      if (trues instanceof EmptyDocIdSet) {
+      if (childNotFalses instanceof EmptyDocIdSet) {
         continue;
       }
-      if (_nullHandlingEnabled) {
-        BlockDocIdSet nulls = filterOperator.getNulls();
-        if (!(nulls instanceof EmptyDocIdSet)) {
-          blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
-          continue;
-        }
-      }
-      blockDocIdSets.add(trues);
+      notFalses.add(childNotFalses);
     }
-    if (blockDocIdSets.isEmpty()) {
-      return new MatchAllDocIdSet(_numDocs);
+    if (notFalses.isEmpty()) {
+      return EmptyDocIdSet.getInstance();
     }
-    if (blockDocIdSets.size() == 1) {
-      return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
-    }
-    return new NotDocIdSet(new OrDocIdSet(blockDocIdSets, _numDocs), _numDocs);
+    return notFalses.size() == 1 ? notFalses.get(0) : new OrDocIdSet(notFalses, _numDocs);
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.getInstance();
   }
 
   @Override
@@ -137,12 +132,42 @@ public class OrFilterOperator extends BaseFilterOperator {
     return true;
   }
 
+  /// The true documents are those true for some child. When a child has UNKNOWN documents, so may the result: a
+  /// document is UNKNOWN when no child is true for it and some child is UNKNOWN, which is the union of the children's
+  /// UNKNOWN documents minus the union of their true ones.
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
-    for (int i = 0; i < _filterOperators.size(); i++) {
-      bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
+    int numChildren = _filterOperators.size();
+    ImmutableRoaringBitmap[] trues = new ImmutableRoaringBitmap[numChildren];
+    MutableRoaringBitmap nulls = null;
+    for (int i = 0; i < numChildren; i++) {
+      BitmapCollection childBitmaps = _filterOperators.get(i).getBitmaps();
+      trues[i] = childBitmaps.reduce();
+      ImmutableRoaringBitmap childNulls = childBitmaps.getNullBitmap();
+      if (childNulls != null) {
+        if (nulls == null) {
+          nulls = new MutableRoaringBitmap();
+        }
+        nulls.or(childNulls);
+      }
     }
-    return new BitmapCollection(_numDocs, false, BufferFastAggregation.or(bitmaps));
+    MutableRoaringBitmap orTrues = BufferFastAggregation.or(trues);
+    if (nulls == null) {
+      return new BitmapCollection(_numDocs, false, orTrues);
+    }
+    nulls.andNot(orTrues);
+    return new BitmapCollection(_numDocs, false, orTrues).excludingNulls(nulls);
+  }
+
+  @Override
+  public boolean mayHaveNulls() {
+    if (_nullHandlingEnabled) {
+      for (BaseFilterOperator filterOperator : _filterOperators) {
+        if (filterOperator.mayHaveNulls()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

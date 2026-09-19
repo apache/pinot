@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,6 +222,25 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   /// @return Segment record
   Record getSegmentRecord(int docId) {
     int[] dimensions = getSegmentRecordDimensions(docId);
+    Object[] metrics = new Object[_numMetrics];
+    for (int i = 0; i < _numMetrics; i++) {
+      // Ignore the column for COUNT aggregation function
+      if (_metricReaders[i] != null) {
+        metrics[i] = _metricReaders[i].getValue(docId);
+      }
+    }
+    return new Record(dimensions, metrics);
+  }
+
+  /// Same as {@link #getSegmentRecord(int)} but reads dims from `dimBuffer` (row-major, indexed by
+  /// `docId * _numDimensions * Integer.BYTES`) instead of re-fetching from the segment.
+  Record getSegmentRecordWithBufferDims(int docId, PinotDataBuffer dimBuffer) {
+    int[] dimensions = new int[_numDimensions];
+    long off = (long) docId * _numDimensions * Integer.BYTES;
+    for (int i = 0; i < _numDimensions; i++) {
+      dimensions[i] = dimBuffer.getInt(off);
+      off += Integer.BYTES;
+    }
     Object[] metrics = new Object[_numMetrics];
     for (int i = 0; i < _numMetrics; i++) {
       // Ignore the column for COUNT aggregation function

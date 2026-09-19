@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.startree.OffHeapStarTree;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -42,10 +43,14 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The `StarTreeLoaderUtils` class provides utility methods to load star-tree indexes.
 public class StarTreeLoaderUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeLoaderUtils.class);
+
   private StarTreeLoaderUtils() {
   }
 
@@ -57,11 +62,23 @@ public class StarTreeLoaderUtils {
     int numStarTrees = starTreeMetadataList.size();
     List<StarTreeV2> starTrees = new ArrayList<>(numStarTrees);
     for (int i = 0; i < numStarTrees; i++) {
+      StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(i);
+
+      // A star-tree is unreadable once one of its dimension columns loses its dictionary, which happens when the
+      // column is moved to 'noDictionaryColumns' without the star-tree being rebuilt. Skip it instead of failing the
+      // whole segment load. SegmentPreProcessor normally removes such star-trees, so reaching this point means the
+      // pre-processing was skipped for this segment.
+      String unloadableDimension = StarTreeBuilderUtils.findUnloadableDimension(starTreeMetadata, segmentMetadata);
+      if (unloadableDimension != null) {
+        LOGGER.warn("Skipping star-tree: {} in segment: {} because dimension column: {} is no longer "
+            + "dictionary-encoded", i, segmentMetadata.getName(), unloadableDimension);
+        continue;
+      }
+
       SegmentDirectory.Reader indexReader = segmentReader.getStarTreeIndexReader(i);
       // Load star-tree index
       StarTree starTree = new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), StandardIndexes.inverted()));
 
-      StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(i);
       int numDocs = starTreeMetadata.getNumDocs();
       Map<String, DataSource> dataSourceMap = new HashMap<>();
 

@@ -44,6 +44,7 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -62,6 +63,7 @@ import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -446,6 +448,13 @@ public class QueryEnvironment {
   ///
   /// It is important to notice that the returned tree is not yet [optimized][#optimize(RelRoot, PlannerContext)].
   private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
+    RelOptPlanner planner = plannerContext.getRelOptPlanner();
+    RexExecutor originalExecutor = planner.getExecutor();
+    if (originalExecutor == null) {
+      // SqlToRelConverter transforms its RelBuilder, discarding executors provided only through the builder context.
+      // Install on the per-query planner so conversion and field trimming can reuse compiled cast templates.
+      planner.setExecutor(PinotRexExecutor.INSTANCE);
+    }
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
@@ -481,6 +490,9 @@ public class QueryEnvironment {
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_PLANNING.asException(
           "Error converting query to relational expression: " + e.getMessage(), e);
+    } finally {
+      // Keep the executor policy of the subsequent optimization phase unchanged.
+      planner.setExecutor(originalExecutor);
     }
   }
 
@@ -791,6 +803,25 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultEnableGroupTrim() {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
+    }
+
+    /// Whether to rewrite exact aggregations into their approximate counterparts, already resolved from the query
+    /// option and the defaults. See [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION].
+    @Value.Default
+    default boolean useApproximateFunction() {
+      return CommonConstants.Broker.DEFAULT_USE_APPROXIMATE_FUNCTION;
+    }
+
+    /// Parameters appended to the rewritten calls, empty for the aggregation function defaults.
+    /// See [CommonConstants.Broker#APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS].
+    @Value.Default
+    default String approximateFunctionDistinctCountParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
+    }
+
+    @Value.Default
+    default String approximateFunctionPercentileParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
     }
 
     @Value.Default

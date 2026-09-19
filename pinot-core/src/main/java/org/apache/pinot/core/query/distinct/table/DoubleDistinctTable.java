@@ -40,6 +40,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DoubleDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "DoubleDistinctTable#mergeDistinctTable";
+
   private final DoubleOpenHashSet _valueSet;
   private final OrderByExpressionContext _orderByExpression;
 
@@ -136,14 +138,17 @@ public class DoubleDistinctTable extends DistinctTable {
     if (doubleDistinctTable._hasNull) {
       addNull();
     }
+    int numValuesMerged = 0;
     DoubleIterator doubleIterator = doubleDistinctTable._valueSet.iterator();
     if (hasLimit()) {
       if (hasOrderBy()) {
         while (doubleIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           addWithOrderBy(doubleIterator.nextDouble());
         }
       } else {
         while (doubleIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(doubleIterator.nextDouble())) {
             return;
           }
@@ -152,6 +157,7 @@ public class DoubleDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       while (doubleIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
         addUnbounded(doubleIterator.nextDouble());
       }
     }

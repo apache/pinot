@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.IOUtils;
 import org.mockito.Mock;
@@ -36,7 +37,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 import static org.testng.Assert.assertEquals;
-
 
 public class ExternalViewReaderTest {
 
@@ -219,5 +219,106 @@ public class ExternalViewReaderTest {
     configureData(_instanceConfigTls, true);
     final List<String> brokers = _externalViewReaderUnderTest.getLiveBrokers();
     assertEquals(brokers, Arrays.asList("first.pug-pinot-broker-headless:8090"));
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // Instance-config read amplification
+  //
+  // The broker resource is walked table by table, so the same broker is met once per table it
+  // serves. Its address is a property of the broker, so every read after the first returns the same
+  // bytes. The fixtures above cannot show this: they hold one table and one broker, where N x M and
+  // M are both 1.
+  // -----------------------------------------------------------------------------------------------
+
+  private static final String BROKER_A = "Broker_10.0.0.1_8099";
+  private static final String BROKER_B = "Broker_10.0.0.2_8099";
+
+  /// Two tables, both served by the same two brokers: four (table, broker) pairs over two distinct
+  /// brokers.
+  private ExternalViewReader newReaderOverTwoTablesAndTwoBrokers() {
+    String externalView = "{\"mapFields\":{"
+        + "\"table1_OFFLINE\":{\"" + BROKER_A + "\":\"ONLINE\",\"" + BROKER_B + "\":\"ONLINE\"},"
+        + "\"table2_OFFLINE\":{\"" + BROKER_A + "\":\"ONLINE\",\"" + BROKER_B + "\":\"ONLINE\"}}}";
+    when(_mockZkClient.readData(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, true))
+        .thenReturn("json".getBytes(StandardCharsets.UTF_8));
+    when(_mockZkClient.readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_A, true))
+        .thenReturn(instanceConfig("10.0.0.1", "8099").getBytes(StandardCharsets.UTF_8));
+    when(_mockZkClient.readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_B, true))
+        .thenReturn(instanceConfig("10.0.0.2", "8099").getBytes(StandardCharsets.UTF_8));
+    return new ExternalViewReader(_mockZkClient) {
+      @Override
+      protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
+        return new ByteArrayInputStream(externalView.getBytes(StandardCharsets.UTF_8));
+      }
+    };
+  }
+
+  private static String instanceConfig(String host, String port) {
+    return "{\"id\":\"Broker_" + host + "_" + port + "\",\"simpleFields\":{"
+        + "\"HELIX_HOST\":\"" + host + "\",\"HELIX_PORT\":\"" + port + "\"},"
+        + "\"mapFields\":{},\"listFields\":{}}";
+  }
+
+  @Test
+  public void testGetTableToBrokersMapReadsEachInstanceConfigOncePerCall() {
+    ExternalViewReader reader = newReaderOverTwoTablesAndTwoBrokers();
+
+    reader.getTableToBrokersMap();
+
+    // Two distinct brokers, so two reads -- not the four the four (table, broker) pairs would imply.
+    Mockito.verify(_mockZkClient, Mockito.times(1))
+        .readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_A, true);
+    Mockito.verify(_mockZkClient, Mockito.times(1))
+        .readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_B, true);
+  }
+
+  /// Fewer reads, identical result: every table still maps to both broker addresses.
+  @Test
+  public void testGetLiveBrokersReadsEachInstanceConfigOncePerCall() {
+    ExternalViewReader reader = newReaderOverTwoTablesAndTwoBrokers();
+
+    reader.getLiveBrokers();
+
+    Mockito.verify(_mockZkClient, Mockito.times(1))
+        .readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_A, true);
+    Mockito.verify(_mockZkClient, Mockito.times(1))
+        .readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_B, true);
+  }
+
+  /// getLiveBrokers returns a List and has always emitted one entry per (table, broker) pair rather
+  /// than per broker. Reusing a resolved address must not quietly turn that into a de-duplicated
+  /// list: it is public API, and a caller picking at random would see its weighting change.
+  @Test
+  public void testGetLiveBrokersStillReturnsOneEntryPerTableBrokerPair() {
+    ExternalViewReader reader = newReaderOverTwoTablesAndTwoBrokers();
+
+    List<String> brokers = reader.getLiveBrokers();
+
+    assertEquals(brokers.size(), 4);
+    assertEquals(Set.copyOf(brokers), Set.of("10.0.0.1:8099", "10.0.0.2:8099"));
+  }
+
+  @Test
+  public void testGetTableToBrokersMapResultIsUnchangedByReusingResolvedAddresses() {
+    ExternalViewReader reader = newReaderOverTwoTablesAndTwoBrokers();
+
+    Map<String, List<String>> result = reader.getTableToBrokersMap();
+
+    assertEquals(result.keySet(), Set.of("table1", "table2"));
+    assertEquals(Set.copyOf(result.get("table1")), Set.of("10.0.0.1:8099", "10.0.0.2:8099"));
+    assertEquals(Set.copyOf(result.get("table2")), Set.of("10.0.0.1:8099", "10.0.0.2:8099"));
+  }
+
+  /// A fresh call must re-read: the map lives for one call only, so a broker that moved host or
+  /// port is picked up on the next refresh without any invalidation machinery.
+  @Test
+  public void testResolvedAddressesAreNotRetainedAcrossCalls() {
+    ExternalViewReader reader = newReaderOverTwoTablesAndTwoBrokers();
+
+    reader.getTableToBrokersMap();
+    reader.getTableToBrokersMap();
+
+    Mockito.verify(_mockZkClient, Mockito.times(2))
+        .readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/" + BROKER_A, true);
   }
 }

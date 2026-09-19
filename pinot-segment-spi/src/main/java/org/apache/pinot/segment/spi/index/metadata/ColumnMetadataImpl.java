@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
 import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -54,12 +57,33 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+import static com.google.common.base.Preconditions.checkElementIndex;
 
+
+/// Column metadata parsed from `metadata.properties` (or built through [Builder]).
+///
+/// A server retains one instance per (segment, column) for as long as the segment is loaded, so the parse path keeps
+/// the per-column footprint small: column names, parent-column names, date-time formats/granularities and custom
+/// default-null literals are interned (they recur in every segment of a table), and a `defaultNullValue` that equals
+/// the type default is not handed to the [FieldSpec] at all, so the spec carries the shared static
+/// `FieldSpec.DEFAULT_*` constant and never retains the literal. The [FieldSpec] itself is then interned through
+/// [#FIELD_SPEC_INTERNER], so every segment of a table (and every table with an identical column definition) shares
+/// one instance per distinct spec instead of retaining its own. Callers must treat shared specs and their nested
+/// values as read-only. Deserialize [FieldSpec#toJsonObject()] to make a copy before editing a spec.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
+
+  /// Canonical instances of the [FieldSpec]s parsed from `metadata.properties`, keyed by [FieldSpec#equals] /
+  /// [FieldSpec#hashCode] (name, data type, single-value, default null value, max length, date-time format and
+  /// granularity, ...), so schema evolution yields a distinct canonical instance per version of a column. The specs
+  /// are held weakly: the canonical instance is exactly the one the loaded segments retain, so it lives as long as
+  /// any of them and is released once the last one is unloaded. Thread-safe.
+  private static final Interner<FieldSpec> FIELD_SPEC_INTERNER = Interners.newWeakInterner();
+  private static final Interner<String> DEFAULT_NULL_VALUE_INTERNER = Interners.newWeakInterner();
 
   private final FieldSpec _fieldSpec;
   private final int _totalDocs;
@@ -88,12 +112,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   @Nullable
   private final CompressionMetadata _compressionMetadata;
 
-  /// List of longs, each encodes:
-  /// - 2 byte - numeric id of IndexType
-  /// - 6 byte - index size
-  ///
-  /// Use non-default size to save space for most columns
-  private final LongArrayList _indexTypeSizeList = new LongArrayList(2);
+  /// Packed index sizes: the high 16 bits identify the index type and the low 48 bits hold its size.
+  /// Allocated on the first valid append and populated before publication. Not thread-safe.
+  @Nullable
+  private LongArrayList _indexTypeSizes;
 
   private ColumnMetadataImpl(FieldSpec fieldSpec, int totalDocs, int cardinality, boolean hasDictionary,
       @Nullable EncodingType forwardIndexEncoding, boolean sorted, boolean nonNull, @Nullable Comparable minValue,
@@ -252,8 +274,12 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public long getIndexSizeFor(IndexType type) {
+    if (_indexTypeSizes == null) {
+      return UNAVAILABLE;
+    }
     short indexId = IndexService.getInstance().getNumericId(type);
-    for (long typeAndSize : _indexTypeSizeList) {
+    for (int i = 0; i < _indexTypeSizes.size(); i++) {
+      long typeAndSize = _indexTypeSizes.getLong(i);
       if (indexId == unpackIndexType(typeAndSize)) {
         return unpackIndexSize(typeAndSize);
       }
@@ -268,17 +294,21 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           "Index size should be a non-negative integer value between 0 and " + SIZE_MASK);
     }
     long typeAndSize = ((long) indexType) << 48 | (size & SIZE_MASK);
-    _indexTypeSizeList.add(typeAndSize);
+    if (_indexTypeSizes == null) {
+      _indexTypeSizes = new LongArrayList(2);
+    }
+    _indexTypeSizes.add(typeAndSize);
   }
 
   @Override
   public int getNumIndexes() {
-    return _indexTypeSizeList.size();
+    return _indexTypeSizes == null ? 0 : _indexTypeSizes.size();
   }
 
   @Override
   public short getIndexType(int position) {
-    return unpackIndexType(_indexTypeSizeList.getLong(position));
+    checkElementIndex(position, getNumIndexes());
+    return unpackIndexType(_indexTypeSizes.getLong(position));
   }
 
   private static short unpackIndexType(long typeAndSize) {
@@ -287,7 +317,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @Override
   public long getIndexSize(int position) {
-    return unpackIndexSize(_indexTypeSizeList.getLong(position));
+    checkElementIndex(position, getNumIndexes());
+    return unpackIndexSize(_indexTypeSizes.getLong(position));
   }
 
   private static long unpackIndexSize(long typeAndSize) {
@@ -341,7 +372,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         && Objects.equals(_parentColumn, that._parentColumn)
         && Objects.equals(_sparseKeys, that._sparseKeys)
         && Objects.equals(_compressionMetadata, that._compressionMetadata)
-        && Objects.equals(_indexTypeSizeList, that._indexTypeSizeList);
+        && Objects.equals(_indexTypeSizes, that._indexTypeSizes);
   }
 
   @Override
@@ -349,7 +380,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return Objects.hash(_fieldSpec, _totalDocs, _cardinality, _hasDictionary, _forwardIndexEncoding, _sorted, _nonNull,
         _minValue, _maxValue, _minMaxValueInvalid, _lengthOfShortestElement, _lengthOfLongestElement, _isAscii,
         _totalNumberOfEntries, _maxNumberOfMultiValues, _maxRowLengthInBytes, _bitsPerElement, _partitionFunction,
-        _partitions, _autoGenerated, _parentColumn, _sparseKeys, _compressionMetadata, _indexTypeSizeList);
+        _partitions, _autoGenerated, _parentColumn, _sparseKeys, _compressionMetadata,
+        _indexTypeSizes);
   }
 
   @Override
@@ -377,7 +409,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         + ", _parentColumn=" + _parentColumn
         + ", _sparseKeys=" + _sparseKeys
         + ", _compressionMetadata=" + _compressionMetadata
-        + ", _indexTypeSizeList=" + _indexTypeSizeList
+        + ", _indexTypeSizes=" + _indexTypeSizes
         + '}';
   }
 
@@ -405,7 +437,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         .setMaxRowLengthInBytes(config.getInt(Column.getKeyFor(column, Column.MAX_ROW_LENGTH_IN_BYTES), UNAVAILABLE))
         .setBitsPerElement(config.getInt(Column.getKeyFor(column, Column.BITS_PER_ELEMENT), UNAVAILABLE))
         .setAutoGenerated(config.getBoolean(Column.getKeyFor(column, Column.IS_AUTO_GENERATED), false))
-        .setParentColumn(config.getString(Column.getKeyFor(column, Column.PARENT_COLUMN), null));
+        .setParentColumn(
+            ColumnNameInterner.intern(config.getString(Column.getKeyFor(column, Column.PARENT_COLUMN), null)));
 
     Object rawSparseKeys = config.getProperty(Column.getKeyFor(column, Column.SPARSE_KEYS));
     if (rawSparseKeys != null) {
@@ -481,8 +514,18 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     }
   }
 
+  /// Parses the [FieldSpec] of the given column. DIMENSION, METRIC, TIME and DATE_TIME specs are returned from
+  /// [#FIELD_SPEC_INTERNER], so the instance is shared with every other segment whose column parses to an equal spec
+  /// and must not be mutated. A COMPLEX spec retains its own mutable child map and is not interned; its children
+  /// are parsed through this method and are interned.
+  @SuppressWarnings("deprecation") // Preserve the field type when loading legacy TIME column metadata.
   public static FieldSpec extractFieldSpec(String column, PropertiesConfiguration config) {
-    String fieldName = config.getString(Column.getKeyFor(column, Column.COLUMN_NAME), column);
+    // The name is retained by the FieldSpec, the segment Schema and every per-segment column map, and it recurs in
+    // every segment of the table: share it through the column-name interner. When COLUMN_NAME is absent
+    // (the segment creator only writes it when it differs from the key) this is the key parsed by SegmentMetadataImpl,
+    // which is already interned, so the lookup just returns it.
+    String fieldName =
+        ColumnNameInterner.intern(config.getString(Column.getKeyFor(column, Column.COLUMN_NAME), column));
     FieldType fieldType = config.getEnum(Column.getKeyFor(column, Column.COLUMN_TYPE), FieldType.class);
     DataType dataType = config.getEnum(Column.getKeyFor(column, Column.DATA_TYPE), DataType.class);
     boolean isSingleValue = config.getBoolean(Column.getKeyFor(column, Column.IS_SINGLE_VALUED), true);
@@ -497,31 +540,66 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         ? FieldSpec.MaxLengthExceedStrategy.valueOf(maxLengthExceedStrategyString) : null;
     switch (fieldType) {
       case DIMENSION:
-        return new DimensionFieldSpec(fieldName, dataType, isSingleValue, maxLength, defaultNullValueString,
-            maxLengthExceedStrategy);
+        return FIELD_SPEC_INTERNER.intern(new DimensionFieldSpec(fieldName, dataType, isSingleValue, maxLength,
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLengthExceedStrategy));
       case METRIC:
-        return new MetricFieldSpec(fieldName, dataType, defaultNullValueString, maxLength, maxLengthExceedStrategy);
+        return FIELD_SPEC_INTERNER.intern(new MetricFieldSpec(fieldName, dataType,
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), maxLength,
+            maxLengthExceedStrategy));
       case TIME:
         TimeUnit timeUnit = TimeUnit.valueOf(config.getString(Segment.TIME_UNIT, "DAYS").toUpperCase());
-        return new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName));
+        return FIELD_SPEC_INTERNER.intern(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, fieldName)));
       case DATE_TIME:
-        String format = config.getString(Column.getKeyFor(column, Column.DATETIME_FORMAT));
-        String granularity = config.getString(Column.getKeyFor(column, Column.DATETIME_GRANULARITY));
-        return new DateTimeFieldSpec(fieldName, dataType, format, granularity, defaultNullValueString, null);
+        String format = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_FORMAT)));
+        String granularity = intern(config.getString(Column.getKeyFor(column, Column.DATETIME_GRANULARITY)));
+        return FIELD_SPEC_INTERNER.intern(new DateTimeFieldSpec(fieldName, dataType, format, granularity,
+            canonicalDefaultNullValue(fieldType, dataType, defaultNullValueString), null));
       case COMPLEX:
         List<String> childFieldNames =
             config.getList(String.class, Column.getKeyFor(column, Column.COMPLEX_CHILD_FIELD_NAMES));
         Map<String, FieldSpec> childFieldSpecs = new HashMap<>();
         if (childFieldNames != null) {
           for (String childField : childFieldNames) {
-            childFieldSpecs.put(childField,
+            childFieldSpecs.put(ColumnNameInterner.intern(childField),
                 extractFieldSpec(ComplexFieldSpec.getFullChildName(column, childField), config));
           }
         }
+        // Deliberately not interned (see the method doc): only the children above are shared.
         return new ComplexFieldSpec(fieldName, dataType, true, childFieldSpecs);
       default:
         throw new IllegalStateException("Unsupported field type: " + fieldType);
     }
+  }
+
+  /// Returns the `defaultNullValue` literal to hand to the [FieldSpec] constructor: `null` when the literal parses to
+  /// the type default, so the spec ends up holding the shared static `FieldSpec.DEFAULT_*` constant instead of a
+  /// per-segment box plus the literal (the segment creator writes the literal for every column, so without this every
+  /// column of every segment paid for it); otherwise the interned literal, so a custom default is shared across the
+  /// segments of the table. Equality is [DataType#equals(Object, Object)], the predicate [FieldSpec#equals] applies to
+  /// default null values, so the canonical spec equals one built from the literal and
+  /// [FieldSpec#getDefaultNullValueString()] (derived from the value) is unchanged; a BIG_DECIMAL literal with a
+  /// different scale or a negative-zero FLOAT/DOUBLE is not equal and stays verbatim.
+  @VisibleForTesting
+  @Nullable
+  static String canonicalDefaultNullValue(FieldType fieldType, DataType dataType, @Nullable String literal) {
+    if (literal == null) {
+      return null;
+    }
+    Object typeDefault;
+    try {
+      typeDefault = FieldSpec.getDefaultNullValue(fieldType, dataType, null);
+    } catch (IllegalStateException e) {
+      // No type default for this combination (e.g. a METRIC BOOLEAN): the literal is the only valid value, exactly as
+      // the FieldSpec constructor treats it.
+      return DEFAULT_NULL_VALUE_INTERNER.intern(literal);
+    }
+    return dataType.equals(FieldSpec.getDefaultNullValue(fieldType, dataType, literal), typeDefault) ? null
+        : DEFAULT_NULL_VALUE_INTERNER.intern(literal);
+  }
+
+  @Nullable
+  private static String intern(@Nullable String value) {
+    return value != null ? value.intern() : null;
   }
 
   @Nullable
@@ -578,9 +656,13 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   //       `/tables/{tableName}/segments/{segmentName}/metadata`
   @SuppressWarnings("unused")
   public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
+    if (_indexTypeSizes == null) {
+      return new HashMap<>();
+    }
     IndexService service = IndexService.getInstance();
-    Map<IndexType<?, ?, ?>, Long> result = Maps.newHashMapWithExpectedSize(_indexTypeSizeList.size());
-    for (long typeAndSize : _indexTypeSizeList) {
+    Map<IndexType<?, ?, ?>, Long> result = Maps.newHashMapWithExpectedSize(_indexTypeSizes.size());
+    for (int i = 0; i < _indexTypeSizes.size(); i++) {
+      long typeAndSize = _indexTypeSizes.getLong(i);
       short type = unpackIndexType(typeAndSize);
       long size = unpackIndexSize(typeAndSize);
       result.put(service.get(type), size);

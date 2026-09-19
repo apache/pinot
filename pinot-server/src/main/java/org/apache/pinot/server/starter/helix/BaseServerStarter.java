@@ -39,7 +39,6 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -68,6 +67,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -140,6 +140,7 @@ import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.ProtoBufDescriptorFallbackListener;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -284,6 +285,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info(
         "Registered ConsumingSegmentConsistencyModeListener change listener for dynamic force commit/reload control");
+    // Register configuration change listener for the protobuf descriptor fallback setting
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ProtoBufDescriptorFallbackListener.getInstance());
+    LOGGER.info("Registered ProtoBufDescriptorFallbackListener change listener for dynamic descriptor fallback"
+        + " control");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -940,6 +945,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       try {
         for (File consumerDir : instanceConsumerDirs) {
           if (consumerDir.exists()) {
+            // Consuming segments write to this directory continuously, so use the delete-tolerant walk.
             totalSize += FileUtils.sizeOfDirectory(consumerDir);
           }
         }
@@ -1024,7 +1030,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /// Can be overridden to perform operations before server starts serving queries.
   protected void preServeQueries() {
+    triggerPageCacheWarmup();
     _segmentOperationsThrottlerSet.startServingQueries();
+  }
+
+  protected void triggerPageCacheWarmup() {
+    try {
+      _serverInstance.startQueryServer();
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRestart();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while pre-serving queries,", e);
+    }
   }
 
   @Override

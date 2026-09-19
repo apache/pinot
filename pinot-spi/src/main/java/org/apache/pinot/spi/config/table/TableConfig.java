@@ -66,6 +66,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
+  public static final String PAGE_CACHE_WARMUP_CONFIG_KEY = "pageCacheWarmupConfig";
   public static final String TABLE_SAMPLERS_KEY = "tableSamplers";
   public static final String DESCRIPTION_KEY = "description";
   public static final String TAGS_KEY = "tags";
@@ -136,6 +137,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for Table config tuner")
   private List<TunerConfig> _tunerConfigList;
 
+  @JsonPropertyDescription(value = "Page cache warmup configuration")
+  private PageCacheWarmupConfig _pageCacheWarmupConfig;
+
   @JsonPropertyDescription(value = "Configs for table samplers")
   private List<TableSamplerConfig> _tableSamplers;
 
@@ -160,7 +164,7 @@ public class TableConfig extends BaseJsonConfig {
     this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
         routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig, dedupConfig,
         dimensionTableConfig, ingestionConfig, tierConfigsList, dimTable, tunerConfigList, instancePartitionsMap,
-        segmentAssignmentConfigMap, tableSamplers, /*materializedView=*/ false);
+        segmentAssignmentConfigMap, tableSamplers, /*materializedView=*/ false, /*pageCacheWarmupConfig=*/ null);
   }
 
   @JsonCreator
@@ -190,7 +194,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
       Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
       @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers,
-      @JsonProperty(IS_MATERIALIZED_VIEW_KEY) boolean materializedView) {
+      @JsonProperty(IS_MATERIALIZED_VIEW_KEY) boolean materializedView,
+      @JsonProperty(PAGE_CACHE_WARMUP_CONFIG_KEY) @Nullable PageCacheWarmupConfig pageCacheWarmupConfig) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -223,6 +228,7 @@ public class TableConfig extends BaseJsonConfig {
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
     _tableSamplers = sanitizeAndValidateTableSamplers(tableSamplers);
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
   }
 
   public TableConfig(TableConfig tableConfig) {
@@ -248,6 +254,7 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tableConfig.getTunerConfigsList();
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    _pageCacheWarmupConfig = tableConfig.getPageCacheWarmupConfig();
     _tableSamplers = sanitizeAndValidateTableSamplers(tableConfig.getTableSamplers());
     _description = tableConfig.getDescription();
     _tags = tableConfig.getTags();
@@ -577,5 +584,15 @@ public class TableConfig extends BaseJsonConfig {
       }
     }
     return Integer.parseInt(_validationConfig.getReplication());
+  }
+
+  @JsonProperty(PAGE_CACHE_WARMUP_CONFIG_KEY)
+  @Nullable
+  public PageCacheWarmupConfig getPageCacheWarmupConfig() {
+    return _pageCacheWarmupConfig;
+  }
+
+  public void setPageCacheWarmupConfig(PageCacheWarmupConfig pageCacheWarmupConfig) {
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
   }
 }

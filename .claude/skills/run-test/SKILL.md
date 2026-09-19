@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 name: run-test
-description: Run a single Pinot JUnit/TestNG test class by name. Auto-detects the owning Maven module and builds the correct ./mvnw invocation, including the integration-test flags when needed.
+description: Run a named Pinot test class or method in its owning Maven module.
 ---
 
 # /run-test

@@ -57,7 +57,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
@@ -91,7 +90,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -389,13 +387,11 @@ public class PinotQueryResource {
       @Nullable String queryOptions)
       throws Exception {
     LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-    SqlNodeAndOptions sqlNodeAndOptions;
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    // Parse with the exact payload forwarded to the broker, so that the options used to route the query (engine,
+    // database) are the ones the broker will apply
+    ObjectNode requestJson = getRequestJson(sqlQuery, traceEnabled, queryOptions);
+    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(sqlQuery, requestJson);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (queryOptions != null) {
-      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
-      sqlNodeAndOptions.setExtraOptions(optionsFromString);
-    }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (sqlType == PinotSqlType.DDL) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
@@ -414,8 +410,8 @@ public class PinotQueryResource {
     switch (sqlType) {
       case DQL:
         return isMse
-            ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
-            : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+            ? getMultiStageQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders)
+            : getQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders);
       case DML:
         Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
@@ -428,8 +424,8 @@ public class PinotQueryResource {
     }
   }
 
-  private StreamingOutput getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String traceEnabled) {
+  private StreamingOutput getMultiStageQueryResponse(String query, SqlNodeAndOptions sqlNodeAndOptions,
+      ObjectNode requestJson, HttpHeaders httpHeaders) {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
@@ -438,23 +434,19 @@ public class PinotQueryResource {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
-    if (queryOptions != null) {
-      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
-    }
-    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-    List<String> tableNames = getTableNames(query, database);
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+    List<String> tableNames = getTableNames(query, sqlNodeAndOptions, database);
     List<String> instanceIds = getInstanceIds(query, tableNames, database);
     String instanceId = selectRandomInstanceId(instanceIds);
-    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+    return sendRequestToBroker(query, instanceId, requestJson, httpHeaders);
   }
 
-  private List<String> getTableNames(String query, String database) {
+  private List<String> getTableNames(String query, SqlNodeAndOptions sqlNodeAndOptions, String database) {
     QueryEnvironment queryEnvironment =
         new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
     List<String> tableNames;
 
-    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query, sqlNodeAndOptions)) {
       tableNames = new ArrayList<>(compiledQuery.getTableNames());
     } catch (QueryException e) {
       if (e.getErrorCode() != QueryErrorCode.UNKNOWN) {
@@ -493,24 +485,19 @@ public class PinotQueryResource {
     return instanceIds;
   }
 
-  private StreamingOutput getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled,
-      String queryOptions, HttpHeaders httpHeaders) {
+  private StreamingOutput getQueryResponse(String query, SqlNodeAndOptions sqlNodeAndOptions, ObjectNode requestJson,
+      HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
-    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
-    if (queryOptions != null) {
-      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
-    }
     String database;
     try {
-      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+      database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
     } catch (DatabaseConflictException e) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(e);
     }
     try {
-      String inputTableName =
-          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
-              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+      String inputTableName = RequestUtils.getTableNames(
+          CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode())).iterator().next();
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
@@ -536,7 +523,7 @@ public class PinotQueryResource {
     // Get brokers for the resource table.
     List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
     String instanceId = selectRandomInstanceId(instanceIds);
-    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+    return sendRequestToBroker(query, instanceId, requestJson, httpHeaders);
   }
 
   // given a list of tables, returns the list of tableConfigs
@@ -602,14 +589,13 @@ public class PinotQueryResource {
     return brokerInstanceConfigs.map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
-  private StreamingOutput sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
+  private StreamingOutput sendRequestToBroker(String query, String instanceId, ObjectNode requestJson,
       HttpHeaders httpHeaders) {
     InstanceConfig instanceConfig = getInstanceConfig(instanceId);
     String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = getPort(instanceConfig);
     String url = getQueryURL(protocol, hostName, port);
-    ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
     // Forward client-supplied headers
     Map<String, String> headers = extractHeaders(httpHeaders);

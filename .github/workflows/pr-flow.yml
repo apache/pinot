@@ -1,0 +1,134 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: PR flow
+
+on:
+  workflow_run:
+    workflows: [PR flow signal]
+    types: [completed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number; leave empty to process the bounded backlog'
+        required: false
+        type: string
+      force:
+        description: 'Regenerate even when the current revision already has a flow'
+        required: false
+        type: boolean
+        default: false
+      preview:
+        description: 'Generate an artifact without changing the PR description'
+        required: false
+        type: boolean
+        default: false
+      max_prs:
+        description: 'Maximum PRs to select from the backlog'
+        required: false
+        type: string
+        default: '3'
+
+permissions: {}
+
+env:
+  PR_FLOW_MODEL: ${{ vars.PR_FLOW_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free' }}
+
+jobs:
+  plan:
+    if: >-
+      github.repository == 'apache/pinot' && vars.PR_FLOW_ENABLED != 'false' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_prs: ${{ steps.plan.outputs.has_prs }}
+    steps:
+      - name: Check out only the trusted workflow scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/pr_flow
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Select eligible PRs
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Used here only to verify bot-owned block signatures; planning makes no model calls.
+          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          FORCE: ${{ inputs.force && 'true' || 'false' }}
+          MAX_PRS: ${{ inputs.max_prs || '3' }}
+        run: python .github/scripts/pr_flow/main.py plan
+
+  diagram:
+    needs: plan
+    if: needs.plan.outputs.has_prs == 'true' && vars.PR_FLOW_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    concurrency:
+      group: pr-flow-${{ github.repository }}-${{ matrix.pr_number }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out only the trusted workflow scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/pr_flow
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Generate the current PR flow
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+          PR_NUMBER: ${{ matrix.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ matrix.expected_head_sha || '' }}
+          FORCE: ${{ inputs.force && 'true' || 'false' }}
+          PREVIEW: ${{ inputs.preview && 'true' || 'false' }}
+          PR_FLOW_OUTPUT_DIR: ${{ runner.temp }}/pr-flow
+        run: python .github/scripts/pr_flow/main.py run
+      - name: Retain the generated preview and run report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-flow-${{ matrix.pr_number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pr-flow
+          if-no-files-found: ignore
+          retention-days: 7

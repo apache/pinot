@@ -59,6 +59,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -159,7 +160,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /// - Time Interval.
   /// - Start and End time.
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    String timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    _timeColumn = ColumnNameInterner.intern(timeColumn);
     if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_END_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.TIME_UNIT)) {
@@ -242,9 +244,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // Load index metadata
-      // Support V3 (e.g. SingleFileIndexDirectory only). Skip for empty segments — there is no payload to size up,
-      // and [EmptyColumnMetadata] does not support `addIndexSize`.
-      if (_segmentVersion == SegmentVersion.v3) {
+      // Index sizes are available only from a local v3 index_map; stream-loaded metadata has no index directory.
+      if (_segmentVersion == SegmentVersion.v3 && _indexDir != null) {
         File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
         if (indexMapFile.exists()) {
           IndexService indexService = IndexService.getInstance();
@@ -309,9 +310,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   /// Helper method to add the physical columns from source list to destination set.
+  ///
+  /// Column names are interned: the same names recur in every segment of a table and each one is retained by the
+  /// column metadata map key, the FieldSpec, the segment Schema and the loader's per-column maps.
+  /// [ColumnNameInterner] holds these shared names weakly so unused names can be reclaimed.
   private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
-      String column = o.toString();
+      String column = ColumnNameInterner.intern(o.toString());
       if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
         // NOTE:
         //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform

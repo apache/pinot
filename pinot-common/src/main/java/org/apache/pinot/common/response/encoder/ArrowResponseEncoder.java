@@ -238,7 +238,8 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case BYTES:
             case UUID:
             case OBJECT:
-              byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+              // The broker renders every other type in this group to a String; OBJECT values arrive as-is
+              byte[] bytes = value.toString().getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
               break;
             case MAP:
