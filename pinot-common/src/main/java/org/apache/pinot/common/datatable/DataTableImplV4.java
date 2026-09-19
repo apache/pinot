@@ -415,27 +415,7 @@ public class DataTableImplV4 implements DataTable {
   /// Helper method to deserialize dictionary map.
   protected String[] deserializeStringDictionary(ByteBuffer buffer)
       throws IOException {
-    int dictionarySize = buffer.getInt();
-    String[] stringDictionary = new String[dictionarySize];
-    byte[] valueBytes = null;
-    for (int i = 0; i < dictionarySize; i++) {
-      int length = buffer.getInt();
-      if (length == 0) {
-        stringDictionary[i] = "";
-        continue;
-      }
-      if (length < 0) {
-        // Preserve the exception raised by allocating the entry buffer in DataTableUtils.decodeString().
-        throw new NegativeArraySizeException(Integer.toString(length));
-      }
-      if (valueBytes == null || valueBytes.length < length) {
-        valueBytes = new byte[length];
-      }
-      buffer.get(valueBytes, 0, length);
-      // String copies the decoded contents, so the next entry can reuse the temporary bytes.
-      stringDictionary[i] = new String(valueBytes, 0, length, UTF_8);
-    }
-    return stringDictionary;
+    return DataTableUtils.decodeStringArray(buffer);
   }
 
   @Override

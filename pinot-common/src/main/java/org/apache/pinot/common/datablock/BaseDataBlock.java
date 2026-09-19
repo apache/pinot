@@ -409,12 +409,7 @@ public abstract class BaseDataBlock implements DataBlock {
   /// Helper method to deserialize dictionary map.
   protected String[] deserializeStringDictionary(ByteBuffer buffer)
       throws IOException {
-    int dictionarySize = buffer.getInt();
-    String[] stringDictionary = new String[dictionarySize];
-    for (int i = 0; i < dictionarySize; i++) {
-      stringDictionary[i] = DataTableUtils.decodeString(buffer);
-    }
-    return stringDictionary;
+    return DataTableUtils.decodeStringArray(buffer);
   }
 
   @Override

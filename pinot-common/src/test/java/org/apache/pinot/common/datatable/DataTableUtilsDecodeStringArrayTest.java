@@ -30,8 +30,8 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 
-/// Tests dictionary decoding and buffer consumption. Each invocation owns its buffers and decoder.
-public class DataTableStringDictionaryTest {
+/// Tests [DataTableUtils#decodeStringArray] decoding and buffer consumption. Each invocation owns its buffers.
+public class DataTableUtilsDecodeStringArrayTest {
   private static final int BUFFER_PREFIX_SIZE = 11;
   private static final int TRAILING_SENTINEL = 0x12345678;
 
@@ -58,7 +58,7 @@ public class DataTableStringDictionaryTest {
     int initialLimit = buffer.limit();
     buffer.mark();
 
-    String[] actual = new DataTableImplV4().deserializeStringDictionary(buffer);
+    String[] actual = DataTableUtils.decodeStringArray(buffer);
 
     // Earlier entries must remain unchanged after longer, shorter and empty entries reuse the scratch bytes.
     assertEquals(actual, expected);
@@ -70,14 +70,14 @@ public class DataTableStringDictionaryTest {
     assertEquals(buffer.remaining(), 0);
     buffer.reset();
     assertEquals(buffer.position(), BUFFER_PREFIX_SIZE);
-    assertEquals(new DataTableImplV4().deserializeStringDictionary(buffer), expected);
+    assertEquals(DataTableUtils.decodeStringArray(buffer), expected);
   }
 
   @Test(dataProvider = "bufferKinds")
   public void testEmptyDictionary(boolean direct, boolean readOnly, boolean sliced)
       throws IOException {
     ByteBuffer buffer = inputBuffer(dictionaryPayload(), direct, readOnly, sliced);
-    assertEquals(new DataTableImplV4().deserializeStringDictionary(buffer), new String[0]);
+    assertEquals(DataTableUtils.decodeStringArray(buffer), new String[0]);
     assertEquals(buffer.position(), BUFFER_PREFIX_SIZE + Integer.BYTES);
     assertEquals(buffer.getInt(), TRAILING_SENTINEL);
     assertEquals(buffer.remaining(), 0);
@@ -98,7 +98,7 @@ public class DataTableStringDictionaryTest {
       expected[i] = DataTableUtils.decodeString(reference);
     }
 
-    String[] actual = new DataTableImplV4().deserializeStringDictionary(buffer);
+    String[] actual = DataTableUtils.decodeStringArray(buffer);
     assertEquals(actual, expected);
     assertEquals(actual, new String[]{"\ufffd(", "\ufffd", "\ufffd", "\ufffdA", "\ufffd", "", "last"});
     assertEquals(buffer.position(), reference.position());
@@ -139,7 +139,7 @@ public class DataTableStringDictionaryTest {
     ByteBuffer buffer = inputBuffer(payload, direct, readOnly, sliced);
     int initialLimit = buffer.limit();
     Throwable exception = expectThrows(exceptionType,
-        () -> new DataTableImplV4().deserializeStringDictionary(buffer));
+        () -> DataTableUtils.decodeStringArray(buffer));
     assertSame(exception.getClass(), exceptionType);
     assertEquals(buffer.position(), BUFFER_PREFIX_SIZE + consumedBytes);
     assertEquals(buffer.limit(), initialLimit);
