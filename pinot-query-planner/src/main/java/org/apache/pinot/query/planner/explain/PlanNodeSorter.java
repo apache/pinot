@@ -32,6 +32,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -127,6 +128,11 @@ public class PlanNodeSorter {
 
     @Override
     public PlanNode visitWindow(WindowNode node, Comparator<PlanNode> comparator) {
+      return defaultNode(node, comparator);
+    }
+
+    @Override
+    public PlanNode visitMatch(MatchNode node, Comparator<PlanNode> comparator) {
       return defaultNode(node, comparator);
     }
 

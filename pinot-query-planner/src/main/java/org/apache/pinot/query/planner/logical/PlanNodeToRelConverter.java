@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -36,17 +38,23 @@ import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalIntersect;
+import org.apache.calcite.rel.logical.LogicalMatch;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlBinaryOperator;
+import org.apache.calcite.sql.SqlMatchRecognize;
+import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.proto.Plan;
@@ -61,9 +69,12 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -391,6 +402,133 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
+    }
+
+    @Override
+    public Void visitMatch(MatchNode node, Void context) {
+      List<RelNode> inputs = inputsAsList(node);
+      try {
+        Preconditions.checkArgument(inputs.size() == 1, "Match node should have exactly one input");
+        _builder.push(toLogicalMatch(node, inputs.get(0)));
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert match node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownMatch", Map.of(),
+            node.getDataSchema(), inputs));
+      }
+      return null;
+    }
+
+    private LogicalMatch toLogicalMatch(MatchNode node, RelNode input) {
+      List<PatternSymbol> symbols = node.getPatternSymbols();
+      Map<String, RexNode> patternDefinitions = new LinkedHashMap<>();
+      Map<String, RexNode> measures = new LinkedHashMap<>();
+      // MEASURES expressions and DEFINE predicates are expressed over the input row, so the input has to be on the
+      // RelBuilder stack while they are converted. It is always popped again, including on failure.
+      _builder.push(input);
+      try {
+        for (PatternSymbol symbol : symbols) {
+          RexExpression definition = symbol.getDefinition();
+          if (definition != null) {
+            patternDefinitions.put(symbol.getName(), RexExpressionUtils.toRexNode(_builder, definition));
+          }
+        }
+        for (MatchNode.Measure measure : node.getMeasures()) {
+          measures.put(measure.getName(), RexExpressionUtils.toRexNode(_builder, measure.getExpression()));
+        }
+      } finally {
+        _builder.build();
+      }
+
+      // MatchNode carries the `^` / `$` anchors as tree nodes; Calcite carries them as booleans on the rel.
+      RowPattern pattern = node.getPattern();
+      RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
+      return LogicalMatch.create(input, rowType, toPatternRexNode(stripAnchors(pattern), symbols),
+          hasAnchor(pattern, RowPattern.Kind.ANCHOR_START), hasAnchor(pattern, RowPattern.Kind.ANCHOR_END),
+          patternDefinitions, measures, toAfterRexNode(node, symbols), Map.of(),
+          node.getRowsPerMatchMode() == MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH,
+          ImmutableBitSet.of(node.getPartitionKeys()), RelCollations.of(node.getCollations()), null);
+    }
+
+    private static boolean hasAnchor(RowPattern pattern, RowPattern.Kind anchor) {
+      if (pattern.getKind() != RowPattern.Kind.CONCAT) {
+        return false;
+      }
+      List<RowPattern> children = ((RowPattern.Concat) pattern).getChildren();
+      return anchor == RowPattern.Kind.ANCHOR_START ? children.get(0).getKind() == anchor
+          : children.get(children.size() - 1).getKind() == anchor;
+    }
+
+    private static RowPattern stripAnchors(RowPattern pattern) {
+      if (pattern.getKind() != RowPattern.Kind.CONCAT) {
+        return pattern;
+      }
+      List<RowPattern> children = ((RowPattern.Concat) pattern).getChildren();
+      int from = children.get(0).getKind() == RowPattern.Kind.ANCHOR_START ? 1 : 0;
+      int to = children.get(children.size() - 1).getKind() == RowPattern.Kind.ANCHOR_END ? children.size() - 1
+          : children.size();
+      if (from == 0 && to == children.size()) {
+        return pattern;
+      }
+      List<RowPattern> stripped = children.subList(from, to);
+      Preconditions.checkArgument(!stripped.isEmpty(), "Match node pattern contains only anchors");
+      return stripped.size() == 1 ? stripped.get(0) : new RowPattern.Concat(stripped);
+    }
+
+    /// Rebuilds Calcite's `RexCall` encoding of the PATTERN clause: PATTERN_CONCAT and PATTERN_ALTER are binary
+    /// and left associative, quantifiers carry their bounds and reluctant flag as literal operands, and a pattern
+    /// variable is a plain string literal.
+    private RexNode toPatternRexNode(RowPattern pattern, List<PatternSymbol> symbols) {
+      RexBuilder rexBuilder = _builder.getRexBuilder();
+      switch (pattern.getKind()) {
+        case SYMBOL:
+          return rexBuilder.makeLiteral(symbols.get(((RowPattern.Symbol) pattern).getSymbolOrdinal()).getName());
+        case CONCAT:
+          return toPatternRexCall(SqlStdOperatorTable.PATTERN_CONCAT, ((RowPattern.Concat) pattern).getChildren(),
+              symbols);
+        case ALTERNATE:
+          return toPatternRexCall(SqlStdOperatorTable.PATTERN_ALTER, ((RowPattern.Alternate) pattern).getChildren(),
+              symbols);
+        case QUANTIFY:
+          RowPattern.Quantify quantify = (RowPattern.Quantify) pattern;
+          return rexBuilder.makeCall(_builder.getTypeFactory().createUnknownType(),
+              SqlStdOperatorTable.PATTERN_QUANTIFIER,
+              List.of(toPatternRexNode(quantify.getChild(), symbols),
+                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantify.getMinRepeat())),
+                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantify.getMaxRepeat())),
+                  rexBuilder.makeLiteral(!quantify.isGreedy())));
+        default:
+          throw new IllegalStateException("Unsupported row pattern kind: " + pattern.getKind());
+      }
+    }
+
+    private RexNode toPatternRexCall(SqlBinaryOperator operator, List<RowPattern> children,
+        List<PatternSymbol> symbols) {
+      Preconditions.checkArgument(!children.isEmpty(), "Row pattern %s has no children", operator.getName());
+      RexNode result = toPatternRexNode(children.get(0), symbols);
+      for (int i = 1; i < children.size(); i++) {
+        result = _builder.getRexBuilder().makeCall(_builder.getTypeFactory().createUnknownType(), operator,
+            List.of(result, toPatternRexNode(children.get(i), symbols)));
+      }
+      return result;
+    }
+
+    private RexNode toAfterRexNode(MatchNode node, List<PatternSymbol> symbols) {
+      RexBuilder rexBuilder = _builder.getRexBuilder();
+      switch (node.getAfterMatchSkipMode()) {
+        case PAST_LAST_ROW:
+          return rexBuilder.makeFlag(SqlMatchRecognize.AfterOption.SKIP_PAST_LAST_ROW);
+        case TO_NEXT_ROW:
+          return rexBuilder.makeFlag(SqlMatchRecognize.AfterOption.SKIP_TO_NEXT_ROW);
+        case TO_FIRST:
+        case TO_LAST:
+          SqlOperator operator = node.getAfterMatchSkipMode() == MatchNode.AfterMatchSkipMode.TO_FIRST
+              ? SqlMatchRecognize.SKIP_TO_FIRST : SqlMatchRecognize.SKIP_TO_LAST;
+          String name = symbols.get(node.getAfterMatchSkipToSymbolOrdinal()).getName();
+          return rexBuilder.makeCall(_builder.getTypeFactory().createUnknownType(), operator,
+              List.of(rexBuilder.makeLiteral(name)));
+        default:
+          throw new IllegalStateException("Unsupported after match skip mode: " + node.getAfterMatchSkipMode());
+      }
     }
 
     private static RexWindowExclusion toRexWindowExclusion(WindowNode.WindowExclusion exclude) {
