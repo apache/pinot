@@ -63,6 +63,26 @@ public interface PartitionFunction extends Serializable {
     return null;
   }
 
+  /// Returns whether the exposed function configuration is null or empty. This does not imply that other settings,
+  /// such as the partition id normalizer, have their default values.
+  @JsonIgnore
+  default boolean hasEmptyConfig() {
+    Map<String, String> config = getFunctionConfig();
+    return config == null || config.isEmpty();
+  }
+
+  /// Returns whether partition ids computed by this function can be reused for the non-null `other` function.
+  /// A true result must guarantee identical results for every input value. False is conservative, not proof that the
+  /// functions differ. Implementations with additional output-affecting state must account for it in this method.
+  ///
+  /// The default only permits matching functions with empty exposed configurations, without comparing config contents.
+  /// Configured implementations may override this method to compare their effective settings.
+  default boolean canReusePartitionIds(PartitionFunction other) {
+    return hasEmptyConfig() && other.hasEmptyConfig() && getClass() == other.getClass()
+        && getName().equals(other.getName()) && getNumPartitions() == other.getNumPartitions()
+        && getPartitionIdNormalizer() == other.getPartitionIdNormalizer();
+  }
+
   /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id
   /// mapping. The framework uses this for identity / staleness matching between config-side and
   /// segment-side partition metadata, and (for the built-in implementations) as the actual driver
