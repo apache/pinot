@@ -129,6 +129,7 @@ import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.ConfigValidationException;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -466,7 +467,8 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
   public String recommendConfig(String inputStr) {
     try {
-      return RecommenderDriver.run(inputStr);
+      return RecommenderDriver.run(inputStr,
+          IngestionGroovyPolicy.fromDisabled(_controllerConf.isDisableIngestionGroovy()));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
@@ -861,7 +863,7 @@ public class PinotTableRestletResource {
         throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
       TableConfigUtils.validate(tableConfig, schema, typesToSkip,
-          _pinotHelixResourceManager.getTableConfig(tableNameWithType));
+          _pinotHelixResourceManager.getTableConfig(tableNameWithType), _controllerConf.isDisableIngestionGroovy());
       TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
       TableConfigValidatorRegistry.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();

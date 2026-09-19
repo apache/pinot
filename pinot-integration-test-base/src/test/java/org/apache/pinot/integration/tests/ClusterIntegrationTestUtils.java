@@ -78,6 +78,7 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -288,9 +289,26 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
       throws Exception {
+    buildSegmentsFromAvroInternal(avroFiles, tableConfig, schema, baseSegmentIndex, segmentDir, tarDir, null);
+  }
+
+  /// Builds Pinot segments with an explicit ingestion Groovy policy.
+  public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir,
+      IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws Exception {
+    buildSegmentsFromAvroInternal(avroFiles, tableConfig, schema, baseSegmentIndex, segmentDir, tarDir,
+        ingestionGroovyPolicy);
+  }
+
+  private static void buildSegmentsFromAvroInternal(List<File> avroFiles, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir,
+      @Nullable IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws Exception {
     int numAvroFiles = avroFiles.size();
     if (numAvroFiles == 1) {
-      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
+      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir,
+          ingestionGroovyPolicy);
     } else {
       ExecutorService executorService =
           Executors.newFixedThreadPool(Math.min(numAvroFiles, Runtime.getRuntime().availableProcessors()));
@@ -299,7 +317,8 @@ public class ClusterIntegrationTestUtils {
         File avroFile = avroFiles.get(i);
         int segmentIndex = i + baseSegmentIndex;
         futures.add(executorService.submit(() -> {
-          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir);
+          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir,
+              ingestionGroovyPolicy);
           return null;
         }));
       }
@@ -325,6 +344,14 @@ public class ClusterIntegrationTestUtils {
     buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
   }
 
+  private static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir,
+      @Nullable IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws Exception {
+    buildSegmentFromFile(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir, FileFormat.AVRO,
+        ingestionGroovyPolicy);
+  }
+
   /// Builds one Pinot segment from the given Avro file.
   ///
   /// @param avroFile Avro file
@@ -342,7 +369,17 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentFromFile(File file, TableConfig tableConfig, org.apache.pinot.spi.data.Schema schema,
       String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
       throws Exception {
+    buildSegmentFromFile(file, tableConfig, schema, segmentNamePostfix, segmentDir, tarDir, fileFormat, null);
+  }
+
+  private static void buildSegmentFromFile(File file, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir,
+      FileFormat fileFormat, @Nullable IngestionGroovyPolicy ingestionGroovyPolicy)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    if (ingestionGroovyPolicy != null) {
+      segmentGeneratorConfig.setIngestionGroovyDisabled(ingestionGroovyPolicy.isIngestionGroovyDisabled());
+    }
     segmentGeneratorConfig.setFormat(fileFormat);
     segmentGeneratorConfig.setInputFilePath(file.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());

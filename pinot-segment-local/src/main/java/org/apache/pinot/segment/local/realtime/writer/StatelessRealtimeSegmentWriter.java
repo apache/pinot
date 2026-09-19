@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -52,6 +53,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -68,6 +70,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -112,6 +115,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private volatile StreamPartitionMsgOffset _currentOffset;
   private final int _fetchTimeoutMs;
   private final TransformPipeline _transformPipeline;
+  private final boolean _disableGroovy;
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
 
@@ -161,7 +165,12 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     _consumer = _consumerFactory.createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
 
     // Initialize decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
+    boolean disableGroovy = FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(
+        indexLoadingConfig.getInstanceDataManagerConfig()
+        != null ? indexLoadingConfig.getInstanceDataManagerConfig().getConfig()
+        .getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY) : null);
+    _disableGroovy = disableGroovy;
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema, disableGroovy);
     _decoder = createDecoder(fieldsToRead);
 
     // Fetch capacity from indexLoadingConfig or use default
@@ -200,7 +209,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
-    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
+    _transformPipeline = new TransformPipeline(_tableConfig, _schema,
+        IngestionGroovyPolicy.fromDisabled(disableGroovy));
 
     // Initialize fetch timeout
     _fetchTimeoutMs =
@@ -359,7 +369,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, _resourceTmpDir.getAbsolutePath(),
               _schema,
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _tableConfig.getIndexingConfig().isNullHandlingEnabled());
+              _tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+              IngestionGroovyPolicy.fromDisabled(_disableGroovy));
       try {
         converter.build(null);
       } catch (Exception e) {

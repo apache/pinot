@@ -37,7 +37,11 @@ public class ServerConf {
   }
 
   public PinotConfiguration getInstanceDataManagerConfig() {
-    return _serverConf.subset(INSTANCE_DATA_MANAGER_CONFIG_PREFIX);
+    PinotConfiguration config = _serverConf.subset(INSTANCE_DATA_MANAGER_CONFIG_PREFIX);
+    config.setProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY,
+        CommonConstants.Groovy.isIngestionGroovyDisabled(
+            _serverConf.getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
+    return config;
   }
 
   public PinotConfiguration getQueryExecutorConfig() {

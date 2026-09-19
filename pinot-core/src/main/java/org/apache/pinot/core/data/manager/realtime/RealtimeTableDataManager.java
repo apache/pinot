@@ -47,6 +47,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -862,7 +863,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           "Cannot configure multi-valued column %s as sorted column for table: %s", sortedColumn, _tableNameWithType);
     }
     // 2. Validate the schema itself
-    SchemaUtils.validate(schema);
+    SchemaUtils.validate(schema, false, FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(
+        _instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
   }
 
   private boolean isEnforceConsumptionInOrder() {

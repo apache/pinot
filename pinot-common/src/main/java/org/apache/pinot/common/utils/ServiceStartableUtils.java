@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
@@ -53,6 +54,13 @@ public class ServiceStartableUtils {
   /// - pinot.all.\* will be replaced to role specific config, e.g. pinot.controller.\* for controllers
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
+    applyClusterConfig(instanceConfig, zkAddress, clusterName, serviceRole, serviceRole != ServiceRole.BROKER);
+  }
+
+  /// Applies cluster config, optionally resolving the cluster-wide ingestion Groovy policy for this service.
+  /// Brokers and HELIX_ONLY controllers do not construct ingestion evaluators and should pass `false`.
+  public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
+      ServiceRole serviceRole, boolean applyIngestionGroovyPolicy) {
     int zkClientSessionConfig =
         instanceConfig.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
             CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS);
@@ -72,6 +80,9 @@ public class ServiceStartableUtils {
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
       if (clusterConfigZNRecord == null) {
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
+        if (applyIngestionGroovyPolicy) {
+          applyIngestionGroovyPolicy(instanceConfig, null, serviceRole);
+        }
         setTimezone(instanceConfig);
         initForwardIndexConfig(instanceConfig);
         initFieldSpecConfig(instanceConfig);
@@ -79,11 +90,18 @@ public class ServiceStartableUtils {
       }
 
       Map<String, String> clusterConfigs = clusterConfigZNRecord.getSimpleFields();
+      if (applyIngestionGroovyPolicy) {
+        applyIngestionGroovyPolicy(instanceConfig,
+            clusterConfigs.get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY), serviceRole);
+      }
       String instanceConfigKeyPrefix =
           String.format(PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE, serviceRole.name().toLowerCase());
       for (Map.Entry<String, String> entry : clusterConfigs.entrySet()) {
         String key = entry.getKey();
         String value = entry.getValue();
+        if (key.equals(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)) {
+          continue;
+        }
         if (key.startsWith(PINOT_ALL_CONFIG_KEY_PREFIX)) {
           String instanceConfigKey = instanceConfigKeyPrefix + key.substring(PINOT_ALL_CONFIG_KEY_PREFIX.length());
           addConfigIfNotExists(instanceConfig, instanceConfigKey, value);
@@ -100,6 +118,45 @@ public class ServiceStartableUtils {
     initForwardIndexConfig(instanceConfig);
     initFieldSpecConfig(instanceConfig);
     initRequestUtilsConfig(instanceConfig);
+  }
+
+  static void applyIngestionGroovyPolicy(PinotConfiguration instanceConfig, @Nullable String clusterValue,
+      ServiceRole serviceRole) {
+    String key = CommonConstants.Groovy.DISABLE_INGESTION_GROOVY;
+    // During a rolling upgrade the cluster key can be absent. Preserve an explicit per-instance opt-in in that case,
+    // while keeping an unconfigured or invalid value fail-closed. Once present, the cluster value is authoritative.
+    if (clusterValue == null) {
+      boolean explicitlyConfigured = instanceConfig.containsKey(key);
+      boolean instanceDisablesGroovy = CommonConstants.Groovy.isIngestionGroovyDisabled(
+          explicitlyConfigured ? instanceConfig.getProperty(key) : null);
+      instanceConfig.setProperty(key, instanceDisablesGroovy);
+      if (!explicitlyConfigured && (serviceRole == ServiceRole.SERVER || serviceRole == ServiceRole.MINION)) {
+        LOGGER.warn("Cluster config '{}' is absent during startup; {} defaults to disabling ingestion Groovy. "
+                + "For an enabled cluster rolling upgrade, upgrade an API-serving controller first or explicitly "
+                + "configure '{}=false' on this instance until the cluster policy is published",
+            key, serviceRole.name().toLowerCase(), key);
+      }
+      return;
+    }
+    boolean clusterDisablesGroovy = CommonConstants.Groovy.isIngestionGroovyDisabled(clusterValue);
+    if (instanceConfig.containsKey(key)) {
+      boolean instanceDisablesGroovy =
+          CommonConstants.Groovy.isIngestionGroovyDisabled(instanceConfig.getProperty(key));
+      if (instanceDisablesGroovy != clusterDisablesGroovy) {
+        throw new IllegalStateException(String.format(
+            "Conflicting ingestion Groovy policy: cluster config '%s=%s' is authoritative, but the %s instance "
+                + "config resolves to %s",
+            key, clusterDisablesGroovy, serviceRole.name().toLowerCase(), instanceDisablesGroovy));
+      }
+    }
+    instanceConfig.setProperty(key, clusterDisablesGroovy);
+  }
+
+  /// Reapplies a previously resolved ingestion Groovy policy after custom configuration hooks have run.
+  /// This prevents an extension from weakening the authoritative cluster policy.
+  public static void enforceIngestionGroovyPolicy(PinotConfiguration instanceConfig, boolean disableGroovy,
+      ServiceRole serviceRole) {
+    applyIngestionGroovyPolicy(instanceConfig, Boolean.toString(disableGroovy), serviceRole);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {

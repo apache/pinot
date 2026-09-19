@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 
 
 /// Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
@@ -33,7 +34,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.GroovyFunctionEvaluator
     implements FunctionEvaluator {
   public GroovyFunctionEvaluator(String closure) {
-    super(closure);
+    super(validateIngestionPolicy(closure));
+  }
+
+  private static String validateIngestionPolicy(String closure) {
+    FunctionEvaluatorFactory.validateIngestionGroovyPolicy(closure);
+    return closure;
   }
 
   public static String getGroovyExpressionPrefix() {
@@ -41,6 +47,7 @@ public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.G
   }
 
   public static void parseGroovyScript(String script) {
+    FunctionEvaluatorFactory.validateIngestionGroovyPolicy(script);
     org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.parseGroovyScript(script);
   }
 

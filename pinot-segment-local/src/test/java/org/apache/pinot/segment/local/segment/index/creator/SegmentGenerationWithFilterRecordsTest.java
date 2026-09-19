@@ -22,7 +22,9 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -35,12 +37,17 @@ import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /// Tests filtering of records during segment generation
@@ -64,6 +71,7 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
 
   @BeforeClass
   public void setup() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
     String filterFunction =
         "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -73,6 +81,11 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
         .build();
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
   }
 
   @BeforeMethod
@@ -94,9 +107,58 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
     }
   }
 
+  @Test
+  public void testOfflineSegmentGenerationEnforcesLegacyFieldSpecGroovyPolicy()
+      throws Exception {
+    Schema legacySchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension("derived", FieldSpec.DataType.STRING)
+        .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).build();
+    legacySchema.getFieldSpecFor("derived")
+        .setTransformFunction("Groovy({col1.reverse()}, col1)");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+
+    boolean originalDisableGroovy = FunctionEvaluatorFactory.isIngestionGroovyDisabled();
+    try {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+      IllegalStateException exception =
+          Assert.expectThrows(IllegalStateException.class, () -> buildSegment(tableConfig, legacySchema));
+      Assert.assertTrue(exception.getMessage().contains("controller.disable.ingestion.groovy=false"));
+
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+      File segmentDir = buildSegment(tableConfig, legacySchema);
+      try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir)) {
+        Assert.assertEquals(segmentRecordReader.next().getValue("derived"),
+            new StringBuilder(STRING_VALUES[0]).reverse().toString());
+      }
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(originalDisableGroovy);
+    }
+  }
+
+  @Test
+  public void testColumnarSegmentGenerationRejectsLegacyFieldSpecGroovy()
+      throws Exception {
+    Schema legacySchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension("derived", FieldSpec.DataType.STRING).build();
+    legacySchema.getFieldSpecFor("derived").setTransformFunction("Groovy({col1.reverse()}, col1)");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, legacySchema);
+    config.setIngestionGroovyDisabled(true);
+    ColumnReaderFactory columnReaderFactory = mock(ColumnReaderFactory.class);
+    when(columnReaderFactory.getAllColumnReaders()).thenReturn(Map.of());
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
+        () -> new SegmentIndexCreationDriverImpl().init(config, columnReaderFactory));
+    Assert.assertTrue(exception.getMessage().contains("controller.disable.ingestion.groovy=false"));
+  }
+
   private File buildSegment(final TableConfig tableConfig, final Schema schema)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setIngestionGroovyDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled());
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
 

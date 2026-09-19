@@ -93,7 +93,7 @@ public class SegmentSizeRule extends AbstractRule {
         int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();
         File generatedSegmentDir =
             new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
-                numRowsInGeneratedSegment, true, workingDir).generate();
+                numRowsInGeneratedSegment, true, workingDir, _input.getIngestionGroovyPolicy()).generate();
         segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir)
             * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
         numRows = numRowsInGeneratedSegment;
