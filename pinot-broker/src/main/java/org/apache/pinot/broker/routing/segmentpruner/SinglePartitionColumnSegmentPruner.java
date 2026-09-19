@@ -116,17 +116,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     return selectedSegments;
   }
 
-  private static boolean hasDefaultConfig(PartitionFunction function) {
-    Map<String, String> config = function.getFunctionConfig();
-    return config == null || config.isEmpty();
-  }
-
-  private static boolean sameFunction(PartitionFunction first, PartitionFunction second) {
-    return first.getClass() == second.getClass() && first.getName().equals(second.getName())
-        && first.getNumPartitions() == second.getNumPartitions()
-        && first.getPartitionIdNormalizer() == second.getPartitionIdNormalizer();
-  }
-
   private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
     Set<String> selectedSegments = new HashSet<>();
     PreparedPredicate predicate = null;
@@ -140,13 +129,10 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       PartitionFunction function = partitionInfo.getPartitionFunction();
       if (predicate == null) {
         predicate = new PreparedPredicate(filterExpression);
-        if (hasDefaultConfig(function)) {
-          cachedFunction = function;
-        }
+        cachedFunction = function;
       }
-      // Reuse the filter structure even when IDs cannot be shared. Never compare configuration contents.
-      boolean reusePartitionIds = cachedFunction != null && hasDefaultConfig(function)
-          && sameFunction(cachedFunction, function);
+      // Reuse the filter structure even when the functions cannot share partition ids.
+      boolean reusePartitionIds = cachedFunction.canReusePartitionIds(function);
       if (predicate.matches(partitionInfo.getPartitions(), function, reusePartitionIds)) {
         selectedSegments.add(segment);
       }
