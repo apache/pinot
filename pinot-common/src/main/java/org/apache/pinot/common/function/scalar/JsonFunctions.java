@@ -19,10 +19,13 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
@@ -31,6 +34,8 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -45,8 +50,15 @@ import org.apache.pinot.common.function.FastJsonPathExtractor;
 import org.apache.pinot.common.function.ForyJsonPathExtractor;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.function.SimpleJsonPath;
+import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.JsonNumberUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /// Inbuilt json related transform functions
@@ -65,10 +77,21 @@ public class JsonFunctions {
 
   private static final Object[] EMPTY = new Object[0];
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
-  private static final ParseContext PARSE_CONTEXT = JsonPath.using(
+
+  /// Jayway context used by `jsonPath*` and `jsonExtractScalar`.
+  /// `JsonExtractScalarTransformFunction` uses this same instance so the transform and scalar stay on one
+  /// configuration. `ArrayAwareJacksonJsonProvider` treats already-parsed `Object[]` values as JSON arrays.
+  public static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
           .build());
+
+  /// BigDecimal-preserving Jayway context for `BIG_DECIMAL` / `STRING` / `JSON` / `LONG` extraction, so JSON
+  /// floats are not rounded through `Double`. Shared with `JsonExtractScalarTransformFunction`.
+  public static final ParseContext PARSE_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
+      new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider(
+              new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
+          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
   // JsonPath context for extracting keys (paths)
   private static final ParseContext KEY_PARSE_CONTEXT = JsonPath.using(
@@ -611,6 +634,443 @@ public class JsonFunctions {
     return null;
   }
 
+  /// Extract a scalar (or scalar-array) value from a JSON document and coerce it to `resultsType`.
+  ///
+  /// Scalar-function counterpart of the `jsonExtractScalar` transform (`JsonExtractScalarTransformFunction` in
+  /// pinot-core), so that `json_extract_scalar(...)` resolves in the multi-stage engine and in ad-hoc scalar
+  /// contexts. `resultsType` is a Pinot [DataType] name, optionally suffixed with `_ARRAY` for a multi-value
+  /// result. Supported types are `INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES` and
+  /// the `INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING` array variants.
+  ///
+  /// The document may be a `String`, a UTF-8 encoded `byte[]` (BYTES columns) or an already-parsed container.
+  /// Coercion mirrors the transform exactly: `BOOLEAN` is returned as its stored `INT` (0/1), `TIMESTAMP` as
+  /// epoch millis (numeric values as-is, strings via ISO-8601), `BIG_DECIMAL` / `STRING` / `JSON` / `LONG`
+  /// use a BigDecimal-preserving parser. The 3-argument form throws on an unresolved single-value path. The
+  /// 4-argument form returns `defaultValue` (including SQL `NULL`). SQL `NULL` input propagates independently
+  /// of that default. A multi-value path yields an empty array when unresolved or when the resolved value is not a
+  /// JSON array, except that an explicit SQL `NULL` default preserves the unresolved result as SQL `NULL`. A `null`
+  /// element inside a resolved array still throws unless a default is supplied. A malformed JSON document is treated
+  /// as unresolved. An illegal JSONPath (for example `$[`) is rejected, matching transform init.
+  @ScalarFunction
+  public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String resultsType) {
+    return jsonExtractScalarInternal(jsonInput, jsonPath, resultsType, null, false);
+  }
+
+  /// See [#jsonExtractScalar(Object, String, String)]. `defaultValue` is returned (coerced to `resultsType`)
+  /// when the path resolves to `null` or the document is malformed. An explicit SQL `NULL` default returns
+  /// Java `null` rather than throwing.
+  @ScalarFunction(nullableParameters = true)
+  @Nullable
+  public static Object jsonExtractScalar(@Nullable Object jsonInput, @Nullable String jsonPath,
+      @Nullable String resultsType,
+      @Nullable Object defaultValue) {
+    return jsonExtractScalarInternal(jsonInput, jsonPath, resultsType, defaultValue, true);
+  }
+
+  @Nullable
+  private static Object jsonExtractScalarInternal(@Nullable Object jsonInput, @Nullable String jsonPath,
+      @Nullable String resultsType, @Nullable Object defaultValue, boolean hasDefault) {
+    // nullableParameters applies to the whole four-argument function. Mirror the framework's null short-circuiting
+    // for the required CHARACTER arguments; the default is the only nullable argument that reaches conversion.
+    if (jsonPath == null || resultsType == null) {
+      return null;
+    }
+    String type = resultsType.toUpperCase();
+    boolean isSingleValue = !type.endsWith("_ARRAY");
+    DataType dataType;
+    try {
+      dataType = DataType.valueOf(isSingleValue ? type : type.substring(0, type.length() - 6));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(unsupportedResultsTypeMessage(resultsType));
+    }
+    // BIG_DECIMAL / STRING / JSON / LONG must read floats as BigDecimal so values above 2^53 stay exact.
+    boolean useBigDecimal = dataType == DataType.BIG_DECIMAL || dataType == DataType.STRING
+        || dataType == DataType.JSON || dataType == DataType.LONG;
+    // Compile the path before touching the document. `$[` must fail the query, not become a default,
+    // matching JsonExtractScalarTransformFunction#init.
+    JsonPath compiledPath = JsonPathCache.INSTANCE.getOrCompute(jsonPath);
+    // SQL NULL input propagates independently of the missing-path default. Validate the result type and path first,
+    // as the single-stage transform does during initialization.
+    if (jsonInput == null) {
+      return null;
+    }
+    if (isSingleValue) {
+      Object value = readJsonPathValue(jsonInput, compiledPath, useBigDecimal);
+      if (value == null) {
+        if (!hasDefault) {
+          throw new IllegalArgumentException(
+              "Cannot resolve JSON path on some records. Consider setting a default value.");
+        }
+        if (defaultValue == null) {
+          return null;
+        }
+        return coerceDefault(defaultValue, dataType);
+      }
+      return coerceScalar(value, dataType);
+    }
+    Object arrayValue = readJsonPathValue(jsonInput, compiledPath, useBigDecimal);
+    // The leaf transform marks an unresolved array row null when its explicit default is SQL NULL. Preserve that
+    // distinction here instead of collapsing the intermediate-stage scalar result to an empty array. A resolved
+    // scalar or object is different: the leaf transform treats its failed List cast as an empty array, so retain that
+    // behavior rather than marking the row null.
+    if (arrayValue == null && hasDefault && defaultValue == null) {
+      return null;
+    }
+    Object[] array = jsonArrayOrUnresolved(arrayValue);
+    Object coercedDefault = hasDefault && defaultValue != null ? coerceDefault(defaultValue, dataType) : null;
+    return coerceScalarArray(array, dataType, coercedDefault, hasDefault);
+  }
+
+  private static DocumentContext parseJsonDocument(Object jsonInput, ParseContext parseContext) {
+    if (jsonInput instanceof String) {
+      return parseContext.parse((String) jsonInput);
+    }
+    if (jsonInput instanceof byte[]) {
+      // BYTES columns carry the raw UTF-8 document; parse(Object) would treat the array as already parsed.
+      return parseContext.parseUtf8((byte[]) jsonInput);
+    }
+    return parseContext.parse(jsonInput);
+  }
+
+  @Nullable
+  private static Object readJsonPathValue(@Nullable Object jsonInput, JsonPath jsonPath, boolean useBigDecimal) {
+    DocumentContext document = parseJsonDocumentOrNull(jsonInput, useBigDecimal);
+    if (document == null) {
+      return null;
+    }
+    return document.read(jsonPath);
+  }
+
+  /// Parses the document only. A bad document is unresolved (null). Path compile already happened
+  /// in [jsonExtractScalarInternal], so a bad path is not swallowed here.
+  @Nullable
+  private static DocumentContext parseJsonDocumentOrNull(@Nullable Object jsonInput, boolean useBigDecimal) {
+    if (jsonInput == null) {
+      return null;
+    }
+    try {
+      return parseJsonDocument(jsonInput, useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT);
+    } catch (Exception e) {
+      // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
+      // per-row parse errors; the caller then applies the default or throws.
+      return null;
+    }
+  }
+
+  /// Transform casts the JsonPath result to `List`. A scalar or object is therefore unresolved and
+  /// becomes an empty array. Do not wrap a non-list in a one-element array.
+  @Nullable
+  private static Object[] jsonArrayOrUnresolved(@Nullable Object value) {
+    if (value instanceof Object[]) {
+      return (Object[]) value;
+    }
+    if (value instanceof List) {
+      return ((List<?>) value).toArray();
+    }
+    return null;
+  }
+
+  private static Object coerceScalar(Object value, DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return coerceToInt(value, false);
+      case BOOLEAN:
+        return coerceToInt(value, true);
+      case LONG:
+        return coerceToLong(value, false);
+      case TIMESTAMP:
+        return coerceToLong(value, true);
+      case FLOAT:
+        return coerceToFloat(value);
+      case DOUBLE:
+        return coerceToDouble(value);
+      case BIG_DECIMAL:
+        return coerceToBigDecimal(value);
+      case STRING:
+      case JSON:
+        return coerceToString(value);
+      case BYTES:
+        return coerceExtractedToBytes(value);
+      default:
+        throw new IllegalArgumentException(unsupportedResultsTypeMessage(dataType.name()));
+    }
+  }
+
+  /// Converts a SQL literal default through the same [LiteralContext] getters used by
+  /// `JsonExtractScalarTransformFunction`. Defaults are SQL literals rather than values extracted from JSON, so their
+  /// conversion rules intentionally differ in a few places (for example, a BOOLEAN default for TIMESTAMP becomes 1).
+  private static Object coerceDefault(Object value, DataType dataType) {
+    LiteralContext literal = new LiteralContext(RequestUtils.getLiteral(value));
+    switch (dataType) {
+      case INT:
+        return literal.getIntValue();
+      case BOOLEAN:
+        return literal.getBooleanValue() ? 1 : 0;
+      case LONG:
+      case TIMESTAMP:
+        return literal.getLongValue();
+      case FLOAT:
+        return literal.getFloatValue();
+      case DOUBLE:
+        return literal.getDoubleValue();
+      case BIG_DECIMAL:
+        return literal.getBigDecimalValue();
+      case STRING:
+      case JSON:
+        return literal.getStringValue();
+      case BYTES:
+        return literal.getBytesValue();
+      default:
+        throw new IllegalArgumentException(unsupportedResultsTypeMessage(dataType.name()));
+    }
+  }
+
+  private static Object coerceScalarArray(@Nullable Object[] array, DataType dataType, @Nullable Object defaultValue,
+      boolean hasDefault) {
+    switch (dataType) {
+      case INT:
+        return toIntArray(array, defaultValue, hasDefault, false);
+      case BOOLEAN:
+        return toIntArray(array, defaultValue, hasDefault, true);
+      case LONG:
+        return toLongArray(array, defaultValue, hasDefault, false);
+      case TIMESTAMP:
+        return toLongArray(array, defaultValue, hasDefault, true);
+      case FLOAT:
+        return toFloatArray(array, defaultValue, hasDefault);
+      case DOUBLE:
+        return toDoubleArray(array, defaultValue, hasDefault);
+      case BIG_DECIMAL:
+        return toBigDecimalArray(array, defaultValue, hasDefault);
+      case STRING:
+        return toStringArray(array, defaultValue, hasDefault);
+      default:
+        throw new IllegalArgumentException(unsupportedResultsTypeMessage(dataType.name() + "_ARRAY"));
+    }
+  }
+
+  /// Resolve a single array element: pass through a non-null element, substitute the default when the
+  /// element is `null` and a default was supplied, or throw when a null element has no default.
+  /// An explicit SQL `NULL` default returns `null` so the caller can write a type placeholder.
+  @Nullable
+  private static Object resolveArrayElement(@Nullable Object element, @Nullable Object defaultValue,
+      boolean hasDefault) {
+    if (element != null) {
+      return element;
+    }
+    if (!hasDefault) {
+      throw new IllegalArgumentException(
+          "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+              + "Consider setting a default value as the fourth argument of json_extract_scalar.");
+    }
+    return defaultValue;
+  }
+
+  private static int[] toIntArray(@Nullable Object[] array, @Nullable Object defaultValue, boolean hasDefault,
+      boolean isBoolean) {
+    if (array == null) {
+      return new int[0];
+    }
+    int[] values = new int[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? 0 : coerceToInt(resolved, isBoolean);
+    }
+    return values;
+  }
+
+  private static long[] toLongArray(@Nullable Object[] array, @Nullable Object defaultValue, boolean hasDefault,
+      boolean isTimestamp) {
+    if (array == null) {
+      return new long[0];
+    }
+    long[] values = new long[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? 0L : coerceToLong(resolved, isTimestamp);
+    }
+    return values;
+  }
+
+  private static float[] toFloatArray(@Nullable Object[] array, @Nullable Object defaultValue, boolean hasDefault) {
+    if (array == null) {
+      return new float[0];
+    }
+    float[] values = new float[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? 0f : coerceToFloat(resolved);
+    }
+    return values;
+  }
+
+  private static double[] toDoubleArray(@Nullable Object[] array, @Nullable Object defaultValue, boolean hasDefault) {
+    if (array == null) {
+      return new double[0];
+    }
+    double[] values = new double[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? 0d : coerceToDouble(resolved);
+    }
+    return values;
+  }
+
+  private static BigDecimal[] toBigDecimalArray(@Nullable Object[] array, @Nullable Object defaultValue,
+      boolean hasDefault) {
+    if (array == null) {
+      return new BigDecimal[0];
+    }
+    BigDecimal[] values = new BigDecimal[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? BigDecimal.ZERO : coerceToBigDecimal(resolved);
+    }
+    return values;
+  }
+
+  private static String[] toStringArray(@Nullable Object[] array, @Nullable Object defaultValue, boolean hasDefault) {
+    if (array == null) {
+      return new String[0];
+    }
+    String[] values = new String[array.length];
+    for (int i = 0; i < array.length; i++) {
+      Object resolved = resolveArrayElement(array[i], defaultValue, hasDefault);
+      values[i] = resolved == null ? "" : coerceToString(resolved);
+    }
+    return values;
+  }
+
+  /// Coerces a JsonPath result to stored `INT`. When `isBoolean` is true, follows Pinot's numeric
+  /// BOOLEAN convention (any non-zero `Number` is true; `"true"` / `"TRUE"` / `"1"` via
+  /// [BooleanUtils#toInt(String)]).
+  public static int coerceToInt(Object value, boolean isBoolean) {
+    if (isBoolean) {
+      if (value instanceof Boolean) {
+        return (Boolean) value ? 1 : 0;
+      }
+      // For BOOLEAN result, follow Pinot's numeric convention: any non-zero number is true.
+      if (value instanceof Number) {
+        return ((Number) value).doubleValue() != 0 ? 1 : 0;
+      }
+      // String fallback: BooleanUtils.toInt accepts "true" / "TRUE" / "1".
+      return BooleanUtils.toInt(value.toString());
+    }
+    if (value instanceof Number) {
+      return ((Number) value).intValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1 : 0;
+    }
+    return Integer.parseInt(value.toString());
+  }
+
+  /// Coerces a JsonPath result to stored `LONG`. When `isTimestamp` is true, numeric values are
+  /// epoch millis and strings go through [TimestampUtils#toMillisSinceEpoch]. Otherwise string
+  /// numbers use [JsonNumberUtils#parseJsonLong] (exact decimal, truncate toward zero, reject
+  /// overflow). Lexical JSON floating-point numbers arrive as [BigDecimal] from the LONG parse
+  /// context and retain their exact decimal spelling. Already-materialized [Double] and [Float]
+  /// values instead retain their binary numeric value through a range-checked Java cast.
+  public static long coerceToLong(Object value, boolean isTimestamp) {
+    if (value instanceof Number) {
+      return longFromJsonNumber((Number) value);
+    }
+    if (isTimestamp) {
+      return TimestampUtils.toMillisSinceEpoch(value.toString());
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1L : 0L;
+    }
+    try {
+      return JsonNumberUtils.parseJsonLong(value.toString());
+    } catch (NumberFormatException e) {
+      throw new NumberFormatException("For input string: \"" + value + "\"");
+    }
+  }
+
+  /// Converts a JsonPath [Number] to long without saturating. `Double.longValue()` and
+  /// `BigInteger.longValue()` wrap or clamp values outside the long range.
+  private static long longFromJsonNumber(Number number) {
+    if (number instanceof BigInteger) {
+      try {
+        return ((BigInteger) number).longValueExact();
+      } catch (ArithmeticException e) {
+        throw new NumberFormatException("For input string: \"" + number + "\"");
+      }
+    }
+    if (number instanceof BigDecimal) {
+      return JsonNumberUtils.truncateToLong((BigDecimal) number);
+    }
+    if (number instanceof Double || number instanceof Float) {
+      double value = number.doubleValue();
+      if (!Double.isFinite(value) || value < Long.MIN_VALUE || value >= 0x1p63) {
+        throw new NumberFormatException("For input string: \"" + number + "\"");
+      }
+      return (long) value;
+    }
+    return number.longValue();
+  }
+
+  /// Coerces a JsonPath result to `FLOAT`. `Boolean` becomes `1f` / `0f`.
+  public static float coerceToFloat(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).floatValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1f : 0f;
+    }
+    return Float.parseFloat(value.toString());
+  }
+
+  /// Coerces a JsonPath result to `DOUBLE`. `Boolean` becomes `1d` / `0d`.
+  public static double coerceToDouble(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).doubleValue();
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? 1d : 0d;
+    }
+    return Double.parseDouble(value.toString());
+  }
+
+  /// Coerces a JsonPath result to `BIG_DECIMAL`. `Boolean` becomes `1` / `0`.
+  public static BigDecimal coerceToBigDecimal(Object value) {
+    if (value instanceof BigDecimal) {
+      return (BigDecimal) value;
+    }
+    if (value instanceof Boolean) {
+      return (Boolean) value ? BigDecimal.ONE : BigDecimal.ZERO;
+    }
+    return new BigDecimal(value.toString());
+  }
+
+  /// `String` values pass through; every other JSON value is serialized via [JsonUtils#objectToString].
+  public static String coerceToString(Object value) {
+    if (value instanceof String) {
+      return (String) value;
+    }
+    try {
+      return JsonUtils.objectToString(value);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Caught exception while serializing JSON value: " + value, e);
+    }
+  }
+
+  /// Base64-decodes a JSON string to `BYTES`, matching [PinotDataType.JSON#toBytes(Object)].
+  /// Use this only for values extracted from the document. SQL default literals stay on the
+  /// hex / raw-`byte[]` path.
+  public static byte[] coerceExtractedToBytes(Object value) {
+    return PinotDataType.JSON.toBytes(value);
+  }
+
+  private static String unsupportedResultsTypeMessage(String resultsType) {
+    return String.format(
+        "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+            + "INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES/"
+            + "INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/BIG_DECIMAL_ARRAY/BOOLEAN_ARRAY/"
+            + "TIMESTAMP_ARRAY/STRING_ARRAY", resultsType);
+  }
+
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
       Map<String, String> result) {
     if (obj instanceof Map) {
@@ -834,6 +1294,14 @@ public class JsonFunctions {
 
   @VisibleForTesting
   static class ArrayAwareJacksonJsonProvider extends JacksonJsonProvider {
+    ArrayAwareJacksonJsonProvider() {
+      super();
+    }
+
+    ArrayAwareJacksonJsonProvider(ObjectMapper objectMapper) {
+      super(objectMapper);
+    }
+
     @Override
     public boolean isArray(Object obj) {
       return (obj instanceof List) || (obj instanceof Object[]);

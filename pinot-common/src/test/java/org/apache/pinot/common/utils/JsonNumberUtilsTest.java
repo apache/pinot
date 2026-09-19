@@ -16,40 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.common.utils;
 
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
-public class NumberUtilsTest {
 
-  @Test
-  public void testParseLong() {
-    assertLong("0", 0);
-    assertLong("-1", -1);
-    assertLong("-1000000", -1000000);
-    assertLong("-1223372036854775808", -1223372036854775808L);
-    assertLong("-9223372036854775808", Long.MIN_VALUE);
-    assertLong("9223372036854775807", Long.MAX_VALUE);
-    assertLong("1223372036854775807", 1223372036854775807L);
-
-    assertLongError(null);
-    assertLongError("");
-    assertLongError("q");
-    assertLongError("--1");
-    assertLongError("++1");
-    assertLongError("+1+");
-    assertLongError("+1-");
-    assertLongError("+1.");
-    assertLongError("1.");
-    assertLongError("1e");
-    assertLongError("1E");
-    assertLongError("9223372036854775808");
-    assertLongError("19223372036854775808");
-    assertLongError("-9223372036854775809");
-    assertLongError("-19223372036854775808");
-  }
+/// Mirrors the JSON-long corpus in `NumberUtilsTest` so the shared parser stays aligned with
+/// `NumberUtils.parseJsonLong`. The test fixture has no shared mutable state.
+public class JsonNumberUtilsTest {
 
   @Test
   public void testParseJsonLong() {
@@ -71,6 +48,7 @@ public class NumberUtilsTest {
     assertJsonLong("1000000.12345678", 1000000);
     assertJsonLong("-9223372036854775808.123456", Long.MIN_VALUE);
     assertJsonLong("9223372036854775807.123456", Long.MAX_VALUE);
+    assertJsonLong("1.9", 1);
 
     // with exponent
     assertJsonLong("2e0", 2L);
@@ -80,10 +58,17 @@ public class NumberUtilsTest {
     assertJsonLong("1e15", 1000000000000000L);
     assertJsonLong("1.1e10", 11000000000L);
     assertJsonLong("1.1E10", 11000000000L);
+    assertJsonLong("1E1", 10L);
+
+    // Above 2^53 and at both long edges. These must not go through double.
     assertJsonLong("9007199254740993", 9007199254740993L);
+    assertJsonLong("9007199254740993.0", 9007199254740993L);
     assertJsonLong("9007199254740993.0E0", 9007199254740993L);
     assertJsonLong("9.223372036854775807E18", Long.MAX_VALUE);
     assertJsonLong("-9.223372036854775808E18", Long.MIN_VALUE);
+    assertJsonLong("9223372036854775807.0E0", Long.MAX_VALUE);
+    assertJsonLong("-9223372036854775808.0E0", Long.MIN_VALUE);
+    assertJsonLong("1.0E-999999999", 0L);
 
     assertJsonLongError(null);
     assertJsonLongError("");
@@ -107,7 +92,7 @@ public class NumberUtilsTest {
     assertJsonLongError("1e");
     assertJsonLongError("1ee");
 
-    //with exponent
+    // with exponent
     assertJsonLongError("2E+");
     assertJsonLongError("2E-");
     assertJsonLongError("2E19");
@@ -122,29 +107,15 @@ public class NumberUtilsTest {
     assertJsonLongError("-2.0E19");
     assertJsonLongError("9.223372036854775808E18");
     assertJsonLongError("-9.223372036854775809E18");
-  }
-
-  private void assertLong(String input, long expected) {
-    try {
-      Assert.assertEquals(NumberUtils.parseLong(input), expected);
-    } catch (NumericException nfe) {
-      Assert.fail("Can't parse " + input);
-    }
-  }
-
-  private void assertLongError(String input) {
-    Assert.assertThrows(NumericException.class, () -> NumberUtils.parseLong(input));
+    assertJsonLongError("1.0E999999999");
+    assertJsonLongError("-1.0E999999999");
   }
 
   private void assertJsonLong(String input, long expected) {
-    try {
-      Assert.assertEquals(NumberUtils.parseJsonLong(input), expected);
-    } catch (NumericException nfe) {
-      Assert.fail("Can't parse " + input);
-    }
+    assertEquals(JsonNumberUtils.parseJsonLong(input), expected);
   }
 
   private void assertJsonLongError(String input) {
-    Assert.assertThrows(NumericException.class, () -> NumberUtils.parseJsonLong(input));
+    assertThrows(NumberFormatException.class, () -> JsonNumberUtils.parseJsonLong(input));
   }
 }

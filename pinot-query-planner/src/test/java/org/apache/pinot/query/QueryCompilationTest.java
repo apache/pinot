@@ -167,6 +167,112 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// All-literal `jsonExtractScalar` is deterministic, so `PinotEvaluateLiteralRule` folds it. The
+  /// folder must accept INTEGER-as-BOOLEAN and primitive arrays (`int[]`, `long[]`, `float[]`).
+  /// Column-input queries do not exercise this path.
+  @Test
+  public void testJsonExtractScalarAllLiteralFolds() {
+    List<String> queries = List.of(
+        "SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'LONG_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'DOUBLE_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a"
+    );
+    for (String query : queries) {
+      assertNotNull(_queryEnvironment.planQuery(query), query);
+      String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + query, RANDOM_REQUEST_ID_GEN.nextLong());
+      assertFalse(explain.toUpperCase().contains("JSONEXTRACTSCALAR"),
+          "all-literal call must fold away the function, but plan still has it: " + explain);
+    }
+    String booleanExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(booleanExplain.contains("true"), booleanExplain);
+    String arrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(arrayExplain.contains("1") && arrayExplain.contains("2"), arrayExplain);
+    String longArrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[9007199254740993]}', '$.v', 'LONG_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(longArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), longArrayExplain);
+    assertTrue(longArrayExplain.contains("9007199254740993"), longArrayExplain);
+    String floatArrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(floatArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), floatArrayExplain);
+    assertTrue(floatArrayExplain.contains("1.5"), floatArrayExplain);
+    String booleanArrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(booleanArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), booleanArrayExplain);
+    assertTrue(booleanArrayExplain.contains("true") && booleanArrayExplain.contains("false"), booleanArrayExplain);
+    String timestampArrayExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(timestampArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), timestampArrayExplain);
+    assertTrue(timestampArrayExplain.contains("2018-01-01 11:12:53"), timestampArrayExplain);
+    String defaultExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(defaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), defaultExplain);
+    assertTrue(defaultExplain.contains("[7]"), defaultExplain);
+    String nullDefaultExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', NULL) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(nullDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullDefaultExplain);
+
+    String emptyArrayQuery = "SELECT jsonExtractScalar('{}', '$.missing', 'INT_ARRAY') FROM a";
+    assertNotNull(_queryEnvironment.planQuery(emptyArrayQuery));
+    String emptyArrayExplain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + emptyArrayQuery,
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(emptyArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), emptyArrayExplain);
+
+    String timestampDefaultExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', "
+            + "TIMESTAMP '2018-01-01 11:12:53') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(timestampDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), timestampDefaultExplain);
+    assertTrue(timestampDefaultExplain.contains("2018-01-01 11:12:53"), timestampDefaultExplain);
+    assertFalse(timestampDefaultExplain.contains("1514805173000"), timestampDefaultExplain);
+
+    for (String[] testCase : new String[][]{
+        {"DATE '2024-02-29'", "2024-02-29"},
+        {"TIME '11:12:53'", "11:12:53"},
+        {"UUID '123e4567-e89b-12d3-a456-426614174000'", "123e4567-e89b-12d3-a456-426614174000"}
+    }) {
+      String canonicalDefaultExplain = _queryEnvironment.explainQuery(
+          "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + testCase[0] + ") FROM a",
+          RANDOM_REQUEST_ID_GEN.nextLong());
+      assertFalse(canonicalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), canonicalDefaultExplain);
+      assertTrue(canonicalDefaultExplain.contains(testCase[1]), canonicalDefaultExplain);
+    }
+
+    String decimalDefaultExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'LONG', 9007199254740993.0) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(decimalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), decimalDefaultExplain);
+    assertTrue(decimalDefaultExplain.contains("9007199254740992"), decimalDefaultExplain);
+    assertFalse(decimalDefaultExplain.contains("9007199254740993"), decimalDefaultExplain);
+
+    String decimalArrayDefaultExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[null]}', '$.v', 'LONG_ARRAY', "
+            + "9007199254740993.0) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(decimalArrayDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), decimalArrayDefaultExplain);
+    assertTrue(decimalArrayDefaultExplain.contains("9007199254740992"), decimalArrayDefaultExplain);
+    assertFalse(decimalArrayDefaultExplain.contains("9007199254740993"), decimalArrayDefaultExplain);
+
+    String nullInputExplain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), '$.missing', 'INT', 7) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(nullInputExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullInputExplain);
+  }
+
   @Test
   public void testPolymorphicArithmeticScalarFunctionsPlanQuery() {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(

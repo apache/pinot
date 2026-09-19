@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -44,8 +46,14 @@ public class FunctionOperand implements TransformOperand {
   private final boolean _needsConversion;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
+  private final boolean _replaceNullJsonOperands;
 
   public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+    this(functionCall, dataSchema, false);
+  }
+
+  public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema,
+      boolean nullHandlingEnabled) {
     _resultType = functionCall.getDataType();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
@@ -65,6 +73,7 @@ public class FunctionOperand implements TransformOperand {
     }
     String functionName = functionCall.getFunctionName();
     String canonicalName = FunctionRegistry.canonicalize(functionName);
+    _replaceNullJsonOperands = !nullHandlingEnabled && isJsonExtractScalar(canonicalName);
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
@@ -103,7 +112,7 @@ public class FunctionOperand implements TransformOperand {
     _functionInvokerResultType = functionInvokerResultType != null ? functionInvokerResultType : ColumnDataType.STRING;
     _operands = new ArrayList<>(numOperands);
     for (RexExpression operand : operands) {
-      _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
+      _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema, nullHandlingEnabled));
     }
     _reusableOperandHolder = new Object[numOperands];
   }
@@ -121,6 +130,19 @@ public class FunctionOperand implements TransformOperand {
       Object value = operand.apply(row);
       _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
     }
+    if (_replaceNullJsonOperands) {
+      if (_reusableOperandHolder[0] == null) {
+        ColumnDataType inputType = _operands.get(0).getResultType();
+        Object nullPlaceholder = inputType.getNullPlaceholder();
+        // An untyped SQL NULL has UNKNOWN type and therefore no generic placeholder. The leaf transform reads every
+        // non-BYTES JSON input through transformToStringValuesSV(), whose NULL literal value is the empty string.
+        _reusableOperandHolder[0] = nullPlaceholder != null ? inputType.toExternal(nullPlaceholder) : "";
+      }
+      if (_reusableOperandHolder.length == 4 && _reusableOperandHolder[3] == null
+          && _reusableOperandHolder[2] != null) {
+        _reusableOperandHolder[3] = getJsonNullDefault(_reusableOperandHolder[2].toString());
+      }
+    }
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {
       result = _functionInvoker.invoke(new Object[]{_reusableOperandHolder});
@@ -132,5 +154,39 @@ public class FunctionOperand implements TransformOperand {
     }
     return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
+  }
+
+  private static boolean isJsonExtractScalar(String canonicalName) {
+    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
+        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
+  }
+
+  @Nullable
+  private static Object getJsonNullDefault(String resultsType) {
+    String baseType = resultsType.toUpperCase(Locale.ROOT);
+    if (baseType.endsWith("_ARRAY")) {
+      baseType = baseType.substring(0, baseType.length() - 6);
+    }
+    switch (baseType) {
+      case "INT":
+      case "BOOLEAN":
+        return 0;
+      case "LONG":
+      case "TIMESTAMP":
+        return 0L;
+      case "FLOAT":
+        return 0F;
+      case "DOUBLE":
+        return 0D;
+      case "BIG_DECIMAL":
+        return BigDecimal.ZERO;
+      case "STRING":
+      case "JSON":
+        return "";
+      case "BYTES":
+        return new byte[0];
+      default:
+        return null;
+    }
   }
 }
