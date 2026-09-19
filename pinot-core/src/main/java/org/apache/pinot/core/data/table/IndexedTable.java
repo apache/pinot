@@ -84,10 +84,14 @@ public abstract class IndexedTable extends BaseTable {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    /// Includes the synthetic $groupingId key column for GROUP BY GROUPING SETS / ROLLUP / CUBE queries, so
-    /// that rows from different grouping sets are keyed (and therefore merged) independently.
-    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
+    /// Derive the key-column count from the schema (total columns minus aggregation columns) rather than the
+    /// query context, so it matches the actual record layout. This normally equals
+    /// `queryContext.getNumGroupByKeyColumns()` -- which includes the synthetic $groupingId column for GROUP BY
+    /// GROUPING SETS / ROLLUP / CUBE so rows from different grouping sets are keyed (and merged) independently --
+    /// but for a base-aggregation grouping-set combine table the records are BASE groups WITHOUT the $groupingId
+    /// column, so the key count is the union-column count. Deriving from the schema keeps both layouts correct.
+    _numKeyColumns = dataSchema.size() - _aggregationFunctions.length;
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
     _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
     // NOTE: Trim should be disabled when there is no ORDER BY
@@ -258,6 +262,14 @@ public abstract class IndexedTable extends BaseTable {
   @Override
   public Iterator<Record> iterator() {
     return _topRecords.iterator();
+  }
+
+  /// Returns the (key, record) entries accumulated so far, before [#finish]. Used by the grouping-sets base
+  /// aggregation path to read the merged base groups and derive the individual grouping sets from them. The
+  /// returned view is backed by the live map and must be treated as read-only; callers must not mutate it, and
+  /// must not add to the table while iterating it.
+  public Collection<Map.Entry<Key, Record>> getRecordEntries() {
+    return _lookupMap.entrySet();
   }
 
   public int getNumResizes() {
