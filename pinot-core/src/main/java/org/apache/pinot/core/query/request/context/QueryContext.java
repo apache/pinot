@@ -258,11 +258,15 @@ public class QueryContext {
   /// row into one group per grouping set. Enabled by default; the `groupingSetsBaseAggregation=false` query
   /// option forces the legacy per-row expansion path. See [CommonConstants.Broker.Request.QueryOptionKey].
   ///
-  /// Not applied to filtered aggregations: those share a single group-key generator across aggregation groups
-  /// and go through a distinct segment path, so grouping-set queries with filtered aggregations always use the
-  /// per-row expansion path.
+  /// Only the standard [org.apache.pinot.core.operator.combine.GroupByCombineOperator] performs the merge-time
+  /// derive that turns the emitted base groups back into grouping-set records. Base aggregation is therefore
+  /// disabled whenever a different combine path would run: filtered aggregations (distinct shared group-key
+  /// generator), the streaming combine used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`, which
+  /// flushes incrementally and cannot derive over the fully-merged base table), and the sorted-aggregate combine
+  /// ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted rows
+  /// already carry the $groupingId discriminator.
   public boolean isGroupingSetsBaseAggregation() {
-    if (_hasFilteredAggregations) {
+    if (_hasFilteredAggregations || _streamingGroupByFlushThreshold > 0 || shouldSortAggregateUnderSafeTrim()) {
       return false;
     }
     String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
