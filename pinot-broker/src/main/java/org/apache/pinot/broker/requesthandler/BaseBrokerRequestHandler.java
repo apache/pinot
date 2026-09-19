@@ -472,5 +472,4 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected boolean isQueryCancellationEnabled() {
     return _enableQueryCancellation;
   }
-
 }

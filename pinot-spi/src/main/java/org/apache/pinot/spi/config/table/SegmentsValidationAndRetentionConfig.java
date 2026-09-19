@@ -247,5 +247,4 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   public void setUntrackedSegmentsRetentionTimeValue(String untrackedSegmentsRetentionTimeValue) {
     _untrackedSegmentsRetentionTimeValue = untrackedSegmentsRetentionTimeValue;
   }
-
 }

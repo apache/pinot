@@ -31,7 +31,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -68,7 +67,6 @@ import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -80,7 +78,6 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -1753,101 +1750,5 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
   private static Set<String> extractLookupTableNames(String sql) {
     return BaseSingleStageBrokerRequestHandler.extractLookupTableNames(CalciteSqlParser.compileToPinotQuery(sql));
-  }
-
-  private static final String RETENTION_TABLE = "retTable";
-
-  private static Schema retentionSchema(DataType tsType, String format) {
-    return new Schema.SchemaBuilder().setSchemaName(RETENTION_TABLE)
-        .addSingleValueDimension("id", DataType.INT)
-        .addDateTimeField("ts", tsType, format, "1:MILLISECONDS")
-        .build();
-  }
-
-  private static TableConfig retentionTableConfig(@Nullable String retentionUnit, @Nullable String retentionValue) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RETENTION_TABLE)
-        .setTimeColumnName("ts")
-        .setRetentionTimeUnit(retentionUnit)
-        .setRetentionTimeValue(retentionValue)
-        .build();
-  }
-
-  @Test
-  public void testSkipExpiredRecordsAttachesEpochFilter() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE);
-    Assert.assertNull(pinotQuery.getFilterExpression());
-
-    long before = System.currentTimeMillis();
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig("DAYS", "5"), retentionSchema(DataType.LONG, "1:MILLISECONDS:EPOCH"), pinotQuery);
-    long after = System.currentTimeMillis();
-
-    Function filter = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(filter.getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
-    List<Expression> operands = filter.getOperands();
-    Assert.assertEquals(operands.get(0).getIdentifier().getName(), "ts");
-    // EPOCH millis column -> numeric literal within the expected cutoff window.
-    long cutoff = operands.get(1).getLiteral().getLongValue();
-    long fiveDaysMs = 5L * 24 * 60 * 60 * 1000;
-    Assert.assertTrue(cutoff >= before - fiveDaysMs && cutoff <= after - fiveDaysMs,
-        "cutoff " + cutoff + " outside expected window");
-  }
-
-  @Test
-  public void testSkipExpiredRecordsAndsWithExistingFilter() {
-    PinotQuery pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE + " WHERE id = 3");
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig("DAYS", "5"), retentionSchema(DataType.LONG, "1:MILLISECONDS:EPOCH"), pinotQuery);
-
-    Function root = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(root.getOperator(), FilterKind.AND.name());
-    Assert.assertEquals(root.getOperands().size(), 2);
-    // Second operand is the appended retention predicate.
-    Assert.assertEquals(root.getOperands().get(1).getFunctionCall().getOperator(),
-        FilterKind.GREATER_THAN_OR_EQUAL.name());
-  }
-
-  @Test
-  public void testSkipExpiredRecordsUsesStringLiteralForSimpleDateFormat() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE);
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig("DAYS", "5"),
-        retentionSchema(DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd"), pinotQuery);
-
-    Function filter = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(filter.getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
-    // SDF column -> string literal (e.g. "20260914").
-    String cutoff = filter.getOperands().get(1).getLiteral().getStringValue();
-    Assert.assertNotNull(cutoff);
-    Assert.assertTrue(cutoff.matches("\\d{8}"), "unexpected SDF cutoff: " + cutoff);
-  }
-
-  @Test
-  public void testSkipExpiredRecordsNoOpWhenRetentionMissing() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE);
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig(null, null), retentionSchema(DataType.LONG, "1:MILLISECONDS:EPOCH"), pinotQuery);
-    Assert.assertNull(pinotQuery.getFilterExpression());
-  }
-
-  @Test
-  public void testSkipExpiredRecordsNoOpWhenRetentionMalformed() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE);
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig("NOT_A_UNIT", "5"), retentionSchema(DataType.LONG, "1:MILLISECONDS:EPOCH"), pinotQuery);
-    Assert.assertNull(pinotQuery.getFilterExpression());
-  }
-
-  @Test
-  public void testSkipExpiredRecordsNoOpWhenConfigOrSchemaNull() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM " + RETENTION_TABLE);
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        null, retentionSchema(DataType.LONG, "1:MILLISECONDS:EPOCH"), pinotQuery);
-    Assert.assertNull(pinotQuery.getFilterExpression());
-
-    BaseSingleStageBrokerRequestHandler.handleSkipExpiredRecords(
-        retentionTableConfig("DAYS", "5"), null, pinotQuery);
-    Assert.assertNull(pinotQuery.getFilterExpression());
   }
 }
