@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DummyAggregationResultHolder;
@@ -47,11 +47,17 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
   private final ExpressionContext _childFunctionKeyInParent;
   private final List<ExpressionContext> _resultNameOperands;
   private final ExpressionContext _childFunctionID;
+  private final ColumnDataType _resultType;
 
   ChildAggregationFunction(List<ExpressionContext> operands) {
+    this(operands, ColumnDataType.UNKNOWN);
+  }
+
+  ChildAggregationFunction(List<ExpressionContext> operands, ColumnDataType resultType) {
     _childFunctionID = operands.get(CHILD_AGGREGATION_FUNCTION_ID_OFFSET);
     _childFunctionKeyInParent = operands.get(CHILD_AGGREGATION_FUNCTION_COLUMN_KEY_OFFSET);
     _resultNameOperands = operands.subList(CHILD_AGGREGATION_FUNCTION_COLUMN_KEY_OFFSET + 1, operands.size());
+    _resultType = resultType;
   }
 
   @Override
@@ -104,23 +110,27 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
   }
 
   @Override
-  public final DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG;
+  public final ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.LONG;
   }
 
   @Override
-  public final DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.UNKNOWN;
+  public final ColumnDataType getFinalResultColumnType() {
+    return _resultType;
   }
 
+  @Nullable
   @Override
   public final Long extractFinalResult(@Nullable Long longValue) {
-    return 0L;
+    // The parent replaces this placeholder after final result conversion. A typed placeholder must be null so
+    // conversion never treats the legacy LONG marker as the projected value's logical type.
+    return _resultType == ColumnDataType.UNKNOWN ? 0L : null;
   }
 
+  @Nullable
   @Override
   public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
-    return 0L;
+    return _resultType == ColumnDataType.UNKNOWN ? 0L : null;
   }
 
   /// The name of the column as follows:
