@@ -61,6 +61,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapLazyUnion;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,6 +199,39 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   /// Returns `true` if the given predicate type is exclusive for json_match calculation, `false` otherwise.
   private boolean isExclusive(Predicate.Type predicateType) {
     return predicateType == Predicate.Type.IS_NULL;
+  }
+
+  /// Folds many posting lists into one [LazyBitmap] using lazy unions, repairing the accumulator once at [#get].
+  /// The zero- and single-input cases return the borrowed posting list wrapped as an immutable [LazyBitmap],
+  /// matching the ownership behavior of [LazyBitmap#or].
+  private static class UnionAccumulator {
+    @Nullable
+    private RoaringBitmap _first;
+    @Nullable
+    private RoaringBitmap _accumulator;
+
+    void add(RoaringBitmap docIds) {
+      if (docIds.isEmpty()) {
+        return;
+      }
+      if (_accumulator != null) {
+        RoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+      } else if (_first == null) {
+        _first = docIds;
+      } else {
+        _accumulator = _first.clone();
+        RoaringBitmapLazyUnion.lazyOr(_accumulator, docIds);
+        _first = null;
+      }
+    }
+
+    LazyBitmap get() {
+      if (_accumulator != null) {
+        RoaringBitmapLazyUnion.repair(_accumulator);
+        return LazyBitmap.createMutable(_accumulator);
+      }
+      return _first != null ? LazyBitmap.createImmutable(_first) : LazyBitmap.EMPTY_BITMAP;
+    }
   }
 
   /// This class allows delaying of cloning posting list bitmap for as long as possible
@@ -438,17 +472,17 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
           buffer.append(value);
           RoaringBitmap docIds = _postingListMap.get(buffer.toString());
           if (docIds != null) {
-            result = result.or(docIds);
+            result.add(docIds);
           }
         }
-        return result;
+        return result.get();
       }
 
       case NOT_IN: {
@@ -488,7 +522,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         }
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         StringBuilder value = new StringBuilder();
         int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
@@ -496,10 +530,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           value.setLength(0);
           value.append(keyValue, valueStart, keyValue.length());
           if (matcher.reset(value).matches()) {
-            result = result.or(entry.getValue());
+            result.add(entry.getValue());
           }
         }
-        return result;
+        return result.get();
       }
 
       case RANGE: {
@@ -521,7 +555,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
           Object valueObj = rangeDataType.convert(entry.getKey().substring(valueStart));
@@ -532,10 +566,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
               upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
                   : rangeDataType.compare(valueObj, upperBound) < 0);
           if (lowerCompareResult && upperCompareResult) {
-            result = result.or(entry.getValue());
+            result.add(entry.getValue());
           }
         }
-        return result;
+        return result.get();
       }
 
       default:
