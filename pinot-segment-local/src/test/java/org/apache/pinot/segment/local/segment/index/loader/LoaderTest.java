@@ -55,11 +55,17 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -179,6 +185,32 @@ public class LoaderTest {
     // changes
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
       assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig));
+    }
+  }
+
+  @Test
+  public void testNeedPreprocessPreservesProviderOverrideDispatch()
+      throws Exception {
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
+    IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
+    when(indexLoadingConfig.getTableConfig()).thenReturn(mock(TableConfig.class));
+    when(indexLoadingConfig.getSchema()).thenReturn(mock(Schema.class));
+    SegmentPreProcessor preProcessor = mock(SegmentPreProcessor.class);
+    when(preProcessor.needProcess()).thenReturn(true);
+    when(preProcessor.needProcess(false)).thenReturn(false);
+
+    try (MockedStatic<SegmentPreProcessor> mockedPreProcessor = mockStatic(SegmentPreProcessor.class)) {
+      mockedPreProcessor.when(() -> SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig))
+          .thenReturn(preProcessor);
+
+      assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
+      verify(preProcessor).needProcess();
+      verify(preProcessor, never()).needProcess(true);
+
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, false));
+      verify(preProcessor).needProcess(false);
     }
   }
 

@@ -76,6 +76,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -107,6 +108,14 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final File INDEX_DIR = new File(TEMP_DIR, SEGMENT_NAME);
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final String SCHEMA = "data/testDataMVSchema.json";
+
+  @Test
+  public void testChangedDerivedColumnInvalidatesMultiColumnTextIndex() {
+    MultiColumnTextIndexConfig config = new MultiColumnTextIndexConfig(List.of("title", "derivedText"));
+    assertTrue(SegmentPreProcessor.usesChangedMultiColumnTextIndexColumn(config, Set.of("derivedText")));
+    assertFalse(SegmentPreProcessor.usesChangedMultiColumnTextIndexColumn(config, Set.of("other")));
+    assertFalse(SegmentPreProcessor.usesChangedMultiColumnTextIndexColumn(null, Set.of("derivedText")));
+  }
 
   // For create inverted indices tests.
   private static final String COLUMN1_NAME = "column1";
