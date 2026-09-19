@@ -90,6 +90,14 @@
         plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </destName>
     </file>
+    <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/target/pinot-batch-ingestion-spark-4-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/pinot-batch-ingestion-spark-4-${project.version}-shaded.jar
+      </destName>
+    </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->
     <!-- Start Include Pinot File System Plugins-->
     <file>
