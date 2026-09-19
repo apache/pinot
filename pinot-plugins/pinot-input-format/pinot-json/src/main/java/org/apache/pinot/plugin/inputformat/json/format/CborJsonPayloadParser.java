@@ -21,9 +21,9 @@ package org.apache.pinot.plugin.inputformat.json.format;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 
 
-/// Parses [CBOR](https://www.rfc-editor.org/rfc/rfc8949.html) (RFC 8949) via Jackson. Values decode
-/// to the same Java types Jackson produces for text JSON (CBOR may additionally emit `Float` and `byte[]`
-/// scalars, which Pinot handles downstream).
+/// Parses [CBOR](https://www.rfc-editor.org/rfc/rfc8949.html) (RFC 8949) via Jackson. Numeric values
+/// stay as native IEEE `Float` / `Double` because CBOR encodes floats in binary, not as decimal text.
+/// CBOR may additionally emit `byte[]` scalars, which Pinot handles downstream.
 ///
 /// CBOR has no mandatory magic number, so AUTO detection only recognizes payloads that carry the optional
 /// self-describe tag `0xD9D9F7` (RFC 8949 §3.4.6). CBOR streams without that tag must select the format
