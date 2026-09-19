@@ -43,6 +43,7 @@ public abstract class BlockExchange implements AutoCloseable {
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
   private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
+  private final boolean _deliversByReference;
 
   protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
       (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());
@@ -86,6 +87,18 @@ public abstract class BlockExchange implements AutoCloseable {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
     _statsIndexChooser = statsIndexChooser;
+    _deliversByReference = anyDeliversByReference(sendingMailboxes);
+  }
+
+  /// Returns whether any of the given mailboxes delivers blocks by reference. Mailboxes are fixed when the exchange
+  /// is created, and each of them gives a constant answer, so this is computed once.
+  private static boolean anyDeliversByReference(List<SendingMailbox> sendingMailboxes) {
+    for (SendingMailbox sendingMailbox : sendingMailboxes) {
+      if (sendingMailbox.deliversByReference()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// API to send a block to the destination mailboxes.
@@ -213,7 +226,17 @@ public abstract class BlockExchange implements AutoCloseable {
 
     @Override
     public boolean isLocal() {
+      // Blocks are handed to the decorated exchange whole, and splitting them is left to that exchange.
+      // TODO: the decorated exchange is currently built with BlockSplitter#NO_OP, so blocks sent through a
+      //       multi-send node are never split. See MailboxSendOperator#getBlockExchange.
       return true;
+    }
+
+    @Override
+    public boolean deliversByReference() {
+      // The decorated exchange passes blocks to its own mailboxes, so this mailbox delivers by reference only if
+      // any of those does
+      return _deliversByReference;
     }
 
     @Override
