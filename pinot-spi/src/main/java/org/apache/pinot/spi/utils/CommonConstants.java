@@ -751,10 +751,6 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
-    /// Controls whether expired records are excluded at query time. Defaults to False.
-    public static final String SKIP_EXPIRED_RECORDS = "pinot.broker.skip.expired.records";
-    public static final boolean DEFAULT_SKIP_EXPIRED_RECORDS = false;
-
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -810,6 +806,8 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
         public static final String QUERY_HASH = "queryHash";
+        /// Query option to skip Expired Records from segments based on your retention time.
+        public static final String SKIP_EXPIRED_RECORDS = "skipExpiredRecords";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -1126,9 +1124,6 @@ public class CommonConstants {
         /// Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
         /// Setting false uses an unbounded per-query collector and requires vectorEfSearch.
         public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
-
-        /// Controls whether out of retention records are excluded at query time. Defaults to false.
-        public static final String SKIP_OUT_OF_RETENTION_VALUES = "skipOutOfRetentionValues";
       }
 
       public static class QueryOptionValue {
