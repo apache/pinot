@@ -137,6 +137,31 @@ public class DeriveGroupingSetsTest {
   }
 
   @Test
+  public void testDeriveDoesNotDropGroupsWhenDerivedCountExceedsNumGroupsLimit() {
+    // The derived group count (baseGroups * numSets) can exceed numGroupsLimit even when the base grouping is
+    // well within it. Deriving must not drop derived groups based on that per-segment guardrail (and certainly
+    // not non-deterministically under parallelism, which could starve an entire low-magnitude set such as the
+    // grand total). Set a small numGroupsLimit and assert the derive still emits every expected derived group,
+    // including the grand total, and that repeated parallel runs are identical.
+    QueryContext queryContext = rollupQueryContext();
+    queryContext.setNumGroupsLimit(10);
+    // 24 base groups (a0..a3 x b0..b6 gives 28 combos, i<24 -> 24 distinct). Grouping sets: {d1,d2}, {d1}, {}.
+    Map<String, Double> first =
+        toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
+            _executorService));
+    // Grand total (both columns rolled up) must be present regardless of the small numGroupsLimit.
+    boolean hasGrandTotal = first.keySet().stream().anyMatch(k -> k.startsWith("null|null|"));
+    assertTrue(hasGrandTotal, "grand-total grouping set must not be dropped by the per-segment numGroupsLimit");
+    // Deterministic across parallel runs.
+    for (int i = 0; i < 4; i++) {
+      Map<String, Double> again =
+          toMap(GroupByUtils.deriveGroupingSetsFromMergedBaseTable(buildBaseTable(24), queryContext, 8,
+              _executorService));
+      assertEquals(again, first, "parallel derive must be deterministic and drop no groups");
+    }
+  }
+
+  @Test
   public void testEmptyBaseTable() {
     QueryContext queryContext = rollupQueryContext();
     IndexedTable derived =
