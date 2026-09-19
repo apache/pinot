@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -27,14 +30,30 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ConfigUtilsTest {
+
+  @Test
+  public void testConversionFailureDoesNotIncludeResolvedConfigValues() {
+    String rejectedSecret = "resolved-secret-sentinel";
+    RuntimeException error = expectThrows(RuntimeException.class,
+        () -> ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(
+            Map.of("INVALID_NUMBER", rejectedSecret), new MalformedConfig()));
+    StringWriter stack = new StringWriter();
+    error.printStackTrace(new PrintWriter(stack));
+
+    assertNull(error.getCause());
+    assertFalse(stack.toString().contains(rejectedSecret), stack.toString());
+  }
 
   @Test
   public void testIndexing() {
@@ -42,6 +61,24 @@ public class ConfigUtilsTest {
         Map.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
             "default_aws_secret_key");
     testIndexingWithConfig(environment);
+  }
+
+  private static final class MalformedConfig extends BaseJsonConfig {
+    private int _number;
+
+    @Override
+    public JsonNode toJsonNode() {
+      return JsonUtils.newObjectNode()
+          .put("number", "$" + "{INVALID_NUMBER}");
+    }
+
+    public int getNumber() {
+      return _number;
+    }
+
+    public void setNumber(int number) {
+      _number = number;
+    }
   }
 
   @Test

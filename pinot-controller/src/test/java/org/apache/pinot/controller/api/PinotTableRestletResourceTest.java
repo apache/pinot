@@ -473,12 +473,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private TableConfig getTableConfig(String tableName, String tableType)
       throws Exception {
-    String tableConfigString = tableClient().getTableConfig(tableName, tableType);
-    JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigString);
-    if (tableConfigNode.has(tableType)) {
-      tableConfigNode = tableConfigNode.get(tableType);
-    }
-    return JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class);
+    return tableClient().getTableConfigObject(tableName, tableType);
   }
 
   @Test
@@ -549,7 +544,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Seed the config below the REST validation layer to model a table persisted before this validation existed.
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyTableConfig);
 
-    TableConfig update = getTableConfig(tableName, "REALTIME");
+    // Fetch the unresolved stored config because this test intentionally exercises the legacy bare-config update
+    // path. Redacted values must be submitted with the complete versioned response envelope instead.
+    TableConfig update = DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(tableName, false, false);
     update.getValidationConfig().setRetentionTimeValue("10");
     JsonNode validationResponse = JsonUtils.stringToJsonNode(tableClient().validateTableConfig(update.toJsonString()));
     assertTrue(validationResponse.has("REALTIME"));
@@ -557,7 +554,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     JsonNode response = JsonUtils.stringToJsonNode(updateTable(tableName, update.toJsonString()));
     assertTrue(response.has("status"));
 
-    TableConfig stored = getTableConfig(tableName, "REALTIME");
+    TableConfig stored = DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(tableName, false, false);
     assertEquals(stored.getValidationConfig().getRetentionTimeValue(), "10");
     assertEquals(stored.getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(), "now()");
 
@@ -571,7 +568,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     IOException updateError = expectThrows(IOException.class, () -> updateTable(tableName, update.toJsonString()));
     assertHasStatus(updateError, 400);
-    assertTrue(updateError.getMessage().contains("Function 'now' has VOLATILE volatility"), updateError.getMessage());
+    assertTrue(updateError.getMessage().contains("Invalid table config: " + tableName), updateError.getMessage());
   }
 
   @Test
@@ -1076,7 +1073,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       updateTable(realtimeTableConfig.getTableName(), realtimeTableConfig.toJsonString());
       fail("Table update should fail due to invalid RG config");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+      assertHasStatus(e, 400);
     }
   }
 
@@ -1138,7 +1135,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   /// Updating existing REALTIME table with invalid replication factor should throw exception.
   private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableConfig tableConfig = (tableType == TableType.REALTIME
         ? getRealtimeTableBuilder(rawTableName)
         : getOfflineTableBuilder(rawTableName))
@@ -1149,7 +1145,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       updateTable(tableConfig.getTableName(), tableConfig.toJsonString());
       fail("Table update should fail due to invalid replication factor");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+      assertHasStatus(e, 400);
     }
   }
 
