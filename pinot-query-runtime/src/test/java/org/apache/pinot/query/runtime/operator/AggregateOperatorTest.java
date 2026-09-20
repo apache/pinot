@@ -19,8 +19,10 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
@@ -36,6 +38,9 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
+import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
+import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorProvider;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -56,6 +61,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -94,6 +100,95 @@ public class AggregateOperatorTest {
     // Then:
     verify(_input, times(1)).nextBlock();
     assertTrue(block.isError(), "Input errors should propagate immediately");
+  }
+
+  @Test
+  public void testInjectedGroupIdGeneratorClosesAfterResultAndNotAgainOnTeardown() {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    AtomicInteger closeCount = new AtomicInteger();
+    AtomicInteger createCount = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider(closeCount, false, false, createCount);
+    assertEquals(createCount.get(), 0, "A custom generator must not allocate during plan construction");
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{2, 1.0});
+    operator.close();
+    operator.cancel(new IllegalStateException("already finished"));
+    assertEquals(createCount.get(), 1);
+    assertEquals(closeCount.get(), 1);
+  }
+
+  @Test
+  public void testInjectedGroupIdGeneratorClosesAfterUpstreamError() {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    MseBlock.Eos upstreamError = ErrorMseBlock.fromException(new IllegalStateException("upstream"));
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
+        .thenReturn(upstreamError);
+    AtomicInteger closeCount = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider(closeCount, false);
+
+    assertSame(operator.nextBlock(), upstreamError);
+    operator.close();
+    assertEquals(closeCount.get(), 1);
+  }
+
+  @Test
+  public void testInjectedGroupIdGeneratorClosesAfterOutputFailure() {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    AtomicInteger closeCount = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider(closeCount, true);
+
+    assertTrue(operator.nextBlock().isError());
+    operator.close();
+    assertEquals(closeCount.get(), 1);
+  }
+
+  @Test
+  public void testProviderFailureDuringFirstUseDoesNotRetryConstruction() {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    AtomicInteger attempts = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider((types, numKeys, limit, initialCapacity) -> {
+      attempts.incrementAndGet();
+      throw new IllegalStateException("provider failed");
+    });
+    assertEquals(attempts.get(), 0);
+
+    assertTrue(operator.nextBlock().isError());
+    operator.close();
+    assertEquals(attempts.get(), 1);
+  }
+
+  @Test
+  public void testInjectedGroupIdGeneratorClosesOnCancellation() {
+    AtomicInteger closeCount = new AtomicInteger();
+    AtomicInteger createCount = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider(closeCount, false, false, createCount);
+
+    operator.cancel(new IllegalStateException("cancelled"));
+    operator.close();
+    assertEquals(createCount.get(), 0, "Cancellation before execution must not create native state");
+    assertEquals(closeCount.get(), 0);
+  }
+
+  @Test
+  public void testUpstreamErrorSurvivesGroupIdGeneratorCloseFailure() {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    MseBlock.Eos upstreamError = ErrorMseBlock.fromException(new IllegalStateException("upstream"));
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
+        .thenReturn(upstreamError);
+    AtomicInteger closeCount = new AtomicInteger();
+    AggregateOperator operator = getOperatorWithProvider(closeCount, false, true);
+
+    assertSame(operator.nextBlock(), upstreamError);
+    operator.close();
+    assertEquals(closeCount.get(), 1);
   }
 
   @Test
@@ -403,6 +498,74 @@ public class AggregateOperatorTest {
     return new AggregateOperator(OperatorTestUtil.getContext(opChainMetadata), _input,
         new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT,
             false, null, 0));
+  }
+
+  private AggregateOperator getOperatorWithProvider(AtomicInteger closeCount, boolean failOnIteration) {
+    return getOperatorWithProvider(closeCount, failOnIteration, false);
+  }
+
+  private AggregateOperator getOperatorWithProvider(AtomicInteger closeCount, boolean failOnIteration,
+      boolean failOnClose) {
+    return getOperatorWithProvider(closeCount, failOnIteration, failOnClose, new AtomicInteger());
+  }
+
+  private AggregateOperator getOperatorWithProvider(AtomicInteger closeCount, boolean failOnIteration,
+      boolean failOnClose, AtomicInteger createCount) {
+    GroupIdGeneratorProvider provider = (types, numKeys, limit, initialCapacity) -> {
+      createCount.incrementAndGet();
+      return new TrackingGroupIdGenerator(GroupIdGeneratorFactory.getGroupIdGenerator(types, numKeys, limit,
+          initialCapacity), closeCount, failOnIteration, failOnClose);
+    };
+    return getOperatorWithProvider(provider);
+  }
+
+  private AggregateOperator getOperatorWithProvider(GroupIdGeneratorProvider provider) {
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    return new AggregateOperator(OperatorTestUtil.getContext(Map.of()), _input,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(),
+            List.of(getSum(new RexExpression.InputRef(1))), List.of(-1), List.of(0), AggType.DIRECT,
+            false, null, 0), provider);
+  }
+
+  private static final class TrackingGroupIdGenerator implements GroupIdGenerator {
+    private final GroupIdGenerator _delegate;
+    private final AtomicInteger _closeCount;
+    private final boolean _failOnIteration;
+    private final boolean _failOnClose;
+
+    private TrackingGroupIdGenerator(GroupIdGenerator delegate, AtomicInteger closeCount, boolean failOnIteration,
+        boolean failOnClose) {
+      _delegate = delegate;
+      _closeCount = closeCount;
+      _failOnIteration = failOnIteration;
+      _failOnClose = failOnClose;
+    }
+
+    @Override
+    public int getGroupId(Object key) {
+      return _delegate.getGroupId(key);
+    }
+
+    @Override
+    public int getNumGroups() {
+      return _delegate.getNumGroups();
+    }
+
+    @Override
+    public Iterator<GroupKey> getGroupKeyIterator(int numColumns) {
+      if (_failOnIteration) {
+        throw new IllegalStateException("output materialization failed");
+      }
+      return _delegate.getGroupKeyIterator(numColumns);
+    }
+
+    @Override
+    public void close() {
+      _closeCount.incrementAndGet();
+      if (_failOnClose) {
+        throw new IllegalStateException("close failed");
+      }
+    }
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,

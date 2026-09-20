@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.operator.groupby;
 import java.util.Iterator;
 
 
-public interface GroupIdGenerator {
+public interface GroupIdGenerator extends AutoCloseable {
   int INVALID_ID = -1;
   int NULL_ID = -2;
 
@@ -38,6 +38,11 @@ public interface GroupIdGenerator {
   int getNumGroups();
 
   Iterator<GroupKey> getGroupKeyIterator(int numColumns);
+
+  /// Releases generator-owned state. Existing heap generators have no explicit resources.
+  @Override
+  default void close() {
+  }
 
   class GroupKey {
     public final int _groupId;

@@ -481,7 +481,7 @@ public class TableResizer {
 
     @Override
     public Comparable extract(Record record) {
-      return (Comparable) record.getValues()[_index];
+      return (Comparable) record.getValue(_index);
     }
   }
 
@@ -504,7 +504,7 @@ public class TableResizer {
 
     @Override
     public Comparable extract(Record record) {
-      return _aggregationFunction.extractFinalResult(record.getValues()[_index]);
+      return _aggregationFunction.extractFinalResult(record.getValue(_index));
     }
   }
 
@@ -545,7 +545,7 @@ public class TableResizer {
       if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
-      int ordinal = ((Number) record.getValues()[_discriminatorIndex]).intValue();
+      int ordinal = ((Number) record.getValue(_discriminatorIndex)).intValue();
       return _valuesByOrdinal[ordinal];
     }
   }

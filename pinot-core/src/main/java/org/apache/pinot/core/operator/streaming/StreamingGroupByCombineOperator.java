@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
@@ -43,6 +44,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Streaming combine operator for group-by queries. Instead of accumulating all groups into a single IndexedTable
@@ -62,6 +65,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// below; finalizing each flush instead would not make them correct, only silent.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingGroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "STREAMING_COMBINE_GROUP_BY";
 
   private final int _flushThreshold;
@@ -70,8 +74,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   private final int _numColumns;
 
   // Main-thread-only state for accumulating group-by results
-  private DataSchema _dataSchema;
-  private SimpleIndexedTable _indexedTable;
+  private IndexedTable _indexedTable;
   private boolean _groupsTrimmed;
   private boolean _numGroupsLimitReached;
   private boolean _numGroupsWarningLimitReached;
@@ -131,6 +134,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while streaming group-by results");
         }
         if (resultsBlock instanceof ExceptionResultsBlock) {
+          abandonTable();
           return checkTerminateExceptionAndAttachExecutionStats(resultsBlock);
         }
         if (resultsBlock == LAST_RESULTS_BLOCK) {
@@ -142,15 +146,19 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
           return flushTable();
         }
       }
+      // All operators done — flush any remaining accumulated data.
+      if (_indexedTable != null && _indexedTable.size() > 0) {
+        return flushTable();
+      }
+      abandonTable();
+      return attachExecutionStats(new MetadataResultsBlock());
     } catch (Exception e) {
+      abandonTable();
       return createExceptionResultsBlockAndAttachExecutionStats(e, "streaming group-by results");
+    } catch (Error e) {
+      abandonTable();
+      throw e;
     }
-    // All operators done — flush any remaining accumulated data
-    if (_indexedTable != null && _indexedTable.size() > 0) {
-      return flushTable();
-    }
-    // Return final metadata block
-    return attachExecutionStats(new MetadataResultsBlock());
   }
 
   /// Detaches a per-segment group-by result from the worker thread's reused thread-local group-key state.
@@ -203,8 +211,8 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   /// on the worker thread by {@link #detachFromWorkerThreadState}.
   private void mergeBlock(GroupByResultsBlock resultsBlock) {
     if (_indexedTable == null) {
-      _dataSchema = resultsBlock.getDataSchema();
-      _indexedTable = createNewIndexedTable();
+      _indexedTable = createNewIndexedTable(resultsBlock.getDataSchema(),
+          HashUtil.getHashMapCapacity(_flushThreshold));
     }
     if (resultsBlock.isGroupsTrimmed()) {
       _groupsTrimmed = true;
@@ -229,18 +237,51 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   }
 
   private GroupByResultsBlock flushTable() {
-    _indexedTable.finish(false);
-    GroupByResultsBlock block = new GroupByResultsBlock(_indexedTable, _queryContext);
-    block.setGroupsTrimmed(_groupsTrimmed);
-    block.setNumGroupsLimitReached(_numGroupsLimitReached);
-    block.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
-    _indexedTable = createNewIndexedTable();
-    return block;
+    IndexedTable table = _indexedTable;
+    Throwable failure = null;
+    try {
+      table.finish(false);
+      GroupByResultsBlock block = new GroupByResultsBlock(table, _queryContext);
+      block.setGroupsTrimmed(_groupsTrimmed);
+      block.setNumGroupsLimitReached(_numGroupsLimitReached);
+      block.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+      return block;
+    } catch (RuntimeException | Error e) {
+      failure = e;
+      throw e;
+    } finally {
+      // The next table is created only if another block arrives; no empty native table survives terminal flush.
+      _indexedTable = null;
+      if (table instanceof AutoCloseable closeable) {
+        try {
+          closeable.close();
+        } catch (Exception | Error closeFailure) {
+          if (failure == null) {
+            throw new RuntimeException("Failed to release flushed group-by table", closeFailure);
+          }
+          if (failure != closeFailure) {
+            failure.addSuppressed(closeFailure);
+          }
+        }
+      }
+    }
   }
 
-  private SimpleIndexedTable createNewIndexedTable() {
-    int initialCapacity = HashUtil.getHashMapCapacity(_flushThreshold);
-    return new SimpleIndexedTable(_dataSchema, false, _queryContext, Integer.MAX_VALUE,
+  /// Factory for the consumer-thread combine table. A closeable table must detach rows during `finish()`.
+  protected IndexedTable createNewIndexedTable(DataSchema dataSchema, int initialCapacity) {
+    return new SimpleIndexedTable(dataSchema, false, _queryContext, Integer.MAX_VALUE,
         Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, _executorService);
+  }
+
+  private void abandonTable() {
+    IndexedTable table = _indexedTable;
+    _indexedTable = null;
+    if (table instanceof AutoCloseable closeable) {
+      try {
+        closeable.close();
+      } catch (Exception | Error e) {
+        LOGGER.warn("Failed to release abandoned streaming group-by table", e);
+      }
+    }
   }
 }
