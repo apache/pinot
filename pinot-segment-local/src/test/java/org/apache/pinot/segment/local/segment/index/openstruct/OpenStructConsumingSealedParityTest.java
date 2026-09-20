@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -55,6 +56,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -275,6 +277,102 @@ public class OpenStructConsumingSealedParityTest {
     } finally {
       sealed.destroy();
     }
+  }
+
+  /// A key whose values are lists is a multi-value column on both tiers, and must read back element for element
+  /// either side of the seal boundary. The two build it by different routes -- a mutable MV forward index of
+  /// dictIds during consumption, the standard MV creators at seal -- so a divergence here would make the REALTIME
+  /// and OFFLINE halves of a hybrid table disagree on the same row.
+  @Test
+  public void testConsumingMatchesSealedForMultiValueKey()
+      throws Exception {
+    String mvKey = "tags";
+    ComplexFieldSpec mvSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    OpenStructIndexConfig osConfig =
+        new OpenStructIndexConfig(false, null, -1, Set.of(mvKey), 0.5, List.of(), null);
+
+    List<List<Object>> consumingValues;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", mvSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, mvDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(mvSpec, idx, NUM_DOCS);
+      DataSource tags = ds.getDataSource(mvKey);
+      assertNotNull(tags, "a multi-value key must be materialized on the consuming side");
+      consumingValues = readAllMultiValues(tags);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructMvParity").addField(mvSpec).build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructMvParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentMvParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, mvDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedTags = sealedMetrics.getDataSource(mvKey);
+      assertNotNull(sealedTags, "a multi-value key must be materialized on the sealed side");
+      assertEquals(consumingValues, readAllMultiValues(sealedTags));
+
+      // Pin the values themselves, not just cross-tier equality: a bug shared by both tiers would survive an
+      // equality-only assertion. Docs 0-4 carry two tags, docs 5-9 carry none.
+      for (int docId = 0; docId < 5; docId++) {
+        assertEquals(consumingValues.get(docId), List.of("t" + docId, "shared"), "docId " + docId);
+      }
+      for (int docId = 5; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId).size(), 1, "an absent doc holds one default element");
+      }
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  private static Map<String, Object> mvDoc(int docId) {
+    Map<String, Object> document = new HashMap<>();
+    if (docId < 5) {
+      document.put("tags", List.of("t" + docId, "shared"));
+    }
+    document.put("host", "host-" + docId);
+    return document;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<List<Object>> readAllMultiValues(DataSource dataSource)
+      throws Exception {
+    ForwardIndexReader<ForwardIndexReaderContext> fwd =
+        (ForwardIndexReader<ForwardIndexReaderContext>) dataSource.getForwardIndex();
+    assertFalse(fwd.isSingleValue(), "expected a multi-value forward index");
+    List<List<Object>> values = new ArrayList<>(NUM_DOCS);
+    int[] buffer = new int[MutableKeyColumn.MAX_NUM_MULTI_VALUES];
+    try (ForwardIndexReaderContext context = fwd.createContext()) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        int length = fwd.getDictIdMV(docId, buffer, context);
+        List<Object> row = new ArrayList<>(length);
+        for (int i = 0; i < length; i++) {
+          row.add(dataSource.getDictionary().get(buffer[i]));
+        }
+        values.add(row);
+      }
+    }
+    return values;
   }
 
   private static long min(List<Object> values) {

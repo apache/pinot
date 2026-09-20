@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -100,6 +101,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
   private final Map<String, Long> _coercionFailuresPerKey = new HashMap<>();
   private final Map<String, Long> _inferenceFailuresPerKey = new HashMap<>();
+  /// Keys whose values are collections. A key is multi-value for the whole segment as soon as one document
+  /// presents it as one, the same all-or-nothing rule the key's type follows.
+  private final Set<String> _multiValueKeys = new HashSet<>();
   private int _numDocs;
   private int _ignoredKeyDropCount;
 
@@ -207,9 +211,49 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           continue;
         }
         FieldSpec keySpec = _childFieldSpecs.get(key);
+        // Shape is decided by the first value the key presents and then sticks, exactly as its type does. A
+        // collection arriving on a key whose shape is already scalar is handled as any other value it cannot
+        // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
+        // column other documents already wrote to.
+        Object[] elements = OpenStructTypeInference.asMultiValue(rawValue);
+        if (!_presenceBitmaps.containsKey(key)) {
+          // A declaration decides the shape in both directions -- a key declared single-value stays single-value
+          // even when its values are collections, because the declaration is what the user asked for. Only an
+          // undeclared key takes its shape from the data.
+          boolean multiValue = keySpec != null ? !keySpec.isSingleValueField() : elements != null;
+          if (multiValue) {
+            _multiValueKeys.add(key);
+          }
+        }
+        if (!_multiValueKeys.contains(key)) {
+          elements = null;
+        }
+        if (elements != null && elements.length == 0) {
+          // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
+          // empty state, so treating this as present would mean inventing one; the key is simply not in this
+          // document, the same as a null value above.
+          continue;
+        }
         DataType valueType;
         if (keySpec != null) {
           valueType = keySpec.getDataType();
+        } else if (elements != null) {
+          // A collection resolves to its element type. Established types stay sticky exactly as for a scalar key:
+          // once a key is STRING it stays STRING, and an element type that disagrees with the established one
+          // resolves to STRING rather than dropping the row.
+          DataType established = _inferredTypes.get(key);
+          if (established != null && established != DataType.STRING) {
+            valueType = established;
+          } else {
+            DataType inferred = OpenStructTypeInference.inferElementDataType(elements);
+            if (inferred == null) {
+              // Empty, or all nulls: nothing to learn from, and STRING holds whatever arrives later.
+              valueType = established != null ? established : DataType.STRING;
+            } else {
+              valueType = established != null && established != inferred ? DataType.STRING : inferred;
+            }
+            _inferredTypes.putIfAbsent(key, valueType);
+          }
         } else {
           DataType established = _inferredTypes.get(key);
           if (established != null && established != DataType.STRING) {
@@ -240,9 +284,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         bitmap.add(_numDocs);
         Object coerced;
         try {
-          PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
           PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
-          coerced = destType.convert(rawValue, sourceType);
+          coerced = elements != null ? coerceElements(elements, destType) : coerceScalar(rawValue, destType);
         } catch (Exception e) {
           _coercionFailuresPerKey.merge(key, 1L, Long::sum);
           bitmap.remove(_numDocs);
@@ -252,6 +295,25 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
     _numDocs++;
+  }
+
+  private static Object coerceScalar(Object rawValue, PinotDataType destType) {
+    return destType.convert(rawValue, PinotDataType.getSingleValueType(rawValue));
+  }
+
+  /// Coerces every element to the key's resolved type. A null element takes the whole value down rather than
+  /// being silently dropped, because an array's length is part of its value -- losing one element would shift
+  /// every index after it.
+  private static Object[] coerceElements(Object[] elements, PinotDataType destType) {
+    Object[] coerced = new Object[elements.length];
+    for (int i = 0; i < elements.length; i++) {
+      Object element = elements[i];
+      if (element == null) {
+        throw new IllegalArgumentException("null element in a multi-value OPEN_STRUCT value");
+      }
+      coerced[i] = destType.convert(element, PinotDataType.getSingleValueType(element));
+    }
+    return coerced;
   }
 
   @Override
@@ -376,14 +438,14 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   /// Without a declaration the child is a single-value dimension of the inferred stored type, whose natural Pinot
   /// null value is what absent docs store.
   ///
-  /// Single-value either way for now: the write path below has no multi-value creator, and a declared multi-value
-  /// key does not work today regardless -- a list value fails inference and falls back to STRING.
+  /// Single- or multi-value follows the data: a key whose values are collections is materialized as a multi-value
+  /// column. A declaration cannot override that, because the values are what the creators have to write.
   private static DimensionFieldSpec materializedFieldSpec(String materializedCol, @Nullable FieldSpec keySpec,
-      DataType valueType) {
+      DataType valueType, boolean singleValue) {
     if (keySpec == null) {
-      return new DimensionFieldSpec(materializedCol, valueType.getStoredType(), true);
+      return new DimensionFieldSpec(materializedCol, valueType.getStoredType(), singleValue);
     }
-    return new DimensionFieldSpec(materializedCol, keySpec.getDataType(), true, keySpec.getMaxLength(),
+    return new DimensionFieldSpec(materializedCol, keySpec.getDataType(), singleValue, keySpec.getMaxLength(),
         keySpec.getDefaultNullValue());
   }
 
@@ -398,8 +460,20 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
 
-    DimensionFieldSpec childFieldSpec = materializedFieldSpec(materializedCol, keySpec, valueType);
-    Object defaultValue = childFieldSpec.getDefaultNullValue();
+    boolean singleValue = !_multiValueKeys.contains(key);
+    if (!singleValue) {
+      // A key becomes multi-value the moment one document presents a collection, which can happen after other
+      // documents already stored a scalar. The column has one shape, so those scalars become one-element values --
+      // the same thing ingestion does for a scalar written to a declared multi-value field. Only the dense side is
+      // normalized: the sparse blob is JSON and can hold both shapes, which is closer to what the row actually had.
+      values.replaceAll(value -> value instanceof Object[] ? value : new Object[]{value});
+    }
+    DimensionFieldSpec childFieldSpec = materializedFieldSpec(materializedCol, keySpec, valueType, singleValue);
+    // A multi-value column has no empty state on disk, so an absent doc stores a one-element array of the default,
+    // which is what the standard segment creator writes for an absent multi-value field.
+    Object defaultValue = singleValue
+        ? childFieldSpec.getDefaultNullValue()
+        : new Object[]{childFieldSpec.getDefaultNullValue()};
 
     // Collect statistics the standard way: present docs contribute their value, absent docs the default
     // (absent docs are also marked in the null vector below).
@@ -525,12 +599,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           }
         }
 
+        boolean singleValue = childFieldSpec.isSingleValueField();
         int ordinal = 0;
         for (int docId = 0; docId < _numDocs; docId++) {
           Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
-          int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
-          for (IndexCreator creator : creators) {
-            creator.add(value, dictId);
+          if (singleValue) {
+            int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
+            for (IndexCreator creator : creators) {
+              creator.add(value, dictId);
+            }
+          } else {
+            Object[] multiValue = (Object[]) value;
+            int[] dictIds = useDictionary ? dictCreator.indexOfMV(multiValue) : null;
+            for (IndexCreator creator : creators) {
+              creator.add(multiValue, dictIds);
+            }
           }
         }
         for (IndexCreator creator : creators) {

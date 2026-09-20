@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Set;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
@@ -44,12 +45,18 @@ import org.apache.pinot.spi.utils.PinotDataType;
 public class MutableKeyColumn implements Closeable {
   private static final int DEFAULT_AVG_STRING_LENGTH = 32;
   private static final int DEFAULT_ROWS_PER_CHUNK = 1000;
+  /// Chunk-sizing hint for a multi-value key, and a hard cap: FixedByteMVMutableForwardIndex rejects a row with
+  /// more values than this. A key discovered during consumption has no declared bound, so this is the one the
+  /// column is built with; a longer value is dropped and metered like any other value the column cannot hold.
+  public static final int MAX_NUM_MULTI_VALUES = 1000;
+  private static final int AVG_NUM_MULTI_VALUES = 4;
 
   private final String _key;
   private final DataType _storedType;
   private final PinotDataType _destType;
   private final boolean _needsInferenceCheck;
   private final MutableForwardIndex _forwardIndex;
+  private final boolean _singleValue;
   private final ThreadSafeMutableRoaringBitmap _presenceBitmap;
   private final MutableDictionary _dictionary;
   private final RealtimeInvertedIndex _invertedIndex;
@@ -66,15 +73,22 @@ public class MutableKeyColumn implements Closeable {
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
       PinotDataBufferMemoryManager memoryManager, int capacity) {
-    this(key, storedType, defaultNullValue, memoryManager, capacity, key, false);
+    this(key, storedType, defaultNullValue, memoryManager, capacity, key, false, true);
   }
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
       PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext,
       boolean needsInferenceCheck) {
+    this(key, storedType, defaultNullValue, memoryManager, capacity, allocationContext, needsInferenceCheck, true);
+  }
+
+  public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
+      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext,
+      boolean needsInferenceCheck, boolean singleValue) {
     _key = key;
     _storedType = storedType;
     _needsInferenceCheck = needsInferenceCheck;
+    _singleValue = singleValue;
     _destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
     _presenceBitmap = new ThreadSafeMutableRoaringBitmap();
     _invertedIndex = new RealtimeInvertedIndex();
@@ -94,8 +108,17 @@ public class MutableKeyColumn implements Closeable {
     // writes the default value, keeping dictIds and bitmap slots contiguous.
     _invertedIndex.reserveNextDictId();
 
-    _forwardIndex = new FixedByteSVMutableForwardIndex(true, DataType.INT,
-        DEFAULT_ROWS_PER_CHUNK, memoryManager, allocationContext + ".fwd");
+    _forwardIndex = singleValue
+        ? new FixedByteSVMutableForwardIndex(true, DataType.INT, DEFAULT_ROWS_PER_CHUNK, memoryManager,
+            allocationContext + ".fwd")
+        : new FixedByteMVMutableForwardIndex(MAX_NUM_MULTI_VALUES, AVG_NUM_MULTI_VALUES, DEFAULT_ROWS_PER_CHUNK,
+            Integer.BYTES, memoryManager, allocationContext + ".fwd", true, DataType.INT);
+  }
+
+  /// Whether this key holds one value per document or a list. Fixed at allocation from the first value the key
+  /// presented, matching [OpenStructColumnSplitter]'s rule on the sealed side.
+  public boolean isSingleValue() {
+    return _singleValue;
   }
 
   public String getKey() {
@@ -168,6 +191,26 @@ public class MutableKeyColumn implements Closeable {
     _lastIndexedDocId = docId;
   }
 
+  /// Indexes a list of values at `docId`. Elements must already be coerced to the stored type. Throws
+  /// [IllegalArgumentException] when the list is longer than [#MAX_NUM_MULTI_VALUES]; the caller drops and meters
+  /// it, the same as a value that cannot be coerced.
+  public void setValues(int docId, Object[] values) {
+    int[] dictIds = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      dictIds[i] = _dictionary.index(values[i]);
+      if (dictIds[i] == 0) {
+        _defaultObserved = true;
+      }
+    }
+    // Before the presence bitmap, so a rejected row is not published as present.
+    _forwardIndex.setDictIdMV(docId, dictIds);
+    _presenceBitmap.add(docId);
+    for (int dictId : dictIds) {
+      _invertedIndex.add(dictId, docId);
+    }
+    _lastIndexedDocId = docId;
+  }
+
   /// Whether any doc has explicitly written the reserved default value (dictId 0), as opposed to
   /// the default being a phantom entry no doc actually carries.
   public boolean isDefaultObserved() {
@@ -213,7 +256,7 @@ public class MutableKeyColumn implements Closeable {
 
     @Override
     public boolean isSingleValue() {
-      return true;
+      return _singleValue;
     }
 
     @Override
@@ -241,6 +284,25 @@ public class MutableKeyColumn implements Closeable {
         int docId = docIds[i];
         dictIdBuffer[i] = docId <= watermark ? _forwardIndex.getDictId(docId) : 0;
       }
+    }
+
+    @Override
+    public int getDictIdMV(int docId, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+      if (docId > _lastIndexedDocId) {
+        // Past the watermark the key has no row yet, which reads as the reserved default -- the same one value a
+        // sealed segment folds in for an absent multi-value doc.
+        dictIdBuffer[0] = 0;
+        return 1;
+      }
+      return _forwardIndex.getDictIdMV(docId, dictIdBuffer);
+    }
+
+    @Override
+    public int[] getDictIdMV(int docId, ForwardIndexReaderContext context) {
+      if (docId > _lastIndexedDocId) {
+        return new int[]{0};
+      }
+      return _forwardIndex.getDictIdMV(docId);
     }
 
     @Override
