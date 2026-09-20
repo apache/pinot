@@ -178,14 +178,34 @@ public final class GroupByUtils {
       }
     }
 
-    // Union the disjoint task maps into the result table. This is single-threaded, so pass numThreads = 1 to
-    // get a plain-HashMap-backed table; every upsert is a pure store because the task key spaces are disjoint.
-    IndexedTable derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext,
-        Integer.MAX_VALUE, initialCapacity, 1, executorService);
-    for (Map<Key, Record> taskMap : taskMaps) {
-      for (Map.Entry<Key, Record> entry : taskMap.entrySet()) {
-        derivedTable.upsert(entry.getKey(), entry.getValue());
+    // Union the disjoint task maps into the result table. Since task key spaces are disjoint, the union never
+    // merges records. In the common case, adopt the largest task map as the table's backing map and putAll the
+    // rest into it, so the largest map's keys are never re-hashed. The deterministic accurate-group-by mode
+    // needs a sorted (skip-list) backing map for deterministic iteration order, so it keeps the upsert-based
+    // union into the table produced by getTrimDisabledIndexedTable (single-threaded, numThreads = 1).
+    IndexedTable derivedTable;
+    if (useDeterministicIndexedTable(queryContext)) {
+      derivedTable = getTrimDisabledIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
+          initialCapacity, 1, executorService);
+      for (Map<Key, Record> taskMap : taskMaps) {
+        for (Map.Entry<Key, Record> entry : taskMap.entrySet()) {
+          derivedTable.upsert(entry.getKey(), entry.getValue());
+        }
       }
+    } else {
+      Map<Key, Record> mergedMap = taskMaps.get(0);
+      for (Map<Key, Record> taskMap : taskMaps) {
+        if (taskMap.size() > mergedMap.size()) {
+          mergedMap = taskMap;
+        }
+      }
+      for (Map<Key, Record> taskMap : taskMaps) {
+        if (taskMap != mergedMap) {
+          mergedMap.putAll(taskMap);
+        }
+      }
+      derivedTable = new SimpleIndexedTable(groupingSetsSchema, false, queryContext, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, Integer.MAX_VALUE, mergedMap, executorService);
     }
 
     /// Optional server-side per-set trim: when configured (and there is an ORDER BY), keep at most K groups
@@ -233,27 +253,33 @@ public final class GroupByUtils {
       int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
       AggregationFunction[] aggregationFunctions) {
     int numSets = setContains.length;
-    Map<Key, Record> taskMap = new HashMap<>();
+    // A single set can produce at most one derived group per base entry, so this covers the largest owned set
+    // (typically the near-identity one) without rehashing; coarser owned sets add far fewer distinct groups.
+    Map<Key, Record> taskMap = new HashMap<>(HashUtil.getHashMapCapacity(baseEntries.size()));
+    // Flyweight probe: reuse one key buffer for lookups (HashMap.get does not retain its argument) and copy it
+    // into a fresh array only when inserting a new derived group. Most projections into coarse sets hit an
+    // existing group, so this avoids a key-array + Key allocation per projection on the merge path.
+    Object[] probeValues = new Object[numUnionColumns + 1];
+    Key probeKey = new Key(probeValues);
     for (Map.Entry<Key, Record> baseEntry : baseEntries) {
       Object[] baseKeys = baseEntry.getKey().getValues();
       Object[] baseValues = baseEntry.getValue().getValues();
       for (int s = taskIndex; s < numSets; s += numTaskSlots) {
         boolean[] contains = setContains[s];
-        Object[] keyValues = new Object[numUnionColumns + 1];
         for (int col = 0; col < numUnionColumns; col++) {
-          keyValues[col] = contains[col] ? baseKeys[col] : null;
+          probeValues[col] = contains[col] ? baseKeys[col] : null;
         }
-        keyValues[numUnionColumns] = s;
-        Key key = new Key(keyValues);
-        Record existing = taskMap.get(key);
+        probeValues[numUnionColumns] = s;
+        Record existing = taskMap.get(probeKey);
         if (existing == null) {
+          Object[] keyValues = probeValues.clone();
           Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
           System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
           for (int i = 0; i < numAggregationFunctions; i++) {
             values[numUnionColumns + 1 + i] =
                 cloneIntermediate(aggregationFunctions[i], baseValues[numUnionColumns + i]);
           }
-          taskMap.put(key, new Record(values));
+          taskMap.put(new Key(keyValues), new Record(values));
         } else {
           Object[] values = existing.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
@@ -451,10 +477,16 @@ public final class GroupByUtils {
     }
   }
 
+  /// Whether trim-disabled tables must be [DeterministicConcurrentIndexedTable] (sorted backing map for
+  /// deterministic iteration order under the accurate-group-by-without-order-by mode).
+  private static boolean useDeterministicIndexedTable(QueryContext queryContext) {
+    return queryContext.isAccurateGroupByWithoutOrderBy() && queryContext.getOrderByExpressions() == null
+        && queryContext.getHavingFilter() == null;
+  }
+
   private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService) {
-    if (queryContext.isAccurateGroupByWithoutOrderBy() && queryContext.getOrderByExpressions() == null
-        && queryContext.getHavingFilter() == null) {
+    if (useDeterministicIndexedTable(queryContext)) {
       return new DeterministicConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
           Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
     }
