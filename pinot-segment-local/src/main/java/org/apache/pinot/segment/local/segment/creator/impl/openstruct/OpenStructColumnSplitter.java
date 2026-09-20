@@ -364,6 +364,29 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     return _materializedColumnMetadata;
   }
 
+  /// Field spec for a materialized child column.
+  ///
+  /// When the parent declares a child spec for the key, the child mirrors it: the declared data type rather than
+  /// the type it is stored as, and the declared default null value. That is what
+  /// [OpenStructDataSource#getValueFieldSpec] resolves for the key, so a document without the key reads the same
+  /// value whether the key is missing from this document or from the segment entirely. It also keeps the logical
+  /// type: a key declared TIMESTAMP, BOOLEAN, JSON or UUID used to land as the LONG, INT, STRING or BYTES it is
+  /// stored as, losing every operator that depends on knowing which it was.
+  ///
+  /// Without a declaration the child is a single-value dimension of the inferred stored type, whose natural Pinot
+  /// null value is what absent docs store.
+  ///
+  /// Single-value either way for now: the write path below has no multi-value creator, and a declared multi-value
+  /// key does not work today regardless -- a list value fails inference and falls back to STRING.
+  private static DimensionFieldSpec materializedFieldSpec(String materializedCol, @Nullable FieldSpec keySpec,
+      DataType valueType) {
+    if (keySpec == null) {
+      return new DimensionFieldSpec(materializedCol, valueType.getStoredType(), true);
+    }
+    return new DimensionFieldSpec(materializedCol, keySpec.getDataType(), true, keySpec.getMaxLength(),
+        keySpec.getDefaultNullValue());
+  }
+
   private void writeDenseKeyColumn(String key)
       throws IOException {
     String materializedCol = OpenStructNaming.materializedColumnName(_columnName, key);
@@ -375,13 +398,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
 
-    // TODO: Honor the declared child field spec (field type, single/multi-value and custom default null value) instead
-    //   of synthesizing a single-value dimension of the stored type, so a document without the key reads the same as
-    //   through OpenStructDataSource.getValueFieldSpec, which returns the declared spec for a key absent from the
-    //   segment. See https://github.com/apache/pinot/issues/19466
-    // Synthetic field spec for the materialized child. Its natural Pinot dimension null value is the value
-    // stored for absent docs, so column metadata stays consistent with on-disk content.
-    DimensionFieldSpec childFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
+    DimensionFieldSpec childFieldSpec = materializedFieldSpec(materializedCol, keySpec, valueType);
     Object defaultValue = childFieldSpec.getDefaultNullValue();
 
     // Collect statistics the standard way: present docs contribute their value, absent docs the default
