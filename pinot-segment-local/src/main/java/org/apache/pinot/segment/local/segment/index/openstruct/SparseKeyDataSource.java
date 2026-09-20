@@ -136,7 +136,12 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public String getString(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asText, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+      // asText() is defined as the empty string for an object or array node, so a key whose value is a nested
+      // document read back as "" and was indistinguishable from a missing key. Serialize container nodes instead,
+      // which is what a caller asking a JSON blob for a value expects and what the JSON functions can consume.
+      return orDefault(docId, context,
+          node -> node.isContainerNode() ? node.toString() : node.asText(),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     }
 
     @Override
