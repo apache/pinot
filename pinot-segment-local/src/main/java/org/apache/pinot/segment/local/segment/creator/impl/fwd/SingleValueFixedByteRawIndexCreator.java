@@ -43,6 +43,12 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
   private final DataType _valueType;
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
+  // Number of documents the writer will be fed. Used to compute the uncompressed value size for the
+  // V7 codec-pipeline writer, whose fixed-byte layout stores exactly totalDocs * valueType.size() bytes.
+  private final int _totalDocs;
+  // Whether compression-statistics tracking was requested. Mirrors the legacy writer's contract of
+  // reporting an uncompressed value size only when tracking is enabled.
+  private boolean _trackUncompressedValueSize;
 
   /// Constructor for the class
   ///
@@ -77,6 +83,7 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
             writerVersion);
     _valueType = valueType;
     _chunkCompressionType = compressionType;
+    _totalDocs = totalDocs;
   }
 
   /// Creates a raw fixed-byte creator backed by the V7 codec-pipeline writer.
@@ -95,6 +102,7 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
         valueType.size());
     _valueType = valueType;
     _chunkCompressionType = null;
+    _totalDocs = totalDocs;
   }
 
   @Override
@@ -140,9 +148,14 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
 
   @Override
   public long getRawForwardIndexUncompressedValueSizeInBytes() {
-    // Compression-statistics metadata supports only the legacy single-compressor format.
     if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
       return legacyWriter.getRawForwardIndexUncompressedValueSizeInBytes();
+    }
+    // V7 codec-pipeline writer: the fixed-byte layout stores exactly one value per doc, so the
+    // uncompressed size is totalDocs * valueType.size(). Report it only when tracking was requested,
+    // matching the legacy writer's contract of returning -1 otherwise.
+    if (_trackUncompressedValueSize) {
+      return (long) _totalDocs * _valueType.size();
     }
     return -1;
   }
@@ -155,6 +168,7 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
 
   @Override
   public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _trackUncompressedValueSize = true;
     if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
       legacyWriter.enableRawForwardIndexUncompressedValueSizeTracking();
     }
