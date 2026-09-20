@@ -277,6 +277,92 @@ public class OpenStructConsumingSealedParityTest {
     }
   }
 
+  /// A nested value addressed by its path key (`device.os`) must resolve identically either side of
+  /// the seal boundary, and so must the container it was split out of. The two tiers reach the same
+  /// key by different routes -- the consuming tier flattens into its own mutable columns, the sealed
+  /// tier flattens into the splitter's dense/sparse classification -- so a divergence here would make
+  /// the REALTIME and OFFLINE halves of a hybrid table disagree on the same row.
+  @Test
+  public void testConsumingMatchesSealedForNestedPathKey()
+      throws Exception {
+    String pathKey = "device.os";
+    String containerKey = "device";
+    ComplexFieldSpec nestedSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    // maxNestedKeyDepth = 2 makes 'device.os' a key; 'device' is pinned dense so both tiers
+    // materialize the container rather than one of them routing it to the sparse blob.
+    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, -1,
+        Set.of(pathKey, containerKey), 0.5, List.of(), null, null, null, 2);
+
+    List<Object> consumingValues;
+    List<Object> consumingContainers;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", nestedSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, nestedDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(nestedSpec, idx, NUM_DOCS);
+      DataSource os = ds.getDataSource(pathKey);
+      assertNotNull(os, "nested leaf must be addressable by its path key on the consuming side");
+      consumingValues = readAllValues(os);
+      DataSource container = ds.getDataSource(containerKey);
+      assertNotNull(container, "container must remain a key of its own");
+      consumingContainers = readAllValues(container);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructNestedParity")
+        .addField(nestedSpec)
+        .build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructNestedParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentNestedParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, nestedDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedOs = sealedMetrics.getDataSource(pathKey);
+      assertNotNull(sealedOs, "nested leaf must be addressable by its path key on the sealed side");
+      assertEquals(consumingValues, readAllValues(sealedOs));
+
+      DataSource sealedContainer = sealedMetrics.getDataSource(containerKey);
+      assertNotNull(sealedContainer);
+      assertEquals(consumingContainers, readAllValues(sealedContainer));
+
+      // Pin the values themselves, not just cross-tier equality: a bug shared by both tiers would
+      // survive an equality-only assertion.
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId), docId % 2 == 0 ? "ios" : "android", "docId " + docId);
+      }
+      assertEquals(consumingContainers.get(0), "{\"os\":\"ios\"}");
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  private static Map<String, Object> nestedDoc(int docId) {
+    Map<String, Object> device = new HashMap<>();
+    device.put("os", docId % 2 == 0 ? "ios" : "android");
+    Map<String, Object> document = new HashMap<>();
+    document.put("device", device);
+    return document;
+  }
+
   private static long min(List<Object> values) {
     return values.stream().mapToLong(v -> ((Number) v).longValue()).min().orElseThrow();
   }

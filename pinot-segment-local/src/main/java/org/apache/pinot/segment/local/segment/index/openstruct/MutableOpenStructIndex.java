@@ -40,6 +40,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -60,6 +61,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private final String _openStructColumn;
   private final String _tableNameWithType;
   private final OpenStructIndexConfig _config;
+  private final int _maxNestedKeyDepth;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
@@ -87,6 +89,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     _openStructColumn = openStructColumn;
     _tableNameWithType = tableNameWithType;
     _config = config;
+    _maxNestedKeyDepth = config.getMaxNestedKeyDepth();
     _memoryManager = memoryManager;
     _capacity = capacity;
 
@@ -112,44 +115,48 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       return;
     }
     Map<String, Object> map = (Map<String, Object>) value;
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      String key = entry.getKey();
-      Object rawValue = entry.getValue();
-      if (rawValue == null) {
-        continue;
-      }
-      if (_config.isIgnoredKey(key)) {
-        _ignoredKeyDropCount++;
-        continue;
-      }
+    // Flattened the same way as the sealed build path ([OpenStructColumnSplitter#addMap]) so a nested
+    // value resolves under the same key before and after seal. Consuming mode materializes every key,
+    // so the container flag the splitter uses for dense selection is not needed here.
+    OpenStructKeyFlattener.flatten(map, _maxNestedKeyDepth, (key, rawValue, container) ->
+        indexEntry(docId, key, rawValue));
+  }
 
-      MutableKeyColumn keyCol = _keyColumns.get(key);
-      if (keyCol == null) {
-        // Mutable mode holds every observed key (see MutableOpenStructDataSource#isFullyMaterialized);
-        // dense/sparse classification (maxDenseKeys / denseKeys) is applied at seal time by the segment
-        // build, so no key is dropped during consumption.
-        // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
-        // does not allocate a column that was never usable.
-        DataType resolvedType = resolveStoredType(key, rawValue, null);
-        Object coerced = tryCoerce(key, rawValue,
-            ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType());
-        if (coerced == null) {
-          continue;
-        }
-        keyCol = allocateKeyColumn(key, resolvedType);
-        keyCol.setValue(docId, coerced);
-        continue;
-      }
-
-      if (keyCol.needsInferenceCheck()) {
-        meterIfUninferable(rawValue);
-      }
-      Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
-      if (coerced == null) {
-        continue;
-      }
-      keyCol.setValue(docId, coerced);
+  private void indexEntry(int docId, String key, @Nullable Object rawValue) {
+    if (rawValue == null) {
+      return;
     }
+    if (_config.isIgnoredKey(key)) {
+      _ignoredKeyDropCount++;
+      return;
+    }
+
+    MutableKeyColumn keyCol = _keyColumns.get(key);
+    if (keyCol == null) {
+      // Mutable mode holds every observed key (see MutableOpenStructDataSource#isFullyMaterialized);
+      // dense/sparse classification (maxDenseKeys / denseKeys) is applied at seal time by the segment
+      // build, so no key is dropped during consumption.
+      // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
+      // does not allocate a column that was never usable.
+      DataType resolvedType = resolveStoredType(key, rawValue, null);
+      Object coerced = tryCoerce(key, rawValue,
+          ColumnDataType.fromDataTypeSV(resolvedType).toPinotDataType());
+      if (coerced == null) {
+        return;
+      }
+      keyCol = allocateKeyColumn(key, resolvedType);
+      keyCol.setValue(docId, coerced);
+      return;
+    }
+
+    if (keyCol.needsInferenceCheck()) {
+      meterIfUninferable(rawValue);
+    }
+    Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
+    if (coerced == null) {
+      return;
+    }
+    keyCol.setValue(docId, coerced);
   }
 
   /// Resolves the stored type for a key without allocating any state, and meters a value that took
