@@ -366,7 +366,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     }
     FieldSpec spec = _childFieldSpecs.get(key);
     if (spec == null) {
-      spec = new DimensionFieldSpec(key, col.getStoredType(), true);
+      // Shape comes from the column, not a fixed single-value assumption: a key holding lists has a multi-value
+      // forward index, and metadata that disagreed with it would tell the query planner the wrong thing.
+      spec = new DimensionFieldSpec(key, col.getStoredType(), col.isSingleValue());
     }
     return new SimpleColumnMetadata(spec, _capacity);
   }

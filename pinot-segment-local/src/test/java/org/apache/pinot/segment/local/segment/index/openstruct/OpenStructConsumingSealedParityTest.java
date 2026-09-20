@@ -300,6 +300,9 @@ public class OpenStructConsumingSealedParityTest {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(mvSpec, idx, NUM_DOCS);
       DataSource tags = ds.getDataSource(mvKey);
       assertNotNull(tags, "a multi-value key must be materialized on the consuming side");
+      // The planner reads shape off the metadata, not the forward index, so the two must agree.
+      assertFalse(tags.getDataSourceMetadata().getFieldSpec().isSingleValueField(),
+          "consuming metadata must report the key as multi-value");
       consumingValues = readAllMultiValues(tags);
     }
 
@@ -330,6 +333,8 @@ public class OpenStructConsumingSealedParityTest {
       OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
       DataSource sealedTags = sealedMetrics.getDataSource(mvKey);
       assertNotNull(sealedTags, "a multi-value key must be materialized on the sealed side");
+      assertFalse(sealedTags.getDataSourceMetadata().getFieldSpec().isSingleValueField(),
+          "sealed metadata must report the key as multi-value");
       assertEquals(consumingValues, readAllMultiValues(sealedTags));
 
       // Pin the values themselves, not just cross-tier equality: a bug shared by both tiers would survive an
