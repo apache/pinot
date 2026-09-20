@@ -130,4 +130,43 @@ public class ItemTransformFunction extends BaseTransformFunction {
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_keyPath).getStringValuesSV();
   }
+
+  // A key can hold a list, in which case its value source is multi-value and the engine asks for the values that
+  // way. The result metadata above already reports the key's own shape, so these are the reads that shape implies;
+  // without them a multi-value key would be storable and describable but not readable.
+
+  @Override
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getDictionaryIdsMV();
+  }
+
+  @Override
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getIntValuesMV();
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getLongValuesMV();
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getFloatValuesMV();
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getDoubleValuesMV();
+  }
+
+  @Override
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getStringValuesMV();
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getBytesValuesMV();
+  }
 }
