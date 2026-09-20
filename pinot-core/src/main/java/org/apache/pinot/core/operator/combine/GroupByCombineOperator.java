@@ -135,11 +135,25 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         /// live in the same query.
         boolean baseLayout = _groupingSets && resultsBlock.getDataSchema() != null
             && resultsBlock.getDataSchema().size() == _numBaseColumns;
-        if (!baseLayout) {
-          GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
+        IndexedTable indexedTable;
+        try {
+          if (!baseLayout) {
+            GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
+          }
+          indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock) : ensureIndexedTable(resultsBlock);
+        } catch (RuntimeException | Error failure) {
+          AggregationGroupByResult result = resultsBlock.getAggregationGroupByResult();
+          if (result != null) {
+            try {
+              result.closeGroupKeyGenerator();
+            } catch (RuntimeException | Error closeFailure) {
+              if (failure != closeFailure) {
+                failure.addSuppressed(closeFailure);
+              }
+            }
+          }
+          throw failure;
         }
-        IndexedTable indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock)
-            : ensureIndexedTable(resultsBlock);
         int numKeyColumns = baseLayout ? _numBaseKeyColumns : _numKeyColumns;
         int numColumns = baseLayout ? _numBaseColumns : _numColumns;
 
@@ -211,8 +225,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       synchronized (this) {
         indexedTable = _indexedTable;
         if (indexedTable == null) {
-          indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-              _executorService);
+          indexedTable = createIndexedTable(resultsBlock);
           _indexedTable = indexedTable;
         }
       }
@@ -238,6 +251,24 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       }
     }
     return baseIndexedTable;
+  }
+
+  /// Construction hook for alternate indexed-table storage; the default keeps the standard combine behavior.
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+        _executorService);
+  }
+
+  @Override
+  protected void onProcessStopped() {
+    IndexedTable table = _indexedTable;
+    if (table instanceof AutoCloseable closeable) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to release group-by table storage", e);
+      }
+    }
   }
 
   @Override

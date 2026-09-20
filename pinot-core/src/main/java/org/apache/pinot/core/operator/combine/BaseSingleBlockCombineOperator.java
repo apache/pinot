@@ -72,20 +72,43 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   private BaseResultsBlock mergeResultsAndAttachExecutionStats() {
     BaseResultsBlock mergedBlock = null;
     Exception mergeException = null;
+    Throwable primaryFailure = null;
     try {
       startProcess();
       mergedBlock = mergeResults();
     } catch (Exception e) {
       mergeException = e;
+      primaryFailure = e;
+    } catch (Error e) {
+      primaryFailure = e;
+      throw e;
     } finally {
       // Wait for all worker threads to finish before reading execution stats. This ensures that no worker thread is
       // still mutating operator state (e.g. _numDocsScanned) when attachExecutionStats() iterates over operators.
-      stopProcess();
+      try {
+        stopProcess();
+        onProcessStopped();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (primaryFailure != null) {
+          if (primaryFailure != cleanupFailure) {
+            primaryFailure.addSuppressed(cleanupFailure);
+          }
+        } else if (mergedBlock instanceof ExceptionResultsBlock) {
+          LOGGER.error("Failed to release combine resources after a query error (query: {})", _queryContext,
+              cleanupFailure);
+        } else {
+          throw cleanupFailure;
+        }
+      }
     }
     if (mergeException != null) {
       return createExceptionResultsBlockAndAttachExecutionStats(mergeException, "merging results blocks");
     }
     return checkTerminateExceptionAndAttachExecutionStats(mergedBlock);
+  }
+
+  /// Invoked after all registered workers have stopped, including cancelled workers.
+  protected void onProcessStopped() {
   }
 
   @Override
