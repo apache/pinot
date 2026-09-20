@@ -22,7 +22,9 @@ import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -69,12 +71,21 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final List<AggregationInfo> _aggregationInfos;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
+  @Nullable
+  private final Function<BaseProjectOperator<?>, GroupKeyGenerator> _groupKeyGeneratorFactory;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
 
   public FilteredGroupByOperator(QueryContext queryContext, List<AggregationInfo> aggregationInfos, long numTotalDocs) {
+    this(queryContext, aggregationInfos, numTotalDocs, null);
+  }
+
+  /// Optional key-storage hook. The one generator is shared across every aggregate-filter lane; the original
+  /// three-argument constructor keeps the built-in generator selection and result-holder behavior unchanged.
+  public FilteredGroupByOperator(QueryContext queryContext, List<AggregationInfo> aggregationInfos, long numTotalDocs,
+      @Nullable Function<BaseProjectOperator<?>, GroupKeyGenerator> groupKeyGeneratorFactory) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null
         && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
@@ -82,6 +93,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
     _aggregationInfos = aggregationInfos;
     _numTotalDocs = numTotalDocs;
+    _groupKeyGeneratorFactory = groupKeyGeneratorFactory;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
@@ -128,6 +140,25 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       return new GroupByResultsBlock(_dataSchema, List.of(), _queryContext);
     }
 
+    GroupKeyGenerator groupKeyGenerator = _groupKeyGeneratorFactory == null ? null
+        : _groupKeyGeneratorFactory.apply(_aggregationInfos.get(0).getProjectOperator());
+    try {
+      return executeGroupBy(groupKeyGenerator);
+    } catch (RuntimeException | Error failure) {
+      if (groupKeyGenerator != null) {
+        try {
+          groupKeyGenerator.close();
+        } catch (RuntimeException | Error closeFailure) {
+          if (failure != closeFailure) {
+            failure.addSuppressed(closeFailure);
+          }
+        }
+      }
+      throw failure;
+    }
+  }
+
+  private GroupByResultsBlock executeGroupBy(@Nullable GroupKeyGenerator groupKeyGenerator) {
     int numAggregations = _aggregationFunctions.length;
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
@@ -136,7 +167,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       resultHolderIndexMap.put(_aggregationFunctions[i], i);
     }
 
-    GroupKeyGenerator groupKeyGenerator = null;
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
