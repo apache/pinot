@@ -222,12 +222,13 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// publishes it via volatile copy-on-write.
   private MutableKeyColumn allocateKeyColumn(String key, DataType storedType) {
     String allocationContext = _openStructColumn + "$" + key;
-    // TODO: Use the declared child field spec's default null value, as OpenStructDataSource.getValueFieldSpec does for
-    //   a key absent from the segment. The standard dimension default of the stored type is kept for now because
-    //   OpenStructColumnSplitter#writeDenseKeyColumn (the sealed build path) derives the absent-doc default the same
-    //   way, and a doc's resolved value must stay identical before and after seal.
-    //   See https://github.com/apache/pinot/issues/19466
-    Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
+    // A declared key takes its declared default, computed from the declared data type rather than the type it is
+    // stored as -- the same rule OpenStructColumnSplitter#materializedFieldSpec applies on the sealed side, so a doc
+    // without the key resolves identically before and after seal.
+    FieldSpec declared = _childFieldSpecs.get(key);
+    Object defaultNullValue = declared != null
+        ? declared.getDefaultNullValue()
+        : FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
     boolean needsInferenceCheck = !_childFieldSpecs.containsKey(key) && storedType == DataType.STRING;
     MutableKeyColumn newCol = new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity,
         allocationContext, needsInferenceCheck);
