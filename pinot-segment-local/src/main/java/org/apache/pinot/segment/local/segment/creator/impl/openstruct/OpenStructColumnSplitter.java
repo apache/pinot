@@ -68,6 +68,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -94,6 +95,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final OpenStructIndexConfig _config;
   private final int _maxDenseKeys;
+  private final int _maxNestedKeyDepth;
 
   // Per-key accumulation
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
@@ -104,6 +106,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   /// Keys whose values are collections. A key is multi-value for the whole segment as soon as one document
   /// presents it as one, the same all-or-nothing rule the key's type follows.
   private final Set<String> _multiValueKeys = new HashSet<>();
+  /// Keys whose value is a nested object rendered as JSON text by [OpenStructKeyFlattener].
+  private final Set<String> _containerKeys = new HashSet<>();
   private int _numDocs;
   private int _ignoredKeyDropCount;
 
@@ -119,6 +123,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     _tableNameWithType = tableNameWithType;
     _config = config;
     _maxDenseKeys = config.getMaxDenseKeys();
+    _maxNestedKeyDepth = config.getMaxNestedKeyDepth();
 
     Map<String, FieldSpec> childFieldSpecs = null;
     if (fieldSpec instanceof ComplexFieldSpec) {
@@ -190,6 +195,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       if (_resolvedDenseKeys.contains(key)) {
         continue;
       }
+      if (_containerKeys.contains(key)) {
+        // A flattened container holds the JSON text of a whole subtree, and its leaves are already
+        // separate keys competing for the same dense budget. Materializing the blob as well spends a
+        // column on data no predicate can use without decoding it, so a container is dense only when
+        // the table config asks for it by name (handled in the configured-keys pass above).
+        continue;
+      }
       double fillRate = (double) _presenceBitmaps.get(key).getCardinality() / _numDocs;
       if ((_maxDenseKeys < 0 || _resolvedDenseKeys.size() < _maxDenseKeys) && fillRate >= minFillRate) {
         _resolvedDenseKeys.add(key);
@@ -200,101 +212,106 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
   private void addMap(@Nullable Map<String, Object> map) {
     if (map != null && !map.isEmpty()) {
-      for (Map.Entry<String, Object> entry : map.entrySet()) {
-        String key = entry.getKey();
-        Object rawValue = entry.getValue();
-        if (rawValue == null) {
-          continue;
-        }
-        if (_config.isIgnoredKey(key)) {
-          _ignoredKeyDropCount++;
-          continue;
-        }
-        FieldSpec keySpec = _childFieldSpecs.get(key);
-        // Shape is decided by the first value the key presents and then sticks, exactly as its type does. A
-        // collection arriving on a key whose shape is already scalar is handled as any other value it cannot
-        // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
-        // column other documents already wrote to.
-        Object[] elements = OpenStructTypeInference.asMultiValue(rawValue);
-        if (!_presenceBitmaps.containsKey(key)) {
-          // A declaration decides the shape in both directions -- a key declared single-value stays single-value
-          // even when its values are collections, because the declaration is what the user asked for. Only an
-          // undeclared key takes its shape from the data.
-          boolean multiValue = keySpec != null ? !keySpec.isSingleValueField() : elements != null;
-          if (multiValue) {
-            _multiValueKeys.add(key);
-          }
-        }
-        if (!_multiValueKeys.contains(key)) {
-          elements = null;
-        }
-        if (elements != null && elements.length == 0) {
-          // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
-          // empty state, so treating this as present would mean inventing one; the key is simply not in this
-          // document, the same as a null value above.
-          continue;
-        }
-        DataType valueType;
-        if (keySpec != null) {
-          valueType = keySpec.getDataType();
-        } else if (elements != null) {
-          // A collection resolves to its element type. Established types stay sticky exactly as for a scalar key:
-          // once a key is STRING it stays STRING, and an element type that disagrees with the established one
-          // resolves to STRING rather than dropping the row.
-          DataType established = _inferredTypes.get(key);
-          if (established != null && established != DataType.STRING) {
-            valueType = established;
-          } else {
-            DataType inferred = OpenStructTypeInference.inferElementDataType(elements);
-            if (inferred == null) {
-              // Empty, or all nulls: nothing to learn from, and STRING holds whatever arrives later.
-              valueType = established != null ? established : DataType.STRING;
-            } else {
-              valueType = established != null && established != inferred ? DataType.STRING : inferred;
-            }
-            _inferredTypes.putIfAbsent(key, valueType);
-          }
-        } else {
-          DataType established = _inferredTypes.get(key);
-          if (established != null && established != DataType.STRING) {
-            // Sticky: a key already resolved to a non-STRING type can't flip later, so skip
-            // inference entirely -- matches MutableOpenStructIndex's fast path. An unmappable
-            // value here is a coercion failure below, not a fresh inference decision; overriding
-            // valueType to STRING per-row would desync it from _inferredTypes and corrupt _values
-            // with a mix of types for one key.
-            valueType = established;
-          } else {
-            // Resolve per value rather than only on first sighting: the key's inferred type is
-            // cached, so folding the counter into a computeIfAbsent would record one failure per
-            // key no matter how many values actually took the STRING fallback.
-            DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-            if (inferred == null) {
-              valueType = DataType.STRING;
-              _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
-            } else {
-              // established is STRING here (or null): once a key falls back to STRING it stays
-              // STRING even if a later value would infer cleanly on its own.
-              valueType = established != null ? established : inferred;
-            }
-            _inferredTypes.putIfAbsent(key, valueType);
-          }
-        }
-        RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
-        List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
-        bitmap.add(_numDocs);
-        Object coerced;
-        try {
-          PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
-          coerced = elements != null ? coerceElements(elements, destType) : coerceScalar(rawValue, destType);
-        } catch (Exception e) {
-          _coercionFailuresPerKey.merge(key, 1L, Long::sum);
-          bitmap.remove(_numDocs);
-          continue;
-        }
-        values.add(coerced);
-      }
+      OpenStructKeyFlattener.flatten(map, _maxNestedKeyDepth, this::addEntry);
     }
     _numDocs++;
+  }
+
+  /// Accumulates one flat key of the current document. `container` marks a key whose value is a nested object
+  /// rendered as JSON text; see [#classify()] for why those are held out of automatic dense selection.
+  private void addEntry(String key, @Nullable Object rawValue, boolean container) {
+    if (rawValue == null) {
+      return;
+    }
+    if (_config.isIgnoredKey(key)) {
+      _ignoredKeyDropCount++;
+      return;
+    }
+    if (container) {
+      _containerKeys.add(key);
+    }
+    FieldSpec keySpec = _childFieldSpecs.get(key);
+    // Shape is decided by the first value the key presents and then sticks, exactly as its type does. A
+    // collection arriving on a key whose shape is already scalar is handled as any other value it cannot
+    // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
+    // column other documents already wrote to.
+    Object[] elements = OpenStructTypeInference.asMultiValue(rawValue);
+    if (!_presenceBitmaps.containsKey(key)) {
+      // A declaration decides the shape in both directions -- a key declared single-value stays single-value
+      // even when its values are collections, because the declaration is what the user asked for. Only an
+      // undeclared key takes its shape from the data.
+      boolean multiValue = keySpec != null ? !keySpec.isSingleValueField() : elements != null;
+      if (multiValue) {
+        _multiValueKeys.add(key);
+      }
+    }
+    if (!_multiValueKeys.contains(key)) {
+      elements = null;
+    }
+    if (elements != null && elements.length == 0) {
+      // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
+      // empty state, so treating this as present would mean inventing one; the key is simply not in this
+      // document, the same as a null value above.
+      return;
+    }
+    DataType valueType;
+    if (keySpec != null) {
+      valueType = keySpec.getDataType();
+    } else if (elements != null) {
+      // A collection resolves to its element type. Established types stay sticky exactly as for a scalar key:
+      // once a key is STRING it stays STRING, and an element type that disagrees with the established one
+      // resolves to STRING rather than dropping the row.
+      DataType established = _inferredTypes.get(key);
+      if (established != null && established != DataType.STRING) {
+        valueType = established;
+      } else {
+        DataType inferred = OpenStructTypeInference.inferElementDataType(elements);
+        if (inferred == null) {
+          // Empty, or all nulls: nothing to learn from, and STRING holds whatever arrives later.
+          valueType = established != null ? established : DataType.STRING;
+        } else {
+          valueType = established != null && established != inferred ? DataType.STRING : inferred;
+        }
+        _inferredTypes.putIfAbsent(key, valueType);
+      }
+    } else {
+      DataType established = _inferredTypes.get(key);
+      if (established != null && established != DataType.STRING) {
+        // Sticky: a key already resolved to a non-STRING type can't flip later, so skip
+        // inference entirely -- matches MutableOpenStructIndex's fast path. An unmappable
+        // value here is a coercion failure below, not a fresh inference decision; overriding
+        // valueType to STRING per-row would desync it from _inferredTypes and corrupt _values
+        // with a mix of types for one key.
+        valueType = established;
+      } else {
+        // Resolve per value rather than only on first sighting: the key's inferred type is
+        // cached, so folding the counter into a computeIfAbsent would record one failure per
+        // key no matter how many values actually took the STRING fallback.
+        DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+        if (inferred == null) {
+          valueType = DataType.STRING;
+          _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+        } else {
+          // established is STRING here (or null): once a key falls back to STRING it stays
+          // STRING even if a later value would infer cleanly on its own.
+          valueType = established != null ? established : inferred;
+        }
+        _inferredTypes.putIfAbsent(key, valueType);
+      }
+    }
+    RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
+    List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
+    bitmap.add(_numDocs);
+    Object coerced;
+    try {
+      PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
+      coerced = elements != null ? coerceElements(elements, destType) : coerceScalar(rawValue, destType);
+    } catch (Exception e) {
+      _coercionFailuresPerKey.merge(key, 1L, Long::sum);
+      bitmap.remove(_numDocs);
+      return;
+    }
+    values.add(coerced);
   }
 
   private static Object coerceScalar(Object rawValue, PinotDataType destType) {
