@@ -526,7 +526,7 @@ public class TableResizer {
 
     @Override
     public Object extract(Record record) {
-      return record.getValues()[_index];
+      return record.getValue(_index);
     }
   }
 
@@ -549,7 +549,7 @@ public class TableResizer {
 
     @Override
     public Object extract(Record record) {
-      return _aggregationFunction.extractFinalResult(record.getValues()[_index]);
+      return _aggregationFunction.extractFinalResult(record.getValue(_index));
     }
   }
 
@@ -590,7 +590,7 @@ public class TableResizer {
       if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
-      int ordinal = ((Number) record.getValues()[_discriminatorIndex]).intValue();
+      int ordinal = ((Number) record.getValue(_discriminatorIndex)).intValue();
       return _valuesByOrdinal[ordinal];
     }
   }

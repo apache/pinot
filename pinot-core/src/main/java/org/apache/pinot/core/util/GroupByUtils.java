@@ -63,6 +63,23 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public final class GroupByUtils {
+  /// Storage shape selected by the existing combine-table sizing and concurrency policy.
+  public enum CombineTableKind {
+    SIMPLE,
+    CONCURRENT,
+    UNBOUNDED_CONCURRENT
+  }
+
+  /// Optional combine-table construction hook. Returning `null` keeps the standard table for the selected shape.
+  /// A closeable table must detach any output rows before `finish()` returns: the combine operator closes it after
+  /// its workers stop, before the returned results block is serialized.
+  @FunctionalInterface
+  public interface CombineTableFactory {
+    IndexedTable create(CombineTableKind kind, DataSchema dataSchema, boolean hasFinalInput,
+        QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity,
+        ExecutorService executorService);
+  }
+
   private GroupByUtils() {
   }
 
@@ -553,6 +570,12 @@ public final class GroupByUtils {
   /// Creates an indexed table for the combine operator given a sample results block.
   public static IndexedTable createIndexedTableForCombineOperator(GroupByResultsBlock resultsBlock,
       QueryContext queryContext, int numThreads, ExecutorService executorService) {
+    return createIndexedTableForCombineOperator(resultsBlock, queryContext, numThreads, executorService, null);
+  }
+
+  /// Uses the standard sizing, trim and concurrency policy while allowing alternate storage for supported shapes.
+  public static IndexedTable createIndexedTableForCombineOperator(GroupByResultsBlock resultsBlock,
+      QueryContext queryContext, int numThreads, ExecutorService executorService, CombineTableFactory tableFactory) {
     DataSchema dataSchema = resultsBlock.getDataSchema();
     int numGroups = resultsBlock.getNumGroups();
     int limit = queryContext.getLimit();
@@ -570,7 +593,7 @@ public final class GroupByUtils {
       int resultSize = queryContext.getNumGroupsLimit();
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
       return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
-          executorService);
+          executorService, tableFactory);
     }
 
     // Disable trim when min trim size is non-positive
@@ -590,7 +613,7 @@ public final class GroupByUtils {
       }
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
       return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
-          executorService);
+          executorService, tableFactory);
     }
 
     int resultSize;
@@ -604,10 +627,10 @@ public final class GroupByUtils {
     int initialCapacity = getIndexedTableInitialCapacity(trimThreshold, numGroups, minInitialIndexedTableCapacity);
     if (trimThreshold == Integer.MAX_VALUE) {
       return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
-          executorService);
+          executorService, tableFactory);
     } else {
       return getTrimEnabledIndexedTable(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold,
-          initialCapacity, numThreads, executorService);
+          initialCapacity, numThreads, executorService, tableFactory);
     }
   }
 
@@ -669,14 +692,35 @@ public final class GroupByUtils {
 
   private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService) {
+    return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
+        numThreads, executorService, null);
+  }
+
+  private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
+      QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService,
+      CombineTableFactory tableFactory) {
     if (useDeterministicIndexedTable(queryContext)) {
       return new DeterministicConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
           Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
     }
     if (numThreads == 1) {
+      if (tableFactory != null) {
+        IndexedTable table = tableFactory.create(CombineTableKind.SIMPLE, dataSchema, hasFinalInput, queryContext,
+            resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
+        if (table != null) {
+          return table;
+        }
+      }
       return new SimpleIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE,
           Integer.MAX_VALUE, initialCapacity, executorService);
     } else {
+      if (tableFactory != null) {
+        IndexedTable table = tableFactory.create(CombineTableKind.UNBOUNDED_CONCURRENT, dataSchema, hasFinalInput,
+            queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
+        if (table != null) {
+          return table;
+        }
+      }
       return new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
           executorService);
     }
@@ -685,11 +729,32 @@ public final class GroupByUtils {
   private static IndexedTable getTrimEnabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity, int numThreads,
       ExecutorService executorService) {
+    return getTrimEnabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
+        initialCapacity, numThreads, executorService, null);
+  }
+
+  private static IndexedTable getTrimEnabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
+      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity, int numThreads,
+      ExecutorService executorService, CombineTableFactory tableFactory) {
     assert trimThreshold != Integer.MAX_VALUE;
     if (numThreads == 1) {
+      if (tableFactory != null) {
+        IndexedTable table = tableFactory.create(CombineTableKind.SIMPLE, dataSchema, hasFinalInput, queryContext,
+            resultSize, trimSize, trimThreshold, initialCapacity, executorService);
+        if (table != null) {
+          return table;
+        }
+      }
       return new SimpleIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
     } else {
+      if (tableFactory != null) {
+        IndexedTable table = tableFactory.create(CombineTableKind.CONCURRENT, dataSchema, hasFinalInput, queryContext,
+            resultSize, trimSize, trimThreshold, initialCapacity, executorService);
+        if (table != null) {
+          return table;
+        }
+      }
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
     }
