@@ -87,6 +87,28 @@ public class SparseKeyDataSourceTest {
   }
 
   @Test
+  public void testAbsentKeyReadsAsTheDeclaredDefaultNotTheTypeDefault() {
+    // A key absent from the segment entirely already reads as the declared default, through
+    // OpenStructDataSource.getValueFieldSpec. A key absent from one document should not read as something else --
+    // and MapFilterOperator refuses the JSON-index fast path for exactly the declared default, so the two
+    // disagreeing let a NOT_IN over that value take the fast path and miss the documents that lack the key.
+    DimensionFieldSpec spec = new DimensionFieldSpec("i", DataType.INT, true, -7);
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
+        new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
+    ForwardIndexReader<?> fwd = new SparseKeyDataSource(spec, blob).getForwardIndex();
+
+    assertEquals(fwd.getInt(0, null), 7);
+    // Doc 2 has other keys but not this one.
+    assertEquals(fwd.getInt(2, null), -7);
+  }
+
+  @Test
+  public void testAbsentKeyStillFallsBackToTheTypeDefaultWhenNoneIsDeclared() {
+    assertEquals(source("i", DataType.INT).getForwardIndex().getInt(2, null),
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+  }
+
+  @Test
   public void testUndeclaredKeyReadsAsString() {
     SparseKeyDataSource src = source("n", DataType.STRING);
     assertEquals(src.getForwardIndex().getString(0, null), "42");

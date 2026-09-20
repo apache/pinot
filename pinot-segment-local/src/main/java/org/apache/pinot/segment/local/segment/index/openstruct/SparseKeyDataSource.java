@@ -50,8 +50,7 @@ public class SparseKeyDataSource extends BaseDataSource {
     super(new SparseKeyMetadata(resolvedChildSpec, blobReader.getNumDocs()),
         new ColumnIndexContainer.FromMap(Map.of(
             StandardIndexes.forward(),
-            new SparseKeyForwardIndexReader(resolvedChildSpec.getName(),
-                resolvedChildSpec.getDataType().getStoredType(), blobReader),
+            new SparseKeyForwardIndexReader(resolvedChildSpec, blobReader),
             StandardIndexes.nullValueVector(),
             new LazyPresenceNullVector(resolvedChildSpec.getName(), blobReader))));
     _fieldSpec = resolvedChildSpec;
@@ -65,8 +64,23 @@ public class SparseKeyDataSource extends BaseDataSource {
     private final String _key;
     private final DataType _storedType;
     private final OpenStructSparseBlobReader _blob;
+    /// The declared default for this key, read once. A document without the key reads as this, and
+    /// [org.apache.pinot.core.operator.filter.MapFilterOperator] already refuses the JSON-index fast path when a
+    /// predicate names it -- so the two must agree, or a NOT_IN over a declared default can take the fast path and
+    /// miss the documents that lack the key.
+    private final Object _declaredDefault;
+
+    SparseKeyForwardIndexReader(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
+      this(fieldSpec.getName(), fieldSpec.getDataType().getStoredType(), blob, fieldSpec.getDefaultNullValue());
+    }
 
     SparseKeyForwardIndexReader(String key, DataType storedType, OpenStructSparseBlobReader blob) {
+      this(key, storedType, blob, null);
+    }
+
+    private SparseKeyForwardIndexReader(String key, DataType storedType, OpenStructSparseBlobReader blob,
+        @Nullable Object declaredDefault) {
+      _declaredDefault = declaredDefault;
       _key = key;
       _storedType = storedType;
       _blob = blob;
@@ -103,40 +117,47 @@ public class SparseKeyDataSource extends BaseDataSource {
       return node == null ? defaultValue : map.apply(node);
     }
 
-    // TODO: Read a document without the key as the child field spec's default null value, as
-    //   OpenStructDataSource.getValueFieldSpec does for a key absent from the segment, instead of the standard type
-    //   default hardcoded below. MapFilterOperator already refuses the sparse JSON fast path for the spec's default.
-    //   See https://github.com/apache/pinot/issues/19466
+    /// The declared default when the key has one, else the standard type default. This is what a key absent from the
+    /// segment entirely already reads as, through `OpenStructDataSource.getValueFieldSpec`, so a key absent from one
+    /// document should not read as something else.
+    private <T> T declaredOr(Class<T> type, T typeDefault) {
+      return type.isInstance(_declaredDefault) ? type.cast(_declaredDefault) : typeDefault;
+    }
+
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asInt, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+      return orDefault(docId, context, JsonNode::asInt,
+          declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT));
     }
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asLong, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+      return orDefault(docId, context, JsonNode::asLong,
+          declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG));
     }
 
     @Override
     public float getFloat(int docId, ForwardIndexReaderContext context) {
       return orDefault(docId, context, node -> (float) node.asDouble(),
-          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+          declaredOr(Float.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT));
     }
 
     @Override
     public double getDouble(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asDouble, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      return orDefault(docId, context, JsonNode::asDouble,
+          declaredOr(Double.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE));
     }
 
     @Override
     public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
       return orDefault(docId, context, node -> new BigDecimal(node.asText()),
-          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
+          declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL));
     }
 
     @Override
     public String getString(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asText, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+      return orDefault(docId, context, JsonNode::asText,
+          declaredOr(String.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING));
     }
 
     @Override
