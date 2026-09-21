@@ -206,6 +206,13 @@ public class V1Constants {
       // sparse read path — readers must treat every unmaterialized key as potentially sparse.
       public static final String SPARSE_KEYS = "sparseKeys";
 
+      // Shape of the multi-value keys in this OPEN_STRUCT column's sparse column, stored as a JSON
+      // object string mapping key name to the longest value it holds. Dense keys carry their own
+      // shape in their column metadata; a sparse key's lives here, because the blob it is stored in
+      // is JSON and holds both shapes. Absent when no sparse key is multi-value, and on segments
+      // built before multi-value keys — readers must treat an unlisted sparse key as single-value.
+      public static final String SPARSE_MULTI_VALUE_KEYS = "sparseMultiValueKeys";
+
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";

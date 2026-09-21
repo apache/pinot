@@ -235,19 +235,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // collection arriving on a key whose shape is already scalar is handled as any other value it cannot
     // represent -- stringified on a STRING key, a coercion failure on a typed one -- rather than reshaping a
     // column other documents already wrote to.
-    Object[] elements = OpenStructTypeInference.asMultiValue(rawValue);
-    if (!_presenceBitmaps.containsKey(key)) {
+    boolean multiValueKey;
+    if (_presenceBitmaps.containsKey(key)) {
+      multiValueKey = _multiValueKeys.contains(key);
+    } else {
       // A declaration decides the shape in both directions -- a key declared single-value stays single-value
       // even when its values are collections, because the declaration is what the user asked for. Only an
       // undeclared key takes its shape from the data.
-      boolean multiValue = keySpec != null ? !keySpec.isSingleValueField() : elements != null;
-      if (multiValue) {
+      multiValueKey = keySpec != null
+          ? !keySpec.isSingleValueField()
+          : OpenStructTypeInference.asMultiValue(rawValue) != null;
+      if (multiValueKey) {
         _multiValueKeys.add(key);
       }
     }
-    if (!_multiValueKeys.contains(key)) {
-      elements = null;
-    }
+    Object[] elements = multiValueKey ? OpenStructTypeInference.asMultiValue(rawValue) : null;
     if (elements != null && elements.length == 0) {
       // No elements, so no value and nothing to infer a type from. A materialized multi-value column has no
       // empty state, so treating this as present would mean inventing one; the key is simply not in this
@@ -388,6 +390,18 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     emitParentColumnMetadata(sparseKeys);
   }
 
+  /// Longest value stored for a multi-value key. A scalar stored on the key before it became multi-value counts
+  /// as the one-element value it reads back as.
+  private int maxNumValues(String key) {
+    int maxNumValues = 1;
+    for (Object value : _values.getOrDefault(key, List.of())) {
+      if (value instanceof Object[] elements) {
+        maxNumValues = Math.max(maxNumValues, elements.length);
+      }
+    }
+    return maxNumValues;
+  }
+
   private static long sumValues(Map<String, Long> counts) {
     return counts.values().stream().mapToLong(Long::longValue).sum();
   }
@@ -487,8 +501,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     if (!singleValue) {
       // A key becomes multi-value the moment one document presents a collection, which can happen after other
       // documents already stored a scalar. The column has one shape, so those scalars become one-element values --
-      // the same thing ingestion does for a scalar written to a declared multi-value field. Only the dense side is
-      // normalized: the sparse blob is JSON and can hold both shapes, which is closer to what the row actually had.
+      // the same thing ingestion does for a scalar written to a declared multi-value field. The sparse blob is not
+      // rewritten this way: it is JSON and keeps the shape the row actually had, and the reader over it normalizes
+      // on the way out from the shape recorded in the sparse multi-value manifest.
       values.replaceAll(value -> value instanceof Object[] ? value : new Object[]{value});
     }
     DimensionFieldSpec childFieldSpec = materializedFieldSpec(materializedCol, keySpec, valueType, singleValue);
@@ -800,6 +815,25 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
             JsonUtils.objectToString(sparseKeys));
       } catch (IOException e) {
         throw new RuntimeException("Failed to serialize sparse-key manifest", e);
+      }
+      // Which tier a key lands on is a tuning decision, so it must not change the key's shape: a dense child
+      // declares multi-value in its own column metadata, and a sparse key -- stored in a JSON blob that holds
+      // either shape -- declares it here, together with the longest value it holds so readers can size their
+      // buffers the way they do from a materialized column's maxNumberOfMultiValues.
+      Map<String, Integer> sparseMultiValueKeys = new LinkedHashMap<>();
+      for (String key : sparseKeys) {
+        if (_multiValueKeys.contains(key)) {
+          sparseMultiValueKeys.put(key, maxNumValues(key));
+        }
+      }
+      if (!sparseMultiValueKeys.isEmpty()) {
+        try {
+          props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(_columnName,
+              V1Constants.MetadataKeys.Column.SPARSE_MULTI_VALUE_KEYS),
+              JsonUtils.objectToString(sparseMultiValueKeys));
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to serialize sparse multi-value key manifest", e);
+        }
       }
     }
     _materializedColumnMetadata.put(_columnName, props);

@@ -45,7 +45,7 @@ public class SparseKeyDataSourceTest {
   private static SparseKeyDataSource source(String key, DataType declaredType) {
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
         new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
-    return new SparseKeyDataSource(new DimensionFieldSpec(key, declaredType, true), blob);
+    return new SparseKeyDataSource(new DimensionFieldSpec(key, declaredType, true), blob, 0);
   }
 
   @Test
@@ -110,7 +110,7 @@ public class SparseKeyDataSourceTest {
     DimensionFieldSpec spec = new DimensionFieldSpec("i", DataType.INT, true, -7);
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
         new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
-    ForwardIndexReader<?> fwd = new SparseKeyDataSource(spec, blob).getForwardIndex();
+    ForwardIndexReader<?> fwd = new SparseKeyDataSource(spec, blob, 0).getForwardIndex();
 
     assertEquals(fwd.getInt(0, null), 7);
     // Doc 2 has other keys but not this one.

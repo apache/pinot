@@ -43,11 +43,17 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// Virtual per-key DataSource for a sparse OPEN_STRUCT key. Parses the blob per doc via
 /// the shared [OpenStructSparseBlobReader], coerces to the resolved stored type. No dictionary.
 /// Null vector built lazily (one blob scan, memoized).
+///
+/// Single- or multi-value follows `resolvedChildSpec`, which is what the key reads as on the dense side too:
+/// a declared child spec, or -- for an undeclared key -- the shape the segment recorded for it.
+/// `maxNumValuesPerMVEntry` is the longest value the key holds, the number callers size their multi-value
+/// buffers from; 0 for a single-value key.
 public class SparseKeyDataSource extends BaseDataSource {
   private final FieldSpec _fieldSpec;
 
-  public SparseKeyDataSource(FieldSpec resolvedChildSpec, OpenStructSparseBlobReader blobReader) {
-    super(new SparseKeyMetadata(resolvedChildSpec, blobReader.getNumDocs()),
+  public SparseKeyDataSource(FieldSpec resolvedChildSpec, OpenStructSparseBlobReader blobReader,
+      int maxNumValuesPerMVEntry) {
+    super(new SparseKeyMetadata(resolvedChildSpec, blobReader.getNumDocs(), maxNumValuesPerMVEntry),
         new ColumnIndexContainer.FromMap(Map.of(
             StandardIndexes.forward(),
             new SparseKeyForwardIndexReader(resolvedChildSpec, blobReader),
@@ -63,6 +69,7 @@ public class SparseKeyDataSource extends BaseDataSource {
   static class SparseKeyForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
     private final String _key;
     private final DataType _storedType;
+    private final boolean _singleValue;
     private final OpenStructSparseBlobReader _blob;
     /// The declared default for this key, read once. A document without the key reads as this, and
     /// [org.apache.pinot.core.operator.filter.MapFilterOperator] already refuses the JSON-index fast path when a
@@ -71,18 +78,20 @@ public class SparseKeyDataSource extends BaseDataSource {
     private final Object _declaredDefault;
 
     SparseKeyForwardIndexReader(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
-      this(fieldSpec.getName(), fieldSpec.getDataType().getStoredType(), blob, fieldSpec.getDefaultNullValue());
+      this(fieldSpec.getName(), fieldSpec.getDataType().getStoredType(), fieldSpec.isSingleValueField(), blob,
+          fieldSpec.getDefaultNullValue());
     }
 
     SparseKeyForwardIndexReader(String key, DataType storedType, OpenStructSparseBlobReader blob) {
-      this(key, storedType, blob, null);
+      this(key, storedType, true, blob, null);
     }
 
-    private SparseKeyForwardIndexReader(String key, DataType storedType, OpenStructSparseBlobReader blob,
-        @Nullable Object declaredDefault) {
+    private SparseKeyForwardIndexReader(String key, DataType storedType, boolean singleValue,
+        OpenStructSparseBlobReader blob, @Nullable Object declaredDefault) {
       _declaredDefault = declaredDefault;
       _key = key;
       _storedType = storedType;
+      _singleValue = singleValue;
       _blob = blob;
     }
 
@@ -93,7 +102,7 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public boolean isSingleValue() {
-      return true;
+      return _singleValue;
     }
 
     @Override
@@ -178,6 +187,187 @@ public class SparseKeyDataSource extends BaseDataSource {
       }, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
     }
 
+
+    /// Value nodes of a multi-value key at one document: the elements of an array, or the value itself, so a
+    /// scalar stored on the key before it became multi-value reads back as the one-element value the dense side
+    /// stores for it. Null when the document does not have the key.
+    @Nullable
+    private JsonNode[] valueNodes(int docId, ForwardIndexReaderContext context) {
+      JsonNode node = valueNode(docId, context);
+      if (node == null) {
+        return null;
+      }
+      if (!node.isArray()) {
+        return new JsonNode[]{node};
+      }
+      JsonNode[] nodes = new JsonNode[node.size()];
+      for (int i = 0; i < nodes.length; i++) {
+        nodes[i] = node.get(i);
+      }
+      return nodes;
+    }
+
+    @Override
+    public int getNumValuesMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      // A document without the key reads as one element holding the default, which is what a materialized
+      // multi-value column stores for an absent document -- it has no empty state.
+      return nodes == null ? 1 : nodes.length;
+    }
+
+    @Override
+    public int[] getIntMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new int[]{declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)};
+      }
+      int[] values = new int[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = nodes[i].asInt();
+      }
+      return values;
+    }
+
+    @Override
+    public int getIntMV(int docId, int[] valueBuffer, ForwardIndexReaderContext context) {
+      int[] values = getIntMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public long[] getLongMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new long[]{declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG)};
+      }
+      long[] values = new long[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = nodes[i].asLong();
+      }
+      return values;
+    }
+
+    @Override
+    public int getLongMV(int docId, long[] valueBuffer, ForwardIndexReaderContext context) {
+      long[] values = getLongMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public float[] getFloatMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new float[]{declaredOr(Float.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT)};
+      }
+      float[] values = new float[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = (float) nodes[i].asDouble();
+      }
+      return values;
+    }
+
+    @Override
+    public int getFloatMV(int docId, float[] valueBuffer, ForwardIndexReaderContext context) {
+      float[] values = getFloatMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public double[] getDoubleMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new double[]{declaredOr(Double.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE)};
+      }
+      double[] values = new double[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = nodes[i].asDouble();
+      }
+      return values;
+    }
+
+    @Override
+    public int getDoubleMV(int docId, double[] valueBuffer, ForwardIndexReaderContext context) {
+      double[] values = getDoubleMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public BigDecimal[] getBigDecimalMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new BigDecimal[]{declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL)};
+      }
+      BigDecimal[] values = new BigDecimal[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = new BigDecimal(nodes[i].asText());
+      }
+      return values;
+    }
+
+    @Override
+    public int getBigDecimalMV(int docId, BigDecimal[] valueBuffer, ForwardIndexReaderContext context) {
+      BigDecimal[] values = getBigDecimalMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public String[] getStringMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new String[]{declaredOr(String.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING)};
+      }
+      String[] values = new String[nodes.length];
+      for (int i = 0; i < nodes.length; i++) {
+        // Serialized for the same reason as the single-value getter: asText() is the empty string for a nested
+        // element, which would be indistinguishable from an element that is genuinely "".
+        values[i] = nodes[i].isContainerNode() ? nodes[i].toString() : nodes[i].asText();
+      }
+      return values;
+    }
+
+    @Override
+    public int getStringMV(int docId, String[] valueBuffer, ForwardIndexReaderContext context) {
+      String[] values = getStringMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    @Override
+    public byte[][] getBytesMV(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
+        return new byte[][]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES};
+      }
+      byte[][] values = new byte[nodes.length][];
+      for (int i = 0; i < nodes.length; i++) {
+        values[i] = binaryValue(nodes[i]);
+      }
+      return values;
+    }
+
+    @Override
+    public int getBytesMV(int docId, byte[][] valueBuffer, ForwardIndexReaderContext context) {
+      byte[][] values = getBytesMV(docId, context);
+      System.arraycopy(values, 0, valueBuffer, 0, values.length);
+      return values.length;
+    }
+
+    /// Bytes of one node, folding a non-binary or malformed value to the type default the same way the
+    /// single-value getter does.
+    private static byte[] binaryValue(JsonNode node) {
+      try {
+        byte[] bytes = node.binaryValue();
+        return bytes == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES : bytes;
+      } catch (IOException e) {
+        return FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+      }
+    }
+
     @Override
     public void close() {
     }
@@ -216,10 +406,12 @@ public class SparseKeyDataSource extends BaseDataSource {
   private static class SparseKeyMetadata implements DataSourceMetadata {
     private final FieldSpec _fieldSpec;
     private final int _numDocs;
+    private final int _maxNumValuesPerMVEntry;
 
-    SparseKeyMetadata(FieldSpec fieldSpec, int numDocs) {
+    SparseKeyMetadata(FieldSpec fieldSpec, int numDocs, int maxNumValuesPerMVEntry) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
+      _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
     }
 
     @Override
@@ -244,7 +436,7 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public int getMaxNumValuesPerMVEntry() {
-      return 0;
+      return _maxNumValuesPerMVEntry;
     }
 
     @Override
