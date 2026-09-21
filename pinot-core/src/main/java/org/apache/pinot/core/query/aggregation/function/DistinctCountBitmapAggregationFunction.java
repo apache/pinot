@@ -37,8 +37,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
@@ -79,13 +77,16 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (dataType == DataType.BYTES && singleValue) {
       if (blockValSet.isBytesBufferEnabled()) {
         forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
-          MutableRoaringBitmap bitmap = aggregationResultHolder.getResult();
-          if (bitmap == null) {
-            bitmap = new MutableRoaringBitmap();
-            aggregationResultHolder.setValue(bitmap);
+          // Deserialize the borrowed view straight into a heap bitmap: this copies it into owned storage before the
+          // callback returns, and keeps unions on heap containers, which are much faster than buffer-backed ones for
+          // sparse inputs.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
+          RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
+          if (valueBitmap != null) {
+            valueBitmap.or(value);
+          } else {
+            aggregationResultHolder.setValue(value);
           }
-          // or() copies incoming containers into owned storage; no borrowed buffer escapes this callback.
-          bitmap.or(new ImmutableRoaringBitmap(buffer));
         }));
         return;
       }
@@ -283,13 +284,15 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (dataType == DataType.BYTES && singleValue) {
       if (blockValSet.isBytesBufferEnabled()) {
         forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
+          // Heap deserialization copies the borrowed view into owned storage; see the scalar path for rationale.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
           int groupKey = groupKeyArray[index];
-          MutableRoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
-          if (bitmap == null) {
-            bitmap = new MutableRoaringBitmap();
-            groupByResultHolder.setValueForKey(groupKey, bitmap);
+          RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
+          if (valueBitmap != null) {
+            valueBitmap.or(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
           }
-          bitmap.or(new ImmutableRoaringBitmap(buffer));
         }));
         return;
       }
@@ -483,14 +486,16 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (dataType == DataType.BYTES && singleValue) {
       if (blockValSet.isBytesBufferEnabled()) {
         forEachNotNull(length, blockValSet, (from, to) -> blockValSet.forEachBytesValueSV(from, to, (buffer, index) -> {
-          ImmutableRoaringBitmap value = new ImmutableRoaringBitmap(buffer);
+          // Heap deserialization copies the borrowed view into owned storage; see the scalar path for rationale.
+          RoaringBitmap value = RoaringBitmapUtils.deserialize(buffer);
           for (int groupKey : groupKeysArray[index]) {
-            MutableRoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
-            if (bitmap == null) {
-              bitmap = new MutableRoaringBitmap();
-              groupByResultHolder.setValueForKey(groupKey, bitmap);
+            RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+            if (bitmap != null) {
+              bitmap.or(value);
+            } else {
+              // Clone a bitmap for the group
+              groupByResultHolder.setValueForKey(groupKey, value.clone());
             }
-            bitmap.or(value);
           }
         }));
         return;
@@ -698,10 +703,6 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       return new RoaringBitmap();
     }
 
-    if (result instanceof MutableRoaringBitmap) {
-      // Preserve the existing intermediate type and wire format. The holder continues to own its mutable accumulator.
-      return ((MutableRoaringBitmap) result).toRoaringBitmap();
-    }
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
@@ -718,10 +719,6 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       return new RoaringBitmap();
     }
 
-    if (result instanceof MutableRoaringBitmap) {
-      // Preserve the existing intermediate type and wire format. The holder continues to own its mutable accumulator.
-      return ((MutableRoaringBitmap) result).toRoaringBitmap();
-    }
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to hash code of the values
       return convertToValueBitmap((DictIdsWrapper) result);
