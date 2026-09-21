@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -81,6 +82,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -379,12 +381,34 @@ public class BaseTableDataManagerTest {
     // the one in zk, thus raw segment is downloaded and loaded.
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
     tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    verify(serverMetrics)
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testCrcReplacementMetricNotEmittedWhenDownloadFails()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    doThrow(new IOException("download failed")).when(tableDataManager)
+        .downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
+
+    assertThrows(IOException.class,
+        () -> tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig));
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
   }
 
   @Test
@@ -428,11 +452,37 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(segmentName, 1024L);
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
     BaseTableDataManager tableDataManager = createTableManager();
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
     tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     // As CRC is same, the index dir is left as is, so not get created by the test.
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+  }
+
+  @Test
+  public void testCrcMismatchMetricNotEmittedWhenCrcCheckDisabled()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    InstanceDataManagerConfig instanceDataManagerConfig = createDefaultInstanceDataManagerConfig();
+    when(instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()).thenReturn(false);
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
+
+    BaseTableDataManager tableDataManager = createTableManager(instanceDataManagerConfig);
+    File indexDir = createSegment(SegmentVersion.v3, 3);
+    tableDataManager.addNewOnlineSegment(zkMetadata, new IndexLoadingConfig());
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+    assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 3);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
   }
 
   @Test
@@ -680,6 +730,8 @@ public class BaseTableDataManagerTest {
 
     // Create a local segment with fewer rows, making its CRC different from the raw segment.
     // So that the raw segment is downloaded and loaded in the end.
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
     BaseTableDataManager tableDataManager = createTableManager();
     File indexDir = createSegment(SegmentVersion.v3, 3);
     File backupDir =
@@ -688,6 +740,8 @@ public class BaseTableDataManagerTest {
 
     assertFalse(indexDir.exists());
     tableDataManager.addNewOnlineSegment(zkMetadata, new IndexLoadingConfig());
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
