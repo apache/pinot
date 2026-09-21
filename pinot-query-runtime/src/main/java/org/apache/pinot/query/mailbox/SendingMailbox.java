@@ -44,6 +44,10 @@ public interface SendingMailbox extends AutoCloseable {
   /// contents within [#send(MseBlock.Data)]. The answer must not change during the life of the mailbox, so callers
   /// can read it once.
   ///
+  /// A mailbox that returns `true` here also returns `true` from [#isLocal()], because a block can only be given by
+  /// reference to a receiver in this process. The reverse does not hold: a local mailbox can still read the block
+  /// within [#send(MseBlock.Data)] and pass on something else.
+  ///
   /// A caller that sends the same block instance to more than one mailbox, when anything downstream mutates the
   /// contents of that block, must:
   ///

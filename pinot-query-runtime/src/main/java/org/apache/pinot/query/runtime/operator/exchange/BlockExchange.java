@@ -92,6 +92,9 @@ public abstract class BlockExchange implements AutoCloseable {
 
   /// Returns whether any of the given mailboxes delivers blocks by reference. Mailboxes are fixed when the exchange
   /// is created, and each of them gives a constant answer, so this is computed once.
+  ///
+  /// The answer therefore counts mailboxes that terminate early later on. That only makes a caller take a copy it
+  /// did not need. It never makes a caller skip a copy it did need.
   private static boolean anyDeliversByReference(List<SendingMailbox> sendingMailboxes) {
     for (SendingMailbox sendingMailbox : sendingMailboxes) {
       if (sendingMailbox.deliversByReference()) {
@@ -177,6 +180,12 @@ public abstract class BlockExchange implements AutoCloseable {
     }
   }
 
+  /// Sends the block to the destinations, following the distribution strategy of this exchange.
+  ///
+  /// Implementations must finish reading the block before this method returns. [BlockExchangeSendingMailbox] reports
+  /// that it does not deliver blocks by reference on that basis, so an implementation that queued a block for
+  /// another thread would break [SendingMailbox#deliversByReference()] for every exchange that decorates it, and
+  /// silently corrupt the aggregation intermediate results that [BroadcastExchange] shares between destinations.
   protected abstract void route(List<SendingMailbox> destinations, MseBlock.Data block);
 
   @Override
@@ -227,15 +236,17 @@ public abstract class BlockExchange implements AutoCloseable {
     @Override
     public boolean isLocal() {
       // Blocks are handed to the decorated exchange whole, and splitting them is left to that exchange.
-      // TODO: the decorated exchange is currently built with BlockSplitter#NO_OP, so blocks sent through a
-      //       multi-send node are never split. See MailboxSendOperator#getBlockExchange.
+      // TODO(#19427): the decorated exchange is currently built with BlockSplitter#NO_OP, so blocks sent
+      //       through a multi-send node are never split. See MailboxSendOperator#getBlockExchange.
       return true;
     }
 
     @Override
     public boolean deliversByReference() {
       // The decorated exchange passes blocks to its own mailboxes, so this mailbox delivers by reference only if
-      // any of those does
+      // any of those does. The question is whether a receiver keeps the block alive after route returns, not whether
+      // the decorated exchange shares one block between its own mailboxes: an inner HashExchange gives each of its
+      // mailboxes a different block, but the rows of those blocks still hold the cells of this one.
       return _deliversByReference;
     }
 
