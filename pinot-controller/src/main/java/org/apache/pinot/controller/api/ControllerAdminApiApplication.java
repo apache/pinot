@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -55,12 +57,18 @@ import org.glassfish.grizzly.threadpool.ThreadPoolProbe;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import org.glassfish.jersey.media.multipart.MultiPartProperties;
 import org.glassfish.jersey.server.ManagedAsyncExecutor;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.glassfish.jersey.spi.ExecutorServiceProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
+
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   public static final String START_TIME = "controllerStartTime";
@@ -86,6 +94,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
+    register(new MultiPartTempDirResolver());
     register(SwaggerApiListingResource.class);
     register(SwaggerSerializers.class);
     register(new CorsFilter());
@@ -231,6 +240,32 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     @Override
     public void dispose(ExecutorService executorService) {
       // managed in ControllerAdminApiApplication.stop()
+    }
+  }
+
+  /// Points Jersey's multipart parser at the controller's own temporary directory instead of `java.io.tmpdir`.
+  ///
+  /// Jersey buffers any part larger than its threshold to disk, but only registers the parsed `MultiPart` with the
+  /// request's `CloseableService` after parsing succeeds. A request that fails to parse — a truncated upload, a
+  /// client disconnect, a malformed `Content-Disposition` — therefore leaves its spilled parts behind, and for
+  /// segment uploads those are the size of the segment. Directing them at the controller's temp tree means the
+  /// startup clean in [ControllerFilePathProvider] reclaims them rather than leaving them on the host forever.
+  ///
+  /// Resolved lazily: the admin application is constructed before [ControllerFilePathProvider] is initialized, but
+  /// Jersey does not build the multipart reader until the first multipart request arrives.
+  @VisibleForTesting
+  static class MultiPartTempDirResolver implements ContextResolver<MultiPartProperties> {
+    @Override
+    public MultiPartProperties getContext(Class<?> type) {
+      MultiPartProperties properties = new MultiPartProperties();
+      try {
+        return properties.tempDir(ControllerFilePathProvider.getInstance().getMultiPartTempDir().getAbsolutePath());
+      } catch (Exception e) {
+        // Fall back to the JVM default rather than failing the request; Jersey itself also falls back if the
+        // configured directory turns out to be unusable.
+        LOGGER.warn("Failed to resolve the multipart temporary directory, using the JVM default", e);
+        return properties;
+      }
     }
   }
 }

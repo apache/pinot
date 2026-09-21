@@ -57,7 +57,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -288,6 +291,42 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     }
     return Arrays.stream(names).filter(name -> Arrays.stream(prefixes).anyMatch(name::startsWith))
         .collect(Collectors.toSet());
+  }
+
+  @Test
+  public void testCleanupMultiPartIsNullSafeAndSwallowsFailures() {
+    // The URI upload path carries no multipart body at all
+    PinotSegmentUploadDownloadRestletResource.cleanupMultiPart(null);
+
+    // Cleanup runs in a finally block, so a failure there must never replace the exception that got us there
+    FormDataMultiPart throwing = mock(FormDataMultiPart.class);
+    doThrow(new RuntimeException("cleanup blew up")).when(throwing).cleanup();
+    PinotSegmentUploadDownloadRestletResource.cleanupMultiPart(throwing);
+    verify(throwing).cleanup();
+  }
+
+  @Test
+  public void testCleanupMultiPartReleasesSpilledParts()
+      throws IOException {
+    // Stand in for the file Jersey spills a large part into; BodyPartEntity#cleanup deletes exactly this
+    File spilled = new File(_tempDir, "MIME1234567890");
+    FileUtils.touch(spilled);
+
+    FormDataBodyPart bodyPart = mock(FormDataBodyPart.class);
+    doAnswer(invocation -> {
+      FileUtils.deleteQuietly(spilled);
+      return null;
+    }).when(bodyPart).cleanup();
+
+    FormDataMultiPart multiPart = new FormDataMultiPart();
+    multiPart.getBodyParts().add(bodyPart);
+
+    PinotSegmentUploadDownloadRestletResource.cleanupMultiPart(multiPart);
+    Assert.assertFalse(spilled.exists());
+
+    // The request-scoped CloseableService closes the same multipart again at the end of the request
+    PinotSegmentUploadDownloadRestletResource.cleanupMultiPart(multiPart);
+    verify(bodyPart, times(2)).cleanup();
   }
 
   @Test
