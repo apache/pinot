@@ -55,6 +55,8 @@ public class CreateSegmentCommandTest {
     CreateSegmentCommand command = new CreateSegmentCommand().setFormat(FileFormat.CSV);
     List<String> dataFiles = command.getDataFiles(_tempDir);
     assertEquals(dataFiles.size(), 2, "Default behavior should search recursively and find both files");
+    assertTrue(dataFiles.stream().anyMatch(f -> f.endsWith("top.csv")));
+    assertTrue(dataFiles.stream().anyMatch(f -> f.endsWith("nested.csv")));
   }
 
   @Test
@@ -80,6 +82,8 @@ public class CreateSegmentCommandTest {
     new CommandLine(command).parseArgs("-dataDir", _tempDir.getPath(), "-format", "CSV");
     List<String> dataFiles = command.getDataFiles(_tempDir);
     assertEquals(dataFiles.size(), 2, "CLI without -searchRecursively should default to recursive search");
+    assertTrue(dataFiles.stream().anyMatch(f -> f.endsWith("top.csv")));
+    assertTrue(dataFiles.stream().anyMatch(f -> f.endsWith("nested.csv")));
   }
 
   @Test
