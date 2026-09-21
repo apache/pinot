@@ -459,7 +459,6 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < numKeys; i++) {
         columns[i] = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[i]);
       }
-      // Multi-column generators retain dictionary IDs, not this array, just as in the row-heap path.
       Object[] key = new Object[numKeys];
       for (int rowId = 0; rowId < numRows; rowId++) {
         for (int i = 0; i < numKeys; i++) {
@@ -503,15 +502,25 @@ public class MultistageGroupByExecutor {
   }
 
   private int[] generateGroupByKeys(DataBlock dataBlock, int numMatchedRows, RoaringBitmap matchedBitmap) {
-    Object[] keys;
-    if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
-    } else {
-      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds, numMatchedRows, matchedBitmap);
-    }
     int[] intKeys = new int[numMatchedRows];
-    for (int i = 0; i < numMatchedRows; i++) {
-      intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+    int numKeys = _groupKeyIds.length;
+    if (numKeys == 1) {
+      Object[] keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
+      for (int i = 0; i < numMatchedRows; i++) {
+        intKeys[i] = _groupIdGenerator.getGroupId(keys[i]);
+      }
+    } else {
+      Object[][] columns = new Object[numKeys][];
+      for (int i = 0; i < numKeys; i++) {
+        columns[i] = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[i], numMatchedRows, matchedBitmap);
+      }
+      Object[] key = new Object[numKeys];
+      for (int rowId = 0; rowId < numMatchedRows; rowId++) {
+        for (int i = 0; i < numKeys; i++) {
+          key[i] = columns[i][rowId];
+        }
+        intKeys[rowId] = _groupIdGenerator.getGroupId(key);
+      }
     }
     return intKeys;
   }

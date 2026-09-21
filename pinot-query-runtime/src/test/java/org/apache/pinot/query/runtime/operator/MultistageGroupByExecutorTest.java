@@ -38,7 +38,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Exercises serialized composite keys and merge state across blocks. Each test owns its executor and input blocks.
+/// Exercises serialized composite keys across merging and filtered aggregation. Each test owns its executor and blocks.
 public class MultistageGroupByExecutorTest {
   private static final DataSchema INPUT_SCHEMA = new DataSchema(new String[]{"weight", "count", "tv", "tag"},
       new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG, ColumnDataType.INT, ColumnDataType.STRING});
@@ -98,7 +98,48 @@ public class MultistageGroupByExecutorTest {
     assertTrue(executor.isNumGroupsLimitReached());
   }
 
+  @DataProvider
+  public Object[][] filteredModes() {
+    return new Object[][]{{2, false}, {2, true}, {3, false}, {3, true}};
+  }
+
+  @Test(dataProvider = "filteredModes")
+  public void testFilteredSerializedKeysAcrossBlocks(int numKeys, boolean skipEmptyGroups) {
+    DataSchema inputSchema = new DataSchema(new String[]{"weight", "count", "tv", "tag", "filter"},
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG, ColumnDataType.INT, ColumnDataType.STRING,
+            ColumnDataType.BOOLEAN});
+    MultistageGroupByExecutor executor = newExecutor(numKeys, false, 100, 4, skipEmptyGroups);
+    executor.processBlock(OperatorTestUtil.block(inputSchema,
+        new Object[]{1.5, 2L, 1000, "Aa", 1},
+        new Object[]{9.5, 3L, 9000, "unmatched", 0},
+        new Object[]{null, 5L, null, null, 1},
+        new Object[]{1.5, 7L, 1000, "Aa", 0},
+        new Object[]{2.5, 11L, 2000, "BB", 1}).asSerialized());
+    executor.processBlock(OperatorTestUtil.block(inputSchema).asSerialized());
+    executor.processBlock(OperatorTestUtil.block(inputSchema,
+        new Object[]{9.5, 13L, 9000, "unmatched", 0}).asSerialized());
+    executor.processBlock(OperatorTestUtil.block(inputSchema,
+        new Object[]{null, 17L, null, null, 1},
+        new Object[]{2.5, 19L, 2000, "BB", 0},
+        new Object[]{1.5, 23L, 1000, "Aa", 1}).asSerialized());
+
+    Map<List<Object>, Long> expected = expectedMap(List.of(
+        new Object[]{1000, 1.5, "Aa", 2L},
+        new Object[]{null, null, null, 2L},
+        new Object[]{2000, 2.5, "BB", 1L}), numKeys);
+    if (!skipEmptyGroups) {
+      expected.put(Arrays.asList(Arrays.copyOf(new Object[]{9000, 9.5, "unmatched"}, numKeys)), 0L);
+    }
+    assertEquals(asMap(executor.getResult(100), numKeys), expected);
+    assertEquals(executor.getNumGroups(), expected.size());
+  }
+
   private static MultistageGroupByExecutor newExecutor(int numKeys, boolean leafReturnFinalResult, int groupLimit) {
+    return newExecutor(numKeys, leafReturnFinalResult, groupLimit, -1, false);
+  }
+
+  private static MultistageGroupByExecutor newExecutor(int numKeys, boolean leafReturnFinalResult, int groupLimit,
+      int filterArgId, boolean skipEmptyGroups) {
     int[] groupKeys = numKeys == 2 ? new int[]{2, 0} : new int[]{2, 0, 3};
     DataSchema resultSchema = numKeys == 2
         ? new DataSchema(new String[]{"tv", "weight", "count"},
@@ -108,8 +149,10 @@ public class MultistageGroupByExecutorTest {
                 ColumnDataType.LONG});
     AggregationFunction<?, ?>[] functions = {
         new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("$1")), true)};
-    return new MultistageGroupByExecutor(groupKeys, functions, new int[]{-1}, -1, AggType.FINAL, leafReturnFinalResult,
-        resultSchema, Map.of(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(groupLimit)), null);
+    return new MultistageGroupByExecutor(groupKeys, functions, new int[]{filterArgId}, filterArgId,
+        filterArgId < 0 ? AggType.FINAL : AggType.DIRECT, leafReturnFinalResult, resultSchema,
+        Map.of(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(groupLimit),
+            QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS, Boolean.toString(skipEmptyGroups)), null);
   }
 
   private static Map<List<Object>, Long> expectedMap(List<Object[]> rows, int numKeys) {
