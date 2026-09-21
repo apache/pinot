@@ -154,6 +154,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.VARBINARY);
   }
 
+  /// A bytea constant must not change which plan EXPLAIN returns. Rewriting it used to rebuild the statement node, so
+  /// `EXPLAIN IMPLEMENTATION PLAN` lost its physical-plan marker and silently returned the logical plan instead.
+  @Test
+  public void testPostgreSqlByteaLiteralKeepsPhysicalExplain() {
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    String expected =
+        _queryEnvironment.explainQuery("EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, X'01' FROM a", requestId);
+    assertTrue(expected.contains("MAIL_RECEIVE"), expected);
+    for (String bytea : List.of("'\\x01'::bytea", "CAST('\\x01' AS BYTEA)")) {
+      String explain = _queryEnvironment.explainQuery(
+          "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, " + bytea + " FROM a", requestId);
+      assertEquals(explain, expected, bytea);
+    }
+  }
+
   /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes

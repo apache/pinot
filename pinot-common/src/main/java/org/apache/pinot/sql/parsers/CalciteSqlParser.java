@@ -670,10 +670,11 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(expression)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       sqlNode = sqlParser.parseSqlExpressionEof();
-      sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
+    // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
+    sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
   }
 

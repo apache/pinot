@@ -18,18 +18,29 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.io.StringReader;
 import java.util.List;
-import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.calcite.sql.SqlBinaryStringLiteral;
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlExplain;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOrderBy;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.sql.parsers.CalciteSqlParser.CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -107,11 +118,12 @@ public class CalciteSqlParserTest {
     assertEquals(byteaEquals.getOperands().get(1).getLiteral().getBinaryValue(), new byte[]{1, 2});
   }
 
-  /// The infix and standard cast spellings must normalize to the same binary literal wherever they appear.
+  /// The infix and standard cast spellings must normalize to the same binary literal wherever they appear, including
+  /// when the source is already a binary literal.
   @Test
   public void testPostgreSqlByteaLiteralMatchesStandardCastSpelling() {
     for (String bytea : List.of("'\\x0102'::bytea", "'\\x0102' :: ByTeA", "CAST('\\x0102' AS BYTEA)",
-        "cast('\\x0102' as bytea)", "X'0102'")) {
+        "cast('\\x0102' as bytea)", "X'0102'", "X'0102'::bytea", "CAST(X'0102' AS BYTEA)")) {
       PinotQuery pinotQuery =
           CalciteSqlParser.compileToPinotQuery("SELECT id FROM myTable WHERE bytesColumn = " + bytea);
       assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
@@ -121,15 +133,129 @@ public class CalciteSqlParserTest {
     }
   }
 
+  /// Regression coverage for rebuilding Pinot's own statement nodes. A copy-on-write rewrite turned a
+  /// `SqlPhysicalExplain` into a plain `SqlExplain`, which silently returned the logical plan, and a
+  /// `SqlPinotCreateMaterializedView` into a `SqlBasicCall` classified as DQL. The statement must keep the class and
+  /// type it has with the equivalent `X'...'` literal, and the constant must still be normalized inside it.
+  @Test(dataProvider = "statementsContainingByteaLiterals")
+  public void testPostgreSqlByteaLiteralPreservesStatementNode(String sql, Class<?> expectedClass,
+      PinotSqlType expectedType) {
+    for (String bytea : List.of("X'01'", "'\\x01'::bytea", "CAST('\\x01' AS BYTEA)")) {
+      String statement = sql.replace("?", bytea);
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(statement);
+      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+      assertEquals(sqlNode.getClass(), expectedClass, statement);
+      assertEquals(sqlNodeAndOptions.getSqlType(), expectedType, statement);
+      String unparsed = sqlNode.toString();
+      assertTrue(unparsed.contains("X'01'"), statement + " unparsed as " + unparsed);
+      assertFalse(unparsed.toUpperCase().contains("BYTEA"), statement + " unparsed as " + unparsed);
+    }
+  }
+
+  @DataProvider
+  public static Object[][] statementsContainingByteaLiterals() {
+    return new Object[][]{
+        {"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a FROM t WHERE b = ?", SqlPhysicalExplain.class, PinotSqlType.DQL},
+        {"EXPLAIN PLAN FOR SELECT a FROM t WHERE b = ?", SqlExplain.class, PinotSqlType.DQL},
+        {"CREATE MATERIALIZED VIEW mv AS SELECT a FROM t WHERE b = ?", SqlPinotCreateMaterializedView.class,
+            PinotSqlType.DDL},
+        {"CREATE MATERIALIZED VIEW mv AS SELECT a FROM t WHERE a IN (SELECT a FROM u WHERE b = ?)",
+            SqlPinotCreateMaterializedView.class, PinotSqlType.DDL},
+        {"SELECT a FROM t WHERE b = ? ORDER BY a LIMIT 5", SqlOrderBy.class, PinotSqlType.DQL}
+    };
+  }
+
+  /// A node that cannot replace an operand in place must fail with a clear error rather than be rebuilt with a
+  /// different class. Pinot's grammar never puts a bytea constant directly under such a node, so the tree is built
+  /// by hand.
+  @Test
+  public void testPostgreSqlByteaLiteralUnderNodeWithoutSetOperandIsRejected()
+      throws Exception {
+    SqlNode query = CalciteSqlParser.newSqlParser(new StringReader("SELECT a FROM t")).parseSqlStmtEof();
+    SqlNode bytea = CalciteSqlParser.newSqlParser(new StringReader("'\\x01'::bytea")).parseSqlExpressionEof();
+    SqlOrderBy orderBy = new SqlOrderBy(SqlParserPos.ZERO, query, SqlNodeList.EMPTY, bytea, null);
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> PostgreSqlCastRewriter.rewrite(orderBy));
+    assertTrue(e.getMessage().contains("not supported inside ORDER_BY"), e.getMessage());
+  }
+
+  /// Same guard for a node list that cannot be updated in place, such as one wrapping an immutable list.
+  @Test
+  public void testPostgreSqlByteaLiteralInImmutableNodeListIsRejected()
+      throws Exception {
+    SqlNode bytea = CalciteSqlParser.newSqlParser(new StringReader("'\\x01'::bytea")).parseSqlExpressionEof();
+    SqlNodeList immutable = SqlNodeList.of(SqlParserPos.ZERO, List.of(bytea));
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> PostgreSqlCastRewriter.rewrite(immutable));
+    assertTrue(e.getMessage().contains("not supported inside an immutable node list"), e.getMessage());
+  }
+
+  private static final String BYTEA_CONSTANT = "'\\x01'::bytea";
+
+  /// The literal a bytea constant is rewritten to must span exactly that constant, so validation errors point at it.
+  /// Recording the enclosing expression's start instead made it claim, e.g., `WHERE b = '\x01'::bytea`.
+  @Test
+  public void testPostgreSqlByteaLiteralKeepsItsSourcePosition()
+      throws Exception {
+    String sql = "SELECT a FROM t WHERE b = " + BYTEA_CONSTANT;
+    SqlSelect select = (SqlSelect) PostgreSqlCastRewriter.rewrite(
+        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlStmtEof());
+    assertSpansByteaConstant(((SqlCall) select.getWhere()).operand(1), sql);
+
+    sql = "SELECT a FROM t WHERE c LIKE 'x' AND b = " + BYTEA_CONSTANT;
+    select = (SqlSelect) PostgreSqlCastRewriter.rewrite(
+        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlStmtEof());
+    assertSpansByteaConstant(((SqlCall) ((SqlCall) select.getWhere()).operand(1)).operand(1), sql);
+
+    sql = "a || " + BYTEA_CONSTANT;
+    SqlCall concat = (SqlCall) PostgreSqlCastRewriter.rewrite(
+        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlExpressionEof());
+    assertSpansByteaConstant(concat.operand(1), sql);
+  }
+
+  private static void assertSpansByteaConstant(SqlNode literal, String sql) {
+    assertTrue(literal instanceof SqlBinaryStringLiteral, sql + " -> " + literal);
+    int start = sql.indexOf(BYTEA_CONSTANT) + 1;
+    SqlParserPos pos = literal.getParserPosition();
+    assertEquals(pos.getLineNum(), 1, sql);
+    assertEquals(pos.getColumnNum(), start, sql);
+    assertEquals(pos.getEndColumnNum(), start + BYTEA_CONSTANT.length() - 1, sql);
+  }
+
+  /// An IN list is a node list reached through the filter rather than the select list.
+  @Test
+  public void testPostgreSqlByteaLiteralInInList() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT id FROM myTable WHERE bytesColumn IN ('\\x01'::bytea, X'02', CAST('\\x03' AS BYTEA))");
+    Function in = pinotQuery.getFilterExpression().getFunctionCall();
+    assertEquals(in.getOperator(), "IN");
+    assertEquals(in.getOperands().get(0).getIdentifier().getName(), "bytesColumn");
+    assertEquals(in.getOperands().get(1).getLiteral().getBinaryValue(), new byte[]{1});
+    assertEquals(in.getOperands().get(2).getLiteral().getBinaryValue(), new byte[]{2});
+    assertEquals(in.getOperands().get(3).getLiteral().getBinaryValue(), new byte[]{3});
+  }
+
+  /// The expression parse path must surface the rewriter's own message rather than only a generic wrapper.
+  @Test
+  public void testPostgreSqlByteaErrorsSurfaceFromCompileToExpression() {
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression("bytesColumn::bytea"));
+    assertTrue(e.getMessage().contains(NOT_A_CONSTANT), e.getMessage());
+    assertTrue(e.getMessage().contains("hexToBytes(<expr>)"), e.getMessage());
+
+    e = expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression("'\\x0'::bytea"));
+    assertTrue(e.getMessage().contains(INVALID_CONSTANT), e.getMessage());
+  }
+
   @Test(dataProvider = "invalidPostgreSqlByteaLiterals")
   public void testInvalidPostgreSqlByteaHexLiterals(String sql, String expectedMessageFragment) {
     SqlCompilationException e =
         expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(sql));
-    assertTrue(ExceptionUtils.getStackTrace(e).contains(expectedMessageFragment),
+    assertTrue(e.getMessage().contains(expectedMessageFragment),
         "Expected <" + expectedMessageFragment + "> for " + sql + " but got: " + e.getMessage());
   }
 
-  private static final String INVALID_CONSTANT = "Invalid PostgreSQL BYTEA hex constant";
+  private static final String INVALID_CONSTANT = "Invalid PostgreSQL BYTEA constant";
   private static final String NOT_A_CONSTANT = "BYTEA casts are supported only for quoted hex constants";
 
   @DataProvider
@@ -139,7 +265,10 @@ public class CalciteSqlParserTest {
         {"SELECT '\\x0'::bytea", INVALID_CONSTANT},
         {"SELECT '\\x0g'::bytea", INVALID_CONSTANT},
         {"SELECT '\\x0 1'::bytea", INVALID_CONSTANT},
-        {"SELECT '0102'::bytea", INVALID_CONSTANT},
+        // PostgreSQL reads this as escape format (four bytes), which is not supported.
+        {"SELECT '0102'::bytea", "only the hex format is supported"},
+        // The \x prefix is case-sensitive, as in PostgreSQL.
+        {"SELECT '\\X0102'::bytea", INVALID_CONSTANT},
         // Full-width and non-Latin digits are hex digits to Character.digit but not to PostgreSQL.
         {"SELECT '\\x\uFF21\uFF22'::bytea", INVALID_CONSTANT},
         {"SELECT '\\x\u0660\u0661'::bytea", INVALID_CONSTANT},
@@ -148,7 +277,7 @@ public class CalciteSqlParserTest {
 
         // BYTEA casts of something that is not a constant.
         {"SELECT bytesColumn::bytea FROM myTable", NOT_A_CONSTANT},
-        {"SELECT CAST(bytesColumn AS BYTEA) FROM myTable", NOT_A_CONSTANT},
+        {"SELECT CAST(bytesColumn AS BYTEA) FROM myTable", "use hexToBytes(<expr>)"},
         {"SELECT id FROM myTable WHERE id = 1 AND bytesColumn::bytea = X'01'", NOT_A_CONSTANT},
 
         // `::` to a target type other than BYTEA.

@@ -93,16 +93,22 @@ void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
 /// above; collapsing the list here instead would make `::` bind the whole expression to its left. PostgreSQL BYTEA
 /// literals are normalized after parsing so both query engines receive the same binary literal representation as
 /// SQL `X'...'`.
+///
+/// The operator records the position of the `::` token itself, as `BinaryRowOperator` does; `toTree` then widens it
+/// to cover the operands. `s.pos()` would instead start at the token before the enclosing expression, so the cast
+/// and the literal it is rewritten to would claim a span such as `WHERE b = '\x01'::bytea`.
 void InfixCast(List<Object> list, ExprContext exprContext, Span s) :
 {
+    final SqlParserPos pos;
     final SqlDataTypeSpec dataType;
 }
 {
     <INFIX_CAST> {
         checkNonQueryExpression(exprContext);
+        pos = getPos();
     }
     dataType = DataType() {
-        list.add(new SqlParserUtil.ToTreeListItem(SqlLibraryOperators.INFIX_CAST, s.pos()));
+        list.add(new SqlParserUtil.ToTreeListItem(SqlLibraryOperators.INFIX_CAST, pos));
         list.add(dataType);
     }
 }
