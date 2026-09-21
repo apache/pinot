@@ -19,7 +19,9 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -55,6 +57,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///
 /// Only objects are split. A list stays a single value, whatever it holds, because its elements
 /// have no names to build a path from.
+///
+/// `.` being an ordinary key character is also what lets one document produce the same key twice:
+/// `{"a.b": 100, "a": {"b": 200}}` has a literal `a.b` and a path `a.b`. A key the document
+/// actually carries wins -- the path is not emitted -- at any level, so `{"a": {"b.c": 1, "b":
+/// {"c": 2}}}` keys `a.b.c` to `1`. Addressability is what flattening adds; it never shadows data
+/// that was already addressable. Two synthesized paths can still collide with each other
+/// (`{"a.b": {"c": 1}, "a": {"b.c": 2}}` reaches `a.b.c` two ways, neither of them literal); there
+/// the first emission wins and the rest are dropped, so a key is emitted at most once per document
+/// whatever the document holds.
 public final class OpenStructKeyFlattener {
 
   /// Path segment separator, and the character that appears in the resulting key.
@@ -85,29 +96,81 @@ public final class OpenStructKeyFlattener {
       }
       return;
     }
-    flattenInto(document, null, 1, maxDepth, sink);
+    flattenInto(new Level(document, null, null), 1, maxDepth, sink, new PathGuard());
   }
 
-  private static void flattenInto(Map<String, Object> map, @Nullable String prefix, int depth, int maxDepth,
-      EntryConsumer sink) {
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
+  /// One map being walked, with the path that leads to it and the level above. The chain is what a
+  /// synthesized path is checked against: an enclosing map holding the rest of the path as a literal
+  /// key means the document already has this key, and the path is dropped rather than emitted twice.
+  private static final class Level {
+    final Map<String, Object> _map;
+    @Nullable
+    final String _prefix;
+    @Nullable
+    final Level _parent;
+
+    Level(Map<String, Object> map, @Nullable String prefix, @Nullable Level parent) {
+      _map = map;
+      _prefix = prefix;
+      _parent = parent;
+    }
+  }
+
+  /// Remembers the synthesized paths already emitted for the current document, so two paths that
+  /// collide with each other resolve to the first one. Allocates nothing until a path is emitted,
+  /// which is never for a flat document.
+  private static final class PathGuard {
+    @Nullable
+    private Set<String> _emitted;
+
+    boolean firstEmission(String path) {
+      if (_emitted == null) {
+        _emitted = new HashSet<>();
+      }
+      return _emitted.add(path);
+    }
+  }
+
+  private static void flattenInto(Level level, int depth, int maxDepth, EntryConsumer sink, PathGuard guard) {
+    boolean synthesized = level._prefix != null;
+    for (Map.Entry<String, Object> entry : level._map.entrySet()) {
       String key = entry.getKey();
       if (key == null) {
         continue;
       }
-      String path = prefix == null ? key : prefix + PATH_SEPARATOR + key;
+      String path = synthesized ? level._prefix + PATH_SEPARATOR + key : key;
+      // A literal key of this document, at this or any enclosing level, is the value of `path`; only a
+      // path the document does not carry itself is synthesized, and only once.
+      boolean emit = !synthesized || (!carriedByEnclosingMap(level, path) && guard.firstEmission(path));
       Object value = entry.getValue();
       if (value instanceof Map) {
-        sink.accept(path, toJson(value), true);
+        if (emit) {
+          sink.accept(path, toJson(value), true);
+        }
         if (depth < maxDepth) {
           @SuppressWarnings("unchecked")
           Map<String, Object> child = (Map<String, Object>) value;
-          flattenInto(child, path, depth + 1, maxDepth, sink);
+          // Recursed into even when the container entry was dropped: the leaves underneath it are
+          // their own keys, and a collision on the container says nothing about them.
+          flattenInto(new Level(child, path, level), depth + 1, maxDepth, sink, guard);
         }
-      } else {
+      } else if (emit) {
         sink.accept(path, value, false);
       }
     }
+  }
+
+  /// Whether a map enclosing `level` holds the remainder of `path` as a key of its own, which makes
+  /// the path a second name for a value the document already keys directly.
+  private static boolean carriedByEnclosingMap(Level level, String path) {
+    for (Level enclosing = level._parent; enclosing != null; enclosing = enclosing._parent) {
+      String prefix = enclosing._prefix;
+      String suffix = prefix == null ? path : path.substring(prefix.length() + 1);
+      if (enclosing._map.containsKey(suffix)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Serializes a container. Returns null when it cannot be serialized, which callers treat as an

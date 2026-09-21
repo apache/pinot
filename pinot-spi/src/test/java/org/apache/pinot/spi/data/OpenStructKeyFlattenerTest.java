@@ -34,12 +34,18 @@ public class OpenStructKeyFlattenerTest {
 
   private final Map<String, Object> _flat = new LinkedHashMap<>();
   private final Set<String> _containers = new LinkedHashSet<>();
+  /// How many times each key was emitted. `_flat` cannot show a key emitted twice -- the second write
+  /// overwrites the first -- and a second emission is exactly what breaks a caller pairing values with a
+  /// presence bitmap.
+  private final Map<String, Integer> _emissions = new LinkedHashMap<>();
 
   private void flatten(Map<String, Object> document, int maxDepth) {
     _flat.clear();
     _containers.clear();
+    _emissions.clear();
     OpenStructKeyFlattener.flatten(document, maxDepth, (path, value, container) -> {
       _flat.put(path, value);
+      _emissions.merge(path, 1, Integer::sum);
       if (container) {
         _containers.add(path);
       }
@@ -133,7 +139,48 @@ public class OpenStructKeyFlattenerTest {
     // A literal dot in a key is left alone; it is only ambiguous with a path, never rewritten.
     flatten(map("a.b", 1, "a", map("b", 2)), 2);
 
-    assertEquals(_flat.get("a.b"), 2, "the nested leaf is emitted after the literal key of the same name");
+    assertEquals(_flat.get("a.b"), 1, "the document's own key is the value of 'a.b'");
+    assertEquals(_emissions.get("a.b"), (Integer) 1, "a key is emitted at most once per document");
+    assertEquals(_flat.get("a"), "{\"b\":2}", "the container is still emitted whole");
+  }
+
+  @Test
+  public void testLiteralKeyWinsWhateverTheDocumentOrder() {
+    // Same document, nested object first. Which name a value gets cannot depend on JSON key order.
+    flatten(map("a", map("b", 2), "a.b", 1), 2);
+
+    assertEquals(_flat.get("a.b"), 1);
+    assertEquals(_emissions.get("a.b"), (Integer) 1);
+  }
+
+  @Test
+  public void testLiteralKeyOfAnInnerObjectWins() {
+    // The collision is two levels down: 'a' holds both a literal 'b.c' and a 'b' object holding 'c'.
+    flatten(map("a", map("b.c", 1, "b", map("c", 2))), 3);
+
+    assertEquals(_flat.get("a.b.c"), 1);
+    assertEquals(_emissions.get("a.b.c"), (Integer) 1);
+  }
+
+  @Test
+  public void testCollidingSynthesizedPathsKeepTheFirst() {
+    // Neither 'a.b.c' is literal: one is 'a.b' + 'c', the other 'a' + 'b.c'. Nothing makes one of them
+    // more the document's own than the other, so the first emission stands and the second is dropped.
+    flatten(map("a.b", map("c", 1), "a", map("b.c", 2)), 3);
+
+    assertEquals(_flat.get("a.b.c"), 1);
+    assertEquals(_emissions.get("a.b.c"), (Integer) 1);
+  }
+
+  @Test
+  public void testShadowedContainerStillHasItsLeavesSplitOut() {
+    // 'a.b' names the literal 1, so the object under a -> b is not emitted as a container. Its own leaves
+    // are separate keys and are not in collision with anything.
+    flatten(map("a.b", 1, "a", map("b", map("c", 2))), 3);
+
+    assertEquals(_flat.get("a.b"), 1);
+    assertEquals(_flat.get("a.b.c"), 2);
+    assertEquals(_containers, Set.of("a"), "'a.b' is the literal value, not the shadowed container");
   }
 
   @Test

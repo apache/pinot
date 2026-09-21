@@ -301,7 +301,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     RoaringBitmap bitmap = _presenceBitmaps.computeIfAbsent(key, k -> new RoaringBitmap());
     List<Object> values = _values.computeIfAbsent(key, k -> new ArrayList<>());
-    bitmap.add(_numDocs);
+    if (!bitmap.checkedAdd(_numDocs)) {
+      // The key already has a value for this document. Values pair with the bitmap positionally when the
+      // column is written, so appending a second one would shift every document after it instead of failing
+      // -- keep the first value and drop this one. [OpenStructKeyFlattener] already emits a key once per
+      // document, which leaves this an invariant of the class rather than a contract held elsewhere.
+      return;
+    }
     Object coerced;
     try {
       PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();

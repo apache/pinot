@@ -458,6 +458,103 @@ public class OpenStructConsumingSealedParityTest {
     }
   }
 
+  /// A document can carry a key that flattening would also synthesize: `.` is an ordinary key character, so
+  /// `{"a.b": 100, "a": {"b": 200}}` names `a.b` twice. The document's own key is the value both tiers must
+  /// read, and the second emission must not reach storage at all -- the sealed tier pairs values with a
+  /// presence bitmap positionally, so an extra value for one document shifts every document after it.
+  @Test
+  public void testConsumingMatchesSealedForKeyCollidingWithItsFlattenedPath()
+      throws Exception {
+    String collidingKey = "a.b";
+    ComplexFieldSpec nestedSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, -1,
+        Set.of(collidingKey, "a"), 0.5, List.of(), null, null, null, 2);
+
+    List<Object> consumingValues;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", nestedSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, collidingDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(nestedSpec, idx, NUM_DOCS);
+      DataSource collided = ds.getDataSource(collidingKey);
+      assertNotNull(collided);
+      consumingValues = readAllDictValues(collided);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructCollisionParity")
+        .addField(nestedSpec)
+        .build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructCollisionParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentCollisionParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, collidingDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedCollided = sealedMetrics.getDataSource(collidingKey);
+      assertNotNull(sealedCollided);
+      assertEquals(consumingValues, readAllDictValues(sealedCollided));
+
+      // Every document reads its own literal value: the nested `{"b": 999}` in doc 0 neither replaces the
+      // 100 the document keys directly, nor shifts the documents after it.
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId), 100 * (docId + 1), "docId " + docId);
+      }
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  /// Like [#readAllValues] but with the reader's own context, which a sealed dictionary-encoded numeric
+  /// forward index requires.
+  private static List<Object> readAllDictValues(DataSource dataSource)
+      throws Exception {
+    ForwardIndexReader<?> fwd = dataSource.getForwardIndex();
+    List<Object> values = new ArrayList<>(NUM_DOCS);
+    try (ForwardIndexReaderContext ctx = fwd.createContext()) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        values.add(dataSource.getDictionary().get(readDictId(fwd, docId, ctx)));
+      }
+    }
+    return values;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends ForwardIndexReaderContext> int readDictId(ForwardIndexReader<T> fwd, int docId,
+      ForwardIndexReaderContext ctx) {
+    return fwd.getDictId(docId, (T) ctx);
+  }
+
+  /// Every document keys `a.b` directly; doc 0 also nests an object whose flattened path is the same key.
+  private static Map<String, Object> collidingDoc(int docId) {
+    Map<String, Object> document = new HashMap<>();
+    document.put("a.b", 100 * (docId + 1));
+    if (docId == 0) {
+      Map<String, Object> nested = new HashMap<>();
+      nested.put("b", 999);
+      document.put("a", nested);
+    }
+    return document;
+  }
+
   private static Map<String, Object> nestedDoc(int docId) {
     Map<String, Object> device = new HashMap<>();
     device.put("os", docId % 2 == 0 ? "ios" : "android");
