@@ -217,8 +217,8 @@ public class PinotDispatchPlanner {
       fragmentMap.put(0, reduceStage);
     }
     WorkerMetadata workerMetadata = workerMetadataList.get(0);
-    // Deliberately rebuilt without the leaf-stage segment maps: every TableScanNode has just been inlined into
-    // a ValueNode, so this stage-0 worker scans nothing and must not look like a leaf-stage worker.
+    // Stage-0 workers never carry segment maps, and this keeps it that way now that they live outside the custom
+    // properties: the copy below takes the custom properties only.
     reduceStage.setWorkerMetadataList(List.of(
         new WorkerMetadata(workerMetadata.getWorkerId(), Map.of(), workerMetadata.getCustomProperties())));
   }

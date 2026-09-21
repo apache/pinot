@@ -200,7 +200,9 @@ public class DispatchablePlanContext {
         WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
         // A leaf-stage worker is identified by carrying a (possibly empty) segment map, so every worker of a
         // scanning stage has to be present in the map. Fail loudly here instead of letting the worker decay
-        // into an intermediate-stage worker on the server.
+        // into an intermediate-stage worker on the server. This guards an invariant rather than an expected path:
+        // every site that populates these maps (WorkerManager and PlanFragmentAndMailboxAssignment) fills them in
+        // the same per-worker loop as workerIdToServerInstanceMap, so every worker gets an entry.
         if (workerIdToSegmentsMap != null) {
           Map<String, List<String>> segmentsMap = workerIdToSegmentsMap.get(workerId);
           Preconditions.checkNotNull(segmentsMap, "Missing segments map for worker id: %s", workerId);

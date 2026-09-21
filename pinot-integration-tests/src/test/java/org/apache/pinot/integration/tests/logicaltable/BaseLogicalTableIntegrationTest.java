@@ -480,6 +480,24 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
         "Broker pruning changed the result of a logical table query");
   }
 
+  /// Both leaf-stage segment list encodings must return the same result for a logical table, whose leaf workers carry
+  /// `logicalTableSegmentsMap`, keyed by physical table name, rather than the table-type keyed `tableSegmentsMap`.
+  @Test
+  public void testProtoSegmentListPreservesLogicalTableResults()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = "SELECT Carrier, COUNT(*) FROM " + getLogicalTableName() + " WHERE DaysSinceEpoch > 16312 "
+        + "GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+
+    JsonNode legacy = postQuery("SET protoSegmentList = false; " + query);
+    assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
+    JsonNode proto = postQuery("SET protoSegmentList = true; " + query);
+    assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
+
+    assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"),
+        "The segment list encoding changed the result of a logical table query");
+  }
+
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {

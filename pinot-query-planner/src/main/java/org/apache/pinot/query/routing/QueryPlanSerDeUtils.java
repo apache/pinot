@@ -26,6 +26,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,14 +83,17 @@ public class QueryPlanSerDeUtils {
       mailboxInfosMap.put(entry.getKey(), fromProtoMailboxInfos(entry.getValue()));
     }
     // A broker using the legacy encoding ships the segment maps as JSON custom properties. Decode them once here and
-    // drop the raw strings so that the metadata never carries two copies of the same segments.
+    // drop the raw strings so that the metadata never carries two copies of the same segments. The custom properties
+    // stay unmodifiable either way, as the proto map view is, so that no server path can come to depend on writing
+    // to them under one encoding only.
     Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
     String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
     String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
     if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
-      customProperties = new HashMap<>(customProperties);
-      customProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
-      customProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+      Map<String, String> strippedProperties = new HashMap<>(customProperties);
+      strippedProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
+      strippedProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+      customProperties = Collections.unmodifiableMap(strippedProperties);
     }
     WorkerMetadata workerMetadata =
         new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap, customProperties);
@@ -133,6 +137,12 @@ public class QueryPlanSerDeUtils {
   public static Map<String, String> fromProtoProperties(ByteString protoProperties)
       throws InvalidProtocolBufferException {
     return Worker.Properties.parseFrom(protoProperties).getPropertyMap();
+  }
+
+  /// Encodes the worker metadata for the wire with the leaf-stage segment maps in the legacy JSON encoding, which every
+  /// server understands. Kept for callers that predate the proto encoding.
+  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
+    return toProtoWorkerMetadataList(workerMetadataList, false);
   }
 
   /// Encodes the worker metadata for the wire, with the leaf-stage segment maps as native proto fields when

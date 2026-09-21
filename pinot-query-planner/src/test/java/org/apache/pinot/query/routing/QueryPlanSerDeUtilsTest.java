@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -100,6 +101,36 @@ public class QueryPlanSerDeUtilsTest {
         QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(leafWorker(emptySegments, null), protoSegmentList));
     assertEquals(decoded.getTableSegmentsMap(), emptySegments);
     assertTrue(decoded.isLeafStageWorker());
+  }
+
+  /// A segments map with no entries at all encodes, in the proto encoding, to `SegmentsMap.getDefaultInstance()`.
+  /// The leaf/intermediate distinction rides on proto3's explicit presence for singular message fields, which must
+  /// keep that default instance on the wire rather than drop the field, so this goes through real bytes.
+  @Test(dataProvider = "encodings")
+  public void testZeroEntrySegmentsMapStillMarksLeafWorker(boolean protoSegmentList)
+      throws Exception {
+    Worker.WorkerMetadata proto = toProto(leafWorker(Map.of(), Map.of()), protoSegmentList);
+    assertEquals(proto.hasTableSegmentsMap(), protoSegmentList);
+    assertEquals(proto.hasLogicalTableSegmentsMap(), protoSegmentList);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertEquals(decoded.getTableSegmentsMap(), Map.of());
+    assertEquals(decoded.getLogicalTableSegmentsMap(), Map.of());
+    assertTrue(decoded.isLeafStageWorker());
+  }
+
+  /// Whether a server path may write to the decoded custom properties must not depend on the encoding the broker
+  /// picked: the legacy decode strips the JSON keys from a copy, which has to stay as unmodifiable as the proto view.
+  @Test(dataProvider = "encodings")
+  public void testDecodedCustomPropertiesAreUnmodifiable(boolean protoSegmentList)
+      throws Exception {
+    WorkerMetadata leaf =
+        QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(leafWorker(TABLE_SEGMENTS_MAP, null), protoSegmentList));
+    assertThrows(UnsupportedOperationException.class, () -> leaf.getCustomProperties().put("k", "v"));
+
+    WorkerMetadata intermediate = QueryPlanSerDeUtils.fromProtoWorkerMetadata(
+        toProto(new WorkerMetadata(1, Map.of(), new HashMap<>(CUSTOM_PROPERTIES)), protoSegmentList));
+    assertThrows(UnsupportedOperationException.class, () -> intermediate.getCustomProperties().put("k", "v"));
   }
 
   @Test(dataProvider = "encodings")

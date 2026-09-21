@@ -423,12 +423,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
         ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
         StageMetadata metadata = explainPlan.getStageMetadata();
-        // This response travels server -> broker, so it cannot negotiate an encoding with its requester. The
-        // broker only reads the plan nodes of an explain response today, but the legacy encoding is the one
-        // every broker can decode, so use it here rather than assume the requester understands the proto
-        // fields.
+        // The segment maps are dropped rather than encoded: QueryDispatcher#explain, the only reader of this
+        // response, reads just the root node of each stage plan, and has since MSE explain was introduced in
+        // 1.3.0, so encoding them would cost a JSON encode of every segment list on every EXPLAIN for nothing.
+        List<WorkerMetadata> explainWorkerMetadataList = new ArrayList<>(metadata.getWorkerMetadataList().size());
+        for (WorkerMetadata explainWorkerMetadata : metadata.getWorkerMetadataList()) {
+          explainWorkerMetadataList.add(new WorkerMetadata(explainWorkerMetadata.getWorkerId(),
+              explainWorkerMetadata.getMailboxInfosMap(), explainWorkerMetadata.getCustomProperties()));
+        }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList(), false);
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(explainWorkerMetadataList, false);
         builder.addStagePlan(Worker.StagePlan.newBuilder()
             .setRootNode(rootAsBytes)
             .setStageMetadata(Worker.StageMetadata.newBuilder()

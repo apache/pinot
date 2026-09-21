@@ -48,7 +48,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -291,6 +293,37 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(prefix,
         "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
+  }
+
+  /// Every server of this cluster runs the broker's own build, so the default SAFE mode has to switch the proto
+  /// segment list encoding on by itself, through the server versions published in the Helix instance configs. Both
+  /// encodings must then return identical results for queries with one and with several leaf stages.
+  @Test
+  public void testProtoSegmentListEncodingIsTransparent()
+      throws Exception {
+    ProtoSegmentListPredicate predicate =
+        ((BrokerRequestHandlerDelegate) _brokerStarters.get(0).getBrokerRequestHandler())
+            .getMultiStageBrokerRequestHandler().getProtoSegmentListPredicate();
+    assertEquals(predicate.getMode(), ProtoSegmentListPredicate.Mode.SAFE);
+    TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
+        "SAFE mode did not enable the proto segment list encoding although every server runs the same version");
+    assertFalse(predicate.isEnabled(true), "Multi-cluster queries must keep the legacy encoding");
+
+    String table = getTableName();
+    String[] queries = {
+        "SELECT COUNT(*) FROM " + table,
+        "SELECT Carrier, COUNT(*), MAX(ArrDelay) FROM " + table + " WHERE DaysSinceEpoch > 16312 "
+            + "GROUP BY Carrier ORDER BY Carrier",
+        "SELECT COUNT(*) FROM " + table + " a JOIN (SELECT DISTINCT Carrier FROM " + table + ") b "
+            + "ON a.Carrier = b.Carrier"
+    };
+    for (String query : queries) {
+      JsonNode legacy = postQuery("SET protoSegmentList = false; " + query);
+      assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
+      JsonNode proto = postQuery("SET protoSegmentList = true; " + query);
+      assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
+      assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"), query);
+    }
   }
 
   @Test

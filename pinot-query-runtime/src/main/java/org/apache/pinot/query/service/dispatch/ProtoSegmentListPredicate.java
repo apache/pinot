@@ -18,92 +18,241 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.api.listeners.BatchMode;
+import org.apache.helix.api.listeners.InstanceConfigChangeListener;
+import org.apache.helix.api.listeners.PreFetch;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// The cluster-level default for encoding leaf-stage segment lists as native protobuf fields of the worker metadata,
-/// read by [QueryDispatcher] on every request that does not carry an explicit
-/// [CommonConstants.Broker.Request.QueryOptionKey#PROTO_SEGMENT_LIST] override.
+/// Decides whether a multi-stage query that does not set the
+/// [CommonConstants.Broker.Request.QueryOptionKey#PROTO_SEGMENT_LIST] query option ships its leaf-stage segment lists
+/// as native protobuf fields of the worker metadata, or as the legacy JSON custom property.
 ///
-/// The value is seeded from the static broker configuration and can then be changed through cluster config, on the
-/// same key, without restarting the brokers. That matters because the setting is only safe once every server of the
-/// cluster understands the proto fields: an older server finds no segments under them, concludes the worker is not a
-/// leaf-stage worker and fails its leaf stage. Operators therefore want to turn it on at the exact moment a rolling
-/// upgrade completes, and to turn it back off immediately if it misbehaves, neither of which should cost a broker
-/// restart. Cluster config wins over the static seed because [org.apache.pinot.common.config
-/// .DefaultClusterConfigChangeHandler] replays the current cluster config to a listener as soon as it is registered;
-/// clearing the key from cluster config falls back to [CommonConstants.Broker#DEFAULT_MSE_PROTO_SEGMENT_LIST], not to
-/// the static seed.
+/// Only servers decode those fields, and a server that predates them finds no segments, treats the worker as an
+/// intermediate-stage worker and fails the leaf stage. The mode, set by
+/// [CommonConstants.Broker#CONFIG_OF_MSE_PROTO_SEGMENT_LIST], picks how that risk is handled:
 ///
-/// Thread-safety: `_enabled` is `volatile`, so [#isEnabled()] stays lock-free on the request path. [#onChange] is
-/// `synchronized` only so that the `previous -> new` pair in its log line cannot interleave with another delivery. It
-/// does *not* order deliveries: the change handler invokes listeners outside its own lock, so a delivery computed
-/// from an older snapshot can still be applied after a newer one and leave a stale value until the next
-/// cluster-config change.
+/// - [Mode#SAFE] (the default): proto only while every server of the cluster reports exactly this broker's Pinot
+///   version in its Helix instance config, so the encoding turns itself on when a rolling upgrade completes and off
+///   again as soon as an older server joins, with no operator involved. It fails closed: a server with a missing,
+///   `UNKNOWN` or unreadable version counts as outdated, the encoding stays off until the first instance-config
+///   delivery, and multi-cluster queries always use the legacy encoding because the servers of remote clusters are
+///   not watched. Any version other than this broker's counts as outdated, including a newer one: telling which
+///   versions understand the fields would mean parsing Pinot version strings, so a heterogeneous cluster
+///   conservatively stays on the legacy encoding until it becomes homogeneous again.
+/// - [Mode#ALWAYS]: proto unconditionally. For clusters that do not publish versions, forks that carry the fields
+///   under a different version string, and tests.
+/// - [Mode#NEVER]: legacy JSON unconditionally. The kill switch.
+///
+/// The per-query option overrides every mode. Modeled on [org.apache.pinot.query.runtime.SendStatsPredicate], which
+/// gates the MSE stats on the same signal, with two deliberate differences: only servers are checked, since brokers
+/// never decode the fields, and an unreadable instance config counts as outdated rather than current, since the
+/// cost of a wrong answer here is a failed query rather than missing stats.
+///
+/// Every instance that is not a controller, broker or minion counts as a server, so an instance config left behind
+/// by a decommissioned old server keeps [Mode#SAFE] on the legacy encoding until it is removed; the outdated servers
+/// are logged whenever the encoding switches.
+///
+/// Thread-safety: [#isEnabled] reads a single `volatile` flag and is lock-free on the request path. Instance-config
+/// deliveries are serialized on `this`, which also publishes the Helix handles set by [#watchInstanceConfigs].
 @ThreadSafe
-public class ProtoSegmentListPredicate implements PinotClusterConfigChangeListener {
+@BatchMode(enabled = false)
+@PreFetch(enabled = false)
+public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProtoSegmentListPredicate.class);
   private static final String KEY = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
-  private static final String ENABLE_WARNING =
-      "Every server of the cluster must already run a version that understands the proto segment list fields. "
-          + "Leaf stages routed to an older server will fail. Set it back to false to revert.";
+  /// Cap on the outdated servers named in one log line, so that a large rolling upgrade does not log the whole fleet.
+  private static final int MAX_LOGGED_SERVERS = 10;
 
-  private volatile boolean _enabled;
-
-  public ProtoSegmentListPredicate(boolean enabled) {
-    _enabled = enabled;
+  public enum Mode {
+    NEVER, SAFE, ALWAYS
   }
 
-  /// Seeds the value from the static broker configuration. NOTE: the Helix manager is not necessarily connected when
-  /// this is called, so a cluster-config override is applied later through [#onChange].
+  private final Mode _mode;
+  private final String _currentVersion;
+  /// SAFE only: servers whose version is not [#_currentVersion], mapped to the version they report. Guarded by `this`.
+  private final Map<String, String> _outdatedServers = new HashMap<>();
+  /// SAFE only: `false` until the first instance-config delivery shows that every server is current.
+  private volatile boolean _allServersCurrent;
+  /// SAFE only: set by [#watchInstanceConfigs]. Guarded by `this`.
+  @Nullable
+  private HelixAdmin _helixAdmin;
+  @Nullable
+  private String _clusterName;
+
+  public ProtoSegmentListPredicate(Mode mode) {
+    this(mode, PinotVersion.VERSION);
+  }
+
+  @VisibleForTesting
+  ProtoSegmentListPredicate(Mode mode, String currentVersion) {
+    _mode = mode;
+    _currentVersion = currentVersion;
+  }
+
+  /// Reads the mode from the static broker configuration, failing fast on a value that is not a mode.
   public static ProtoSegmentListPredicate create(PinotConfiguration brokerConf) {
-    String rawValue = brokerConf.getProperty(KEY);
-    boolean enabled = rawValue == null || rawValue.isEmpty()
-        ? CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST : parseBoolean(rawValue);
-    LOGGER.info("Initialized {} with value: {}", KEY, enabled);
-    if (enabled) {
-      LOGGER.warn("{} is enabled in the static broker config. {}", KEY, ENABLE_WARNING);
+    String value = brokerConf.getProperty(KEY, CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST);
+    Mode mode;
+    try {
+      mode = Mode.valueOf(value.trim().toUpperCase(Locale.ENGLISH));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Invalid value '" + value + "' for " + KEY + ", expected one of NEVER, SAFE, ALWAYS", e);
     }
-    return new ProtoSegmentListPredicate(enabled);
+    LOGGER.info("Initialized {} with mode: {}", KEY, mode);
+    return new ProtoSegmentListPredicate(mode);
   }
 
-  public boolean isEnabled() {
-    return _enabled;
+  public Mode getMode() {
+    return _mode;
+  }
+
+  /// Whether a query that does not set the query option uses the proto encoding. `multiClusterQuery` is whether the
+  /// query routes to other clusters, whose server versions this predicate cannot see.
+  public boolean isEnabled(boolean multiClusterQuery) {
+    switch (_mode) {
+      case ALWAYS:
+        return true;
+      case SAFE:
+        return !multiClusterQuery && _allServersCurrent;
+      default:
+        return false;
+    }
+  }
+
+  /// Starts watching the server versions of the cluster when the mode needs it, and is a no-op otherwise.
+  /// `helixManager` must already be connected. A registration failure is logged rather than thrown: it leaves
+  /// [Mode#SAFE] on the legacy encoding, which is always correct, and an optimization must not fail broker startup.
+  public void watchInstanceConfigs(HelixManager helixManager) {
+    if (_mode != Mode.SAFE) {
+      return;
+    }
+    try {
+      // Published under the monitor that deliveries synchronize on, but registered outside it: Helix may deliver the
+      // initial notification on another thread while registration is still in progress.
+      synchronized (this) {
+        _helixAdmin = helixManager.getClusterManagmentTool();
+        _clusterName = helixManager.getClusterName();
+      }
+      helixManager.addInstanceConfigChangeListener(this);
+      LOGGER.info("Watching server versions for {}", KEY);
+    } catch (Exception e) {
+      LOGGER.error("Failed to watch server versions for {}, leaving the legacy segment list encoding on", KEY, e);
+    }
   }
 
   @Override
-  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(KEY)) {
+  public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
+    NotificationContext.Type type = context.getType();
+    if (type != NotificationContext.Type.INIT && type != NotificationContext.Type.CALLBACK) {
       return;
     }
-    String value = clusterConfigs.get(KEY);
-    boolean previous = _enabled;
-    _enabled = value == null || value.isEmpty()
-        ? CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST : parseBoolean(value);
-    if (previous == _enabled) {
+    HelixAdmin helixAdmin = _helixAdmin;
+    if (helixAdmin == null) {
+      LOGGER.warn("Ignoring instance config change delivered before {} was watched", KEY);
       return;
     }
-    LOGGER.info("Updated {} from: {} to: {}", KEY, previous, _enabled);
-    if (_enabled) {
-      LOGGER.warn("{} was enabled live via cluster config. {}", KEY, ENABLE_WARNING);
+    String pathChanged = context.getPathChanged();
+    if (type == NotificationContext.Type.INIT || context.getIsChildChange() || pathChanged == null) {
+      // Instances were added or removed, this is the first delivery, or the changed path is unknown: rebuild the
+      // whole view.
+      Map<String, String> serverVersions = new HashMap<>();
+      for (String instanceId : helixAdmin.getInstancesInCluster(_clusterName)) {
+        if (isServer(instanceId)) {
+          serverVersions.put(instanceId, readVersion(helixAdmin, instanceId));
+        }
+      }
+      refreshAllServers(serverVersions);
+    } else {
+      // A single instance config changed, e.g. a server restarted on a new version and republished it.
+      String instanceId = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
+      if (isServer(instanceId)) {
+        refreshServer(instanceId, readVersion(helixAdmin, instanceId));
+      }
     }
   }
 
-  /// [Boolean#parseBoolean(String)] semantics (anything but `true` reads as `false`), plus a warning so that a typo
-  /// does not silently disable the setting. Reading the static seed as a raw string rather than through
-  /// [PinotConfiguration#getProperty(String, boolean)] is deliberate: that conversion is equally lenient but silent.
-  private static boolean parseBoolean(String value) {
-    String trimmed = value.trim();
-    if (!trimmed.equalsIgnoreCase("true") && !trimmed.equalsIgnoreCase("false")) {
-      LOGGER.warn("Unrecognized boolean value '{}' for {}, reading it as false", value, KEY);
+  /// Replaces the whole view with the versions reported by `serverVersions`, keyed by server instance id.
+  @VisibleForTesting
+  synchronized void refreshAllServers(Map<String, String> serverVersions) {
+    _outdatedServers.clear();
+    for (Map.Entry<String, String> entry : serverVersions.entrySet()) {
+      if (isOutdated(entry.getValue())) {
+        _outdatedServers.put(entry.getKey(), String.valueOf(entry.getValue()));
+      }
     }
-    return Boolean.parseBoolean(trimmed);
+    updateAllServersCurrent();
+  }
+
+  /// Updates the view for one server whose instance config changed.
+  @VisibleForTesting
+  synchronized void refreshServer(String instanceId, @Nullable String version) {
+    if (isOutdated(version)) {
+      _outdatedServers.put(instanceId, String.valueOf(version));
+    } else {
+      _outdatedServers.remove(instanceId);
+    }
+    updateAllServersCurrent();
+  }
+
+  private void updateAllServersCurrent() {
+    boolean allServersCurrent = _outdatedServers.isEmpty();
+    if (allServersCurrent == _allServersCurrent) {
+      return;
+    }
+    _allServersCurrent = allServersCurrent;
+    if (allServersCurrent) {
+      LOGGER.info("Every server reports version {}, enabling the proto segment list encoding", _currentVersion);
+    } else {
+      LOGGER.info("{} server(s) do not report version {}, using the legacy segment list encoding: {}",
+          _outdatedServers.size(), _currentVersion, describeOutdatedServers());
+    }
+  }
+
+  private String describeOutdatedServers() {
+    return _outdatedServers.entrySet().stream().limit(MAX_LOGGED_SERVERS)
+        .map(entry -> entry.getKey() + "=" + entry.getValue())
+        .collect(Collectors.joining(", ", "[", _outdatedServers.size() > MAX_LOGGED_SERVERS ? ", ...]" : "]"));
+  }
+
+  private boolean isOutdated(@Nullable String version) {
+    return version == null || version.equals(PinotVersion.UNKNOWN) || !version.equals(_currentVersion);
+  }
+
+  private static boolean isServer(String instanceId) {
+    return InstanceTypeUtils.getInstanceType(instanceId) == InstanceType.SERVER;
+  }
+
+  /// The version the instance publishes in its instance config, or `null` when it publishes none or its config
+  /// cannot be read. Both read as outdated.
+  @Nullable
+  private String readVersion(HelixAdmin helixAdmin, String instanceId) {
+    try {
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(_clusterName, instanceId);
+      return instanceConfig != null
+          ? instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, null) : null;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read the instance config of server: {}, treating it as outdated", instanceId, e);
+      return null;
+    }
   }
 }

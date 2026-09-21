@@ -668,15 +668,17 @@ public class CommonConstants {
     public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
     public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
 
-    /// Cluster-level default for shipping the leaf-stage segment lists of a multi-stage query as native protobuf
-    /// fields of the worker metadata instead of a JSON string custom property. The proto encoding skips a JSON encode
-    /// per leaf-stage worker on the broker and a JSON parse per worker on the server. Individual queries may override
-    /// this default via the [Request.QueryOptionKey#PROTO_SEGMENT_LIST] query option. Requires all servers to
-    /// understand the proto encoding; enabling it on a mixed-version cluster with older servers fails their leaf
-    /// stages, so only enable it once the whole fleet has been upgraded. Brokers also watch this key in cluster
-    /// config, so it can be turned on right after a rolling upgrade, and back off again, without restarting them.
+    /// How a multi-stage query that does not set the [Request.QueryOptionKey#PROTO_SEGMENT_LIST] query option ships
+    /// its leaf-stage segment lists: as native protobuf fields of the worker metadata, which skips a JSON encode per
+    /// leaf-stage worker on the broker and a JSON parse per worker on the server, or as the legacy JSON string custom
+    /// property. A server that predates the proto fields fails the leaf stages it receives in the proto encoding.
+    /// - `SAFE` (default): proto only while every server of the cluster reports this broker's Pinot version, so the
+    ///   encoding switches itself on when a rolling upgrade completes; multi-cluster queries always use the legacy
+    ///   encoding.
+    /// - `ALWAYS`: proto unconditionally.
+    /// - `NEVER`: legacy unconditionally.
     public static final String CONFIG_OF_MSE_PROTO_SEGMENT_LIST = "pinot.broker.mse.proto.segment.list";
-    public static final boolean DEFAULT_MSE_PROTO_SEGMENT_LIST = false;
+    public static final String DEFAULT_MSE_PROTO_SEGMENT_LIST = "SAFE";
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -951,13 +953,13 @@ public class CommonConstants {
         /// other transport error) during dispatch, the broker cancels the query and surfaces the error to the
         /// client.
         public static final String STREAM_STATS = "streamStats";
-        /// When set to true, the broker ships the leaf-stage segment lists as native protobuf fields of the worker
-        /// metadata instead of the legacy JSON string custom property, skipping a JSON encode per leaf-stage worker on
-        /// the broker and a JSON parse per worker on every server.
+        /// When set, overrides `pinot.broker.mse.proto.segment.list` for one query: `true` ships the leaf-stage
+        /// segment lists as native protobuf fields of the worker metadata, `false` as the legacy JSON string custom
+        /// property.
         ///
-        /// **Mixed-version note.** All servers must understand the proto encoding when this option is enabled: an
-        /// older server finds no segments to scan and fails the leaf stage. Enable it (per query, or cluster-wide via
-        /// `pinot.broker.mse.proto.segment.list`) only once the whole fleet has been upgraded.
+        /// **Mixed-version note.** `true` requires every server the query reaches to understand the proto encoding: an
+        /// older server fails the leaf stage. The broker default (`SAFE`) already picks the proto encoding whenever
+        /// that holds, so this option is mostly useful to force the legacy encoding.
         public static final String PROTO_SEGMENT_LIST = "protoSegmentList";
         /// If set, changes the explain behavior in multi-stage engine.
         ///

@@ -133,20 +133,30 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
   /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
-  /// Cluster-level default for the proto encoding of leaf-stage segment lists. Used as the fallback when the query
-  /// does not carry an explicit [QueryOptionKey#PROTO_SEGMENT_LIST] override. Read per request because operators can
-  /// change it live through cluster config; see [ProtoSegmentListPredicate].
+  /// Picks the leaf-stage segment list encoding of a query that does not carry an explicit
+  /// [QueryOptionKey#PROTO_SEGMENT_LIST] override. Read once per request, since in its default mode it follows the
+  /// server versions of the cluster; see [ProtoSegmentListPredicate].
   private final ProtoSegmentListPredicate _protoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
-        new ProtoSegmentListPredicate(CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST));
+        new ProtoSegmentListPredicate(ProtoSegmentListPredicate.Mode.NEVER));
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
-  /// disables keep-alive.
+  /// disables keep-alive. Kept for callers that predate [ProtoSegmentListPredicate]: they do not watch the server
+  /// versions of the cluster, so they keep the legacy segment list encoding.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout, keepAliveTimeMs,
+        keepAliveTimeoutMs, keepAliveWithoutCalls, streamStatsDefault, statsDrainMs,
+        new ProtoSegmentListPredicate(ProtoSegmentListPredicate.Mode.NEVER));
+  }
+
+  /// Overload that also takes the predicate picking the leaf-stage segment list encoding of each query.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
@@ -366,7 +376,7 @@ public class QueryDispatcher {
     // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
     // before all opchains have responded.
     BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
-    boolean protoSegmentList = QueryOptionsUtils.isProtoSegmentList(queryOptions, _protoSegmentList.isEnabled());
+    boolean protoSegmentList = useProtoSegmentList(queryOptions);
     for (QueryServerInstance server : serversOut) {
       Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, protoSegmentList);
       int expectedForServer = 0;
@@ -641,7 +651,7 @@ public class QueryDispatcher {
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
-    boolean protoSegmentList = QueryOptionsUtils.isProtoSegmentList(queryOptions, _protoSegmentList.isEnabled());
+    boolean protoSegmentList = useProtoSegmentList(queryOptions);
     BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
         serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, protoSegmentList));
 
@@ -705,6 +715,14 @@ public class QueryDispatcher {
     if (deadline.isExpired()) {
       throw new TimeoutException("Timed out waiting for response of async query-dispatch");
     }
+  }
+
+  /// Whether this query ships its leaf-stage segment lists in the proto encoding: the query option if set, otherwise
+  /// the predicate, which has to use the legacy encoding for a multi-cluster query because it cannot see the server
+  /// versions of the other clusters. Resolved once per query so that all of its servers get the same encoding.
+  private boolean useProtoSegmentList(Map<String, String> queryOptions) {
+    return QueryOptionsUtils.isProtoSegmentList(queryOptions,
+        _protoSegmentList.isEnabled(QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)));
   }
 
   /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'

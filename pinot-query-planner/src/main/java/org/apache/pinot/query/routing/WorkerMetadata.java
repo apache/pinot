@@ -82,6 +82,8 @@ public class WorkerMetadata {
     return _tableSegmentsMap;
   }
 
+  /// Stores `tableSegmentsMap` by reference, and it is only encoded for the wire when the query is dispatched, so the
+  /// caller must not mutate it (or its lists) once the plan is built.
   public void setTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
     _tableSegmentsMap = tableSegmentsMap;
   }
@@ -93,6 +95,7 @@ public class WorkerMetadata {
     return _logicalTableSegmentsMap;
   }
 
+  /// Stores `logicalTableSegmentsMap` by reference, with the same no-mutation contract as [#setTableSegmentsMap].
   public void setLogicalTableSegmentsMap(Map<String, List<String>> logicalTableSegmentsMap) {
     _logicalTableSegmentsMap = logicalTableSegmentsMap;
   }

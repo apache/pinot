@@ -18,143 +18,215 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.helix.model.ClusterConfig;
-import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate.Mode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests for the static-config seed, the live cluster-config update path and the precedence between the two that
-/// [ProtoSegmentListPredicate] documents.
+/// Tests for the modes of [ProtoSegmentListPredicate] and for how its SAFE mode follows the server versions published
+/// in the Helix instance configs.
 public class ProtoSegmentListPredicateTest {
   private static final String KEY = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
+  private static final String CLUSTER = "testCluster";
+  private static final String CURRENT = "1.6.0";
+  private static final String OLD = "1.5.0";
+  private static final String SERVER_1 = "Server_host1_8098";
+  private static final String SERVER_2 = "Server_host2_8098";
+  private static final String BROKER = "Broker_host3_8099";
 
   @Test
-  public void testCreateUsesShippedDefaultWhenUnset() {
-    assertFalse(ProtoSegmentListPredicate.create(new PinotConfiguration()).isEnabled());
+  public void testCreateDefaultsToSafe() {
+    assertEquals(ProtoSegmentListPredicate.create(new PinotConfiguration()).getMode(), Mode.SAFE);
   }
 
   @Test
-  public void testCreateReadsStaticBrokerConfig() {
-    assertTrue(ProtoSegmentListPredicate.create(configWith("true")).isEnabled());
-    assertFalse(ProtoSegmentListPredicate.create(configWith("false")).isEnabled());
-  }
-
-  /// An empty static value means "not set", exactly as an empty cluster-config value does, so the two paths cannot
-  /// disagree about what a blank entry means.
-  @Test
-  public void testCreateTreatsEmptyStaticValueAsUnset() {
-    assertFalse(ProtoSegmentListPredicate.create(configWith("")).isEnabled());
-  }
-
-  /// A typo must never enable the setting, on either path: the encoding is only safe on a fully upgraded cluster.
-  @Test
-  public void testUnrecognizedValueReadsAsDisabled() {
-    assertFalse(ProtoSegmentListPredicate.create(configWith("ture")).isEnabled());
-
-    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(true);
-    predicate.onChange(Set.of(KEY), Map.of(KEY, "yes"));
-    assertFalse(predicate.isEnabled());
+  public void testCreateParsesModesCaseInsensitively() {
+    assertEquals(ProtoSegmentListPredicate.create(configWith(" always ")).getMode(), Mode.ALWAYS);
+    assertEquals(ProtoSegmentListPredicate.create(configWith("Never")).getMode(), Mode.NEVER);
+    assertEquals(ProtoSegmentListPredicate.create(configWith("SAFE")).getMode(), Mode.SAFE);
   }
 
   @Test
-  public void testOnChangeEnablesAndDisables() {
-    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(false);
-    predicate.onChange(Set.of(KEY), Map.of(KEY, "true"));
-    assertTrue(predicate.isEnabled());
-    predicate.onChange(Set.of(KEY), Map.of(KEY, "false"));
-    assertFalse(predicate.isEnabled());
+  public void testCreateRejectsUnknownMode() {
+    assertThrows(IllegalArgumentException.class, () -> ProtoSegmentListPredicate.create(configWith("true")));
   }
 
   @Test
-  public void testOnChangeTrimsAndIsCaseInsensitive() {
-    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(false);
-    predicate.onChange(Set.of(KEY), Map.of(KEY, "  TRUE  "));
-    assertTrue(predicate.isEnabled());
+  public void testAlwaysAndNeverIgnoreServerVersionsAndMultiCluster() {
+    ProtoSegmentListPredicate always = new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT);
+    always.refreshAllServers(Map.of(SERVER_1, OLD));
+    assertTrue(always.isEnabled(false));
+    assertTrue(always.isEnabled(true));
+
+    ProtoSegmentListPredicate never = new ProtoSegmentListPredicate(Mode.NEVER, CURRENT);
+    never.refreshAllServers(Map.of(SERVER_1, CURRENT));
+    assertFalse(never.isEnabled(false));
+    assertFalse(never.isEnabled(true));
   }
 
   @Test
-  public void testOnChangeIgnoresChangeThatDoesNotTouchTheKey() {
-    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(true);
-    // The key is present in the config snapshot but not in the changed set, so the value is kept.
-    predicate.onChange(Set.of("some.other.key"), Map.of(KEY, "false", "some.other.key", "x"));
-    assertTrue(predicate.isEnabled());
+  public void testSafeIsDisabledBeforeFirstDelivery() {
+    assertFalse(new ProtoSegmentListPredicate(Mode.SAFE, CURRENT).isEnabled(false));
   }
 
-  /// Clearing the key from cluster config falls back to the shipped default rather than to the static seed, which is
-  /// the safe direction for a setting that is only valid on a fully upgraded cluster.
   @Test
-  public void testOnChangeResetsToDefaultWhenValueRemovedOrEmpty() {
-    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(true);
-    predicate.onChange(Set.of(KEY), Map.of());
-    assertFalse(predicate.isEnabled());
+  public void testSafeFollowsARollingUpgrade() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.refreshAllServers(Map.of(SERVER_1, OLD, SERVER_2, OLD));
+    assertFalse(predicate.isEnabled(false), "no server upgraded yet");
 
-    predicate = new ProtoSegmentListPredicate(true);
-    predicate.onChange(Set.of(KEY), Map.of(KEY, ""));
-    assertFalse(predicate.isEnabled());
+    predicate.refreshServer(SERVER_1, CURRENT);
+    assertFalse(predicate.isEnabled(false), "one server still old");
+
+    predicate.refreshServer(SERVER_2, CURRENT);
+    assertTrue(predicate.isEnabled(false), "the encoding must switch on when the last server is upgraded");
+
+    predicate.refreshServer(SERVER_2, OLD);
+    assertFalse(predicate.isEnabled(false), "a rolled-back server must switch it off again");
   }
 
-  /// The documented precedence "cluster config beats the static seed" holds only because the change handler replays
-  /// the current snapshot to a listener as it is registered. Pinned here against the real handler rather than left to
-  /// the javadoc, since that replay is what lets an operator flip the encoding without restarting the brokers.
   @Test
-  public void testRegistrationReplayLetsClusterConfigWinOverStaticSeed() {
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
-    handler.onClusterConfigChange(clusterConfig(Map.of(KEY, "true")), null);
+  public void testSafeTreatsNewerAndUnknownVersionsAsOutdated() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.refreshAllServers(Map.of(SERVER_1, CURRENT, SERVER_2, "1.7.0"));
+    assertFalse(predicate.isEnabled(false), "a newer version is not provably compatible");
 
-    ProtoSegmentListPredicate predicate = ProtoSegmentListPredicate.create(configWith("false"));
-    assertFalse(predicate.isEnabled(), "static seed applies before registration");
+    predicate.refreshServer(SERVER_2, PinotVersion.UNKNOWN);
+    assertFalse(predicate.isEnabled(false));
 
-    assertTrue(handler.registerClusterConfigChangeListener(predicate));
-    assertTrue(predicate.isEnabled(), "cluster config must win over the static seed");
-
-    // Registration really did wire the listener up, so a later change still reaches it: this is the live disable
-    // path an operator relies on to revert without a broker restart.
-    handler.onClusterConfigChange(clusterConfig(Map.of(KEY, "false")), null);
-    assertFalse(predicate.isEnabled());
+    Map<String, String> missingVersion = new HashMap<>();
+    missingVersion.put(SERVER_1, CURRENT);
+    missingVersion.put(SERVER_2, null);
+    predicate.refreshAllServers(missingVersion);
+    assertFalse(predicate.isEnabled(false), "a server that publishes no version must read as outdated");
   }
 
-  /// The other half of the same contract: a replayed snapshot that does not carry the key must leave the static seed
-  /// alone.
   @Test
-  public void testRegistrationReplayPreservesStaticSeed() {
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
-    handler.onClusterConfigChange(clusterConfig(Map.of("some.other.key", "x")), null);
-
-    ProtoSegmentListPredicate predicate = ProtoSegmentListPredicate.create(configWith("true"));
-    assertTrue(handler.registerClusterConfigChangeListener(predicate));
-    assertTrue(predicate.isEnabled(), "an unrelated cluster config must not clear the seed");
+  public void testSafeNeverEnablesWhenThisBrokerVersionIsUnknown() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, PinotVersion.UNKNOWN);
+    predicate.refreshAllServers(Map.of(SERVER_1, PinotVersion.UNKNOWN));
+    assertFalse(predicate.isEnabled(false));
   }
 
-  /// The ordering the broker actually uses: `BaseBrokerStarter` registers the predicate while it builds the
-  /// multi-stage request handler, which is before the change handler is wired to Helix, so the replay at
-  /// registration carries an empty snapshot. Cluster config must still win once the first real delivery arrives,
-  /// which it does because an empty previous snapshot reports every key as changed.
   @Test
-  public void testRegistrationBeforeFirstDeliveryStillLetsClusterConfigWin() {
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
-
-    ProtoSegmentListPredicate predicate = ProtoSegmentListPredicate.create(configWith("false"));
-    assertTrue(handler.registerClusterConfigChangeListener(predicate));
-    assertFalse(predicate.isEnabled(), "empty replay must leave the static seed alone");
-
-    handler.onClusterConfigChange(clusterConfig(Map.of(KEY, "true")), null);
-    assertTrue(predicate.isEnabled(), "first real delivery must apply the cluster config");
-
-    handler.onClusterConfigChange(clusterConfig(Map.of(KEY, "false")), null);
-    assertFalse(predicate.isEnabled());
+  public void testSafeUsesLegacyEncodingForMultiClusterQueries() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.refreshAllServers(Map.of(SERVER_1, CURRENT));
+    assertTrue(predicate.isEnabled(false));
+    assertFalse(predicate.isEnabled(true), "servers of remote clusters are not watched");
   }
 
-  private static ClusterConfig clusterConfig(Map<String, String> configs) {
-    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
-    configs.forEach((key, value) -> clusterConfig.getRecord().setSimpleField(key, value));
-    return clusterConfig;
+  @Test
+  public void testFullRefreshForgetsRemovedServers() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.refreshAllServers(Map.of(SERVER_1, CURRENT, SERVER_2, OLD));
+    assertFalse(predicate.isEnabled(false));
+
+    predicate.refreshAllServers(Map.of(SERVER_1, CURRENT));
+    assertTrue(predicate.isEnabled(false), "a decommissioned old server must stop blocking the encoding");
+  }
+
+  /// The Helix translation: the initial delivery reads every server (and skips brokers, which never decode the
+  /// fields), and a later change to one instance config reads just that instance.
+  @Test
+  public void testHelixDeliveriesDriveTheView()
+      throws Exception {
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixAdmin.getInstancesInCluster(CLUSTER)).thenReturn(List.of(SERVER_1, SERVER_2, BROKER));
+    when(helixAdmin.getInstanceConfig(CLUSTER, SERVER_1)).thenReturn(instanceConfig(SERVER_1, CURRENT));
+    when(helixAdmin.getInstanceConfig(CLUSTER, SERVER_2)).thenReturn(instanceConfig(SERVER_2, OLD));
+    HelixManager helixManager = helixManager(helixAdmin);
+
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.watchInstanceConfigs(helixManager);
+    verify(helixManager).addInstanceConfigChangeListener(predicate);
+
+    predicate.onInstanceConfigChange(List.of(), notification(helixManager, NotificationContext.Type.INIT, false, null));
+    assertFalse(predicate.isEnabled(false));
+    verify(helixAdmin, never()).getInstanceConfig(CLUSTER, BROKER);
+
+    when(helixAdmin.getInstanceConfig(CLUSTER, SERVER_2)).thenReturn(instanceConfig(SERVER_2, CURRENT));
+    predicate.onInstanceConfigChange(List.of(), notification(helixManager, NotificationContext.Type.CALLBACK, false,
+        "/" + CLUSTER + "/CONFIGS/PARTICIPANT/" + SERVER_2));
+    assertTrue(predicate.isEnabled(false));
+  }
+
+  /// Unlike SendStatsPredicate, an unreadable instance config fails closed: the cost of wrongly enabling the encoding
+  /// is a failed query.
+  @Test
+  public void testUnreadableInstanceConfigCountsAsOutdated()
+      throws Exception {
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixAdmin.getInstancesInCluster(CLUSTER)).thenReturn(List.of(SERVER_1));
+    when(helixAdmin.getInstanceConfig(CLUSTER, SERVER_1)).thenThrow(new RuntimeException("ZK hiccup"));
+    HelixManager helixManager = helixManager(helixAdmin);
+
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.watchInstanceConfigs(helixManager);
+    predicate.onInstanceConfigChange(List.of(), notification(helixManager, NotificationContext.Type.INIT, false, null));
+    assertFalse(predicate.isEnabled(false));
+  }
+
+  @Test
+  public void testWatchIsANoOpOutsideSafeMode()
+      throws Exception {
+    HelixManager helixManager = helixManager(mock(HelixAdmin.class));
+    new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT).watchInstanceConfigs(helixManager);
+    new ProtoSegmentListPredicate(Mode.NEVER, CURRENT).watchInstanceConfigs(helixManager);
+    verify(helixManager, never()).addInstanceConfigChangeListener(any());
+  }
+
+  /// A failed registration must not fail broker startup; it just leaves SAFE on the legacy encoding.
+  @Test
+  public void testFailedRegistrationLeavesTheLegacyEncoding()
+      throws Exception {
+    HelixManager helixManager = helixManager(mock(HelixAdmin.class));
+    doThrow(new RuntimeException("not connected")).when(helixManager).addInstanceConfigChangeListener(any());
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.watchInstanceConfigs(helixManager);
+    assertFalse(predicate.isEnabled(false));
+  }
+
+  private static HelixManager helixManager(HelixAdmin helixAdmin) {
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn(CLUSTER);
+    return helixManager;
+  }
+
+  private static InstanceConfig instanceConfig(String instanceId, String version) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, version);
+    return instanceConfig;
+  }
+
+  private static NotificationContext notification(HelixManager helixManager, NotificationContext.Type type,
+      boolean childChange, String pathChanged) {
+    NotificationContext context = new NotificationContext(helixManager);
+    context.setType(type);
+    context.setIsChildChange(childChange);
+    context.setPathChanged(pathChanged);
+    return context;
   }
 
   private static PinotConfiguration configWith(String value) {

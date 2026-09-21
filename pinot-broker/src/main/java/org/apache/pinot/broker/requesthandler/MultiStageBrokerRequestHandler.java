@@ -146,8 +146,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
   private final boolean _streamStatsDefault;
-  /// Live cluster-config default for the proto segment list encoding. Registered as a cluster-config
-  /// listener by the broker starter so operators can flip it without restarting the brokers.
+  /// Picks the default leaf-stage segment list encoding. The broker starter makes it watch the server versions of
+  /// the cluster, which its default mode follows.
   private final ProtoSegmentListPredicate _protoSegmentListPredicate;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
@@ -1110,8 +1110,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return _queryDispatcher;
   }
 
-  /// The live default for the proto segment list encoding, to be registered as a cluster-config change listener by
-  /// the broker starter.
+  /// The predicate picking the default leaf-stage segment list encoding, for the broker starter to make it watch the
+  /// server versions of the cluster.
   public ProtoSegmentListPredicate getProtoSegmentListPredicate() {
     return _protoSegmentListPredicate;
   }
