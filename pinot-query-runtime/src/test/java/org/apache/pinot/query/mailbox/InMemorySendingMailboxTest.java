@@ -49,4 +49,16 @@ public class InMemorySendingMailboxTest {
       Mockito.verifyNoInteractions(mailboxService);
     }
   }
+
+  @Test
+  public void deliversBlocksByReference() {
+    InMemorySendingMailbox mailbox =
+        new InMemorySendingMailbox("test-mailbox", Mockito.mock(MailboxService.class), Long.MAX_VALUE,
+            new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    // Blocks are offered to the receiving mailbox as they are, so senders that share one block between mailboxes
+    // must give this one a copy. See BroadcastExchange.
+    Assert.assertTrue(mailbox.deliversByReference());
+    Assert.assertTrue(mailbox.isLocal());
+  }
 }
