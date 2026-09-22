@@ -65,19 +65,26 @@ public interface PartitionFunction extends Serializable {
 
   /// Returns whether the exposed function configuration is null or empty. This does not imply that other settings,
   /// such as the partition id normalizer, have their default values.
+  /// Public helper for implementations overriding [#canReusePartitionIds(PartitionFunction)].
   @JsonIgnore
   default boolean hasEmptyConfig() {
     Map<String, String> config = getFunctionConfig();
     return config == null || config.isEmpty();
   }
 
-  /// Returns whether partition ids computed by this function can be reused for the non-null `other` function.
-  /// A true result must guarantee identical results for every input value. False is conservative, not proof that the
-  /// functions differ. Implementations with additional output-affecting state must account for it in this method.
+  /// Returns whether this function and the non-null `other` function compute identical partition ids for every input.
+  /// This relation must be reflexive, symmetric and transitive: callers may share ids computed by any member of a
+  /// compatible group, not just this instance. A coarser partitioning or a superset is not sufficient.
+  /// False for distinct instances is conservative, not proof that their results differ.
+  /// Implementations with additional output-affecting state must account for it in this method.
   ///
-  /// The default only permits matching functions with empty exposed configurations, without comparing config contents.
+  /// The default permits the same instance or matching functions with empty exposed configurations, without comparing
+  /// config contents. It assumes all output-affecting settings are represented by the exposed config/count/normalizer.
   /// Configured implementations may override this method to compare their effective settings.
   default boolean canReusePartitionIds(PartitionFunction other) {
+    if (this == other) {
+      return true;
+    }
     return hasEmptyConfig() && other.hasEmptyConfig() && getClass() == other.getClass()
         && getName().equals(other.getName()) && getNumPartitions() == other.getNumPartitions()
         && getPartitionIdNormalizer() == other.getPartitionIdNormalizer();
