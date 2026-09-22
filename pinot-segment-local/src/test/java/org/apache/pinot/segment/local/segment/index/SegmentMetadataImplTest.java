@@ -108,7 +108,7 @@ public class SegmentMetadataImplTest {
 
     JsonNode jsonMeta = metadata.toJson(null);
     assertEquals(jsonMeta.get("segmentName").asText(), metadata.getName());
-    Assert.assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
+    Assert.assertEquals(jsonMeta.get("crc").asLong(), metadata.getCrc());
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
     assertEquals(jsonMeta.get("timeColumn").asText(), metadata.getTimeColumn());

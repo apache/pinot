@@ -114,7 +114,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
     Assert.assertFalse(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME).exists());
     SegmentMetadataImpl metaAfterConversion = new SegmentMetadataImpl(_segmentDirectory);
     Assert.assertNotNull(metaAfterConversion);
-    Assert.assertFalse(metaAfterConversion.getCrc().equalsIgnoreCase(String.valueOf(Long.MIN_VALUE)));
+    Assert.assertNotEquals(metaAfterConversion.getCrc(), Long.MIN_VALUE);
     Assert.assertEquals(metaAfterConversion.getCrc(), beforeConversionMeta.getCrc());
     Assert.assertTrue(metaAfterConversion.getIndexCreationTime() != Long.MIN_VALUE);
     Assert.assertEquals(metaAfterConversion.getIndexCreationTime(), beforeConversionMeta.getIndexCreationTime());

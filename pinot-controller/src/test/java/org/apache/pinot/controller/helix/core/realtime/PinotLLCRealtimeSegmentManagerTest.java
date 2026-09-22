@@ -143,8 +143,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final long END_TIME_MS = START_TIME_MS + TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 1);
   private static final Interval INTERVAL = new Interval(START_TIME_MS, END_TIME_MS);
   // NOTE: CRC is always non-negative
-  private static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
-  private static final String DATA_CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
+  private static final long CRC = RANDOM.nextLong() & 0xFFFFFFFFL;
+  private static final long DATA_CRC = RANDOM.nextLong() & 0xFFFFFFFFL;
   private static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
 
   @AfterClass
@@ -341,8 +341,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
     assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-    assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
-    assertEquals(committedSegmentZKMetadata.getDataCrc(), Long.parseLong(DATA_CRC));
+    assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
+    assertEquals(committedSegmentZKMetadata.getDataCrc(), DATA_CRC);
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
     assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -419,7 +419,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getStartOffset(), committingSegmentStartOffset);
     assertEquals(committedSegmentZKMetadata.getEndOffset(), committingSegmentEndOffset);
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-    assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+    assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
     assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -614,7 +614,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
       assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
       assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
       assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
       assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -678,7 +678,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
       assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
       assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
       assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
       assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);

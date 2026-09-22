@@ -162,7 +162,7 @@ public class BaseTableDataManagerTest {
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn("0");
+    when(localMetadata.getCrc()).thenReturn(0L);
 
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
@@ -185,7 +185,7 @@ public class BaseTableDataManagerTest {
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn("0");
+    when(localMetadata.getCrc()).thenReturn(0L);
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -222,7 +222,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
@@ -253,7 +253,7 @@ public class BaseTableDataManagerTest {
     when(zkMetadata.getCrc()).thenReturn(crc);
     when(zkMetadata.getTier()).thenReturn(TIER_NAME);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -289,7 +289,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // Require to use v3 format.
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -319,7 +319,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // Require to add indices.
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
@@ -346,7 +346,7 @@ public class BaseTableDataManagerTest {
         makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
             false);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
+    assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
 
     // Same CRC but force to download.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -366,7 +366,7 @@ public class BaseTableDataManagerTest {
     tableDataManager.reloadSegment(SEGMENT_NAME, true, null);
     assertTrue(indexDir.exists());
     segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
+    assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
     assertEquals(segmentMetadata.getTotalDocs(), 5);
   }
 
@@ -847,7 +847,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+    when(segmentMetadata.getDataCrc()).thenReturn(99999L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -871,7 +871,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, segmentCrc);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("11111");
+    when(segmentMetadata.getDataCrc()).thenReturn(11111L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -893,7 +893,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+    when(segmentMetadata.getDataCrc()).thenReturn(99999L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -1182,7 +1182,7 @@ public class BaseTableDataManagerTest {
 
   protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(segmentMetadata.getCrc()).thenReturn(crc);
     return createImmutableSegmentDataManager(segmentName, segmentMetadata);
   }
 

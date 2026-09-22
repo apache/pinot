@@ -325,7 +325,7 @@ public class ImmutableSegmentLoader {
         segmentVersionOnDisk, segmentVersionToLoad);
   }
 
-  private static void preprocessSegment(File indexDir, String segmentName, String segmentCrc,
+  private static void preprocessSegment(File indexDir, String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       SegmentZKMetadata zkMetadata)
       throws Exception {
