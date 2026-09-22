@@ -68,8 +68,7 @@ public class SegmentCommitterFactory {
     if (uploadToFs || peerSegmentDownloadScheme != null) {
       // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
       segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
-          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
-          instanceDataManagerConfig.getInstanceId());
+          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
     } else {
       segmentUploader = new Server2ControllerSegmentUploader(_logger,
           _protocolHandler.getFileUploadDownloadClient(),

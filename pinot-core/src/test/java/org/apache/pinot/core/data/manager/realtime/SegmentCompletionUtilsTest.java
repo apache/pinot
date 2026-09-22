@@ -18,74 +18,43 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.UUID;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 public class SegmentCompletionUtilsTest {
-  private static final String SEGMENT_NAME = "table__0__1__123";
-  private static final String SERVER_A = "Server_host-a_8098";
-  private static final String SERVER_B = "Server_host-b_8098";
 
   @Test
   public void testGenerateSegmentFilePrefix() {
-    assertEquals(SegmentCompletionUtils.getTmpSegmentNamePrefix("segment"), "segment.tmp.");
+    String segmentName = "segment";
+    assertEquals(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName), "segment.tmp.");
   }
 
   @Test
-  public void testSameServerRetryReusesTempKey() {
-    String first = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, SERVER_A);
-    String retry = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, SERVER_A);
-    assertEquals(first, SEGMENT_NAME + ".tmp." + SERVER_A);
-    assertEquals(retry, first);
-  }
-
-  @Test
-  public void testTwoReplicasDoNotShareTempKey() {
-    String replicaA = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, SERVER_A);
-    String replicaB = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, SERVER_B);
-    assertNotEquals(replicaA, replicaB);
-    assertTrue(replicaA.endsWith(SERVER_A));
-    assertTrue(replicaB.endsWith(SERVER_B));
-    assertFalse(replicaA.contains(SERVER_B));
-    assertFalse(replicaB.contains(SERVER_A));
-  }
-
-  @Test
-  public void testUuidGeneratorStillMintsDistinctLeftoverNames() {
-    String first = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME);
-    String second = SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME);
-    assertTrue(first.startsWith(SEGMENT_NAME + ".tmp."));
-    assertTrue(second.startsWith(SEGMENT_NAME + ".tmp."));
+  public void testGenerateSegmentLocation() {
+    String segmentName = "segment";
+    String first = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String second = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    assertTrue(first.startsWith(segmentName + ".tmp."));
     assertNotEquals(first, second);
+    UUID.fromString(first.substring((segmentName + ".tmp.").length()));
     assertTrue(SegmentCompletionUtils.isTmpFile(first));
-    assertTrue(SegmentCompletionUtils.isTmpFile(second));
   }
 
   @Test
-  public void testRejectsUnsafeInstanceId() {
-    expectThrows(IllegalArgumentException.class,
-        () -> SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, ""));
-    expectThrows(IllegalArgumentException.class,
-        () -> SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, "Server_host/8098"));
-    expectThrows(IllegalArgumentException.class,
-        () -> SegmentCompletionUtils.generateTmpSegmentFileName(SEGMENT_NAME, "Server_host\\8098"));
-    expectThrows(IllegalArgumentException.class, () -> SegmentCompletionUtils.generateTmpSegmentFileName("", SERVER_A));
-  }
-
-  @Test
-  public void testIsTmpFileRecognizesInstanceIdAndLeftoverUuid() {
+  public void testIsTmpFile() {
     assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.550e8400-e29b-41d4-a716-446655440000"));
-    assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://foo/" + SEGMENT_NAME + ".tmp." + SERVER_A));
-    assertTrue(SegmentCompletionUtils.isTmpFile("s3://bucket/" + SEGMENT_NAME + ".tmp.Server_foo.bar.com_8098"));
+    assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://batch.tmp." + UUID.randomUUID()));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://batch.tmp.20260918"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.not/a-uuid"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.not\\a-uuid"));
     assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp."));
     assertFalse(SegmentCompletionUtils.isTmpFile(".tmp.550e8400-e29b-41d4-a716-446655440000"));
-    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo/" + SEGMENT_NAME));
-    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.Server_host/8098"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.55"));
   }
 }

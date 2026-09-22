@@ -110,6 +110,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -1250,8 +1251,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String otherSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
     String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
     String extraSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
-    String extraInstanceIdFileName =
-        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, "Server_host-a_8098");
+    String extraInstanceIdFileName = segmentName + ".tmp.Server_host-a_8098";
     String otherSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(otherSegmentName);
     File segmentFile = new File(tableDir, segmentFileName);
     File extraSegmentFile = new File(tableDir, extraSegmentFileName);
@@ -1955,7 +1955,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testDeleteInstanceIdTmpSegmentFiles()
+  public void testDeleteTmpSegmentsKeepsCompletedOfflineSegments()
       throws Exception {
     ControllerConf config = new ControllerConf();
     config.setDataDir(TEMP_DIR.toString());
@@ -1965,25 +1965,131 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotFSFactory.init(new PinotConfiguration());
     File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
     FileUtils.deleteDirectory(tableDir);
+    assertTrue(tableDir.mkdirs());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
-    String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, "Server_host-a_8098");
-    File segmentFile = new File(tableDir, segmentFileName);
-    FileUtils.write(segmentFile, "temporary file contents", Charset.defaultCharset());
 
     SegmentZKMetadata segZKMeta = mock(SegmentZKMetadata.class);
+    when(segZKMeta.getStatus()).thenReturn(Status.DONE);
+    when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
     PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
-    when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .build());
     PinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(helixResourceManager, config);
 
-    when(segZKMeta.getStatus()).thenReturn(Status.DONE);
-    when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
+    // No temp file. Do not read offline ZooKeeper at all.
+    File datedBatchFile = new File(tableDir, "batch.tmp.20260918");
+    FileUtils.write(datedBatchFile, "permanent batch segment", Charset.defaultCharset());
     int numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
-    assertFalse(segmentFile.exists());
+    assertTrue(datedBatchFile.exists());
+    assertEquals(numDeletedTmpSegments, 0);
+    verify(helixResourceManager, never()).getTableConfig(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsFromPropertyStore(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(offlineTableName);
+    clearInvocations(helixResourceManager);
+
+    // No offline table. The aged UUID orphan is still deleted.
+    String orphanFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    File orphanFile = new File(tableDir, orphanFileName);
+    FileUtils.write(orphanFile, "temporary file contents", Charset.defaultCharset());
+    numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
+    assertFalse(orphanFile.exists());
+    assertTrue(datedBatchFile.exists());
     assertEquals(numDeletedTmpSegments, 1);
+    verify(helixResourceManager).getTableConfig(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsFromPropertyStore(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(offlineTableName);
+    clearInvocations(helixResourceManager);
+
+    // Offline table exists, but no segment name matches a listed temp path. Do not load full metadata.
+    FileUtils.deleteDirectory(tableDir);
+    orphanFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    orphanFile = new File(tableDir, orphanFileName);
+    datedBatchFile = new File(tableDir, "batch.tmp.20260918");
+    FileUtils.write(orphanFile, "temporary file contents", Charset.defaultCharset());
+    FileUtils.write(datedBatchFile, "permanent batch segment", Charset.defaultCharset());
+    when(helixResourceManager.getTableConfig(offlineTableName)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build());
+    when(helixResourceManager.getSegmentsFromPropertyStore(offlineTableName))
+        .thenReturn(List.of("unrelatedOfflineSegment"));
+    numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
+    assertFalse(orphanFile.exists());
+    assertTrue(datedBatchFile.exists());
+    assertEquals(numDeletedTmpSegments, 1);
+    verify(helixResourceManager).getSegmentsFromPropertyStore(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(offlineTableName);
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(eq(offlineTableName), anyList(), isNull());
+    clearInvocations(helixResourceManager);
+
+    orphanFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    orphanFile = new File(tableDir, orphanFileName);
+    String completedBatchName = "batch.tmp." + UUID.randomUUID();
+    String inProgressName = "batch.tmp." + UUID.randomUUID();
+    String committingName = "batch.tmp." + UUID.randomUUID();
+    String downloadUrlName = "batch.tmp." + UUID.randomUUID();
+    File completedBatchFile = new File(tableDir, completedBatchName);
+    File inProgressFile = new File(tableDir, inProgressName);
+    File committingFile = new File(tableDir, committingName);
+    File downloadUrlFile = new File(tableDir, downloadUrlName);
+    FileUtils.write(orphanFile, "temporary file contents", Charset.defaultCharset());
+    FileUtils.write(completedBatchFile, "completed offline segment", Charset.defaultCharset());
+    FileUtils.write(inProgressFile, "in progress offline segment", Charset.defaultCharset());
+    FileUtils.write(committingFile, "committing offline segment", Charset.defaultCharset());
+    FileUtils.write(downloadUrlFile, "download url alias", Charset.defaultCharset());
+
+    String downloadUrl = URIUtils.getUri(downloadUrlFile.getAbsolutePath()).toString();
+    SegmentZKMetadata completedSegment = new SegmentZKMetadata(completedBatchName);
+    completedSegment.setStatus(Status.UPLOADED);
+    completedSegment.setDownloadUrl(downloadUrl);
+    SegmentZKMetadata inProgressSegment = new SegmentZKMetadata(inProgressName);
+    inProgressSegment.setStatus(Status.IN_PROGRESS);
+    inProgressSegment.setDownloadUrl(URIUtils.getUri(inProgressFile.getAbsolutePath()).toString());
+    SegmentZKMetadata committingSegment = new SegmentZKMetadata(committingName);
+    committingSegment.setStatus(Status.COMMITTING);
+    committingSegment.setDownloadUrl(URIUtils.getUri(committingFile.getAbsolutePath()).toString());
+    Map<String, SegmentZKMetadata> metadataByName = new HashMap<>();
+    metadataByName.put(completedBatchName, completedSegment);
+    metadataByName.put(inProgressName, inProgressSegment);
+    metadataByName.put(committingName, committingSegment);
+    when(helixResourceManager.getSegmentsFromPropertyStore(offlineTableName)).thenReturn(
+        List.of(completedBatchName, inProgressName, committingName, "unrelatedOfflineSegment"));
+    when(helixResourceManager.getSegmentsZKMetadata(eq(offlineTableName), anyList(), isNull())).thenAnswer(
+        invocation -> {
+          List<String> requested = invocation.getArgument(1);
+          List<SegmentZKMetadata> metadata = new ArrayList<>();
+          for (String name : requested) {
+            metadata.add(metadataByName.get(name));
+          }
+          return metadata;
+        });
+
+    numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
+    assertFalse(orphanFile.exists());
+    assertFalse(inProgressFile.exists());
+    assertFalse(committingFile.exists());
+    assertTrue(datedBatchFile.exists());
+    assertTrue(completedBatchFile.exists());
+    assertTrue(downloadUrlFile.exists());
+    assertEquals(numDeletedTmpSegments, 3);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<String>> namesCaptor = ArgumentCaptor.forClass(List.class);
+    verify(helixResourceManager).getSegmentsZKMetadata(eq(offlineTableName), namesCaptor.capture(), isNull());
+    assertEquals(new HashSet<>(namesCaptor.getValue()), Set.of(completedBatchName, inProgressName, committingName));
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(offlineTableName);
+
+    // file:/// dataDir and listFiles' file:/ form must still keep the completed temp-shaped name.
+    ControllerConf schemeConfig = new ControllerConf();
+    schemeConfig.setDataDir("file://" + TEMP_DIR.getAbsolutePath());
+    schemeConfig.setProperty(TMP_SEGMENT_RETENTION_IN_SECONDS, Integer.MIN_VALUE);
+    schemeConfig.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
+    PinotLLCRealtimeSegmentManager schemeManager =
+        new FakePinotLLCRealtimeSegmentManager(helixResourceManager, schemeConfig);
+    clearInvocations(helixResourceManager);
+    numDeletedTmpSegments = schemeManager.deleteTmpSegments(REALTIME_TABLE_NAME, List.of(segZKMeta));
+    assertTrue(completedBatchFile.exists());
+    assertTrue(downloadUrlFile.exists());
+    assertTrue(datedBatchFile.exists());
+    assertEquals(numDeletedTmpSegments, 0);
+    verify(helixResourceManager, never()).getSegmentsZKMetadata(offlineTableName);
   }
 
   @Test

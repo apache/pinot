@@ -229,15 +229,13 @@ public class LLCSegmentCompletionHandlers {
 
     // Get the segment from the form input and put it into the data directory (could be remote)
     File localTempFile = null;
+    URI segmentFileURI = null;
     try {
       localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
       String rawTableName = new LLCSegmentName(segmentName).getTableName();
-      String tmpSegmentFileName = instanceId != null && !instanceId.isBlank()
-          ? SegmentCompletionUtils.generateTmpSegmentFileName(segmentName, instanceId)
-          : SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
-      URI segmentFileURI =
+      segmentFileURI =
           URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-              URIUtils.encode(tmpSegmentFileName));
+              URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
       // Emit metrics related to deep-store upload operation
       long startTimeMs = System.currentTimeMillis();
       long segmentSizeBytes = localTempFile.length();
@@ -255,6 +253,15 @@ public class LLCSegmentCompletionHandlers {
       return response;
     } catch (Exception e) {
       LOGGER.error("Caught exception while uploading segment: {} from instance: {}", segmentName, instanceId, e);
+      // This response does not hand the URI back, so remove an object the copy may have stored. A throwing delete
+      // must not turn RESP_FAILED into a server error.
+      if (segmentFileURI != null) {
+        try {
+          PinotFSFactory.create(segmentFileURI.getScheme()).delete(segmentFileURI, true);
+        } catch (Exception deleteFailure) {
+          LOGGER.warn("Failed to delete temporary segment file: {}", segmentFileURI, deleteFailure);
+        }
+      }
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     } finally {
       FileUtils.deleteQuietly(localTempFile);

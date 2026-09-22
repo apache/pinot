@@ -151,7 +151,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentOperationsThrottlerSet,
         _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
-        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics, _instanceId);
+        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     initInstanceDataDir(instanceDataDir);

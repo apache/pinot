@@ -241,8 +241,7 @@ public class ReingestionResource {
 
       ServerSegmentCompletionProtocolHandler protocolHandler =
           new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), realtimeTableName);
-      protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile,
-          _serverInstance.getInstanceDataManager().getInstanceId());
+      protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
 
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     }
