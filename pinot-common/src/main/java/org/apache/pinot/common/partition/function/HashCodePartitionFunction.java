@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 
@@ -34,11 +35,14 @@ public class HashCodePartitionFunction implements PartitionFunction {
   private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.PRE_MODULO_ABS;
   private final int _numPartitions;
   private final PartitionIdNormalizer _normalizer;
+  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public HashCodePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
+    _partitionFunctionIdentity =
+        PartitionFunctionIdentity.of(HashCodePartitionFunction.class, _numPartitions, _normalizer);
   }
 
   @Override
@@ -59,6 +63,11 @@ public class HashCodePartitionFunction implements PartitionFunction {
   @Override
   public PartitionIdNormalizer getPartitionIdNormalizer() {
     return _normalizer;
+  }
+
+  @Override
+  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
+    return _partitionFunctionIdentity;
   }
 
   // Keep it for backward-compatibility, use getName() instead
