@@ -470,7 +470,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     Preconditions.checkState(zkMetadata.getStatus() != Status.IN_PROGRESS,
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig(zkMetadata.getTier());
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig().withSegmentTier(zkMetadata.getTier());
     handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
@@ -540,7 +540,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Segment: {} is already completed, skipping adding it as CONSUMING segment", segmentName);
       return;
     }
-    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig(null);
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
     handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
@@ -751,7 +751,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and replacing CONSUMING segment: {} with committed one", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig(zkMetadata.getTier());
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig().withSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
         zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
@@ -771,7 +771,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
-    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig(null);
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
 

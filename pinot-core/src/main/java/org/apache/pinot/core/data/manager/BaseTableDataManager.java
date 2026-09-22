@@ -117,9 +117,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
@@ -440,31 +438,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return indexLoadingConfig;
   }
 
-  /// Returns the shared processed config for ordinary loads. Callers must not modify it.
-  /// Tier overrides, OPEN_STRUCT children, and schema-less loads require segment-local mutable configs.
+  /// Returns the shared processed config for ordinary loads. Segment-specific settings are applied with the
+  /// `with...` methods on [IndexLoadingConfig], which share its processed table-level state.
   /// Explicit reloads and config/schema refresh messages still use [#fetchIndexLoadingConfig()].
-  protected IndexLoadingConfig getCachedIndexLoadingConfig(@Nullable String segmentTier) {
+  protected IndexLoadingConfig getCachedIndexLoadingConfig() {
     Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
-    Schema schema = cached.getRight();
-    boolean shareConfig = segmentTier == null && schema != null;
-    if (shareConfig) {
-      for (ComplexFieldSpec fieldSpec : schema.getComplexFieldSpecs()) {
-        if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
-          shareConfig = false;
-          break;
-        }
-      }
-    }
     IndexLoadingConfig indexLoadingConfig = _cachedIndexLoadingConfig;
-    if (!shareConfig || indexLoadingConfig == null || indexLoadingConfig.getTableConfig() != cached.getLeft()
-        || indexLoadingConfig.getSchema() != schema) {
-      indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), schema);
+    if (indexLoadingConfig == null || indexLoadingConfig.getTableConfig() != cached.getLeft()
+        || indexLoadingConfig.getSchema() != cached.getRight()) {
+      indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
       indexLoadingConfig.setTableDataDir(_tableDataDir);
-      if (shareConfig) {
-        _cachedIndexLoadingConfig = indexLoadingConfig;
-      } else {
-        indexLoadingConfig.setSegmentTier(segmentTier);
-      }
+      _cachedIndexLoadingConfig = indexLoadingConfig;
     }
     return indexLoadingConfig;
   }

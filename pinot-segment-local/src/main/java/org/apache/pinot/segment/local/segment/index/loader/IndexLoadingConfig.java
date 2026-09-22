@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -44,8 +45,10 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -88,6 +91,7 @@ public class IndexLoadingConfig {
   private boolean _enableDefaultStarTree;
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
   private boolean _skipSegmentPreprocess;
+  private boolean _hasOpenStructColumns;
 
   private boolean _dirty = true;
 
@@ -102,6 +106,38 @@ public class IndexLoadingConfig {
     _tableConfig = tableConfig;
     _schema = schema;
     init();
+  }
+
+  /// Creates a segment-local wrapper around the already processed table-level config. The wrapper shares the
+  /// table config, schema, and resolved index configs until a segment-specific override requires a local copy.
+  private IndexLoadingConfig(IndexLoadingConfig source) {
+    _instanceDataManagerConfig = source._instanceDataManagerConfig;
+    _tableConfig = source._tableConfig;
+    _schema = source._schema;
+    _readMode = source._readMode;
+    _segmentVersion = source._segmentVersion;
+    _segmentTier = source._segmentTier;
+    _knownColumns = source._knownColumns != null ? new HashSet<>(source._knownColumns) : null;
+    _tableDataDir = source._tableDataDir;
+    _errorOnColumnBuildFailure = source._errorOnColumnBuildFailure;
+    _forwardIndexOnly = source._forwardIndexOnly;
+    _instanceId = source._instanceId;
+    _isRealtimeOffHeapAllocation = source._isRealtimeOffHeapAllocation;
+    _isDirectRealtimeOffHeapAllocation = source._isDirectRealtimeOffHeapAllocation;
+    _realtimeAvgMultiValueCount = source._realtimeAvgMultiValueCount;
+    _segmentStoreURI = source._segmentStoreURI;
+    _segmentDirectoryLoader = source._segmentDirectoryLoader;
+    _instanceTierConfigs = source._instanceTierConfigs;
+    _sortedColumns = source._sortedColumns;
+    _columnMinMaxValueGeneratorMode = source._columnMinMaxValueGeneratorMode;
+    _enableDynamicStarTreeCreation = source._enableDynamicStarTreeCreation;
+    _starTreeIndexConfigs = source._starTreeIndexConfigs;
+    _enableDefaultStarTree = source._enableDefaultStarTree;
+    _indexConfigsByColName = source._indexConfigsByColName;
+    _skipSegmentPreprocess = source._skipSegmentPreprocess;
+    _hasOpenStructColumns = source._hasOpenStructColumns;
+    _multiColTextIndexConfig = source._multiColTextIndexConfig;
+    _dirty = source._dirty;
   }
 
   @VisibleForTesting
@@ -173,6 +209,12 @@ public class IndexLoadingConfig {
   private void extractFromTableConfigAndSchema() {
     if (_schema != null) {
       TimestampIndexUtils.applyTimestampIndex(_tableConfig, _schema);
+      for (ComplexFieldSpec fieldSpec : _schema.getComplexFieldSpecs()) {
+        if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
+          _hasOpenStructColumns = true;
+          break;
+        }
+      }
     }
 
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
@@ -232,7 +274,7 @@ public class IndexLoadingConfig {
     }
     Schema schema = new Schema();
     for (String column : getAllKnownColumns()) {
-      schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true));
+      schema.addField(new DimensionFieldSpec(column, DataType.STRING, true));
     }
     return schema;
   }
@@ -327,6 +369,15 @@ public class IndexLoadingConfig {
     _dirty = true;
   }
 
+  public IndexLoadingConfig withSegmentTier(@Nullable String segmentTier) {
+    if (Objects.equals(_segmentTier, segmentTier)) {
+      return this;
+    }
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived.setSegmentTier(segmentTier);
+    return derived;
+  }
+
   public String getTableDataDir() {
     return _tableDataDir;
   }
@@ -409,10 +460,14 @@ public class IndexLoadingConfig {
     return map == null ? null : Collections.unmodifiableMap(map);
   }
 
-  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+  public IndexLoadingConfig withOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    if (!_hasOpenStructColumns) {
+      return this;
+    }
     if (_indexConfigsByColName == null || _dirty) {
       refreshIndexConfigs();
     }
+    Map<String, FieldIndexConfigs> updatedConfigs = null;
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String childColumn = entry.getKey();
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
@@ -442,8 +497,30 @@ public class IndexLoadingConfig {
           FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
           .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
           .build();
-      _indexConfigsByColName.put(childColumn, childConfigs);
+      if (updatedConfigs == null) {
+        updatedConfigs = new HashMap<>(_indexConfigsByColName);
+      }
+      updatedConfigs.put(childColumn, childConfigs);
     }
+    if (updatedConfigs == null) {
+      return this;
+    }
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived._indexConfigsByColName = updatedConfigs;
+    return derived;
+  }
+
+  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    _indexConfigsByColName = withOpenStructChildConfigs(segmentMetadata)._indexConfigsByColName;
+  }
+
+  public IndexLoadingConfig withKnownColumns(Set<String> columns) {
+    if (_knownColumns != null && _knownColumns.containsAll(columns)) {
+      return this;
+    }
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived.addKnownColumns(columns);
+    return derived;
   }
 
   public void addKnownColumns(Set<String> columns) {
