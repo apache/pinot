@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -122,13 +123,32 @@ public class ItemTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getFloatValuesSV();
+  }
+
+  @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_keyPath).getDoubleValuesSV();
+  }
+
+  /// Without this the base class has no way to produce a BIG_DECIMAL: its conversion switch widens INT, LONG, FLOAT,
+  /// DOUBLE, STRING and BYTES into one, but a key whose own type is already BIG_DECIMAL matches no case and throws
+  /// `Cannot read SV BIG_DECIMAL as BIG_DECIMAL`. Reading it straight off the key's value source is both the fix and
+  /// the cheaper path.
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getBigDecimalValuesSV();
   }
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_keyPath).getStringValuesSV();
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_keyPath).getBytesValuesSV();
   }
 
   // A key can hold a list, in which case its value source is multi-value and the engine asks for the values that
