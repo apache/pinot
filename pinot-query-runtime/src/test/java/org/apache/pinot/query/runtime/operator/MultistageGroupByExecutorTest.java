@@ -150,7 +150,7 @@ public class MultistageGroupByExecutorTest {
     AggregationFunction<?, ?>[] functions = {
         new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("$1")), true)};
     return new MultistageGroupByExecutor(groupKeys, functions, new int[]{filterArgId}, filterArgId,
-        filterArgId < 0 ? AggType.FINAL : AggType.DIRECT, leafReturnFinalResult, resultSchema,
+        filterArgId < 0 ? AggType.FINAL : AggType.DIRECT, leafReturnFinalResult, INPUT_SCHEMA, resultSchema,
         Map.of(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(groupLimit),
             QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS, Boolean.toString(skipEmptyGroups)), null);
   }
