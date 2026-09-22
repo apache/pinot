@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -97,6 +98,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private volatile boolean _hasDeletedDocIds;
+  // Guards column reads through cached references against destroy(): readers hold the read lock, destroy() takes the
+  // write lock just long enough to set _destroyed before closing the indexes
+  private final ReentrantReadWriteLock _destroyLock = new ReentrantReadWriteLock();
+  private volatile boolean _destroyed;
 
   public ImmutableSegmentImpl(
       SegmentDirectory segmentDirectory,
@@ -355,6 +360,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
     }
+    // Wait for in-flight column reads (see tryAcquireReadLock) and make later ones skip this segment
+    _destroyLock.writeLock().lock();
+    try {
+      _destroyed = true;
+    } finally {
+      _destroyLock.writeLock().unlock();
+    }
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {
@@ -383,6 +395,26 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     } catch (Exception e) {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
     }
+  }
+
+  /// True once [#destroy()] has started: the index buffers may be closed and must not be read.
+  public boolean isDestroyed() {
+    return _destroyed;
+  }
+
+  /// Blocks [#destroy()] while the caller reads this segment's columns through a cached reference. Returns false,
+  /// without holding the lock, once the segment is destroyed. A true return must be paired with [#releaseReadLock()].
+  public boolean tryAcquireReadLock() {
+    _destroyLock.readLock().lock();
+    if (_destroyed) {
+      _destroyLock.readLock().unlock();
+      return false;
+    }
+    return true;
+  }
+
+  public void releaseReadLock() {
+    _destroyLock.readLock().unlock();
   }
 
   @Nullable

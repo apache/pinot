@@ -1306,6 +1306,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /// Blocks destroy() of an immutable segment while the caller reads its columns through a cached reference. Returns
+  /// false once the segment is destroyed. Consuming segments are kept alive by their consumer and always succeed.
+  /// Liveness is keyed on the segment object on purpose: the TableDataManager registers a replaced segment only after
+  /// replaceSegment(), so a name based lookup would report the live new segment as gone for the whole replace.
+  protected static boolean tryAcquireSegmentReadLock(IndexSegment segment) {
+    return !(segment instanceof ImmutableSegmentImpl immutableSegment) || immutableSegment.tryAcquireReadLock();
+  }
+
+  protected static void releaseSegmentReadLock(IndexSegment segment) {
+    if (segment instanceof ImmutableSegmentImpl immutableSegment) {
+      immutableSegment.releaseReadLock();
+    }
+  }
+
   @Override
   public void trackNewlyAddedSegment(String segmentName) {
     if (_newSegmentTrackingTimeMs > 0) {
