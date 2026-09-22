@@ -20,6 +20,7 @@ package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +53,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
-    _functionConfig = functionConfig != null ? Collections.unmodifiableMap(functionConfig) : null;
+    functionConfig = functionConfig != null ? Collections.unmodifiableMap(new HashMap<>(functionConfig)) : null;
+    _functionConfig = functionConfig;
 
     int seed = 0;
     boolean useX64 = false;
@@ -112,6 +114,16 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public PartitionIdNormalizer getPartitionIdNormalizer() {
     return _normalizer;
+  }
+
+  @Override
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    if (getClass() != other.getClass()) {
+      return false;
+    }
+    Murmur3PartitionFunction function = (Murmur3PartitionFunction) other;
+    return _numPartitions == function._numPartitions && _normalizer == function._normalizer
+        && _seed == function._seed && _useX64 == function._useX64 && _useRawBytes == function._useRawBytes;
   }
 
   // Keep it for backward-compatibility, use getName() instead

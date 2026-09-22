@@ -132,7 +132,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 4,
-        "Only compatible default functions reuse IDs; configured functions never compare configuration contents");
+        "Only functions compatible with the first segment may reuse its partition IDs");
     records.put("b", metadata("b", "PrunerCounting", 16, Set.of(11), null));
     records.put("d", metadata("d", "PrunerCounting", 8, Set.of(3), null));
     expected.add("d");
@@ -140,6 +140,25 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner(records).prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 3,
         "Different partition counts must not reuse partition IDs");
+  }
+
+  @Test
+  public void testEqualConfigurationsReusePartitionIds() throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS; i++) {
+      String segment = "segment_" + i;
+      records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(4), Map.of("offset", "1")));
+    }
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request(predicate("EQUALS", "3")), records.keySet()), records.keySet());
+    assertEquals(CountingPartitionFunction.CALLS.get(), 1, "Equal nonempty configs should share computed IDs");
+    pruner.refreshSegment("segment_1", metadata("segment_1", "PrunerCounting", 8, Set.of(4), Map.of("offset", "2")));
+    Set<String> expected = new HashSet<>(records.keySet());
+    expected.remove("segment_1");
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request(predicate("EQUALS", "3")), records.keySet()), expected);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 2, "A changed config must not reuse the first function's ID");
   }
 
   @Test
@@ -415,7 +434,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
     public CountingPartitionFunction(int numPartitions, @Nullable Map<String, String> config) {
       _numPartitions = numPartitions;
       _offset = config == null ? 0 : Integer.parseInt(config.getOrDefault("offset", "0"));
-      _functionConfig = config;
+      _functionConfig = config == null ? null : Map.copyOf(config);
     }
 
     @Override

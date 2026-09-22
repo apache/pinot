@@ -19,6 +19,8 @@
 package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -66,6 +68,7 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES) != null, "columnValues must be configured");
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES_DELIMITER) != null,
         "'columnValuesDelimiter' must be configured");
+    functionConfig = Collections.unmodifiableMap(new HashMap<>(functionConfig));
     _functionConfig = functionConfig;
     _values = StringUtils.split(functionConfig.get(COLUMN_VALUES), functionConfig.get(COLUMN_VALUES_DELIMITER));
     Preconditions.checkState(numPartitions == _values.length + 1,
@@ -105,6 +108,12 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   public PartitionIdNormalizer getPartitionIdNormalizer() {
     // Output is a fixed mapping in [0, numPartitions); no normalization is applied.
     return PartitionIdNormalizer.NO_OP;
+  }
+
+  @Override
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    // Comparing potentially large value lists for every segment can cost more than the partition lookup itself.
+    return this == other;
   }
 
   @Override
