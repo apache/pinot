@@ -51,11 +51,15 @@ public class PartitionFunctionTest {
     assertTrue(emptyConfig.hasEmptyConfig());
     assertTrue(function.canReusePartitionIds(emptyConfig));
     assertTrue(emptyConfig.canReusePartitionIds(function));
+    PartitionFunction third = new MurmurPartitionFunction(8, Map.of());
+    assertTrue(emptyConfig.canReusePartitionIds(third));
+    assertTrue(function.canReusePartitionIds(third));
     assertFalse(function.canReusePartitionIds(new MurmurPartitionFunction(16, null)));
     assertFalse(function.canReusePartitionIds(new Murmur3PartitionFunction(8, null)));
 
     PartitionFunction configured = new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"));
     assertFalse(configured.hasEmptyConfig());
+    assertTrue(configured.canReusePartitionIds(configured));
     assertFalse(function.canReusePartitionIds(configured));
     assertFalse(configured.canReusePartitionIds(function));
     assertFalse(configured.canReusePartitionIds(new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"))));

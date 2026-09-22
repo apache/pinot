@@ -994,6 +994,10 @@ public class CommonConstants {
         /// Query-level override for `inpredicate.threshold`. Negative means always prune.
         public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
+        /// Set false to use the uncached single-column broker partition pruner. Defaults to true; the cache is only
+        /// used for at least 256 candidate segments. Does not disable partition pruning itself.
+        public static final String ENABLE_PARTITION_PRUNING_CACHE = "enablePartitionPruningCache";
+
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
         //   first, where inverted index can be applied if exists

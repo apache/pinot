@@ -36,6 +36,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -98,12 +99,12 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
-    int numSegments = segments.size();
-    if (numSegments == 0) {
-      return segments;
-    }
-    if (numSegments >= MIN_SEGMENTS_FOR_PREPARATION) {
-      return pruneWithPreparedPredicate(filterExpression, segments);
+    if (segments.size() >= MIN_SEGMENTS_FOR_PREPARATION) {
+      Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+      if (queryOptions == null
+          || !"false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE))) {
+        return pruneWithPreparedPredicate(filterExpression, segments);
+      }
     }
     Set<String> selectedSegments = new HashSet<>();
     for (String segment : segments) {
@@ -213,6 +214,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
           Identifier identifier = _operands.get(0).getIdentifier();
           if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+            // Grow only as literals are visited: a long IN can match its first value on every segment.
             _partitionIds = new ArrayList<>(1);
           }
         }

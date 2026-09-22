@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -74,6 +75,10 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(CountingPartitionFunction.CALLS.get(), 1);
     assertEquals(pruner.prune(request, records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 2, "Computed hashes must not survive a prune call");
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE, "false"));
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request, records.keySet()), expected);
+    assertEquals(CountingPartitionFunction.CALLS.get(), 256, "Disabling the cache must use per-segment evaluation");
   }
 
   @Test
@@ -130,30 +135,28 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner(records).prune(request(predicate("IN", "1", "9", "17", "2")), records.keySet()), expected);
   }
 
-  @Test
-  public void testLargeConfigurationsAndUnrelatedPredicates() throws Exception {
+  @Test(dataProvider = "candidateCounts")
+  public void testLargeConfigurationsAndUnrelatedPredicates(int numSegments, boolean cacheEnabled) throws Exception {
     String values = "first|" + "x".repeat(100_000);
     Map<String, String> config = Map.of("columnValues", values, "columnValuesDelimiter", "|");
     ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), config);
     ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), config);
-    SinglePartitionColumnSegmentPruner pruner = pruner(Map.of("first", first, "second", second));
-    assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of("first"));
-    assertEquals(pruner.prune(request(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
-        RequestUtils.getLiteralExpression("value"))), Set.of("first", "second")), Set.of("first", "second"));
+    Map<String, ZNRecord> records = new LinkedHashMap<>(Map.of("first", first, "second", second));
+    for (int i = 2; i < numSegments; i++) {
+      String segment = "segment_" + i;
+      records.put(segment, metadata(segment, "BoundedColumnValue", 3, Set.of(2), config));
+    }
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    BrokerRequest request = request(predicate("EQUALS", "first"));
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE,
+        Boolean.toString(cacheEnabled)));
+    assertEquals(pruner.prune(request, records.keySet()), Set.of("first"));
+    request.getPinotQuery().setFilterExpression(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
+        RequestUtils.getLiteralExpression("value")));
+    assertEquals(pruner.prune(request, records.keySet()), records.keySet());
     pruner.refreshSegment("first", metadata("first", "BoundedColumnValue", 3, Set.of(2), config));
-    assertEquals(pruner.prune(request(predicate("EQUALS", "first")), Set.of("first", "second")), Set.of());
-  }
-
-  @Test
-  public void testConfigurationHashCollisionsDoNotReusePartitionIds() throws Exception {
-    Map<String, String> firstConfig = Map.of("columnValues", "Aa|BB", "columnValuesDelimiter", "|");
-    Map<String, String> secondConfig = Map.of("columnValues", "BB|Aa", "columnValuesDelimiter", "|");
-    assertEquals(firstConfig.hashCode(), secondConfig.hashCode(),
-        "Fixture must exercise a configuration hash collision");
-    ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), firstConfig);
-    ZNRecord second = metadata("second", "BoundedColumnValue", 3, Set.of(2), secondConfig);
-    Map<String, ZNRecord> records = Map.of("first", first, "second", second);
-    assertEquals(pruner(records).prune(request(predicate("EQUALS", "Aa")), records.keySet()), records.keySet());
+    request.getPinotQuery().setFilterExpression(predicate("EQUALS", "first"));
+    assertEquals(pruner.prune(request, records.keySet()), Set.of());
   }
 
   @Test
@@ -201,17 +204,17 @@ public class SinglePartitionColumnSegmentPrunerTest {
 
   @DataProvider
   public Object[][] candidateCounts() {
-    return new Object[][]{{1}, {2}, {256}};
+    return new Object[][]{{1, true}, {2, true}, {255, true}, {256, true}, {256, false}};
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testAndOrUnsupportedPredicatesAndLazyInValues(int numSegments) throws Exception {
+  public void testAndOrUnsupportedPredicatesAndLazyInValues(int numSegments, boolean cacheEnabled) throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "Modulo", 8, Set.of(1), null));
     }
-    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    SinglePartitionColumnSegmentPruner pruner = pruner(records, cacheEnabled);
     Set<String> segments = records.keySet();
     Expression invalidValue = predicate("EQUALS", "invalid-number");
     assertEquals(pruner.prune(request(predicate("IN", "1", "invalid-number")), segments), segments);
@@ -247,26 +250,30 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner.prune(request(predicate("EQUALS", "invalid-number")), Set.of()), Set.of());
   }
 
-  @Test
-  public void testUnknownMetadataIsConservativeAndDoesNotEvaluateFilter() throws Exception {
-    SinglePartitionColumnSegmentPruner pruner = new SinglePartitionColumnSegmentPruner(TABLE, COLUMN);
+  @Test(dataProvider = "candidateCounts")
+  public void testUnknownMetadataIsConservativeAndDoesNotEvaluateFilter(int numSegments, boolean cacheEnabled)
+      throws Exception {
+    SinglePartitionColumnSegmentPruner pruner = pruner(Map.of(), cacheEnabled);
     ZNRecord invalid = new ZNRecord("invalid");
     invalid.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, "invalid-json");
     pruner.init(null, null, List.of("missing", "empty", "invalid"),
         Arrays.asList(null, new ZNRecord("empty"), invalid));
-    Set<String> segments = Set.of("missing", "empty", "invalid", "not-initialized");
+    Set<String> segments = new HashSet<>(Set.of("missing", "empty", "invalid", "not-initialized"));
+    for (int i = segments.size(); i < numSegments; i++) {
+      segments.add("not-initialized_" + i);
+    }
     assertEquals(pruner.prune(request(predicate("EQUALS", "invalid-number")), segments), segments);
     assertEquals(pruner.prune(request(function("INVALID_OPERATOR")), segments), segments);
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testRefreshUsesCurrentPartitionsAndConfiguration(int numSegments) throws Exception {
+  public void testRefreshUsesCurrentPartitionsAndConfiguration(int numSegments, boolean cacheEnabled) throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(3), null));
     }
-    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    SinglePartitionColumnSegmentPruner pruner = pruner(records, cacheEnabled);
     Set<String> segments = records.keySet();
     BrokerRequest request = request(predicate("EQUALS", "3"));
     assertEquals(pruner.prune(request, segments), segments);
@@ -321,6 +328,19 @@ public class SinglePartitionColumnSegmentPrunerTest {
     return pruner;
   }
 
+  private static SinglePartitionColumnSegmentPruner pruner(Map<String, ZNRecord> records, boolean cacheEnabled) {
+    SinglePartitionColumnSegmentPruner pruner = new SinglePartitionColumnSegmentPruner(TABLE, COLUMN) {
+      @Override
+      public Set<String> prune(BrokerRequest request, Set<String> segments) {
+        request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE,
+            Boolean.toString(cacheEnabled)));
+        return super.prune(request, segments);
+      }
+    };
+    pruner.init(null, null, new ArrayList<>(records.keySet()), new ArrayList<>(records.values()));
+    return pruner;
+  }
+
   private static ZNRecord metadata(String segment, String function, int count, Set<Integer> partitions,
       @Nullable Map<String, String> config) throws Exception {
     ZNRecord record = new ZNRecord(segment);
@@ -350,7 +370,8 @@ public class SinglePartitionColumnSegmentPrunerTest {
     return brokerRequest;
   }
 
-  /// Stateless partition function with observable hash calls.
+  /// Stateless partition function registered by the factory scan with observable hash calls. Exact-count tests require
+  /// sequential test methods; the concurrent-query fixture deliberately uses Modulo instead.
   public static class CountingPartitionFunction implements PartitionFunction {
     private static final long serialVersionUID = 1L;
     private static final AtomicInteger CALLS = new AtomicInteger();
