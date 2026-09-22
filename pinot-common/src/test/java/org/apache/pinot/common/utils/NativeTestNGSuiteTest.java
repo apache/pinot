@@ -44,7 +44,7 @@ import static org.testng.Assert.fail;
 
 /// Verifies the native JUnit Platform suites used to group TestNG tests without XML suite files.
 /// Not thread-safe: the fixtures share lifecycle events and must execute sequentially.
-public class TestNGSuiteTest {
+public class NativeTestNGSuiteTest {
   private static final List<String> EVENTS = new ArrayList<>();
 
   @BeforeEach
@@ -56,8 +56,16 @@ public class TestNGSuiteTest {
   public void testSharedLifecycleAndClassOrder() {
     TestExecutionSummary summary = execute(SharedSuite.class);
     assertEquals(summary.getTotalFailureCount(), 0L, summary.getFailures().toString());
-    assertEquals(summary.getTestsSucceededCount(), 2L);
-    assertEquals(EVENTS, List.of("start", "first", "second", "finish"));
+    assertEquals(summary.getTestsSucceededCount(), 4L);
+    assertEquals(EVENTS, List.of("start", "first", "second", "third", "last", "finish"));
+  }
+
+  @Test
+  public void testReversedClassOrder() {
+    TestExecutionSummary summary = execute(ReversedSuite.class);
+    assertEquals(summary.getTotalFailureCount(), 0L, summary.getFailures().toString());
+    assertEquals(summary.getTestsSucceededCount(), 4L);
+    assertEquals(EVENTS, List.of("start", "last", "third", "second", "first", "finish"));
   }
 
   @Test
@@ -103,8 +111,19 @@ public class TestNGSuiteTest {
   /// Stateless suite declaration that preserves the shared lifecycle and class order.
   @Suite
   @IncludeEngines("testng")
-  @SelectClasses({ZFirstFixture.class, ASecondFixture.class})
-  public static class SharedSuite {
+  @SelectClasses({ZFirstFixture.class, ASecondFixture.class, MThirdFixture.class, BLastFixture.class})
+  @ConfigurationParameter(key = "testng.listeners",
+      value = "org.apache.pinot.common.utils.NativeTestNGSuiteTest$SharedSuite")
+  public static class SharedSuite extends OrderedTestNGSuite {
+  }
+
+  /// Reverses the same four fixtures so incidental HashSet iteration cannot satisfy both order assertions.
+  @Suite
+  @IncludeEngines("testng")
+  @SelectClasses({BLastFixture.class, MThirdFixture.class, ASecondFixture.class, ZFirstFixture.class})
+  @ConfigurationParameter(key = "testng.listeners",
+      value = "org.apache.pinot.common.utils.NativeTestNGSuiteTest$ReversedSuite")
+  public static class ReversedSuite extends OrderedTestNGSuite {
   }
 
   /// Stateless suite declaration excluding the stateless group.
@@ -155,7 +174,6 @@ public class TestNGSuiteTest {
   public static class ZFirstFixture extends SharedFixture {
     @org.testng.annotations.Test
     public void first() {
-      assertEquals(EVENTS, List.of("start"));
       EVENTS.add("first");
     }
   }
@@ -164,8 +182,23 @@ public class TestNGSuiteTest {
   public static class ASecondFixture extends SharedFixture {
     @org.testng.annotations.Test
     public void second() {
-      assertEquals(EVENTS, List.of("start", "first"));
       EVENTS.add("second");
+    }
+  }
+
+  /// Sequential fixture verifying a third nonalphabetical class selection.
+  public static class MThirdFixture extends SharedFixture {
+    @org.testng.annotations.Test
+    public void third() {
+      EVENTS.add("third");
+    }
+  }
+
+  /// Sequential fixture that must execute last, like the Kafka shutdown scenario.
+  public static class BLastFixture extends SharedFixture {
+    @org.testng.annotations.Test
+    public void last() {
+      EVENTS.add("last");
     }
   }
 

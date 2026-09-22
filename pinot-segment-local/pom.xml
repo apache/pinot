@@ -35,12 +35,6 @@
   </properties>
 
   <dependencies>
-    <!-- Required when javac reads zstd-jni's annotated signatures for deprecation diagnostics. -->
-    <dependency>
-      <groupId>org.jetbrains</groupId>
-      <artifactId>annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>

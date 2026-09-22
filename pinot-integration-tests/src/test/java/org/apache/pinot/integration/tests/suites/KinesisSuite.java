@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.integration.tests.suites;
 
+import org.apache.pinot.common.utils.OrderedTestNGSuite;
 import org.apache.pinot.integration.tests.realtime.ingestion.KinesisShardChangeTest;
 import org.apache.pinot.integration.tests.realtime.ingestion.RealtimeKinesisIntegrationTest;
+import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
@@ -29,9 +31,11 @@ import org.junit.platform.suite.api.Suite;
 /// Stateless suite definition; the selected tests run sequentially in one fork.
 @Suite
 @IncludeEngines("testng")
+@ConfigurationParameter(key = "testng.listeners",
+    value = "org.apache.pinot.integration.tests.suites.KinesisSuite")
 @SelectClasses({
     RealtimeKinesisIntegrationTest.class,
     KinesisShardChangeTest.class
 })
-public class KinesisSuite {
+public class KinesisSuite extends OrderedTestNGSuite {
 }

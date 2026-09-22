@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.integration.tests.suites;
 
+import org.apache.pinot.common.utils.OrderedTestNGSuite;
 import org.apache.pinot.integration.tests.ExactlyOnceKafkaRealtimeClusterIntegrationTest;
 import org.apache.pinot.integration.tests.KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest;
 import org.apache.pinot.integration.tests.KafkaConsumingSegmentToBeMovedSummaryIntegrationTest;
 import org.apache.pinot.integration.tests.LLCRealtimeClusterIntegrationTest;
+import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
@@ -31,11 +33,13 @@ import org.junit.platform.suite.api.Suite;
 /// Stateless suite definition; the selected tests run sequentially in one fork.
 @Suite
 @IncludeEngines("testng")
+@ConfigurationParameter(key = "testng.listeners",
+    value = "org.apache.pinot.integration.tests.suites.SharedKafkaRealtimeSuite")
 @SelectClasses({
     LLCRealtimeClusterIntegrationTest.class,
     ExactlyOnceKafkaRealtimeClusterIntegrationTest.class,
     KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.class,
     KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.class
 })
-public class SharedKafkaRealtimeSuite {
+public class SharedKafkaRealtimeSuite extends OrderedTestNGSuite {
 }

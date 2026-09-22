@@ -2042,25 +2042,6 @@
         <scope>test</scope>
       </dependency>
 
-      <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-suite</artifactId>
-        <version>${junit-platform.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-launcher</artifactId>
-        <version>${junit-platform.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.support</groupId>
-        <artifactId>testng-engine</artifactId>
-        <version>${testng-engine.version}</version>
-        <scope>test</scope>
-      </dependency>
-
       <!-- mockito bom -->
       <dependency>
         <groupId>org.mockito</groupId>
@@ -2112,6 +2093,24 @@
         <version>${assertj.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-suite</artifactId>
+        <version>${junit-platform.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-launcher</artifactId>
+        <version>${junit-platform.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.support</groupId>
+        <artifactId>testng-engine</artifactId>
+        <version>${testng-engine.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
