@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -190,6 +191,14 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      ServerMetrics serverMetrics)
+      throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
       tableConfig = createTableConfig();
@@ -214,7 +223,6 @@ public class RealtimeSegmentDataManagerTest {
     _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
         new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
-    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
@@ -655,6 +663,53 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupRemovesConsumingGauge()
+      throws Exception {
+    // A retired partition (e.g. a Kinesis shard that was split/merged and fully consumed -> end of partition
+    // group) never gets a successor consuming segment. The LLC_PARTITION_CONSUMING gauge must be REMOVED, not
+    // left at 0, otherwise it lingers at 0 forever and raises a false-positive RealtimeIngestionStopped alert.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
+      segmentDataManager.setEndOfPartitionGroup(true);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      verify(serverMetrics, atLeast(1)).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+      verify(serverMetrics, never()).setValueOfTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING),
+          eq(0L));
+    }
+  }
+
+  @Test
+  public void testNormalCommitKeepsConsumingGaugeAtZero()
+      throws Exception {
+    // A normal commit (not end of partition group) gets a successor consuming segment, so the gauge is set to
+    // 0 (and flipped back to 1 by the next consuming segment). It must NOT be removed.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
+      // _endOfPartitionGroup defaults to false -> normal commit.
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
     }
   }
 
