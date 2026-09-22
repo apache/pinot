@@ -41,8 +41,15 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -56,6 +63,31 @@ import static org.testng.Assert.expectThrows;
 public class SinglePartitionColumnSegmentPrunerTest {
   private static final String COLUMN = "memberId";
   private static final String TABLE = "testTable_OFFLINE";
+
+  @Test
+  public void testLiveThresholdThroughFactory() throws Exception {
+    AtomicInteger threshold = new AtomicInteger(3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE).build();
+    tableConfig.getIndexingConfig().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(Map.of(COLUMN, new ColumnPartitionConfig("PrunerCounting", 8))));
+    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null));
+    SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, threshold::get).get(0);
+    pruner.init(null, null, List.of("first", "second"),
+        List.of(metadata("first", "PrunerCounting", 8, Set.of(1), null),
+            metadata("second", "PrunerCounting", 8, Set.of(2), null)));
+    BrokerRequest request = request(predicate("EQUALS", "1"));
+    for (int minSegments : new int[]{3, 2, 0, 3}) {
+      threshold.set(minSegments);
+      CountingPartitionFunction.CALLS.set(0);
+      assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
+      assertEquals(CountingPartitionFunction.CALLS.get(), minSegments > 2 ? 2 : 1);
+    }
+    threshold.set(0);
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE, "false"));
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 2);
+  }
 
   @Test
   public void testHashesOnceAcrossDistinctMetadataInstancesPerQuery() throws Exception {
@@ -204,7 +236,8 @@ public class SinglePartitionColumnSegmentPrunerTest {
 
   @DataProvider
   public Object[][] candidateCounts() {
-    return new Object[][]{{1, true}, {2, true}, {255, true}, {256, true}, {256, false}};
+    int threshold = Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+    return new Object[][]{{1, true}, {2, true}, {threshold - 1, true}, {threshold, true}, {threshold, false}};
   }
 
   @Test(dataProvider = "candidateCounts")
