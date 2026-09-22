@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -86,7 +87,7 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
+  private Map<String, FieldIndexConfigs> _indexConfigsByColName = Map.of();
   private boolean _skipSegmentPreprocess;
 
   private boolean _dirty = true;
@@ -102,6 +103,37 @@ public class IndexLoadingConfig {
     _tableConfig = tableConfig;
     _schema = schema;
     init();
+  }
+
+  /// Copies an already processed config without re-reading table/index settings. Table-level values and immutable
+  /// field-index configs are shared; setters and OPEN_STRUCT child additions only affect this copy.
+  public IndexLoadingConfig(IndexLoadingConfig source) {
+    _instanceDataManagerConfig = source._instanceDataManagerConfig;
+    _tableConfig = source._tableConfig;
+    _schema = source._schema;
+    _readMode = source._readMode;
+    _segmentVersion = source._segmentVersion;
+    _segmentTier = source._segmentTier;
+    _tableDataDir = source._tableDataDir;
+    _errorOnColumnBuildFailure = source._errorOnColumnBuildFailure;
+    _forwardIndexOnly = source._forwardIndexOnly;
+    _instanceId = source._instanceId;
+    _isRealtimeOffHeapAllocation = source._isRealtimeOffHeapAllocation;
+    _isDirectRealtimeOffHeapAllocation = source._isDirectRealtimeOffHeapAllocation;
+    _realtimeAvgMultiValueCount = source._realtimeAvgMultiValueCount;
+    _segmentStoreURI = source._segmentStoreURI;
+    _segmentDirectoryLoader = source._segmentDirectoryLoader;
+    _instanceTierConfigs = source._instanceTierConfigs;
+    _sortedColumns = source._sortedColumns;
+    _columnMinMaxValueGeneratorMode = source._columnMinMaxValueGeneratorMode;
+    _enableDynamicStarTreeCreation = source._enableDynamicStarTreeCreation;
+    _starTreeIndexConfigs = source._starTreeIndexConfigs;
+    _enableDefaultStarTree = source._enableDefaultStarTree;
+    _indexConfigsByColName = source._indexConfigsByColName;
+    _skipSegmentPreprocess = source._skipSegmentPreprocess;
+    _dirty = source._dirty;
+    _multiColTextIndexConfig = source._multiColTextIndexConfig;
+    _knownColumns = source._knownColumns != null ? new HashSet<>(source._knownColumns) : null;
   }
 
   @VisibleForTesting
@@ -210,7 +242,8 @@ public class IndexLoadingConfig {
     // specific index configs transparently.
     TableConfig tableConfig = getTableConfigWithTierOverwrites();
     Schema schema = inferSchema();
-    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+    _indexConfigsByColName =
+        Collections.unmodifiableMap(FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema));
     // Accessing the StarTree index configs is not handled by IndexType.getConfig(), so we manually update them.
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
@@ -323,8 +356,10 @@ public class IndexLoadingConfig {
   }
 
   public void setSegmentTier(String segmentTier) {
-    _segmentTier = segmentTier;
-    _dirty = true;
+    if (!Objects.equals(_segmentTier, segmentTier)) {
+      _segmentTier = segmentTier;
+      _dirty = true;
+    }
   }
 
   public String getTableDataDir() {
@@ -413,6 +448,7 @@ public class IndexLoadingConfig {
     if (_indexConfigsByColName == null || _dirty) {
       refreshIndexConfigs();
     }
+    Map<String, FieldIndexConfigs> updatedConfigs = null;
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String childColumn = entry.getKey();
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
@@ -442,7 +478,13 @@ public class IndexLoadingConfig {
           FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
           .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
           .build();
-      _indexConfigsByColName.put(childColumn, childConfigs);
+      if (updatedConfigs == null) {
+        updatedConfigs = new HashMap<>(_indexConfigsByColName);
+      }
+      updatedConfigs.put(childColumn, childConfigs);
+    }
+    if (updatedConfigs != null) {
+      _indexConfigsByColName = Collections.unmodifiableMap(updatedConfigs);
     }
   }
 

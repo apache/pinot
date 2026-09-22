@@ -176,6 +176,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
+  private volatile IndexLoadingConfig _cachedIndexLoadingConfig;
 
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
@@ -437,14 +438,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return indexLoadingConfig;
   }
 
-  /// Builds a per-segment loading config from the cached table config and schema without fetching them from ZK.
+  /// Returns a copy of the processed cached config, isolating mutable per-segment state.
   /// Explicit reloads and config/schema refresh messages still use [#fetchIndexLoadingConfig()].
-  protected IndexLoadingConfig getIndexLoadingConfig() {
+  protected IndexLoadingConfig getCachedIndexLoadingConfig() {
     Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
-    IndexLoadingConfig indexLoadingConfig =
-        new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
-    indexLoadingConfig.setTableDataDir(_tableDataDir);
-    return indexLoadingConfig;
+    IndexLoadingConfig indexLoadingConfig = _cachedIndexLoadingConfig;
+    // Match the snapshot by identity: a refresh must rebuild even for equal table configs/schemas.
+    if (indexLoadingConfig == null || indexLoadingConfig.getTableConfig() != cached.getLeft()
+        || indexLoadingConfig.getSchema() != cached.getRight()) {
+      indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
+      indexLoadingConfig.setTableDataDir(_tableDataDir);
+      _cachedIndexLoadingConfig = indexLoadingConfig;
+    }
+    return new IndexLoadingConfig(indexLoadingConfig);
   }
 
   @Override

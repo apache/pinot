@@ -71,7 +71,7 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   protected void doAddOnlineSegment(String segmentName)
       throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     handleUpsertPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);

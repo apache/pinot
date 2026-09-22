@@ -1079,16 +1079,21 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testGetIndexLoadingConfigReusesSchemaAndRefreshes() {
+  public void testGetCachedIndexLoadingConfigReusesSchemaAndRefreshes() {
     TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema original = createSchemaReuseSchema();
     BaseTableDataManager manager = createSchemaReuseManager(table, original);
-    IndexLoadingConfig first = manager.getIndexLoadingConfig();
-    IndexLoadingConfig second = manager.getIndexLoadingConfig();
+    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
     assertSame(first.getSchema(), original);
     assertSame(second.getSchema(), original);
     assertSame(first.getTableConfig(), second.getTableConfig());
     assertNotSame(first, second);
+    assertSame(first.getFieldIndexConfig("id"), second.getFieldIndexConfig("id"));
+    first.setSegmentTier(null);
+    assertSame(first.getFieldIndexConfig("id"), second.getFieldIndexConfig("id"));
+    first.setForwardIndexOnly(true);
+    assertFalse(second.isForwardIndexOnly());
     verifyNoInteractions(manager._propertyStore);
 
     Schema changed = createSchemaReuseSchema();
@@ -1100,18 +1105,25 @@ public class BaseTableDataManagerTest {
     assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
     assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
     assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
-    assertSame(manager.getIndexLoadingConfig().getSchema(), refreshed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), refreshed);
 
     manager.updateCachedTableConfigAndSchema(table, changed);
-    assertSame(manager.getIndexLoadingConfig().getSchema(), changed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), changed);
+    TableConfig indexedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of("id")).build();
+    manager.updateCachedTableConfigAndSchema(indexedTable, changed);
+    IndexLoadingConfig indexed = manager.getCachedIndexLoadingConfig();
+    assertTrue(indexed.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertFalse(first.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig().getFieldIndexConfig("id"));
   }
 
   @Test
-  public void testGetIndexLoadingConfigNormalizesTimestampBeforeReuse() {
+  public void testGetCachedIndexLoadingConfigNormalizesTimestampBeforeReuse() {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    Schema first = manager.getIndexLoadingConfig().getSchema();
-    IndexLoadingConfig second = manager.getIndexLoadingConfig();
+    Schema first = manager.getCachedIndexLoadingConfig().getSchema();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
     assertSame(second.getSchema(), first);
     assertTrue(first.hasColumn("$ts$DAY"));
     assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
@@ -1120,7 +1132,7 @@ public class BaseTableDataManagerTest {
 
     ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
     manager.onTableConfigOrSchemaRefresh();
-    Schema changed = manager.getIndexLoadingConfig().getSchema();
+    Schema changed = manager.getCachedIndexLoadingConfig().getSchema();
     assertNotSame(changed, first);
     assertTrue(changed.hasColumn("$ts$HOUR"));
     assertFalse(changed.hasColumn("$ts$DAY"));
@@ -1128,24 +1140,27 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testGetIndexLoadingConfigConcurrentlyReusesCachedSchema()
+  public void testGetCachedIndexLoadingConfigConcurrentlyReusesCachedSchema()
       throws Exception {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    Schema shared = manager.getIndexLoadingConfig().getSchema();
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
     ExecutorService executor = Executors.newFixedThreadPool(8);
     CountDownLatch start = new CountDownLatch(1);
     try {
-      List<Future<Schema>> results = new ArrayList<>();
+      List<Future<IndexLoadingConfig>> results = new ArrayList<>();
       for (int i = 0; i < 32; i++) {
         results.add(executor.submit(() -> {
           assertTrue(start.await(10, TimeUnit.SECONDS));
-          return manager.getIndexLoadingConfig().getSchema();
+          return manager.getCachedIndexLoadingConfig();
         }));
       }
       start.countDown();
-      for (Future<Schema> result : results) {
-        assertSame(result.get(10, TimeUnit.SECONDS), shared);
+      for (Future<IndexLoadingConfig> result : results) {
+        IndexLoadingConfig copy = result.get(10, TimeUnit.SECONDS);
+        assertNotSame(copy, shared);
+        assertSame(copy.getSchema(), shared.getSchema());
+        assertSame(copy.getFieldIndexConfig("id"), shared.getFieldIndexConfig("id"));
       }
       verifyNoInteractions(manager._propertyStore);
     } finally {
