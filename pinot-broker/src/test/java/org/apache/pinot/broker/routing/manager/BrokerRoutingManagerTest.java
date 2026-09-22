@@ -31,6 +31,7 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -46,6 +47,7 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -63,6 +65,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -247,6 +250,40 @@ public class BrokerRoutingManagerTest {
         eq(BrokerMeter.SERVER_MISSING_FOR_ROUTING), increments.capture());
     assertEquals(increments.getAllValues().stream().mapToLong(Long::longValue).sum(), 2L);
     verifyNoMoreInteractions(_brokerMetrics);
+  }
+
+  @Test
+  public void testPartitionPruningCacheThresholdUpdates() {
+    String key = Broker.CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig config = new ClusterConfig("testCluster");
+    config.getRecord().setSimpleField(key, "128");
+    config.getRecord().setSimpleField(key + "." + TEST_TABLE, "32");
+    handler.onClusterConfigChange(config, null);
+    handler.registerClusterConfigChangeListener(_routingManager);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 32);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments("other_OFFLINE"), 128);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments("testTable_REALTIME"), 128);
+
+    config.getRecord().setSimpleField(key + "." + TEST_TABLE, "0");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 0);
+    for (String invalid : List.of("-1", "not-an-int", "2147483648")) {
+      config.getRecord().setSimpleField(key + "." + TEST_TABLE, invalid);
+      handler.onClusterConfigChange(config, null);
+      assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 128);
+    }
+    config.getRecord().getSimpleFields().remove(key + "." + TEST_TABLE);
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 128);
+    config.getRecord().setSimpleField(key, "invalid");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE),
+        Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    config.getRecord().getSimpleFields().clear();
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE),
+        Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
   }
 
   @Test

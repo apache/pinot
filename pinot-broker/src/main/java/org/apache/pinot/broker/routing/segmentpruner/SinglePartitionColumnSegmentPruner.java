@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.ArrayList;
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -36,6 +39,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.FilterKind;
 
@@ -43,15 +47,21 @@ import org.apache.pinot.sql.FilterKind;
 /// The `SinglePartitionColumnSegmentPruner` prunes segments based on their partition metadata stored in ZK. The
 /// pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
-  // Preparing predicates costs more than it saves for small inputs, especially with cheap partition functions.
-  private static final int MIN_SEGMENTS_FOR_PREPARATION = 256;
   private final String _tableNameWithType;
   private final String _partitionColumn;
+  private final IntSupplier _minSegmentsForPreparation;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
+    this(tableNameWithType, partitionColumn, () -> Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+  }
+
+  /// The thread-safe supplier is read once per query so cluster config changes apply without rebuilding the pruner.
+  public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn,
+      IntSupplier minSegmentsForPreparation) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
+    _minSegmentsForPreparation = minSegmentsForPreparation;
   }
 
   @Override
@@ -99,7 +109,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
-    if (segments.size() >= MIN_SEGMENTS_FOR_PREPARATION) {
+    if (segments.size() >= _minSegmentsForPreparation.getAsInt()) {
       Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
       if (queryOptions == null
           || !"false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE))) {
@@ -195,7 +205,10 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     private FilterKind _kind;
     private List<Expression> _operands;
     private PreparedPredicate[] _children;
-    private List<Integer> _partitionIds;
+    private boolean _isPartitionPredicate;
+    private Integer _singlePartitionId;
+    private IntSet _partitionIds;
+    private int _numEvaluatedValues;
 
     private PreparedPredicate(Expression expression) {
       _expression = expression;
@@ -213,10 +226,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
           }
         } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
           Identifier identifier = _operands.get(0).getIdentifier();
-          if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-            // Grow only as literals are visited: a long IN can match its first value on every segment.
-            _partitionIds = new ArrayList<>(1);
-          }
+          _isPartitionPredicate = identifier != null && identifier.getName().equals(_partitionColumn);
         }
       }
       switch (_kind) {
@@ -236,7 +246,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
           return false;
         case EQUALS:
         case IN:
-          if (_partitionIds != null) {
+          if (_isPartitionPredicate) {
             int numValues = _kind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
             if (!reusePartitionIds) {
               for (int i = 0; i < numValues; i++) {
@@ -247,14 +257,44 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
               }
               return false;
             }
-            for (int i = 0; i < numValues; i++) {
-              Integer partitionId;
-              if (i < _partitionIds.size()) {
-                partitionId = _partitionIds.get(i);
-              } else {
-                partitionId = partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(i + 1)));
-                _partitionIds.add(partitionId);
+            if (numValues == 1) {
+              if (_singlePartitionId == null) {
+                _singlePartitionId =
+                    partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(1)));
               }
+              return partitions.contains(_singlePartitionId);
+            }
+            if (_partitionIds == null) {
+              // Grow only as literals are visited: a long IN can match its first value on every segment.
+              _partitionIds = new IntOpenHashSet(1);
+            }
+            // Probe the smaller set; a segment can itself contain many partitions.
+            if (_partitionIds.size() == 1) {
+              if (partitions.contains(_singlePartitionId)) {
+                return true;
+              }
+            } else if (_partitionIds.size() <= partitions.size()) {
+              IntIterator iterator = _partitionIds.iterator();
+              while (iterator.hasNext()) {
+                if (partitions.contains(iterator.nextInt())) {
+                  return true;
+                }
+              }
+            } else {
+              for (int partition : partitions) {
+                if (_partitionIds.contains(partition)) {
+                  return true;
+                }
+              }
+            }
+            while (_numEvaluatedValues < numValues) {
+              int partitionId = partitionFunction.getPartition(
+                  RequestContextUtils.getStringValue(_operands.get(_numEvaluatedValues + 1)));
+              if (_numEvaluatedValues == 0) {
+                _singlePartitionId = partitionId;
+              }
+              _numEvaluatedValues++;
+              _partitionIds.add(partitionId);
               if (partitions.contains(partitionId)) {
                 return true;
               }
