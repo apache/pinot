@@ -339,6 +339,12 @@ public class CommonConstants {
   }
 
   public static class Broker {
+    /// Minimum candidate segments for query-local partition-ID caching. Cluster config supports per-table overrides
+    /// by appending `.<tableNameWithType>` to this key. Zero enables caching for any candidate count.
+    /// Invalid or removed table overrides fall back to the cluster default, then the built-in default.
+    public static final String CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS =
+        "pinot.broker.partition.pruning.cache.min.segments";
+    public static final int DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS = 32;
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     /// Namespace for service credentials used by the broker when invoking Server admin APIs.
