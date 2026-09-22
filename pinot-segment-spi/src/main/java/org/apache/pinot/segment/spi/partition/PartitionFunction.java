@@ -58,6 +58,7 @@ public interface PartitionFunction extends Serializable {
   /// @return Number of possible partitions.
   int getNumPartitions();
 
+  /// Returns the immutable configuration used to construct this function, or null if none is exposed.
   @Nullable
   default Map<String, String> getFunctionConfig() {
     return null;
@@ -78,16 +79,23 @@ public interface PartitionFunction extends Serializable {
   /// False for distinct instances is conservative, not proof that their results differ.
   /// Implementations with additional output-affecting state must account for it in this method.
   ///
-  /// The default permits the same instance or matching functions with empty exposed configurations, without comparing
-  /// config contents. It assumes all output-affecting settings are represented by the exposed config/count/normalizer.
-  /// Configured implementations may override this method to compare their effective settings.
+  /// The default compares class, name, partition count, normalizer and configuration contents (null and empty are
+  /// equivalent). It assumes these represent all output-affecting settings. Implementations can override this method
+  /// to compare their immutable effective settings instead of configuration maps, or conservatively decline reuse
+  /// when the comparison is more expensive than computing the partition ids.
   default boolean canReusePartitionIds(PartitionFunction other) {
     if (this == other) {
       return true;
     }
-    return hasEmptyConfig() && other.hasEmptyConfig() && getClass() == other.getClass()
-        && getName().equals(other.getName()) && getNumPartitions() == other.getNumPartitions()
-        && getPartitionIdNormalizer() == other.getPartitionIdNormalizer();
+    if (getClass() != other.getClass() || !getName().equals(other.getName())
+        || getNumPartitions() != other.getNumPartitions()
+        || getPartitionIdNormalizer() != other.getPartitionIdNormalizer()) {
+      return false;
+    }
+    Map<String, String> config = getFunctionConfig();
+    Map<String, String> otherConfig = other.getFunctionConfig();
+    return config == null || config.isEmpty() ? otherConfig == null || otherConfig.isEmpty()
+        : config.equals(otherConfig);
   }
 
   /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id
