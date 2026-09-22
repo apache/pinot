@@ -470,7 +470,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     Preconditions.checkState(zkMetadata.getStatus() != Status.IN_PROGRESS,
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
@@ -541,7 +541,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Segment: {} is already completed, skipping adding it as CONSUMING segment", segmentName);
       return;
     }
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig();
     handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
@@ -753,7 +753,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Downloading and replacing CONSUMING segment: {} with committed one", segmentName);
     File indexDir = downloadSegment(zkMetadata);
     // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
         zkMetadata);
@@ -775,7 +775,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
     // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig();
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
 

@@ -431,14 +431,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema,
-        normalized -> {
-          Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
-          Schema shared = cached != null ? cached.getRight() : null;
-          return normalized.equals(shared) ? shared : normalized;
-        });
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    updateCachedTableConfigAndSchema(tableConfig, indexLoadingConfig.getSchema());
+    updateCachedTableConfigAndSchema(tableConfig, schema);
+    return indexLoadingConfig;
+  }
+
+  /// Builds a per-segment loading config from the cached table config and schema without fetching them from ZK.
+  /// Explicit reloads and config/schema refresh messages still use [#fetchIndexLoadingConfig()].
+  protected IndexLoadingConfig getIndexLoadingConfig() {
+    Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
+    IndexLoadingConfig indexLoadingConfig =
+        new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
+    indexLoadingConfig.setTableDataDir(_tableDataDir);
     return indexLoadingConfig;
   }
 
@@ -449,6 +454,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    // Normalize before publishing so segment loads never add timestamp fields to a shared schema.
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 

@@ -74,8 +74,6 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
-import org.apache.pinot.spi.data.ComplexFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -98,6 +96,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -1080,37 +1079,39 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testFetchIndexLoadingConfigReusesSchemaAndRefreshes() {
+  public void testGetIndexLoadingConfigReusesSchemaAndRefreshes() {
     TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema original = createSchemaReuseSchema();
     BaseTableDataManager manager = createSchemaReuseManager(table, original);
-    manager.updateCachedTableConfigAndSchema(table, original);
-    IndexLoadingConfig first = manager.fetchIndexLoadingConfig();
-    IndexLoadingConfig second = manager.fetchIndexLoadingConfig();
+    IndexLoadingConfig first = manager.getIndexLoadingConfig();
+    IndexLoadingConfig second = manager.getIndexLoadingConfig();
     assertSame(first.getSchema(), original);
     assertSame(second.getSchema(), original);
-    assertNotSame(first.getTableConfig(), second.getTableConfig());
+    assertSame(first.getTableConfig(), second.getTableConfig());
+    assertNotSame(first, second);
+    verifyNoInteractions(manager._propertyStore);
 
     Schema changed = createSchemaReuseSchema();
     changed.getFieldSpecFor("id").setDefaultNullValue(-2);
     ZKMetadataProvider.setSchema(manager._propertyStore, changed);
+    // Explicit refreshes still fetch the latest schema even without a separate refresh message.
     Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
     assertNotSame(refreshed, original);
     assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
     assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
     assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
-    assertSame(manager.fetchIndexLoadingConfig().getSchema(), refreshed);
+    assertSame(manager.getIndexLoadingConfig().getSchema(), refreshed);
 
     manager.updateCachedTableConfigAndSchema(table, changed);
-    assertSame(manager.fetchIndexLoadingConfig().getSchema(), changed);
+    assertSame(manager.getIndexLoadingConfig().getSchema(), changed);
   }
 
   @Test
-  public void testFetchIndexLoadingConfigNormalizesTimestampBeforeReuse() {
+  public void testGetIndexLoadingConfigNormalizesTimestampBeforeReuse() {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    Schema first = manager.fetchIndexLoadingConfig().getSchema();
-    IndexLoadingConfig second = manager.fetchIndexLoadingConfig();
+    Schema first = manager.getIndexLoadingConfig().getSchema();
+    IndexLoadingConfig second = manager.getIndexLoadingConfig();
     assertSame(second.getSchema(), first);
     assertTrue(first.hasColumn("$ts$DAY"));
     assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
@@ -1118,7 +1119,8 @@ public class BaseTableDataManagerTest {
     assertEquals(second.getTableConfig().getIngestionConfig().getTransformConfigs().size(), 1);
 
     ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
-    Schema changed = manager.fetchIndexLoadingConfig().getSchema();
+    manager.onTableConfigOrSchemaRefresh();
+    Schema changed = manager.getIndexLoadingConfig().getSchema();
     assertNotSame(changed, first);
     assertTrue(changed.hasColumn("$ts$HOUR"));
     assertFalse(changed.hasColumn("$ts$DAY"));
@@ -1126,30 +1128,11 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testFetchIndexLoadingConfigObservesNestedSchemaChanges() {
-    Schema original = createComplexSchema(-1);
-    BaseTableDataManager manager =
-        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), original);
-    Schema first = manager.fetchIndexLoadingConfig().getSchema();
-    assertSame(manager.fetchIndexLoadingConfig().getSchema(), first);
-
-    Schema changed = createComplexSchema(-2);
-    assertNotEquals(changed, original);
-    ZKMetadataProvider.setSchema(manager._propertyStore, changed);
-    Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
-    assertNotSame(refreshed, first);
-    ComplexFieldSpec nested = (ComplexFieldSpec) refreshed.getFieldSpecFor("nested");
-    assertEquals(((ComplexFieldSpec) nested.getChildFieldSpec("value")).getChildFieldSpec("value")
-        .getDefaultNullValue(), -2);
-    assertSame(manager.fetchIndexLoadingConfig().getSchema(), refreshed);
-  }
-
-  @Test
-  public void testFetchIndexLoadingConfigConcurrentlyReusesCachedSchema()
+  public void testGetIndexLoadingConfigConcurrentlyReusesCachedSchema()
       throws Exception {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    Schema shared = manager.fetchIndexLoadingConfig().getSchema();
+    Schema shared = manager.getIndexLoadingConfig().getSchema();
     ExecutorService executor = Executors.newFixedThreadPool(8);
     CountDownLatch start = new CountDownLatch(1);
     try {
@@ -1157,13 +1140,14 @@ public class BaseTableDataManagerTest {
       for (int i = 0; i < 32; i++) {
         results.add(executor.submit(() -> {
           assertTrue(start.await(10, TimeUnit.SECONDS));
-          return manager.fetchIndexLoadingConfig().getSchema();
+          return manager.getIndexLoadingConfig().getSchema();
         }));
       }
       start.countDown();
       for (Future<Schema> result : results) {
         assertSame(result.get(10, TimeUnit.SECONDS), shared);
       }
+      verifyNoInteractions(manager._propertyStore);
     } finally {
       start.countDown();
       executor.shutdownNow();
@@ -1176,6 +1160,8 @@ public class BaseTableDataManagerTest {
     manager._tableNameWithType = OFFLINE_TABLE_NAME;
     ZKMetadataProvider.setTableConfig(manager._propertyStore, table);
     ZKMetadataProvider.setSchema(manager._propertyStore, schema);
+    manager.updateCachedTableConfigAndSchema(table, schema);
+    manager._propertyStore = spy(manager._propertyStore);
     return manager;
   }
 
@@ -1183,14 +1169,6 @@ public class BaseTableDataManagerTest {
     return new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension("id", DataType.INT, -1)
         .addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
-  }
-
-  private static Schema createComplexSchema(int defaultValue) {
-    Schema schema = createSchemaReuseSchema();
-    ComplexFieldSpec child = new ComplexFieldSpec("value", DataType.MAP, true,
-        Map.of("value", new DimensionFieldSpec("value", DataType.INT, true, defaultValue)));
-    schema.addField(new ComplexFieldSpec("nested", DataType.MAP, true, Map.of("value", child)));
-    return schema;
   }
 
   private static TableConfig createTimestampTable(TimestampIndexGranularity granularity) {
