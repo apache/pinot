@@ -22,6 +22,7 @@ import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -43,6 +44,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -59,7 +61,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final BaseProjectOperator<?> _projectOperator;
-  private final boolean _useStarTree;
+  /// Non-null when the aggregation reads a star-tree, holding the pairs resolved against the one it was routed to.
+  @Nullable
+  private final AggregationFunctionColumnPair[] _starTreeFunctionColumnPairs;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
 
@@ -71,7 +75,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
     _projectOperator = aggregationInfo.getProjectOperator();
-    _useStarTree = aggregationInfo.isUseStarTree();
+    _starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
     _numTotalDocs = numTotalDocs;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
@@ -120,8 +124,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     // TODO: pass trimGroupSize to executor, who creates the result holder
-    if (_useStarTree) {
-      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
+    if (_starTreeFunctionColumnPairs != null) {
+      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator,
+          _starTreeFunctionColumnPairs);
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }

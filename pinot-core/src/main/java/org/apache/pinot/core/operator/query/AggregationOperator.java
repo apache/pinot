@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
@@ -49,7 +50,9 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final BaseProjectOperator<?> _projectOperator;
-  private final boolean _useStarTree;
+  /// Non-null when the aggregation reads a star-tree, holding the pairs resolved against the one it was routed to.
+  @Nullable
+  private final AggregationFunctionColumnPair[] _starTreeFunctionColumnPairs;
   private final int _numTotalDocs;
 
   private int _numDocsScanned = 0;
@@ -82,7 +85,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperator = aggregationInfo.getProjectOperator();
-    _useStarTree = aggregationInfo.isUseStarTree();
+    _starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
     _numTotalDocs = numTotalDocs;
     _nonScanResolvable = nonScanResolvable;
     _dataSources = dataSources;
@@ -92,9 +95,9 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   protected AggregationResultsBlock getNextBlock() {
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
-    if (_useStarTree) {
+    if (_starTreeFunctionColumnPairs != null) {
       // StarTreeAggregationExecutor doesn't support non-scan results.
-      aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
+      aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions, _starTreeFunctionColumnPairs);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, resolveNonScanResults());
     }

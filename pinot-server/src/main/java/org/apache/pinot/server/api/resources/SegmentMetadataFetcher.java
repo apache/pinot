@@ -64,6 +64,7 @@ public class SegmentMetadataFetcher {
   private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
+  private static final String STAR_TREE_NULL_HANDLING_ENABLED = "null-handling-enabled";
 
   /// This is a helper method that fetches the segment metadata for a given segment.
   /// @param columns Columns to include for metadata
@@ -188,6 +189,9 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED,
           starTreeMetadata.getSkipStarNodeCreationForDimensions());
+      // Part of the star-tree's identity: a null-aware and a regular star-tree over the same columns are different
+      // indexes, so a consumer rebuilding a config from this metadata has to carry it
+      starTreeIndexMap.put(STAR_TREE_NULL_HANDLING_ENABLED, starTreeMetadata.isNullHandlingEnabled());
       startreeDetails.add(starTreeIndexMap);
     }
     return startreeDetails;
