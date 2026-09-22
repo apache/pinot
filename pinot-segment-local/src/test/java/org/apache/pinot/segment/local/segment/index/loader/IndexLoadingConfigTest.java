@@ -23,21 +23,15 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.ComplexFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -147,9 +141,7 @@ public class IndexLoadingConfigTest {
         .setStarTreeIndexConfigs(List.of(stIdxCfg))
         .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": []}}"))
         .setFieldConfigList(Arrays.asList(col1Cfg, col2Cfg)).build();
-    IndexLoadingConfig original = new IndexLoadingConfig(idmCfg, tableConfig, schema);
-    IndexLoadingConfig ilc = new IndexLoadingConfig(original);
-    assertSame(ilc.getFieldIndexConfig("col1"), original.getFieldIndexConfig("col1"));
+    IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
     ilc.setSegmentTier("coldTier");
     // Check index configs for coldTier
     assertEquals(ilc.getStarTreeIndexConfigs().size(), 0);
@@ -162,31 +154,6 @@ public class IndexLoadingConfigTest {
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
-    assertNull(original.getSegmentTier());
-    assertEquals(original.getStarTreeIndexConfigs().size(), 1);
-    assertTrue(original.getFieldIndexConfig("col1").getConfig(StandardIndexes.inverted()).isEnabled());
-    assertTrue(original.getFieldIndexConfig("col2").getConfig(StandardIndexes.dictionary()).isEnabled());
-  }
-
-  @Test
-  public void testCopyIsolatesOpenStructChildren()
-      throws IOException {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of())).build();
-    FieldConfig fieldConfig = JsonUtils.stringToObject(
-        "{\"name\":\"event\",\"indexes\":{\"open_struct\":{}}}", FieldConfig.class);
-    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setFieldConfigList(List.of(fieldConfig)).build();
-    IndexLoadingConfig original = new IndexLoadingConfig(table, schema);
-    IndexLoadingConfig copy = new IndexLoadingConfig(original);
-    ColumnMetadata child = mock(ColumnMetadata.class);
-    when(child.getFieldSpec()).thenReturn(new DimensionFieldSpec("event$key", DataType.INT, true));
-    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
-    when(metadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("event$key", child)));
-    copy.addOpenStructChildConfigs(metadata);
-    assertNotNull(copy.getFieldIndexConfig("event$key"));
-    assertNull(original.getFieldIndexConfig("event$key"));
-    assertNull(new IndexLoadingConfig(original).getFieldIndexConfig("event$key"));
   }
 
   @Test

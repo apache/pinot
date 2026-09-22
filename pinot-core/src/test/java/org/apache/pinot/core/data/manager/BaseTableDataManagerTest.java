@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +75,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -1083,17 +1085,12 @@ public class BaseTableDataManagerTest {
     TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema original = createSchemaReuseSchema();
     BaseTableDataManager manager = createSchemaReuseManager(table, original);
-    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig();
-    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig(null);
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig(null);
     assertSame(first.getSchema(), original);
     assertSame(second.getSchema(), original);
     assertSame(first.getTableConfig(), second.getTableConfig());
-    assertNotSame(first, second);
-    assertSame(first.getFieldIndexConfig("id"), second.getFieldIndexConfig("id"));
-    first.setSegmentTier(null);
-    assertSame(first.getFieldIndexConfig("id"), second.getFieldIndexConfig("id"));
-    first.setForwardIndexOnly(true);
-    assertFalse(second.isForwardIndexOnly());
+    assertSame(first, second);
     verifyNoInteractions(manager._propertyStore);
 
     Schema changed = createSchemaReuseSchema();
@@ -1105,25 +1102,54 @@ public class BaseTableDataManagerTest {
     assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
     assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
     assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
-    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), refreshed);
+    assertSame(manager.getCachedIndexLoadingConfig(null).getSchema(), refreshed);
 
     manager.updateCachedTableConfigAndSchema(table, changed);
-    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), changed);
+    assertSame(manager.getCachedIndexLoadingConfig(null).getSchema(), changed);
     TableConfig indexedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setInvertedIndexColumns(List.of("id")).build();
     manager.updateCachedTableConfigAndSchema(indexedTable, changed);
-    IndexLoadingConfig indexed = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig indexed = manager.getCachedIndexLoadingConfig(null);
     assertTrue(indexed.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(first.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
-    assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig().getFieldIndexConfig("id"));
+    assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig(null).getFieldIndexConfig("id"));
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigIsolatesSegmentSettings() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, schema);
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig(null);
+    IndexLoadingConfig tierConfig = manager.getCachedIndexLoadingConfig("cold");
+    assertNotSame(tierConfig, shared);
+    assertEquals(tierConfig.getSegmentTier(), "cold");
+    assertNull(shared.getSegmentTier());
+    assertSame(manager.getCachedIndexLoadingConfig(null), shared);
+
+    Schema openStructSchema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of())).build();
+    manager.updateCachedTableConfigAndSchema(table, openStructSchema);
+    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig(null);
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig(null);
+    assertNotSame(first, second);
+    assertSame(first.getSchema(), second.getSchema());
+
+    manager.updateCachedTableConfigAndSchema(table, null);
+    first = manager.getCachedIndexLoadingConfig(null);
+    second = manager.getCachedIndexLoadingConfig(null);
+    first.addKnownColumns(Set.of("segmentColumn"));
+    assertNotNull(first.getFieldIndexConfig("segmentColumn"));
+    assertNull(second.getFieldIndexConfig("segmentColumn"));
+    verifyNoInteractions(manager._propertyStore);
   }
 
   @Test
   public void testGetCachedIndexLoadingConfigNormalizesTimestampBeforeReuse() {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    Schema first = manager.getCachedIndexLoadingConfig().getSchema();
-    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    Schema first = manager.getCachedIndexLoadingConfig(null).getSchema();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig(null);
     assertSame(second.getSchema(), first);
     assertTrue(first.hasColumn("$ts$DAY"));
     assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
@@ -1132,7 +1158,7 @@ public class BaseTableDataManagerTest {
 
     ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
     manager.onTableConfigOrSchemaRefresh();
-    Schema changed = manager.getCachedIndexLoadingConfig().getSchema();
+    Schema changed = manager.getCachedIndexLoadingConfig(null).getSchema();
     assertNotSame(changed, first);
     assertTrue(changed.hasColumn("$ts$HOUR"));
     assertFalse(changed.hasColumn("$ts$DAY"));
@@ -1144,7 +1170,7 @@ public class BaseTableDataManagerTest {
       throws Exception {
     BaseTableDataManager manager =
         createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
-    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig(null);
     ExecutorService executor = Executors.newFixedThreadPool(8);
     CountDownLatch start = new CountDownLatch(1);
     try {
@@ -1152,15 +1178,12 @@ public class BaseTableDataManagerTest {
       for (int i = 0; i < 32; i++) {
         results.add(executor.submit(() -> {
           assertTrue(start.await(10, TimeUnit.SECONDS));
-          return manager.getCachedIndexLoadingConfig();
+          return manager.getCachedIndexLoadingConfig(null);
         }));
       }
       start.countDown();
       for (Future<IndexLoadingConfig> result : results) {
-        IndexLoadingConfig copy = result.get(10, TimeUnit.SECONDS);
-        assertNotSame(copy, shared);
-        assertSame(copy.getSchema(), shared.getSchema());
-        assertSame(copy.getFieldIndexConfig("id"), shared.getFieldIndexConfig("id"));
+        assertSame(result.get(10, TimeUnit.SECONDS), shared);
       }
       verifyNoInteractions(manager._propertyStore);
     } finally {
