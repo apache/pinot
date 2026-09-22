@@ -64,38 +64,31 @@ public interface PartitionFunction extends Serializable {
     return null;
   }
 
-  /// Returns whether the exposed function configuration is null or empty. This does not imply that other settings,
-  /// such as the partition id normalizer, have their default values.
-  /// Public helper for implementations overriding [#canReusePartitionIds(PartitionFunction)].
+  /// Returns the canonical identity for this function's effective partitioning behavior, or null to conservatively
+  /// permit reuse only for this exact instance. Implementations should compute the identity once in their constructor
+  /// from every output-affecting setting.
+  @Nullable
   @JsonIgnore
-  default boolean hasEmptyConfig() {
-    Map<String, String> config = getFunctionConfig();
-    return config == null || config.isEmpty();
+  default PartitionFunctionIdentity getPartitionFunctionIdentity() {
+    return null;
   }
 
   /// Returns whether this function and the non-null `other` function compute identical partition ids for every input.
   /// This relation must be reflexive, symmetric and transitive: callers may share ids computed by any member of a
   /// compatible group, not just this instance. A coarser partitioning or a superset is not sufficient.
   /// False for distinct instances is conservative, not proof that their results differ.
-  /// Implementations with additional output-affecting state must account for it in this method.
-  ///
-  /// The default compares class, name, partition count, normalizer and configuration contents (null and empty are
-  /// equivalent). It assumes these represent all output-affecting settings. Implementations can override this method
-  /// to compare their immutable effective settings instead of configuration maps, or conservatively decline reuse
-  /// when the comparison is more expensive than computing the partition ids.
+  /// Implementations opt in by returning a canonical [PartitionFunctionIdentity] built from all output-affecting
+  /// settings. Identity hashes are cached and collisions are resolved when identities are interned, so this comparison
+  /// is constant-time without making partition pruning probabilistic.
   default boolean canReusePartitionIds(PartitionFunction other) {
     if (this == other) {
       return true;
     }
-    if (getClass() != other.getClass() || !getName().equals(other.getName())
-        || getNumPartitions() != other.getNumPartitions()
-        || getPartitionIdNormalizer() != other.getPartitionIdNormalizer()) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     }
-    Map<String, String> config = getFunctionConfig();
-    Map<String, String> otherConfig = other.getFunctionConfig();
-    return config == null || config.isEmpty() ? otherConfig == null || otherConfig.isEmpty()
-        : config.equals(otherConfig);
+    PartitionFunctionIdentity identity = getPartitionFunctionIdentity();
+    return identity != null && identity == other.getPartitionFunctionIdentity();
   }
 
   /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id

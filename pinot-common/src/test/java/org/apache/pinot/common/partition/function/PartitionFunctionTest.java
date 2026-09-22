@@ -48,8 +48,6 @@ public class PartitionFunctionTest {
   public void testPartitionIdReuse() {
     PartitionFunction function = new MurmurPartitionFunction(8, null);
     PartitionFunction emptyConfig = new MurmurPartitionFunction(8, Map.of());
-    assertTrue(function.hasEmptyConfig());
-    assertTrue(emptyConfig.hasEmptyConfig());
     assertTrue(function.canReusePartitionIds(emptyConfig));
     assertTrue(emptyConfig.canReusePartitionIds(function));
     PartitionFunction third = new MurmurPartitionFunction(8, Map.of());
@@ -59,7 +57,6 @@ public class PartitionFunctionTest {
     assertFalse(function.canReusePartitionIds(new Murmur3PartitionFunction(8, null)));
 
     PartitionFunction configured = new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"));
-    assertFalse(configured.hasEmptyConfig());
     assertTrue(configured.canReusePartitionIds(configured));
     assertFalse(function.canReusePartitionIds(configured));
     assertFalse(configured.canReusePartitionIds(function));
@@ -67,7 +64,6 @@ public class PartitionFunctionTest {
 
     PartitionFunction modulo = new ModuloPartitionFunction(8, null);
     PartitionFunction abs = new ModuloPartitionFunction(8, Map.of("partitionIdNormalizer", "ABS"));
-    assertTrue(abs.hasEmptyConfig(), "An empty exposed config does not imply the default normalizer");
     assertFalse(modulo.canReusePartitionIds(abs));
     assertFalse(abs.canReusePartitionIds(modulo));
   }
@@ -95,12 +91,20 @@ public class PartitionFunctionTest {
   }
 
   @Test
-  public void testBoundedConfigIsImmutable() {
+  public void testBoundedIdentityIsCollisionSafeAndConfigIsImmutable() {
     Map<String, String> config = new HashMap<>(Map.of("columnValues", "a|b", "columnValuesDelimiter", "|"));
     PartitionFunction function = new BoundedColumnValuePartitionFunction(3, config);
     assertTrue(function.canReusePartitionIds(function));
-    assertFalse(function.canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, config)),
-        "Large lookup configurations should not be compared for every segment");
+    assertTrue(function.canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, config)));
+
+    Map<String, String> collidingConfig =
+        Map.of("columnValues", "Aa|x", "columnValuesDelimiter", "|");
+    Map<String, String> otherCollidingConfig =
+        Map.of("columnValues", "BB|x", "columnValuesDelimiter", "|");
+    assertEquals(collidingConfig.hashCode(), otherCollidingConfig.hashCode(), "Fixture must exercise a hash collision");
+    assertFalse(new BoundedColumnValuePartitionFunction(3, collidingConfig)
+        .canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, otherCollidingConfig)));
+
     config.put("columnValues", "b|a");
     assertEquals(function.getPartition("a"), 1);
     assertEquals(function.getFunctionConfig().get("columnValues"), "a|b");

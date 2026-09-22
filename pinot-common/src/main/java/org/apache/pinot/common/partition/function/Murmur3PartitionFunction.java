@@ -25,6 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
@@ -49,6 +50,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private final boolean _useX64;
   private final boolean _useRawBytes;
   private final PartitionIdNormalizer _normalizer;
+  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -79,6 +81,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     _useX64 = useX64;
     _useRawBytes = useRawBytes;
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
+    _partitionFunctionIdentity = PartitionFunctionIdentity.of(Murmur3PartitionFunction.class, _numPartitions,
+        _normalizer, _seed, _useX64, _useRawBytes);
   }
 
   @Override
@@ -117,13 +121,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public boolean canReusePartitionIds(PartitionFunction other) {
-    if (getClass() != other.getClass()) {
-      return false;
-    }
-    Murmur3PartitionFunction function = (Murmur3PartitionFunction) other;
-    return _numPartitions == function._numPartitions && _normalizer == function._normalizer
-        && _seed == function._seed && _useX64 == function._useX64 && _useRawBytes == function._useRawBytes;
+  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
+    return _partitionFunctionIdentity;
   }
 
   // Keep it for backward-compatibility, use getName() instead
