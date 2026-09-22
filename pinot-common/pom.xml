@@ -62,12 +62,6 @@
           <!-- Keep this module's historical fork reuse, but honor the root parallel-fork knob. -->
           <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>true</reuseForks>
-          <properties>
-            <property>
-              <name>usedefaultlisteners</name>
-              <value>false</value>
-            </property>
-          </properties>
         </configuration>
       </plugin>
 
@@ -352,6 +346,22 @@
     </dependency>
 
     <!-- Test -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.support</groupId>
+      <artifactId>testng-engine</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>

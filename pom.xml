@@ -358,6 +358,8 @@
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
     <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
+    <junit-platform.version>1.14.4</junit-platform.version>
+    <testng-engine.version>1.1.0</testng-engine.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
@@ -2040,6 +2042,25 @@
         <scope>test</scope>
       </dependency>
 
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-suite</artifactId>
+        <version>${junit-platform.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-launcher</artifactId>
+        <version>${junit-platform.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.support</groupId>
+        <artifactId>testng-engine</artifactId>
+        <version>${testng-engine.version}</version>
+        <scope>test</scope>
+      </dependency>
+
       <!-- mockito bom -->
       <dependency>
         <groupId>org.mockito</groupId>
@@ -2243,14 +2264,6 @@
               -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
-          <!-- Explicitly select the test provider, instead of relying on the classpath -->
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.maven.surefire</groupId>
-              <artifactId>surefire-testng</artifactId>
-              <version>${surefire.version}</version>
-            </dependency>
-          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2574,13 +2587,10 @@
                green-washed. -->
           <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
           <properties>
-            <!-- Surefire is the default report writer; modules can explicitly opt into an isolated
-                 reporter. TestNG's native HTML/XML reporters write shared files and assets, which
-                 race when multiple forks use one module. -->
-            <property>
-              <name>usedefaultlisteners</name>
-              <value>false</value>
-            </property>
+            <!-- Use Surefire's reports; TestNG's default reporters share files across parallel forks. -->
+            <configurationParameters>
+              testng.useDefaultListeners=false
+            </configurationParameters>
           </properties>
           <systemPropertyVariables>
             <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)

@@ -161,9 +161,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/SharedKafkaRealtimeSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
               <execution>
@@ -178,9 +178,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/MultiNodesOfflineSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
               <execution>
@@ -195,9 +195,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/SharedHybridSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
             </executions>
@@ -296,9 +296,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/SharedKafkaRealtimeSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
               <execution>
@@ -313,9 +313,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/KinesisSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
             </executions>
@@ -369,9 +369,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/MultiNodesOfflineSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
               <execution>
@@ -386,9 +386,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/CustomClusterSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
               <execution>
@@ -403,9 +403,9 @@
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
+                  <includes combine.self="override">
+                    <include>**/suites/SharedHybridSuite.java</include>
+                  </includes>
                 </configuration>
               </execution>
             </executions>
@@ -498,9 +498,9 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <skipTests>false</skipTests>
-              <suiteXmlFiles>
-                <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
-              </suiteXmlFiles>
+              <includes combine.self="override">
+                <include>**/suites/CustomClusterSuite.java</include>
+              </includes>
             </configuration>
           </plugin>
         </plugins>
@@ -521,9 +521,9 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <skipTests>false</skipTests>
-              <suiteXmlFiles>
-                <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
-              </suiteXmlFiles>
+              <includes combine.self="override">
+                <include>**/suites/KinesisSuite.java</include>
+              </includes>
             </configuration>
           </plugin>
         </plugins>
@@ -532,6 +532,10 @@
   </profiles>
 
   <dependencies>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
