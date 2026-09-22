@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.pruner;
 
 import com.google.common.collect.ImmutableSet;
-import java.util.ArrayList;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
