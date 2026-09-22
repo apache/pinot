@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -35,6 +36,7 @@ import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -42,9 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Decides whether a multi-stage query that does not set the
-/// [CommonConstants.Broker.Request.QueryOptionKey#PROTO_SEGMENT_LIST] query option ships its leaf-stage segment lists
-/// as native protobuf fields of the worker metadata, or as the legacy JSON custom property.
+/// Decides whether a multi-stage query ships its leaf-stage segment lists as native protobuf fields of the worker
+/// metadata, or as the legacy JSON custom property.
 ///
 /// Only servers decode those fields, and a server that predates them finds no segments, treats the worker as an
 /// intermediate-stage worker and fails the leaf stage. The mode, set by
@@ -62,21 +63,27 @@ import org.slf4j.LoggerFactory;
 ///   under a different version string, and tests.
 /// - [Mode#NEVER]: legacy JSON unconditionally. The kill switch.
 ///
-/// The per-query option overrides every mode. Modeled on [org.apache.pinot.query.runtime.SendStatsPredicate], which
-/// gates the MSE stats on the same signal, with two deliberate differences: only servers are checked, since brokers
-/// never decode the fields, and an unreadable instance config counts as outdated rather than current, since the
-/// cost of a wrong answer here is a failed query rather than missing stats.
+/// The mode is read from cluster config, falling back to the static broker config and then to
+/// [CommonConstants.Broker#DEFAULT_MSE_PROTO_SEGMENT_LIST]. Cluster config wins and is applied to the next query, so
+/// an operator can switch the encoding off without restarting the brokers; clearing the key restores the static
+/// broker config. A value that is not a mode is ignored with a warning, leaving the current mode in place.
+///
+/// Modeled on [org.apache.pinot.query.runtime.SendStatsPredicate], which gates the MSE stats on the same signal, with
+/// two deliberate differences: only servers are checked, since brokers never decode the fields, and an unreadable
+/// instance config counts as outdated rather than current, since the cost of a wrong answer here is a failed query
+/// rather than missing stats.
 ///
 /// Every instance that is not a controller, broker or minion counts as a server, so an instance config left behind
 /// by a decommissioned old server keeps [Mode#SAFE] on the legacy encoding until it is removed; the outdated servers
 /// are logged whenever the encoding switches.
 ///
-/// Thread-safety: [#isEnabled] reads a single `volatile` flag and is lock-free on the request path. Instance-config
-/// deliveries are serialized on `this`, which also publishes the Helix handles set by [#watchInstanceConfigs].
+/// Thread-safety: [#isEnabled] reads two `volatile` fields and is lock-free on the request path. Instance-config and
+/// cluster-config deliveries are serialized on `this`, which also publishes the Helix handles set by
+/// [#watchInstanceConfigs].
 @ThreadSafe
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
-public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
+public class ProtoSegmentListPredicate implements InstanceConfigChangeListener, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProtoSegmentListPredicate.class);
   private static final String KEY = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
   /// Cap on the outdated servers named in one log line, so that a large rolling upgrade does not log the whole fleet.
@@ -86,7 +93,11 @@ public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
     NEVER, SAFE, ALWAYS
   }
 
-  private final Mode _mode;
+  /// The mode of the static broker config, used until cluster config says otherwise and again when the cluster-config
+  /// key is cleared.
+  private final Mode _staticMode;
+  /// The mode in force, which cluster config can change at runtime.
+  private volatile Mode _mode;
   private final String _currentVersion;
   /// SAFE only: servers whose version is not [#_currentVersion], mapped to the version they report. Guarded by `this`.
   private final Map<String, String> _outdatedServers = new HashMap<>();
@@ -104,6 +115,7 @@ public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
 
   @VisibleForTesting
   ProtoSegmentListPredicate(Mode mode, String currentVersion) {
+    _staticMode = mode;
     _mode = mode;
     _currentVersion = currentVersion;
   }
@@ -126,8 +138,8 @@ public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
     return _mode;
   }
 
-  /// Whether a query that does not set the query option uses the proto encoding. `multiClusterQuery` is whether the
-  /// query routes to other clusters, whose server versions this predicate cannot see.
+  /// Whether a query uses the proto encoding. `multiClusterQuery` is whether the query routes to other clusters,
+  /// whose server versions this predicate cannot see.
   public boolean isEnabled(boolean multiClusterQuery) {
     switch (_mode) {
       case ALWAYS:
@@ -139,13 +151,11 @@ public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
     }
   }
 
-  /// Starts watching the server versions of the cluster when the mode needs it, and is a no-op otherwise.
-  /// `helixManager` must already be connected. A registration failure is logged rather than thrown: it leaves
-  /// [Mode#SAFE] on the legacy encoding, which is always correct, and an optimization must not fail broker startup.
+  /// Starts watching the server versions of the cluster. Registered whatever the current mode is, because cluster
+  /// config can switch the mode to [Mode#SAFE] at runtime. `helixManager` must already be connected. A registration
+  /// failure is logged rather than thrown: it leaves [Mode#SAFE] on the legacy encoding, which is always correct, and
+  /// an optimization must not fail broker startup.
   public void watchInstanceConfigs(HelixManager helixManager) {
-    if (_mode != Mode.SAFE) {
-      return;
-    }
     try {
       // Published under the monitor that deliveries synchronize on, but registered outside it: Helix may deliver the
       // initial notification on another thread while registration is still in progress.
@@ -158,6 +168,35 @@ public class ProtoSegmentListPredicate implements InstanceConfigChangeListener {
     } catch (Exception e) {
       LOGGER.error("Failed to watch server versions for {}, leaving the legacy segment list encoding on", KEY, e);
     }
+  }
+
+  /// Applies a mode set in cluster config, which wins over the static broker config and takes effect on the next
+  /// query. Clearing the key restores the static broker config.
+  @Override
+  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(KEY)) {
+      return;
+    }
+    String value = clusterConfigs.get(KEY);
+    Mode mode;
+    if (value == null || value.isBlank()) {
+      mode = _staticMode;
+    } else {
+      try {
+        mode = Mode.valueOf(value.trim().toUpperCase(Locale.ENGLISH));
+      } catch (IllegalArgumentException e) {
+        // Keep the mode in force: a typo must not silently move a cluster off the encoding an operator chose.
+        LOGGER.warn("Ignoring invalid value '{}' for {}, expected one of NEVER, SAFE, ALWAYS, staying on: {}", value,
+            KEY, _mode);
+        return;
+      }
+    }
+    Mode previous = _mode;
+    if (mode == previous) {
+      return;
+    }
+    _mode = mode;
+    LOGGER.info("Updated {} from: {} to: {}", KEY, previous, mode);
   }
 
   @Override

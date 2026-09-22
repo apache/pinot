@@ -21,6 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
@@ -187,13 +188,59 @@ public class ProtoSegmentListPredicateTest {
     assertFalse(predicate.isEnabled(false));
   }
 
+  /// The kill switch: a mode set in cluster config wins over the static broker config and takes effect without a
+  /// broker restart.
   @Test
-  public void testWatchIsANoOpOutsideSafeMode()
+  public void testClusterConfigOverridesTheStaticMode() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.SAFE, CURRENT);
+    predicate.refreshAllServers(Map.of(SERVER_1, CURRENT));
+    assertTrue(predicate.isEnabled(false));
+
+    predicate.onChange(Set.of(KEY), Map.of(KEY, "NEVER"));
+    assertEquals(predicate.getMode(), Mode.NEVER);
+    assertFalse(predicate.isEnabled(false), "NEVER from cluster config must switch the encoding off");
+
+    predicate.onChange(Set.of(KEY), Map.of(KEY, "always"));
+    assertEquals(predicate.getMode(), Mode.ALWAYS);
+    assertTrue(predicate.isEnabled(true), "ALWAYS from cluster config must apply even to multi-cluster queries");
+  }
+
+  /// Clearing the cluster-config key restores the static broker config, as the other live broker configs do.
+  @Test
+  public void testClearingClusterConfigRestoresTheStaticMode() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT);
+    predicate.onChange(Set.of(KEY), Map.of(KEY, "NEVER"));
+    assertEquals(predicate.getMode(), Mode.NEVER);
+
+    predicate.onChange(Set.of(KEY), Map.of());
+    assertEquals(predicate.getMode(), Mode.ALWAYS);
+    assertTrue(predicate.isEnabled(false));
+  }
+
+  /// A typo must not silently move the cluster off the encoding an operator chose, so the mode in force stays.
+  @Test
+  public void testInvalidClusterConfigValueIsIgnored() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT);
+    predicate.onChange(Set.of(KEY), Map.of(KEY, "true"));
+    assertEquals(predicate.getMode(), Mode.ALWAYS);
+    assertTrue(predicate.isEnabled(false));
+  }
+
+  @Test
+  public void testClusterConfigChangeThatDoesNotTouchTheKeyIsIgnored() {
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT);
+    predicate.onChange(Set.of("some.other.key"), Map.of(KEY, "NEVER"));
+    assertEquals(predicate.getMode(), Mode.ALWAYS);
+  }
+
+  /// SAFE can be selected at runtime, so the server versions are watched whatever the static mode is.
+  @Test
+  public void testWatchesServerVersionsWhateverTheStaticModeIs()
       throws Exception {
     HelixManager helixManager = helixManager(mock(HelixAdmin.class));
-    new ProtoSegmentListPredicate(Mode.ALWAYS, CURRENT).watchInstanceConfigs(helixManager);
-    new ProtoSegmentListPredicate(Mode.NEVER, CURRENT).watchInstanceConfigs(helixManager);
-    verify(helixManager, never()).addInstanceConfigChangeListener(any());
+    ProtoSegmentListPredicate predicate = new ProtoSegmentListPredicate(Mode.NEVER, CURRENT);
+    predicate.watchInstanceConfigs(helixManager);
+    verify(helixManager).addInstanceConfigChangeListener(predicate);
   }
 
   /// A failed registration must not fail broker startup; it just leaves SAFE on the legacy encoding.

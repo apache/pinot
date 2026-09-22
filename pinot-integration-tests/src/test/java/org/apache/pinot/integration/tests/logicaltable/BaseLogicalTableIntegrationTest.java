@@ -29,10 +29,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
+import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -41,6 +43,7 @@ import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -482,20 +485,44 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   /// Both leaf-stage segment list encodings must return the same result for a logical table, whose leaf workers carry
   /// `logicalTableSegmentsMap`, keyed by physical table name, rather than the table-type keyed `tableSegmentsMap`.
+  /// The encoding is switched through cluster config, the way an operator would, and restored afterwards because the
+  /// cluster is shared with the other logical-table test classes.
   @Test
   public void testProtoSegmentListPreservesLogicalTableResults()
       throws Exception {
     setUseMultiStageQueryEngine(true);
     String query = "SELECT Carrier, COUNT(*) FROM " + getLogicalTableName() + " WHERE DaysSinceEpoch > 16312 "
         + "GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+    // The cluster was started by the shared suite instance, which is the one holding the broker starter.
+    ProtoSegmentListPredicate predicate =
+        ((BrokerRequestHandlerDelegate) _sharedClusterTestSuite._brokerStarters.get(0).getBrokerRequestHandler())
+            .getMultiStageBrokerRequestHandler().getProtoSegmentListPredicate();
+    TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
+        "SAFE mode did not enable the proto segment list encoding although every server runs the same version");
 
-    JsonNode legacy = postQuery("SET protoSegmentList = false; " + query);
-    assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
-    JsonNode proto = postQuery("SET protoSegmentList = true; " + query);
+    JsonNode proto = postQuery(query);
     assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
 
-    assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"),
-        "The segment list encoding changed the result of a logical table query");
+    try {
+      setProtoSegmentListMode("NEVER");
+      TestUtils.waitForCondition(aVoid -> !predicate.isEnabled(false), 10_000L,
+          "Setting the mode to NEVER in cluster config did not reach the broker");
+
+      JsonNode legacy = postQuery(query);
+      assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
+      assertEquals(legacy.get("resultTable").get("rows"), proto.get("resultTable").get("rows"),
+          "The segment list encoding changed the result of a logical table query");
+    } finally {
+      setProtoSegmentListMode("SAFE");
+      TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
+          "Restoring SAFE in cluster config did not reach the broker");
+    }
+  }
+
+  private void setProtoSegmentListMode(String mode)
+      throws Exception {
+    sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(),
+        JsonUtils.objectToString(Map.of(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, mode)));
   }
 
   @Test

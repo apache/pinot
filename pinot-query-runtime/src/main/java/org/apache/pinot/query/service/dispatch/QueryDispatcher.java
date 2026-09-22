@@ -133,9 +133,9 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
   /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
-  /// Picks the leaf-stage segment list encoding of a query that does not carry an explicit
-  /// [QueryOptionKey#PROTO_SEGMENT_LIST] override. Read once per request, since in its default mode it follows the
-  /// server versions of the cluster; see [ProtoSegmentListPredicate].
+  /// Picks the leaf-stage segment list encoding of a query. Read once per request, since operators can change the
+  /// mode through cluster config and its default mode follows the server versions of the cluster; see
+  /// [ProtoSegmentListPredicate].
   private final ProtoSegmentListPredicate _protoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
@@ -717,12 +717,11 @@ public class QueryDispatcher {
     }
   }
 
-  /// Whether this query ships its leaf-stage segment lists in the proto encoding: the query option if set, otherwise
-  /// the predicate, which has to use the legacy encoding for a multi-cluster query because it cannot see the server
-  /// versions of the other clusters. Resolved once per query so that all of its servers get the same encoding.
+  /// Whether this query ships its leaf-stage segment lists in the proto encoding. A multi-cluster query keeps the
+  /// legacy encoding, because the predicate cannot see the server versions of the other clusters. Resolved once per
+  /// query so that all of its servers get the same encoding even if the mode changes mid-dispatch.
   private boolean useProtoSegmentList(Map<String, String> queryOptions) {
-    return QueryOptionsUtils.isProtoSegmentList(queryOptions,
-        _protoSegmentList.isEnabled(QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)));
+    return _protoSegmentList.isEnabled(QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false));
   }
 
   /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'

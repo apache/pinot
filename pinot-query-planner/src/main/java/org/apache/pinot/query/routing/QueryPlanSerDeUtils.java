@@ -48,7 +48,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///   fields understand.
 ///
 /// Decoding accepts both, so a server always understands every broker; the broker enables the proto encoding only
-/// when every server does (see the `protoSegmentList` query option).
+/// when every server does (see `ProtoSegmentListPredicate`).
 public class QueryPlanSerDeUtils {
   private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
   };

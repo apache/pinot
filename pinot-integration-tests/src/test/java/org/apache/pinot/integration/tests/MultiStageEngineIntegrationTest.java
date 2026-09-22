@@ -296,8 +296,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   /// Every server of this cluster runs the broker's own build, so the default SAFE mode has to switch the proto
-  /// segment list encoding on by itself, through the server versions published in the Helix instance configs. Both
-  /// encodings must then return identical results for queries with one and with several leaf stages.
+  /// segment list encoding on by itself, through the server versions published in the Helix instance configs. Setting
+  /// the mode to NEVER in cluster config has to switch it back off without restarting the broker, and both encodings
+  /// must return identical results for queries with one and with several leaf stages.
   @Test
   public void testProtoSegmentListEncodingIsTransparent()
       throws Exception {
@@ -310,19 +311,41 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(predicate.isEnabled(true), "Multi-cluster queries must keep the legacy encoding");
 
     String table = getTableName();
-    String[] queries = {
+    List<String> queries = List.of(
         "SELECT COUNT(*) FROM " + table,
         "SELECT Carrier, COUNT(*), MAX(ArrDelay) FROM " + table + " WHERE DaysSinceEpoch > 16312 "
             + "GROUP BY Carrier ORDER BY Carrier",
         "SELECT COUNT(*) FROM " + table + " a JOIN (SELECT DISTINCT Carrier FROM " + table + ") b "
-            + "ON a.Carrier = b.Carrier"
-    };
+            + "ON a.Carrier = b.Carrier");
+
+    Map<String, JsonNode> protoRows = new HashMap<>();
     for (String query : queries) {
-      JsonNode legacy = postQuery("SET protoSegmentList = false; " + query);
-      assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
-      JsonNode proto = postQuery("SET protoSegmentList = true; " + query);
-      assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
-      assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"), query);
+      JsonNode response = postQuery(query);
+      assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + response);
+      protoRows.put(query, response.get("resultTable").get("rows"));
+    }
+
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      // The kill switch: a mode set in cluster config reaches the broker without a restart.
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, "NEVER");
+      TestUtils.waitForCondition(aVoid -> !predicate.isEnabled(false), 10_000L,
+          "Setting the mode to NEVER in cluster config did not reach the broker");
+
+      for (String query : queries) {
+        JsonNode response = postQuery(query);
+        assertTrue(response.get("exceptions").isEmpty(),
+            "Unexpected exceptions with the legacy encoding: " + response);
+        assertEquals(response.get("resultTable").get("rows"), protoRows.get(query),
+            "The segment list encoding changed the result of: " + query);
+      }
+    } finally {
+      _helixManager.getConfigAccessor().set(scope, CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, "SAFE");
+      TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
+          "Restoring SAFE in cluster config did not reach the broker");
     }
   }
 

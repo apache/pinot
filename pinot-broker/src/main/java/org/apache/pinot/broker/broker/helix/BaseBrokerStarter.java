@@ -108,6 +108,7 @@ import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
+import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -586,8 +587,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
-      // Watches the server versions that pick the default segment list encoding; a no-op unless the mode is SAFE.
-      multiStageBrokerRequestHandler.getProtoSegmentListPredicate().watchInstanceConfigs(_spectatorHelixManager);
+      // The segment list encoding follows the server versions in SAFE mode, and its mode follows cluster config.
+      ProtoSegmentListPredicate protoSegmentListPredicate =
+          multiStageBrokerRequestHandler.getProtoSegmentListPredicate();
+      protoSegmentListPredicate.watchInstanceConfigs(_spectatorHelixManager);
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(protoSegmentListPredicate);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
