@@ -526,6 +526,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return partitionIds;
   }
 
+  // Preserve the SEGMENT_COUNT gauge paired with BaseTableDataManager.closeSegment's decrement.
+  @SuppressWarnings("deprecation")
   private void doAddConsumingSegment(String segmentName)
       throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
@@ -541,7 +543,29 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
     IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
-    handleSegmentPreload(zkMetadata, indexLoadingConfig);
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    int partitionGroupId = llcSegmentName.getPartitionGroupId();
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager;
+    PartitionDedupMetadataManager partitionDedupMetadataManager;
+    synchronized (_segmentDataManagerMap) {
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
+          _tableNameWithType);
+      // Partition owners must be visible before shutdown stops/closes them. Preload and construction can be slow,
+      // so run them outside this monitor and check admission again before publishing the segment.
+      partitionUpsertMetadataManager = _tableUpsertMetadataManager != null
+          ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+          : null;
+      partitionDedupMetadataManager = _tableDedupMetadataManager != null
+          ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+          : null;
+    }
+    if (partitionUpsertMetadataManager != null && _tableUpsertMetadataManager.getContext().isPreloadEnabled()) {
+      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
+    }
+    if (partitionDedupMetadataManager != null && _tableDedupMetadataManager.getContext().isPreloadEnabled()) {
+      partitionDedupMetadataManager.preloadSegments(indexLoadingConfig);
+    }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
@@ -565,29 +589,32 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
 
     // Generates only one semaphore for every partition
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    int partitionGroupId = llcSegmentName.getPartitionGroupId();
     ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
-            : null;
-    PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
-            : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
             consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
             _isTableReadyToConsumeData);
-    registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
-    if (partitionUpsertMetadataManager != null) {
-      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+    // A segment can finish construction after table shutdown has drained the registered segments. Publish and start
+    // it together so shutdown either owns its cleanup or rejects it before any consumer is started.
+    synchronized (_segmentDataManagerMap) {
+      if (!_shutDown) {
+        registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
+        if (partitionUpsertMetadataManager != null) {
+          partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+        }
+        realtimeSegmentDataManager.startConsumption();
+        _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
+        _logger.info("Added new CONSUMING segment: {}", segmentName);
+        return;
+      }
     }
-    realtimeSegmentDataManager.startConsumption();
-    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
-
-    _logger.info("Added new CONSUMING segment: {}", segmentName);
+    // It was never published or counted in table gauges, so do not use releaseSegment/closeSegment here.
+    realtimeSegmentDataManager.destroy();
+    throw new IllegalStateException(
+        "Table data manager is already shut down, cannot add CONSUMING segment: " + segmentName + " to table: "
+            + _tableNameWithType);
   }
 
   @Override

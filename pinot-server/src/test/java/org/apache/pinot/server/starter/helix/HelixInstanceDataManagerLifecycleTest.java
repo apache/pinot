@@ -23,18 +23,37 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -50,6 +69,71 @@ public class HelixInstanceDataManagerLifecycleTest {
   @DataProvider
   public Object[][] segmentTypes() {
     return new Object[][]{{false}, {true}};
+  }
+
+  @DataProvider
+  public Object[][] tableManagerPresence() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "tableManagerPresence")
+  @SuppressWarnings("unchecked")
+  public void testDeletedTableCreationChecksConfigTimestamp(boolean existingManager)
+      throws Exception {
+    String table = "deleted_REALTIME";
+    ZNRecord configRecord = TableConfigSerDeUtils.toZNRecord(
+        new TableConfigBuilder(TableType.REALTIME).setTableName("deleted").build());
+    AtomicReference<ZNRecord> currentConfig = new AtomicReference<>(configRecord);
+    AtomicLong creationTimeMs = new AtomicLong(100L);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(table)), any(),
+        eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+          Stat stat = invocation.getArgument(1);
+          if (stat != null) {
+            stat.setCtime(creationTimeMs.get());
+          }
+          return currentConfig.get();
+        });
+    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForSchema("deleted")), any(),
+        eq(AccessOption.PERSISTENT))).thenReturn(
+            SchemaSerDeUtils.toZNRecord(new Schema.SchemaBuilder().setSchemaName("deleted").build()));
+    TableDataManager oldManager = mock(TableDataManager.class);
+    TableDataManager replacement = mock(TableDataManager.class);
+    TableDataManagerProvider provider = mock(TableDataManagerProvider.class);
+    when(provider.getTableDataManager(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(),
+        any()))
+        .thenReturn(existingManager ? oldManager : replacement, replacement);
+    HelixInstanceDataManager instance = new HelixInstanceDataManager();
+    instance._recentlyDeletedTables = CacheBuilder.newBuilder().build();
+    FieldUtils.writeField(instance, "_propertyStore", propertyStore, true);
+    FieldUtils.writeField(instance, "_tableDataManagerProvider", provider, true);
+    if (existingManager) {
+      instance.addConsumingSegment(table, "old");
+    }
+
+    instance.deleteTable(table, 200L);
+    instance.deleteTable(table, 200L);
+    instance.deleteTable(table, 50L);
+    assertThrows(IllegalStateException.class, () -> instance.addConsumingSegment(table, "stale"));
+    currentConfig.set(null);
+    assertThrows(IllegalStateException.class, () -> instance.addConsumingSegment(table, "missing"));
+    assertNull(instance.getTableDataManager(table));
+    verify(provider, times(existingManager ? 1 : 0)).getTableDataManager(any(), any(), any(), any(), any(), any(),
+        any(), any(), any(), anyBoolean(), any());
+
+    // A genuinely recreated table is allowed, but a failed start must retain the deletion guard.
+    currentConfig.set(configRecord);
+    creationTimeMs.set(201L);
+    doThrow(new IllegalStateException("start failure")).doNothing().when(replacement).start();
+    assertThrows(IllegalStateException.class, () -> instance.addConsumingSegment(table, "failed"));
+    creationTimeMs.set(100L);
+    assertThrows(IllegalStateException.class, () -> instance.addConsumingSegment(table, "stale-after-failure"));
+    assertNull(instance.getTableDataManager(table));
+    creationTimeMs.set(201L);
+    instance.addConsumingSegment(table, "new");
+    assertSame(instance.getTableDataManager(table), replacement);
+    assertNull(instance._recentlyDeletedTables.getIfPresent(table));
+    verify(replacement).addConsumingSegment("new");
   }
 
   @Test(dataProvider = "segmentTypes")
@@ -122,25 +206,29 @@ public class HelixInstanceDataManagerLifecycleTest {
   @Test
   public void testOtherTableCanInitializeDuringShutdown()
       throws Exception {
+    String table = "Aa_REALTIME";
+    String otherTable = "BB_REALTIME";
+    assertEquals(table.hashCode(), otherTable.hashCode());
     TableDataManager oldManager = mock(TableDataManager.class);
     TableDataManager otherManager = mock(TableDataManager.class);
     CountDownLatch shutdownEntered = new CountDownLatch(1);
     CountDownLatch finishShutdown = new CountDownLatch(1);
-    TestInstanceDataManager instance = new TestInstanceDataManager(name -> name.equals("old_REALTIME")
-        ? oldManager : otherManager);
+    TestInstanceDataManager instance = new TestInstanceDataManager(name -> name.equals(table)
+        ? oldManager
+        : otherManager);
     doAnswer(invocation -> {
       shutdownEntered.countDown();
       await(finishShutdown);
       return null;
     }).when(oldManager).shutDown();
-    instance.addConsumingSegment("old_REALTIME", "old");
+    instance.addConsumingSegment(table, "old");
     FutureTask<Void> deletion = new FutureTask<>(() -> {
-      instance.deleteTable("old_REALTIME", 1L);
+      instance.deleteTable(table, 1L);
       return null;
     });
     Thread deletionThread = new Thread(deletion, "delete-other-table");
     FutureTask<Void> creation = new FutureTask<>(() -> {
-      instance.addConsumingSegment("other_REALTIME", "other");
+      instance.addConsumingSegment(otherTable, "other");
       return null;
     });
     Thread creationThread = new Thread(creation, "create-other-table");

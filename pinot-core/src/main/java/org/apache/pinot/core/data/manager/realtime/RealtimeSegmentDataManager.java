@@ -1816,7 +1816,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
-    if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
+    if (_consumerThread != null && Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
       _segmentLogger.info("Interrupting the consumer thread and waiting for it to join");
       long startTimeMs = System.currentTimeMillis();
       _consumerThread.interrupt();

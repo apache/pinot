@@ -307,7 +307,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Shutting down table data manager");
-    _shutDown = true;
+    // Close admission atomically with publishing and starting a consuming segment. Segment construction and
+    // shutdown's blocking cleanup must remain outside this monitor.
+    synchronized (_segmentDataManagerMap) {
+      _shutDown = true;
+    }
     doShutdown();
     _logger.info("Shut down table data manager");
   }

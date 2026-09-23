@@ -22,7 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.util.concurrent.Striped;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -34,8 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -90,7 +91,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   // Serialize table creation with the previous owner's entire shutdown, including table-scoped resource cleanup.
   // Acquire it before changing the manager map, and release it before calling the table's segment-add methods.
-  private final Striped<Lock> _tableLifecycleLocks = Striped.lock(1024);
+  private final LoadingCache<String, Lock> _tableLifecycleLocks =
+      CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(() -> new ReentrantLock()));
 
   // Logical table metadata cache to cache logical table configs, schemas, and offline/realtime table configs.
   private final LogicalTableMetadataCache _logicalTableMetadataCache = new LogicalTableMetadataCache();
@@ -312,16 +314,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception {
-    Lock lifecycleLock = _tableLifecycleLocks.get(tableNameWithType);
+    Lock lifecycleLock = _tableLifecycleLocks.getUnchecked(tableNameWithType);
     lifecycleLock.lock();
     try {
-      AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
-      _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-        _recentlyDeletedTables.put(k, deletionTimeMs);
-        tableDataManagerRef.set(v);
-        return null;
-      });
-      TableDataManager tableDataManager = tableDataManagerRef.get();
+      // The first segment callback can arrive after deletion, before a manager has ever been created.
+      // Keep the newest deletion timestamp when duplicate or out-of-order deletion messages arrive.
+      _recentlyDeletedTables.asMap().merge(tableNameWithType, deletionTimeMs, Math::max);
+      TableDataManager tableDataManager = _tableDataManagerMap.remove(tableNameWithType);
       if (tableDataManager == null) {
         LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
         return;
@@ -349,7 +348,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   private TableDataManager getOrCreateTableDataManager(String tableNameWithType) {
-    Lock lifecycleLock = _tableLifecycleLocks.get(tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      return tableDataManager;
+    }
+    Lock lifecycleLock = _tableLifecycleLocks.getUnchecked(tableNameWithType);
     lifecycleLock.lock();
     try {
       return _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager);
@@ -376,7 +379,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(tableCreationTimeMs > tableDeleteTimeMs,
           "Table: %s was recently deleted (deleted %dms ago) but the table config was created before that (created "
               + "%dms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
-      _recentlyDeletedTables.invalidate(tableNameWithType);
     } else {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
@@ -390,6 +392,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
             _isServerReadyToServeQueries, _serverIngestionOomProtectionThrottleState, _enableAsyncSegmentRefresh,
             _reloadJobStatusCache);
     tableDataManager.start();
+    _recentlyDeletedTables.invalidate(tableNameWithType);
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
   }
