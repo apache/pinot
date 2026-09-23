@@ -2779,6 +2779,9 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
+        <!-- RAT is not safe for concurrent executions (RAT-573), so a single execution at the root scans the whole tree
+          instead of one execution per module. -->
+        <inherited>false</inherited>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -2788,6 +2791,7 @@
           </execution>
         </executions>
         <configuration>
+          <excludeSubProjects>false</excludeSubProjects>
           <excludes>
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
@@ -2848,19 +2852,19 @@
             <exclude>**/.settings/**</exclude>
             <exclude>**/.project</exclude>
             <exclude>**/.classpath</exclude>
-            <exclude>.externalToolBuilders/**</exclude>
+            <exclude>**/.externalToolBuilders/**</exclude>
 
             <!-- Knowledge base (not source code) -->
             <exclude>kb/**</exclude>
 
             <!-- GenAI Config files -->
-            <exclude>.claude/**</exclude>
-            <exclude>.codex/**</exclude>
-            <exclude>.continue/**</exclude>
-            <exclude>.copilot/**</exclude>
-            <exclude>.cursor/**</exclude>
-            <exclude>.openai/**</exclude>
-            <exclude>.ollama/**</exclude>
+            <exclude>**/.claude/**</exclude>
+            <exclude>**/.codex/**</exclude>
+            <exclude>**/.continue/**</exclude>
+            <exclude>**/.copilot/**</exclude>
+            <exclude>**/.cursor/**</exclude>
+            <exclude>**/.openai/**</exclude>
+            <exclude>**/.ollama/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
