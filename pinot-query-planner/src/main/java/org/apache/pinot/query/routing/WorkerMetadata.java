@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.routing;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// `WorkerMetadata` is used to send worker-level info about how to execute a stage on a particular worker.
@@ -35,6 +38,14 @@ import javax.annotation.Nullable;
 /// The segment maps are held as plain objects: they are only encoded for the wire in [QueryPlanSerDeUtils] when a
 /// request is built for the server that runs the worker, so the planner never pays for encoding on the compile path.
 ///
+/// On a server, a segment map that arrived in the legacy JSON encoding is kept as the raw JSON and only parsed on first
+/// access, so that each worker parses its own list on its own thread when its leaf stage is compiled, rather than
+/// every worker of a stage being parsed one after another while the request is deserialized.
+///
+/// Thread-safety: the raw JSON is set while the request is deserialized, before the instance is handed to a worker.
+/// The parsed maps are published through `volatile` fields; two threads racing on the first access may both parse the
+/// JSON, which is harmless since they produce equal maps.
+///
 /// TODO: WorkerMetadata now doesn't have info directly about how to construct the mailboxes. instead it rely on
 /// MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
 public class WorkerMetadata {
@@ -44,13 +55,22 @@ public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
 
+  private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
+  };
+
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
   private final Map<String, String> _customProperties;
   @Nullable
-  private Map<String, List<String>> _tableSegmentsMap;
+  private volatile Map<String, List<String>> _tableSegmentsMap;
   @Nullable
-  private Map<String, List<String>> _logicalTableSegmentsMap;
+  private volatile Map<String, List<String>> _logicalTableSegmentsMap;
+  /// The legacy JSON encoding of [#_tableSegmentsMap] as received from the broker, parsed on first access.
+  @Nullable
+  private String _tableSegmentsMapJson;
+  /// The legacy JSON encoding of [#_logicalTableSegmentsMap] as received from the broker, parsed on first access.
+  @Nullable
+  private String _logicalTableSegmentsMapJson;
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
     this(workerId, mailboxInfosMap, new HashMap<>());
@@ -79,7 +99,12 @@ public class WorkerMetadata {
   /// table (intermediate stage, or a logical-table leaf).
   @Nullable
   public Map<String, List<String>> getTableSegmentsMap() {
-    return _tableSegmentsMap;
+    Map<String, List<String>> tableSegmentsMap = _tableSegmentsMap;
+    if (tableSegmentsMap == null && _tableSegmentsMapJson != null) {
+      tableSegmentsMap = decodeSegmentsMapJson(_tableSegmentsMapJson);
+      _tableSegmentsMap = tableSegmentsMap;
+    }
+    return tableSegmentsMap;
   }
 
   /// Stores `tableSegmentsMap` by reference, and it is only encoded for the wire when the query is dispatched, so the
@@ -88,11 +113,21 @@ public class WorkerMetadata {
     _tableSegmentsMap = tableSegmentsMap;
   }
 
+  /// Stores the legacy JSON encoding of the table segments map, to be parsed by [#getTableSegmentsMap] on first access.
+  void setTableSegmentsMapJson(String tableSegmentsMapJson) {
+    _tableSegmentsMapJson = tableSegmentsMapJson;
+  }
+
   /// Segments to scan keyed by physical table name (with type suffix), or `null` for a worker that scans no logical
   /// table.
   @Nullable
   public Map<String, List<String>> getLogicalTableSegmentsMap() {
-    return _logicalTableSegmentsMap;
+    Map<String, List<String>> logicalTableSegmentsMap = _logicalTableSegmentsMap;
+    if (logicalTableSegmentsMap == null && _logicalTableSegmentsMapJson != null) {
+      logicalTableSegmentsMap = decodeSegmentsMapJson(_logicalTableSegmentsMapJson);
+      _logicalTableSegmentsMap = logicalTableSegmentsMap;
+    }
+    return logicalTableSegmentsMap;
   }
 
   /// Stores `logicalTableSegmentsMap` by reference, with the same no-mutation contract as [#setTableSegmentsMap].
@@ -100,8 +135,24 @@ public class WorkerMetadata {
     _logicalTableSegmentsMap = logicalTableSegmentsMap;
   }
 
-  /// A leaf-stage worker carries a (possibly empty) segment map; an intermediate-stage worker carries none.
+  /// Stores the legacy JSON encoding of the logical table segments map, to be parsed by
+  /// [#getLogicalTableSegmentsMap] on first access.
+  void setLogicalTableSegmentsMapJson(String logicalTableSegmentsMapJson) {
+    _logicalTableSegmentsMapJson = logicalTableSegmentsMapJson;
+  }
+
+  /// A leaf-stage worker carries a (possibly empty) segment map, parsed or not; an intermediate-stage worker carries
+  /// none.
   public boolean isLeafStageWorker() {
-    return _tableSegmentsMap != null || _logicalTableSegmentsMap != null;
+    return _tableSegmentsMap != null || _logicalTableSegmentsMap != null || _tableSegmentsMapJson != null
+        || _logicalTableSegmentsMapJson != null;
+  }
+
+  private static Map<String, List<String>> decodeSegmentsMapJson(String segmentsMapJson) {
+    try {
+      return JsonUtils.stringToObject(segmentsMapJson, SEGMENTS_MAP_TYPE);
+    } catch (IOException e) {
+      throw new RuntimeException("Unable to deserialize segments map: " + segmentsMapJson, e);
+    }
   }
 }

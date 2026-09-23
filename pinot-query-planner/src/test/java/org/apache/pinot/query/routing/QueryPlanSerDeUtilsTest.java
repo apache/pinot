@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -152,6 +153,40 @@ public class QueryPlanSerDeUtilsTest {
 
   /// A broker that predates the proto fields ships Jackson-encoded JSON custom properties; a new server must decode
   /// exactly that.
+  /// The legacy JSON is not parsed while the request is deserialized, so that every worker parses its own list on its
+  /// own thread, as it did before the proto encoding existed. Malformed JSON makes that observable: decoding succeeds
+  /// and the worker is still a leaf-stage worker, and only the first access fails.
+  @Test
+  public void testLegacyJsonIsParsedOnFirstAccessOnly()
+      throws Exception {
+    Worker.WorkerMetadata proto = Worker.WorkerMetadata.newBuilder().setWorkedId(7)
+        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, "{not json")
+        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY, "{not json either")
+        .build();
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertTrue(decoded.isLeafStageWorker(), "an unparsed segment map still marks a leaf-stage worker");
+    assertThrows(RuntimeException.class, decoded::getTableSegmentsMap);
+    assertThrows(RuntimeException.class, decoded::getLogicalTableSegmentsMap);
+  }
+
+  /// A parsed segment map is memoized, so a worker that reads it more than once parses it once.
+  @Test
+  public void testLegacyJsonIsParsedOnce()
+      throws Exception {
+    Worker.WorkerMetadata proto = Worker.WorkerMetadata.newBuilder().setWorkedId(7)
+        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, JsonUtils.objectToString(TABLE_SEGMENTS_MAP))
+        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
+            JsonUtils.objectToString(LOGICAL_TABLE_SEGMENTS_MAP))
+        .build();
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertSame(decoded.getTableSegmentsMap(), decoded.getTableSegmentsMap());
+    assertSame(decoded.getLogicalTableSegmentsMap(), decoded.getLogicalTableSegmentsMap());
+    assertEquals(decoded.getTableSegmentsMap(), TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getLogicalTableSegmentsMap(), LOGICAL_TABLE_SEGMENTS_MAP);
+  }
+
   @Test
   public void testDecodesLegacyBrokerJsonCustomProperties()
       throws Exception {

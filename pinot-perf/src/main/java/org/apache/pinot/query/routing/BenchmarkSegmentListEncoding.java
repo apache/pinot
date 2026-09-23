@@ -110,16 +110,20 @@ public class BenchmarkSegmentListEncoding {
     return QueryPlanSerDeUtils.toProtoWorkerMetadataList(_workerMetadataList, true).get(0);
   }
 
+  /// Decode includes the first `getTableSegmentsMap()`, since the legacy JSON is only parsed then, on the worker's own
+  /// thread; without it the legacy decode would measure nothing but the protobuf parse.
   @Benchmark
-  public WorkerMetadata decodeLegacy()
+  public Map<String, List<String>> decodeLegacy()
       throws Exception {
-    return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_legacyBytes));
+    return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_legacyBytes))
+        .getTableSegmentsMap();
   }
 
   @Benchmark
-  public WorkerMetadata decodeProto()
+  public Map<String, List<String>> decodeProto()
       throws Exception {
-    return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_protoBytes));
+    return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_protoBytes))
+        .getTableSegmentsMap();
   }
 
   public static void main(String[] args)

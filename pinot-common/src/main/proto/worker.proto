@@ -96,7 +96,8 @@ message WorkerMetadata {
   map<string, string> customProperty = 3;
   // Leaf-stage segments to scan, keyed by table type (OFFLINE / REALTIME). Presence marks a leaf-stage worker.
   // Sent instead of the JSON-encoded "tableSegmentsMap" custom property when the broker enables the proto segment
-  // list encoding (see the "protoSegmentList" query option); older brokers keep sending the custom property.
+  // list encoding (see the "pinot.broker.mse.enable.proto.segment.list" broker config); otherwise, and on older
+  // brokers, the custom property is sent.
   SegmentsMap tableSegmentsMap = 4;
   // Leaf-stage segments of a logical table, keyed by physical table name (with type suffix). Same encoding rules.
   SegmentsMap logicalTableSegmentsMap = 5;

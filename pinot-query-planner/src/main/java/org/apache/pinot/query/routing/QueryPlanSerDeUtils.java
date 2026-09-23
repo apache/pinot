@@ -19,12 +19,10 @@
 package org.apache.pinot.query.routing;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,9 +49,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// turns it on, which they only do once every server understands it (see
 /// `CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST`).
 public class QueryPlanSerDeUtils {
-  private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
-  };
-
   private QueryPlanSerDeUtils() {
   }
 
@@ -83,10 +78,11 @@ public class QueryPlanSerDeUtils {
     for (Map.Entry<Integer, ByteString> entry : protoMailboxInfosMap.entrySet()) {
       mailboxInfosMap.put(entry.getKey(), fromProtoMailboxInfos(entry.getValue()));
     }
-    // A broker using the legacy encoding ships the segment maps as JSON custom properties. Decode them once here and
-    // drop the raw strings so that the metadata never carries two copies of the same segments. The custom properties
-    // stay unmodifiable either way, as the proto map view is, so that no server path can come to depend on writing
-    // to them under one encoding only.
+    // A broker using the legacy encoding ships the segment maps as JSON custom properties. Move them out of the custom
+    // properties into WorkerMetadata unparsed: each worker parses its own list on first access, on its own thread,
+    // instead of every worker of the stage being parsed here one after another. The custom properties stay
+    // unmodifiable either way, as the proto map view is, so that no server path can come to depend on writing to them
+    // under one encoding only.
     Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
     String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
     String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
@@ -101,13 +97,13 @@ public class QueryPlanSerDeUtils {
     if (protoWorkerMetadata.hasTableSegmentsMap()) {
       workerMetadata.setTableSegmentsMap(fromProtoSegmentsMap(protoWorkerMetadata.getTableSegmentsMap()));
     } else if (tableSegmentsJson != null) {
-      workerMetadata.setTableSegmentsMap(decodeSegmentsMapJson(tableSegmentsJson));
+      workerMetadata.setTableSegmentsMapJson(tableSegmentsJson);
     }
     if (protoWorkerMetadata.hasLogicalTableSegmentsMap()) {
       workerMetadata.setLogicalTableSegmentsMap(
           fromProtoSegmentsMap(protoWorkerMetadata.getLogicalTableSegmentsMap()));
     } else if (logicalTableSegmentsJson != null) {
-      workerMetadata.setLogicalTableSegmentsMap(decodeSegmentsMapJson(logicalTableSegmentsJson));
+      workerMetadata.setLogicalTableSegmentsMapJson(logicalTableSegmentsJson);
     }
     return workerMetadata;
   }
@@ -119,14 +115,6 @@ public class QueryPlanSerDeUtils {
       segmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue().getSegmentList()));
     }
     return segmentsMap;
-  }
-
-  private static Map<String, List<String>> decodeSegmentsMapJson(String segmentsMapJson) {
-    try {
-      return JsonUtils.stringToObject(segmentsMapJson, SEGMENTS_MAP_TYPE);
-    } catch (IOException e) {
-      throw new RuntimeException("Unable to deserialize segments map: " + segmentsMapJson, e);
-    }
   }
 
   private static MailboxInfos fromProtoMailboxInfos(ByteString protoMailboxInfos)
