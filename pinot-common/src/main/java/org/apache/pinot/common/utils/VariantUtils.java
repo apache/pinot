@@ -409,7 +409,12 @@ public final class VariantUtils {
   /// Tolerant Variant extraction. Malformed input returns Java null.
   @Nullable
   public static byte[] tryVariantGet(@Nullable byte[] envelope, String path) {
-    return (byte[]) tryVariantGet(envelope, compilePath(path), ResultType.VARIANT);
+    // Match the three-argument overload: a malformed path is one of the failures the tolerant form maps to null.
+    try {
+      return (byte[]) tryVariantGet(envelope, compilePath(path), ResultType.VARIANT);
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   /// Tolerant typed extraction. Malformed input and incompatible types return Java null.

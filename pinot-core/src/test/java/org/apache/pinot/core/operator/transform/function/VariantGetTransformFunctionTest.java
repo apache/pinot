@@ -382,6 +382,26 @@ public class VariantGetTransformFunctionTest {
     }
   }
 
+  /// Scalar lookup binds by argument count, so without a guard a raw envelope would bind to a String/byte[]
+  /// parameter and be consumed as hex text; COALESCE's compatible-type fallback is STRING for the same reason.
+  @Test
+  public void testScalarFunctionsRejectRawVariantArguments() {
+    for (String expressionString : new String[]{
+        "length(parseJson('{\"a\":1}'))",
+        "concat(parseJson('{\"a\":1}'), 'x', '')",
+        "toBase64(parseJson('{\"a\":1}'))",
+        "coalesce(parseJson('{\"a\":1}'), 'x')"}) {
+      ExpressionContext expression = RequestContextUtils.getExpression(expressionString);
+      BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+          () -> TransformFunctionFactory.getNullHandlingEnabled(expression, Map.of()));
+      assertTrue(exception.getMessage().contains("Raw VARIANT values do not support"), exception.getMessage());
+    }
+    // A typed extraction is an ordinary scalar argument.
+    TransformFunctionFactory.getNullHandlingEnabled(
+        RequestContextUtils.getExpression("length(variantGet(parseJson('{\"a\":\"xy\"}'), '$.a', 'STRING'))"),
+        Map.of());
+  }
+
   private static List<TransformFunction> arguments(TransformFunction input, String path) {
     return List.of(input, stringLiteral(path));
   }

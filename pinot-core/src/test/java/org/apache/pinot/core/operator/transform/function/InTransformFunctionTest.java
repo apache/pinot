@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class InTransformFunctionTest extends BaseTransformFunctionTest {
@@ -426,5 +427,21 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     expectedNullBitmap.add((long) 0, (long) NUM_ROWS);
 
     testNullBitmap(transformFunction, expectedNullBitmap);
+  }
+
+  /// Every IN-family transform must reject a raw VARIANT operand: IN and NOT IN through their list form, and
+  /// IN_ID_SET (also reached by IN_SUBQUERY) before it deserializes the IdSet, since an IdSet built from a BYTES
+  /// column would compare raw envelope bytes.
+  @Test
+  public void testRawVariantInRejected() {
+    for (String expressionString : new String[]{
+        "parseJson('{\"a\":1}') IN ('x', 'y')",
+        "parseJson('{\"a\":1}') NOT IN ('x', 'y')",
+        "IN_ID_SET(parseJson('{\"a\":1}'), 'not-decoded-because-the-guard-runs-first')"}) {
+      ExpressionContext expression = RequestContextUtils.getExpression(expressionString);
+      BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+          () -> TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap));
+      assertTrue(exception.getMessage().contains("Raw VARIANT values do not support IN"), exception.getMessage());
+    }
   }
 }
