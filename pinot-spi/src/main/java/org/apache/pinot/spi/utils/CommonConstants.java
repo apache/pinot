@@ -678,9 +678,8 @@ public class CommonConstants {
     /// stage. Turn it on once the rolling upgrade has finished.
     ///
     /// Read from cluster config as well as from the static broker config, cluster config winning and taking effect on
-    /// the next query, so it can be turned on, and off again, without restarting the brokers. Clearing the
-    /// cluster-config key restores the static broker config, and a value that is neither `true` nor `false` reads as
-    /// disabled.
+    /// the next query, so it can be turned on, and off again, without restarting the brokers. Anything in cluster
+    /// config other than `true` — the key cleared, or a value that is not a boolean — disables it.
     public static final String CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST = "pinot.broker.mse.enable.proto.segment.list";
     public static final boolean DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST = false;
 

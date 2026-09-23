@@ -104,6 +104,7 @@ import org.slf4j.LoggerFactory;
 
 /// `QueryDispatcher` dispatch a query to different workers.
 public class QueryDispatcher implements PinotClusterConfigChangeListener {
+  private static final String PROTO_SEGMENT_LIST_KEY = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /// Maximum time (ms) to wait for outstanding `OpChainComplete` stats messages on both the success and error
@@ -136,12 +137,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final boolean _streamStatsDefault;
   /// Whether leaf-stage segment lists are shipped as native protobuf fields of the worker metadata instead of the
   /// legacy JSON custom property. Seeded from the static broker config and then followed live from cluster config on
-  /// [CommonConstants.Broker#CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST], so an operator can turn it on once every
-  /// server of the cluster has been upgraded, and off again, without restarting the brokers. `volatile` because the
-  /// cluster-config callback and the request path race; read once per query so that all servers of one query agree.
+  /// [#PROTO_SEGMENT_LIST_KEY], so an operator can turn it on once every server of the cluster has been upgraded, and
+  /// off again, without restarting the brokers. `volatile` because the cluster-config callback and the request path
+  /// race; read once per query so that all servers of one query agree.
   private volatile boolean _protoSegmentList;
-  /// The value of the static broker config, restored when the cluster-config key is cleared.
-  private final boolean _staticProtoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
@@ -184,7 +183,6 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
     _protoSegmentList = protoSegmentList;
-    _staticProtoSegmentList = protoSegmentList;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -722,32 +720,21 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     }
   }
 
-  /// Applies the proto segment list encoding set in cluster config, which wins over the static broker config and takes
-  /// effect on the next query. Clearing the key restores the static broker config. Anything that is not `true` or
-  /// `false` reads as disabled, the safe direction, with a warning naming the offending value.
+  /// Applies the proto segment list encoding set in cluster config, which takes effect on the next query. Anything
+  /// other than `true` — the key cleared, or a value that is not a boolean — reads as disabled, which is the legacy
+  /// encoding every server understands.
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST)) {
+    if (!changedConfigs.contains(PROTO_SEGMENT_LIST_KEY)) {
       return;
     }
-    String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST);
-    boolean protoSegmentList;
-    if (value == null || value.isBlank()) {
-      protoSegmentList = _staticProtoSegmentList;
-    } else {
-      String trimmed = value.trim();
-      if (!trimmed.equalsIgnoreCase("true") && !trimmed.equalsIgnoreCase("false")) {
-        LOGGER.warn("Unrecognized boolean value '{}' for {}, reading it as false", value,
-            CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST);
-      }
-      protoSegmentList = Boolean.parseBoolean(trimmed);
-    }
+    String value = clusterConfigs.get(PROTO_SEGMENT_LIST_KEY);
+    boolean protoSegmentList = value != null && Boolean.parseBoolean(value.trim());
     if (protoSegmentList == _protoSegmentList) {
       return;
     }
     _protoSegmentList = protoSegmentList;
-    LOGGER.info("Updated {} from: {} to: {}", CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST,
-        !protoSegmentList, protoSegmentList);
+    LOGGER.info("Updated {} from: {} to: {}", PROTO_SEGMENT_LIST_KEY, !protoSegmentList, protoSegmentList);
     if (protoSegmentList) {
       LOGGER.warn("The proto segment list encoding is now enabled. Every server this broker dispatches to, including "
           + "the servers of remote clusters when multi-cluster routing is used, must already run a version that "

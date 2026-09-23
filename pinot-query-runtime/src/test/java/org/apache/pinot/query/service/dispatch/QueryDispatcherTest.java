@@ -118,9 +118,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  /// Clearing the cluster-config key restores the static broker config rather than the shipped default.
+  /// Clearing the cluster-config key disables the encoding, whatever the static broker config said: the fallback is
+  /// always the legacy encoding that every server understands.
   @Test
-  public void testClearingClusterConfigRestoresTheStaticValue() {
+  public void testClearingClusterConfigDisablesTheEncoding() {
     String key = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
     QueryDispatcher dispatcher =
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
@@ -128,11 +129,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     try {
       Assert.assertTrue(dispatcher.isProtoSegmentList(), "The static broker config seeds the value");
 
-      dispatcher.onChange(Set.of(key), Map.of(key, "false"));
-      Assert.assertFalse(dispatcher.isProtoSegmentList());
-
       dispatcher.onChange(Set.of(key), Map.of());
-      Assert.assertTrue(dispatcher.isProtoSegmentList(), "Clearing the key must restore the static broker config");
+      Assert.assertFalse(dispatcher.isProtoSegmentList(), "Clearing the key must fall back to the legacy encoding");
     } finally {
       dispatcher.shutdown();
     }
