@@ -377,8 +377,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       tableConfig = tableConfigAndStat.getLeft();
       long tableCreationTimeMs = tableConfigAndStat.getRight().getCtime();
       Preconditions.checkState(tableCreationTimeMs > tableDeleteTimeMs,
-          "Table: %s was recently deleted (deleted %dms ago) but the table config was created before that (created "
-              + "%dms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
+          "Table: %s was recently deleted (deleted %sms ago) but the table config was created before that (created "
+              + "%sms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
     } else {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);

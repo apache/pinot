@@ -38,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -134,6 +135,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  // One party belongs to shutdown. Immutable additions register under the admission monitor and finish without
+  // holding it, allowing metadata updates, lifecycle hooks and replacement cleanup to complete before shutdown drains.
+  private final Phaser _immutableSegmentAdds = new Phaser(1);
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
   protected TableUpsertMetadataManager _tableUpsertMetadataManager;
 
@@ -307,11 +311,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Shutting down table data manager");
-    // Close admission atomically with publishing and starting a consuming segment. Segment construction and
-    // shutdown's blocking cleanup must remain outside this monitor.
+    // Close admission atomically with immutable additions and consuming segment startup. Downloads, construction
+    // and blocking cleanup must remain outside this monitor.
     synchronized (_segmentDataManagerMap) {
       _shutDown = true;
     }
+    _immutableSegmentAdds.arriveAndAwaitAdvance();
     doShutdown();
     _logger.info("Shut down table data manager");
   }
@@ -374,9 +379,30 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// @param immutableSegment Immutable segment to add
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    boolean admitted;
+    synchronized (_segmentDataManagerMap) {
+      admitted = !_shutDown;
+      if (admitted) {
+        _immutableSegmentAdds.register();
+      }
+    }
+    if (!admitted) {
+      // Loading can complete after shutdown. This segment was never registered or counted in table gauges.
+      immutableSegment.destroy();
+      throw new IllegalStateException("Table data manager is already shut down, cannot add segment: "
+          + immutableSegment.getSegmentName() + " to table: " + _tableNameWithType);
+    }
+    try {
+      doAddSegment(immutableSegment, zkMetadata);
+    } finally {
+      _immutableSegmentAdds.arriveAndDeregister();
+    }
+  }
+
+  /// Adds an admitted immutable segment, including its metadata and replacement cleanup. Shutdown waits for this
+  /// operation to finish before stopping partition managers and draining registered segments.
+  protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
-    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
-        segmentName, _tableNameWithType);
     _logger.info("Adding immutable segment: {}", segmentName);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
@@ -945,7 +971,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+    PartitionUpsertMetadataManager partitionManager;
+    synchronized (_segmentDataManagerMap) {
+      Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot preload table: %s",
+          _tableNameWithType);
+      partitionManager = _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+    }
+    partitionManager.preloadSegments(indexLoadingConfig);
   }
 
   protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {

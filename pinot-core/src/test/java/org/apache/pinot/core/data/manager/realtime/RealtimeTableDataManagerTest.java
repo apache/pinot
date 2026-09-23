@@ -38,16 +38,20 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.segment.local.dedup.DedupContext;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig.ConsistencyMode;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -70,10 +74,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -102,8 +109,9 @@ public class RealtimeTableDataManagerTest {
   @SuppressWarnings("deprecation")
   public void testConsumingSegmentConstructedDuringShutdownIsDestroyed(boolean upsertEnabled)
       throws Exception {
-    ServerMetrics metrics = mock(ServerMetrics.class);
-    ServerMetrics.register(metrics);
+    ServerMetrics.register(mock(ServerMetrics.class));
+    ServerMetrics metrics = ServerMetrics.get();
+    clearInvocations(metrics);
     File indexDir = Files.createTempDirectory("consuming-shutdown").toFile();
     RealtimeSegmentDataManager segment = mock(RealtimeSegmentDataManager.class);
     CountDownLatch constructed = new CountDownLatch(1);
@@ -191,6 +199,137 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
+  @DataProvider
+  public Object[][] upsertConsistencyModes() {
+    return new Object[][]{{ConsistencyMode.NONE}, {ConsistencyMode.SYNC}, {ConsistencyMode.SNAPSHOT}};
+  }
+
+  @Test(dataProvider = "upsertEnabled")
+  public void testOnlinePreloadDoesNotCreatePartitionAfterShutdown(boolean upsertEnabled)
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("online-preload-shutdown").toFile();
+    LifecycleTableDataManager table = spy(
+        new LifecycleTableDataManager(indexDir, mock(RealtimeSegmentDataManager.class), upsertEnabled, () -> { }));
+    TableDedupMetadataManager dedup = mock(TableDedupMetadataManager.class);
+    PartitionDedupMetadataManager partitionDedup = mock(PartitionDedupMetadataManager.class);
+    if (upsertEnabled) {
+      when(table._upsertMetadataManager.getContext().isPreloadEnabled()).thenReturn(true);
+    } else {
+      FieldUtils.writeField(table, "_tableDedupMetadataManager", dedup, true);
+      DedupContext context = mock(DedupContext.class);
+      when(dedup.getContext()).thenReturn(context);
+      when(context.isPreloadEnabled()).thenReturn(true);
+      when(dedup.getOrCreatePartitionManager(0)).thenReturn(partitionDedup);
+    }
+    SegmentZKMetadata metadata = new SegmentZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    metadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    doReturn(metadata).when(table).fetchZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    CountDownLatch loadingConfig = new CountDownLatch(1);
+    CountDownLatch finishLoadingConfig = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      loadingConfig.countDown();
+      await(finishLoadingConfig);
+      return invocation.callRealMethod();
+    }).when(table).fetchIndexLoadingConfig();
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addOnlineSegment(LifecycleTableDataManager.SEGMENT_NAME);
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "preload-online-segment");
+    try {
+      additionThread.start();
+      await(loadingConfig, addition);
+      table.shutDown();
+      finishLoadingConfig.countDown();
+      ExecutionException failure = expectThrows(ExecutionException.class, () -> addition.get(10, TimeUnit.SECONDS));
+      verify(table._upsertMetadataManager, never()).getOrCreatePartitionManager(0);
+      verify(table._partitionUpsertMetadataManager, never()).preloadSegments(any());
+      verify(dedup, never()).getOrCreatePartitionManager(0);
+      verify(partitionDedup, never()).preloadSegments(any());
+      assertTrue(failure.getCause() instanceof IllegalStateException);
+      assertEquals(table.getNumSegments(), 0);
+    } finally {
+      finishLoadingConfig.countDown();
+      additionThread.join(10000);
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  @Test(dataProvider = "upsertConsistencyModes")
+  public void testShutdownWaitsForUpsertSegmentReplacement(ConsistencyMode consistencyMode)
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("upsert-replacement-shutdown").toFile();
+    LifecycleTableDataManager table =
+        new LifecycleTableDataManager(indexDir, mock(RealtimeSegmentDataManager.class), true, () -> { });
+    when(table._upsertMetadataManager.getContext().getConsistencyMode()).thenReturn(consistencyMode);
+    ImmutableSegment oldSegment = immutableSegment(LifecycleTableDataManager.SEGMENT_NAME);
+    ImmutableSegment newSegment = immutableSegment(LifecycleTableDataManager.SEGMENT_NAME);
+    table.addSegment(oldSegment, null);
+    CountDownLatch replacementEntered = new CountDownLatch(1);
+    CountDownLatch finishReplacement = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      replacementEntered.countDown();
+      await(finishReplacement);
+      return null;
+    }).when(table._partitionUpsertMetadataManager).replaceSegment(newSegment, oldSegment);
+    FutureTask<Void> replacement = new FutureTask<>(() -> {
+      table.addSegment(newSegment, null);
+      return null;
+    });
+    FutureTask<Void> shutdown = new FutureTask<>(() -> {
+      table.shutDown();
+      return null;
+    });
+    Thread replacementThread = new Thread(replacement, "replace-upsert-segment");
+    Thread shutdownThread = new Thread(shutdown, "shutdown-upsert-table");
+    try {
+      replacementThread.start();
+      await(replacementEntered, replacement);
+      assertEquals(table.getSegmentDataManager(LifecycleTableDataManager.SEGMENT_NAME).hasMultiSegments(),
+          consistencyMode != ConsistencyMode.NONE);
+      shutdownThread.start();
+      TestUtils.waitForCondition(ignored -> table.isShutDown()
+              && (shutdownThread.getState() == Thread.State.WAITING || shutdown.isDone()), 10, 10000,
+          "Shutdown did not wait for the admitted upsert replacement");
+      assertFalse(shutdown.isDone(), "Shutdown must wait for the complete upsert replacement");
+      verify(table._upsertMetadataManager, never()).stop();
+      verify(oldSegment, never()).destroy();
+      verify(newSegment, never()).destroy();
+      finishReplacement.countDown();
+      replacement.get(10, TimeUnit.SECONDS);
+      shutdown.get(10, TimeUnit.SECONDS);
+      verify(oldSegment).offload();
+      verify(oldSegment).destroy();
+      verify(newSegment).offload();
+      verify(newSegment).destroy();
+      verify(table._upsertMetadataManager).stop();
+      verify(table._upsertMetadataManager).close();
+      assertEquals(table.getNumSegments(), 0);
+
+      ImmutableSegment lateSegment = immutableSegment("lifecycle__1__0__1");
+      expectThrows(IllegalStateException.class, () -> table.addSegment(lateSegment, null));
+      verify(lateSegment).destroy();
+      verify(table._upsertMetadataManager, never()).getOrCreatePartitionManager(1);
+      assertEquals(table.getNumSegments(), 0);
+    } finally {
+      finishReplacement.countDown();
+      replacementThread.join(10000);
+      shutdownThread.join(10000);
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  private static ImmutableSegment immutableSegment(String segmentName) {
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(segment.getSegmentName()).thenReturn(segmentName);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(metadata.getName()).thenReturn(segmentName);
+    return segment;
+  }
+
   private static void await(CountDownLatch latch, FutureTask<?> operation)
       throws Exception {
     TestUtils.waitForCondition(ignored -> latch.getCount() == 0 || operation.isDone(), 10, 10000,
@@ -210,7 +349,7 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
-  /// Exercises public consuming admission and shutdown while controlling segment construction/start.
+  /// Exercises public segment admission and shutdown while controlling construction, startup and upsert replacement.
   private static class LifecycleTableDataManager extends RealtimeTableDataManager {
     private static final String SEGMENT_NAME = "lifecycle__0__0__1";
     private final TableConfig _tableConfig =
