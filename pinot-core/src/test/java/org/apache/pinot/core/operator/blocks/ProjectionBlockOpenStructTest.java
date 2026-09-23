@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.blocks;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -27,7 +28,6 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doReturn;
@@ -35,10 +35,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 /// Covers projection over an OPEN_STRUCT column, where the parent data source carries no readers of its own and every
@@ -121,17 +121,20 @@ public class ProjectionBlockOpenStructTest {
     dataFetcher.close();
   }
 
-  /// Selecting the parent column itself is not supported. It must fail as a bad request pointing at the per-key syntax
-  /// rather than an NPE from the reader the DataFetcher never registered.
+  /// Selecting the parent column reads the whole struct as a JSON document. It used to throw, which also took out
+  /// `SELECT *` on any table carrying an OPEN_STRUCT column — the first query anyone runs.
   @Test
-  public void testSelectingOpenStructParentFailsWithClearMessage() {
+  public void testSelectingOpenStructParentReadsTheWholeDocument() {
+    OpenStructDataSource openStruct = mockOpenStructDataSource();
+    when(openStruct.getDataSources()).thenReturn(Map.of());
+
     Map<String, DataSource> dataSourceMap = new HashMap<>();
-    dataSourceMap.put(OPEN_STRUCT_COLUMN, mockOpenStructDataSource());
+    dataSourceMap.put(OPEN_STRUCT_COLUMN, openStruct);
     ProjectionBlock projectionBlock =
         new ProjectionBlock(dataSourceMap, new DataBlockCache(new DataFetcher(dataSourceMap, Map.of())));
 
-    BadQueryRequestException e =
-        expectThrows(BadQueryRequestException.class, () -> projectionBlock.getBlockValueSet(OPEN_STRUCT_COLUMN));
-    assertTrue(e.getMessage().contains(OPEN_STRUCT_COLUMN + "['key']"), e.getMessage());
+    BlockValSet values = projectionBlock.getBlockValueSet(OPEN_STRUCT_COLUMN);
+    assertEquals(values.getValueType(), FieldSpec.DataType.STRING);
+    assertTrue(values.isSingleValue());
   }
 }

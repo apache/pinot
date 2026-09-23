@@ -18,16 +18,29 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.DecimalNode;
+import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.math.BigDecimal;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.operator.docvalsets.OpenStructDocumentBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// ProjectionBlock holds a column name to Block Map.
@@ -61,13 +74,100 @@ public class ProjectionBlock implements ValueBlock {
   public BlockValSet getBlockValueSet(String column) {
     DataSource dataSource = _dataSourceMap.get(column);
     // An OPEN_STRUCT parent is only a handle for per-key resolution — it has no forward index, so DataFetcher does
-    // not register it and it cannot be read as a column. Reject it here rather than letting the missing
-    // ColumnValueReader surface as an NPE.
-    if (dataSource instanceof OpenStructDataSource) {
-      throw new BadQueryRequestException(
-          "OPEN_STRUCT column: " + column + " cannot be selected directly; use " + column + "['key']");
+    // not register it and it cannot be read through the block cache. Assemble its document here instead, which is
+    // what the storage layer's contract defers to the query layer. Without this `SELECT col` and, worse, `SELECT *`
+    // both failed outright on any table carrying one.
+    if (dataSource instanceof OpenStructDataSource openStructDataSource) {
+      return openStructDocuments(column, openStructDataSource);
     }
     return new ProjectionBlockValSet(_dataBlockCache, column, dataSource);
+  }
+
+  /// The column's whole document per row, as JSON text.
+  ///
+  /// Each key is read through the per-key value set the block already knows how to build, so a key's own type and
+  /// null bitmap decide how it is rendered and whether it appears at all — an absent key is omitted rather than
+  /// written as null, which is the same distinction `col['key']` makes.
+  private BlockValSet openStructDocuments(String column, OpenStructDataSource openStructDataSource) {
+    int numDocs = getNumDocs();
+    ObjectNode[] documents = new ObjectNode[numDocs];
+    for (int docId = 0; docId < numDocs; docId++) {
+      documents[docId] = JsonUtils.newObjectNode();
+    }
+    for (String key : openStructDataSource.getDataSources().keySet()) {
+      addKeyToDocuments(documents, numDocs, getBlockValueSet(new String[]{column, key}), key);
+    }
+    String[] serialized = new String[numDocs];
+    for (int docId = 0; docId < numDocs; docId++) {
+      serialized[docId] = documents[docId].toString();
+    }
+    return new OpenStructDocumentBlockValSet(serialized);
+  }
+
+  private static void addKeyToDocuments(ObjectNode[] documents, int numDocs, BlockValSet values, String key) {
+    RoaringBitmap nulls = values.getNullBitmap();
+    if (!values.isSingleValue()) {
+      String[][] multiValues = values.getStringValuesMV();
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (nulls != null && nulls.contains(docId)) {
+          continue;
+        }
+        ArrayNode array = JsonUtils.newArrayNode();
+        for (String value : multiValues[docId]) {
+          array.add(value);
+        }
+        documents[docId].set(key, array);
+      }
+      return;
+    }
+    switch (values.getValueType().getStoredType()) {
+      case INT: {
+        int[] ints = values.getIntValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> IntNode.valueOf(ints[docId]));
+        break;
+      }
+      case LONG: {
+        long[] longs = values.getLongValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> LongNode.valueOf(longs[docId]));
+        break;
+      }
+      case FLOAT: {
+        float[] floats = values.getFloatValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> DoubleNode.valueOf(floats[docId]));
+        break;
+      }
+      case DOUBLE: {
+        double[] doubles = values.getDoubleValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> DoubleNode.valueOf(doubles[docId]));
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] decimals = values.getBigDecimalValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> DecimalNode.valueOf(decimals[docId]));
+        break;
+      }
+      case BYTES: {
+        byte[][] bytes = values.getBytesValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> TextNode.valueOf(BytesUtils.toHexString(bytes[docId])));
+        break;
+      }
+      default: {
+        String[] strings = values.getStringValuesSV();
+        putEach(documents, numDocs, nulls, key, docId -> TextNode.valueOf(strings[docId]));
+        break;
+      }
+    }
+  }
+
+  private static void putEach(ObjectNode[] documents, int numDocs, @Nullable RoaringBitmap nulls, String key,
+      java.util.function.IntFunction<JsonNode> value) {
+    for (int docId = 0; docId < numDocs; docId++) {
+      // A key absent from this row is absent from its document; writing it as JSON null would say the row carried
+      // the key with no value, which is a different fact.
+      if (nulls == null || !nulls.contains(docId)) {
+        documents[docId].set(key, value.apply(docId));
+      }
+    }
   }
 
   @Override
