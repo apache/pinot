@@ -593,7 +593,8 @@ public class SegmentPrunerTest extends ControllerTest {
     allSegments.addAll(churningSegments);
 
     int numReaders = 4;
-    int numRounds = 500;
+    int minRounds = 500;
+    long minPrunes = 2000;
     CountDownLatch readersStarted = new CountDownLatch(numReaders);
     AtomicBoolean writing = new AtomicBoolean(true);
     AtomicLong numPrunes = new AtomicLong();
@@ -604,20 +605,29 @@ public class SegmentPrunerTest extends ControllerTest {
       for (int i = 0; i < numReaders; i++) {
         readers.add(executorService.submit(() -> {
           readersStarted.countDown();
-          while (writing.get() && failure.get() == null) {
-            // Any exception here propagates out of the task and is rethrown by Future.get() below
-            Set<String> selectedSegments = segmentPruner.prune(between20And30, allSegments);
-            numPrunes.incrementAndGet();
-            if (!selectedSegments.containsAll(stableSegments)) {
-              Set<String> missingSegments = new HashSet<>(stableSegments);
-              missingSegments.removeAll(selectedSegments);
-              failure.compareAndSet(null, "Lost segments while the segment assignment changed: " + missingSegments);
+          try {
+            while (writing.get() && failure.get() == null) {
+              Set<String> selectedSegments = segmentPruner.prune(between20And30, allSegments);
+              numPrunes.incrementAndGet();
+              if (!selectedSegments.containsAll(stableSegments)) {
+                Set<String> missingSegments = new HashSet<>(stableSegments);
+                missingSegments.removeAll(selectedSegments);
+                failure.compareAndSet(null, "Lost segments while the segment assignment changed: " + missingSegments);
+              }
             }
+          } catch (RuntimeException | Error e) {
+            // Stop the writer at once. Future.get() below still rethrows the original exception with its stack.
+            failure.compareAndSet(null, "Reader failed: " + e);
+            throw e;
           }
         }));
       }
       assertTrue(readersStarted.await(1, TimeUnit.MINUTES));
-      for (int i = 0; i < numRounds && failure.get() == null; i++) {
+      // Keep changing segments until the readers have raced the writer enough times, however slowly the machine
+      // schedules them
+      long deadlineNs = System.nanoTime() + TimeUnit.MINUTES.toNanos(1);
+      for (int i = 0; (i < minRounds || numPrunes.get() < minPrunes) && failure.get() == null; i++) {
+        assertTrue(System.nanoTime() < deadlineNs, "Readers only pruned " + numPrunes.get() + " times in a minute");
         segmentPruner.onAssignmentChange(null, null, allSegments, churningSegments, churningZnRecords);
         for (String churningSegment : churningSegments) {
           segmentPruner.refreshSegment(churningSegment, createTimeRangeZNRecord(churningSegment, 21, 22 + i % 5));
@@ -634,7 +644,6 @@ public class SegmentPrunerTest extends ControllerTest {
       reader.get();
     }
     assertNull(failure.get(), failure.get());
-    assertTrue(numPrunes.get() > numRounds, "Readers only pruned " + numPrunes.get() + " times, too few to race");
   }
 
   @Test
