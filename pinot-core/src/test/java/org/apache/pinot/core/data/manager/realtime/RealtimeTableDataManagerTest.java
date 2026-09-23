@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -199,6 +200,140 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
+  // Regression for the same-name table recreation race: a consuming add admitted before shutdown, paused just before
+  // it cleans up its segment data directory, must abort at the pre-cleanup shutdown re-check instead of resuming and
+  // deleting a directory that may already belong to a recreated same-name table.
+  @Test(dataProvider = "upsertEnabled")
+  public void testStaleConsumingAddAbortsBeforeDirCleanupAfterShutdown(boolean upsertEnabled)
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("consuming-dir-cleanup").toFile();
+    File segmentDir = new File(indexDir, LifecycleTableDataManager.SEGMENT_NAME);
+    FileUtils.forceMkdir(segmentDir);
+    File marker = new File(segmentDir, "marker");
+    assertTrue(marker.createNewFile());
+    RealtimeSegmentDataManager segment = mock(RealtimeSegmentDataManager.class);
+    AtomicBoolean constructionRan = new AtomicBoolean();
+    CountDownLatch cleanupEntered = new CountDownLatch(1);
+    CountDownLatch finishCleanup = new CountDownLatch(1);
+    LifecycleTableDataManager table = new LifecycleTableDataManager(indexDir, segment, upsertEnabled,
+        () -> constructionRan.set(true), () -> {
+      cleanupEntered.countDown();
+      await(finishCleanup);
+    });
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addConsumingSegment(LifecycleTableDataManager.SEGMENT_NAME);
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "cleanup-consuming-segment");
+    try {
+      additionThread.start();
+      await(cleanupEntered, addition);
+      // Shutdown must complete without waiting for the paused add.
+      table.shutDown();
+      finishCleanup.countDown();
+      ExecutionException failure = expectThrows(ExecutionException.class, () -> addition.get(10, TimeUnit.SECONDS));
+      assertEquals(failure.getCause().getClass(), IllegalStateException.class, String.valueOf(failure.getCause()));
+      // The stale add must abort before the directory cleanup and before constructing a segment data manager.
+      assertTrue(marker.exists(), "Stale consuming add must not delete the segment data directory after shutdown");
+      assertFalse(constructionRan.get(), "Stale consuming add must not construct a segment data manager");
+      assertEquals(table.getNumSegments(), 0);
+      verify(segment, never()).startConsumption();
+    } finally {
+      finishCleanup.countDown();
+      additionThread.join(10000);
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  // A recreated same-name table shares the data directory and the per-segment locks with the deleted table's manager.
+  // Its add for a colliding segment name must wait for the stale add to abort, find its files untouched, and complete.
+  @Test
+  public void testRecreatedTableConsumingAddSerializesBehindStaleAdd()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("consuming-recreate").toFile();
+    File segmentDir = new File(indexDir, LifecycleTableDataManager.SEGMENT_NAME);
+    FileUtils.forceMkdir(segmentDir);
+    File marker = new File(segmentDir, "marker");
+    assertTrue(marker.createNewFile());
+    SegmentLocks sharedLocks = new SegmentLocks();
+
+    RealtimeSegmentDataManager oldSegment = mock(RealtimeSegmentDataManager.class);
+    AtomicBoolean oldConstructionRan = new AtomicBoolean();
+    CountDownLatch oldCleanupEntered = new CountDownLatch(1);
+    CountDownLatch finishOldCleanup = new CountDownLatch(1);
+    LifecycleTableDataManager oldTable = new LifecycleTableDataManager(indexDir, oldSegment, false,
+        () -> oldConstructionRan.set(true), () -> {
+      oldCleanupEntered.countDown();
+      await(finishOldCleanup);
+    }, sharedLocks);
+
+    RealtimeSegmentDataManager newSegment = mock(RealtimeSegmentDataManager.class);
+    MutableSegment mutableSegment = mock(MutableSegment.class);
+    when(newSegment.getSegment()).thenReturn(mutableSegment);
+    when(mutableSegment.getSegmentMetadata()).thenReturn(mock(SegmentMetadata.class));
+    when(newSegment.decreaseReferenceCount()).thenReturn(true);
+    AtomicBoolean newConstructionRan = new AtomicBoolean();
+    CountDownLatch newCleanupEntered = new CountDownLatch(1);
+    CountDownLatch finishNewCleanup = new CountDownLatch(1);
+
+    FutureTask<Void> oldAddition = new FutureTask<>(() -> {
+      oldTable.addConsumingSegment(LifecycleTableDataManager.SEGMENT_NAME);
+      return null;
+    });
+    Thread oldAdditionThread = new Thread(oldAddition, "stale-consuming-add");
+    Thread newAdditionThread = null;
+    try {
+      oldAdditionThread.start();
+      await(oldCleanupEntered, oldAddition);
+      // Table deletion: shutdown completes while the stale add is paused inside the segment lock.
+      oldTable.shutDown();
+
+      LifecycleTableDataManager newTable = new LifecycleTableDataManager(indexDir, newSegment, false,
+          () -> newConstructionRan.set(true), () -> {
+        newCleanupEntered.countDown();
+        await(finishNewCleanup);
+      }, sharedLocks);
+      FutureTask<Void> newAddition = new FutureTask<>(() -> {
+        newTable.addConsumingSegment(LifecycleTableDataManager.SEGMENT_NAME);
+        return null;
+      });
+      newAdditionThread = new Thread(newAddition, "recreated-consuming-add");
+      newAdditionThread.start();
+      // The recreated table's add must block on the shared per-segment lock while the stale add is in flight.
+      Thread newThread = newAdditionThread;
+      TestUtils.waitForCondition(ignored -> newThread.getState() == Thread.State.WAITING || newAddition.isDone(),
+          10, 10000, "Recreated table's add did not block on the shared segment lock");
+      assertFalse(newAddition.isDone(), "Recreated table's add must wait for the stale add to finish");
+      assertEquals(newCleanupEntered.getCount(), 1,
+          "Recreated table's add must not enter the critical section while the stale add holds the segment lock");
+
+      finishOldCleanup.countDown();
+      ExecutionException failure = expectThrows(ExecutionException.class, () -> oldAddition.get(10, TimeUnit.SECONDS));
+      assertEquals(failure.getCause().getClass(), IllegalStateException.class, String.valueOf(failure.getCause()));
+      assertFalse(oldConstructionRan.get(), "Stale consuming add must not construct a segment data manager");
+
+      // The recreated table's add now proceeds; the stale add must have left the segment directory untouched.
+      await(newCleanupEntered, newAddition);
+      assertTrue(marker.exists(), "Stale consuming add must not delete the recreated table's segment directory");
+      finishNewCleanup.countDown();
+      newAddition.get(10, TimeUnit.SECONDS);
+      assertTrue(newConstructionRan.get());
+      assertEquals(newTable.getNumSegments(), 1);
+      verify(newSegment).startConsumption();
+      assertFalse(marker.exists(), "Recreated table's add owns the directory cleanup");
+    } finally {
+      finishOldCleanup.countDown();
+      finishNewCleanup.countDown();
+      oldAdditionThread.join(10000);
+      if (newAdditionThread != null) {
+        newAdditionThread.join(10000);
+      }
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
   @DataProvider
   public Object[][] upsertConsistencyModes() {
     return new Object[][]{{ConsistencyMode.NONE}, {ConsistencyMode.SYNC}, {ConsistencyMode.SNAPSHOT}};
@@ -358,6 +493,7 @@ public class RealtimeTableDataManagerTest {
         .addSingleValueDimension("value", DataType.STRING).build();
     private final RealtimeSegmentDataManager _segment;
     private final Runnable _beforeConstructionReturns;
+    private final Runnable _beforeAdmissionRecheck;
     private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager =
         mock(PartitionUpsertMetadataManager.class);
     private final TableUpsertMetadataManager _upsertMetadataManager = mock(TableUpsertMetadataManager.class);
@@ -365,21 +501,39 @@ public class RealtimeTableDataManagerTest {
     LifecycleTableDataManager(File indexDir, RealtimeSegmentDataManager segment, boolean upsertEnabled,
         Runnable beforeConstructionReturns)
         throws IllegalAccessException {
+      this(indexDir, segment, upsertEnabled, beforeConstructionReturns, () -> { }, new SegmentLocks());
+    }
+
+    LifecycleTableDataManager(File indexDir, RealtimeSegmentDataManager segment, boolean upsertEnabled,
+        Runnable beforeConstructionReturns, Runnable beforeAdmissionRecheck)
+        throws IllegalAccessException {
+      this(indexDir, segment, upsertEnabled, beforeConstructionReturns, beforeAdmissionRecheck, new SegmentLocks());
+    }
+
+    LifecycleTableDataManager(File indexDir, RealtimeSegmentDataManager segment, boolean upsertEnabled,
+        Runnable beforeConstructionReturns, Runnable beforeAdmissionRecheck, SegmentLocks segmentLocks)
+        throws IllegalAccessException {
       super(null);
       _indexDir = indexDir;
       _tableNameWithType = _tableConfig.getTableName();
       _cachedTableConfigAndSchema = Pair.of(_tableConfig, _schema);
       _logger = LoggerFactory.getLogger(LifecycleTableDataManager.class);
-      _segmentLocks = new SegmentLocks();
+      _segmentLocks = segmentLocks;
       _recentlyDeletedSegments = CacheBuilder.newBuilder().build();
       _segment = segment;
       _beforeConstructionReturns = beforeConstructionReturns;
+      _beforeAdmissionRecheck = beforeAdmissionRecheck;
       FieldUtils.writeField(this, "_ingestionDelayTracker", mock(IngestionDelayTracker.class), true);
       if (upsertEnabled) {
         _tableUpsertMetadataManager = _upsertMetadataManager;
         when(_tableUpsertMetadataManager.getContext()).thenReturn(mock(UpsertContext.class));
         when(_tableUpsertMetadataManager.getOrCreatePartitionManager(0)).thenReturn(_partitionUpsertMetadataManager);
       }
+    }
+
+    @Override
+    void beforeConsumingSegmentAdmissionRecheck(String segmentName) {
+      _beforeAdmissionRecheck.run();
     }
 
     @Override

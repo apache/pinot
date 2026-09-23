@@ -572,11 +572,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (partitionDedupMetadataManager != null && _tableDedupMetadataManager.getContext().isPreloadEnabled()) {
       partitionDedupMetadataManager.preloadSegments(indexLoadingConfig);
     }
-    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-    if (segmentDataManager != null) {
-      _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
-          segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
-      return;
+    beforeConsumingSegmentAdmissionRecheck(segmentName);
+    synchronized (_segmentDataManagerMap) {
+      // Shutdown does not wait for in-flight consuming adds, and after the table is deleted a same-name table can be
+      // recreated over the same data directory. The per-segment lock (from the instance-wide SegmentLocks shared
+      // across table data managers) keeps the recreated table's writers for this segment out until this add returns;
+      // this re-check additionally aborts a stale add before it deletes the previous incarnation's leftover directory
+      // or constructs a segment data manager that shutdown would only reject at publish time.
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
+          _tableNameWithType);
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager != null) {
+        _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
+            segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
+        return;
+      }
     }
 
     _logger.info("Adding new CONSUMING segment: {}", segmentName);
@@ -621,6 +632,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     throw new IllegalStateException(
         "Table data manager is already shut down, cannot add CONSUMING segment: " + segmentName + " to table: "
             + _tableNameWithType);
+  }
+
+  /// Invoked while adding a CONSUMING segment, after the initial admission and partition-manager preload, immediately
+  /// before the shutdown re-check that guards the segment data directory cleanup. The per-segment lock is held.
+  /// No-op in production; tests override it to pause an in-flight add inside the shutdown/recreation window.
+  @VisibleForTesting
+  void beforeConsumingSegmentAdmissionRecheck(String segmentName) {
   }
 
   @Override

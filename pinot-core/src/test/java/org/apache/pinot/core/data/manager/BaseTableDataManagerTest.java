@@ -967,6 +967,31 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  // Regression for the same-name table recreation race on the ONLINE path: after shutdown, a stale download must not
+  // replace the segment data directory, which a recreated same-name table may already own.
+  @Test
+  public void testMoveSegmentRejectedAfterShutdown()
+      throws IOException {
+    BaseTableDataManager tableDataManager = createTableManager();
+    File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-move-after-shutdown");
+
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "input");
+    FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir", StandardCharsets.UTF_8);
+    TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    File segmentDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    File marker = new File(segmentDir, "marker");
+    FileUtils.write(marker, "recreated owner's data", StandardCharsets.UTF_8);
+
+    tableDataManager.shutDown();
+    expectThrows(IllegalStateException.class,
+        () -> tableDataManager.untarAndMoveSegment(SEGMENT_NAME, tempTar, tempRootDir));
+    assertEquals(FileUtils.readFileToString(marker, StandardCharsets.UTF_8), "recreated owner's data",
+        "Stale download must not replace the segment data directory after shutdown");
+  }
+
   @Test
   public void testReplaceSegmentIfCrcMismatchWhenFlagDisabledSegmentCrcMismatchShouldDownload()
       throws Exception {

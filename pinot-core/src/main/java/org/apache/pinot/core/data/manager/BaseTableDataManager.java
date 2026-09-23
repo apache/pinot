@@ -1524,6 +1524,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File moveSegment(String segmentName, File untarredSegmentDir)
       throws IOException {
     File indexDir = getSegmentDataDir(segmentName);
+    // Replacing the segment data directory is destructive, and a deleted table shares the directory with a same-name
+    // recreated table. Abort stale operations instead of mutating the directory after shutdown. Callers hold the
+    // per-segment lock from the instance-wide SegmentLocks shared across table data managers, so the recreated
+    // table's lock-holding operations on the same segment cannot interleave with this method.
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot replace data directory of segment: %s of table: %s",
+        segmentName, _tableNameWithType);
     try {
       FileUtils.deleteDirectory(indexDir);
       FileUtils.moveDirectory(untarredSegmentDir, indexDir);
