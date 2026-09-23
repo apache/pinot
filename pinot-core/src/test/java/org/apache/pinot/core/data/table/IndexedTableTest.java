@@ -49,6 +49,8 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 /// Tests the [Table] operations
 @SuppressWarnings({"rawtypes"})
@@ -81,7 +83,7 @@ public class IndexedTableTest {
 
       @Override
       public void setValue(int index, Object value) {
-        Assert.assertEquals(index, 1);
+        assertEquals(index, 1);
         _aggregate = value;
       }
     };
@@ -89,7 +91,7 @@ public class IndexedTableTest {
     table.upsert(new Key(new Object[]{"native-key"}), new Record(new Object[]{"native-key", 3L}));
     table.finish(false, true);
 
-    Assert.assertEquals(table.iterator().next().getValue(1), 5L);
+    assertEquals(table.iterator().next().getValue(1), 5L);
   }
 
   @Test

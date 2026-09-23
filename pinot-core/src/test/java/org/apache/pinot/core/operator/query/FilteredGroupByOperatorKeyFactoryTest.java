@@ -19,9 +19,11 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -32,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doReturn;
@@ -41,6 +44,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 /// Exercises ownership of a query-supplied generator on filtered aggregation failure.
@@ -125,6 +129,63 @@ public class FilteredGroupByOperatorKeyFactoryTest {
     assertEquals(creations.get(), 1);
     verify(generator, never()).close();
     result.getAggregationGroupByResult().closeGroupKeyGenerator();
+    verify(generator).close();
+  }
+
+  @DataProvider
+  public static Object[][] materializationPaths() {
+    return new Object[][]{{"trim"}, {"sort"}, {"groupingSets"}};
+  }
+
+  @Test(dataProvider = "materializationPaths")
+  public void testMaterializedResultDoesNotRetryThrowingClose(String path) {
+    boolean groupingSets = path.equals("groupingSets");
+    QueryContext queryContext = mock(QueryContext.class);
+    ExpressionContext key = ExpressionContext.forIdentifier("key");
+    AggregationFunction function = mock(AggregationFunction.class);
+    BaseProjectOperator<?> project = mock(BaseProjectOperator.class);
+    ColumnContext column = mock(ColumnContext.class);
+    AggregationInfo lane = mock(AggregationInfo.class);
+    GroupKeyGenerator generator = mock(GroupKeyGenerator.class);
+    when(queryContext.getAggregationFunctions()).thenReturn(new AggregationFunction[]{function});
+    when(queryContext.getFilteredAggregationFunctions()).thenReturn(List.of(Pair.of(function, null)));
+    when(queryContext.getFilteredAggregationsIndexMap()).thenReturn(Map.of());
+    when(queryContext.getGroupByExpressions()).thenReturn(List.of(key));
+    when(queryContext.getNumGroupByKeyColumns()).thenReturn(groupingSets ? 2 : 1);
+    when(queryContext.getNumExtraGroupByKeyColumns()).thenReturn(groupingSets ? 1 : 0);
+    when(queryContext.getOrderByExpressions()).thenReturn(List.of(new OrderByExpressionContext(key, true)));
+    when(queryContext.getLimit()).thenReturn(1);
+    when(queryContext.getNumGroupsLimit()).thenReturn(10);
+    when(queryContext.getNumGroupsWarningLimit()).thenReturn(10);
+    when(queryContext.getEffectiveSegmentGroupTrimSize()).thenReturn(path.equals("sort") ? 2 : 1);
+    when(queryContext.shouldSortAggregateUnderSafeTrim()).thenReturn(true);
+    when(queryContext.isGroupingSets()).thenReturn(groupingSets);
+    if (groupingSets) {
+      when(queryContext.getGroupingSets()).thenReturn(List.of(new int[]{0}));
+      when(queryContext.getGroupingSetSegmentTrimSize()).thenReturn(1);
+    }
+    when(project.getResultColumnContext(key)).thenReturn(column);
+    when(project.getExecutionStatistics()).thenReturn(new ExecutionStatistics(0, 0, 0, 0));
+    when(column.getDataType()).thenReturn(DataType.INT);
+    when(column.isSingleValue()).thenReturn(true);
+    when(function.getIntermediateResultColumnType()).thenReturn(ColumnDataType.LONG);
+    when(function.createGroupByResultHolder(0, 10)).thenReturn(mock(GroupByResultHolder.class));
+    doReturn(project).when(lane).getProjectOperator();
+    when(lane.getFunctions()).thenReturn(new AggregationFunction[]{function});
+    when(generator.getGlobalGroupKeyUpperBound()).thenReturn(10);
+    when(generator.getNumKeys()).thenReturn(2);
+    GroupKeyGenerator.GroupKey first = new GroupKeyGenerator.GroupKey();
+    first._keys = groupingSets ? new Object[]{1, 0} : new Object[]{1};
+    GroupKeyGenerator.GroupKey second = new GroupKeyGenerator.GroupKey();
+    second._groupId = 1;
+    second._keys = groupingSets ? new Object[]{2, 0} : new Object[]{2};
+    when(generator.getGroupKeys()).thenReturn(List.of(first, second).iterator());
+    IllegalStateException closeFailure = new IllegalStateException("close failure");
+    doThrow(closeFailure).when(generator).close();
+    FilteredGroupByOperator operator =
+        new FilteredGroupByOperator(queryContext, List.of(lane), 0L, ignored -> generator);
+
+    assertSame(expectThrows(IllegalStateException.class, operator::getNextBlock), closeFailure);
     verify(generator).close();
   }
 

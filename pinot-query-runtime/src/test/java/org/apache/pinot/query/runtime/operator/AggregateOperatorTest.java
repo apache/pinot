@@ -136,14 +136,15 @@ public class AggregateOperatorTest {
   }
 
   @Test
-  public void testInjectedGroupIdGeneratorClosesAfterOutputFailure() {
+  public void testOutputFailureSurvivesGroupIdGeneratorCloseFailure() {
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1.0}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     AtomicInteger closeCount = new AtomicInteger();
-    AggregateOperator operator = getOperatorWithProvider(closeCount, true);
+    AggregateOperator operator = getOperatorWithProvider(closeCount, true, true);
 
-    assertTrue(operator.nextBlock().isError());
+    ErrorMseBlock errorBlock = (ErrorMseBlock) operator.nextBlock();
+    assertEquals(errorBlock.getErrorMessages(), Map.of(QueryErrorCode.UNKNOWN, "output materialization failed"));
     operator.close();
     assertEquals(closeCount.get(), 1);
   }
