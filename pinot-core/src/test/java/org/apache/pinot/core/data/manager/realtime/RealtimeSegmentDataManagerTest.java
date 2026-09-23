@@ -684,9 +684,34 @@ public class RealtimeSegmentDataManagerTest {
 
       segmentDataManager.goOnlineFromConsuming(metadata);
 
+      // On a successful ONLINE transition the gauge is set to 0 in the finally and then removed.
       verify(serverMetrics, atLeast(1)).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
-      verify(serverMetrics, never()).setValueOfTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING),
-          eq(0L));
+    }
+  }
+
+  @Test
+  public void testEndOfPartitionGroupKeepsGaugeWhenOnlineTransitionFails()
+      throws Exception {
+    // If the ONLINE transition fails after end of partition group (e.g. build/download fails and we enter
+    // ERROR), the gauge must stay at 0 -- it must NOT be removed -- so a genuine ingestion stall stays visible.
+    ServerMetrics serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      // ERROR state makes goOnlineFromConsuming download-and-replace, which we force to fail.
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
+      segmentDataManager.setEndOfPartitionGroup(true);
+      segmentDataManager._throwOnReplace = true;
+
+      Assert.assertThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+
+      // Transition failed -> gauge left at 0, never removed.
+      verify(serverMetrics, atLeast(1)).setValueOfTableGauge(anyString(),
+          eq(ServerGauge.LLC_PARTITION_CONSUMING), eq(0L));
+      verify(serverMetrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
     }
   }
 
@@ -1521,6 +1546,8 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
+    // When set, downloadSegmentAndReplace throws to simulate a failed ONLINE transition.
+    public boolean _throwOnReplace = false;
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
@@ -1749,6 +1776,9 @@ public class RealtimeSegmentDataManagerTest {
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
       terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
+      if (_throwOnReplace) {
+        throw new RuntimeException("Simulated failed segment replace");
+      }
     }
 
     @Override

@@ -861,7 +861,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
           }
-          markConsumingStopped();
+          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
           if (_shouldStop) {
             break;
           }
@@ -1050,7 +1050,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method
       // as the final step.
       if (!_shouldStop) {
-        markConsumingStopped();
+        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
 
@@ -1489,21 +1489,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Updates the [ServerGauge#LLC_PARTITION_CONSUMING] gauge when this consuming segment stops.
-  ///
-  /// When the partition is retired -- a stream shard that has been split/merged and fully consumed, i.e.
-  /// [#_endOfPartitionGroup] is set -- no successor consuming segment is ever created for it, so leaving the
-  /// gauge at 0 would make it linger at 0 forever and raise a false-positive RealtimeIngestionStopped alert.
-  /// In that case the gauge is removed so the series goes absent. For every other stop (a normal commit that
-  /// gets a successor consuming segment, or a hold) the gauge is set to 0 as before.
-  private void markConsumingStopped() {
-    if (_endOfPartitionGroup) {
-      _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
-    } else {
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
-    }
-  }
-
   @VisibleForTesting
   void setEndOfPartitionGroup(boolean endOfPartitionGroup) {
     _endOfPartitionGroup = endOfPartitionGroup;
@@ -1626,7 +1611,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
-    markConsumingStopped();
+    _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     try {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
@@ -1745,7 +1730,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       Utils.rethrowException(e);
     } finally {
-      markConsumingStopped();
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    }
+    // Reached only on a successful CONSUMING -> ONLINE transition (any failure above is rethrown and skips
+    // this). If the segment stopped because the stream partition group ended -- e.g. a Kinesis shard was
+    // split/merged and fully consumed -- no successor consuming segment is created for this partition (the
+    // controller drops the ended partition from the stream partition list), so the gauge set to 0 above
+    // would otherwise linger at 0 forever and raise a false ingestion-stopped alert. Remove it. On a failed
+    // transition we never reach here, so the gauge stays at 0 and a genuine stall remains visible.
+    if (_endOfPartitionGroup) {
+      _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     }
   }
 
@@ -1776,7 +1770,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.warn("Exception when catching up to final offset", e);
       return false;
     } finally {
-      markConsumingStopped();
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
     if (_currentOffset.compareTo(endOffset) != 0) {
       // Timeout?
