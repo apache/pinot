@@ -176,7 +176,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
-  private volatile IndexLoadingConfig _cachedIndexLoadingConfig;
+  protected volatile IndexLoadingConfig _cachedIndexLoadingConfig;
 
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
