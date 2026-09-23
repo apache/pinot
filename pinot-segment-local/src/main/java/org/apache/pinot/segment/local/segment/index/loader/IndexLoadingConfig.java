@@ -55,18 +55,16 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
-/// Table level index loading config.
+/// Index loading config with shared table-level state and segment-local mutable overrides.
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
 
-  private final InstanceDataManagerConfig _instanceDataManagerConfig;
-  private final TableConfig _tableConfig;
-  private final Schema _schema;
+  private final ImmutableState _immutableState;
 
-  // These fields can be modified after initialization
-  // TODO: Revisit them
-  private ReadMode _readMode = ReadMode.DEFAULT_MODE;
+  // Mutable config and segment-specific overrides.
+  @Nullable
+  private ReadMode _readModeOverride;
   private SegmentVersion _segmentVersion;
   private String _segmentTier;
   private Set<String> _knownColumns;
@@ -74,68 +72,159 @@ public class IndexLoadingConfig {
   private boolean _errorOnColumnBuildFailure;
   private boolean _forwardIndexOnly;
 
-  // Initialized by instance data manager config
-  private String _instanceId;
-  private boolean _isRealtimeOffHeapAllocation;
-  private boolean _isDirectRealtimeOffHeapAllocation;
-  private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
-  private String _segmentStoreURI;
-  private String _segmentDirectoryLoader;
-  private Map<String, Map<String, String>> _instanceTierConfigs;
-
-  // Initialized by table config and schema
-  private List<String> _sortedColumns = List.of();
-  private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
+  private Map<String, FieldIndexConfigs> _indexConfigsByColName;
   private boolean _skipSegmentPreprocess;
-  private boolean _hasOpenStructColumns;
-
   private boolean _dirty = true;
-
   private MultiColumnTextIndexConfig _multiColTextIndexConfig;
+
+  /// Immutable table-level state shared by derived segment configs.
+  private static final class ImmutableState {
+    @Nullable
+    private final InstanceDataManagerConfig _instanceDataManagerConfig;
+    @Nullable
+    private final TableConfig _tableConfig;
+    @Nullable
+    private final Schema _schema;
+    private final ReadMode _readMode;
+    @Nullable
+    private final String _instanceId;
+    private final boolean _isRealtimeOffHeapAllocation;
+    private final boolean _isDirectRealtimeOffHeapAllocation;
+    private final int _realtimeAvgMultiValueCount;
+    @Nullable
+    private final String _segmentStoreURI;
+    @Nullable
+    private final String _segmentDirectoryLoader;
+    @Nullable
+    private final Map<String, Map<String, String>> _instanceTierConfigs;
+    private final List<String> _sortedColumns;
+    private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
+    private final boolean _hasOpenStructColumns;
+
+    private ImmutableState(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
+        @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+      _instanceDataManagerConfig = instanceDataManagerConfig;
+      _tableConfig = tableConfig;
+      _schema = schema;
+
+      String instanceId = null;
+      boolean isRealtimeOffHeapAllocation = false;
+      boolean isDirectRealtimeOffHeapAllocation = false;
+      int realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
+      ReadMode readMode = ReadMode.DEFAULT_MODE;
+      String segmentStoreURI = null;
+      String segmentDirectoryLoader = null;
+      Map<String, Map<String, String>> instanceTierConfigs = null;
+      if (instanceDataManagerConfig != null) {
+        ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
+        if (instanceReadMode != null) {
+          readMode = instanceReadMode;
+        }
+        instanceId = instanceDataManagerConfig.getInstanceId();
+        isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+        isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
+        String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
+        if (avgMultiValueCount != null) {
+          realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
+        }
+        segmentStoreURI = instanceDataManagerConfig.getSegmentStoreUri();
+        segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
+        Map<String, Map<String, String>> tierConfigs = instanceDataManagerConfig.getTierConfigs();
+        instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
+      }
+
+      List<String> sortedColumns = List.of();
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
+      boolean hasOpenStructColumns = false;
+      if (tableConfig != null) {
+        if (schema != null) {
+          TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+          for (ComplexFieldSpec fieldSpec : schema.getComplexFieldSpecs()) {
+            if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
+              hasOpenStructColumns = true;
+              break;
+            }
+          }
+        }
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        String tableReadMode = indexingConfig.getLoadMode();
+        if (tableReadMode != null) {
+          readMode = ReadMode.getEnum(tableReadMode);
+        }
+        List<String> tableSortedColumns = indexingConfig.getSortedColumn();
+        if (tableSortedColumns != null) {
+          sortedColumns = tableSortedColumns;
+        }
+        String generatorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
+        if (generatorMode != null) {
+          columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.valueOf(generatorMode.toUpperCase());
+        }
+      }
+
+      _instanceId = instanceId;
+      _readMode = readMode;
+      _isRealtimeOffHeapAllocation = isRealtimeOffHeapAllocation;
+      _isDirectRealtimeOffHeapAllocation = isDirectRealtimeOffHeapAllocation;
+      _realtimeAvgMultiValueCount = realtimeAvgMultiValueCount;
+      _segmentStoreURI = segmentStoreURI;
+      _segmentDirectoryLoader = segmentDirectoryLoader;
+      _instanceTierConfigs = instanceTierConfigs;
+      _sortedColumns = sortedColumns;
+      _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
+      _hasOpenStructColumns = hasOpenStructColumns;
+    }
+  }
 
   /// NOTE: This step might modify the passed in table config and schema.
   ///
   /// TODO: Revisit the init handling. Currently it doesn't apply tiered config override
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig, @Nullable Schema schema) {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    _tableConfig = tableConfig;
-    _schema = schema;
-    init();
+    _immutableState = new ImmutableState(instanceDataManagerConfig, tableConfig, schema);
+    _indexConfigsByColName = new HashMap<>();
+    initMutableState();
+    if (tableConfig != null) {
+      refreshIndexConfigs();
+    }
+  }
+
+  private void initMutableState() {
+    InstanceDataManagerConfig instanceDataManagerConfig = _immutableState._instanceDataManagerConfig;
+    if (instanceDataManagerConfig != null) {
+      String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
+      if (instanceSegmentVersion != null) {
+        _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
+      }
+    }
+    TableConfig tableConfig = _immutableState._tableConfig;
+    if (tableConfig != null) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
+      if (tableSegmentVersion != null) {
+        _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
+      }
+    }
   }
 
   /// Creates a segment-local wrapper around the already processed table-level config. The wrapper shares the
   /// table config, schema, and resolved index configs until a segment-specific override requires a local copy.
   private IndexLoadingConfig(IndexLoadingConfig source) {
-    _instanceDataManagerConfig = source._instanceDataManagerConfig;
-    _tableConfig = source._tableConfig;
-    _schema = source._schema;
-    _readMode = source._readMode;
+    _immutableState = source._immutableState;
+    _readModeOverride = source._readModeOverride;
     _segmentVersion = source._segmentVersion;
     _segmentTier = source._segmentTier;
-    _knownColumns = source._knownColumns != null ? new HashSet<>(source._knownColumns) : null;
+    _knownColumns = source._knownColumns;
     _tableDataDir = source._tableDataDir;
     _errorOnColumnBuildFailure = source._errorOnColumnBuildFailure;
     _forwardIndexOnly = source._forwardIndexOnly;
-    _instanceId = source._instanceId;
-    _isRealtimeOffHeapAllocation = source._isRealtimeOffHeapAllocation;
-    _isDirectRealtimeOffHeapAllocation = source._isDirectRealtimeOffHeapAllocation;
-    _realtimeAvgMultiValueCount = source._realtimeAvgMultiValueCount;
-    _segmentStoreURI = source._segmentStoreURI;
-    _segmentDirectoryLoader = source._segmentDirectoryLoader;
-    _instanceTierConfigs = source._instanceTierConfigs;
-    _sortedColumns = source._sortedColumns;
-    _columnMinMaxValueGeneratorMode = source._columnMinMaxValueGeneratorMode;
     _enableDynamicStarTreeCreation = source._enableDynamicStarTreeCreation;
     _starTreeIndexConfigs = source._starTreeIndexConfigs;
     _enableDefaultStarTree = source._enableDefaultStarTree;
     _indexConfigsByColName = source._indexConfigsByColName;
     _skipSegmentPreprocess = source._skipSegmentPreprocess;
-    _hasOpenStructColumns = source._hasOpenStructColumns;
     _multiColTextIndexConfig = source._multiColTextIndexConfig;
     _dirty = source._dirty;
   }
@@ -157,93 +246,21 @@ public class IndexLoadingConfig {
 
   @Nullable
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
-    return _instanceDataManagerConfig;
+    return _immutableState._instanceDataManagerConfig;
   }
 
   @Nullable
   public TableConfig getTableConfig() {
-    return _tableConfig;
+    return _immutableState._tableConfig;
   }
 
   @Nullable
   public Schema getSchema() {
-    return _schema;
-  }
-
-  private void init() {
-    if (_instanceDataManagerConfig != null) {
-      extractFromInstanceConfig();
-    }
-    if (_tableConfig != null) {
-      extractFromTableConfigAndSchema();
-    }
-  }
-
-  private void extractFromInstanceConfig() {
-    _instanceId = _instanceDataManagerConfig.getInstanceId();
-
-    ReadMode instanceReadMode = _instanceDataManagerConfig.getReadMode();
-    if (instanceReadMode != null) {
-      _readMode = instanceReadMode;
-    }
-
-    String instanceSegmentVersion = _instanceDataManagerConfig.getSegmentFormatVersion();
-    if (instanceSegmentVersion != null) {
-      _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
-    }
-
-    _isRealtimeOffHeapAllocation = _instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffHeapAllocation = _instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
-
-    String avgMultiValueCount = _instanceDataManagerConfig.getAvgMultiValueCount();
-    if (avgMultiValueCount != null) {
-      _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
-    }
-    _segmentStoreURI = _instanceDataManagerConfig.getSegmentStoreUri();
-    _segmentDirectoryLoader = _instanceDataManagerConfig.getSegmentDirectoryLoader();
-
-    Map<String, Map<String, String>> tierConfigs = _instanceDataManagerConfig.getTierConfigs();
-    _instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
-  }
-
-  private void extractFromTableConfigAndSchema() {
-    if (_schema != null) {
-      TimestampIndexUtils.applyTimestampIndex(_tableConfig, _schema);
-      for (ComplexFieldSpec fieldSpec : _schema.getComplexFieldSpecs()) {
-        if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
-          _hasOpenStructColumns = true;
-          break;
-        }
-      }
-    }
-
-    IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    String tableReadMode = indexingConfig.getLoadMode();
-    if (tableReadMode != null) {
-      _readMode = ReadMode.getEnum(tableReadMode);
-    }
-
-    List<String> sortedColumns = indexingConfig.getSortedColumn();
-    if (sortedColumns != null) {
-      _sortedColumns = sortedColumns;
-    }
-
-    String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
-    if (tableSegmentVersion != null) {
-      _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
-    }
-
-    String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
-    if (columnMinMaxValueGeneratorMode != null) {
-      _columnMinMaxValueGeneratorMode =
-          ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
-    }
-
-    refreshIndexConfigs();
+    return _immutableState._schema;
   }
 
   public void refreshIndexConfigs() {
-    if (_tableConfig == null) {
+    if (_immutableState._tableConfig == null) {
       _dirty = false;
       return;
     }
@@ -264,13 +281,13 @@ public class IndexLoadingConfig {
   }
 
   private TableConfig getTableConfigWithTierOverwrites() {
-    return (_segmentTier == null || _tableConfig == null) ? _tableConfig
-        : TableConfigUtils.overwriteTableConfigForTier(_tableConfig, _segmentTier);
+    return _segmentTier == null || _immutableState._tableConfig == null ? _immutableState._tableConfig
+        : TableConfigUtils.overwriteTableConfigForTier(_immutableState._tableConfig, _segmentTier);
   }
 
   private Schema inferSchema() {
-    if (_schema != null) {
-      return _schema;
+    if (_immutableState._schema != null) {
+      return _immutableState._schema;
     }
     Schema schema = new Schema();
     for (String column : getAllKnownColumns()) {
@@ -280,15 +297,15 @@ public class IndexLoadingConfig {
   }
 
   public ReadMode getReadMode() {
-    return _readMode;
+    return _readModeOverride != null ? _readModeOverride : _immutableState._readMode;
   }
 
   public void setReadMode(ReadMode readMode) {
-    _readMode = readMode;
+    _readModeOverride = readMode;
   }
 
   public List<String> getSortedColumns() {
-    return unmodifiable(_sortedColumns);
+    return unmodifiable(_immutableState._sortedColumns);
   }
 
   public boolean isEnableDynamicStarTreeCreation() {
@@ -332,32 +349,32 @@ public class IndexLoadingConfig {
   }
 
   public boolean isRealtimeOffHeapAllocation() {
-    return _isRealtimeOffHeapAllocation;
+    return _immutableState._isRealtimeOffHeapAllocation;
   }
 
   public boolean isDirectRealtimeOffHeapAllocation() {
-    return _isDirectRealtimeOffHeapAllocation;
+    return _immutableState._isDirectRealtimeOffHeapAllocation;
   }
 
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
-    return _columnMinMaxValueGeneratorMode;
+    return _immutableState._columnMinMaxValueGeneratorMode;
   }
 
   public String getSegmentStoreURI() {
-    return _segmentStoreURI;
+    return _immutableState._segmentStoreURI;
   }
 
   public int getRealtimeAvgMultiValueCount() {
-    return _realtimeAvgMultiValueCount;
+    return _immutableState._realtimeAvgMultiValueCount;
   }
 
   public String getSegmentDirectoryLoader() {
-    return StringUtils.isNotBlank(_segmentDirectoryLoader) ? _segmentDirectoryLoader
+    return StringUtils.isNotBlank(_immutableState._segmentDirectoryLoader) ? _immutableState._segmentDirectoryLoader
         : SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME;
   }
 
   public String getInstanceId() {
-    return _instanceId;
+    return _immutableState._instanceId;
   }
 
   public String getSegmentTier() {
@@ -430,10 +447,11 @@ public class IndexLoadingConfig {
   /// tries its bests to get the columns from other attributes like [#getTableConfig()], which may also not be
   /// defined or may not be complete.
   private Set<String> getAllKnownColumns() {
-    assert _tableConfig != null && _schema == null;
+    assert _immutableState._tableConfig != null && _immutableState._schema == null;
     if (_knownColumns == null) {
-      Set<String> knownColumns = _tableConfig.getIndexingConfig().getAllReferencedColumns();
-      List<FieldConfig> fieldConfigs = _tableConfig.getFieldConfigList();
+      Set<String> knownColumns =
+          new HashSet<>(_immutableState._tableConfig.getIndexingConfig().getAllReferencedColumns());
+      List<FieldConfig> fieldConfigs = _immutableState._tableConfig.getFieldConfigList();
       if (fieldConfigs != null) {
         for (FieldConfig fieldConfig : fieldConfigs) {
           knownColumns.add(fieldConfig.getName());
@@ -445,7 +463,7 @@ public class IndexLoadingConfig {
   }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
-    return unmodifiable(_instanceTierConfigs);
+    return unmodifiable(_immutableState._instanceTierConfigs);
   }
 
   private <E> List<E> unmodifiable(List<E> list) {
@@ -461,7 +479,7 @@ public class IndexLoadingConfig {
   }
 
   public IndexLoadingConfig withOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
-    if (!_hasOpenStructColumns) {
+    if (!_immutableState._hasOpenStructColumns) {
       return this;
     }
     if (_indexConfigsByColName == null || _dirty) {
@@ -524,11 +542,9 @@ public class IndexLoadingConfig {
   }
 
   public void addKnownColumns(Set<String> columns) {
-    if (_knownColumns == null) {
-      _knownColumns = new HashSet<>(columns);
-    } else {
-      _knownColumns.addAll(columns);
-    }
+    Set<String> knownColumns = _knownColumns != null ? new HashSet<>(_knownColumns) : new HashSet<>();
+    knownColumns.addAll(columns);
+    _knownColumns = knownColumns;
     _dirty = true;
   }
 }

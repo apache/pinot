@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -52,6 +53,24 @@ import static org.testng.Assert.*;
 
 public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
+
+  @Test
+  public void testReadModePrecedenceAndOverrideIsolation() {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceConfig.getReadMode()).thenReturn(ReadMode.heap);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setLoadMode("MMAP").build();
+
+    IndexLoadingConfig base = new IndexLoadingConfig(instanceConfig, tableConfig, null);
+    assertEquals(base.getReadMode(), ReadMode.mmap);
+
+    IndexLoadingConfig derived = base.withSegmentTier("coldTier");
+    derived.setReadMode(ReadMode.heap);
+    assertEquals(derived.getReadMode(), ReadMode.heap);
+    assertEquals(base.getReadMode(), ReadMode.mmap);
+
+    assertEquals(new IndexLoadingConfig(instanceConfig, null, null).getReadMode(), ReadMode.heap);
+  }
 
   @Test
   public void testCalculateIndexConfigsWithoutTierOverwrites()
