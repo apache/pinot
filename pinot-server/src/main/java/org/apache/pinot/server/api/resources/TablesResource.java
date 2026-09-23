@@ -695,15 +695,18 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Include bitmap CRC, capture times, snapshot file age and observed consumer offsets; "
+          + "diagnostic only, not a consistent partition snapshot")
+      @QueryParam("includeDiagnostics") @DefaultValue("false") boolean includeDiagnostics,
       TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
+        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType, includeDiagnostics));
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdsType) {
+      String validDocIdsType, boolean includeDiagnostics) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
@@ -715,7 +718,21 @@ public class TablesResource {
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
     }
+    List<SegmentDataManager> diagnosticSegments = List.of();
     try {
+      Map<Integer, List<RealtimeSegmentDataManager>> consumersByPartition = new HashMap<>();
+      if (includeDiagnostics) {
+        // Keep the observed consumers acquired until the diagnostic reads complete. No stream RPC is needed.
+        diagnosticSegments = tableDataManager.acquireAllSegments();
+        for (SegmentDataManager manager : diagnosticSegments) {
+          if (manager instanceof RealtimeSegmentDataManager consumer) {
+            LLCSegmentName name = LLCSegmentName.of(manager.getSegmentName());
+            if (name != null) {
+              consumersByPartition.computeIfAbsent(name.getPartitionGroupId(), key -> new ArrayList<>()).add(consumer);
+            }
+          }
+        }
+      }
       if (!missingSegments.isEmpty()) {
         // we need not abort here or throw exception as we can still process the segments that are available
         // During UpsertCompactionTaskGenerator, controller sends a lot of segments to server to fetch validDocIds
@@ -743,6 +760,8 @@ public class TablesResource {
           continue;
         }
 
+        ValidDocIdsMetadataDiagnostics diagnostics = includeDiagnostics
+            ? new ValidDocIdsMetadataDiagnostics(indexSegment, validDocIdsType, consumersByPartition) : null;
         final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
             getValidDocIds(indexSegment, validDocIdsType);
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
@@ -760,6 +779,9 @@ public class TablesResource {
         }
 
         Map<String, Object> validDocIdsMetadata = new HashMap<>();
+        if (diagnostics != null) {
+          validDocIdsMetadata.put("diagnostics", diagnostics.finish(validDocIdsSnapshot));
+        }
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdsSnapshot.getCardinality();
         int totalInvalidDocs = totalDocs - totalValidDocs;
@@ -794,6 +816,9 @@ public class TablesResource {
       return allValidDocIdsMetadata;
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+      for (SegmentDataManager segmentDataManager : diagnosticSegments) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
