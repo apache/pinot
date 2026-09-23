@@ -422,7 +422,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
-        _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of()));
+        getAllowedTablesForEmittingMetrics(_brokerConf));
     _brokerMetrics.initializeGlobalMeters();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ZK_JUTE_MAX_BUFFER,
@@ -750,6 +750,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     NettyInspector.registerMetrics(_brokerMetrics);
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /// Returns the tables that emit table-level metrics even when table-level metrics are disabled.
+  @VisibleForTesting
+  static List<String> getAllowedTablesForEmittingMetrics(PinotConfiguration brokerConf) {
+    return brokerConf.getCommaSeparatedList(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
   }
 
   protected void initClusterChangeMediator() throws Exception {

@@ -320,6 +320,18 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testEnableTwoRulesSeparatedByCommaAndSpace() {
+    // The space after the comma must not stop the second rule from matching
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM a ORDER BY col1";
+    String explain = explainQueryWithRuleEnabled(query,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE + ", " + PlannerRuleNames.SORT_PROJECT_TRANSPOSE);
+    int sortIdx = explain.indexOf("LogicalSort");
+    int projectIdx = explain.indexOf("LogicalProject");
+    assertTrue(projectIdx >= 0 && sortIdx > projectIdx,
+        "With SortProjectTranspose enabled, Project must be above Sort. Plan:\n" + explain);
+  }
+
+  @Test
   public void testAggregateJoinTransposeExtendedDisabledByDefault() {
     // test aggregate function pushdown is disabled by default
     String query = "EXPLAIN PLAN FOR \n"

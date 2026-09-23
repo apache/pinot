@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -456,26 +457,23 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipPlannerRulesStr == null) {
-      return Set.of();
-    }
-
-    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(skippedRules));
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usePlannerRulesStr == null) {
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.USE_PLANNER_RULES));
+  }
+
+  /// Parses a comma-separated list of planner rule names. Each name is trimmed, and empty names are dropped.
+  private static Set<String> parsePlannerRules(@Nullable String plannerRules) {
+    if (plannerRules == null) {
       return Set.of();
     }
-
-    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(useRules));
+    return Arrays.stream(StringUtils.split(plannerRules, ','))
+        .map(String::trim)
+        .filter(ruleName -> !ruleName.isEmpty())
+        .collect(Collectors.toSet());
   }
 
   /// Returns the per-query override of the approximate-function rewrite, or `null` if the query does not set one, in
