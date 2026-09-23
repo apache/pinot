@@ -88,6 +88,56 @@ public class QueryDispatcherTest extends QueryTestSet {
             Duration.ofSeconds(1));
   }
 
+  /// The proto segment list encoding ships disabled and is turned on by an operator through cluster config, which has
+  /// to reach the broker without a restart, and off again the same way.
+  @Test
+  public void testProtoSegmentListFollowsClusterConfig() {
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      Assert.assertFalse(dispatcher.isProtoSegmentList(), "The encoding must ship disabled");
+
+      dispatcher.onChange(Set.of(key), Map.of(key, "true"));
+      Assert.assertTrue(dispatcher.isProtoSegmentList(), "Cluster config must turn the encoding on");
+
+      dispatcher.onChange(Set.of(key), Map.of(key, "false"));
+      Assert.assertFalse(dispatcher.isProtoSegmentList(), "Cluster config must turn the encoding off again");
+
+      // A change that does not touch the key leaves it alone.
+      dispatcher.onChange(Set.of(key), Map.of(key, "TRUE"));
+      dispatcher.onChange(Set.of("some.other.key"), Map.of("some.other.key", "x"));
+      Assert.assertTrue(dispatcher.isProtoSegmentList());
+
+      // Anything that is not a boolean reads as disabled, the safe direction.
+      dispatcher.onChange(Set.of(key), Map.of(key, "SAFE"));
+      Assert.assertFalse(dispatcher.isProtoSegmentList());
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// Clearing the cluster-config key restores the static broker config rather than the shipped default.
+  @Test
+  public void testClearingClusterConfigRestoresTheStaticValue() {
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1), 0, 0, false, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, true);
+    try {
+      Assert.assertTrue(dispatcher.isProtoSegmentList(), "The static broker config seeds the value");
+
+      dispatcher.onChange(Set.of(key), Map.of(key, "false"));
+      Assert.assertFalse(dispatcher.isProtoSegmentList());
+
+      dispatcher.onChange(Set.of(key), Map.of());
+      Assert.assertTrue(dispatcher.isProtoSegmentList(), "Clearing the key must restore the static broker config");
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
   @AfterClass
   public void tearDown() {
     _queryDispatcher.shutdown();

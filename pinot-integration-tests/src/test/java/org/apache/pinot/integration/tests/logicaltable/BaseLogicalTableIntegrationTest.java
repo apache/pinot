@@ -34,7 +34,7 @@ import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
-import org.apache.pinot.query.service.dispatch.ProtoSegmentListPredicate;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -485,7 +485,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   /// Both leaf-stage segment list encodings must return the same result for a logical table, whose leaf workers carry
   /// `logicalTableSegmentsMap`, keyed by physical table name, rather than the table-type keyed `tableSegmentsMap`.
-  /// The encoding is switched through cluster config, the way an operator would, and restored afterwards because the
+  /// The encoding is turned on through cluster config, the way an operator would, and turned off again because the
   /// cluster is shared with the other logical-table test classes.
   @Test
   public void testProtoSegmentListPreservesLogicalTableResults()
@@ -494,35 +494,35 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     String query = "SELECT Carrier, COUNT(*) FROM " + getLogicalTableName() + " WHERE DaysSinceEpoch > 16312 "
         + "GROUP BY Carrier ORDER BY Carrier LIMIT 100";
     // The cluster was started by the shared suite instance, which is the one holding the broker starter.
-    ProtoSegmentListPredicate predicate =
+    QueryDispatcher dispatcher =
         ((BrokerRequestHandlerDelegate) _sharedClusterTestSuite._brokerStarters.get(0).getBrokerRequestHandler())
-            .getMultiStageBrokerRequestHandler().getProtoSegmentListPredicate();
-    TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
-        "SAFE mode did not enable the proto segment list encoding although every server runs the same version");
+            .getMultiStageBrokerRequestHandler().getQueryDispatcher();
+    assertTrue(!dispatcher.isProtoSegmentList(), "The proto segment list encoding must ship disabled");
 
-    JsonNode proto = postQuery(query);
-    assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
+    JsonNode legacy = postQuery(query);
+    assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
 
     try {
-      setProtoSegmentListMode("NEVER");
-      TestUtils.waitForCondition(aVoid -> !predicate.isEnabled(false), 10_000L,
-          "Setting the mode to NEVER in cluster config did not reach the broker");
+      setProtoSegmentList(true);
+      TestUtils.waitForCondition(aVoid -> dispatcher.isProtoSegmentList(), 10_000L,
+          "Enabling the proto segment list encoding in cluster config did not reach the broker");
 
-      JsonNode legacy = postQuery(query);
-      assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
-      assertEquals(legacy.get("resultTable").get("rows"), proto.get("resultTable").get("rows"),
+      JsonNode proto = postQuery(query);
+      assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
+      assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"),
           "The segment list encoding changed the result of a logical table query");
     } finally {
-      setProtoSegmentListMode("SAFE");
-      TestUtils.waitForCondition(aVoid -> predicate.isEnabled(false), 10_000L,
-          "Restoring SAFE in cluster config did not reach the broker");
+      setProtoSegmentList(false);
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isProtoSegmentList(), 10_000L,
+          "Disabling the proto segment list encoding in cluster config did not reach the broker");
     }
   }
 
-  private void setProtoSegmentListMode(String mode)
+  private void setProtoSegmentList(boolean enabled)
       throws Exception {
     sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(),
-        JsonUtils.objectToString(Map.of(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, mode)));
+        JsonUtils.objectToString(
+            Map.of(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, String.valueOf(enabled))));
   }
 
   @Test

@@ -47,8 +47,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///   [WorkerMetadata#LOGICAL_TABLE_SEGMENTS_MAP_KEY] custom property, which is all that servers predating the proto
 ///   fields understand.
 ///
-/// Decoding accepts both, so a server always understands every broker; the broker enables the proto encoding only
-/// when every server does (see `ProtoSegmentListPredicate`).
+/// Decoding accepts both, so a server always understands every broker; the proto encoding is off until an operator
+/// turns it on, which they only do once every server understands it (see
+/// `CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST`).
 public class QueryPlanSerDeUtils {
   private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
   };

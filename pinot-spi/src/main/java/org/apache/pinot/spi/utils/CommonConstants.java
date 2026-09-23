@@ -668,21 +668,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
     public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
 
-    /// How a multi-stage query ships its leaf-stage segment lists: as native protobuf fields of the worker metadata,
-    /// which skips a JSON encode per leaf-stage worker on the broker and a JSON parse per worker on the server, or as
-    /// the legacy JSON string custom property. A server that predates the proto fields fails the leaf stages it
-    /// receives in the proto encoding.
-    /// - `SAFE` (default): proto only while every server of the cluster reports this broker's Pinot version, so the
-    ///   encoding switches itself on when a rolling upgrade completes; multi-cluster queries always use the legacy
-    ///   encoding.
-    /// - `ALWAYS`: proto unconditionally.
-    /// - `NEVER`: legacy unconditionally.
+    /// Whether a multi-stage query ships its leaf-stage segment lists as native protobuf fields of the worker
+    /// metadata, which skips a JSON encode per leaf-stage worker on the broker and a JSON parse per worker on the
+    /// server, instead of the legacy JSON string custom property.
     ///
-    /// Also read from cluster config under the same key, which wins over the static broker config and takes effect on
-    /// the next query, so the encoding can be switched off without restarting the brokers; clearing the cluster-config
-    /// key restores the static broker config.
+    /// Ships disabled, and must stay disabled until every server the broker dispatches to runs a version that
+    /// understands the proto fields, including the servers of remote clusters when multi-cluster routing is used: an
+    /// older server finds no segments under them, concludes the worker is not a leaf-stage worker and fails the leaf
+    /// stage. Turn it on once the rolling upgrade has finished.
+    ///
+    /// Read from cluster config as well as from the static broker config, cluster config winning and taking effect on
+    /// the next query, so it can be turned on, and off again, without restarting the brokers. Clearing the
+    /// cluster-config key restores the static broker config, and a value that is neither `true` nor `false` reads as
+    /// disabled.
     public static final String CONFIG_OF_MSE_PROTO_SEGMENT_LIST = "pinot.broker.mse.proto.segment.list";
-    public static final String DEFAULT_MSE_PROTO_SEGMENT_LIST = "SAFE";
+    public static final boolean DEFAULT_MSE_PROTO_SEGMENT_LIST = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
