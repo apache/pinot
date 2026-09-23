@@ -20,9 +20,15 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -185,6 +191,104 @@ public class IndexLoadingConfigTest {
     // Switching back to a tier without an override: table-level value again.
     ilc.setSegmentTier(null);
     assertTrue(ilc.isSkipSegmentPreprocess());
+  }
+
+  @Test
+  public void testCopyConstructorCopiesAllFields()
+      throws Exception {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    IndexLoadingConfig original = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+
+    // Set every non-final field to a non-default value so that a field missed by the copy constructor is detected
+    List<Field> fields = new ArrayList<>();
+    for (Field field : IndexLoadingConfig.class.getDeclaredFields()) {
+      if (Modifier.isStatic(field.getModifiers())) {
+        continue;
+      }
+      field.setAccessible(true);
+      fields.add(field);
+      if (!Modifier.isFinal(field.getModifiers())) {
+        field.set(original, newValue(field, field.get(original)));
+      }
+    }
+
+    IndexLoadingConfig copy = new IndexLoadingConfig(original);
+    for (Field field : fields) {
+      assertEquals(field.get(copy), field.get(original), "Field not copied: " + field.getName());
+    }
+    // Mutable collections must not be shared with the original
+    for (String name : List.of("_knownColumns", "_indexConfigsByColName")) {
+      Field field = IndexLoadingConfig.class.getDeclaredField(name);
+      field.setAccessible(true);
+      assertNotSame(field.get(copy), field.get(original), "Field shared with original: " + name);
+    }
+  }
+
+  private static Object newValue(Field field, Object currentValue) {
+    Class<?> type = field.getType();
+    String name = field.getName();
+    if (type == boolean.class) {
+      return !(boolean) currentValue;
+    }
+    if (type == int.class) {
+      return (int) currentValue + 1;
+    }
+    if (type == String.class) {
+      return name;
+    }
+    if (type.isEnum()) {
+      for (Object constant : type.getEnumConstants()) {
+        if (constant != currentValue) {
+          return constant;
+        }
+      }
+      fail("No alternative enum value for field: " + name);
+    }
+    if (type == Set.class) {
+      return new HashSet<>(Set.of(name));
+    }
+    if (type == List.class) {
+      return new ArrayList<>(List.of(name));
+    }
+    if (type == Map.class) {
+      return new HashMap<>(Map.of(name, name));
+    }
+    return mock(type);
+  }
+
+  @Test
+  public void testCopyIsIsolatedFromOriginal()
+      throws IOException {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSkipSegmentPreprocess(true)
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"preprocessed\": {\"skipSegmentPreprocess\": false}}"))
+        .build();
+    IndexLoadingConfig original = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    original.setTableDataDir("/original");
+    assertTrue(original.isSkipSegmentPreprocess());
+
+    IndexLoadingConfig copy = new IndexLoadingConfig(original);
+    assertTrue(copy.isSkipSegmentPreprocess());
+    assertEquals(copy.getTableDataDir(), "/original");
+
+    copy.setSegmentTier("preprocessed");
+    copy.setTableDataDir("/copy");
+    assertFalse(copy.isSkipSegmentPreprocess());
+    assertEquals(copy.getSegmentTier(), "preprocessed");
+    assertEquals(copy.getTableDataDir(), "/copy");
+
+    // Original is unaffected
+    assertNull(original.getSegmentTier());
+    assertEquals(original.getTableDataDir(), "/original");
+    assertTrue(original.isSkipSegmentPreprocess());
   }
 
   @Test
