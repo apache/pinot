@@ -104,7 +104,8 @@ import org.slf4j.LoggerFactory;
 
 /// `QueryDispatcher` dispatch a query to different workers.
 public class QueryDispatcher implements PinotClusterConfigChangeListener {
-  private static final String PROTO_SEGMENT_LIST_KEY = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
+  private static final String ENABLE_PROTO_SEGMENT_LIST_KEY =
+      CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /// Maximum time (ms) to wait for outstanding `OpChainComplete` stats messages on both the success and error
@@ -137,10 +138,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final boolean _streamStatsDefault;
   /// Whether leaf-stage segment lists are shipped as native protobuf fields of the worker metadata instead of the
   /// legacy JSON custom property. Seeded from the static broker config and then followed live from cluster config on
-  /// [#PROTO_SEGMENT_LIST_KEY], so an operator can turn it on once every server of the cluster has been upgraded, and
-  /// off again, without restarting the brokers. `volatile` because the cluster-config callback and the request path
-  /// race; read once per query so that all servers of one query agree.
-  private volatile boolean _protoSegmentList;
+  /// [#ENABLE_PROTO_SEGMENT_LIST_KEY], so an operator can turn it on once every server of the cluster has been
+  /// upgraded, and off again, without restarting the brokers. `volatile` because the cluster-config callback and the
+  /// request path race; read once per query so that all servers of one query agree.
+  private volatile boolean _enableProtoSegmentList;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
@@ -163,15 +164,15 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
-      boolean protoSegmentList) {
+      boolean enableProtoSegmentList) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs, protoSegmentList);
+        streamStatsDefault, statsDrainMs, enableProtoSegmentList);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs, boolean protoSegmentList) {
+      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -182,7 +183,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
-    _protoSegmentList = protoSegmentList;
+    _enableProtoSegmentList = enableProtoSegmentList;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -379,9 +380,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
     // before all opchains have responded.
     BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
-    boolean protoSegmentList = _protoSegmentList;
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
     for (QueryServerInstance server : serversOut) {
-      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, protoSegmentList);
+      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata, enableProtoSegmentList);
       int expectedForServer = 0;
       for (DispatchablePlanFragment stagePlan : plansWithoutRoot) {
         List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(server);
@@ -654,9 +655,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
-    boolean protoSegmentList = _protoSegmentList;
+    boolean enableProtoSegmentList = _enableProtoSegmentList;
     BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
-        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, protoSegmentList));
+        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata, enableProtoSegmentList));
 
     processResults(requestId, serverInstancesOut.size(), resultConsumer, deadline, dispatchCallbacks);
   }
@@ -725,17 +726,18 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   /// encoding every server understands.
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(PROTO_SEGMENT_LIST_KEY)) {
+    if (!changedConfigs.contains(ENABLE_PROTO_SEGMENT_LIST_KEY)) {
       return;
     }
-    String value = clusterConfigs.get(PROTO_SEGMENT_LIST_KEY);
-    boolean protoSegmentList = value != null && Boolean.parseBoolean(value.trim());
-    if (protoSegmentList == _protoSegmentList) {
+    String value = clusterConfigs.get(ENABLE_PROTO_SEGMENT_LIST_KEY);
+    boolean enableProtoSegmentList = value != null && Boolean.parseBoolean(value.trim());
+    if (enableProtoSegmentList == _enableProtoSegmentList) {
       return;
     }
-    _protoSegmentList = protoSegmentList;
-    LOGGER.info("Updated {} from: {} to: {}", PROTO_SEGMENT_LIST_KEY, !protoSegmentList, protoSegmentList);
-    if (protoSegmentList) {
+    _enableProtoSegmentList = enableProtoSegmentList;
+    LOGGER.info("Updated {} from: {} to: {}", ENABLE_PROTO_SEGMENT_LIST_KEY, !enableProtoSegmentList,
+        enableProtoSegmentList);
+    if (enableProtoSegmentList) {
       LOGGER.warn("The proto segment list encoding is now enabled. Every server this broker dispatches to, including "
           + "the servers of remote clusters when multi-cluster routing is used, must already run a version that "
           + "understands it; leaf stages routed to an older server will fail. Set it back to false to revert.");
@@ -743,15 +745,15 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   }
 
   @VisibleForTesting
-  public boolean isProtoSegmentList() {
-    return _protoSegmentList;
+  public boolean isEnableProtoSegmentList() {
+    return _enableProtoSegmentList;
   }
 
   /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'
   /// metadata. The leaf-stage segment lists are encoded here, once per worker, rather than at plan time.
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
       Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata,
-      boolean protoSegmentList) {
+      boolean enableProtoSegmentList) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
     requestBuilder.setVersion(PlanVersions.V1);
 
@@ -765,7 +767,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           workerMetadataList.add(stageWorkerMetadataList.get(workerId));
         }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList, protoSegmentList);
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList, enableProtoSegmentList);
         StageInfo stageInfo = entry.getValue();
 
         Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()

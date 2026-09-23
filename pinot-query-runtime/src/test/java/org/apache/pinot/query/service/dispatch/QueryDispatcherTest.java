@@ -97,22 +97,22 @@ public class QueryDispatcherTest extends QueryTestSet {
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
             Duration.ofSeconds(1));
     try {
-      Assert.assertFalse(dispatcher.isProtoSegmentList(), "The encoding must ship disabled");
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(), "The encoding must ship disabled");
 
       dispatcher.onChange(Set.of(key), Map.of(key, "true"));
-      Assert.assertTrue(dispatcher.isProtoSegmentList(), "Cluster config must turn the encoding on");
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList(), "Cluster config must turn the encoding on");
 
       dispatcher.onChange(Set.of(key), Map.of(key, "false"));
-      Assert.assertFalse(dispatcher.isProtoSegmentList(), "Cluster config must turn the encoding off again");
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(), "Cluster config must turn the encoding off again");
 
       // A change that does not touch the key leaves it alone.
       dispatcher.onChange(Set.of(key), Map.of(key, "TRUE"));
       dispatcher.onChange(Set.of("some.other.key"), Map.of("some.other.key", "x"));
-      Assert.assertTrue(dispatcher.isProtoSegmentList());
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList());
 
       // Anything that is not a boolean reads as disabled, the safe direction.
       dispatcher.onChange(Set.of(key), Map.of(key, "SAFE"));
-      Assert.assertFalse(dispatcher.isProtoSegmentList());
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList());
     } finally {
       dispatcher.shutdown();
     }
@@ -127,10 +127,11 @@ public class QueryDispatcherTest extends QueryTestSet {
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
             Duration.ofSeconds(1), 0, 0, false, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, true);
     try {
-      Assert.assertTrue(dispatcher.isProtoSegmentList(), "The static broker config seeds the value");
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList(), "The static broker config seeds the value");
 
       dispatcher.onChange(Set.of(key), Map.of());
-      Assert.assertFalse(dispatcher.isProtoSegmentList(), "Clearing the key must fall back to the legacy encoding");
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(),
+          "Clearing the key must fall back to the legacy encoding");
     } finally {
       dispatcher.shutdown();
     }

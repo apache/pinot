@@ -497,14 +497,14 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryDispatcher dispatcher =
         ((BrokerRequestHandlerDelegate) _sharedClusterTestSuite._brokerStarters.get(0).getBrokerRequestHandler())
             .getMultiStageBrokerRequestHandler().getQueryDispatcher();
-    assertTrue(!dispatcher.isProtoSegmentList(), "The proto segment list encoding must ship disabled");
+    assertTrue(!dispatcher.isEnableProtoSegmentList(), "The proto segment list encoding must ship disabled");
 
     JsonNode legacy = postQuery(query);
     assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
 
     try {
       setProtoSegmentList(true);
-      TestUtils.waitForCondition(aVoid -> dispatcher.isProtoSegmentList(), 10_000L,
+      TestUtils.waitForCondition(aVoid -> dispatcher.isEnableProtoSegmentList(), 10_000L,
           "Enabling the proto segment list encoding in cluster config did not reach the broker");
 
       JsonNode proto = postQuery(query);
@@ -513,7 +513,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
           "The segment list encoding changed the result of a logical table query");
     } finally {
       setProtoSegmentList(false);
-      TestUtils.waitForCondition(aVoid -> !dispatcher.isProtoSegmentList(), 10_000L,
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isEnableProtoSegmentList(), 10_000L,
           "Disabling the proto segment list encoding in cluster config did not reach the broker");
     }
   }

@@ -303,7 +303,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     QueryDispatcher dispatcher = ((BrokerRequestHandlerDelegate) _brokerStarters.get(0).getBrokerRequestHandler())
         .getMultiStageBrokerRequestHandler().getQueryDispatcher();
-    assertFalse(dispatcher.isProtoSegmentList(), "The proto segment list encoding must ship disabled");
+    assertFalse(dispatcher.isEnableProtoSegmentList(), "The proto segment list encoding must ship disabled");
 
     String table = getTableName();
     List<String> queries = List.of(
@@ -327,7 +327,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       // What an operator does once every server has been upgraded.
       _helixManager.getConfigAccessor()
           .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "true");
-      TestUtils.waitForCondition(aVoid -> dispatcher.isProtoSegmentList(), 10_000L,
+      TestUtils.waitForCondition(aVoid -> dispatcher.isEnableProtoSegmentList(), 10_000L,
           "Enabling the proto segment list encoding in cluster config did not reach the broker");
 
       for (String query : queries) {
@@ -340,7 +340,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     } finally {
       _helixManager.getConfigAccessor()
           .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "false");
-      TestUtils.waitForCondition(aVoid -> !dispatcher.isProtoSegmentList(), 10_000L,
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isEnableProtoSegmentList(), 10_000L,
           "Disabling the proto segment list encoding in cluster config did not reach the broker");
     }
   }
