@@ -370,13 +370,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getCrc() {
-    return String.valueOf(_crc);
+  public long getCrc() {
+    return _crc;
   }
 
   @Override
-  public String getDataCrc() {
-    return String.valueOf(_dataCrc);
+  public long getDataCrc() {
+    return _dataCrc;
   }
 
   @Override

@@ -107,7 +107,7 @@ public class BaseSingleSegmentConversionExecutorTest {
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     _segmentIndexDir = new File(SEGMENT_DIR, SEGMENT_NAME);
-    _segmentCrc = Long.parseLong(new SegmentMetadataImpl(_segmentIndexDir).getCrc());
+    _segmentCrc = new SegmentMetadataImpl(_segmentIndexDir).getCrc();
 
     Assert.assertTrue(DATA_DIR.mkdirs());
     MinionContext.getInstance().setDataDir(DATA_DIR);
@@ -259,7 +259,7 @@ public class BaseSingleSegmentConversionExecutorTest {
         Set.of(V1Constants.MetadataKeys.METADATA_FILE_NAME, V1Constants.SEGMENT_CREATION_META));
     SegmentMetadataImpl pushedMetadata = new SegmentMetadataImpl(untarredMetadataDir);
     Assert.assertEquals(pushedMetadata.getName(), SEGMENT_NAME);
-    Assert.assertEquals(Long.parseLong(pushedMetadata.getCrc()), _segmentCrc);
+    Assert.assertEquals(pushedMetadata.getCrc(), _segmentCrc);
   }
 
   /// A plain-path output dir (local deep store) must reach the controller as a file URI.
