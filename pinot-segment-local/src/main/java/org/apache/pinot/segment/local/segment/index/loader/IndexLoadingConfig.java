@@ -395,8 +395,16 @@ public class IndexLoadingConfig {
     if (Objects.equals(_segmentTier, segmentTier)) {
       return this;
     }
+    return copyWithSegmentTier(segmentTier);
+  }
+
+  /// Creates a segment-local mutable wrapper with the given tier. This always creates a wrapper, even when the tier is
+  /// unchanged, so callers can safely apply additional segment-specific overrides.
+  public IndexLoadingConfig copyWithSegmentTier(@Nullable String segmentTier) {
     IndexLoadingConfig derived = new IndexLoadingConfig(this);
-    derived.setSegmentTier(segmentTier);
+    if (!Objects.equals(_segmentTier, segmentTier)) {
+      derived.setSegmentTier(segmentTier);
+    }
     return derived;
   }
 

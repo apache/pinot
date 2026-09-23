@@ -1120,7 +1120,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
-    indexLoadingConfig = indexLoadingConfig.withSegmentTier(segmentTier);
+    indexLoadingConfig = indexLoadingConfig.copyWithSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     _segmentReloadSemaphore.acquire(segmentName, _logger);
