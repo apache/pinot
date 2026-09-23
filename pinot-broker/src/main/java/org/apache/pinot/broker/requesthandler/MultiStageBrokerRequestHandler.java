@@ -229,10 +229,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Executors.newFixedThreadPool(
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
             new NamedThreadFactory("multi-stage-query-compile-executor")));
-    _defaultDisabledPlannerRules =
-        _config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES) ? Set.copyOf(
-            _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()))
-            : CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    _defaultDisabledPlannerRules = getDefaultDisabledPlannerRules(_config);
     boolean fingerprintingConfigured = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
@@ -255,6 +252,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD);
     _defaultStreamingDistinctFlushThreshold =
         streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
+  }
+
+  /// Returns the planner rules disabled by default: the comma-separated list in
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES], or
+  /// [CommonConstants.Broker#DEFAULT_DISABLED_RULES] when the config is not set. An empty value disables no rules.
+  @VisibleForTesting
+  static Set<String> getDefaultDisabledPlannerRules(PinotConfiguration config) {
+    if (!config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES)) {
+      return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    }
+    return Set.copyOf(
+        config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
   }
 
   @Override

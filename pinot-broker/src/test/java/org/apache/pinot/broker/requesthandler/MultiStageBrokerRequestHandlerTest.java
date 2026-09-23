@@ -50,6 +50,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -207,6 +208,27 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     handler.applyBrokerDefaultQueryOptions(queryOptions);
     Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD),
         "No option should be injected when the broker default is unset");
+  }
+
+  @Test
+  public void testDefaultDisabledPlannerRulesFromClusterConfig() {
+    // ServiceStartableUtils.applyClusterConfig applies cluster configs with setProperty, which doesn't split lists
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES,
+        "SortJoinCopy, AggregateUnionAggregate,");
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(config),
+        Set.of(PlannerRuleNames.SORT_JOIN_COPY, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE));
+  }
+
+  @Test
+  public void testDefaultDisabledPlannerRulesUnsetOrEmpty() {
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(new PinotConfiguration()),
+        CommonConstants.Broker.DEFAULT_DISABLED_RULES);
+
+    // An empty value disables no rules instead of falling back to the defaults
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, "");
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(config), Set.of());
   }
 
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
