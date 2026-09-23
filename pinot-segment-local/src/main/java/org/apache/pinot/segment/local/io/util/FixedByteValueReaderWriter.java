@@ -23,8 +23,6 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 public final class FixedByteValueReaderWriter implements ValueReader {
   private final PinotDataBuffer _dataBuffer;
@@ -81,15 +79,6 @@ public final class FixedByteValueReaderWriter implements ValueReader {
       buffer[i] = b;
     }
     return i;
-  }
-
-  @Override
-  public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    assert buffer.length >= numBytesPerValue;
-
-    long startOffset = (long) index * numBytesPerValue;
-    _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
-    return new String(buffer, 0, numBytesPerValue, UTF_8);
   }
 
   @Override
