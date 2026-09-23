@@ -1063,9 +1063,7 @@ public enum PinotDataType {
 
     @Override
     public byte[] toBytes(Object value) {
-      byte[] envelope = (byte[]) value;
-      VariantEnvelope.validateAndGetMetadataLength(envelope);
-      return envelope;
+      return validateEnvelopeOrSentinel((byte[]) value);
     }
 
     @Override
@@ -1078,8 +1076,17 @@ public enum PinotDataType {
       if (sourceType == VARIANT) {
         return toBytes(value);
       }
-      byte[] envelope = sourceType.toBytes(value);
-      VariantEnvelope.validateAndGetMetadataLength(envelope);
+      return validateEnvelopeOrSentinel(sourceType.toBytes(value));
+    }
+
+    /// The zero-length array is the reserved SQL-null default and is never a valid envelope. It must pass through so
+    /// that stored nulls survive re-ingestion from a segment (minion merges, purge, realtime-to-offline), where the
+    /// record reader emits the column default and the data-type transformer converts every value regardless of the
+    /// null marker. Mirrors [org.apache.pinot.spi.data.FieldSpec.DataType#VARIANT] conversion.
+    private byte[] validateEnvelopeOrSentinel(byte[] envelope) {
+      if (envelope.length != 0) {
+        VariantEnvelope.validateAndGetMetadataLength(envelope);
+      }
       return envelope;
     }
 

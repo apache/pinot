@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -30,12 +31,15 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.VariantEnvelope;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -302,5 +306,30 @@ public class DataTypeTransformerTest {
     disabledDedupUppercaseRow.putValue(uuidCol, uppercaseUuid);
     disabledDedupUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
     disabledDedupTransformer.transform(disabledDedupUppercaseRow); // must not throw
+  }
+
+  /// Re-ingesting a segment (minion merge, purge, realtime-to-offline) feeds the stored default for null rows
+  /// through this transformer with the null marker set. For VARIANT that default is the reserved zero-length
+  /// sentinel, which is not a valid envelope and must pass through untouched rather than fail conversion.
+  @Test
+  public void testVariantSqlNullSentinelSurvivesReIngestion() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("payload", FieldSpec.DataType.VARIANT).build();
+    DataTypeTransformer transformer = new DataTypeTransformer(tableConfig, schema);
+
+    GenericRow nullRow = new GenericRow();
+    nullRow.putDefaultNullValue("payload", new byte[0]);
+    transformer.transform(nullRow);
+    assertEquals((byte[]) nullRow.getValue("payload"), new byte[0]);
+    assertTrue(nullRow.isNullValue("payload"));
+    assertFalse(nullRow.isIncomplete());
+
+    byte[] envelope = VariantEnvelope.encode(ByteBuffer.wrap(new byte[]{1, 2}), ByteBuffer.wrap(new byte[]{3, 4}));
+    GenericRow valueRow = new GenericRow();
+    valueRow.putValue("payload", envelope);
+    transformer.transform(valueRow);
+    assertEquals((byte[]) valueRow.getValue("payload"), envelope);
+    assertFalse(valueRow.isNullValue("payload"));
   }
 }

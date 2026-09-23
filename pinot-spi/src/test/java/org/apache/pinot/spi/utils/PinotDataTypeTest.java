@@ -230,7 +230,10 @@ public class PinotDataTypeTest {
     assertEquals(VARIANT.convert(envelope, BYTES), envelope);
     assertEquals(VARIANT.toInternal(envelope), envelope);
     assertEquals(BYTES.convert(envelope, VARIANT), envelope);
-    assertThrows(IllegalArgumentException.class, () -> VARIANT.convert(new byte[0], BYTES));
+    // The zero-length array is the reserved SQL-null default; it must pass through so stored nulls survive
+    // re-ingestion from a segment (minion merge, purge, realtime-to-offline).
+    assertEquals(VARIANT.convert(new byte[0], BYTES), new byte[0]);
+    assertEquals(VARIANT.toBytes(new byte[0]), new byte[0]);
     assertThrows(IllegalArgumentException.class, () -> VARIANT.convert(new byte[]{1, 2, 3}, BYTES));
     assertThrows(UnsupportedOperationException.class, () -> VARIANT.toString(envelope));
     assertThrows(UnsupportedOperationException.class, () -> VARIANT.toInt(envelope));

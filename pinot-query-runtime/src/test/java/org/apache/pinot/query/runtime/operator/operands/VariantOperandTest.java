@@ -262,6 +262,26 @@ public class VariantOperandTest {
         new RexExpression.Literal(ColumnDataType.INT, 1), new RexExpression.Literal(ColumnDataType.STRING, "VARCHAR")));
   }
 
+  /// The Variant string `"null"` is the fourth null state of the design contract and must stay distinct from SQL
+  /// null, Variant null, and a missing path: it is present, not null, typed STRING, and extracts as the text null.
+  @Test
+  public void testVariantStringNullIsNotANull() {
+    List<Object> row = row(VariantUtils.parseJsonToVariant("{\"k\":\"null\"}"));
+    List<Object> rootRow = row(VariantUtils.parseJsonToVariant("\"null\""));
+
+    assertEquals(operand(ColumnDataType.STRING, "variantGet",
+        new RexExpression.InputRef(0), stringLiteral("$.k"), stringLiteral("STRING")).apply(row), "null");
+    assertEquals(operand(ColumnDataType.BOOLEAN, "variantExists",
+        new RexExpression.InputRef(0), stringLiteral("$.k")).apply(row), 1);
+    assertEquals(operand(ColumnDataType.BOOLEAN, "isVariantNull",
+        new RexExpression.InputRef(0), stringLiteral("$.k")).apply(row), 0);
+    assertEquals(operand(ColumnDataType.BOOLEAN, "isVariantNull", new RexExpression.InputRef(0)).apply(rootRow), 0);
+    assertEquals(operand(ColumnDataType.STRING, "variantTypeOf",
+        new RexExpression.InputRef(0), stringLiteral("$.k")).apply(row), "STRING");
+    assertEquals(operand(ColumnDataType.STRING, "variantToJson", new RexExpression.InputRef(0)).apply(rootRow),
+        "\"null\"");
+  }
+
   private static TransformOperand operand(ColumnDataType resultType, String functionName,
       RexExpression... operands) {
     RexExpression.FunctionCall functionCall =

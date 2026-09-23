@@ -122,8 +122,10 @@ public class VariantSchemaValidationTest {
     byte[] envelope =
         VariantEnvelope.encode(ByteBuffer.wrap(new byte[]{1}), ByteBuffer.wrap(new byte[]{0}));
     assertSame(DataTypeTransformerUtils.transformValue(COLUMN, envelope, PinotDataType.VARIANT), envelope);
-    assertThrows(IllegalArgumentException.class,
-        () -> DataTypeTransformerUtils.transformValue(COLUMN, new byte[0], PinotDataType.VARIANT));
+    // The zero-length array is the reserved SQL-null default and must pass through: re-ingesting a segment feeds
+    // it back through this conversion for every null row.
+    assertEquals((byte[]) DataTypeTransformerUtils.transformValue(COLUMN, new byte[0], PinotDataType.VARIANT),
+        new byte[0]);
     assertThrows(IllegalArgumentException.class,
         () -> DataTypeTransformerUtils.transformValue(COLUMN, new byte[]{1, 2}, PinotDataType.VARIANT));
   }
