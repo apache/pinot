@@ -442,12 +442,12 @@ public class QueryOptionsUtils {
         throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
             + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
       }
-      String columnName = conf[0];
+      String columnName = conf[0].trim();
       String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
         skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
-            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+            .add(FieldConfig.IndexType.valueOf(indexType.trim().toUpperCase(Locale.ROOT)));
       }
     }
 
