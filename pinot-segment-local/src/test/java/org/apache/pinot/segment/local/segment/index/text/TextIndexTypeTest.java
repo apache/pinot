@@ -20,7 +20,9 @@
 package org.apache.pinot.segment.local.segment.index.text;
 
 import java.io.File;
+import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCombined;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -28,8 +30,8 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -79,33 +81,60 @@ public class TextIndexTypeTest {
     }
   }
 
-  /// V3-layout sibling of the legacy-directory-first test: a not-yet-migrated V3 segment keeps its
-  /// Lucene directory under the `v3/` subdirectory. The gate's lookup
-  /// (`SegmentDirectoryPaths.findTextIndexIndexFile`) must find it there and skip the
-  /// consolidated-entry probe the same way.
+  /// Regression: when the segment directory path is not a local filesystem directory (e.g. a
+  /// `SegmentDirectory` backed by remote/tiered storage), the legacy-directory probe must be
+  /// skipped — `SegmentDirectoryPaths.findTextIndexIndexFile` -> `findFormatFile` rejects
+  /// non-directory paths with `IllegalArgumentException`, which used to fail the whole segment
+  /// load before `getIndexFor` could serve the valid consolidated columns.psf entry. The factory
+  /// must go straight to the consolidated entry and return a working reader. Mirrors the vector
+  /// reader's `testReaderFactoryLoadsConsolidatedHnswWhenSegmentDirectoryIsNotLocal`.
   @Test
-  public void testReaderFactoryUsesLegacyTextDirectoryInV3LayoutWithoutProbing()
+  public void testReaderFactoryLoadsConsolidatedTextWhenSegmentDirectoryIsNotLocal()
       throws Exception {
-    File indexDir = new File(FileUtils.getTempDirectory(), "text-index-type-v3-legacy-" + System.nanoTime());
-    FileUtils.deleteQuietly(indexDir);
+    File buildDir = new File(FileUtils.getTempDirectory(), "text-index-type-nonlocal-" + System.nanoTime());
+    FileUtils.deleteQuietly(buildDir);
+    PinotDataBuffer buffer = null;
     try {
-      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-      Assert.assertTrue(v3Dir.mkdirs());
-      createLegacyTextIndex(v3Dir);
-      Assert.assertTrue(
-          new File(v3Dir, COLUMN + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).isDirectory(),
-          "test setup: legacy Lucene text index directory must exist under v3/");
+      Assert.assertTrue(buildDir.mkdirs());
+      // Build a legacy Lucene text index directory, then pack it into a combined buffer standing in
+      // for the consolidated columns.psf entry.
+      createLegacyTextIndex(buildDir);
+      File luceneDir = new File(buildDir, COLUMN + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+      Assert.assertTrue(luceneDir.isDirectory(), "test setup: legacy Lucene text index directory must exist");
+      File combinedFile = new File(buildDir, COLUMN + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      LuceneTextIndexCombined.combineLuceneIndexFiles(luceneDir, combinedFile.getAbsolutePath());
+      // BIG_ENDIAN mirrors how columns.psf entries are mapped in production.
+      buffer = PinotDataBuffer.mapFile(combinedFile, /* readOnly */ true, 0, combinedFile.length(),
+          ByteOrder.BIG_ENDIAN, "text-index-type-nonlocal-test");
 
-      SegmentDirectory.Reader segmentReader = mockSegmentReader(indexDir);
+      SegmentDirectory segmentDirectory = Mockito.mock(SegmentDirectory.class);
+      SegmentDirectory.Reader segmentReader = Mockito.mock(SegmentDirectory.Reader.class);
+      // A path that exists nowhere on the local filesystem, as getPath() yields for remote-backed
+      // segment directories.
+      Mockito.when(segmentDirectory.getPath())
+          .thenReturn(new File("/segments/textTest/nonexistent-" + System.nanoTime()).toPath());
+      Mockito.when(segmentReader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      Mockito.when(segmentReader.getIndexFor(COLUMN, StandardIndexes.text())).thenReturn(buffer);
 
-      try (TextIndexReader reader = createReaderWithStoreInSegmentFile(segmentReader)) {
-        Assert.assertNotNull(reader, "v3-layout legacy text index directory must be readable with "
-            + "storeInSegmentFile=true");
+      TextIndexConfig readerConfig = new TextIndexConfigBuilder().withStoreInSegmentFile(true).build();
+      FieldIndexConfigs fieldIndexConfigs =
+          new FieldIndexConfigs.Builder().add(StandardIndexes.text(), readerConfig).build();
+      ColumnMetadata metadata = Mockito.mock(ColumnMetadata.class);
+      Mockito.when(metadata.getColumnName()).thenReturn(COLUMN);
+      Mockito.when(metadata.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+      Mockito.when(metadata.getTotalDocs()).thenReturn(NUM_DOCS);
+
+      try (TextIndexReader reader = StandardIndexes.text().getReaderFactory()
+          .createIndexReader(segmentReader, fieldIndexConfigs, metadata)) {
+        Assert.assertNotNull(reader,
+            "consolidated text entry must load when the segment directory is not a local path");
         Assert.assertEquals(reader.getDocIds("clean", null).getCardinality(), 2);
       }
-      Mockito.verify(segmentReader, Mockito.never()).getIndexFor(COLUMN, StandardIndexes.text());
     } finally {
-      FileUtils.deleteQuietly(indexDir);
+      if (buffer != null) {
+        buffer.close();
+      }
+      FileUtils.deleteQuietly(buildDir);
     }
   }
 

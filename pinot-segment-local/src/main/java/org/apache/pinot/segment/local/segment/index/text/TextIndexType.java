@@ -162,7 +162,14 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
         // directory and fails to map it (not a regular file), which would kill the segment load
         // before any fallback could run. This keeps storeInSegmentFile=true rolling-upgrade-safe
         // for existing text segments.
-        File legacyTextIndex = SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir, metadata.getColumnName());
+        // Probe only when the segment directory is a local directory: under a remote/tiered segment
+        // directory (e.g. tiered storage on S3) getPath() is not a local filesystem path, there can
+        // be no legacy directory on disk, and findTextIndexIndexFile -> findFormatFile would reject
+        // the path outright (IllegalArgumentException) before getIndexFor could read the valid
+        // consolidated columns.psf entry.
+        File legacyTextIndex = segmentDir.isDirectory()
+            ? SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir, metadata.getColumnName())
+            : null;
         if (legacyTextIndex == null || !legacyTextIndex.isDirectory()) {
           PinotDataBuffer textIndexBuffer;
           try {
