@@ -97,11 +97,6 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
-  public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int readBytes(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 

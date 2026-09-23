@@ -58,9 +58,6 @@ public interface ValueReader extends Closeable {
     return new String(buffer, 0, length, StandardCharsets.UTF_8);
   }
 
-  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
-  String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
-
   /// Reads the bytes into the given buffer and returns the length. Applicable to variable sized types other than
   /// STRING, i.e. BIG_DECIMAL, BYTES.
   /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
