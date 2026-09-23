@@ -1368,4 +1368,32 @@ public class VariantUtilsTest {
         path, ResultType.LONG, result));
     assertEquals(result.getLongValue(), 7L);
   }
+
+  /// Design contract 7.1: the Variant string `"null"` is present, not a Variant null, typed STRING, extracts as the
+  /// text null, and renders as the quoted JSON string. Both engines share these entry points.
+  @Test
+  public void testVariantStringNullStaysDistinctFromNulls() {
+    byte[] object = VariantUtils.parseJsonToVariant("{\"k\":\"null\"}");
+    byte[] root = VariantUtils.parseJsonToVariant("\"null\"");
+
+    assertEquals(VariantUtils.variantGet(object, "$.k", "STRING"), "null");
+    assertEquals(VariantUtils.variantExists(object, "$.k"), Boolean.TRUE);
+    assertEquals(VariantUtils.isVariantNull(object, "$.k"), Boolean.FALSE);
+    assertFalse(VariantUtils.isVariantNull(root));
+    assertEquals(VariantUtils.variantTypeOf(object, "$.k"), "STRING");
+    assertEquals(VariantUtils.variantToJson(root), "\"null\"");
+  }
+
+  /// The two- and three-argument tolerant scalar overloads must agree: a malformed path or unsupported target
+  /// type is a tolerated failure for both, not a plan-time error for one and null for the other.
+  @Test
+  public void testTryVariantGetOverloadsAgreeOnMalformedArguments() {
+    byte[] envelope = VariantUtils.parseJsonToVariant("{\"a\":1}");
+    for (String malformedPath : new String[]{"$[", "$.a.", "a.b", "$['a']"}) {
+      assertNull(VariantUtils.tryVariantGet(envelope, malformedPath), malformedPath);
+      assertNull(VariantUtils.tryVariantGet(envelope, malformedPath, "INT"), malformedPath);
+    }
+    assertNull(VariantUtils.tryVariantGet(envelope, "$.a", "NOT_A_TYPE"));
+    assertEquals(VariantUtils.tryVariantGet(envelope, "$.a", "INT"), 1);
+  }
 }

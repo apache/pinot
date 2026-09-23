@@ -88,6 +88,7 @@ import org.apache.pinot.core.operator.transform.function.VectorTransformFunction
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -368,6 +369,14 @@ public class TransformFunctionFactory {
           ColumnDataType[] argumentDataTypes = new ColumnDataType[numArguments];
           for (int i = 0; i < numArguments; i++) {
             TransformResultMetadata resultMetadata = transformFunctionArguments.get(i).getResultMetadata();
+            // Scalar lookup binds by argument count, so a raw envelope would silently bind to a String/byte[]
+            // parameter and be consumed as hex text. The VARIANT functions are transform functions, so they never
+            // reach this branch.
+            if (resultMetadata.getDataType() == DataType.VARIANT) {
+              throw new BadQueryRequestException(String.format(
+                  "Raw VARIANT values do not support function %s; extract a typed path with variantGet first",
+                  originalFunctionName));
+            }
             argumentDataTypes[i] =
                 ColumnDataType.fromDataType(resultMetadata.getDataType(), resultMetadata.isSingleValue());
           }

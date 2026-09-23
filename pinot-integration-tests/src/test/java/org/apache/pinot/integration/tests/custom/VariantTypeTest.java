@@ -350,6 +350,23 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     response = postVariantQuery(
         "SELECT " + PAYLOAD + ", COUNT(*) FROM " + TABLE_NAME + " GROUP BY " + PAYLOAD);
     assertExceptionContains(response, "raw variant", "group by");
+    // A filtered aggregation routes to the filtered group-by operator, whose guard is otherwise unreachable.
+    response = postVariantQuery(
+        "SELECT " + PAYLOAD + ", COUNT(*) FILTER (WHERE " + EVENT_TYPE + " = 'checkout') FROM " + TABLE_NAME
+            + " GROUP BY " + PAYLOAD);
+    assertExceptionContains(response, "raw variant", "group by");
+    // Scalar functions and COALESCE must not consume the raw envelope as text. Multi-stage inserts an implicit CAST
+    // that its own guard (or Calcite) rejects, so only the single-stage message is pinned.
+    for (String query : List.of(
+        "SELECT LENGTH(" + PAYLOAD + ") FROM " + TABLE_NAME,
+        "SELECT COALESCE(" + PAYLOAD + ", 'x') FROM " + TABLE_NAME)) {
+      response = postVariantQuery(query);
+      if (useMultiStageQueryEngine) {
+        assertHasException(response);
+      } else {
+        assertExceptionContains(response, "raw variant");
+      }
+    }
     response = postVariantQuery("SELECT DISTINCT " + PAYLOAD + " FROM " + TABLE_NAME);
     assertExceptionContains(response, "raw variant", useMultiStageQueryEngine ? "group by" : "distinct");
 
@@ -358,6 +375,9 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
             + ", '$.eventType', 'STRING') = 'checkout'",
         "SELECT variant_get(" + PAYLOAD + ", '$.eventType', 'STRING'), COUNT(*) FROM " + TABLE_NAME
             + " GROUP BY variant_get(" + PAYLOAD + ", '$.eventType', 'STRING')",
+        "SELECT variant_get(" + PAYLOAD + ", '$.eventType', 'STRING'), COUNT(*) FILTER (WHERE " + EVENT_TYPE
+            + " = 'checkout') FROM " + TABLE_NAME + " GROUP BY variant_get(" + PAYLOAD + ", '$.eventType', 'STRING')",
+        "SELECT LENGTH(variant_get(" + PAYLOAD + ", '$.eventType', 'STRING')) FROM " + TABLE_NAME,
         "SELECT DISTINCT variant_get(" + PAYLOAD + ", '$.eventType', 'STRING') FROM " + TABLE_NAME)) {
       assertNoExceptions(postVariantQuery(query));
     }
