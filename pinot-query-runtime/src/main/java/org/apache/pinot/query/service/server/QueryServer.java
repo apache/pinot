@@ -663,7 +663,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       Worker.OpChainComplete.Builder builder = Worker.OpChainComplete.newBuilder()
           .setStageId(opChainId.getStageId())
           .setWorkerId(opChainId.getVirtualServerId())
-          .setSuccess(error == null);
+          .setSuccess(error == null)
+          .addAllMaterializedOutput(context.getMaterializedOutputHandles());
       if (error != null) {
         builder.setErrorMsg(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
       }

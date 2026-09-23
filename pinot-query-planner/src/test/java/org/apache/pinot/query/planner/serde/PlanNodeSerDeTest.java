@@ -51,6 +51,16 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testMaterializedExchangeSerDe() {
+    DispatchableSubPlan dispatchableSubPlan =
+        _queryEnvironment.planQuery("SET materializedExchange=true; SELECT col1, COUNT(*) FROM a GROUP BY col1");
+    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode stagePlan = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
+      assertEquals(PlanNodeDeserializer.process(PlanNodeSerializer.process(stagePlan)), stagePlan);
+    }
+  }
+
+  @Test
   public void testPrunedUnnestNodeSerDe() {
     // Round-trips the passthrough-pruning wire fields (passthroughInputIndexes, prunedPassthrough). A non-sequential
     // index list plus WITH ORDINALITY exercise the proto repeated/bool fields and ordering.
