@@ -2785,103 +2785,131 @@
             <goals>
               <goal>check</goal>
             </goals>
+            <!--
+              Run RAT once from the root over the whole source tree instead of once per module. RAT 0.17+ declares
+              the check goal thread-safe but shares mutable state across executions (RAT-553, RAT-573), so concurrent
+              per-module executions in parallel builds (-T) fail intermittently. To run it standalone, use
+              `./mvnw -N apache-rat:check`.
+            -->
+            <inherited>false</inherited>
           </execution>
         </executions>
         <configuration>
-          <excludes>
+          <excludeSubProjects>false</excludeSubProjects>
+          <!--
+            Parse only .gitignore files. The deprecated default (parseSCMIgnoresAsExcludes=true) also applies every
+            STANDARD_SCMS pattern, including CVS's "**/core", which silently skips every directory named "core"
+            (e.g. org/apache/pinot/core). Setting the deprecated parameter to false is the only way to disable it.
+          -->
+          <parseSCMIgnoresAsExcludes>false</parseSCMIgnoresAsExcludes>
+          <inputExcludeParsedScms>
+            <inputExcludeParsedScm>GIT</inputExcludeParsedScm>
+          </inputExcludeParsedScms>
+          <!-- RAT 0.17+ skips hidden directories by default; keep checking .github -->
+          <inputIncludeStds>
+            <inputIncludeStd>HIDDEN_DIR</inputIncludeStd>
+          </inputIncludeStds>
+          <!-- Tracked sources hidden by the root .gitignore "quickstart*" rule (meant for quickstart output files) -->
+          <inputIncludes>
+            <inputInclude>**/src/**/?uick?tart*</inputInclude>
+          </inputIncludes>
+          <inputExcludes>
             <!-- Exclude license copies -->
-            <exclude>licenses/**</exclude>
-            <exclude>licenses-binary/**</exclude>
+            <inputExclude>licenses/**</inputExclude>
+            <inputExclude>licenses-binary/**</inputExclude>
 
             <!-- Exclude build targets -->
-            <exclude>**/target/**</exclude>
+            <inputExclude>**/target/**</inputExclude>
 
             <!-- Exclude Maven plugin generated files -->
-            <exclude>**/dependency-reduced-pom.xml</exclude>
+            <inputExclude>**/dependency-reduced-pom.xml</inputExclude>
 
             <!-- Text and log files -->
-            <exclude>**/*.txt</exclude>
-            <exclude>**/*.log</exclude>
-            <exclude>**/*.list</exclude>
-            <exclude>**/*.out</exclude>
-            <exclude>**/*.generated</exclude>
-            <exclude>**/*.json</exclude>
-            <exclude>**/*.schema</exclude>
-            <exclude>**/*.sql</exclude>
+            <inputExclude>**/*.txt</inputExclude>
+            <inputExclude>**/*.log</inputExclude>
+            <inputExclude>**/*.list</inputExclude>
+            <inputExclude>**/*.out</inputExclude>
+            <inputExclude>**/*.generated</inputExclude>
+            <inputExclude>**/*.json</inputExclude>
+            <inputExclude>**/*.schema</inputExclude>
+            <inputExclude>**/*.sql</inputExclude>
 
             <!-- JDBC Drivers -->
-            <exclude>**/java.sql.*</exclude>
+            <inputExclude>**/java.sql.*</inputExclude>
 
             <!-- Spark datasource register -->
-            <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+            <inputExclude>**/org.apache.spark.sql.sources.DataSourceRegister</inputExclude>
 
             <!-- Binary files -->
-            <exclude>**/*.avro</exclude>
-            <exclude>**/*.avsc</exclude>
-            <exclude>**/*.csv</exclude>
-            <exclude>**/*.desc</exclude>
-            <exclude>**/*.fst</exclude>
-            <exclude>**/*.parquet</exclude>
-            <exclude>**/*.gz</exclude>
-            <exclude>**/*.orc</exclude>
-            <exclude>**/*.dict</exclude>
-            <exclude>**/*.raw</exclude>
-            <exclude>**/*.mapping</exclude>
-            <exclude>**/*.ser</exclude>
-            <exclude>**/*.v1</exclude>
-            <exclude>**/*.v2</exclude>
-            <exclude>**/Text.lucene.index/**</exclude>
-            <exclude>**/appAssemblerScriptTemplate</exclude>
-            <exclude>doap_Pinot.rdf</exclude>
+            <inputExclude>**/*.avro</inputExclude>
+            <inputExclude>**/*.avsc</inputExclude>
+            <inputExclude>**/*.csv</inputExclude>
+            <inputExclude>**/*.desc</inputExclude>
+            <inputExclude>**/*.fst</inputExclude>
+            <inputExclude>**/*.parquet</inputExclude>
+            <inputExclude>**/*.gz</inputExclude>
+            <inputExclude>**/*.orc</inputExclude>
+            <inputExclude>**/*.dict</inputExclude>
+            <inputExclude>**/*.raw</inputExclude>
+            <inputExclude>**/*.mapping</inputExclude>
+            <inputExclude>**/*.ser</inputExclude>
+            <inputExclude>**/*.v1</inputExclude>
+            <inputExclude>**/*.v2</inputExclude>
+            <inputExclude>**/Text.lucene.index/**</inputExclude>
+            <inputExclude>**/appAssemblerScriptTemplate</inputExclude>
+            <inputExclude>doap_Pinot.rdf</inputExclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
             -->
-            <exclude>**/node_modules/**</exclude>
-            <exclude>**/dist/**</exclude>
-            <exclude>**/*.*rc</exclude>
-            <exclude>**/src/main/resources/*.*rc</exclude>
+            <inputExclude>**/node_modules/**</inputExclude>
+            <inputExclude>**/dist/**</inputExclude>
+            <inputExclude>**/*.*rc</inputExclude>
+            <inputExclude>**/src/main/resources/*.*rc</inputExclude>
 
             <!-- IDE files -->
-            <exclude>**/*.iml</exclude>
-            <exclude>**/maven-eclipse.xml</exclude>
-            <exclude>**/.settings/**</exclude>
-            <exclude>**/.project</exclude>
-            <exclude>**/.classpath</exclude>
-            <exclude>.externalToolBuilders/**</exclude>
+            <inputExclude>**/*.iml</inputExclude>
+            <inputExclude>**/maven-eclipse.xml</inputExclude>
+            <inputExclude>**/.settings/**</inputExclude>
+            <inputExclude>**/.project</inputExclude>
+            <inputExclude>**/.classpath</inputExclude>
+            <inputExclude>.externalToolBuilders/**</inputExclude>
+
+            <!-- Maven wrapper and JVM config (jvm.config cannot hold comments) -->
+            <inputExclude>.mvn/**</inputExclude>
 
             <!-- Knowledge base (not source code) -->
-            <exclude>kb/**</exclude>
+            <inputExclude>kb/**</inputExclude>
 
             <!-- GenAI Config files -->
-            <exclude>.claude/**</exclude>
-            <exclude>.codex/**</exclude>
-            <exclude>.continue/**</exclude>
-            <exclude>.copilot/**</exclude>
-            <exclude>.cursor/**</exclude>
-            <exclude>.openai/**</exclude>
-            <exclude>.ollama/**</exclude>
+            <inputExclude>.claude/**</inputExclude>
+            <inputExclude>.codex/**</inputExclude>
+            <inputExclude>.continue/**</inputExclude>
+            <inputExclude>.copilot/**</inputExclude>
+            <inputExclude>.cursor/**</inputExclude>
+            <inputExclude>.openai/**</inputExclude>
+            <inputExclude>.ollama/**</inputExclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>helm/**</exclude>
-            <exclude>docker/**</exclude>
-            <exclude>.trivyignore</exclude>
+            <inputExclude>helm/**</inputExclude>
+            <inputExclude>docker/**</inputExclude>
+            <inputExclude>.trivyignore</inputExclude>
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
-            <exclude>contrib/**</exclude>
+            <inputExclude>contrib/**</inputExclude>
 
             <!-- Github template files -->
-            <exclude>.github/*.md</exclude>
+            <inputExclude>.github/*.md</inputExclude>
 
             <!-- Test output -->
-            <exclude>**/test-output/**</exclude>
+            <inputExclude>**/test-output/**</inputExclude>
 
             <!-- MISC -->
-            <exclude>**/.factorypath</exclude>
+            <inputExclude>**/.factorypath</inputExclude>
 
             <!-- specific files -->
-            <exclude>**/src/test/resources/*version-header.properties</exclude>
-          </excludes>
+            <inputExclude>**/src/test/resources/*version-header.properties</inputExclude>
+          </inputExcludes>
         </configuration>
       </plugin>
       <plugin>
