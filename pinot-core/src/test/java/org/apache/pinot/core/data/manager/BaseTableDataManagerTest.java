@@ -288,6 +288,31 @@ public class BaseTableDataManagerTest {
     assertEquals(new SegmentMetadataImpl(tierDataDir).getTotalDocs(), 5);
   }
 
+  /// Regression test for https://github.com/apache/pinot/issues/18164: the table-level config passed into reload is
+  /// shared by all segments, so reloading one segment must not set its tier on the shared config.
+  @Test
+  public void testReloadSegmentDoesNotMutateSharedIndexLoadingConfig()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v1, 5);
+    long crc = getCRC(indexDir);
+    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
+    when(zkMetadata.getCrc()).thenReturn(crc);
+    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
+    when(localMetadata.getCrc()).thenReturn(crc);
+
+    // Segment currently lives on coolTier
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata);
+    when(((ImmutableSegment) segmentDataManager.getSegment()).getTier()).thenReturn(TIER_NAME);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+
+    IndexLoadingConfig sharedConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+    tableDataManager.reloadSegment(segmentDataManager, sharedConfig, false);
+    assertNull(sharedConfig.getSegmentTier());
+    assertNull(sharedConfig.getTableDataDir());
+  }
+
   @Test
   public void testReloadSegmentConvertVersion()
       throws Exception {
