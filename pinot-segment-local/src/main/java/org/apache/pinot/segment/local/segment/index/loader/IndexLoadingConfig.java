@@ -387,6 +387,9 @@ public class IndexLoadingConfig {
   }
 
   public void setSegmentTier(String segmentTier) {
+    if (Objects.equals(_segmentTier, segmentTier)) {
+      return;
+    }
     _segmentTier = segmentTier;
     _resolvedIndexState = null;
   }
@@ -402,9 +405,7 @@ public class IndexLoadingConfig {
   /// unchanged, so callers can safely apply additional segment-specific overrides.
   public IndexLoadingConfig copyWithSegmentTier(@Nullable String segmentTier) {
     IndexLoadingConfig derived = new IndexLoadingConfig(this);
-    if (!Objects.equals(_segmentTier, segmentTier)) {
-      derived.setSegmentTier(segmentTier);
-    }
+    derived.setSegmentTier(segmentTier);
     return derived;
   }
 
@@ -545,6 +546,9 @@ public class IndexLoadingConfig {
   }
 
   public void addKnownColumns(Set<String> columns) {
+    if (_knownColumns != null && _knownColumns.containsAll(columns)) {
+      return;
+    }
     Set<String> knownColumns = _knownColumns != null ? new HashSet<>(_knownColumns) : new HashSet<>();
     knownColumns.addAll(columns);
     _knownColumns = knownColumns;
