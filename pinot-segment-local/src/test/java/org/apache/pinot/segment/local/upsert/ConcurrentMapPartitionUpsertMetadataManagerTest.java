@@ -2417,12 +2417,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return new Object[][]{
         {ConsumingSegmentConsistencyModeListener.Mode.PROTECTED, false},
         {ConsumingSegmentConsistencyModeListener.Mode.PROTECTED, true},
-        {ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED, false}
+        {ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED, false},
+        {ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED, true}
     };
   }
 
   @Test(dataProvider = "metadataRevertFailureCases")
-  public void testOnlyProtectedRevertFailuresAreReported(ConsumingSegmentConsistencyModeListener.Mode mode,
+  public void testProtectedRevertFailuresAreReportedWithoutThrowing(ConsumingSegmentConsistencyModeListener.Mode mode,
       boolean replacement) {
     ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
     ConsumingSegmentConsistencyModeListener.Mode originalMode = listener.getConsistencyMode();
@@ -2445,7 +2446,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       RuntimeException failure = new RuntimeException("removal failed");
       doThrow(failure).when(manager).removeSegment(eq(segment), any(MutableRoaringBitmap.class));
 
-      RuntimeException thrown = expectThrows(RuntimeException.class, () -> {
+      Runnable removeOrReplaceSegment = () -> {
         if (replacement) {
           ImmutableSegmentImpl newSegment = mock(ImmutableSegmentImpl.class);
           when(newSegment.getSegmentName()).thenReturn(segmentName);
@@ -2453,10 +2454,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         } else {
           manager.removeSegment(segment);
         }
-      });
-      assertSame(thrown, failure, "Preserve the original failure on every removal path");
-      verify(manager).removeSegment(eq(segment), any(MutableRoaringBitmap.class));
+      };
       boolean report = mode == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED;
+      if (report) {
+        removeOrReplaceSegment.run();
+        if (!replacement) {
+          assertFalse(manager._trackedSegments.contains(segment), "Failed revert must not prevent segment offload");
+        }
+      } else {
+        RuntimeException thrown = expectThrows(RuntimeException.class, removeOrReplaceSegment::run);
+        assertSame(thrown, failure, "Preserve the original failure outside protected revert");
+      }
+      verify(manager).removeSegment(eq(segment), any(MutableRoaringBitmap.class));
       verify(metrics, times(report ? 1 : 0))
           .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
       verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());

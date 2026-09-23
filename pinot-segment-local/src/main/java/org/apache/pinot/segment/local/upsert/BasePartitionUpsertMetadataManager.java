@@ -737,8 +737,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           + "manual reconstruction and replay are required.";
       _logger.error(message, e);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
-      // Preserve the existing propagation of failures that the backend did not handle.
-      throw e;
+      // Moving the segment to ERROR does not repair partially reverted metadata. Report the failure for alerting
+      // instead, so operators can reconstruct and replay the affected partition from the failed segment's sequence.
+      return;
     }
     if (getPrevKeyToRecordLocationSize() == 0) {
       _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
