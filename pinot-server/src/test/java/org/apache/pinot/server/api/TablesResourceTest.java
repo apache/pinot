@@ -76,6 +76,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -409,6 +410,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
     assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
@@ -458,6 +460,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
     assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
@@ -473,6 +476,37 @@ public class TablesResourceTest extends BaseResourceTest {
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
     assertNotNull(serverStatus, "Server status should not be null");
     assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+  }
+
+  @DataProvider
+  public Object[][] diagnosticBitmapTypes() {
+    return new Object[][] {{"SNAPSHOT"}, {"SNAPSHOT_WITH_DELETE"}, {"IN_MEMORY"}, {"IN_MEMORY_WITH_DELETE"}};
+  }
+
+  @Test(dataProvider = "diagnosticBitmapTypes")
+  public void testValidDocIdsMetadataDiagnostics(String bitmapType)
+      throws IOException {
+    ImmutableSegmentImpl segment = (ImmutableSegmentImpl) _realtimeIndexSegments.get(0);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, segment);
+    long before = System.currentTimeMillis();
+    String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
+        .queryParam("validDocIdsType", bitmapType)
+        .queryParam("includeDiagnostics", true)
+        .request().post(Entity.json(new TableSegments(List.of(segment.getSegmentName()))), String.class);
+    long after = System.currentTimeMillis();
+    JsonNode metadata = JsonUtils.stringToJsonNode(response).get(0);
+    JsonNode diagnostics = metadata.get("diagnostics");
+    assertEquals(metadata.get("totalValidDocs").asInt(), 8);
+    assertEquals(metadata.get("validDocIdsType").asText(), bitmapType);
+    assertTrue(diagnostics.get("captureStartTimeMs").asLong() >= before);
+    assertTrue(diagnostics.get("captureEndTimeMs").asLong() <= after);
+    long expectedCrc = switch (bitmapType) {
+      case "SNAPSHOT" -> 4200314552L;
+      case "IN_MEMORY" -> 3650129781L;
+      default -> 569535174L;
+    };
+    assertEquals(diagnostics.get("validDocIdsCrc32").asLong(), expectedCrc);
+    assertEquals(diagnostics.has("snapshotFileAgeMs"), bitmapType.startsWith("SNAPSHOT"));
   }
 
   // Verify metadata file from segments.
