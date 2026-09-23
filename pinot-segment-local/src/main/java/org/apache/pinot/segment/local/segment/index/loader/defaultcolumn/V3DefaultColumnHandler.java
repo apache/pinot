@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -37,6 +38,12 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
   public V3DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     super(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+  }
+
+  public V3DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter,
+      @Nullable SegmentDirectory segmentDirectory) {
+    super(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, segmentDirectory);
   }
 
   @Override
@@ -61,7 +68,6 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
     boolean isSingleValue = fieldSpec.isSingleValueField();
-    boolean forwardIndexDisabled = !isSingleValue && isForwardIndexDisabled(column);
     File forwardIndexFile = null;
     File invertedIndexFile = null;
 
@@ -74,15 +80,17 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
         forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else {
-      if (forwardIndexDisabled) {
-        // An inverted index is created instead of forward index for multi-value columns with forward index disabled
-        // Note that we don't currently support creation of forward index disabled derived columns
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+      if (!forwardIndexFile.exists()) {
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+      }
+      if (!forwardIndexFile.exists() && isForwardIndexDisabled(column)) {
+        // A forward-index-disabled multi-value DEFAULT column is written as an inverted index instead of a forward
+        // index (see BaseDefaultColumnHandler#createDefaultValueColumnV1Indices). A DERIVED column always writes a
+        // forward index -- ForwardIndexHandler drops it in its post-update cleanup once the inverted index has been
+        // built from it -- so the on-disk file, not the config, decides which one to transfer here.
+        forwardIndexFile = null;
         invertedIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
-      } else {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
-        if (!forwardIndexFile.exists()) {
-          forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-        }
       }
     }
 
