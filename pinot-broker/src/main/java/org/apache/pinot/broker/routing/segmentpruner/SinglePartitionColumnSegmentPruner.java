@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -49,16 +48,15 @@ import org.apache.pinot.sql.FilterKind;
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final String _tableNameWithType;
   private final String _partitionColumn;
-  private final IntSupplier _minSegmentsForPreparation;
+  private final int _minSegmentsForPreparation;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
-    this(tableNameWithType, partitionColumn, () -> Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    this(tableNameWithType, partitionColumn, Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
   }
 
-  /// The thread-safe supplier is read once per query so cluster config changes apply without rebuilding the pruner.
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn,
-      IntSupplier minSegmentsForPreparation) {
+      int minSegmentsForPreparation) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _minSegmentsForPreparation = minSegmentsForPreparation;
@@ -109,7 +107,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
-    if (segments.size() >= _minSegmentsForPreparation.getAsInt()) {
+    if (segments.size() >= _minSegmentsForPreparation) {
       Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
       if (queryOptions == null
           || !"false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE))) {

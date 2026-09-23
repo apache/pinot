@@ -228,12 +228,28 @@ public abstract class BaseBrokerRoutingManager
         }
       }
     });
-    // Publish one snapshot, including removals. Existing pruners read it once per query, without rebuilding routing.
-    _partitionPruningCacheMinSegments = Map.copyOf(thresholds);
+    Map<String, Integer> previousThresholds = _partitionPruningCacheMinSegments;
+    Map<String, Integer> updatedThresholds = Map.copyOf(thresholds);
+    _partitionPruningCacheMinSegments = updatedThresholds;
+    for (String tableNameWithType : _routingEntryMap.keySet()) {
+      if (resolvePartitionPruningCacheMinSegments(previousThresholds, tableNameWithType)
+          != resolvePartitionPruningCacheMinSegments(updatedThresholds, tableNameWithType)) {
+        try {
+          buildRouting(tableNameWithType);
+        } catch (Exception e) {
+          LOGGER.error("Failed to rebuild routing for table: {} after partition pruning cache threshold change",
+              tableNameWithType, e);
+        }
+      }
+    }
   }
 
   int getPartitionPruningCacheMinSegments(String tableNameWithType) {
-    Map<String, Integer> thresholds = _partitionPruningCacheMinSegments;
+    return resolvePartitionPruningCacheMinSegments(_partitionPruningCacheMinSegments, tableNameWithType);
+  }
+
+  private static int resolvePartitionPruningCacheMinSegments(Map<String, Integer> thresholds,
+      String tableNameWithType) {
     Integer threshold = thresholds.get(tableNameWithType);
     if (threshold == null) {
       threshold = thresholds.get("");
@@ -845,7 +861,7 @@ public abstract class BaseBrokerRoutingManager
 
       // Register segment pruners and initialize segment zk metadata fetcher.
       List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore,
-          () -> getPartitionPruningCacheMinSegments(tableNameWithType));
+          getPartitionPruningCacheMinSegments(tableNameWithType));
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
