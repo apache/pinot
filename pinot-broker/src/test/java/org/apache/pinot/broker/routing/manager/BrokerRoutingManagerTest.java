@@ -811,8 +811,12 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testPartitionPruningCacheThresholdUpdates() {
+  public void testPartitionPruningCacheThresholdUpdates()
+      throws Exception {
     String key = CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+    _routingManager = spy(_routingManager);
+    doNothing().when(_routingManager).buildRouting(any());
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
     DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
     ClusterConfig config = new ClusterConfig("testCluster");
     config.getRecord().setSimpleField(key, "128");
@@ -842,6 +846,7 @@ public class BrokerRoutingManagerTest {
     handler.onClusterConfigChange(config, null);
     assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE),
         DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    verify(_routingManager, times(3)).buildRouting(TEST_TABLE);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.
