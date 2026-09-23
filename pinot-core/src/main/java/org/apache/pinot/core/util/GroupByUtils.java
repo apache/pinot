@@ -71,10 +71,13 @@ public final class GroupByUtils {
   }
 
   /// Optional combine-table construction hook. Returning `null` keeps the standard table for the selected shape.
+  /// Implementations must honor the supplied sizing, trimming and concurrency policy. The deterministic table for
+  /// accurate unordered group-by bypasses this hook. A factory owns cleanup if construction fails before returning.
   /// A closeable table must detach any output rows before `finish()` returns: the combine operator closes it after
   /// its workers stop, before the returned results block is serialized.
   @FunctionalInterface
   public interface CombineTableFactory {
+    @Nullable
     IndexedTable create(CombineTableKind kind, DataSchema dataSchema, boolean hasFinalInput,
         QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity,
         ExecutorService executorService);
@@ -115,6 +118,16 @@ public final class GroupByUtils {
   public static GroupByResultsBlock buildGroupingSetsResultsBlock(QueryContext queryContext, DataSchema dataSchema,
       GroupKeyGenerator groupKeyGenerator, GroupByResultHolder[] groupByResultHolders, int numGroups,
       int discriminatorColumnIndex, boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached) {
+    return buildGroupingSetsResultsBlock(queryContext, dataSchema, groupKeyGenerator, groupByResultHolders, numGroups,
+        discriminatorColumnIndex, numGroupsLimitReached, numGroupsWarningLimitReached, true);
+  }
+
+  /// When `closeGroupKeyGenerator` is false, the caller owns cleanup after materialization (including failures).
+  /// An untrimmed result retains the generator and transfers ownership to the consumer in either mode.
+  public static GroupByResultsBlock buildGroupingSetsResultsBlock(QueryContext queryContext, DataSchema dataSchema,
+      GroupKeyGenerator groupKeyGenerator, GroupByResultHolder[] groupByResultHolders, int numGroups,
+      int discriminatorColumnIndex, boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
+      boolean closeGroupKeyGenerator) {
     GroupByResultsBlock resultsBlock;
     int perSetTrimSize = queryContext.getGroupingSetSegmentTrimSize();
     int numGroupingSets = queryContext.getGroupingSets().size();
@@ -123,7 +136,9 @@ public final class GroupByUtils {
       List<IntermediateRecord> intermediateRecords =
           tableResizer.trimInSegmentResultsByGroupingSet(groupKeyGenerator, groupByResultHolders, perSetTrimSize,
               discriminatorColumnIndex);
-      groupKeyGenerator.close();
+      if (closeGroupKeyGenerator) {
+        groupKeyGenerator.close();
+      }
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
       resultsBlock = new GroupByResultsBlock(dataSchema, intermediateRecords, queryContext);
       resultsBlock.setGroupsTrimmed(true);
@@ -571,7 +586,8 @@ public final class GroupByUtils {
 
   /// Uses the standard sizing, trim and concurrency policy while allowing alternate storage for supported shapes.
   public static IndexedTable createIndexedTableForCombineOperator(GroupByResultsBlock resultsBlock,
-      QueryContext queryContext, int numThreads, ExecutorService executorService, CombineTableFactory tableFactory) {
+      QueryContext queryContext, int numThreads, ExecutorService executorService,
+      @Nullable CombineTableFactory tableFactory) {
     DataSchema dataSchema = resultsBlock.getDataSchema();
     int numGroups = resultsBlock.getNumGroups();
     int limit = queryContext.getLimit();
@@ -694,7 +710,7 @@ public final class GroupByUtils {
 
   private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService,
-      CombineTableFactory tableFactory) {
+      @Nullable CombineTableFactory tableFactory) {
     if (useDeterministicIndexedTable(queryContext)) {
       return new DeterministicConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
           Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
@@ -731,7 +747,7 @@ public final class GroupByUtils {
 
   private static IndexedTable getTrimEnabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, int initialCapacity, int numThreads,
-      ExecutorService executorService, CombineTableFactory tableFactory) {
+      ExecutorService executorService, @Nullable CombineTableFactory tableFactory) {
     assert trimThreshold != Integer.MAX_VALUE;
     if (numThreads == 1) {
       if (tableFactory != null) {

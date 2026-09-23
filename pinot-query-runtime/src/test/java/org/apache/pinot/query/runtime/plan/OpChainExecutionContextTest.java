@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.Map;
-import org.apache.pinot.core.instance.context.BrokerContext;
-import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.StageMetadata;
-import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,44 +36,35 @@ public class OpChainExecutionContextTest {
     MailboxService mailboxService = mock(MailboxService.class);
     QueryOperatorFactoryProvider brokerProvider = mock(QueryOperatorFactoryProvider.class);
     QueryOperatorFactoryProvider serverProvider = mock(QueryOperatorFactoryProvider.class);
-    Object previousBrokerProvider = BrokerContext.getInstance().getQueryOperatorFactoryProvider();
-    Object previousServerProvider = ServerContext.getInstance().getQueryOperatorFactoryProvider();
 
-    try {
-      BrokerContext.getInstance().setQueryOperatorFactoryProvider(brokerProvider);
-      ServerContext.getInstance().setQueryOperatorFactoryProvider(serverProvider);
+    when(mailboxService.getInstanceType()).thenReturn(InstanceType.BROKER);
+    assertThat(OpChainExecutionContext.getDefaultQueryOperatorFactoryProvider(
+        mailboxService, brokerProvider, serverProvider)).isSameAs(brokerProvider);
 
-      when(mailboxService.getInstanceType()).thenReturn(InstanceType.BROKER);
-      assertThat(newContext(mailboxService).getQueryOperatorFactoryProvider()).isSameAs(brokerProvider);
-
-      when(mailboxService.getInstanceType()).thenReturn(InstanceType.SERVER);
-      assertThat(newContext(mailboxService).getQueryOperatorFactoryProvider()).isSameAs(serverProvider);
-    } finally {
-      BrokerContext.getInstance().setQueryOperatorFactoryProvider(
-          previousBrokerProvider != null ? previousBrokerProvider : DefaultQueryOperatorFactoryProvider.INSTANCE);
-      ServerContext.getInstance().setQueryOperatorFactoryProvider(
-          previousServerProvider != null ? previousServerProvider : DefaultQueryOperatorFactoryProvider.INSTANCE);
-    }
+    when(mailboxService.getInstanceType()).thenReturn(InstanceType.SERVER);
+    assertThat(OpChainExecutionContext.getDefaultQueryOperatorFactoryProvider(
+        mailboxService, brokerProvider, serverProvider)).isSameAs(serverProvider);
   }
 
-  @Test
-  public void testFallsBackWhenRoleProviderHasWrongType() {
+  @DataProvider
+  public Object[][] invalidRoleProviders() {
+    return new Object[][]{
+        {InstanceType.BROKER, null},
+        {InstanceType.BROKER, new Object()},
+        {InstanceType.SERVER, null},
+        {InstanceType.SERVER, new Object()}
+    };
+  }
+
+  @Test(dataProvider = "invalidRoleProviders")
+  public void testFallsBackWhenRoleProviderIsMissingOrHasWrongType(InstanceType role, Object roleProvider) {
     MailboxService mailboxService = mock(MailboxService.class);
-    when(mailboxService.getInstanceType()).thenReturn(InstanceType.BROKER);
+    when(mailboxService.getInstanceType()).thenReturn(role);
+    QueryOperatorFactoryProvider otherRoleProvider = mock(QueryOperatorFactoryProvider.class);
 
     assertThat(OpChainExecutionContext.getDefaultQueryOperatorFactoryProvider(
-        mailboxService, new Object(), mock(QueryOperatorFactoryProvider.class)))
+        mailboxService, role == InstanceType.BROKER ? roleProvider : otherRoleProvider,
+        role == InstanceType.SERVER ? roleProvider : otherRoleProvider))
         .isSameAs(DefaultQueryOperatorFactoryProvider.INSTANCE);
-  }
-
-  private static OpChainExecutionContext newContext(MailboxService mailboxService) {
-    when(mailboxService.getHostname()).thenReturn("localhost");
-    when(mailboxService.getPort()).thenReturn(1234);
-    StageMetadata stageMetadata = mock(StageMetadata.class);
-    when(stageMetadata.getStageId()).thenReturn(1);
-    WorkerMetadata workerMetadata = mock(WorkerMetadata.class);
-    when(workerMetadata.getWorkerId()).thenReturn(2);
-    return new OpChainExecutionContext(mailboxService, 3L, "cid", Long.MAX_VALUE, Long.MAX_VALUE, "broker",
-        Map.of(), stageMetadata, workerMetadata, null, false, false);
   }
 }

@@ -344,9 +344,21 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         int mergedKeys = 0;
         for (Map.Entry<Key, Record> entry : indexedTable.getRecordEntries()) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
+          Key key = entry.getKey();
+          Record record = entry.getValue();
+          if (indexedTable instanceof AutoCloseable) {
+            // The derived table can retain this row after the source storage is closed. Copy before merging;
+            // finishing the source table here could trim groups before their BASE and FULL totals are combined.
+            Object[] values = new Object[_numColumns];
+            for (int i = 0; i < _numColumns; i++) {
+              values[i] = record.getValue(i);
+            }
+            key = new Key(Arrays.copyOf(values, _numKeyColumns));
+            record = new Record(values);
+          }
           if (derivedTable.size() < derivedCap) {
-            derivedTable.upsert(entry.getKey(), entry.getValue());
-          } else if (!derivedTable.upsertExistingIfPresent(entry.getKey(), entry.getValue())) {
+            derivedTable.upsert(key, record);
+          } else if (!derivedTable.upsertExistingIfPresent(key, record)) {
             derivedTable.markNumGroupsLimitReached();
           }
         }
