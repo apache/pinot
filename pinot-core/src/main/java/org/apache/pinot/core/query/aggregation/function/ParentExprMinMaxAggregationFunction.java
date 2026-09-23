@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
@@ -356,5 +357,31 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   @Override
   public ExprMinMaxObject extractFinalResult(@Nullable ExprMinMaxObject exprMinMaxObject) {
     return exprMinMaxObject;
+  }
+
+  /// Service registration for the ExprMin parent aggregation.
+  public static final class MinProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTPARENTAGGEXPRMIN;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ParentExprMinMaxAggregationFunction(function.getArguments(), false, nullHandlingEnabled);
+    }
+  }
+
+  /// Service registration for the ExprMax parent aggregation.
+  public static final class MaxProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTPARENTAGGEXPRMAX;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ParentExprMinMaxAggregationFunction(function.getArguments(), true, nullHandlingEnabled);
+    }
   }
 }
