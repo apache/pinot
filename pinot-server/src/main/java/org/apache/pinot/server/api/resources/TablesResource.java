@@ -104,6 +104,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -660,10 +661,11 @@ public class TablesResource {
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+      final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
+      MutableRoaringBitmap validDocIdSnapshot =
+          validDocIdsSnapshotPair.getRight() != null ? validDocIdsSnapshotPair.getRight().docIds() : null;
 
       if (validDocIdSnapshot == null) {
         String msg = String.format(
@@ -695,18 +697,15 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Include bitmap CRC, capture times, snapshot file age and observed consumer offsets; "
-          + "diagnostic only, not a consistent partition snapshot")
-      @QueryParam("includeDiagnostics") @DefaultValue("false") boolean includeDiagnostics,
       TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
-        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType, includeDiagnostics));
+        processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdsType, boolean includeDiagnostics) {
+      String validDocIdsType) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
@@ -718,21 +717,7 @@ public class TablesResource {
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
     }
-    List<SegmentDataManager> diagnosticSegments = List.of();
     try {
-      Map<Integer, List<RealtimeSegmentDataManager>> consumersByPartition = new HashMap<>();
-      if (includeDiagnostics) {
-        // Keep the observed consumers acquired until the diagnostic reads complete. No stream RPC is needed.
-        diagnosticSegments = tableDataManager.acquireAllSegments();
-        for (SegmentDataManager manager : diagnosticSegments) {
-          if (manager instanceof RealtimeSegmentDataManager consumer) {
-            LLCSegmentName name = LLCSegmentName.of(manager.getSegmentName());
-            if (name != null) {
-              consumersByPartition.computeIfAbsent(name.getPartitionGroupId(), key -> new ArrayList<>()).add(consumer);
-            }
-          }
-        }
-      }
       if (!missingSegments.isEmpty()) {
         // we need not abort here or throw exception as we can still process the segments that are available
         // During UpsertCompactionTaskGenerator, controller sends a lot of segments to server to fetch validDocIds
@@ -760,12 +745,11 @@ public class TablesResource {
           continue;
         }
 
-        ValidDocIdsMetadataDiagnostics diagnostics = includeDiagnostics
-            ? new ValidDocIdsMetadataDiagnostics(indexSegment, validDocIdsType, consumersByPartition) : null;
-        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+        final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdSnapshotPair =
             getValidDocIds(indexSegment, validDocIdsType);
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
-        MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
+        DocIdsSnapshot snapshot = validDocIdSnapshotPair.getRight();
+        MutableRoaringBitmap validDocIdsSnapshot = snapshot != null ? snapshot.docIds() : null;
         if (validDocIdsSnapshot == null) {
           if (LOGGER.isDebugEnabled()) {
             String msg = String.format(
@@ -779,8 +763,8 @@ public class TablesResource {
         }
 
         Map<String, Object> validDocIdsMetadata = new HashMap<>();
-        if (diagnostics != null) {
-          validDocIdsMetadata.put("diagnostics", diagnostics.finish(validDocIdsSnapshot));
+        if (snapshot.metadata() != null) {
+          validDocIdsMetadata.put("diagnostics", snapshot.metadata().toResponse(System.currentTimeMillis()));
         }
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdsSnapshot.getCardinality();
@@ -818,9 +802,6 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
-      for (SegmentDataManager segmentDataManager : diagnosticSegments) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
     }
   }
 
@@ -830,32 +811,34 @@ public class TablesResource {
     return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
   }
 
-  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+  private Pair<ValidDocIdsType, DocIdsSnapshot> getValidDocIds(IndexSegment indexSegment,
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT,
-          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
       case SNAPSHOT_WITH_DELETE:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
                 V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
-        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getValidDocIds().getMutableRoaringBitmap(), null));
       case IN_MEMORY_WITH_DELETE:
-        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getQueryableDocIds().getMutableRoaringBitmap(), null));
       default:
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
         return Pair.of(ValidDocIdsType.SNAPSHOT,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 

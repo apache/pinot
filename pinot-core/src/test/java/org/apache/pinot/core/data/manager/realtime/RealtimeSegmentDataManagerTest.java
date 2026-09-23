@@ -56,6 +56,8 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -75,6 +77,7 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.InOrder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -88,11 +91,13 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -232,6 +237,36 @@ public class RealtimeSegmentDataManagerTest {
   public void tearDown() {
     FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
+  }
+
+  @Test
+  public void testSnapshotTriggerContextBeforeConsumption()
+      throws Exception {
+    for (double metadataTtl : new double[]{0, 1}) {
+      try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+        PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+        UpsertContext context = mock(UpsertContext.class);
+        when(manager.getContext()).thenReturn(context);
+        when(context.getMetadataTTL()).thenReturn(metadataTtl);
+        Field managerField = RealtimeSegmentDataManager.class.getDeclaredField("_partitionUpsertMetadataManager");
+        managerField.setAccessible(true);
+        managerField.set(segmentDataManager, manager);
+        doAnswer(invocation -> {
+          assertEquals(segmentDataManager.getCurrentOffset().toString(), START_OFFSET.toString());
+          return null;
+        }).when(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+        segmentDataManager._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+        segmentDataManager.createPartitionConsumer().run();
+        InOrder order = inOrder(manager);
+        if (metadataTtl > 0) {
+          order.verify(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+          order.verify(manager).removeExpiredPrimaryKeys();
+        } else {
+          order.verify(manager).removeExpiredPrimaryKeys();
+          order.verify(manager).takeSnapshot(SEGMENT_NAME_STR, START_OFFSET.toString());
+        }
+      }
+    }
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.

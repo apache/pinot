@@ -84,6 +84,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// before a new consuming segment starts consuming.
   void takeSnapshot();
 
+  /// Takes a snapshot with the triggering consumer's startup context. Older implementations may ignore the context.
+  default void takeSnapshot(String consumingSegmentName, String startOffset) {
+    takeSnapshot();
+  }
+
   /// Remove the expired primary keys from the metadata when TTL is enabled.
   void removeExpiredPrimaryKeys();
 

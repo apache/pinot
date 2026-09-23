@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -469,7 +470,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @DataProvider
   public Object[][] diagnosticBitmapTypes() {
-    return new Object[][] {{"SNAPSHOT"}, {"SNAPSHOT_WITH_DELETE"}, {"IN_MEMORY"}, {"IN_MEMORY_WITH_DELETE"}};
+    return new Object[][] {{null}, {"SNAPSHOT"}, {"SNAPSHOT_WITH_DELETE"}, {"IN_MEMORY"}, {"IN_MEMORY_WITH_DELETE"}};
   }
 
   @Test(dataProvider = "diagnosticBitmapTypes")
@@ -477,25 +478,37 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     ImmutableSegmentImpl segment = (ImmutableSegmentImpl) _realtimeIndexSegments.get(0);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, segment);
-    long before = System.currentTimeMillis();
+    // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
+    DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
+    for (String file : List.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
+        V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME)) {
+      ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(file));
+      segment.persistDocIdsSnapshot(file, DocIdsSnapshot.capture(bitmap, trigger));
+    }
+    long beforeRequest = System.currentTimeMillis();
     String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
         .queryParam("validDocIdsType", bitmapType)
-        .queryParam("includeDiagnostics", true)
         .request().post(Entity.json(new TableSegments(List.of(segment.getSegmentName()))), String.class);
-    long after = System.currentTimeMillis();
+    long afterRequest = System.currentTimeMillis();
     JsonNode metadata = JsonUtils.stringToJsonNode(response).get(0);
-    JsonNode diagnostics = metadata.get("diagnostics");
     assertEquals(metadata.get("totalValidDocs").asInt(), 8);
-    assertEquals(metadata.get("validDocIdsType").asText(), bitmapType);
-    assertTrue(diagnostics.get("captureStartTimeMs").asLong() >= before);
-    assertTrue(diagnostics.get("captureEndTimeMs").asLong() <= after);
-    long expectedCrc = switch (bitmapType) {
-      case "SNAPSHOT" -> 4200314552L;
-      case "IN_MEMORY" -> 3650129781L;
-      default -> 569535174L;
-    };
-    assertEquals(diagnostics.get("validDocIdsCrc32").asLong(), expectedCrc);
-    assertEquals(diagnostics.has("snapshotFileAgeMs"), bitmapType.startsWith("SNAPSHOT"));
+    String expectedType = bitmapType != null ? bitmapType : "SNAPSHOT";
+    assertEquals(metadata.get("validDocIdsType").asText(), expectedType);
+    if (expectedType.startsWith("IN_MEMORY")) {
+      assertFalse(metadata.has("diagnostics"));
+      return;
+    }
+    JsonNode diagnostics = metadata.get("diagnostics");
+    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME
+        : V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME;
+    long capturedAt = segment.loadDocIdsSnapshot(file).metadata().snapshotCapturedAtMs();
+    assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
+    assertEquals(diagnostics.get("snapshotTriggerSegmentName").asText(), trigger.segmentName());
+    assertEquals(diagnostics.get("snapshotTriggerStartOffset").asText(), trigger.startOffset());
+    assertEquals(diagnostics.get("validDocIdsCrc32").asLong(),
+        expectedType.equals("SNAPSHOT") ? 4200314552L : 569535174L);
   }
 
   // Verify metadata file from segments.
