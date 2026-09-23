@@ -1095,11 +1095,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  /// Reloads a single segment. The passed in config is treated as read-only: this method pins the segment tier (and
+  /// the table data dir) on a private copy.
   @VisibleForTesting
-  public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, boolean forceDownload)
+  public void reloadSegment(String segmentName, IndexLoadingConfig tableIndexLoadingConfig,
+      SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableIndexLoadingConfig);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());

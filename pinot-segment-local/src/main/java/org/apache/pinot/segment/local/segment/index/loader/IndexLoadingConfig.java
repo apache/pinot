@@ -119,6 +119,40 @@ public class IndexLoadingConfig {
     this(null, null, null);
   }
 
+  /// Creates a copy of the given config
+  public IndexLoadingConfig(IndexLoadingConfig other) {
+    _instanceDataManagerConfig = other._instanceDataManagerConfig;
+    _tableConfig = other._tableConfig;
+    _schema = other._schema;
+
+    _readMode = other._readMode;
+    _segmentVersion = other._segmentVersion;
+    _segmentTier = other._segmentTier;
+    _knownColumns = other._knownColumns != null ? new HashSet<>(other._knownColumns) : null;
+    _tableDataDir = other._tableDataDir;
+    _errorOnColumnBuildFailure = other._errorOnColumnBuildFailure;
+    _forwardIndexOnly = other._forwardIndexOnly;
+
+    _instanceId = other._instanceId;
+    _isRealtimeOffHeapAllocation = other._isRealtimeOffHeapAllocation;
+    _isDirectRealtimeOffHeapAllocation = other._isDirectRealtimeOffHeapAllocation;
+    _realtimeAvgMultiValueCount = other._realtimeAvgMultiValueCount;
+    _segmentStoreURI = other._segmentStoreURI;
+    _segmentDirectoryLoader = other._segmentDirectoryLoader;
+    _instanceTierConfigs = other._instanceTierConfigs;
+
+    _sortedColumns = other._sortedColumns;
+    _columnMinMaxValueGeneratorMode = other._columnMinMaxValueGeneratorMode;
+    _enableDynamicStarTreeCreation = other._enableDynamicStarTreeCreation;
+    _starTreeIndexConfigs = other._starTreeIndexConfigs;
+    _enableDefaultStarTree = other._enableDefaultStarTree;
+    _indexConfigsByColName = other._indexConfigsByColName != null ? new HashMap<>(other._indexConfigsByColName) : null;
+    _skipSegmentPreprocess = other._skipSegmentPreprocess;
+    _multiColTextIndexConfig = other._multiColTextIndexConfig;
+
+    _dirty = other._dirty;
+  }
+
   @Nullable
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
     return _instanceDataManagerConfig;
