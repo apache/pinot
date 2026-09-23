@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.query.service.dispatch.streaming;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -56,14 +60,18 @@ public class StreamingQuerySession {
   private final long _requestId;
   private final int _expectedOpChains;
   private final CountDownLatch _completionLatch;
+  private final boolean _trackExpectedWorkers;
+  private final Map<Integer, Set<Integer>> _expectedWorkerIdsByStage;
   /// Guards [#_stageAccumulator], [#_respondedByStage], [#_mergeFailedByStage],
-  /// [#_openStreams], and [#_peerErrorObserved]. Lock hold time is proportional to the merge work (a few
-  /// map operations), not to proto decode; see [#recordOpChainComplete] for why decode is done outside.
+  /// [#_successfulWorkerIdsByStage], [#_openStreams], [#_barrierFailure], and [#_peerErrorObserved].
+  /// Lock hold time is proportional to the merge work (a few map operations), not to proto decode; see
+  /// [#recordOpChainComplete] for why decode is done outside.
   ///
   /// If lock contention becomes a bottleneck at high QPS, a virtual-thread actor (one VT per query draining from
   /// an `ArrayBlockingQueue`, with gRPC I/O threads simply enqueuing) would eliminate the lock entirely and
   /// avoid any contention between concurrent inbound callbacks.
   private final ReentrantLock _lock = new ReentrantLock();
+  private final Condition _barrierChanged = _lock.newCondition();
 
   /// Per-stage merged accumulator. Mutated under [#_lock].
   private final Map<Integer, StageStatsTreeNode> _stageAccumulator = new HashMap<>();
@@ -71,6 +79,10 @@ public class StreamingQuerySession {
   private final Map<Integer, Integer> _respondedByStage = new HashMap<>();
   /// Per-stage count of opchains that responded but the broker couldn't merge their payload.
   private final Map<Integer, Integer> _mergeFailedByStage = new HashMap<>();
+  /// Materialized outputs reported by successful producer opchains. Mutated under [#_lock].
+  private final List<Worker.MaterializedPartitionHandle> _materializedOutputs = new ArrayList<>();
+  /// Unique workers that have successfully completed each stage. Mutated under [#_lock].
+  private final Map<Integer, Set<Integer>> _successfulWorkerIdsByStage = new HashMap<>();
   /// Stages whose accumulator hit a shape mismatch. A mismatch means the workers of this stage disagree on the tree
   /// shape (typically version skew), so no merged result for the stage can be trusted: the partially-merged tree is
   /// dropped, and every subsequent report for the stage is counted as `mergeFailed` rather than being allowed
@@ -84,6 +96,9 @@ public class StreamingQuerySession {
   /// True after the first peer error (success=false OpChainComplete or stream onError). Used to trigger fan-out
   /// cancel idempotently.
   private boolean _peerErrorObserved = false;
+  /// First execution or transport failure observed by an exact stage/stream barrier.
+  @Nullable
+  private IllegalStateException _barrierFailure;
 
   /// Set once [#snapshotCoverage()] has been taken (the broker has stopped waiting for stats). After this, late
   /// [#recordOpChainComplete] reports are ignored: the broker is about to flatten/serialize the snapshot on its
@@ -92,9 +107,26 @@ public class StreamingQuerySession {
   private boolean _finalized = false;
 
   public StreamingQuerySession(long requestId, int expectedOpChains) {
+    this(requestId, expectedOpChains, null);
+  }
+
+  public StreamingQuerySession(long requestId, int expectedOpChains,
+      Map<Integer, Set<Integer>> expectedWorkerIdsByStage) {
     _requestId = requestId;
     _expectedOpChains = expectedOpChains;
     _completionLatch = new CountDownLatch(expectedOpChains);
+    _trackExpectedWorkers = expectedWorkerIdsByStage != null;
+    _expectedWorkerIdsByStage =
+        expectedWorkerIdsByStage == null ? Map.of() : copyExpectedWorkerIds(expectedWorkerIdsByStage);
+  }
+
+  private static Map<Integer, Set<Integer>> copyExpectedWorkerIds(
+      Map<Integer, Set<Integer>> expectedWorkerIdsByStage) {
+    Map<Integer, Set<Integer>> copy = new HashMap<>(expectedWorkerIdsByStage.size());
+    for (Map.Entry<Integer, Set<Integer>> entry : expectedWorkerIdsByStage.entrySet()) {
+      copy.put(Objects.requireNonNull(entry.getKey()), Set.copyOf(Objects.requireNonNull(entry.getValue())));
+    }
+    return Collections.unmodifiableMap(copy);
   }
 
   public long getRequestId() {
@@ -111,6 +143,7 @@ public class StreamingQuerySession {
     _lock.lock();
     try {
       _openStreams.add(stream);
+      _barrierChanged.signalAll();
     } finally {
       _lock.unlock();
     }
@@ -122,6 +155,7 @@ public class StreamingQuerySession {
     _lock.lock();
     try {
       _openStreams.remove(stream);
+      _barrierChanged.signalAll();
     } finally {
       _lock.unlock();
     }
@@ -160,11 +194,22 @@ public class StreamingQuerySession {
         // awaitCompletion, so there is nothing left to count down.
         return;
       }
-      if (!isSuccess) {
-        if (!_peerErrorObserved) {
-          _peerErrorObserved = true;
-          shouldFanOutCancel = true;
+      int workerId = message.getWorkerId();
+      if (_trackExpectedWorkers) {
+        Set<Integer> expectedWorkerIds = _expectedWorkerIdsByStage.get(stageId);
+        if (expectedWorkerIds == null || !expectedWorkerIds.contains(workerId)) {
+          shouldFanOutCancel = recordBarrierFailureLocked("Unexpected OpChainComplete stage=" + stageId
+              + " worker=" + workerId + " on request " + _requestId);
+        } else if (isSuccess) {
+          _successfulWorkerIdsByStage.computeIfAbsent(stageId, ignored -> new HashSet<>()).add(workerId);
+          _barrierChanged.signalAll();
         }
+      }
+      if (!isSuccess) {
+        shouldFanOutCancel |= recordBarrierFailureLocked("OpChainComplete reported failure for stage=" + stageId
+            + " worker=" + workerId + " on request " + _requestId + ": " + message.getErrorMsg());
+      } else {
+        _materializedOutputs.addAll(message.getMaterializedOutputList());
       }
       if (decodeError != null) {
         LOGGER.warn("Decode failed for opchain stage={} worker={} on request {}: {}",
@@ -196,6 +241,18 @@ public class StreamingQuerySession {
     if (shouldFanOutCancel) {
       fanOutCancel();
     }
+  }
+
+  private boolean recordBarrierFailureLocked(String message) {
+    if (_barrierFailure == null) {
+      _barrierFailure = new IllegalStateException(message);
+    }
+    _barrierChanged.signalAll();
+    if (!_peerErrorObserved) {
+      _peerErrorObserved = true;
+      return true;
+    }
+    return false;
   }
 
   /// Merges `incoming` into the accumulator for `stageId`. Returns `true` if it was stored or merged
@@ -257,6 +314,10 @@ public class StreamingQuerySession {
     _lock.lock();
     try {
       _openStreams.remove(stream);
+      if (_barrierFailure == null) {
+        _barrierFailure = new IllegalStateException("Stream failed on request " + _requestId, error);
+      }
+      _barrierChanged.signalAll();
       if (!_peerErrorObserved) {
         _peerErrorObserved = true;
         shouldFanOutCancel = true;
@@ -311,6 +372,82 @@ public class StreamingQuerySession {
   public boolean awaitCompletion(long timeout, TimeUnit unit)
       throws InterruptedException {
     return _completionLatch.await(timeout, unit);
+  }
+
+  /// Waits until every expected worker for all requested stages reports successful execution.
+  public void awaitSuccessfulStages(Set<Integer> stageIds, long timeout, TimeUnit unit)
+      throws InterruptedException {
+    long remainingNanos = unit.toNanos(timeout);
+    _lock.lockInterruptibly();
+    try {
+      for (int stageId : stageIds) {
+        if (!_expectedWorkerIdsByStage.containsKey(stageId)) {
+          throw new IllegalStateException("No expected workers registered for stage=" + stageId
+              + " on request " + _requestId);
+        }
+      }
+      while (true) {
+        throwIfBarrierFailedLocked();
+        if (areStagesSuccessfulLocked(stageIds)) {
+          return;
+        }
+        if (remainingNanos <= 0) {
+          throw new IllegalStateException("Timed out waiting for stages " + stageIds
+              + " on request " + _requestId);
+        }
+        remainingNanos = _barrierChanged.awaitNanos(remainingNanos);
+      }
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  private boolean areStagesSuccessfulLocked(Set<Integer> stageIds) {
+    for (int stageId : stageIds) {
+      Set<Integer> successfulWorkerIds = _successfulWorkerIdsByStage.get(stageId);
+      if (successfulWorkerIds == null
+          || !successfulWorkerIds.containsAll(_expectedWorkerIdsByStage.get(stageId))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Waits until every registered server stream has closed.
+  public void awaitStreamsClosed(long timeout, TimeUnit unit)
+      throws InterruptedException {
+    long remainingNanos = unit.toNanos(timeout);
+    _lock.lockInterruptibly();
+    try {
+      while (true) {
+        throwIfBarrierFailedLocked();
+        if (_openStreams.isEmpty()) {
+          return;
+        }
+        if (remainingNanos <= 0) {
+          throw new IllegalStateException("Timed out waiting for server streams to close on request " + _requestId);
+        }
+        remainingNanos = _barrierChanged.awaitNanos(remainingNanos);
+      }
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  private void throwIfBarrierFailedLocked() {
+    if (_barrierFailure != null) {
+      throw _barrierFailure;
+    }
+  }
+
+  /// Returns an immutable snapshot of materialized output descriptors received so far.
+  public List<Worker.MaterializedPartitionHandle> getMaterializedOutputs() {
+    _lock.lock();
+    try {
+      return List.copyOf(_materializedOutputs);
+    } finally {
+      _lock.unlock();
+    }
   }
 
   /// Returns a snapshot of the per-stage coverage. Stage ids that received any responses (successful or
