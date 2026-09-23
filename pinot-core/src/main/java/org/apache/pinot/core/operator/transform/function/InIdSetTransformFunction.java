@@ -57,6 +57,9 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
         "First argument for IN_ID_SET transform function must be a single-value expression");
     Preconditions.checkArgument(arguments.get(1) instanceof LiteralTransformFunction,
         "Second argument for IN_ID_SET transform function must be a literal string of the base64 encoded IdSet");
+    // An IdSet built from a BYTES column would compare raw envelope bytes; that is the equality raw VARIANT rejects.
+    Preconditions.checkArgument(arguments.get(0).getResultMetadata().getDataType() != DataType.VARIANT,
+        "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
 
     _transformFunction = arguments.get(0);
     try {
