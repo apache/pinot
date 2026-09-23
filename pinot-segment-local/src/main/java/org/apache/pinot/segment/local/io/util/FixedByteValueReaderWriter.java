@@ -93,6 +93,15 @@ public final class FixedByteValueReaderWriter implements ValueReader {
   }
 
   @Override
+  public int readBytes(int index, int numBytesPerValue, byte[] buffer) {
+    assert buffer.length >= numBytesPerValue;
+
+    long startOffset = (long) index * numBytesPerValue;
+    _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
+    return numBytesPerValue;
+  }
+
+  @Override
   public byte[] getBytes(int index, int numBytesPerValue) {
     long startOffset = (long) index * numBytesPerValue;
     byte[] value = new byte[numBytesPerValue];

@@ -153,7 +153,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       boolean reuseExistingSegment = false;
       if (copyToDeepStore) {
         segmentMetadataTarFile = createSegmentMetadataTarFile(convertedSegmentDir, tempDataDir, segmentName);
-        long convertedSegmentCrc = Long.parseLong(new SegmentMetadataImpl(convertedSegmentDir).getCrc());
+        long convertedSegmentCrc = new SegmentMetadataImpl(convertedSegmentDir).getCrc();
         reuseExistingSegment =
             convertedSegmentCrc == Long.parseLong(originalSegmentCrc) && StringUtils.isNotEmpty(downloadURL);
       }

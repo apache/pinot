@@ -329,7 +329,8 @@ public class MinionTaskUtils {
 
   /// Returns the validDocIds bitmap for the segment, resolved across the servers hosting it. A server contributes
   /// its bitmap only when its CRC matches `expectedCrc`, or - when segment CRCs differ - when `expectedDataCrc`
-  /// matches (see [#crcMatches]). `comparisonModeStr` selects the resolution mode:
+  /// matches (see [#crcMatches]). A negative `expectedDataCrc` means the data CRC is unavailable and cannot
+  /// resolve a mismatch. `comparisonModeStr` selects the resolution mode:
   /// - `UNSAFE`: first usable bitmap; failing / mismatched / non-READY servers are skipped.
   /// - `EQUAL` (default): the bitmap every server agrees on.
   /// - `MOST_VALID_DOCS`: the bitmap with the highest valid-doc count.
@@ -339,7 +340,7 @@ public class MinionTaskUtils {
   /// for other fetch failures, CRC mismatches, non-GOOD status, or `EQUAL`-mode consensus failures.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
+      String validDocIdsType, MinionContext minionContext, long expectedCrc, long expectedDataCrc,
       String comparisonModeStr) {
     MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
@@ -380,8 +381,7 @@ public class MinionTaskUtils {
       // offheap upsert is used because we will need to delete & add all primary keys.
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
-      if (!crcMatches(parseCrc(expectedCrc), parseCrc(expectedDataCrc), parseCrc(crcFromValidDocIdsBitmap),
-          serverDataCrc)) {
+      if (!crcMatches(expectedCrc, expectedDataCrc, parseCrc(crcFromValidDocIdsBitmap), serverDataCrc)) {
         if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
           continue;

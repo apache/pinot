@@ -555,7 +555,7 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentDataManager.getCrc());
+        segmentCrcForTable.put(segmentDataManager.getSegmentName(), Long.toString(segmentDataManager.getCrc()));
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
@@ -676,7 +676,7 @@ public class TablesResource {
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
+      return new ValidDocIdsBitmapResponse(segmentName, Long.toString(indexSegment.getSegmentMetadata().getCrc()),
           toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc()), finalValidDocIdsType, validDocIdsBytes,
           _serverInstance.getInstanceDataManager().getInstanceId(), status);
     } finally {
@@ -773,7 +773,7 @@ public class TablesResource {
         validDocIdsMetadata.put("totalDocs", totalDocs);
         validDocIdsMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
-        validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        validDocIdsMetadata.put("segmentCrc", Long.toString(indexSegment.getSegmentMetadata().getCrc()));
         String reportableDataCrc = toReportableDataCrc(indexSegment.getSegmentMetadata().getDataCrc());
         if (reportableDataCrc != null) {
           validDocIdsMetadata.put("segmentDataCrc", reportableDataCrc);
@@ -807,8 +807,8 @@ public class TablesResource {
 
   /// The segment's data CRC to report, or null when unavailable (negative).
   @Nullable
-  private static String toReportableDataCrc(String dataCrc) {
-    return dataCrc != null && Long.parseLong(dataCrc) >= 0 ? dataCrc : null;
+  private static String toReportableDataCrc(long dataCrc) {
+    return dataCrc >= 0 ? Long.toString(dataCrc) : null;
   }
 
   private Pair<ValidDocIdsType, DocIdsSnapshot> getValidDocIds(IndexSegment indexSegment,
@@ -981,8 +981,8 @@ public class TablesResource {
       String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
       return new TableLLCSegmentUploadResponse(
           segmentName,
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()),
-          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getDataCrc()),
+          segmentDataManager.getSegment().getSegmentMetadata().getCrc(),
+          segmentDataManager.getSegment().getSegmentMetadata().getDataCrc(),
           downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
@@ -1210,7 +1210,7 @@ public class TablesResource {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
-              } else if (!segmentDataManager.getCrc().equals(String.valueOf(zkMetadata.getCrc()))) {
+              } else if (segmentDataManager.getCrc() != zkMetadata.getCrc()) {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but has CRC mismatch. "
                         + "zk_metadata_crc=%s, segment_data_manager_crc=%s",

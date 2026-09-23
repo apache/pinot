@@ -1175,7 +1175,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
             TierConfigUtils.normalizeTierName(segmentTier));
         SegmentDirectory segmentDirectory =
-            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+            initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
         // We should first try to reuse existing segment directory
         if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
           _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
@@ -1587,7 +1587,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
     SegmentDirectory segmentDirectory =
-        tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+        tryInitSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
     /*
@@ -1630,8 +1630,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
         ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
-        segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
-            indexLoadingConfig, zkMetadata);
+        segmentDirectory = initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
@@ -1646,7 +1645,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
@@ -1984,7 +1983,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new StaleSegment(segmentName, false, null);
   }
 
-  protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory initSegmentDirectory(String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
@@ -2009,13 +2008,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
   public static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
-    if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
+    if (zkMetadata.getCrc() == localMetadata.getCrc()) {
       return true;
     }
     return zkMetadata.isUseDataCrc()
         && zkMetadata.getDataCrc() >= 0
-        && Long.parseLong(localMetadata.getDataCrc()) >= 0
-        && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
+        && localMetadata.getDataCrc() >= 0
+        && zkMetadata.getDataCrc() == localMetadata.getDataCrc();
   }
 
   protected static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {

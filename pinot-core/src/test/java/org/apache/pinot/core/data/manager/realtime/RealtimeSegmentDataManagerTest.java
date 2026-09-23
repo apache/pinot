@@ -933,7 +933,7 @@ public class RealtimeSegmentDataManagerTest {
       driver.init(generatorConfig, recordReader);
       driver.build();
     }
-    return Long.parseLong(new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc());
+    return new SegmentMetadataImpl(new File(resourceDir, segmentName)).getCrc();
   }
 
   @Test

@@ -572,7 +572,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-      assertEquals(segmentMetadata.getCrc(), params[1]);
+      assertEquals(Long.toString(segmentMetadata.getCrc()), params[1]);
 
       assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
       assertEquals(segmentMetadata.getTotalDocs(), rows.size());
