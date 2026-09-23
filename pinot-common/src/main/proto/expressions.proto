@@ -95,12 +95,18 @@ message BytesArray {
   repeated bytes values = 1;
 }
 
+message AggregationFunctionBinding {
+  repeated ColumnDataType argumentTypes = 1;
+  ColumnDataType resultType = 2;
+}
+
 message FunctionCall {
   ColumnDataType dataType = 1;
   string functionName = 2;
   repeated Expression functionOperands = 3;
   bool isDistinct = 4;
   bool ignoreNulls = 5;
+  AggregationFunctionBinding aggregationBinding = 6;
 }
 
 message Expression {

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -349,6 +350,25 @@ public enum AggregationFunctionType {
   @Nullable
   public SqlKind getSqlKind() {
     return _sqlKind;
+  }
+
+  /// Whether this overload requires schema-derived operand and result types before execution. A call that requires
+  /// binding derives its logical result type from the registered return type inference. Aggregates opt in by
+  /// overriding this method.
+  public boolean isTypeBindingRequired(int argumentCount) {
+    return false;
+  }
+
+  /// Distinguishes inferred overloads from legacy overloads with explicit string type arguments. The callback is
+  /// queried only for operands relevant to overload selection, so legacy calls need no schema-based resolution.
+  public boolean isTypeBindingRequired(int argumentCount, IntPredicate isStringLiteral) {
+    return isTypeBindingRequired(argumentCount);
+  }
+
+  /// Whether existing calls can keep their original unbound execution when a native input lacks schema metadata.
+  /// This does not permit fallback for invalid expressions, unsupported input types, or new inferred overloads.
+  public boolean supportsLegacyUnboundCalls() {
+    return false;
   }
 
   public static boolean isAggregationFunction(String functionName) {
