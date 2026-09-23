@@ -66,24 +66,19 @@ public class SinglePartitionColumnSegmentPrunerTest {
   private static final String TABLE = "testTable_OFFLINE";
 
   @Test
-  public void testLiveThresholdThroughFactory() throws Exception {
-    AtomicInteger threshold = new AtomicInteger(3);
+  public void testThresholdThroughFactory() throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE).build();
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(
         new SegmentPartitionConfig(Map.of(COLUMN, new ColumnPartitionConfig("PrunerCounting", 8))));
     tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null));
-    SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, threshold::get).get(0);
+    SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, 2).get(0);
     pruner.init(null, null, List.of("first", "second"),
         List.of(metadata("first", "PrunerCounting", 8, Set.of(1), null),
             metadata("second", "PrunerCounting", 8, Set.of(2), null)));
     BrokerRequest request = request(predicate("EQUALS", "1"));
-    for (int minSegments : new int[]{3, 2, 0, 3}) {
-      threshold.set(minSegments);
-      CountingPartitionFunction.CALLS.set(0);
-      assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
-      assertEquals(CountingPartitionFunction.CALLS.get(), minSegments > 2 ? 2 : 1);
-    }
-    threshold.set(0);
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 1);
     request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE, "false"));
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
