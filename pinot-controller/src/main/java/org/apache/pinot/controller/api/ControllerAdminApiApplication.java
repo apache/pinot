@@ -30,8 +30,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.audit.AuditLogFilter;
@@ -41,6 +43,7 @@ import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -60,7 +63,6 @@ import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.media.multipart.MultiPartProperties;
 import org.glassfish.jersey.server.ManagedAsyncExecutor;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.glassfish.jersey.spi.ExecutorServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +97,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
     register(new MultiPartTempDirResolver());
+    register(new MultiPartTempDirGuard());
     register(SwaggerApiListingResource.class);
     register(SwaggerSerializers.class);
     register(new CorsFilter());
@@ -250,9 +253,6 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   /// client disconnect, a malformed `Content-Disposition` — therefore leaves its spilled parts behind, and for
   /// segment uploads those are the size of the segment. Directing them at the controller's temp tree means the
   /// startup clean in [ControllerFilePathProvider] reclaims them rather than leaving them on the host forever.
-  ///
-  /// Resolved lazily: the admin application is constructed before [ControllerFilePathProvider] is initialized, but
-  /// Jersey does not build the multipart reader until the first multipart request arrives.
   @VisibleForTesting
   static class MultiPartTempDirResolver implements ContextResolver<MultiPartProperties> {
     @Override
@@ -261,10 +261,33 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       try {
         return properties.tempDir(ControllerFilePathProvider.getInstance().getMultiPartTempDir().getAbsolutePath());
       } catch (Exception e) {
-        // Fall back to the JVM default rather than failing the request; Jersey itself also falls back if the
-        // configured directory turns out to be unusable.
-        LOGGER.warn("Failed to resolve the multipart temporary directory, using the JVM default", e);
+        // Falling back is still better than failing every upload, but it is not a per-request fallback: this runs
+        // once at startup, so the controller is stuck with java.io.tmpdir until it restarts.
+        LOGGER.error("Failed to resolve the multipart temporary directory. Multipart uploads will spill into the JVM "
+            + "default temporary directory for the lifetime of this controller, where orphaned parts are never "
+            + "reclaimed", e);
         return properties;
+      }
+    }
+  }
+
+  /// Re-creates the multipart temporary directory if it has gone missing since [MultiPartTempDirResolver] resolved it.
+  /// Only multipart requests pay for this, and only the cost of a `stat` when the directory is present.
+  @Provider
+  @VisibleForTesting
+  static class MultiPartTempDirGuard implements ContainerRequestFilter {
+    @Override
+    public void filter(ContainerRequestContext requestContext) {
+      MediaType mediaType = requestContext.getMediaType();
+      if (mediaType == null || !mediaType.getType().equalsIgnoreCase("multipart")) {
+        return;
+      }
+      try {
+        ControllerFilePathProvider.getInstance().getMultiPartTempDir();
+      } catch (Exception e) {
+        // Leave the request alone: if the directory really is unusable the parse fails with its own error, and this
+        // guard must not be the thing that rejects an otherwise valid upload.
+        LOGGER.warn("Failed to ensure the multipart temporary directory exists", e);
       }
     }
   }
