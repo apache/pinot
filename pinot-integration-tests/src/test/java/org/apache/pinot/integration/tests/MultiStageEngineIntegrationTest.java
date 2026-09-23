@@ -325,7 +325,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             .build();
     try {
       // What an operator does once every server has been upgraded.
-      _helixManager.getConfigAccessor().set(scope, CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, "true");
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "true");
       TestUtils.waitForCondition(aVoid -> dispatcher.isProtoSegmentList(), 10_000L,
           "Enabling the proto segment list encoding in cluster config did not reach the broker");
 
@@ -337,7 +338,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             "The segment list encoding changed the result of: " + query);
       }
     } finally {
-      _helixManager.getConfigAccessor().set(scope, CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, "false");
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, "false");
       TestUtils.waitForCondition(aVoid -> !dispatcher.isProtoSegmentList(), 10_000L,
           "Disabling the proto segment list encoding in cluster config did not reach the broker");
     }

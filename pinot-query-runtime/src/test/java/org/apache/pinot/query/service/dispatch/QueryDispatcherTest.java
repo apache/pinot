@@ -92,7 +92,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   /// to reach the broker without a restart, and off again the same way.
   @Test
   public void testProtoSegmentListFollowsClusterConfig() {
-    String key = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
     QueryDispatcher dispatcher =
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
             Duration.ofSeconds(1));
@@ -121,7 +121,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   /// Clearing the cluster-config key restores the static broker config rather than the shipped default.
   @Test
   public void testClearingClusterConfigRestoresTheStaticValue() {
-    String key = CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST;
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
     QueryDispatcher dispatcher =
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
             Duration.ofSeconds(1), 0, 0, false, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, true);

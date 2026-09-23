@@ -49,7 +49,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///
 /// Decoding accepts both, so a server always understands every broker; the proto encoding is off until an operator
 /// turns it on, which they only do once every server understands it (see
-/// `CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST`).
+/// `CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST`).
 public class QueryPlanSerDeUtils {
   private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
   };

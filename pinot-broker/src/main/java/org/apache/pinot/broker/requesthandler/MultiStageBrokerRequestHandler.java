@@ -210,8 +210,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long streamStatsDrainMs = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS_DRAIN_MS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
-    boolean protoSegmentList = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST,
-        CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST);
+    boolean protoSegmentList = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
     _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,

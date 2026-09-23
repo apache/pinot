@@ -522,7 +522,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       throws Exception {
     sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(),
         JsonUtils.objectToString(
-            Map.of(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST, String.valueOf(enabled))));
+            Map.of(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, String.valueOf(enabled))));
   }
 
   @Test

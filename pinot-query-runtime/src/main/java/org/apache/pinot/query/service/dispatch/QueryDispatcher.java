@@ -136,9 +136,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final boolean _streamStatsDefault;
   /// Whether leaf-stage segment lists are shipped as native protobuf fields of the worker metadata instead of the
   /// legacy JSON custom property. Seeded from the static broker config and then followed live from cluster config on
-  /// [CommonConstants.Broker#CONFIG_OF_MSE_PROTO_SEGMENT_LIST], so an operator can turn it on once every server of the
-  /// cluster has been upgraded, and off again, without restarting the brokers. `volatile` because the cluster-config
-  /// callback and the request path race; read once per query so that all servers of one query agree.
+  /// [CommonConstants.Broker#CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST], so an operator can turn it on once every
+  /// server of the cluster has been upgraded, and off again, without restarting the brokers. `volatile` because the
+  /// cluster-config callback and the request path race; read once per query so that all servers of one query agree.
   private volatile boolean _protoSegmentList;
   /// The value of the static broker config, restored when the cluster-config key is cleared.
   private final boolean _staticProtoSegmentList;
@@ -147,7 +147,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
-        CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST);
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
@@ -157,7 +157,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout, keepAliveTimeMs,
         keepAliveTimeoutMs, keepAliveWithoutCalls, streamStatsDefault, statsDrainMs,
-        CommonConstants.Broker.DEFAULT_MSE_PROTO_SEGMENT_LIST);
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
   }
 
   /// Overload that also takes the static broker config seed for the proto segment list encoding.
@@ -727,10 +727,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   /// `false` reads as disabled, the safe direction, with a warning naming the offending value.
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST)) {
+    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST)) {
       return;
     }
-    String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST);
+    String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST);
     boolean protoSegmentList;
     if (value == null || value.isBlank()) {
       protoSegmentList = _staticProtoSegmentList;
@@ -738,7 +738,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       String trimmed = value.trim();
       if (!trimmed.equalsIgnoreCase("true") && !trimmed.equalsIgnoreCase("false")) {
         LOGGER.warn("Unrecognized boolean value '{}' for {}, reading it as false", value,
-            CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST);
+            CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST);
       }
       protoSegmentList = Boolean.parseBoolean(trimmed);
     }
@@ -746,7 +746,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       return;
     }
     _protoSegmentList = protoSegmentList;
-    LOGGER.info("Updated {} from: {} to: {}", CommonConstants.Broker.CONFIG_OF_MSE_PROTO_SEGMENT_LIST,
+    LOGGER.info("Updated {} from: {} to: {}", CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST,
         !protoSegmentList, protoSegmentList);
     if (protoSegmentList) {
       LOGGER.warn("The proto segment list encoding is now enabled. Every server this broker dispatches to, including "
