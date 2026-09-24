@@ -247,11 +247,11 @@ public class ImmutableSegmentImplTest {
     ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
     ColumnIndexContainer containerA = mock(ColumnIndexContainer.class);
     ColumnMaterializer materializer = mock(ColumnMaterializer.class);
-    AtomicInteger creations = new AtomicInteger();
+    CountDownLatch creationStarted = new CountDownLatch(1);
+    CountDownLatch allowCreation = new CountDownLatch(1);
     when(materializer.createIndexContainer(a)).thenAnswer(invocation -> {
-      creations.incrementAndGet();
-      // Widen the window in which every other caller must wait for this creation instead of starting its own
-      Thread.sleep(50);
+      creationStarted.countDown();
+      allowCreation.await();
       return containerA;
     });
     ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), schema(a), materializer, a);
@@ -269,17 +269,19 @@ public class ImmutableSegmentImplTest {
         }));
       }
       start.countDown();
+      assertTrue(creationStarted.await(5, TimeUnit.SECONDS));
+      allowCreation.countDown();
       first = futures.get(0).get();
       for (Future<DataSource> future : futures) {
         assertSame(future.get(), first);
       }
     } finally {
+      allowCreation.countDown();
       executor.shutdownNow();
     }
 
     assertNotNull(first);
     assertSame(first.getIndexContainer(), containerA);
-    assertEquals(creations.get(), 1);
     verify(materializer, times(1)).createIndexContainer(a);
   }
 

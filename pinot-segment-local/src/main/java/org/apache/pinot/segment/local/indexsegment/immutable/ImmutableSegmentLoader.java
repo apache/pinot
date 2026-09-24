@@ -283,8 +283,7 @@ public class ImmutableSegmentLoader {
   /// Lazy counterpart of the load above (see [ImmutableSegmentImpl]): no per-column container is created here. The
   /// built-in virtual columns keep their eager containers, the star-tree dimensions are materialized now because the
   /// star-tree shares their dictionaries, and every other physical column waits for its first access. The
-  /// [ColumnMaterializer] snapshots the per-column index configs before the virtual columns are added to the metadata,
-  /// so it covers exactly the physical columns.
+  /// [ColumnMaterializer] retains the resolved index configs before virtual columns are added to the metadata.
   private static ImmutableSegmentImpl loadWithLazyColumns(SegmentDirectory segmentDirectory,
       SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -296,7 +295,7 @@ public class ImmutableSegmentLoader {
       mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
       mcTextColumns = Set.copyOf(segmentMetadata.getMultiColumnTextMetadata().getColumns());
     }
-    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, columnMetadataMap.keySet(),
+    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader,
         indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.isForwardIndexOnly(), mcTextReader,
         mcTextColumns);
 
