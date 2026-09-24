@@ -121,31 +121,31 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/A*Test.java</include>
+                <include>org/apache/pinot/integration/tests/B*Test.java</include>
+                <include>org/apache/pinot/integration/tests/C*Test.java</include>
+                <include>org/apache/pinot/integration/tests/D*Test.java</include>
+                <include>org/apache/pinot/integration/tests/E*Test.java</include>
+                <include>org/apache/pinot/integration/tests/F*Test.java</include>
+                <include>org/apache/pinot/integration/tests/G*Test.java</include>
+                <include>org/apache/pinot/integration/tests/H*Test.java</include>
+                <include>org/apache/pinot/integration/tests/I*Test.java</include>
+                <include>org/apache/pinot/integration/tests/J*Test.java</include>
+                <include>org/apache/pinot/integration/tests/K*Test.java</include>
+                <include>org/apache/pinot/integration/tests/L*Test.java</include>
+                <include>org/apache/pinot/integration/tests/M*Test.java</include>
+                <include>org/apache/pinot/integration/tests/N*Test.java</include>
+                <include>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -162,7 +162,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/SharedKafkaRealtimeSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/SharedKafkaRealtimeSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -179,7 +179,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/MultiNodesOfflineSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/MultiNodesOfflineSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -196,7 +196,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/SharedHybridSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/SharedHybridSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -221,26 +221,26 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
-                <include>**/org/apache/pinot/server/realtime/**</include>
+                <include>org/apache/pinot/integration/tests/O*Test.java</include>
+                <include>org/apache/pinot/integration/tests/P*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Q*Test.java</include>
+                <include>org/apache/pinot/integration/tests/R*Test.java</include>
+                <include>org/apache/pinot/integration/tests/S*Test.java</include>
+                <include>org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>org/apache/pinot/integration/tests/U*Test.java</include>
+                <include>org/apache/pinot/integration/tests/V*Test.java</include>
+                <include>org/apache/pinot/integration/tests/W*Test.java</include>
+                <include>org/apache/pinot/integration/tests/X*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Y*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>org/apache/pinot/integration/tests/tpch/*Test.java</include>
+                <include>org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -250,6 +250,10 @@
     <!--
       The CI-only lane profiles split each integration-test set into two isolated Maven processes. Each source test
       is selected by exactly one default execution or by one focused suite execution.
+
+      Surefire include/exclude patterns are relative to the test classes directory and must NOT be prefixed with
+      "**/": under the JUnit Platform provider a leading "**/" no longer matches zero directories, so a pattern
+      like "**/org/apache/pinot/..." silently selects nothing.
     -->
     <profile>
       <id>integration-tests-set-1-lane-a</id>
@@ -267,20 +271,20 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
+                <include>org/apache/pinot/integration/tests/A*Test.java</include>
+                <include>org/apache/pinot/integration/tests/B*Test.java</include>
+                <include>org/apache/pinot/integration/tests/C*Test.java</include>
+                <include>org/apache/pinot/integration/tests/D*Test.java</include>
+                <include>org/apache/pinot/integration/tests/E*Test.java</include>
+                <include>org/apache/pinot/integration/tests/F*Test.java</include>
+                <include>org/apache/pinot/integration/tests/G*Test.java</include>
+                <include>org/apache/pinot/integration/tests/H*Test.java</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -297,7 +301,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/SharedKafkaRealtimeSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/SharedKafkaRealtimeSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -314,7 +318,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/KinesisSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/KinesisSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -339,21 +343,21 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
-                <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/I*Test.java</include>
+                <include>org/apache/pinot/integration/tests/J*Test.java</include>
+                <include>org/apache/pinot/integration/tests/K*Test.java</include>
+                <include>org/apache/pinot/integration/tests/L*Test.java</include>
+                <include>org/apache/pinot/integration/tests/M*Test.java</include>
+                <include>org/apache/pinot/integration/tests/N*Test.java</include>
+                <include>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -370,7 +374,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/MultiNodesOfflineSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/MultiNodesOfflineSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -387,7 +391,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/CustomClusterSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/CustomClusterSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -404,7 +408,7 @@
                     <exclude>none</exclude>
                   </excludes>
                   <includes combine.self="override">
-                    <include>**/suites/SharedHybridSuite.java</include>
+                    <include>org/apache/pinot/integration/tests/suites/SharedHybridSuite.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -429,16 +433,16 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
+                <include>org/apache/pinot/integration/tests/O*Test.java</include>
+                <include>org/apache/pinot/integration/tests/P*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Q*Test.java</include>
+                <include>org/apache/pinot/integration/tests/R*Test.java</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -461,22 +465,22 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
-                <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</include>
-                <include>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</include>
-                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
-                <include>**/org/apache/pinot/server/realtime/**</include>
+                <include>org/apache/pinot/integration/tests/S*Test.java</include>
+                <include>org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>org/apache/pinot/integration/tests/U*Test.java</include>
+                <include>org/apache/pinot/integration/tests/V*Test.java</include>
+                <include>org/apache/pinot/integration/tests/W*Test.java</include>
+                <include>org/apache/pinot/integration/tests/X*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Y*Test.java</include>
+                <include>org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/tpch/*Test.java</include>
+                <include>org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -499,7 +503,7 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes combine.self="override">
-                <include>**/suites/CustomClusterSuite.java</include>
+                <include>org/apache/pinot/integration/tests/suites/CustomClusterSuite.java</include>
               </includes>
             </configuration>
           </plugin>
@@ -522,7 +526,7 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes combine.self="override">
-                <include>**/suites/KinesisSuite.java</include>
+                <include>org/apache/pinot/integration/tests/suites/KinesisSuite.java</include>
               </includes>
             </configuration>
           </plugin>
