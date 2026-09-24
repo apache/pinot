@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -38,14 +37,11 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.PRE_MODULO_ABS;
   private final int _numPartitions;
   private final PartitionIdNormalizer _normalizer;
-  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public ByteArrayPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
-    _partitionFunctionIdentity =
-        PartitionFunctionIdentity.of(ByteArrayPartitionFunction.class, _numPartitions, _normalizer);
   }
 
   @Override
@@ -69,8 +65,29 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return _partitionFunctionIdentity;
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    return equals(other);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
+    if (other == null || getClass() != ByteArrayPartitionFunction.class
+        || other.getClass() != ByteArrayPartitionFunction.class) {
+      return false;
+    }
+    ByteArrayPartitionFunction that = (ByteArrayPartitionFunction) other;
+    return _numPartitions == that._numPartitions && _normalizer == that._normalizer;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _numPartitions;
+    result = 31 * result + _normalizer.hashCode();
+    return result;
   }
 
   // Keep it for backward-compatibility, use getName() instead
