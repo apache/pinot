@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests.logicaltable;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
@@ -61,7 +63,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -70,6 +71,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   private static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable";
   protected static final String DEFAULT_TABLE_NAME = "physicalTable";
   protected static final String EMPTY_OFFLINE_TABLE_NAME = "empty_o";
+  private static final String GROOVY_DISABLED_MESSAGE = "Groovy transform functions are disabled for queries";
+  private static final long CONFIG_PROPAGATION_CHECK_INTERVAL_MS = 100L;
+  private static final long CONFIG_PROPAGATION_TIMEOUT_MS = 60_000L;
   protected static BaseLogicalTableIntegrationTest _sharedClusterTestSuite = null;
   protected List<File> _avroFiles;
 
@@ -115,6 +119,14 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
       _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
       _controllerBaseApiUrl = _sharedClusterTestSuite._controllerBaseApiUrl;
+      // tearDown() purges the shared cluster through cleanup() so the next class starts from an empty cluster,
+      // and cleanup() reads Helix and the property store directly. Only the instance that ran @BeforeSuite has
+      // those handles, so without copying them here cleanup() throws a NullPointerException that replaces
+      // whatever it was about to report.
+      _helixManager = _sharedClusterTestSuite._helixManager;
+      _helixDataAccessor = _sharedClusterTestSuite._helixDataAccessor;
+      _helixAdmin = _sharedClusterTestSuite._helixAdmin;
+      _propertyStore = _sharedClusterTestSuite._propertyStore;
     }
 
     _avroFiles = getAllAvroFiles();
@@ -142,6 +154,14 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
     // create realtime table
     Map<String, List<File>> realtimeTableDataFiles = getRealtimeTableDataFiles();
+    if (!realtimeTableDataFiles.isEmpty()) {
+      // getKafkaTopic() defaults to the class simple name, so every subclass has its own topic, but the shared
+      // cluster's @BeforeSuite runs on a single instance and therefore only creates that one instance's topic.
+      // Create this class's topic explicitly - a no-op when it already exists - so that a table config pinning
+      // stream.kafka.partition.ids is validated against the expected partition count rather than against a
+      // single-partition topic auto-created by the broker on first access.
+      createKafkaTopic(getKafkaTopic(), getNumKafkaPartitions());
+    }
     for (Map.Entry<String, List<File>> entry : realtimeTableDataFiles.entrySet()) {
       String tableName = entry.getKey();
       List<File> avroFilesForTable = entry.getValue();
@@ -528,128 +548,152 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
-    QueryConfig queryConfig = new QueryConfig(null, false, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
-        + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
+        + "'arg0 + arg1', FlightNum, Origin) FROM " + getLogicalTableName();
 
-    // Query should not throw exception
-    postQuery(groovyQuery);
+    // Every step has to flip the outcome of the step before it. A wait whose condition already holds under the
+    // previous config returns immediately and proves nothing, so the config being cleared is checked from the
+    // enabled state: the cluster default disables Groovy exactly like the explicit override does.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, false, null, null, null, null),
+        () -> succeeds(groovyQuery), "Groovy query kept failing after groovy was enabled");
 
-    // Disable groovy explicitly
-    queryConfig = new QueryConfig(null, true, null, null, null, null);
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, true, null, null, null, null),
+        () -> failsWithGroovyDisabled(groovyQuery), "Groovy query kept succeeding after groovy was disabled");
 
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, false, null, null, null, null),
+        () -> succeeds(groovyQuery), "Groovy query kept failing after groovy was enabled again");
 
-    // grpc and http throw different exceptions. So only check error message.
-    Exception athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
-    assertTrue(athrows.getMessage().contains("Groovy transform functions are disabled for queries"));
+    // Removing the query config falls back to the cluster default, which disables groovy again.
+    applyQueryConfigAndAwait(logicalTableConfig, null, () -> failsWithGroovyDisabled(groovyQuery),
+        "Groovy query kept succeeding after the query config was removed");
+  }
 
-    // Remove query config
-    logicalTableConfig.setQueryConfig(null);
-    updateLogicalTableConfig(logicalTableConfig);
-
-    athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
-    assertTrue(athrows.getMessage().contains("Groovy transform functions are disabled for queries"));
+  /// Returns whether `query` fails because groovy is disabled, rather than succeeding or failing for another reason.
+  ///
+  /// Returns instead of asserting so that [#applyQueryConfigAndAwait] can retry: an assertion failure is an
+  /// `AssertionError`, which the wait helper does not treat as a not-yet-satisfied condition.
+  private boolean failsWithGroovyDisabled(String query) {
+    try {
+      postQuery(query);
+      return false;
+    } catch (Exception e) {
+      // grpc and http throw different exceptions, so only check the error message.
+      String message = e.getMessage();
+      return message != null && message.contains(GROOVY_DISABLED_MESSAGE);
+    }
   }
 
   @Test
   public void testMaxQueryResponseSizeTableConfig()
       throws Exception {
-    String starQuery = "SELECT * from mytable";
-
-    QueryConfig queryConfig = new QueryConfig(null, null, null, null, 100L, null);
+    String starQuery = "SELECT * from " + getLogicalTableName();
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
 
-    JsonNode response = postQuery(starQuery);
-    JsonNode exceptions = response.get("exceptions");
-    assertTrue(!exceptions.isEmpty()
-        && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 100L, null),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled under a 100 byte response size limit");
 
-    // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(null, null, null, null, 1000000L, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    // Query succeeds with a high limit.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 1000000L, null),
+        () -> succeeds(starQuery), "Query kept failing under a high response size limit");
 
-    //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    // Restore the restrictive limit so that clearing it below is observable: waiting for success straight after
+    // the high limit would be satisfied by the high limit itself.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 100L, null),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled after the 100 byte response size limit was restored");
+
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
+        () -> succeeds(starQuery), "Query kept failing after the response size limit was cleared");
   }
 
   @Test
   public void testMaxServerResponseSizeTableConfig()
       throws Exception {
-    String starQuery = "SELECT * from mytable";
-
-    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L);
+    String starQuery = "SELECT * from " + getLogicalTableName();
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    JsonNode response = postQuery(starQuery);
-    JsonNode exceptions = response.get("exceptions");
-    assertTrue(!exceptions.isEmpty()
-        && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
 
-    // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(null, null, null, null, null, 1000000L);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000L),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled under a 1000 byte server response size limit");
 
-    //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    // Query succeeds with a high limit.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000000L),
+        () -> succeeds(starQuery), "Query kept failing under a high server response size limit");
+
+    // Restore the restrictive limit so that clearing it below is observable.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000L),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled after the 1000 byte server response size limit was restored");
+
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
+        () -> succeeds(starQuery), "Query kept failing after the server response size limit was cleared");
   }
 
   @Test
   public void testQueryTimeOut()
       throws Exception {
-    String starQuery = "SELECT * from mytable";
-    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
+    String starQuery = "SELECT * from " + getLogicalTableName();
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    JsonNode response = postQuery(starQuery);
-    JsonNode exceptions = response.get("exceptions");
-    assertTrue(
-        !exceptions.isEmpty() && (exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.BROKER_TIMEOUT.getId()
-            // Timeout may occur just before submitting the request. Then this error code is thrown.
-            || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
 
-    // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    // A 1 ms budget can expire at any stage, and each stage reports its own code: before the request is
+    // submitted (SERVER_NOT_RESPONDING), while it waits to be scheduled (QUERY_SCHEDULING_TIMEOUT), while a
+    // server runs it (EXECUTION_TIMEOUT) or while the broker waits for servers (BROKER_TIMEOUT). Which one wins
+    // depends on how much work the table shape implies, so accept any of them.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(1L, null, null, null, null, null),
+        () -> failsWith(starQuery, QueryErrorCode.BROKER_TIMEOUT, QueryErrorCode.SERVER_NOT_RESPONDING,
+            QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, QueryErrorCode.EXECUTION_TIMEOUT),
+        "Query did not time out under a 1 ms timeout");
 
-    //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    // Query succeeds with a high timeout.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(1000000L, null, null, null, null, null),
+        () -> succeeds(starQuery), "Query kept failing under a high timeout");
+
+    // Restore the 1 ms timeout so that clearing the override below is observable.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(1L, null, null, null, null, null),
+        () -> failsWith(starQuery, QueryErrorCode.BROKER_TIMEOUT, QueryErrorCode.SERVER_NOT_RESPONDING,
+            QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, QueryErrorCode.EXECUTION_TIMEOUT),
+        "Query did not time out after the 1 ms timeout was restored");
+
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
+        () -> succeeds(starQuery), "Query kept failing after the timeout override was cleared");
+  }
+
+  /// Applies `queryConfig` to `logicalTableConfig` and waits until the brokers act on it.
+  ///
+  /// Updating a logical table config through the controller is asynchronous: brokers observe the change through
+  /// a ZooKeeper property store listener, so a query issued right after the REST call can still be planned with
+  /// the previous config. Waiting for the new behavior keeps these assertions from racing that propagation.
+  private void applyQueryConfigAndAwait(LogicalTableConfig logicalTableConfig, @Nullable QueryConfig queryConfig,
+      TestUtils.SupplierWithException<Boolean> brokerAppliedConfig, String message)
+      throws Exception {
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    TestUtils.waitForCondition(brokerAppliedConfig, CONFIG_PROPAGATION_CHECK_INTERVAL_MS,
+        CONFIG_PROPAGATION_TIMEOUT_MS, message, Duration.ofMillis(CONFIG_PROPAGATION_TIMEOUT_MS / 4));
+  }
+
+  /// Returns whether `query` completes without any exception.
+  private boolean succeeds(String query)
+      throws Exception {
+    return postQuery(query).get("exceptions").isEmpty();
+  }
+
+  /// Returns whether `query` reports an exception whose error code is one of `expectedErrorCodes`.
+  private boolean failsWith(String query, QueryErrorCode... expectedErrorCodes)
+      throws Exception {
+    JsonNode exceptions = postQuery(query).get("exceptions");
+    if (exceptions.isEmpty()) {
+      return false;
+    }
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    for (QueryErrorCode expectedErrorCode : expectedErrorCodes) {
+      if (errorCode == expectedErrorCode.getId()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -662,7 +706,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     // Query should return empty result
     JsonNode queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
     assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
-    assertEquals(queryResponse.get("numServersQueried").asInt(), useMultiStageQueryEngine ? 1 : 0);
+    // Neither engine dispatches to servers for an empty table: the multi-stage broker short-circuits when all leaf
+    // stages are empty (#18538).
+    assertEquals(queryResponse.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers");
     assertTrue(queryResponse.get("exceptions").isEmpty());
   }
 
