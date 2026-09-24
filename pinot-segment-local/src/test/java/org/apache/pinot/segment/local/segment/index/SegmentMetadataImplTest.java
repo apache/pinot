@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -421,30 +420,22 @@ public class SegmentMetadataImplTest {
   @Test
   public void testColumnMetadataMapDerivedLazily()
       throws Exception {
-    long materializations = SegmentMetadataImpl.getNumColumnMetadataMapMaterializations();
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     assertFalse(metadata.isColumnMetadataMapMaterialized());
 
     List<String> columns = new ArrayList<>(metadata.getAllColumns());
-    assertEquals(metadata.getNumColumns(), columns.size());
     assertEquals(metadata.getAllColumnMetadata().size(), columns.size());
     for (String column : columns) {
       assertNotNull(metadata.getColumnMetadataFor(column), column);
     }
-    Map<String, ColumnMetadata> visited = new LinkedHashMap<>();
-    metadata.forEachColumn(visited::put);
-    assertEquals(new ArrayList<>(visited.keySet()), columns);
     metadata.toJson(null);
     assertFalse(metadata.isColumnMetadataMapMaterialized(), "reading the columns must not build the map");
-    assertEquals(SegmentMetadataImpl.getNumColumnMetadataMapMaterializations(), materializations);
 
     TreeMap<String, ColumnMetadata> map = metadata.getColumnMetadataMap();
     assertTrue(metadata.isColumnMetadataMapMaterialized());
-    assertEquals(SegmentMetadataImpl.getNumColumnMetadataMapMaterializations(), materializations + 1);
-    assertEquals(map, visited);
     assertEquals(new ArrayList<>(map.keySet()), columns);
+    assertEquals(new ArrayList<>(map.values()), new ArrayList<>(metadata.getAllColumnMetadata()));
     assertSame(metadata.getColumnMetadataMap(), map);
-    assertEquals(SegmentMetadataImpl.getNumColumnMetadataMapMaterializations(), materializations + 1);
     assertNull(metadata.getColumnMetadataFor("noSuchColumn"));
   }
 
@@ -472,7 +463,7 @@ public class SegmentMetadataImplTest {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     assertNotNull(metadata.getColumnMetadataMap());
     assertNotNull(metadata.getSchema());
-    int numColumns = metadata.getNumColumns();
+    int numColumns = metadata.getAllColumns().size();
 
     String column = "$aVirtualColumn";
     ColumnMetadata added =
@@ -480,7 +471,7 @@ public class SegmentMetadataImplTest {
     metadata.addColumnMetadata(column, added);
     assertFalse(metadata.isColumnMetadataMapMaterialized());
     assertFalse(metadata.isSchemaMaterialized());
-    assertEquals(metadata.getNumColumns(), numColumns + 1);
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
     assertSame(metadata.getColumnMetadataFor(column), added);
     assertEquals(new ArrayList<>(metadata.getAllColumns()), new ArrayList<>(metadata.getColumnMetadataMap().keySet()));
     assertEquals(metadata.getAllColumns().first(), column, "must be inserted in natural order, not appended");
@@ -490,7 +481,7 @@ public class SegmentMetadataImplTest {
     ColumnMetadata replacement =
         new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.LONG, true), null, null);
     metadata.addColumnMetadata(column, replacement);
-    assertEquals(metadata.getNumColumns(), numColumns + 1);
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
     assertSame(metadata.getColumnMetadataFor(column), replacement);
   }
 
@@ -501,7 +492,7 @@ public class SegmentMetadataImplTest {
   public void testColumnMetadataViewIsASnapshot()
       throws Exception {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
-    int numColumns = metadata.getNumColumns();
+    int numColumns = metadata.getAllColumns().size();
     Collection<ColumnMetadata> snapshot = metadata.getAllColumnMetadata();
     String column = metadata.getAllColumns().first();
     ColumnMetadata original = metadata.getColumnMetadataFor(column);
@@ -515,9 +506,10 @@ public class SegmentMetadataImplTest {
     assertSame(new ArrayList<>(snapshot).get(0), original, "a replacement must not reach the earlier snapshot");
     assertNotSame(metadata.getColumnMetadataFor(column), original);
 
-    assertEquals(metadata.getNumColumns(), numColumns + 1);
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
     assertEquals(metadata.getAllColumnMetadata().size(), numColumns + 1);
-    metadata.forEachColumn((name, columnMetadata) -> assertEquals(columnMetadata.getColumnName(), name));
+    assertEquals(metadata.getAllColumnMetadata().stream().map(ColumnMetadata::getColumnName).toList(),
+        new ArrayList<>(metadata.getAllColumns()));
   }
 
   /// A CONSUMING segment holds no column metadata: its column names come from the explicit schema, the column
@@ -531,11 +523,10 @@ public class SegmentMetadataImplTest {
     SegmentMetadataImpl metadata =
         new SegmentMetadataImpl("testTable", "testTable__0__0__20240101T0000Z", schema, 123L);
     assertEquals(metadata.getAllColumns(), schema.getColumnNames());
-    assertEquals(metadata.getNumColumns(), schema.size());
+    assertEquals(metadata.getAllColumns().size(), schema.size());
     assertTrue(metadata.getAllColumnMetadata().isEmpty());
     assertNull(metadata.getColumnMetadataMap());
     assertNull(metadata.getColumnMetadataFor("dim"));
-    metadata.forEachColumn((column, columnMetadata) -> fail("no column metadata to visit, got: " + column));
 
     ColumnMetadata added =
         new EmptyColumnMetadata(new DimensionFieldSpec("added", FieldSpec.DataType.INT, true), null, null);

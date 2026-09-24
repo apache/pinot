@@ -45,8 +45,6 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -94,8 +92,8 @@ import org.slf4j.LoggerFactory;
 /// [#addColumnMetadata(String, ColumnMetadata)] replace both arrays at once and drop both derived views. The
 /// explicit-schema constructor keeps the caller's Schema as is and holds no column metadata at all, so those two
 /// mutators reject such a metadata rather than drop the schema it was given: a CONSUMING segment answers
-/// [#getAllColumns()] and [#getNumColumns()] from that schema and reports no column metadata at all
-/// ([#getColumnMetadataFor(String)] `null`, [#getAllColumnMetadata()] empty, [#forEachColumn(BiConsumer)] a no-op,
+/// [#getAllColumns()] from that schema and reports no column metadata at all
+/// ([#getColumnMetadataFor(String)] `null`, [#getAllColumnMetadata()] empty,
 /// [#getColumnMetadataMap()] `null`).
 ///
 /// Thread-safe: the two arrays are published together in one immutable holder, so no reader can see the names of
@@ -104,8 +102,6 @@ import org.slf4j.LoggerFactory;
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
-  /// Number of derived column metadata maps built so far, JVM-wide, for the same reason.
-  private static final AtomicLong NUM_COLUMN_METADATA_MAP_MATERIALIZATIONS = new AtomicLong();
   private final File _indexDir;
   /// The columns of a metadata-backed segment, or `null` for a CONSUMING segment, which is constructed with an
   /// explicit schema and holds no column metadata. Replaced as a whole (never written in place) by
@@ -478,12 +474,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return columns != null ? new SortedStringArraySet(columns._names) : getSchema().getColumnNames();
   }
 
-  @Override
-  public int getNumColumns() {
-    Columns columns = _columns;
-    return columns != null ? columns._names.length : getSchema().size();
-  }
-
   /// An unmodifiable view of the column metadata array, in the natural column-name order of [#getAllColumns()], and
   /// empty for a CONSUMING segment, which holds no column metadata (see the class documentation). Like
   /// [#getAllColumns()] it is a snapshot.
@@ -491,20 +481,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public Collection<ColumnMetadata> getAllColumnMetadata() {
     Columns columns = _columns;
     return columns != null ? Collections.unmodifiableList(Arrays.asList(columns._metadata)) : List.of();
-  }
-
-  /// Visits every column and its metadata in natural column-name order, and visits nothing for a CONSUMING segment,
-  /// which holds no column metadata (see the class documentation). The pair comes from one snapshot of the columns,
-  /// so a concurrent change cannot pair a name with another column's metadata.
-  @Override
-  public void forEachColumn(BiConsumer<String, ColumnMetadata> action) {
-    Columns columns = _columns;
-    if (columns == null) {
-      return;
-    }
-    for (int i = 0; i < columns._names.length; i++) {
-      action.accept(columns._names[i], columns._metadata[i]);
-    }
   }
 
   @Nullable
@@ -638,9 +614,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private TreeMap<String, ColumnMetadata> buildColumnMetadataMap() {
-    NUM_COLUMN_METADATA_MAP_MATERIALIZATIONS.incrementAndGet();
     TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
-    forEachColumn(columnMetadataMap::put);
+    Columns columns = Preconditions.checkNotNull(_columns);
+    for (int i = 0; i < columns._names.length; i++) {
+      columnMetadataMap.put(columns._names[i], columns._metadata[i]);
+    }
     return columnMetadataMap;
   }
 
@@ -648,13 +626,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @VisibleForTesting
   public boolean isColumnMetadataMapMaterialized() {
     return _columnMetadataMapView != null;
-  }
-
-  /// Number of column metadata maps derived from the column arrays so far in this JVM. A load or query path that
-  /// leaves this unchanged did not build any segment's map.
-  @VisibleForTesting
-  public static long getNumColumnMetadataMapMaterializations() {
-    return NUM_COLUMN_METADATA_MAP_MATERIALIZATIONS.get();
   }
 
   /// {@inheritDoc}
@@ -764,13 +735,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
 
-    if (_columns != null) {
+    Columns columns = _columns;
+    if (columns != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      forEachColumn((column, columnMetadata) -> {
-        if (columnFilter == null || columnFilter.contains(column)) {
-          columnsMetadata.add(JsonUtils.objectToJsonNode(columnMetadata));
+      for (int i = 0; i < columns._names.length; i++) {
+        if (columnFilter == null || columnFilter.contains(columns._names[i])) {
+          columnsMetadata.add(JsonUtils.objectToJsonNode(columns._metadata[i]));
         }
-      });
+      }
       segmentMetadata.set("columns", columnsMetadata);
     }
 
