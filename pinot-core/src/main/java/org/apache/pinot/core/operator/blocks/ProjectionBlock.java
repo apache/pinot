@@ -139,9 +139,10 @@ public class ProjectionBlock implements ValueBlock {
       return BytesUtils.toHexString(bytes);
     }
     if (value instanceof Map<?, ?> map) {
+      // Keys re-typed, values left raw: renderDocument renders each one as it walks them.
       Map<String, Object> nested = new LinkedHashMap<>(map.size());
       for (Map.Entry<?, ?> entry : map.entrySet()) {
-        nested.put(String.valueOf(entry.getKey()), renderValue(entry.getValue()));
+        nested.put(String.valueOf(entry.getKey()), entry.getValue());
       }
       return renderDocument(nested);
     }
