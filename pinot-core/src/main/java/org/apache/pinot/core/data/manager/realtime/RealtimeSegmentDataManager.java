@@ -1554,6 +1554,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   void postStopConsumedMsgForInitializationError() {
+    if (_realtimeTableDataManager != null && _realtimeTableDataManager.isShutDown()) {
+      // The table was shut down (deleted, or the server is stopping) after initialization failed. Its Helix state no
+      // longer matters, and a recreated table with the same name may already own this segment name, so asking the
+      // controller to mark the segment OFFLINE could deregister the new table's consuming replica instead.
+      _segmentLogger.info("Skip segmentStoppedConsuming for segment: {}, table data manager is already shut down",
+          _segmentNameStr);
+      return;
+    }
     if (hasDifferentSegmentDataManagerRegistered()) {
       _segmentLogger.info(
           "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",

@@ -135,8 +135,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
-  // One party belongs to shutdown. Immutable additions register under the admission monitor and finish without
-  // holding it, allowing metadata updates, lifecycle hooks and replacement cleanup to complete before shutdown drains.
+  /// Admission barrier for immutable segment additions. One party belongs to shutdown. Additions register under the
+  /// segment map monitor and finish without holding it, so metadata updates, lifecycle hooks and replacement cleanup
+  /// complete before shutdown stops the partition managers and drains the map.
   private final Phaser _immutableSegmentAdds = new Phaser(1);
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
   protected TableUpsertMetadataManager _tableUpsertMetadataManager;

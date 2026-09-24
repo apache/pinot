@@ -174,6 +174,32 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testInitializationErrorStopMsgSkippedAfterTableShutdown()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      // Shutdown drained the old table's segment map, so nothing is registered under this segment name even though a
+      // recreated same-name table may already be consuming it.
+      when(tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR)).thenReturn(null);
+      when(tableDataManager.isShutDown()).thenReturn(true);
+
+      segmentDataManager.postStopConsumedMsgForInitializationError();
+
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testDestroyBeforeConsumptionStarts()
+      throws Exception {
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    // Never started: stop() must tolerate the missing consumer thread, and destroy() must still close the consumer.
+    segmentDataManager.stop();
+    segmentDataManager.destroy();
+    Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
+  }
+
+  @Test
   public void testPostStopConsumedMsgDoesNotCheckRegisteredSegmentManager()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {

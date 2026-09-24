@@ -483,7 +483,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
     } else if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
-      ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      // Table shutdown can drain and release the consuming segment while this thread catches it up or builds it.
+      // Hold a reference for the transition so the mutable segment is destroyed by the last release rather than
+      // underneath the build; shutdown still offloads it without waiting for the transition to finish.
+      Preconditions.checkState(segmentDataManager.increaseReferenceCount(),
+          "Table data manager is already shut down, cannot change segment: %s from CONSUMING to ONLINE in table: %s",
+          segmentName, _tableNameWithType);
+      try {
+        ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      } finally {
+        releaseSegment(segmentDataManager);
+      }
     } else if (zkMetadata.getStatus().isCompleted()) {
       // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
       // call completes.
@@ -532,8 +542,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return partitionIds;
   }
 
-  // Preserve the SEGMENT_COUNT gauge paired with BaseTableDataManager.closeSegment's decrement.
-  @SuppressWarnings("deprecation")
   private void doAddConsumingSegment(String segmentName)
       throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
@@ -622,7 +630,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
         }
         realtimeSegmentDataManager.startConsumption();
-        _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
+        incrementSegmentCountGauge();
         _logger.info("Added new CONSUMING segment: {}", segmentName);
         return;
       }
@@ -632,6 +640,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     throw new IllegalStateException(
         "Table data manager is already shut down, cannot add CONSUMING segment: " + segmentName + " to table: "
             + _tableNameWithType);
+  }
+
+  /// Counts a published CONSUMING segment through the same deprecated `AbstractMetrics.addValueToTableGauge` API that
+  /// `BaseTableDataManager.closeSegment` uses for the matching decrement, so the SEGMENT_COUNT gauge stays balanced
+  /// until both sides migrate together.
+  @SuppressWarnings("deprecation")
+  private void incrementSegmentCountGauge() {
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
   }
 
   /// Invoked while adding a CONSUMING segment, after the initial admission and partition-manager preload, immediately

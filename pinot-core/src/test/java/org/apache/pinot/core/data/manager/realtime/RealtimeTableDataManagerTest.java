@@ -334,6 +334,67 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
+  @Test
+  public void testShutdownDoesNotDestroyConsumingSegmentDuringOnlineTransition()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("online-transition-shutdown").toFile();
+    RealtimeSegmentDataManager segment = mock(RealtimeSegmentDataManager.class);
+    // Real reference counting on the mock: shutdown's release must not be the last one while the transition runs.
+    FieldUtils.writeField(segment, "_referenceCount", 1, true);
+    doCallRealMethod().when(segment).increaseReferenceCount();
+    doCallRealMethod().when(segment).decreaseReferenceCount();
+    doCallRealMethod().when(segment).getReferenceCount();
+    MutableSegment mutableSegment = mock(MutableSegment.class);
+    when(mutableSegment.getSegmentMetadata()).thenReturn(mock(SegmentMetadata.class));
+    when(segment.getSegment()).thenReturn(mutableSegment);
+    LifecycleTableDataManager table = spy(new LifecycleTableDataManager(indexDir, segment, false, () -> { }));
+    CountDownLatch transitionStarted = new CountDownLatch(1);
+    CountDownLatch finishTransition = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      transitionStarted.countDown();
+      await(finishTransition);
+      return null;
+    }).when(segment).goOnlineFromConsuming(any());
+    table.addConsumingSegment(LifecycleTableDataManager.SEGMENT_NAME);
+    assertEquals(table.getNumSegments(), 1);
+    assertEquals(segment.getReferenceCount(), 1);
+    SegmentZKMetadata committedMetadata = new SegmentZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    committedMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    doReturn(committedMetadata).when(table).fetchZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    FutureTask<Void> transition = new FutureTask<>(() -> {
+      table.addOnlineSegment(LifecycleTableDataManager.SEGMENT_NAME);
+      return null;
+    });
+    Thread transitionThread = new Thread(transition, "consuming-to-online");
+    FutureTask<Void> shutdown = new FutureTask<>(() -> {
+      table.shutDown();
+      return null;
+    });
+    Thread shutdownThread = new Thread(shutdown, "table-shutdown");
+    try {
+      transitionThread.start();
+      await(transitionStarted, transition);
+      assertEquals(segment.getReferenceCount(), 2, "Transition holds its own reference");
+      shutdownThread.start();
+      // Shutdown offloads and releases the segment without waiting for the transition, and must not destroy it.
+      shutdown.get(10, TimeUnit.SECONDS);
+      verify(segment).offload();
+      verify(segment, never()).destroy();
+      assertEquals(table.getNumSegments(), 0);
+      assertEquals(segment.getReferenceCount(), 1, "Shutdown released the map's reference only");
+      finishTransition.countDown();
+      transition.get(10, TimeUnit.SECONDS);
+      verify(segment).destroy();
+      assertEquals(segment.getReferenceCount(), 0);
+    } finally {
+      finishTransition.countDown();
+      transitionThread.join(10000);
+      shutdownThread.join(10000);
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
   @DataProvider
   public Object[][] upsertConsistencyModes() {
     return new Object[][]{{ConsistencyMode.NONE}, {ConsistencyMode.SYNC}, {ConsistencyMode.SNAPSHOT}};

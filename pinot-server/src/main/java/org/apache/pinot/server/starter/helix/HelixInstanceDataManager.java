@@ -89,15 +89,20 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
-  // Serialize table creation with the previous owner's entire shutdown, including table-scoped resource cleanup.
-  // Acquire it before changing the manager map, and release it before calling the table's segment-add methods.
+  /// Serializes table creation with the previous owner's entire shutdown, including table-scoped resource cleanup
+  /// such as the segment build time lease extender. Acquire it before changing [#_tableDataManagerMap], and release
+  /// it before calling the table's segment-add methods. Values are weak so idle tables do not accumulate locks; a
+  /// lock stays strongly reachable from its holder for as long as it is held.
   private final LoadingCache<String, Lock> _tableLifecycleLocks =
       CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(() -> new ReentrantLock()));
 
   // Logical table metadata cache to cache logical table configs, schemas, and offline/realtime table configs.
   private final LogicalTableMetadataCache _logicalTableMetadataCache = new LogicalTableMetadataCache();
 
-  // TODO: Consider making segment locks per table instead of per instance
+  /// Intentionally shared across all table data managers, including successive incarnations of the same table name:
+  /// a deleted table's stale segment operation and a recreated same-name table's operation on a colliding segment
+  /// name must serialize on one lock. The shutdown re-checks in `BaseTableDataManager.moveSegment` and
+  /// `RealtimeTableDataManager.doAddConsumingSegment` rely on this, so do not make these locks per table.
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
@@ -347,6 +352,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     getOrCreateTableDataManager(realtimeTableName).addConsumingSegment(segmentName);
   }
 
+  /// Returns the table data manager, creating and starting it under the table's lifecycle lock when absent. The
+  /// lock-free fast path can return a manager that a concurrent [#deleteTable] is shutting down; that manager's
+  /// segment-add methods reject the operation once shutdown has closed admission. The slow path waits for such a
+  /// shutdown to finish before creating the replacement.
   private TableDataManager getOrCreateTableDataManager(String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
@@ -361,6 +370,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  /// Creates and starts a table data manager; callers must hold the table's lifecycle lock. A recently deleted table
+  /// is recreated only from a table config created after its newest recorded deletion, and the deletion record is
+  /// cleared only after the manager has started, so a failed creation keeps rejecting stale configs.
   @VisibleForTesting
   TableDataManager createTableDataManager(String tableNameWithType) {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
