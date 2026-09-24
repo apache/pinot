@@ -600,7 +600,9 @@ public class ForwardIndexHandlerTest {
       _writer = writer;
 
       // TEST1: Validate with zero changes. ForwardIndexHandler should be a No-Op.
+      assertFalse(segmentDirectory.getSegmentMetadata().isSchemaMaterialized());
       assertTrue(computeOperations().isEmpty());
+      assertFalse(segmentDirectory.getSegmentMetadata().isSchemaMaterialized());
     }
   }
 
