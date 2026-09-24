@@ -42,6 +42,11 @@ public interface MessageBatch<T> {
   StreamMessage<T> getStreamMessage(int index);
 
   /// Returns the start offset of the next batch.
+  ///
+  /// Implementations must return the requested start offset unchanged when the partition had nothing to hand back,
+  /// and may only return a larger offset when the stream itself has moved past offsets this batch will never deliver
+  /// (for example Kafka transaction control records under `read_committed`). The consume loop advances the segment's
+  /// current offset to this value even for an empty batch, so returning a speculative larger offset skips data.
   StreamPartitionMsgOffset getOffsetOfNextBatch();
 
   /// Returns the offset of the first message (including tombstone) in the batch.

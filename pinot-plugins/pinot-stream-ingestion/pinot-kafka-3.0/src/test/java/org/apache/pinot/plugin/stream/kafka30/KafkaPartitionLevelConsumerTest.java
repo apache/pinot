@@ -66,6 +66,7 @@ import org.testng.annotations.Test;
 import static org.apache.kafka.clients.consumer.ConsumerRecord.NULL_CHECKSUM;
 import static org.apache.kafka.common.record.LegacyRecord.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -589,6 +590,44 @@ public class KafkaPartitionLevelConsumerTest {
         new FakeKafkaPartitionLevelConsumer("clientId-test", getStreamConfig("test-topic"), 0);
     KafkaMessageBatch kafkaMessageBatch = kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
     Assert.assertEquals(kafkaMessageBatch.getSizeInBytes(), 14);
+  }
+
+  @Test
+  public void testReadCommittedEmptyPollSnapsOffsetOfNextBatchToPosition() {
+    TopicPartition topicPartition = new TopicPartition("test-topic", 0);
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    ConsumerRecords<Bytes, Bytes> emptyRecords =
+        new ConsumerRecords<>(Map.of(topicPartition, List.of()));
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(emptyRecords);
+    when(mockConsumer.position(eq(topicPartition), any(Duration.class))).thenReturn(12L);
+
+    class FakeKafkaPartitionLevelConsumer extends KafkaPartitionLevelConsumer {
+      FakeKafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
+        super(clientId, streamConfig, partition);
+      }
+
+      @Override
+      protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
+        return mockConsumer;
+      }
+    }
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", "test-topic");
+    streamConfigMap.put("stream.kafka.broker.list", _kafkaBrokerAddress);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put("stream.kafka.isolation.level",
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
+    StreamConfig streamConfig = new StreamConfig("tableName_REALTIME", streamConfigMap);
+
+    FakeKafkaPartitionLevelConsumer consumer =
+        new FakeKafkaPartitionLevelConsumer("clientId-empty-rc", streamConfig, 0);
+    MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(10L), 10000);
+    assertEquals(messageBatch.getMessageCount(), 0);
+    assertEquals(messageBatch.getUnfilteredMessageCount(), 0);
+    assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "12");
   }
 
   @Test
