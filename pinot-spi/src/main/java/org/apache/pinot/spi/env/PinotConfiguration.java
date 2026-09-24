@@ -32,6 +32,7 @@ import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
@@ -337,12 +338,35 @@ public class PinotConfiguration {
   /// Retrieves a list of String values with the given property name. See [PinotConfiguration] for supported key
   /// naming conventions.
   ///
+  /// A value set with [#setProperty(String, Object)] is not split on commas. For a list config that can be set this
+  /// way, such as a cluster config, use [#getCommaSeparatedList(String, List)].
+  ///
   /// @param name of the property to retrieve a list of values. Property name will be sanitized.
   /// @return the property String value. Fallback to the provided default values if no property is found.
   public List<String> getProperty(String name, List<String> defaultValues) {
     return Optional.of(
             Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
         .filter(list -> !list.isEmpty()).orElse(defaultValues);
+  }
+
+  /// Retrieves a list of String values with the given property name, and splits each value on commas. Each value is
+  /// trimmed, and empty values are dropped. See [PinotConfiguration] for supported key naming conventions.
+  ///
+  /// Use this instead of [#getProperty(String, List)] for a list config that can be set with
+  /// [#setProperty(String, Object)], such as a cluster config. Values from a [Map] or a config file are split on
+  /// commas when they are loaded, but a value set with [#setProperty(String, Object)] is kept as one value. Do not
+  /// use this for values that can contain commas.
+  ///
+  /// @param name of the property to retrieve a list of values. Property name will be sanitized.
+  /// @param defaultValues to return if the property is missing or has no values.
+  /// @return an unmodifiable list of the values, or `defaultValues` if there are none.
+  public List<String> getCommaSeparatedList(String name, List<String> defaultValues) {
+    List<String> values = Arrays.stream(_configuration.getStringArray(relaxPropertyName(name)))
+        .flatMap(value -> Arrays.stream(StringUtils.split(value, ',')))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .collect(Collectors.toUnmodifiableList());
+    return values.isEmpty() ? defaultValues : values;
   }
 
   /// Retrieves a long value with the given property name. See [PinotConfiguration] for supported key naming
