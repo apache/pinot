@@ -91,7 +91,8 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
-    if (!checkMinMaxRange(dataSourceMetadata, cachedValue.getComparableValue())) {
+    if (!checkMinMaxRange(dataSourceMetadata.getMinValue(), dataSourceMetadata.getMaxValue(),
+        cachedValue.getComparableValue())) {
       return true;
     }
     // Check column partition
@@ -120,8 +121,10 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
     for (ValueCache.CachedValue value : cachedValues) {
-      if (checkMinMaxRange(dataSourceMetadata, value.getComparableValue())) {
+      if (checkMinMaxRange(minValue, maxValue, value.getComparableValue())) {
         return false;
       }
     }
@@ -198,14 +201,12 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   /// Returns `true` if the value is within the column's min/max value range, `false` otherwise.
-  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
-    Comparable minValue = dataSourceMetadata.getMinValue();
+  private static boolean checkMinMaxRange(Comparable minValue, Comparable maxValue, Comparable value) {
     if (minValue != null) {
       if (value.compareTo(minValue) < 0) {
         return false;
       }
     }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
     if (maxValue != null) {
       if (value.compareTo(maxValue) > 0) {
         return false;
