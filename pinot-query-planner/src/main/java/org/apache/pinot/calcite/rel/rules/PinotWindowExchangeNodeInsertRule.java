@@ -141,10 +141,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
-        // Sort each sender explicitly and merge the sorted mailbox streams at the receiver. Hashing on the partition
-        // keys sends every row of a partition to the same receiver, so the merged stream orders each partition.
+        // Keep the receiver full-sort path for a partitioned exchange. Sorting before the hash exchange compares rows
+        // routed to different receivers and blocks streaming; the explicit Sort retained above the exchange establishes
+        // the required ordering after partitioning.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, true, true, prePartitioned);
+            windowGroup.orderKeys, false, false, prePartitioned);
       }
     }
     // WindowAggregateOperator requires its input ordered on the ORDER BY keys and does no ordering of its own, so

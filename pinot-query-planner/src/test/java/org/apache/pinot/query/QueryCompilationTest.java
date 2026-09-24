@@ -1286,11 +1286,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
   }
 
-  /// Sender-sorted exchanges must express their ordering as an operator in the sending fragment. The send node's
-  /// flag is only metadata for the matching receive, so it is not enough without a SortNode using the same collation.
+  /// A global ordered window keeps the sender-sort/receiver-merge path. Sender-sorted exchanges must express their
+  /// ordering as an operator in the sending fragment: the send node's flag alone is only metadata.
   @Test
-  public void testOrderedWindowSenderHasExplicitMatchingSortInput() {
-    String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
+  public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
+    String query = "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
     MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
 
     assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
@@ -1303,6 +1303,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(sortNode.getFetch(), Integer.MAX_VALUE);
     assertEquals(sortNode.getOffset(), -1);
     assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
+  }
+
+  /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
+  @Test
+  public void testPartitionedOrderedWindowUsesReceiverFullSort() {
+    String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+
+    assertFalse(sendNode.isSort(), "The partitioned exchange must not advertise a globally sorted sender stream");
+    assertFalse(sendNode.hasExplicitSortInput(), "The partitioned exchange must not sort before hash distribution");
+    assertFalse(sendNode.getInputs().get(0) instanceof SortNode,
+        "The explicit full sort belongs in the receiving fragment after hash distribution");
   }
 
   /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
