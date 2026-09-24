@@ -163,10 +163,11 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   /// Merges the sorted senders, emitting at most [SortOperator#DEFAULT_MAX_ROWS_PER_BLOCK] rows per call.
   private MseBlock mergeNextBlock() {
-    List<Object[]> rows = new ArrayList<>(SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK);
+    ArrayList<Object[]> rows = new ArrayList<>(0);
     while (rows.size() < SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK) {
       if (!_starvedCursors.isEmpty()) {
         MseBlock.Eos error;
+        boolean receivedMoreRows = false;
         if (rows.isEmpty()) {
           error = readOneBlock();
         } else {
@@ -178,6 +179,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
             break;
           }
           error = processReadBlock(block);
+          receivedMoreRows = block != null && block.isData() && ((MseBlock.Data) block).getNumRows() > 0;
         }
         if (error != null) {
           return terminate(error);
@@ -187,10 +189,27 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
           _rows.addAll(rows);
           return sortAllRows();
         }
+        if (receivedMoreRows) {
+          // A refill proves this is not a one-block result. Restore the established full-block capacity once so
+          // fragmented input cannot trigger repeated growth while this output block is assembled.
+          rows.ensureCapacity(SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK);
+        }
         continue;
       }
       if (_readyCursors.isEmpty()) {
         break;
+      }
+      if (rows.isEmpty()) {
+        // Keep empty and tiny results cheap without sacrificing the one-allocation path for full output blocks.
+        // Sum all currently buffered rows once; later output blocks retain the established full-block capacity.
+        int initialCapacity = _mergeOutputStarted ? SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK
+            : _readyCursors.getCappedAvailableRowCount(SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK);
+        // ArrayList grows by 1.5x. Round near-full first blocks up now so a small refill cannot allocate an oversized
+        // replacement in addition to the nearly full initial array.
+        if (initialCapacity + (initialCapacity >> 1) >= SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK) {
+          initialCapacity = SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK;
+        }
+        rows.ensureCapacity(initialCapacity);
       }
       if (_tryEqualHeadMerge && _readyCursors.size() > 1) {
         int remaining = SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK - rows.size();
@@ -446,6 +465,21 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return _rows.get(_index++);
     }
 
+    int getCappedAvailableRowCount(int limit) {
+      int rowCount = _rows.size() - _index;
+      if (rowCount >= limit) {
+        return limit;
+      }
+      for (List<Object[]> pendingRows : _pending) {
+        int remaining = limit - rowCount;
+        if (pendingRows.size() >= remaining) {
+          return limit;
+        }
+        rowCount += pendingRows.size();
+      }
+      return rowCount;
+    }
+
     void drainTo(List<Object[]> rows) {
       if (_index < _rows.size()) {
         rows.addAll(_rows.subList(_index, _rows.size()));
@@ -513,6 +547,19 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
     int size() {
       return _size;
+    }
+
+    int getCappedAvailableRowCount(int limit) {
+      int rowCount = 0;
+      for (int i = 0; i < _size; i++) {
+        int remaining = limit - rowCount;
+        int availableRowCount = _heap[i].getCappedAvailableRowCount(remaining);
+        if (availableRowCount >= remaining) {
+          return limit;
+        }
+        rowCount += availableRowCount;
+      }
+      return rowCount;
     }
 
     void ensureOrdered() {
