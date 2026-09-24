@@ -156,13 +156,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _materializationLock = null;
     _columnNames = segmentMetadata.getAllColumns();
     _physicalColumnNames = new PhysicalColumnNames(segmentMetadata);
-    _dataSources = new Object2ObjectOpenHashMap<>(segmentMetadata.getNumColumns());
+    _dataSources = new Object2ObjectOpenHashMap<>(_columnNames.size());
 
     Map<String, Map<String, DataSource>> openStructDenseChildren = new HashMap<>();
     Map<String, DataSource> openStructSparseChildren = new HashMap<>();
     Set<String> openStructParents = new HashSet<>();
 
-    segmentMetadata.forEachColumn((colName, columnMetadata) -> {
+    for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
+      String colName = columnMetadata.getColumnName();
       if (columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild()) {
         String parent = ((ColumnMetadataImpl) columnMetadata).getParentColumn();
         openStructParents.add(parent);
@@ -173,7 +174,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           openStructDenseChildren.computeIfAbsent(parent, k -> new HashMap<>())
               .put(OpenStructNaming.parseKey(colName), childDs);
         }
-        return;
+        continue;
       }
 
       if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
@@ -181,7 +182,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       } else {
         _dataSources.put(colName, new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName)));
       }
-    });
+    }
 
     for (String parent : openStructParents) {
       // The parent's spec comes from its column metadata, not from the segment schema (see _columnNames): calling
@@ -247,11 +248,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Nullable
   private static Map<String, List<String>> groupOpenStructChildren(SegmentMetadataImpl segmentMetadata) {
     Map<String, List<String>> children = new HashMap<>();
-    segmentMetadata.forEachColumn((column, columnMetadata) -> {
+    for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
       if (columnMetadata instanceof ColumnMetadataImpl impl && impl.isMaterializedChild()) {
-        children.computeIfAbsent(impl.getParentColumn(), k -> new ArrayList<>()).add(column);
+        children.computeIfAbsent(impl.getParentColumn(), k -> new ArrayList<>()).add(columnMetadata.getColumnName());
       }
-    });
+    }
     children.keySet().removeIf(parent -> {
       ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataFor(parent);
       return parentMetadata == null || !(parentMetadata.getFieldSpec() instanceof ComplexFieldSpec);

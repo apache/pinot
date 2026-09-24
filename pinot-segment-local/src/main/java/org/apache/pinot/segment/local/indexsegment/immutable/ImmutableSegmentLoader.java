@@ -247,7 +247,7 @@ public class ImmutableSegmentLoader {
     }
 
     Map<String, ColumnIndexContainer> indexContainerMap =
-        new Object2ObjectOpenHashMap<>(segmentMetadata.getNumColumns());
+        new Object2ObjectOpenHashMap<>(segmentMetadata.getAllColumns().size());
     for (String column : segmentMetadata.getAllColumns()) {
       // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(column,

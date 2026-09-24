@@ -28,6 +28,7 @@ import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -88,15 +89,15 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
     if (segmentMetadata != null) {
       // Get partition info from all partitioned columns in the segment metadata
-      segmentMetadata.forEachColumn((columnName, columnMetadata) -> {
+      for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions != null) {
           // Add all partition IDs for this column
           for (Integer partitionId : partitions) {
-            partitionInfo.add(columnName + "_" + partitionId);
+            partitionInfo.add(columnMetadata.getColumnName() + "_" + partitionId);
           }
         }
-      });
+      }
     }
 
     // Ensure we always have at least one entry for multi-value columns

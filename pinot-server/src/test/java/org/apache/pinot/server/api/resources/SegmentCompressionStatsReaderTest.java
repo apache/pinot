@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.ws.rs.WebApplicationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
@@ -122,7 +123,7 @@ public class SegmentCompressionStatsReaderTest {
   @Test
   public void testServerRejectsOversizedColumnContributionResponse() {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getNumColumns()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(List.of("value")));
     ImmutableSegment segment = mock(ImmutableSegment.class);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 
