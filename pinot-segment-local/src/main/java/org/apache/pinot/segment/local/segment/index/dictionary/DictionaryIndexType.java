@@ -71,6 +71,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -561,15 +562,16 @@ public class DictionaryIndexType
 
   /// Creates a MutableDictionary.
   ///
-  /// Unlikes most indexes, while dictionaries are important when
+  /// Unlike most indexes, while dictionaries are important when
   /// [`mutable segments`]\[org.apache.pinot.segment.spi.MutableSegment\] are created, they do not follow the
   /// [org.apache.pinot.segment.spi.index.mutable.MutableIndex] interface and therefore
   /// [DictionaryIndexType#createMutableIndex(MutableIndexContext, org.apache.pinot.spi.config.table.IndexConfig)]
-  /// is not implemented.
-  ///
-  /// This also means that dictionaries cannot be overridden in realtime tables.
+  /// is not implemented. Mutable segments create their dictionaries through this method on the dictionary index type
+  /// registered in [IndexService] instead, so a plugin that overrides the dictionary index type can override
+  /// [#createMutableDictionary(DataType, boolean, PinotDataBufferMemoryManager, int, int, String)] to substitute its
+  /// own implementation for some of the stored types.
   @Nullable
-  public static MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
+  public MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
     if (config.isDisabled()) {
       return null;
     }
@@ -589,8 +591,16 @@ public class DictionaryIndexType
     int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.21);
     String dictionaryAllocationContext =
         IndexUtil.buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-    return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
-        dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
+    return createMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(), dictionaryColumnSize,
+        Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
+  }
+
+  /// Creates the mutable dictionary for the given stored type and sizing hints. Override to substitute a different
+  /// implementation for some of the stored types, and delegate to `super` for the rest.
+  protected MutableDictionary createMutableDictionary(DataType storedType, boolean offHeap,
+      PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
+    return MutableDictionaryFactory.getMutableDictionary(storedType, offHeap, memoryManager, avgLength, cardinality,
+        allocationContext);
   }
 
   public BuildLifecycle getIndexBuildLifecycle() {
