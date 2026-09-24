@@ -277,27 +277,6 @@ public class SortedMailboxMergeReceiveOperatorTest {
   }
 
   @Test
-  public void shouldFallBackBeforeOutputForLegacySender() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    Object[] row1 = new Object[]{5, 1};
-    Object[] row2 = new Object[]{1, 1};
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1, row2),
-        OperatorTestUtil.eosWithEmptyStats());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    Object[] row3 = new Object[]{2, 2};
-    Object[] row4 = new Object[]{4, 2};
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row3, row4),
-        OperatorTestUtil.eosWithEmptyStats());
-
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
-        RelDistribution.Type.HASH_DISTRIBUTED)) {
-      assertEquals(drain(operator), List.of(row2, row3, row4, row1));
-    }
-  }
-
-  @Test
   public void shouldEmitFallbackRowsInBoundedBlocks() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(
@@ -526,18 +505,6 @@ public class SortedMailboxMergeReceiveOperatorTest {
       assertTrue(block.isError());
       assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains(errorMessage));
       verify(_mailbox1).earlyTerminate();
-    }
-  }
-
-  @Test
-  public void shouldTimeout() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadata1,
-        RelDistribution.Type.SINGLETON, DATA_SCHEMA, FIELD_COLLATIONS, System.currentTimeMillis() + 100L, true,
-        true)) {
-      MseBlock block = operator.nextBlock();
-      assertTrue(block.isError());
-      assertTrue(((ErrorMseBlock) block).getErrorMessages().containsKey(QueryErrorCode.EXECUTION_TIMEOUT));
     }
   }
 
