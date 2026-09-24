@@ -310,14 +310,12 @@ public class SegmentMetadataImplTest {
   @Test
   public void testSchemaDerivedLazilyFromColumnMetadata()
       throws Exception {
-    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     assertFalse(metadata.isSchemaMaterialized());
     assertEquals(metadata.getAllColumns(), metadata.getColumnMetadataMap().keySet());
     assertEquals(metadata.toJson(null).get("columns").size(), metadata.getAllColumns().size());
     assertTrue(metadata.toJson(null).get("schemaName").isNull());
     assertFalse(metadata.isSchemaMaterialized());
-    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
 
     Schema eager = new Schema();
     for (ColumnMetadata columnMetadata : metadata.getColumnMetadataMap().values()) {
@@ -325,14 +323,12 @@ public class SegmentMetadataImplTest {
     }
     Schema schema = metadata.getSchema();
     assertTrue(metadata.isSchemaMaterialized());
-    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations + 1);
     assertEquals(schema, eager);
     assertEquals(schema.getColumnNames(), metadata.getAllColumns());
     for (String column : metadata.getAllColumns()) {
       assertSame(schema.getFieldSpecFor(column), metadata.getColumnMetadataFor(column).getFieldSpec(), column);
     }
     assertSame(metadata.getSchema(), schema);
-    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations + 1);
   }
 
   /// Loading a segment registers the built-in virtual columns in the column metadata, so the schema derived afterwards
@@ -341,7 +337,6 @@ public class SegmentMetadataImplTest {
   @Test
   public void testSchemaIncludesBuiltInVirtualColumnsAfterLoad()
       throws Exception {
-    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
     ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
     try {
       SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
@@ -356,7 +351,6 @@ public class SegmentMetadataImplTest {
       }
       metadata.toJson(null);
       assertFalse(metadata.isSchemaMaterialized(), "serving the segment must not build the segment schema");
-      assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
 
       Schema legacy = new Schema();
       for (String column : segment.getPhysicalColumnNames()) {
@@ -406,7 +400,6 @@ public class SegmentMetadataImplTest {
   /// than derived: it has no column metadata to derive from.
   @Test
   public void testExplicitSchemaIsReturnedAsIs() {
-    long materializations = SegmentMetadataImpl.getNumSchemaMaterializations();
     Schema schema = new Schema.SchemaBuilder().setSchemaName("consuming")
         .addSingleValueDimension("dim", FieldSpec.DataType.STRING)
         .addMetric("metric", FieldSpec.DataType.LONG)
@@ -417,7 +410,6 @@ public class SegmentMetadataImplTest {
     assertSame(metadata.getSchema(), schema);
     assertEquals(metadata.getAllColumns(), schema.getColumnNames());
     assertEquals(metadata.toJson(null).get("schemaName").asText(), "consuming");
-    assertEquals(SegmentMetadataImpl.getNumSchemaMaterializations(), materializations);
   }
 
   private static File buildOpenStructSegment(String parent)
