@@ -137,7 +137,8 @@ public class ServerQueryRequest {
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
-    _queryContext = getQueryContext(brokerRequest.getPinotQuery());
+    _queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery(),
+        payloadType.equalsIgnoreCase(Request.PayloadType.SQL));
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
     _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());

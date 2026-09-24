@@ -50,6 +50,13 @@ public class QueryContextConverterUtils {
 
   /// Converts the given [PinotQuery] into a [QueryContext].
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
+    return getQueryContext(pinotQuery, false);
+  }
+
+  /// For direct server SQL, defer aggregation construction until the executor supplies the table schema through
+  /// [QueryContext#setSchema]. Only the top-level query is deferred; a subquery is converted as before, because the
+  /// executor never supplies a schema to it.
+  public static QueryContext getQueryContext(PinotQuery pinotQuery, boolean requiresSchemaBinding) {
     // FROM
     String tableName;
     DataSource dataSource = pinotQuery.getDataSource();
@@ -220,6 +227,7 @@ public class QueryContextConverterUtils {
         .setQueryOptions(pinotQuery.getQueryOptions())
         .setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode)
+        .setRequiresSchemaBinding(requiresSchemaBinding)
         .build();
   }
 
