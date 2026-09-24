@@ -295,7 +295,7 @@ public class ImmutableSegmentLoader {
       mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
       mcTextColumns = Set.copyOf(segmentMetadata.getMultiColumnTextMetadata().getColumns());
     }
-    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, columnMetadataMap.keySet(),
+    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, segmentMetadata.getAllColumns(),
         indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.isForwardIndexOnly(), mcTextReader,
         mcTextColumns);
 
