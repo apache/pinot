@@ -18,15 +18,10 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.DecimalNode;
-import com.fasterxml.jackson.databind.node.DoubleNode;
-import com.fasterxml.jackson.databind.node.IntNode;
-import com.fasterxml.jackson.databind.node.LongNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-import java.math.BigDecimal;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -37,10 +32,11 @@ import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource.MapValueReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /// ProjectionBlock holds a column name to Block Map.
@@ -85,89 +81,85 @@ public class ProjectionBlock implements ValueBlock {
 
   /// The column's whole document per row, as JSON text.
   ///
-  /// Each key is read through the per-key value set the block already knows how to build, so a key's own type and
-  /// null bitmap decide how it is rendered and whether it appears at all — an absent key is omitted rather than
-  /// written as null, which is the same distinction `col['key']` makes.
+  /// Assembled through [OpenStructDataSource#openMapValueReader()], the reconstruction the storage layer already
+  /// owns and the seal path already uses. Going key by key over [OpenStructDataSource#getDataSources()] instead
+  /// reads only the materialized keys -- sparse keys share one JSON column and have no DataSource of their own --
+  /// so every unmaterialized key would silently vanish from the document.
   private BlockValSet openStructDocuments(String column, OpenStructDataSource openStructDataSource) {
     int numDocs = getNumDocs();
-    ObjectNode[] documents = new ObjectNode[numDocs];
-    for (int docId = 0; docId < numDocs; docId++) {
-      documents[docId] = JsonUtils.newObjectNode();
+    int[] docIds = getDocIds();
+    String[] documents = new String[numDocs];
+    try (MapValueReader reader = openStructDataSource.openMapValueReader()) {
+      for (int i = 0; i < numDocs; i++) {
+        Map<String, Object> document = reader.getMapValue(docIds[i]);
+        documents[i] = document == null ? "{}" : JsonUtils.objectToString(renderDocument(document));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read OPEN_STRUCT column: " + column, e);
     }
-    for (String key : openStructDataSource.getDataSources().keySet()) {
-      addKeyToDocuments(documents, numDocs, getBlockValueSet(new String[]{column, key}), key);
-    }
-    String[] serialized = new String[numDocs];
-    for (int docId = 0; docId < numDocs; docId++) {
-      serialized[docId] = documents[docId].toString();
-    }
-    return new OpenStructDocumentBlockValSet(serialized);
+    return new OpenStructDocumentBlockValSet(documents);
   }
 
-  private static void addKeyToDocuments(ObjectNode[] documents, int numDocs, BlockValSet values, String key) {
-    RoaringBitmap nulls = values.getNullBitmap();
-    if (!values.isSingleValue()) {
-      String[][] multiValues = values.getStringValuesMV();
-      for (int docId = 0; docId < numDocs; docId++) {
-        if (nulls != null && nulls.contains(docId)) {
-          continue;
-        }
-        ArrayNode array = JsonUtils.newArrayNode();
-        for (String value : multiValues[docId]) {
-          array.add(value);
-        }
-        documents[docId].set(key, array);
-      }
-      return;
-    }
-    switch (values.getValueType().getStoredType()) {
-      case INT: {
-        int[] ints = values.getIntValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> IntNode.valueOf(ints[docId]));
-        break;
-      }
-      case LONG: {
-        long[] longs = values.getLongValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> LongNode.valueOf(longs[docId]));
-        break;
-      }
-      case FLOAT: {
-        float[] floats = values.getFloatValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> DoubleNode.valueOf(floats[docId]));
-        break;
-      }
-      case DOUBLE: {
-        double[] doubles = values.getDoubleValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> DoubleNode.valueOf(doubles[docId]));
-        break;
-      }
-      case BIG_DECIMAL: {
-        BigDecimal[] decimals = values.getBigDecimalValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> DecimalNode.valueOf(decimals[docId]));
-        break;
-      }
-      case BYTES: {
-        byte[][] bytes = values.getBytesValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> TextNode.valueOf(BytesUtils.toHexString(bytes[docId])));
-        break;
-      }
-      default: {
-        String[] strings = values.getStringValuesSV();
-        putEach(documents, numDocs, nulls, key, docId -> TextNode.valueOf(strings[docId]));
-        break;
+  /// The document as it should read back: nested, and with no key spelled twice.
+  ///
+  /// A key nested inside an object is materialized under its path -- `configApi.timeTaken` -- while the object it
+  /// came from stays in the document whole, so the reconstruction carries the same value both ways. The object is
+  /// the shape the source had, so it wins and the paths into it are dropped. `.` is an ordinary key character with
+  /// no escape, and that is exactly what makes the container's own entry the thing that disambiguates: a dotted key
+  /// whose prefix is not itself a key was never a path, so it stays a key spelled with a dot.
+  private static Map<String, Object> renderDocument(Map<String, Object> document) {
+    Map<String, Object> rendered = new LinkedHashMap<>(document.size());
+    for (Map.Entry<String, Object> entry : document.entrySet()) {
+      if (!isPathIntoPresentObject(entry.getKey(), document)) {
+        rendered.put(entry.getKey(), renderValue(entry.getValue()));
       }
     }
+    return rendered;
   }
 
-  private static void putEach(ObjectNode[] documents, int numDocs, @Nullable RoaringBitmap nulls, String key,
-      java.util.function.IntFunction<JsonNode> value) {
-    for (int docId = 0; docId < numDocs; docId++) {
-      // A key absent from this row is absent from its document; writing it as JSON null would say the row carried
-      // the key with no value, which is a different fact.
-      if (nulls == null || !nulls.contains(docId)) {
-        documents[docId].set(key, value.apply(docId));
+  /// Whether `key` is a path into an object that the document also carries whole. `configApi.timeTaken` is, when
+  /// `configApi` is a key; a key the document literally spells with a dot is not, because no prefix of it is a key.
+  private static boolean isPathIntoPresentObject(String key, Map<String, Object> document) {
+    int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR);
+    while (dot >= 0) {
+      if (document.get(key.substring(0, dot)) instanceof Map) {
+        return true;
       }
+      dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, dot + 1);
     }
+    return false;
+  }
+
+  /// Values as JSON renders them, recursing so a nested object is cleaned up the same way the top level is.
+  /// Only BYTES needs a hand: Jackson would base64 it, while every other way of reading this value out of Pinot
+  /// -- `col['key']` included -- gives hex.
+  @Nullable
+  private static Object renderValue(@Nullable Object value) {
+    if (value instanceof byte[] bytes) {
+      return BytesUtils.toHexString(bytes);
+    }
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> nested = new LinkedHashMap<>(map.size());
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        nested.put(String.valueOf(entry.getKey()), renderValue(entry.getValue()));
+      }
+      return renderDocument(nested);
+    }
+    if (value instanceof List<?> list) {
+      List<Object> rendered = new ArrayList<>(list.size());
+      for (Object element : list) {
+        rendered.add(renderValue(element));
+      }
+      return rendered;
+    }
+    if (value instanceof Object[] array) {
+      List<Object> rendered = new ArrayList<>(array.length);
+      for (Object element : array) {
+        rendered.add(renderValue(element));
+      }
+      return rendered;
+    }
+    return value;
   }
 
   @Override
