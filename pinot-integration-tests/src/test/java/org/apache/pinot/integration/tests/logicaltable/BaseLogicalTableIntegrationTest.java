@@ -29,10 +29,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -41,6 +43,7 @@ import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -478,6 +481,48 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(withPruning.get("resultTable").get("rows").get(0).get(0).asLong(),
         withoutPruning.get("resultTable").get("rows").get(0).get(0).asLong(),
         "Broker pruning changed the result of a logical table query");
+  }
+
+  /// Both leaf-stage segment list encodings must return the same result for a logical table, whose leaf workers carry
+  /// `logicalTableSegmentsMap`, keyed by physical table name, rather than the table-type keyed `tableSegmentsMap`.
+  /// The encoding is turned on through cluster config, the way an operator would, and turned off again because the
+  /// cluster is shared with the other logical-table test classes.
+  @Test
+  public void testProtoSegmentListPreservesLogicalTableResults()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = "SELECT Carrier, COUNT(*) FROM " + getLogicalTableName() + " WHERE DaysSinceEpoch > 16312 "
+        + "GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+    // The cluster was started by the shared suite instance, which is the one holding the broker starter.
+    QueryDispatcher dispatcher =
+        ((BrokerRequestHandlerDelegate) _sharedClusterTestSuite._brokerStarters.get(0).getBrokerRequestHandler())
+            .getMultiStageBrokerRequestHandler().getQueryDispatcher();
+    assertTrue(!dispatcher.isEnableProtoSegmentList(), "The proto segment list encoding must ship disabled");
+
+    JsonNode legacy = postQuery(query);
+    assertTrue(legacy.get("exceptions").isEmpty(), "Unexpected exceptions with the legacy encoding: " + legacy);
+
+    try {
+      setProtoSegmentList(true);
+      TestUtils.waitForCondition(aVoid -> dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Enabling the proto segment list encoding in cluster config did not reach the broker");
+
+      JsonNode proto = postQuery(query);
+      assertTrue(proto.get("exceptions").isEmpty(), "Unexpected exceptions with the proto encoding: " + proto);
+      assertEquals(proto.get("resultTable").get("rows"), legacy.get("resultTable").get("rows"),
+          "The segment list encoding changed the result of a logical table query");
+    } finally {
+      setProtoSegmentList(false);
+      TestUtils.waitForCondition(aVoid -> !dispatcher.isEnableProtoSegmentList(), 10_000L,
+          "Disabling the proto segment list encoding in cluster config did not reach the broker");
+    }
+  }
+
+  private void setProtoSegmentList(boolean enabled)
+      throws Exception {
+    sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(),
+        JsonUtils.objectToString(
+            Map.of(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST, String.valueOf(enabled))));
   }
 
   @Test
