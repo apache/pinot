@@ -503,7 +503,8 @@ public final class RelToPlanNodeConverter {
       for (RexExpression op : ops) {
         rewritten.add(rewriteInputRefs(op, elemOutIdx, ordOutIdx));
       }
-      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten, fc.isDistinct(),
+          fc.isIgnoreNulls(), fc.getAggregationBinding());
     } else {
       return expr;
     }
@@ -529,7 +530,8 @@ public final class RelToPlanNodeConverter {
       for (RexExpression op : ops) {
         rewritten.add(rewriteInputRefsForMultipleArrays(op, elemOutIdxs, ordOutIdx));
       }
-      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten, fc.isDistinct(),
+          fc.isIgnoreNulls(), fc.getAggregationBinding());
     } else {
       return expr;
     }
@@ -892,7 +894,8 @@ public final class RelToPlanNodeConverter {
       for (RexExpression op : ops) {
         rewritten.add(remapInputRefs(op, oldToNew));
       }
-      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten);
+      return new RexExpression.FunctionCall(fc.getDataType(), fc.getFunctionName(), rewritten, fc.isDistinct(),
+          fc.isIgnoreNulls(), fc.getAggregationBinding());
     } else {
       return expr;
     }
