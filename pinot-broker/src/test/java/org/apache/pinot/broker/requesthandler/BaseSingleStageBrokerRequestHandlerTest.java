@@ -26,12 +26,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
@@ -41,14 +43,19 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.function.AggregationFunctionTypeResolver;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -63,6 +70,7 @@ import org.apache.pinot.materializedview.rewrite.ExecutionMode;
 import org.apache.pinot.materializedview.rewrite.MatchType;
 import org.apache.pinot.materializedview.rewrite.MaterializedViewQueryRewriteEngine;
 import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -89,6 +97,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
 import org.testng.Assert;
@@ -96,8 +105,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -1807,6 +1818,180 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(extractLookupTableNames(
             "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
         Set.of("dimA", "dimB"));
+  }
+
+  private static final Schema BINDING_SCHEMA = new Schema.SchemaBuilder()
+      .addSingleValueDimension("name", DataType.STRING)
+      .addSingleValueDimension("event_time", DataType.TIMESTAMP)
+      .addSingleValueDimension("stored_time", DataType.LONG)
+      .build();
+
+  /// No aggregate requires a binding yet. Stub the per-call rule so MODE requires one whose result type is its first
+  /// argument's logical type, which exercises where the broker binds and unbinds requests.
+  private static MockedStatic<AggregationFunctionTypeResolver> requireBindingForMode() {
+    MockedStatic<AggregationFunctionTypeResolver> resolver = mockStatic(AggregationFunctionTypeResolver.class);
+    resolver.when(() -> AggregationFunctionTypeResolver.bind(any(), anyList(), any())).thenAnswer(invocation -> {
+      if (invocation.getArgument(0) != AggregationFunctionType.MODE) {
+        return null;
+      }
+      IntFunction<ColumnDataType> argumentTypes = invocation.getArgument(2);
+      ColumnDataType type = argumentTypes.apply(0);
+      return new AggregateCallBinding(List.of(type), type);
+    });
+    return resolver;
+  }
+
+  private static boolean hasAggregationBinding(PinotQuery query) {
+    PinotQuery unbound = query.deepCopy();
+    AggregationFunctionBinder.unbind(unbound);
+    return !unbound.equals(query);
+  }
+
+  @Test
+  public void testExpressionOverrideIgnoresBindingAndBindsReplacement() {
+    try (MockedStatic<AggregationFunctionTypeResolver> ignored = requireBindingForMode()) {
+      for (boolean sorted : new boolean[]{false, true}) {
+        PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT trim(MODE(name)) FROM testTable");
+        AggregationFunctionBinder.bind(query, BINDING_SCHEMA);
+        Expression replacement = CalciteSqlParser.compileToExpression("MODE(event_time)");
+        Map<Expression, Expression> overrides =
+            Map.of(CalciteSqlParser.compileToExpression("trim(MODE(name))"), replacement);
+        if (sorted) {
+          overrides = new TreeMap<>(overrides);
+        }
+        BaseSingleStageBrokerRequestHandler.handleExpressionOverride(query, overrides, BINDING_SCHEMA);
+        Expression selected = query.getSelectList().get(0);
+        Assert.assertEquals(RequestContextUtils.getExpression(selected).toString(), "mode(event_time)");
+        Assert.assertEquals(selected.getFunctionCall().getAggregationBinding().getResultType(), "TIMESTAMP");
+        // The configured override is copied, never bound in place.
+        Assert.assertFalse(replacement.getFunctionCall().isSetAggregationBinding());
+      }
+    }
+  }
+
+  @Test
+  public void testExpressionOverrideKeepsLogicalBindingOfExistingCall() {
+    try (MockedStatic<AggregationFunctionTypeResolver> ignored = requireBindingForMode()) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT MODE(event_time) FROM testTable");
+      AggregationFunctionBinder.bind(query, BINDING_SCHEMA);
+      BaseSingleStageBrokerRequestHandler.handleExpressionOverride(query, Map.of(
+          CalciteSqlParser.compileToExpression("event_time"), CalciteSqlParser.compileToExpression("stored_time")),
+          BINDING_SCHEMA);
+      Expression selected = query.getSelectList().get(0);
+      Assert.assertEquals(RequestContextUtils.getExpression(selected).toString(), "mode(stored_time)");
+      // A storage column substituted for a logical one does not change the call's logical contract.
+      Assert.assertEquals(
+          RequestContextUtils.getExpression(selected).getFunction().getAggregationBinding().getResultType(),
+          ColumnDataType.TIMESTAMP);
+    }
+  }
+
+  @Test
+  public void testUnbindableAggregationIsQueryValidationError()
+      throws Exception {
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(new AtomicReference<>());
+    try (MockedStatic<AggregationFunctionTypeResolver> resolver = mockStatic(AggregationFunctionTypeResolver.class)) {
+      resolver.when(() -> AggregationFunctionTypeResolver.bind(any(), anyList(), any()))
+          .thenThrow(new IllegalArgumentException("Unsupported MODE input type"));
+      BrokerResponseNative response = handleRequest(handler, "SELECT MODE(created_15min) FROM myTable", null);
+      assertSingleException(response, QueryErrorCode.QUERY_VALIDATION, "Unsupported MODE input type");
+    }
+  }
+
+  /// View definitions are matched by Thrift expression equality, which includes bindings. The rewrite engine must see
+  /// the unbound SQL-level query, and the executed query must be bound against the schema of the table it targets.
+  @Test
+  public void testMaterializedViewMatchesUnboundQueryAndBindsExecutedQuery()
+      throws Exception {
+    String baseOfflineTable = "baseTable_OFFLINE";
+    String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
+    String baseRawTable = "baseTable";
+    String materializedViewRawTable = "mv_baseTable";
+    PinotQuery materializedViewQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ts, MODE(revenue) FROM mv_baseTable_OFFLINE GROUP BY ts LIMIT 100");
+    MaterializedViewRewritePlan plan = new MaterializedViewRewritePlan(
+        materializedViewOfflineTable, MatchType.EXACT, ExecutionMode.FULL_REWRITE, materializedViewQuery, 1.0);
+    AtomicReference<Boolean> boundAtMatch = new AtomicReference<>();
+    MaterializedViewQueryRewriteEngine materializedViewEngine = mock(MaterializedViewQueryRewriteEngine.class);
+    when(materializedViewEngine.tryRewrite(any(PinotQuery.class), anyString())).thenAnswer(invocation -> {
+      boundAtMatch.set(hasAggregationBinding(invocation.getArgument(0)));
+      return plan;
+    });
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(baseRawTable)).thenReturn(baseRawTable);
+    when(tableCache.getSchema(baseRawTable)).thenReturn(new Schema.SchemaBuilder().setSchemaName(baseRawTable)
+        .addSingleValueDimension("ts", DataType.STRING).addMetric("revenue", DataType.DOUBLE).build());
+    when(tableCache.getSchema(materializedViewRawTable)).thenReturn(new Schema.SchemaBuilder()
+        .setSchemaName(materializedViewRawTable).addSingleValueDimension("ts", DataType.STRING)
+        .addMetric("revenue", DataType.LONG).build());
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(baseOfflineTable)).thenReturn(tableCfg);
+    when(tableCache.getTableConfig(materializedViewOfflineTable)).thenReturn(tableCfg);
+    when(tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(baseRawTable))).thenReturn(null);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(baseOfflineTable)).thenReturn(true);
+    when(routingManager.routingExists(materializedViewOfflineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+        new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+    AtomicReference<BrokerRequest> capturedServerBrokerRequest = new AtomicReference<>();
+    MaterializedViewHandler materializedViewHandler = new DefaultMaterializedViewHandler(materializedViewEngine);
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, materializedViewHandler) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerBrokerRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    try (MockedStatic<AggregationFunctionTypeResolver> ignored = requireBindingForMode()) {
+      BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(
+          "SELECT ts, MODE(revenue) FROM baseTable GROUP BY ts LIMIT 100");
+      Assert.assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    }
+    Assert.assertEquals(boundAtMatch.get(), Boolean.FALSE, "The rewrite engine must match the unbound query");
+    PinotQuery executed = capturedServerBrokerRequest.get().getPinotQuery();
+    Assert.assertEquals(executed.getDataSource().getTableName(), materializedViewOfflineTable);
+    Function mode = executed.getSelectList().get(1).getFunctionCall();
+    Assert.assertEquals(mode.getOperator(), "mode");
+    Assert.assertEquals(mode.getAggregationBinding().getResultType(), "LONG",
+        "The executed query must be bound against the view's schema");
   }
 
   private static Set<String> extractLookupTableNames(String sql) {

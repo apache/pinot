@@ -76,7 +76,7 @@ public final class AggregationFunctionTypeResolver {
     private static final long serialVersionUID = 1L;
 
     public TypeInferenceUnavailableException(String functionName) {
-      super("No schema-only type inference for native transform: " + functionName);
+      super("No schema-only type inference for function: " + functionName);
     }
   }
 
