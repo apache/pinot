@@ -219,6 +219,12 @@ public class IndexLoadingConfigTest {
     assertNotNull(derived.getFieldIndexConfig("event$key"));
     assertNull(base.getFieldIndexConfig("event$key"));
 
+    // A loaded segment keeps the resolved map it captured, even if its config is refreshed later.
+    Map<String, FieldIndexConfigs> captured = derived.getFieldIndexConfigByColName();
+    derived.refreshIndexConfigs();
+    assertNotNull(captured.get("event$key"));
+    assertNull(derived.getFieldIndexConfig("event$key"));
+
     TableConfig schemaLessTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     IndexLoadingConfig schemaLess = new IndexLoadingConfig(schemaLessTable, null);
     derived = schemaLess.withKnownColumns(Set.of("segmentColumn"));
