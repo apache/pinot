@@ -209,8 +209,9 @@ public class RealtimeSegmentDataManagerTest {
   public void testDestroyBeforeConsumptionStarts()
       throws Exception {
     FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    // Never started: stop() must tolerate the missing consumer thread, and destroy() must still close the consumer.
-    segmentDataManager.stop();
+    // Never started: the real stop() must tolerate the missing consumer thread (the fake normally overrides it), and
+    // destroy() must still close the stream consumer.
+    segmentDataManager.invokeRealStop();
     segmentDataManager.destroy();
     Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
   }
@@ -1649,6 +1650,12 @@ public class RealtimeSegmentDataManagerTest {
 
     public void invokePostStopConsumedMsg(String reason) {
       super.postStopConsumedMsg(reason);
+    }
+
+    /// Runs the production stop() instead of this fake's override.
+    public void invokeRealStop()
+        throws InterruptedException {
+      super.stop();
     }
 
     @Override

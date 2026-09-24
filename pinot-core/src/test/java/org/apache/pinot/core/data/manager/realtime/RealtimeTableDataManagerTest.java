@@ -397,7 +397,8 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
-  @Test
+  // Without the shutdown re-check the wait would run to the 10-minute default download timeout; fail fast instead.
+  @Test(timeOut = 60_000)
   public void testCommittingSegmentDownloadAbortsAfterShutdown()
       throws Exception {
     ServerMetrics.register(mock(ServerMetrics.class));
