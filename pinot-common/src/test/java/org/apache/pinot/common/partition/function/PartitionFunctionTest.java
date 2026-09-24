@@ -91,24 +91,32 @@ public class PartitionFunctionTest {
   }
 
   @Test
-  public void testBoundedIdentityIsCollisionSafeAndConfigIsImmutable() {
-    Map<String, String> config = new HashMap<>(Map.of("columnValues", "a|b", "columnValuesDelimiter", "|"));
-    PartitionFunction function = new BoundedColumnValuePartitionFunction(3, config);
-    assertTrue(function.canReusePartitionIds(function));
-    assertTrue(function.canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, config)));
+  public void testComplexFunctionsAndSubclassesKeepInstanceEquality() {
+    Map<String, String> config = Map.of("columnValues", "a|b", "columnValuesDelimiter", "|");
+    PartitionFunction bounded = new BoundedColumnValuePartitionFunction(3, config);
+    assertTrue(bounded.canReusePartitionIds(bounded));
+    assertFalse(bounded.canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, config)));
+    class CustomMurmur extends MurmurPartitionFunction {
+      CustomMurmur() {
+        super(8, null);
+      }
+    }
+    PartitionFunction subclass = new CustomMurmur();
+    PartitionFunction another = new CustomMurmur();
+    assertTrue(subclass.canReusePartitionIds(subclass));
+    assertFalse(subclass.canReusePartitionIds(another));
+    assertFalse(subclass.canReusePartitionIds(new MurmurPartitionFunction(8, null)));
+    assertFalse(new MurmurPartitionFunction(8, null).canReusePartitionIds(subclass));
+  }
 
-    Map<String, String> collidingConfig =
-        Map.of("columnValues", "Aa|x", "columnValuesDelimiter", "|");
-    Map<String, String> otherCollidingConfig =
-        Map.of("columnValues", "BB|x", "columnValuesDelimiter", "|");
-    assertEquals(collidingConfig.hashCode(), otherCollidingConfig.hashCode(), "Fixture must exercise a hash collision");
-    assertFalse(new BoundedColumnValuePartitionFunction(3, collidingConfig)
-        .canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, otherCollidingConfig)));
-
-    config.put("columnValues", "b|a");
-    assertEquals(function.getPartition("a"), 1);
-    assertEquals(function.getFunctionConfig().get("columnValues"), "a|b");
-    expectThrows(UnsupportedOperationException.class, () -> function.getFunctionConfig().put("columnValues", "b|a"));
+  @Test
+  public void testHashCollisionDoesNotImplyEquality() {
+    // Increasing the partition count and decreasing the seed compensates in the 31-based hash.
+    PartitionFunction first = new Murmur3PartitionFunction(8, Map.of("seed", "961"));
+    PartitionFunction second = new Murmur3PartitionFunction(9, Map.of("seed", "0"));
+    assertEquals(first.hashCode(), second.hashCode());
+    assertNotEquals(first, second);
+    assertFalse(first.canReusePartitionIds(second));
   }
 
   @Test(dataProvider = "reuseConfigurations")
@@ -119,6 +127,9 @@ public class PartitionFunctionTest {
     PartitionFunction second = PartitionFunctionFactory.getPartitionFunction(name, 8, equivalentConfig);
     PartitionFunction third = PartitionFunctionFactory.getPartitionFunction(name, 8, new HashMap<>(equivalentConfig));
     assertTrue(first.canReusePartitionIds(first));
+    assertEquals(first, second);
+    assertEquals(first.hashCode(), second.hashCode());
+    assertFalse(first.equals(null));
     assertTrue(first.canReusePartitionIds(second));
     assertTrue(second.canReusePartitionIds(first));
     assertTrue(second.canReusePartitionIds(third));

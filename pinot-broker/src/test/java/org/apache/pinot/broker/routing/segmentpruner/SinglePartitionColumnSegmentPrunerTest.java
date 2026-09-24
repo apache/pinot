@@ -39,7 +39,6 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -426,14 +425,11 @@ public class SinglePartitionColumnSegmentPrunerTest {
     private final int _numPartitions;
     private final int _offset;
     private final Map<String, String> _functionConfig;
-    private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
     public CountingPartitionFunction(int numPartitions, @Nullable Map<String, String> config) {
       _numPartitions = numPartitions;
       _offset = config == null ? 0 : Integer.parseInt(config.getOrDefault("offset", "0"));
       _functionConfig = config == null ? null : Map.copyOf(config);
-      _partitionFunctionIdentity = PartitionFunctionIdentity.of(CountingPartitionFunction.class, _numPartitions,
-          PartitionIdNormalizer.POSITIVE_MODULO, _offset);
     }
 
     @Override
@@ -458,8 +454,9 @@ public class SinglePartitionColumnSegmentPrunerTest {
     }
 
     @Override
-    public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-      return _partitionFunctionIdentity;
+    public boolean canReusePartitionIds(PartitionFunction other) {
+      return other instanceof CountingPartitionFunction
+          && _numPartitions == other.getNumPartitions() && _offset == ((CountingPartitionFunction) other)._offset;
     }
 
     @Override

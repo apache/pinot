@@ -25,7 +25,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 
@@ -54,7 +53,6 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
   private final String[] _values;
-  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public BoundedColumnValuePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     _numPartitions = numPartitions;
@@ -64,8 +62,6 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
       // probe-built instance, which is fine because the registry never calls it.
       _functionConfig = null;
       _values = null;
-      _partitionFunctionIdentity = PartitionFunctionIdentity.of(BoundedColumnValuePartitionFunction.class,
-          _numPartitions, PartitionIdNormalizer.NO_OP);
       return;
     }
     Preconditions.checkArgument(functionConfig.size() > 0, "'functionConfig' must not be empty");
@@ -77,8 +73,6 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     _values = StringUtils.split(functionConfig.get(COLUMN_VALUES), functionConfig.get(COLUMN_VALUES_DELIMITER));
     Preconditions.checkState(numPartitions == _values.length + 1,
         "'numPartitions' must just be one greater than number of column values configured");
-    _partitionFunctionIdentity = PartitionFunctionIdentity.of(BoundedColumnValuePartitionFunction.class,
-        _numPartitions, PartitionIdNormalizer.NO_OP, _functionConfig);
   }
 
   @Override
@@ -114,11 +108,6 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   public PartitionIdNormalizer getPartitionIdNormalizer() {
     // Output is a fixed mapping in [0, numPartitions); no normalization is applied.
     return PartitionIdNormalizer.NO_OP;
-  }
-
-  @Override
-  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return _partitionFunctionIdentity;
   }
 
   @Override

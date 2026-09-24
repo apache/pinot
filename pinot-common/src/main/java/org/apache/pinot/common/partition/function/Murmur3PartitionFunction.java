@@ -25,7 +25,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
@@ -50,7 +49,6 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private final boolean _useX64;
   private final boolean _useRawBytes;
   private final PartitionIdNormalizer _normalizer;
-  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -81,8 +79,6 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     _useX64 = useX64;
     _useRawBytes = useRawBytes;
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
-    _partitionFunctionIdentity = PartitionFunctionIdentity.of(Murmur3PartitionFunction.class, _numPartitions,
-        _normalizer, _seed, _useX64, _useRawBytes);
   }
 
   @Override
@@ -121,8 +117,34 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return _partitionFunctionIdentity;
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    return equals(other);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
+    if (other == null || getClass() != Murmur3PartitionFunction.class
+        || other.getClass() != Murmur3PartitionFunction.class) {
+      return false;
+    }
+    Murmur3PartitionFunction that = (Murmur3PartitionFunction) other;
+    return _numPartitions == that._numPartitions && _normalizer == that._normalizer
+        && _seed == that._seed && _useX64 == that._useX64
+        && _useRawBytes == that._useRawBytes;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _numPartitions;
+    result = 31 * result + _normalizer.hashCode();
+    result = 31 * result + _seed;
+    result = 31 * result + Boolean.hashCode(_useX64);
+    result = 31 * result + Boolean.hashCode(_useRawBytes);
+    return result;
   }
 
   // Keep it for backward-compatibility, use getName() instead

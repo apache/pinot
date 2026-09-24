@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
@@ -47,7 +46,6 @@ public class MurmurPartitionFunction implements PartitionFunction {
   private final Map<String, String> _functionConfig;
   private final boolean _useRawBytes;
   private final PartitionIdNormalizer _normalizer;
-  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public MurmurPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -56,8 +54,6 @@ public class MurmurPartitionFunction implements PartitionFunction {
     _functionConfig = functionConfig;
     _useRawBytes = functionConfig != null && Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
-    _partitionFunctionIdentity = PartitionFunctionIdentity.of(MurmurPartitionFunction.class, _numPartitions,
-        _normalizer, _useRawBytes);
   }
 
   @Override
@@ -93,8 +89,31 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return _partitionFunctionIdentity;
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    return equals(other);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
+    if (other == null || getClass() != MurmurPartitionFunction.class
+        || other.getClass() != MurmurPartitionFunction.class) {
+      return false;
+    }
+    MurmurPartitionFunction that = (MurmurPartitionFunction) other;
+    return _numPartitions == that._numPartitions && _normalizer == that._normalizer
+        && _useRawBytes == that._useRawBytes;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _numPartitions;
+    result = 31 * result + _normalizer.hashCode();
+    result = 31 * result + Boolean.hashCode(_useRawBytes);
+    return result;
   }
 
   // Keep it for backward-compatibility, use getName() instead
