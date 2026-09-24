@@ -46,19 +46,22 @@ public class FullSortOperator extends SortOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(FullSortOperator.class);
 
   private final Comparator<Object[]> _comparator;
+  private final int _maxInitialCapacity;
   /// The buffered input. Handed downstream as a sublist view of itself, so releasing has to drop the reference
   /// rather than empty the list.
   @Nullable
   private ArrayList<Object[]> _rows;
+  /// Retains the first non-empty block until the next block determines whether to size for one block or the full
+  /// holder capacity.
+  @Nullable
+  private List<Object[]> _firstInputRows;
 
   FullSortOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema dataSchema, int offset,
       int numRowsToKeep, int maxRowsPerBlock, List<RelFieldCollation> collations, int defaultHolderCapacity) {
     super(context, input, dataSchema, offset, numRowsToKeep, maxRowsPerBlock, true);
     _comparator = new SortUtils.SortComparator(collations, false);
-    // Sized like the priority queue this replaced. Rows arrive a block at a time, so a default-capacity list grows
-    // repeatedly: 1.8x the allocation of a pre-sized one at 10K rows (242KB vs 133KB). The gap closes as the result
-    // grows and the sort itself dominates.
-    _rows = new ArrayList<>(Math.min(defaultHolderCapacity, numRowsToKeep));
+    _maxInitialCapacity = Math.min(defaultHolderCapacity, numRowsToKeep);
+    _rows = new ArrayList<>();
   }
 
   @Override
@@ -75,11 +78,12 @@ public class FullSortOperator extends SortOperator {
   protected void releaseBuffers() {
     super.releaseBuffers();
     _rows = null;
+    _firstInputRows = null;
   }
 
   @Override
   protected boolean hasBufferedState() {
-    return super.hasBufferedState() || _rows != null;
+    return super.hasBufferedState() || _rows != null || _firstInputRows != null;
   }
 
   @Override
@@ -87,13 +91,29 @@ public class FullSortOperator extends SortOperator {
     assert _rows != null : "Rows must not be released while the operator is still producing";
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
-      _rows.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+      List<Object[]> inputRows = ((MseBlock.Data) block).asRowHeap().getRows();
+      if (!inputRows.isEmpty()) {
+        if (_rows.isEmpty() && _firstInputRows == null) {
+          _firstInputRows = inputRows;
+        } else {
+          if (_firstInputRows != null) {
+            _rows.ensureCapacity(_maxInitialCapacity);
+            _rows.addAll(_firstInputRows);
+            _firstInputRows = null;
+          }
+          _rows.addAll(inputRows);
+        }
+      }
       checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
     _eosBlock = (MseBlock.Eos) block;
     if (_eosBlock.isError()) {
       return _eosBlock;
+    }
+    if (_firstInputRows != null) {
+      _rows = new ArrayList<>(_firstInputRows);
+      _firstInputRows = null;
     }
     if (_rows.size() <= _offset) {
       return _eosBlock;
