@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
@@ -42,10 +43,12 @@ public class LeadControllerManager {
   private final ControllerMetrics _controllerMetrics;
   private final Set<Integer> _leadForPartitions;
   private final Thread _controllerLeadershipFetchingThread;
+  private final Object _leadershipAcquiredCallbackLock = new Object();
 
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
+  private Runnable _leadershipAcquiredCallback;
 
   public LeadControllerManager(String helixControllerInstanceId, HelixManager helixManager,
       ControllerMetrics controllerMetrics) {
@@ -60,6 +63,7 @@ public class LeadControllerManager {
       public void run() {
         while (true) {
           try {
+            boolean leadershipAcquired = false;
             synchronized (LeadControllerManager.this) {
               if (_isShuttingDown) {
                 return;
@@ -67,6 +71,7 @@ public class LeadControllerManager {
               if (isHelixLeader()) {
                 if (!_amIHelixLeader) {
                   _amIHelixLeader = true;
+                  leadershipAcquired = true;
                   LOGGER.warn("Becoming leader without getting Helix change callback");
                   _controllerMetrics
                       .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
@@ -80,6 +85,14 @@ public class LeadControllerManager {
                       .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
                 }
                 _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
+              }
+            }
+            if (leadershipAcquired) {
+              notifyLeadershipAcquired();
+            }
+            synchronized (LeadControllerManager.this) {
+              if (_isShuttingDown) {
+                return;
               }
               LeadControllerManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL_MS);
             }
@@ -110,12 +123,18 @@ public class LeadControllerManager {
   /// Given a partition name, marks current controller as lead controller for this partition by caching the partition
   /// id to current controller.
   /// @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
-  public synchronized void addPartitionLeader(String partitionName) {
-    LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
-    int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
-    _leadForPartitions.add(partitionId);
-    _controllerMetrics
-        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
+  public void addPartitionLeader(String partitionName) {
+    boolean partitionAdded;
+    synchronized (this) {
+      LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
+      int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
+      partitionAdded = _leadForPartitions.add(partitionId);
+      _controllerMetrics
+          .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
+    }
+    if (partitionAdded) {
+      notifyLeadershipAcquired();
+    }
   }
 
   /// Given a partition name, removes current controller as lead controller for this partition by removing the
@@ -127,6 +146,35 @@ public class LeadControllerManager {
     _leadForPartitions.remove(partitionId);
     _controllerMetrics
         .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
+  }
+
+  /// Registers the callback invoked after this controller acquires Helix or lead-controller partition leadership.
+  /// Callback exceptions are isolated from Helix callbacks and the leadership-fetching thread.
+  void registerLeadershipAcquiredCallback(Runnable callback) {
+    Objects.requireNonNull(callback, "callback must not be null");
+    synchronized (_leadershipAcquiredCallbackLock) {
+      _leadershipAcquiredCallback = callback;
+    }
+  }
+
+  /// Unregisters the leadership acquisition callback and waits for an in-flight callback to complete.
+  void unregisterLeadershipAcquiredCallback() {
+    synchronized (_leadershipAcquiredCallbackLock) {
+      _leadershipAcquiredCallback = null;
+    }
+  }
+
+  private void notifyLeadershipAcquired() {
+    synchronized (_leadershipAcquiredCallbackLock) {
+      if (_leadershipAcquiredCallback == null) {
+        return;
+      }
+      try {
+        _leadershipAcquiredCallback.run();
+      } catch (Exception e) {
+        LOGGER.error("Caught exception from leadership acquisition callback", e);
+      }
+    }
   }
 
   /// Checks from ZK if the current controller host is Helix cluster leader.
@@ -173,55 +221,70 @@ public class LeadControllerManager {
   /// does not add much overhead.
   /// At some point in future when we stop supporting the disabled resource, we will remove this line altogether and
   /// the logic that goes with it.
-  synchronized void onHelixControllerChange() {
-    if (_isShuttingDown) {
-      return;
+  void onHelixControllerChange() {
+    boolean leadershipAcquired = false;
+    synchronized (this) {
+      if (_isShuttingDown) {
+        return;
+      }
+      if (isHelixLeader()) {
+        if (!_amIHelixLeader) {
+          _amIHelixLeader = true;
+          leadershipAcquired = true;
+          LOGGER.info("Became Helix leader");
+        } else {
+          LOGGER.info("Already Helix leader. Duplicate notification");
+        }
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
+      } else {
+        if (_amIHelixLeader) {
+          _amIHelixLeader = false;
+          LOGGER.info("Lost Helix leadership");
+        } else {
+          LOGGER.info("Already not Helix leader. Duplicate notification");
+        }
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
+      }
     }
-    if (isHelixLeader()) {
-      if (!_amIHelixLeader) {
-        _amIHelixLeader = true;
-        LOGGER.info("Became Helix leader");
-      } else {
-        LOGGER.info("Already Helix leader. Duplicate notification");
-      }
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
-    } else {
-      if (_amIHelixLeader) {
-        _amIHelixLeader = false;
-        LOGGER.info("Lost Helix leadership");
-      } else {
-        LOGGER.info("Already not Helix leader. Duplicate notification");
-      }
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
+    if (leadershipAcquired) {
+      notifyLeadershipAcquired();
     }
   }
 
   /// Callback on changes in resource config.
-  synchronized void onResourceConfigChange() {
-    if (_isShuttingDown) {
-      return;
-    }
+  void onResourceConfigChange() {
+    boolean leadershipMayHaveExpanded = false;
+    synchronized (this) {
+      if (_isShuttingDown) {
+        return;
+      }
+      boolean leadControllerResourceEnabled;
+      try {
+        leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+      } catch (Exception e) {
+        // Do not change the state if any exception happened.
+        // Enabling the resource is always one-off. If administrator wants to enable it he will check the log.
+        // Plus, it's quite common to have resource config changes because every time there's a Helix task generated,
+        // the task will be written to resource config, which will trigger this notification as well.
+        LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
+        return;
+      }
 
-    boolean leadControllerResourceEnabled;
-    try {
-      leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
-    } catch (Exception e) {
-      // Do not change the state if any exception happened.
-      // Enabling the resource is always one-off. If administrator wants to enable it he will check the log.
-      // Plus, it's quite common to have resource config changes because every time there's a Helix task generated,
-      // the task will be written to resource config, which will trigger this notification as well.
-      LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
-      return;
+      boolean wasLeadControllerResourceEnabled = _isLeadControllerResourceEnabled;
+      if (leadControllerResourceEnabled) {
+        LOGGER.info("Lead controller resource is enabled.");
+        _isLeadControllerResourceEnabled = true;
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 1L);
+      } else {
+        LOGGER.info("Lead controller resource is disabled.");
+        _isLeadControllerResourceEnabled = false;
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
+      }
+      leadershipMayHaveExpanded = wasLeadControllerResourceEnabled != leadControllerResourceEnabled
+          && (leadControllerResourceEnabled ? !_leadForPartitions.isEmpty() : _amIHelixLeader);
     }
-
-    if (leadControllerResourceEnabled) {
-      LOGGER.info("Lead controller resource is enabled.");
-      _isLeadControllerResourceEnabled = true;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 1L);
-    } else {
-      LOGGER.info("Lead controller resource is disabled.");
-      _isLeadControllerResourceEnabled = false;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
+    if (leadershipMayHaveExpanded) {
+      notifyLeadershipAcquired();
     }
   }
 }
