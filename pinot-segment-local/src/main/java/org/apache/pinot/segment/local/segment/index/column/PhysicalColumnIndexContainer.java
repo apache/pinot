@@ -94,7 +94,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     long presentMask = 0L;
     boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
-      for (IndexType<?, ?, ?> indexType : allIndexes) {
+      for (int indexId = 0; indexId < numIndexTypes; indexId++) {
+        IndexType<?, ?, ?> indexType = allIndexes.get(indexId);
         if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {
           continue;
         }
@@ -103,7 +104,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           try {
             IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
             if (reader != null) {
-              short indexId = indexService.getNumericId(indexType);
               readersById[indexId] = reader;
               presentMask |= 1L << indexId;
             }
