@@ -176,6 +176,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
+  protected volatile IndexLoadingConfig _cachedIndexLoadingConfig;
 
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
@@ -437,6 +438,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return indexLoadingConfig;
   }
 
+  /// Returns the shared processed config for ordinary loads. Segment-specific settings are applied with the
+  /// `with...` methods on [IndexLoadingConfig], which share its processed table-level state.
+  /// Explicit reloads and config/schema refresh messages still use [#fetchIndexLoadingConfig()].
+  protected IndexLoadingConfig getCachedIndexLoadingConfig() {
+    Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
+    IndexLoadingConfig indexLoadingConfig = _cachedIndexLoadingConfig;
+    if (indexLoadingConfig == null || indexLoadingConfig.getTableConfig() != cached.getLeft()
+        || indexLoadingConfig.getSchema() != cached.getRight()) {
+      indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
+      indexLoadingConfig.setTableDataDir(_tableDataDir);
+      _cachedIndexLoadingConfig = indexLoadingConfig;
+    }
+    return indexLoadingConfig;
+  }
+
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
@@ -444,6 +460,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    // Normalize before publishing so segment loads never add timestamp fields to a shared schema.
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
@@ -1100,7 +1120,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
-    indexLoadingConfig.setSegmentTier(segmentTier);
+    indexLoadingConfig = indexLoadingConfig.copyWithSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     _segmentReloadSemaphore.acquire(segmentName, _logger);

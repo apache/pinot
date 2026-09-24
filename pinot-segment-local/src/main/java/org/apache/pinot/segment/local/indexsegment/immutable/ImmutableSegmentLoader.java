@@ -127,6 +127,7 @@ public class ImmutableSegmentLoader {
     if (segmentMetadata.getTotalDocs() == 0) {
       return new EmptyIndexSegment(segmentMetadata);
     }
+    indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
     String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
         .setReadMode(indexLoadingConfig.getReadMode())
@@ -171,6 +172,7 @@ public class ImmutableSegmentLoader {
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() > 0) {
+      indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
       if (segmentOperationsThrottlerSet != null) {
         segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().acquire();
       }
@@ -205,6 +207,7 @@ public class ImmutableSegmentLoader {
       // mirroring the non-empty ImmutableSegmentImpl path.
       return new EmptyIndexSegment(segmentMetadata, segmentDirectory);
     }
+    indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
 
     // Remove columns not in schema from the metadata
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
@@ -229,7 +232,7 @@ public class ImmutableSegmentLoader {
         }
       }
     } else {
-      indexLoadingConfig.addKnownColumns(columnMetadataMap.keySet());
+      indexLoadingConfig = indexLoadingConfig.withKnownColumns(columnMetadataMap.keySet());
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();

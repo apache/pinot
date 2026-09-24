@@ -30,16 +30,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -57,13 +61,17 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -88,6 +96,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -277,6 +286,28 @@ public class BaseTableDataManagerTest {
     assertTrue(tierDataDir.exists());
     assertFalse(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(tierDataDir).getTotalDocs(), 5);
+  }
+
+  /// Regression test for https://github.com/apache/pinot/issues/18164: the table-level config passed into reload is
+  /// shared by all segments, so reloading one segment must not set its tier on the shared config.
+  @Test
+  public void testReloadSegmentFromDefaultTierDoesNotMutateSharedIndexLoadingConfig()
+      throws Exception {
+    // The current tier is null while the target tier is coolTier, exercising both tier mutations in the reload path.
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setTier(TIER_NAME);
+    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
+    when(localMetadata.getCrc()).thenReturn(0L);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+
+    IndexLoadingConfig sharedConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+    tableDataManager.reloadSegment(segmentDataManager, sharedConfig, true);
+    assertNull(sharedConfig.getSegmentTier());
+    assertNull(sharedConfig.getTableDataDir());
   }
 
   @Test
@@ -1067,6 +1098,127 @@ public class BaseTableDataManagerTest {
     tableDataManager.registerSegment(SEGMENT_NAME, newSegmentManager);
 
     verify(segmentDirectory, times(1)).onSegmentAdded();
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigReusesSchemaAndRefreshes() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema original = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, original);
+    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    assertSame(first.getSchema(), original);
+    assertSame(second.getSchema(), original);
+    assertSame(first.getTableConfig(), second.getTableConfig());
+    assertSame(first, second);
+    verifyNoInteractions(manager._propertyStore);
+
+    Schema changed = createSchemaReuseSchema();
+    changed.getFieldSpecFor("id").setDefaultNullValue(-2);
+    ZKMetadataProvider.setSchema(manager._propertyStore, changed);
+    // Explicit refreshes still fetch the latest schema even without a separate refresh message.
+    Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
+    assertNotSame(refreshed, original);
+    assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
+    assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
+    assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), refreshed);
+
+    manager.updateCachedTableConfigAndSchema(table, changed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), changed);
+    TableConfig indexedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of("id")).build();
+    manager.updateCachedTableConfigAndSchema(indexedTable, changed);
+    IndexLoadingConfig indexed = manager.getCachedIndexLoadingConfig();
+    assertTrue(indexed.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertFalse(first.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig().getFieldIndexConfig("id"));
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigDerivesSegmentTier() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, schema);
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig tierConfig = shared.withSegmentTier("cold");
+    assertNotSame(tierConfig, shared);
+    assertEquals(tierConfig.getSegmentTier(), "cold");
+    assertNull(shared.getSegmentTier());
+    assertSame(manager.getCachedIndexLoadingConfig(), shared);
+    assertSame(shared.withSegmentTier(null), shared);
+    verifyNoInteractions(manager._propertyStore);
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigNormalizesTimestampBeforeReuse() {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    Schema first = manager.getCachedIndexLoadingConfig().getSchema();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    assertSame(second.getSchema(), first);
+    assertTrue(first.hasColumn("$ts$DAY"));
+    assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
+    assertEquals(second.getTableConfig().getIndexingConfig().getRangeIndexColumns(), List.of("$ts$DAY"));
+    assertEquals(second.getTableConfig().getIngestionConfig().getTransformConfigs().size(), 1);
+
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
+    manager.onTableConfigOrSchemaRefresh();
+    Schema changed = manager.getCachedIndexLoadingConfig().getSchema();
+    assertNotSame(changed, first);
+    assertTrue(changed.hasColumn("$ts$HOUR"));
+    assertFalse(changed.hasColumn("$ts$DAY"));
+    assertFalse(first.hasColumn("$ts$HOUR"));
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigConcurrentlyReusesCachedSchema()
+      throws Exception {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      List<Future<IndexLoadingConfig>> results = new ArrayList<>();
+      for (int i = 0; i < 32; i++) {
+        results.add(executor.submit(() -> {
+          assertTrue(start.await(10, TimeUnit.SECONDS));
+          return manager.getCachedIndexLoadingConfig();
+        }));
+      }
+      start.countDown();
+      for (Future<IndexLoadingConfig> result : results) {
+        assertSame(result.get(10, TimeUnit.SECONDS), shared);
+      }
+      verifyNoInteractions(manager._propertyStore);
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private static BaseTableDataManager createSchemaReuseManager(TableConfig table, Schema schema) {
+    BaseTableDataManager manager = new OfflineTableDataManager();
+    manager._propertyStore = new FakePropertyStore();
+    manager._tableNameWithType = OFFLINE_TABLE_NAME;
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, table);
+    ZKMetadataProvider.setSchema(manager._propertyStore, schema);
+    manager.updateCachedTableConfigAndSchema(table, schema);
+    manager._propertyStore = spy(manager._propertyStore);
+    return manager;
+  }
+
+  private static Schema createSchemaReuseSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("id", DataType.INT, -1)
+        .addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+  }
+
+  private static TableConfig createTimestampTable(TimestampIndexGranularity granularity) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setFieldConfigList(List.of(new FieldConfig.Builder("ts")
+            .withTimestampConfig(new TimestampConfig(List.of(granularity))).build())).build();
   }
 
   protected BaseTableDataManager createTableManager() {
