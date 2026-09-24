@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -62,13 +63,23 @@ public class RexExpressionToProtoExpression {
     for (RexExpression operand : operands) {
       protoOperands.add(convertExpression(operand));
     }
-    return Expressions.FunctionCall.newBuilder()
+    Expressions.FunctionCall.Builder builder = Expressions.FunctionCall.newBuilder()
         .setDataType(convertColumnDataType(functionCall.getDataType()))
         .setFunctionName(functionCall.getFunctionName())
         .addAllFunctionOperands(protoOperands)
         .setIsDistinct(functionCall.isDistinct())
-        .setIgnoreNulls(functionCall.isIgnoreNulls())
-        .build();
+        .setIgnoreNulls(functionCall.isIgnoreNulls());
+    AggregateCallBinding binding = functionCall.getAggregationBinding();
+    if (binding != null) {
+      Expressions.AggregationFunctionBinding.Builder bindingBuilder =
+          Expressions.AggregationFunctionBinding.newBuilder()
+              .setResultType(convertColumnDataType(binding.getResultType()));
+      for (ColumnDataType argumentType : binding.getArgumentTypes()) {
+        bindingBuilder.addArgumentTypes(convertColumnDataType(argumentType));
+      }
+      builder.setAggregationBinding(bindingBuilder);
+    }
+    return builder.build();
   }
 
   public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {

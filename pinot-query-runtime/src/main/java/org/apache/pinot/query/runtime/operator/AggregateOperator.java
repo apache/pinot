@@ -343,7 +343,8 @@ public class AggregateOperator extends MultiStageOperator {
       }
     }
     return AggregationFunctionFactory.getAggregationFunction(
-        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments,
+            functionCall.getAggregationBinding()), true);
   }
 
   private static String fromColIdToIdentifier(int colId) {
