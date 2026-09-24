@@ -548,6 +548,13 @@ public class RealtimeTableDataManagerTest {
       return new IndexLoadingConfig(_tableConfig, _schema);
     }
 
+    /// Ordinary ONLINE and CONSUMING loads resolve the cached config. Route it through [#fetchIndexLoadingConfig()]
+    /// so tests can pause a load at the point where its config is resolved, before any preload or admission.
+    @Override
+    protected IndexLoadingConfig getCachedIndexLoadingConfig() {
+      return fetchIndexLoadingConfig();
+    }
+
     @Override
     protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
         TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
