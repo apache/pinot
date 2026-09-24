@@ -45,7 +45,10 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -57,6 +60,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -74,8 +78,10 @@ public class SortedMailboxMergeReceiveOperatorTest {
       List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
   private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
   private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 1, 1, 0, 0);
+  private static final String MAILBOX_ID_3 = MailboxIdUtils.toMailboxId(0, 1, 2, 0, 0);
 
   private StageMetadata _stageMetadataBoth;
+  private StageMetadata _stageMetadataThree;
   private StageMetadata _stageMetadata1;
 
   private AutoCloseable _mocks;
@@ -85,12 +91,18 @@ public class SortedMailboxMergeReceiveOperatorTest {
   private ReceivingMailbox _mailbox1;
   @Mock
   private ReceivingMailbox _mailbox2;
+  @Mock
+  private ReceivingMailbox _mailbox3;
 
   @BeforeClass
   public void setUp() {
     MailboxInfos mailboxInfosBoth = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));
     _stageMetadataBoth = new StageMetadata(0,
         Stream.of(0, 1).map(workerId -> new WorkerMetadata(workerId, Map.of(1, mailboxInfosBoth), Map.of()))
+            .collect(Collectors.toList()), Map.of());
+    MailboxInfos mailboxInfosThree = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1, 2)));
+    _stageMetadataThree = new StageMetadata(0,
+        Stream.of(0, 1, 2).map(workerId -> new WorkerMetadata(workerId, Map.of(1, mailboxInfosThree), Map.of()))
             .collect(Collectors.toList()), Map.of());
     MailboxInfos mailboxInfos1 = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0)));
     _stageMetadata1 =
@@ -104,6 +116,7 @@ public class SortedMailboxMergeReceiveOperatorTest {
     when(_mailboxService.getPort()).thenReturn(1234);
     when(_mailbox1.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
     when(_mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+    when(_mailbox3.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
   }
 
   @AfterMethod
@@ -156,6 +169,46 @@ public class SortedMailboxMergeReceiveOperatorTest {
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
       assertEquals(drain(operator), List.of(row4, row1, row5, row2, row6, row3));
+    }
+  }
+
+  @Test
+  public void shouldMergeEqualHeadsAcrossRefillIntoBoundedBlocks() {
+    // Three rows per key move the equal-head batch from 8,190 to 8,193 rows, crossing the 8,192-row usage check.
+    int commonKeys = 2_731;
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(0, commonKeys, 1)),
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(3_000, 1_000, 1)),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(0, commonKeys, 2)),
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(4_000, 1_000, 2)),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_3))).thenReturn(_mailbox3);
+    when(_mailbox3.poll()).thenReturn(
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(0, commonKeys, 3)),
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, sortedRows(5_000, 1_000, 3)),
+        OperatorTestUtil.eosWithEmptyStats());
+
+    ThreadAccountant accountant = mock(ThreadAccountant.class);
+    try (QueryThreadContext ignored = QueryThreadContext.open(QueryExecutionContext.forMseTest(), accountant);
+        SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataThree,
+            RelDistribution.Type.HASH_DISTRIBUTED)) {
+      List<Object[]> rows = new ArrayList<>(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows());
+      assertEquals(rows.size(), 10_000);
+      // Three initial reads, one 8,190 -> 8,193 boundary crossing, and three refills. The exact count also verifies
+      // that ordinary equal-head batches do not sample on every batch.
+      verify(accountant, times(7)).sampleUsage();
+      MseBlock secondBlock = operator.nextBlock();
+      assertEquals(((MseBlock.Data) secondBlock).getNumRows(), 1_193);
+      rows.addAll(((MseBlock.Data) secondBlock).asRowHeap().getRows());
+      int commonRows = commonKeys * 3;
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i)[0], i < commonRows ? i / 3 : 3_000 + i - commonRows);
+      }
+      assertTrue(operator.nextBlock().isSuccess());
     }
   }
 
