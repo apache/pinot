@@ -42,7 +42,6 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -91,10 +90,6 @@ import org.slf4j.LoggerFactory;
 /// populated at load before the metadata is published.
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
-
-  /// Number of derived schemas built so far, JVM-wide, so a test can assert that a load or a query left every
-  /// segment's schema unbuilt.
-  private static final AtomicLong NUM_SCHEMA_MATERIALIZATIONS = new AtomicLong();
 
   private final File _indexDir;
   private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
@@ -427,7 +422,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private Schema buildSchema() {
-    NUM_SCHEMA_MATERIALIZATIONS.incrementAndGet();
     Schema schema = new Schema();
     for (ColumnMetadata columnMetadata : _columnMetadataMap.values()) {
       schema.addField(columnMetadata.getFieldSpec());
@@ -440,13 +434,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @VisibleForTesting
   public boolean isSchemaMaterialized() {
     return _schema != null;
-  }
-
-  /// Number of schemas derived from column metadata so far in this JVM. A load or query path that leaves this
-  /// unchanged did not build any segment's schema.
-  @VisibleForTesting
-  public static long getNumSchemaMaterializations() {
-    return NUM_SCHEMA_MATERIALIZATIONS.get();
   }
 
   /// The keys of the column metadata map, i.e. the same names as `getSchema().getColumnNames()` without building the
