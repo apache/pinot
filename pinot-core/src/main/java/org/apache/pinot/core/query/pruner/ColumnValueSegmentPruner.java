@@ -91,8 +91,13 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     DataSourceMetadata dataSourceMetadata = getDataSourceMetadata(segment, column, dataSourceCache, query);
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
-    if (!checkMinMaxRange(dataSourceMetadata.getMinValue(), dataSourceMetadata.getMaxValue(),
-        cachedValue.getComparableValue())) {
+    Comparable value = cachedValue.getComparableValue();
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    if (minValue != null && value.compareTo(minValue) < 0) {
+      return true;
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null && value.compareTo(maxValue) > 0) {
       return true;
     }
     // Check column partition
