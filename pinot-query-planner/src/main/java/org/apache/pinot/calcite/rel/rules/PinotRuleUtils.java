@@ -27,6 +27,7 @@ import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
@@ -34,6 +35,8 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -45,12 +48,18 @@ import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.BoundAggregationFunction;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class PinotRuleUtils {
@@ -95,6 +104,45 @@ public class PinotRuleUtils {
 
   public static boolean isAggregate(RelNode rel) {
     return unboxRel(rel) instanceof Aggregate;
+  }
+
+  /// Binds against the original input, before an aggregate's operands are replaced with accumulator references.
+  @Nullable
+  public static AggregateCallBinding bindAggregateCall(AggregateCall aggregateCall, RelNode originalInput) {
+    if (aggregateCall.getAggregation() instanceof BoundAggregationFunction) {
+      return ((BoundAggregationFunction) aggregateCall.getAggregation()).getBinding();
+    }
+    String functionName = aggregateCall.getAggregation().getName();
+    if (!AggregationFunctionType.isAggregationFunction(functionName)) {
+      return null;
+    }
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
+    List<Integer> argList = aggregateCall.getArgList();
+    // SQL validation ensures string type options are literals; the input type remains available after filters/sorts.
+    if (!functionType.isTypeBindingRequired(argList.size(), index -> SqlTypeName.STRING_TYPES.contains(
+        originalInput.getRowType().getFieldList().get(argList.get(index)).getType().getSqlTypeName()))) {
+      return null;
+    }
+    List<ColumnDataType> argumentTypes = new ArrayList<>(argList.size());
+    for (Integer index : argList) {
+      argumentTypes.add(RelToPlanNodeConverter.convertToColumnDataType(
+          originalInput.getRowType().getFieldList().get(index).getType()));
+    }
+    // SQL validation has already applied the registered return type rule, including any literal-dependent options.
+    // Physical planning must not try to recover literals from an input that may have been filtered or reordered.
+    return new AggregateCallBinding(argumentTypes,
+        RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.getType()));
+  }
+
+  /// Restores the logical final type after stage splitting, retaining SQL precision when it is already available.
+  public static RelDataType getBoundReturnType(AggregateCall aggregateCall, RelNode input,
+      AggregateCallBinding binding) {
+    RelDataType currentType = aggregateCall.getType();
+    if (RelToPlanNodeConverter.convertToColumnDataType(currentType) == binding.getResultType()) {
+      return currentType;
+    }
+    RelDataTypeFactory typeFactory = input.getCluster().getTypeFactory();
+    return typeFactory.createTypeWithNullability(binding.getResultType().toType(typeFactory), currentType.isNullable());
   }
 
   /// utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the

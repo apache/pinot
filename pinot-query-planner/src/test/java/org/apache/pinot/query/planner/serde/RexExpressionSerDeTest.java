@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -30,6 +31,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class RexExpressionSerDeTest {
@@ -42,6 +44,24 @@ public class RexExpressionSerDeTest {
           ColumnDataType.UUID_ARRAY,
           ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
+
+  @Test
+  public void testBoundAggregateRoundTrip() {
+    AggregateCallBinding binding = new AggregateCallBinding(
+        List.of(ColumnDataType.TIMESTAMP, ColumnDataType.LONG), ColumnDataType.TIMESTAMP);
+    RexExpression.FunctionCall call = new RexExpression.FunctionCall(ColumnDataType.OBJECT, "FIRSTWITHTIME",
+        List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)), false, false, binding);
+    RexExpression.FunctionCall restored = ProtoExpressionToRexExpression.convertFunctionCall(
+        RexExpressionToProtoExpression.convertFunctionCall(call));
+    assertEquals(restored, call);
+    assertEquals(restored.getDataType(), ColumnDataType.OBJECT);
+    assertEquals(restored.getAggregationBinding(), binding);
+
+    RexExpression.FunctionCall legacy = new RexExpression.FunctionCall(ColumnDataType.DOUBLE, "SUM",
+        List.of(new RexExpression.InputRef(0)));
+    assertNull(ProtoExpressionToRexExpression.convertFunctionCall(
+        RexExpressionToProtoExpression.convertFunctionCall(legacy)).getAggregationBinding());
+  }
 
   @Test
   public void testNullLiteral() {
