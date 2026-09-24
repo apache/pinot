@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -39,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -233,14 +236,15 @@ public class UpsertCompactionTaskGeneratorTest {
 
     // no completed segments scenario, there shouldn't be any segment selected for compaction
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, new HashMap<>(),
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            new HashMap<>(), validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
 
     // test with valid crc and thresholds
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -250,8 +254,9 @@ public class UpsertCompactionTaskGeneratorTest {
     // test with a higher invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("60", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
@@ -259,8 +264,9 @@ public class UpsertCompactionTaskGeneratorTest {
     // test without an invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("0", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -270,8 +276,9 @@ public class UpsertCompactionTaskGeneratorTest {
     // test without a invalidRecordsThresholdCount
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -289,8 +296,9 @@ public class UpsertCompactionTaskGeneratorTest {
     validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<>() {
     });
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
 
     // completedSegment is supposed to be filtered out
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
@@ -314,8 +322,9 @@ public class UpsertCompactionTaskGeneratorTest {
     });
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, validDocIdsMetadataInfo, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+            null);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 2);
     Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 0);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
@@ -339,51 +348,53 @@ public class UpsertCompactionTaskGeneratorTest {
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server2")));
     UpsertCompactionTaskGenerator.SegmentSelectionResult result =
-        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-            equalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+            _completedSegmentsMap, equalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
     Map<String, List<ValidDocIdsMetadataInfo>> unequalReplicas = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 60, 40, 100, crc, ServiceStatus.Status.GOOD, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        unequalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, unequalReplicas, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
     assertTrue(result.getSegmentsForDeletion().isEmpty());
 
     Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        oneResponded, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, oneResponded, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
     Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
     Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.STARTING, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        unhealthy, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, unhealthy, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS,
+        null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
 
     Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
         meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
         meta(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
-        mostValidDocs, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, mostValidDocs, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS,
+        null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
     assertTrue(result.getSegmentsForDeletion().isEmpty());
 
@@ -397,16 +408,86 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, List<ValidDocIdsMetadataInfo>> dataCrcMatch = Map.of(segmentName, List.of(
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "5000", ServiceStatus.Status.GOOD, "server1"),
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "5000", ServiceStatus.Status.GOOD, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, dataCrcMap, dataCrcMatch,
-        twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        dataCrcMap, dataCrcMatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertEquals(result.getSegmentsForCompaction().size(), 1);
 
     Map<String, List<ValidDocIdsMetadataInfo>> dataCrcMismatch = Map.of(segmentName, List.of(
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server1"),
         metaWithDataCrc(segmentName, 50, 50, 100, 2000, "9999", ServiceStatus.Status.GOOD, "server2")));
-    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, dataCrcMap, dataCrcMismatch,
-        twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL);
+    result = UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        dataCrcMap, dataCrcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
     assertTrue(result.getSegmentsForCompaction().isEmpty());
+  }
+
+  /// Tests that only a genuine replica disagreement raises the divergence meter. A CRC mismatch, an unhealthy
+  /// server or a short responder list all mean "ask again later", so those skips must leave the meter alone.
+  @Test
+  public void testProcessValidDocIdsMetadataConsensusFailureMeter() {
+    Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
+    String segmentName = _completedSegment.getSegmentName();
+    long crc = _completedSegment.getCrc();
+    Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    // The registry is shared across tests, so compare deltas rather than absolute counts.
+    long baseline = meterCount(controllerMetrics);
+
+    Map<String, List<ValidDocIdsMetadataInfo>> agree = Map.of(segmentName, List.of(
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, agree, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 0, "Agreeing replicas must not raise the meter");
+
+    Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 50, 50, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, crcMismatch, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 0,
+        "A CRC mismatch is a segment reload in flight, not divergence");
+
+    Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.STARTING, "server2")));
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, unhealthy, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 0, "A server that is still starting is not divergence");
+
+    Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1")));
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, oneResponded, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 0, "A short responder list is not divergence");
+
+    Map<String, List<ValidDocIdsMetadataInfo>> disagree = Map.of(segmentName, List.of(
+        meta(segmentName, 50, 50, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 60, 40, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, disagree, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 1,
+        "Replicas reporting different valid doc counts must raise the meter");
+
+    // MOST_VALID_DOCS picks a winner instead of skipping, so it never reports divergence.
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, disagree, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS,
+        controllerMetrics);
+    assertEquals(meterCount(controllerMetrics) - baseline, 1,
+        "MOST_VALID_DOCS resolves the disagreement, so the meter must not move");
+
+    // A null ControllerMetrics is the no-metrics path and must not blow up.
+    UpsertCompactionTaskGenerator.processValidDocIdsMetadata(REALTIME_TABLE_NAME, compactionConfigs,
+        _completedSegmentsMap, disagree, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    assertEquals(meterCount(controllerMetrics) - baseline, 1, "The null-metrics path must not move the meter");
+  }
+
+  private static long meterCount(ControllerMetrics controllerMetrics) {
+    return controllerMetrics.getMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.UPSERT_COMPACTION_SEGMENT_SKIPPED_CONSENSUS_FAILURE).count();
   }
 
   private static ValidDocIdsMetadataInfo meta(String segmentName, long validDocs, long invalidDocs, long totalDocs,
