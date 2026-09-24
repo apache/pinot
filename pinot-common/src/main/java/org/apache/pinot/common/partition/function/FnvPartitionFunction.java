@@ -25,7 +25,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionIdentity;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -49,7 +48,6 @@ public class FnvPartitionFunction implements PartitionFunction {
   private final FnvHashFunctions.Variant _variant;
   private final boolean _useRawBytes;
   private final PartitionIdNormalizer _normalizer;
-  private final PartitionFunctionIdentity _partitionFunctionIdentity;
 
   public FnvPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -69,8 +67,6 @@ public class FnvPartitionFunction implements PartitionFunction {
     _variant = variant;
     _useRawBytes = useRawBytes;
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
-    _partitionFunctionIdentity = PartitionFunctionIdentity.of(FnvPartitionFunction.class, _numPartitions, _normalizer,
-        _variant, _useRawBytes);
   }
 
   @Override
@@ -109,8 +105,33 @@ public class FnvPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return _partitionFunctionIdentity;
+  public boolean canReusePartitionIds(PartitionFunction other) {
+    return equals(other);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
+    if (other == null || getClass() != FnvPartitionFunction.class
+        || other.getClass() != FnvPartitionFunction.class) {
+      return false;
+    }
+    FnvPartitionFunction that = (FnvPartitionFunction) other;
+    return _numPartitions == that._numPartitions && _normalizer == that._normalizer
+        && _variant == that._variant
+        && _useRawBytes == that._useRawBytes;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _numPartitions;
+    result = 31 * result + _normalizer.hashCode();
+    result = 31 * result + _variant.hashCode();
+    result = 31 * result + Boolean.hashCode(_useRawBytes);
+    return result;
   }
 
   // Keep it for backward-compatibility, use getName() instead

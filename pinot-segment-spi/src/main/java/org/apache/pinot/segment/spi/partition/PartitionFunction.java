@@ -64,31 +64,12 @@ public interface PartitionFunction extends Serializable {
     return null;
   }
 
-  /// Returns the canonical identity for this function's effective partitioning behavior, or null to conservatively
-  /// permit reuse only for this exact instance. Implementations should compute the identity once in their constructor
-  /// from every output-affecting setting.
-  @Nullable
-  @JsonIgnore
-  default PartitionFunctionIdentity getPartitionFunctionIdentity() {
-    return null;
-  }
-
-  /// Returns whether this function and the non-null `other` function compute identical partition ids for every input.
-  /// This relation must be reflexive, symmetric and transitive: callers may share ids computed by any member of a
-  /// compatible group, not just this instance. A coarser partitioning or a superset is not sufficient.
-  /// False for distinct instances is conservative, not proof that their results differ.
-  /// Implementations opt in by returning a canonical [PartitionFunctionIdentity] built from all output-affecting
-  /// settings. Identity hashes are cached and collisions are resolved when identities are interned, so this comparison
-  /// is constant-time without making partition pruning probabilistic.
+  /// Returns whether this function and `other` produce identical partition ids for every input.
+  /// Implementations may opt in using immutable value equality over every output-affecting setting.
+  /// Equality must be reflexive, symmetric and transitive; matching hash codes alone are insufficient.
+  /// The default permits reuse only for the same instance, including for existing plugins with unrelated equality.
   default boolean canReusePartitionIds(PartitionFunction other) {
-    if (this == other) {
-      return true;
-    }
-    if (other == null || getClass() != other.getClass()) {
-      return false;
-    }
-    PartitionFunctionIdentity identity = getPartitionFunctionIdentity();
-    return identity != null && identity == other.getPartitionFunctionIdentity();
+    return this == other;
   }
 
   /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id
