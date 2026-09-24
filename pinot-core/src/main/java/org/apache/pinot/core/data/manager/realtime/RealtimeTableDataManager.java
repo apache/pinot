@@ -623,6 +623,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             _isTableReadyToConsumeData);
     // A segment can finish construction after table shutdown has drained the registered segments. Publish and start
     // it together so shutdown either owns its cleanup or rejects it before any consumer is started.
+    // Query threads never take this monitor: they read the segment map lock-free and only take per-segment reference
+    // counts and the upsert view locks. The upsert view locks acquired below (trackSegmentForUpsertView) are leaf
+    // locks that never call back into the table data manager, so holding this monitor while taking them cannot
+    // delay a query. Keep it that way: do not add callbacks from upsert view code into this class.
     synchronized (_segmentDataManagerMap) {
       if (!_shutDown) {
         registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
