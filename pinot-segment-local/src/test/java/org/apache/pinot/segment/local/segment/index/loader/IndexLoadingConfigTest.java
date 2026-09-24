@@ -23,18 +23,26 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -45,6 +53,24 @@ import static org.testng.Assert.*;
 
 public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
+
+  @Test
+  public void testReadModePrecedenceAndOverrideIsolation() {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceConfig.getReadMode()).thenReturn(ReadMode.heap);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setLoadMode("MMAP").build();
+
+    IndexLoadingConfig base = new IndexLoadingConfig(instanceConfig, tableConfig, null);
+    assertEquals(base.getReadMode(), ReadMode.mmap);
+
+    IndexLoadingConfig derived = base.withSegmentTier("coldTier");
+    derived.setReadMode(ReadMode.heap);
+    assertEquals(derived.getReadMode(), ReadMode.heap);
+    assertEquals(base.getReadMode(), ReadMode.mmap);
+
+    assertEquals(new IndexLoadingConfig(instanceConfig, null, null).getReadMode(), ReadMode.heap);
+  }
 
   @Test
   public void testCalculateIndexConfigsWithoutTierOverwrites()
@@ -141,8 +167,10 @@ public class IndexLoadingConfigTest {
         .setStarTreeIndexConfigs(List.of(stIdxCfg))
         .setTierOverwrites(JsonUtils.stringToJsonNode("{\"coldTier\": {\"starTreeIndexConfigs\": []}}"))
         .setFieldConfigList(Arrays.asList(col1Cfg, col2Cfg)).build();
-    IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
-    ilc.setSegmentTier("coldTier");
+    IndexLoadingConfig base = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    IndexLoadingConfig ilc = base.withSegmentTier("coldTier");
+    assertSame(base.withSegmentTier(null), base);
+    assertNull(base.getSegmentTier());
     // Check index configs for coldTier
     assertEquals(ilc.getStarTreeIndexConfigs().size(), 0);
     Map<String, FieldIndexConfigs> allFieldCfgs = ilc.getFieldIndexConfigByColName();
@@ -154,6 +182,36 @@ public class IndexLoadingConfigTest {
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+    assertEquals(base.getStarTreeIndexConfigs().size(), 1);
+    assertTrue(base.getFieldIndexConfig("col1").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertTrue(base.getFieldIndexConfig("col2").getConfig(StandardIndexes.dictionary()).isEnabled());
+  }
+
+  @Test
+  public void testDerivedConfigIsolatesSegmentColumns()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of())).build();
+    FieldConfig fieldConfig = JsonUtils.stringToObject(
+        "{\"name\":\"event\",\"indexes\":{\"open_struct\":{}}}", FieldConfig.class);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(List.of(fieldConfig)).build();
+    IndexLoadingConfig base = new IndexLoadingConfig(tableConfig, schema);
+    ColumnMetadata child = mock(ColumnMetadata.class);
+    when(child.getFieldSpec()).thenReturn(new DimensionFieldSpec("event$key", DataType.INT, true));
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    when(metadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("event$key", child)));
+
+    IndexLoadingConfig derived = base.withOpenStructChildConfigs(metadata);
+    assertNotSame(derived, base);
+    assertNotNull(derived.getFieldIndexConfig("event$key"));
+    assertNull(base.getFieldIndexConfig("event$key"));
+
+    TableConfig schemaLessTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig schemaLess = new IndexLoadingConfig(schemaLessTable, null);
+    derived = schemaLess.withKnownColumns(Set.of("segmentColumn"));
+    assertNotNull(derived.getFieldIndexConfig("segmentColumn"));
+    assertNull(schemaLess.getFieldIndexConfig("segmentColumn"));
   }
 
   @Test

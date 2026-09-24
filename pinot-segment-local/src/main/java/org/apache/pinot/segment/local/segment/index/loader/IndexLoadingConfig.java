@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -44,64 +45,200 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
-/// Table level index loading config.
+/// Index loading config with shared table-level state and segment-local mutable overrides.
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
 
-  private final InstanceDataManagerConfig _instanceDataManagerConfig;
-  private final TableConfig _tableConfig;
-  private final Schema _schema;
+  private final ImmutableState _immutableState;
 
-  // These fields can be modified after initialization
-  // TODO: Revisit them
-  private ReadMode _readMode = ReadMode.DEFAULT_MODE;
-  private SegmentVersion _segmentVersion;
+  // Mutable config and segment-specific overrides.
+  @Nullable
+  private ReadMode _readModeOverride;
+  @Nullable
+  private SegmentVersion _segmentVersionOverride;
   private String _segmentTier;
   private Set<String> _knownColumns;
   private String _tableDataDir;
   private boolean _errorOnColumnBuildFailure;
   private boolean _forwardIndexOnly;
+  private ResolvedIndexState _resolvedIndexState;
 
-  // Initialized by instance data manager config
-  private String _instanceId;
-  private boolean _isRealtimeOffHeapAllocation;
-  private boolean _isDirectRealtimeOffHeapAllocation;
-  private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
-  private String _segmentStoreURI;
-  private String _segmentDirectoryLoader;
-  private Map<String, Map<String, String>> _instanceTierConfigs;
+  /// Immutable table-level state shared by derived segment configs.
+  private static final class ImmutableState {
+    @Nullable
+    private final InstanceDataManagerConfig _instanceDataManagerConfig;
+    @Nullable
+    private final TableConfig _tableConfig;
+    @Nullable
+    private final Schema _schema;
+    private final ReadMode _readMode;
+    @Nullable
+    private final SegmentVersion _segmentVersion;
+    @Nullable
+    private final String _instanceId;
+    private final boolean _isRealtimeOffHeapAllocation;
+    private final boolean _isDirectRealtimeOffHeapAllocation;
+    private final int _realtimeAvgMultiValueCount;
+    @Nullable
+    private final String _segmentStoreURI;
+    @Nullable
+    private final String _segmentDirectoryLoader;
+    @Nullable
+    private final Map<String, Map<String, String>> _instanceTierConfigs;
+    private final List<String> _sortedColumns;
+    private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
+    private final boolean _hasOpenStructColumns;
 
-  // Initialized by table config and schema
-  private List<String> _sortedColumns = List.of();
-  private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
-  private boolean _enableDynamicStarTreeCreation;
-  private List<StarTreeIndexConfig> _starTreeIndexConfigs;
-  private boolean _enableDefaultStarTree;
-  private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
-  private boolean _skipSegmentPreprocess;
+    private ImmutableState(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
+        @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+      _instanceDataManagerConfig = instanceDataManagerConfig;
+      _tableConfig = tableConfig;
+      _schema = schema;
 
-  private boolean _dirty = true;
+      String instanceId = null;
+      boolean isRealtimeOffHeapAllocation = false;
+      boolean isDirectRealtimeOffHeapAllocation = false;
+      int realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
+      ReadMode readMode = ReadMode.DEFAULT_MODE;
+      SegmentVersion segmentVersion = null;
+      String segmentStoreURI = null;
+      String segmentDirectoryLoader = null;
+      Map<String, Map<String, String>> instanceTierConfigs = null;
+      if (instanceDataManagerConfig != null) {
+        ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
+        if (instanceReadMode != null) {
+          readMode = instanceReadMode;
+        }
+        String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
+        if (instanceSegmentVersion != null) {
+          segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
+        }
+        instanceId = instanceDataManagerConfig.getInstanceId();
+        isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+        isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
+        String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
+        if (avgMultiValueCount != null) {
+          realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
+        }
+        segmentStoreURI = instanceDataManagerConfig.getSegmentStoreUri();
+        segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
+        Map<String, Map<String, String>> tierConfigs = instanceDataManagerConfig.getTierConfigs();
+        instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
+      }
 
-  private MultiColumnTextIndexConfig _multiColTextIndexConfig;
+      List<String> sortedColumns = List.of();
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
+      boolean hasOpenStructColumns = false;
+      if (tableConfig != null) {
+        if (schema != null) {
+          TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+          for (ComplexFieldSpec fieldSpec : schema.getComplexFieldSpecs()) {
+            if (fieldSpec.getDataType() == DataType.OPEN_STRUCT) {
+              hasOpenStructColumns = true;
+              break;
+            }
+          }
+        }
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        String tableReadMode = indexingConfig.getLoadMode();
+        if (tableReadMode != null) {
+          readMode = ReadMode.getEnum(tableReadMode);
+        }
+        String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
+        if (tableSegmentVersion != null) {
+          segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
+        }
+        List<String> tableSortedColumns = indexingConfig.getSortedColumn();
+        if (tableSortedColumns != null) {
+          sortedColumns = tableSortedColumns;
+        }
+        String generatorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
+        if (generatorMode != null) {
+          columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.valueOf(generatorMode.toUpperCase());
+        }
+      }
+
+      _instanceId = instanceId;
+      _readMode = readMode;
+      _segmentVersion = segmentVersion;
+      _isRealtimeOffHeapAllocation = isRealtimeOffHeapAllocation;
+      _isDirectRealtimeOffHeapAllocation = isDirectRealtimeOffHeapAllocation;
+      _realtimeAvgMultiValueCount = realtimeAvgMultiValueCount;
+      _segmentStoreURI = segmentStoreURI;
+      _segmentDirectoryLoader = segmentDirectoryLoader;
+      _instanceTierConfigs = instanceTierConfigs;
+      _sortedColumns = sortedColumns;
+      _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
+      _hasOpenStructColumns = hasOpenStructColumns;
+    }
+  }
+
+  /// Index settings resolved from the table config, segment tier, schema, and known segment columns.
+  private static final class ResolvedIndexState {
+    private static final ResolvedIndexState EMPTY =
+        new ResolvedIndexState(false, null, false, Map.of(), false, null);
+
+    private final boolean _enableDynamicStarTreeCreation;
+    @Nullable
+    private final List<StarTreeIndexConfig> _starTreeIndexConfigs;
+    private final boolean _enableDefaultStarTree;
+    private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
+    private final boolean _skipSegmentPreprocess;
+    @Nullable
+    private final MultiColumnTextIndexConfig _multiColTextIndexConfig;
+
+    private ResolvedIndexState(boolean enableDynamicStarTreeCreation,
+        @Nullable List<StarTreeIndexConfig> starTreeIndexConfigs, boolean enableDefaultStarTree,
+        Map<String, FieldIndexConfigs> indexConfigsByColName, boolean skipSegmentPreprocess,
+        @Nullable MultiColumnTextIndexConfig multiColTextIndexConfig) {
+      _enableDynamicStarTreeCreation = enableDynamicStarTreeCreation;
+      _starTreeIndexConfigs = starTreeIndexConfigs;
+      _enableDefaultStarTree = enableDefaultStarTree;
+      _indexConfigsByColName = indexConfigsByColName;
+      _skipSegmentPreprocess = skipSegmentPreprocess;
+      _multiColTextIndexConfig = multiColTextIndexConfig;
+    }
+
+    private ResolvedIndexState withIndexConfigsByColName(Map<String, FieldIndexConfigs> indexConfigsByColName) {
+      return new ResolvedIndexState(_enableDynamicStarTreeCreation, _starTreeIndexConfigs, _enableDefaultStarTree,
+          indexConfigsByColName, _skipSegmentPreprocess, _multiColTextIndexConfig);
+    }
+  }
 
   /// NOTE: This step might modify the passed in table config and schema.
   ///
   /// TODO: Revisit the init handling. Currently it doesn't apply tiered config override
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig, @Nullable Schema schema) {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    _tableConfig = tableConfig;
-    _schema = schema;
-    init();
+    _immutableState = new ImmutableState(instanceDataManagerConfig, tableConfig, schema);
+    if (tableConfig != null) {
+      refreshIndexConfigs();
+    }
+  }
+
+  /// Creates a segment-local wrapper around the already processed table-level config. The wrapper shares the
+  /// table config, schema, and resolved index configs until a segment-specific override requires a local copy.
+  private IndexLoadingConfig(IndexLoadingConfig source) {
+    _immutableState = source._immutableState;
+    _readModeOverride = source._readModeOverride;
+    _segmentVersionOverride = source._segmentVersionOverride;
+    _segmentTier = source._segmentTier;
+    _knownColumns = source._knownColumns;
+    _tableDataDir = source._tableDataDir;
+    _errorOnColumnBuildFailure = source._errorOnColumnBuildFailure;
+    _forwardIndexOnly = source._forwardIndexOnly;
+    _resolvedIndexState = source._resolvedIndexState;
   }
 
   @VisibleForTesting
@@ -121,88 +258,22 @@ public class IndexLoadingConfig {
 
   @Nullable
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
-    return _instanceDataManagerConfig;
+    return _immutableState._instanceDataManagerConfig;
   }
 
   @Nullable
   public TableConfig getTableConfig() {
-    return _tableConfig;
+    return _immutableState._tableConfig;
   }
 
   @Nullable
   public Schema getSchema() {
-    return _schema;
-  }
-
-  private void init() {
-    if (_instanceDataManagerConfig != null) {
-      extractFromInstanceConfig();
-    }
-    if (_tableConfig != null) {
-      extractFromTableConfigAndSchema();
-    }
-  }
-
-  private void extractFromInstanceConfig() {
-    _instanceId = _instanceDataManagerConfig.getInstanceId();
-
-    ReadMode instanceReadMode = _instanceDataManagerConfig.getReadMode();
-    if (instanceReadMode != null) {
-      _readMode = instanceReadMode;
-    }
-
-    String instanceSegmentVersion = _instanceDataManagerConfig.getSegmentFormatVersion();
-    if (instanceSegmentVersion != null) {
-      _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
-    }
-
-    _isRealtimeOffHeapAllocation = _instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffHeapAllocation = _instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
-
-    String avgMultiValueCount = _instanceDataManagerConfig.getAvgMultiValueCount();
-    if (avgMultiValueCount != null) {
-      _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
-    }
-    _segmentStoreURI = _instanceDataManagerConfig.getSegmentStoreUri();
-    _segmentDirectoryLoader = _instanceDataManagerConfig.getSegmentDirectoryLoader();
-
-    Map<String, Map<String, String>> tierConfigs = _instanceDataManagerConfig.getTierConfigs();
-    _instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
-  }
-
-  private void extractFromTableConfigAndSchema() {
-    if (_schema != null) {
-      TimestampIndexUtils.applyTimestampIndex(_tableConfig, _schema);
-    }
-
-    IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    String tableReadMode = indexingConfig.getLoadMode();
-    if (tableReadMode != null) {
-      _readMode = ReadMode.getEnum(tableReadMode);
-    }
-
-    List<String> sortedColumns = indexingConfig.getSortedColumn();
-    if (sortedColumns != null) {
-      _sortedColumns = sortedColumns;
-    }
-
-    String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
-    if (tableSegmentVersion != null) {
-      _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
-    }
-
-    String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
-    if (columnMinMaxValueGeneratorMode != null) {
-      _columnMinMaxValueGeneratorMode =
-          ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
-    }
-
-    refreshIndexConfigs();
+    return _immutableState._schema;
   }
 
   public void refreshIndexConfigs() {
-    if (_tableConfig == null) {
-      _dirty = false;
+    if (_immutableState._tableConfig == null) {
+      _resolvedIndexState = ResolvedIndexState.EMPTY;
       return;
     }
     // Accessing the index configs for single-column index is handled by IndexType.getConfig() as defined in index-spi.
@@ -210,112 +281,105 @@ public class IndexLoadingConfig {
     // specific index configs transparently.
     TableConfig tableConfig = getTableConfigWithTierOverwrites();
     Schema schema = inferSchema();
-    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+    Map<String, FieldIndexConfigs> indexConfigsByColName =
+        FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
     // Accessing the StarTree index configs is not handled by IndexType.getConfig(), so we manually update them.
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
-    _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
-    _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
-    _multiColTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
-    _skipSegmentPreprocess = indexingConfig.isSkipSegmentPreprocess();
-    _dirty = false;
+    _resolvedIndexState = new ResolvedIndexState(indexingConfig.isEnableDynamicStarTreeCreation(),
+        indexingConfig.getStarTreeIndexConfigs(), indexingConfig.isEnableDefaultStarTree(), indexConfigsByColName,
+        indexingConfig.isSkipSegmentPreprocess(), indexingConfig.getMultiColumnTextIndexConfig());
+  }
+
+  private ResolvedIndexState getResolvedIndexState() {
+    if (_resolvedIndexState == null) {
+      refreshIndexConfigs();
+    }
+    return _resolvedIndexState;
   }
 
   private TableConfig getTableConfigWithTierOverwrites() {
-    return (_segmentTier == null || _tableConfig == null) ? _tableConfig
-        : TableConfigUtils.overwriteTableConfigForTier(_tableConfig, _segmentTier);
+    return _segmentTier == null || _immutableState._tableConfig == null ? _immutableState._tableConfig
+        : TableConfigUtils.overwriteTableConfigForTier(_immutableState._tableConfig, _segmentTier);
   }
 
   private Schema inferSchema() {
-    if (_schema != null) {
-      return _schema;
+    if (_immutableState._schema != null) {
+      return _immutableState._schema;
     }
     Schema schema = new Schema();
     for (String column : getAllKnownColumns()) {
-      schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true));
+      schema.addField(new DimensionFieldSpec(column, DataType.STRING, true));
     }
     return schema;
   }
 
   public ReadMode getReadMode() {
-    return _readMode;
+    return _readModeOverride != null ? _readModeOverride : _immutableState._readMode;
   }
 
   public void setReadMode(ReadMode readMode) {
-    _readMode = readMode;
+    _readModeOverride = readMode;
   }
 
   public List<String> getSortedColumns() {
-    return unmodifiable(_sortedColumns);
+    return unmodifiable(_immutableState._sortedColumns);
   }
 
   public boolean isEnableDynamicStarTreeCreation() {
-    if (_dirty) {
-      refreshIndexConfigs();
-    }
-    return _enableDynamicStarTreeCreation;
+    return getResolvedIndexState()._enableDynamicStarTreeCreation;
   }
 
   @Nullable
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
-    if (_dirty) {
-      refreshIndexConfigs();
-    }
-    return unmodifiable(_starTreeIndexConfigs);
+    return unmodifiable(getResolvedIndexState()._starTreeIndexConfigs);
   }
 
   @Nullable
   public MultiColumnTextIndexConfig getMultiColTextIndexConfig() {
-    if (_dirty) {
-      refreshIndexConfigs();
-    }
-    return _multiColTextIndexConfig;
+    return getResolvedIndexState()._multiColTextIndexConfig;
   }
 
   public boolean isEnableDefaultStarTree() {
-    if (_dirty) {
-      refreshIndexConfigs();
-    }
-    return _enableDefaultStarTree;
+    return getResolvedIndexState()._enableDefaultStarTree;
   }
 
   @Nullable
   public SegmentVersion getSegmentVersion() {
-    return _segmentVersion;
+    return _segmentVersionOverride != null ? _segmentVersionOverride : _immutableState._segmentVersion;
   }
 
   /// For tests only.
   public void setSegmentVersion(SegmentVersion segmentVersion) {
-    _segmentVersion = segmentVersion;
+    _segmentVersionOverride = segmentVersion;
   }
 
   public boolean isRealtimeOffHeapAllocation() {
-    return _isRealtimeOffHeapAllocation;
+    return _immutableState._isRealtimeOffHeapAllocation;
   }
 
   public boolean isDirectRealtimeOffHeapAllocation() {
-    return _isDirectRealtimeOffHeapAllocation;
+    return _immutableState._isDirectRealtimeOffHeapAllocation;
   }
 
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
-    return _columnMinMaxValueGeneratorMode;
+    return _immutableState._columnMinMaxValueGeneratorMode;
   }
 
   public String getSegmentStoreURI() {
-    return _segmentStoreURI;
+    return _immutableState._segmentStoreURI;
   }
 
   public int getRealtimeAvgMultiValueCount() {
-    return _realtimeAvgMultiValueCount;
+    return _immutableState._realtimeAvgMultiValueCount;
   }
 
   public String getSegmentDirectoryLoader() {
-    return StringUtils.isNotBlank(_segmentDirectoryLoader) ? _segmentDirectoryLoader
+    return StringUtils.isNotBlank(_immutableState._segmentDirectoryLoader) ? _immutableState._segmentDirectoryLoader
         : SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME;
   }
 
   public String getInstanceId() {
-    return _instanceId;
+    return _immutableState._instanceId;
   }
 
   public String getSegmentTier() {
@@ -323,8 +387,26 @@ public class IndexLoadingConfig {
   }
 
   public void setSegmentTier(String segmentTier) {
+    if (Objects.equals(_segmentTier, segmentTier)) {
+      return;
+    }
     _segmentTier = segmentTier;
-    _dirty = true;
+    _resolvedIndexState = null;
+  }
+
+  public IndexLoadingConfig withSegmentTier(@Nullable String segmentTier) {
+    if (Objects.equals(_segmentTier, segmentTier)) {
+      return this;
+    }
+    return copyWithSegmentTier(segmentTier);
+  }
+
+  /// Creates a segment-local mutable wrapper with the given tier. This always creates a wrapper, even when the tier is
+  /// unchanged, so callers can safely apply additional segment-specific overrides.
+  public IndexLoadingConfig copyWithSegmentTier(@Nullable String segmentTier) {
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived.setSegmentTier(segmentTier);
+    return derived;
   }
 
   public String getTableDataDir() {
@@ -352,25 +434,16 @@ public class IndexLoadingConfig {
   }
 
   public boolean isSkipSegmentPreprocess() {
-    if (_dirty) {
-      refreshIndexConfigs();
-    }
-    return _skipSegmentPreprocess;
+    return getResolvedIndexState()._skipSegmentPreprocess;
   }
 
   @Nullable
   public FieldIndexConfigs getFieldIndexConfig(String columnName) {
-    if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigs();
-    }
-    return _indexConfigsByColName.get(columnName);
+    return getResolvedIndexState()._indexConfigsByColName.get(columnName);
   }
 
   public Map<String, FieldIndexConfigs> getFieldIndexConfigByColName() {
-    if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigs();
-    }
-    return unmodifiable(_indexConfigsByColName);
+    return unmodifiable(getResolvedIndexState()._indexConfigsByColName);
   }
 
   /// Returns a subset of the columns on the table.
@@ -379,10 +452,11 @@ public class IndexLoadingConfig {
   /// tries its bests to get the columns from other attributes like [#getTableConfig()], which may also not be
   /// defined or may not be complete.
   private Set<String> getAllKnownColumns() {
-    assert _tableConfig != null && _schema == null;
+    assert _immutableState._tableConfig != null && _immutableState._schema == null;
     if (_knownColumns == null) {
-      Set<String> knownColumns = _tableConfig.getIndexingConfig().getAllReferencedColumns();
-      List<FieldConfig> fieldConfigs = _tableConfig.getFieldConfigList();
+      Set<String> knownColumns =
+          new HashSet<>(_immutableState._tableConfig.getIndexingConfig().getAllReferencedColumns());
+      List<FieldConfig> fieldConfigs = _immutableState._tableConfig.getFieldConfigList();
       if (fieldConfigs != null) {
         for (FieldConfig fieldConfig : fieldConfigs) {
           knownColumns.add(fieldConfig.getName());
@@ -394,7 +468,7 @@ public class IndexLoadingConfig {
   }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
-    return unmodifiable(_instanceTierConfigs);
+    return unmodifiable(_immutableState._instanceTierConfigs);
   }
 
   private <E> List<E> unmodifiable(List<E> list) {
@@ -409,20 +483,23 @@ public class IndexLoadingConfig {
     return map == null ? null : Collections.unmodifiableMap(map);
   }
 
-  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
-    if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigs();
+  public IndexLoadingConfig withOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    if (!_immutableState._hasOpenStructColumns) {
+      return this;
     }
+    ResolvedIndexState resolvedIndexState = getResolvedIndexState();
+    Map<String, FieldIndexConfigs> indexConfigsByColName = resolvedIndexState._indexConfigsByColName;
+    Map<String, FieldIndexConfigs> updatedConfigs = null;
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String childColumn = entry.getKey();
-      if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
+      if (!childColumn.contains(OpenStructNaming.SEPARATOR) || indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
       if (OpenStructNaming.isSparseColumn(childColumn)) {
         continue;
       }
       String parentColumn = OpenStructNaming.parseParentColumn(childColumn);
-      FieldIndexConfigs parentConfigs = _indexConfigsByColName.get(parentColumn);
+      FieldIndexConfigs parentConfigs = indexConfigsByColName.get(parentColumn);
       if (parentConfigs == null) {
         continue;
       }
@@ -442,16 +519,39 @@ public class IndexLoadingConfig {
           FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
           .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
           .build();
-      _indexConfigsByColName.put(childColumn, childConfigs);
+      if (updatedConfigs == null) {
+        updatedConfigs = new HashMap<>(indexConfigsByColName);
+      }
+      updatedConfigs.put(childColumn, childConfigs);
     }
+    if (updatedConfigs == null) {
+      return this;
+    }
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived._resolvedIndexState = resolvedIndexState.withIndexConfigsByColName(updatedConfigs);
+    return derived;
+  }
+
+  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    _resolvedIndexState = withOpenStructChildConfigs(segmentMetadata)._resolvedIndexState;
+  }
+
+  public IndexLoadingConfig withKnownColumns(Set<String> columns) {
+    if (_knownColumns != null && _knownColumns.containsAll(columns)) {
+      return this;
+    }
+    IndexLoadingConfig derived = new IndexLoadingConfig(this);
+    derived.addKnownColumns(columns);
+    return derived;
   }
 
   public void addKnownColumns(Set<String> columns) {
-    if (_knownColumns == null) {
-      _knownColumns = new HashSet<>(columns);
-    } else {
-      _knownColumns.addAll(columns);
+    if (_knownColumns != null && _knownColumns.containsAll(columns)) {
+      return;
     }
-    _dirty = true;
+    Set<String> knownColumns = _knownColumns != null ? new HashSet<>(_knownColumns) : new HashSet<>();
+    knownColumns.addAll(columns);
+    _knownColumns = knownColumns;
+    _resolvedIndexState = null;
   }
 }
