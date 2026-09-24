@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.partition.function.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -31,9 +30,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.joda.time.Interval;
 import org.mockito.Mockito;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,13 +48,8 @@ public class SegmentMetadataMockUtils {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(columns);
     when(segmentMetadata.getAllColumns()).thenReturn(columns.navigableKeySet());
     when(segmentMetadata.getAllColumnMetadata()).thenReturn(columns.values());
-    when(segmentMetadata.getNumColumns()).thenReturn(columns.size());
     when(segmentMetadata.getColumnMetadataFor(anyString())).thenAnswer(
         call -> columns.get(call.<String>getArgument(0)));
-    doAnswer(call -> {
-      columns.forEach(call.<BiConsumer<String, ColumnMetadata>>getArgument(0));
-      return null;
-    }).when(segmentMetadata).forEachColumn(any());
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,

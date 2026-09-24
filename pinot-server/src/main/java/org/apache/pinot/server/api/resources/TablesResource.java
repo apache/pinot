@@ -396,7 +396,7 @@ public class TablesResource {
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getNumColumns();
+      additionalCount = segment.getSegmentMetadata().getAllColumns().size();
     } else {
       for (String column : columnFilter) {
         if (segment.getSegmentMetadata().getColumnMetadataFor(column) != null) {

@@ -27,7 +27,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
@@ -115,26 +114,11 @@ public interface SegmentMetadata {
     return getSchema().getColumnNames();
   }
 
-  /// Number of columns in [#getAllColumns()].
-  ///
-  /// A segment that holds no column metadata (a CONSUMING one, built from an explicit schema) still reports its
-  /// schema's columns here, so this is not the size of [#getAllColumnMetadata()]: do not pair the two.
-  default int getNumColumns() {
-    return getColumnMetadataMap().size();
-  }
-
   /// The column metadata of every column that has some, in the natural column-name order of [#getAllColumns()], and
   /// empty for a segment that holds none (a CONSUMING one, which answers [#getColumnMetadataFor(String)] with `null`
   /// for every column of its schema).
   default Collection<ColumnMetadata> getAllColumnMetadata() {
     return getColumnMetadataMap().values();
-  }
-
-  /// Applies `action` to every (column name, column metadata) pair, in the natural column-name order of
-  /// [#getAllColumns()], and to nothing at all for a segment that holds no column metadata, exactly as
-  /// [#getAllColumnMetadata()] is empty for one.
-  default void forEachColumn(BiConsumer<String, ColumnMetadata> action) {
-    getColumnMetadataMap().forEach(action);
   }
 
   /// Returns the whole column metadata as a map, for callers that need one.
@@ -143,7 +127,7 @@ public interface SegmentMetadata {
   /// on demand, so load- and query-path code must not call this: it re-inflates a map entry per column for every
   /// segment it touches, and a server keeps that for the segment's lifetime. Read column names through
   /// [#getAllColumns()], one column through [#getColumnMetadataFor(String)], all of them through
-  /// [#getAllColumnMetadata()] or [#forEachColumn(BiConsumer)], and mutate through
+  /// [#getAllColumnMetadata()], and mutate through
   /// [#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)] rather than through the returned map,
   /// whose writes an implementation is free not to see.
   TreeMap<String, ColumnMetadata> getColumnMetadataMap();

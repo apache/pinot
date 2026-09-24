@@ -21,13 +21,10 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.function.BiConsumer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 
@@ -44,12 +41,7 @@ final class MockSegmentMetadata {
     when(metadata.getColumnMetadataMap()).thenReturn(sorted);
     when(metadata.getAllColumns()).thenReturn(Collections.unmodifiableNavigableSet(sorted.navigableKeySet()));
     when(metadata.getAllColumnMetadata()).thenReturn(Collections.unmodifiableCollection(sorted.values()));
-    when(metadata.getNumColumns()).thenReturn(sorted.size());
     when(metadata.getColumnMetadataFor(anyString())).thenAnswer(call -> sorted.get(call.<String>getArgument(0)));
-    doAnswer(call -> {
-      sorted.forEach(call.<BiConsumer<String, ColumnMetadata>>getArgument(0));
-      return null;
-    }).when(metadata).forEachColumn(any());
     return metadata;
   }
 }
