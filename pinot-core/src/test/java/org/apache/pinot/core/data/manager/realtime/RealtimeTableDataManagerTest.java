@@ -24,6 +24,8 @@ import com.google.common.cache.RemovalNotification;
 import java.io.File;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -391,6 +393,36 @@ public class RealtimeTableDataManagerTest {
       finishTransition.countDown();
       transitionThread.join(10000);
       shutdownThread.join(10000);
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  @Test
+  public void testCommittingSegmentDownloadAbortsAfterShutdown()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("committing-download-shutdown").toFile();
+    LifecycleTableDataManager table = spy(
+        new LifecycleTableDataManager(indexDir, mock(RealtimeSegmentDataManager.class), false, () -> { }));
+    // The pauseless wait derives its timeout from the stream config, so give the cached table config one.
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.topic.name", "lifecycle");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("lifecycle")
+        .setStreamConfigs(streamConfigs).build();
+    FieldUtils.writeField(table, "_cachedTableConfigAndSchema",
+        Pair.of(tableConfig, table.getCachedTableConfigAndSchema().getRight()), true);
+    SegmentZKMetadata committing = new SegmentZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    committing.setStatus(CommonConstants.Segment.Realtime.Status.COMMITTING);
+    doReturn(committing).when(table).fetchZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    try {
+      table.shutDown();
+      // A stale wait must abort before polling ZK again instead of holding the shared segment lock until the timeout.
+      IllegalStateException failure =
+          expectThrows(IllegalStateException.class, () -> table.downloadSegment(committing));
+      assertTrue(failure.getMessage().contains("already shut down"), failure.getMessage());
+      verify(table, never()).fetchZKMetadata(LifecycleTableDataManager.SEGMENT_NAME);
+    } finally {
       FileUtils.deleteDirectory(indexDir);
     }
   }

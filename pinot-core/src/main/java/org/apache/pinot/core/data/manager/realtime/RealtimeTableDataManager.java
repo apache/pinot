@@ -673,6 +673,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     long downloadTimeoutMs = getDownloadTimeoutMs(getCachedTableConfigAndSchema().getLeft());
     long deadlineMs = System.currentTimeMillis() + downloadTimeoutMs;
     while (System.currentTimeMillis() < deadlineMs) {
+      // A deleted table's transition can wait here for minutes while holding the shared per-segment lock. Abort so a
+      // recreated same-name table's operations on this segment are not blocked behind, or served by, a stale wait.
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot download COMMITTING segment: %s of table: %s", segmentName,
+          _tableNameWithType);
       // ZK Metadata may change during segment download process; fetch it on every retry.
       zkMetadata = fetchZKMetadata(segmentName);
       if (zkMetadata.getStatus().isCompleted()) {

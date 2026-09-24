@@ -1547,17 +1547,29 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         break;
       }
+      // Nothing stops a segment that never started consuming, so re-check the table between retries: once it is
+      // shut down, a retry could be accepted on behalf of a recreated same-name table's segment.
+      if (isTableDataManagerShutDown()) {
+        _segmentLogger.info("Stop retrying segmentStoppedConsuming for segment: {}, table data manager is already "
+            + "shut down", _segmentNameStr);
+        break;
+      }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
   }
 
+  /// Whether the owning table data manager has been shut down (the table was deleted, or the server is stopping).
+  private boolean isTableDataManagerShutDown() {
+    return _realtimeTableDataManager != null && _realtimeTableDataManager.isShutDown();
+  }
+
   @VisibleForTesting
   void postStopConsumedMsgForInitializationError() {
-    if (_realtimeTableDataManager != null && _realtimeTableDataManager.isShutDown()) {
-      // The table was shut down (deleted, or the server is stopping) after initialization failed. Its Helix state no
-      // longer matters, and a recreated table with the same name may already own this segment name, so asking the
-      // controller to mark the segment OFFLINE could deregister the new table's consuming replica instead.
+    if (isTableDataManagerShutDown()) {
+      // The table was shut down after initialization failed. Its Helix state no longer matters, and a recreated table
+      // with the same name may already own this segment name, so asking the controller to mark the segment OFFLINE
+      // could deregister the new table's consuming replica instead.
       _segmentLogger.info("Skip segmentStoppedConsuming for segment: {}, table data manager is already shut down",
           _segmentNameStr);
       return;
