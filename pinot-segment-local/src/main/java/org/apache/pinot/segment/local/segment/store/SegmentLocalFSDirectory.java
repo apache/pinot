@@ -53,8 +53,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   // matches most systems
   private static final int PAGE_SIZE_BYTES = 4096;
-  // Prefetch limit...arbitrary but related to common server memory and data size profiles
-  private static final long MAX_MMAP_PREFETCH_PAGES = 100 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
   private static final double PREFETCH_SLOWDOWN_PCT = 0.67;
   private static final AtomicLong PREFETCHED_PAGES = new AtomicLong(0);
 
@@ -63,6 +61,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final ReadMode _readMode;
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
   private final SegmentLock _segmentLock = new SegmentLock();
+  private final long _maxMmapPrefetchPages;
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
@@ -76,6 +75,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     _segmentDirectory = null;
     _readMode = null;
     _segmentDirectoryLoaderContext = null;
+    _maxMmapPrefetchPages = toPrefetchPages(CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES);
   }
 
   public SegmentLocalFSDirectory(File indexDir, ReadMode readMode)
@@ -97,6 +97,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     _segmentMetadata = metadata;
     _readMode = readMode;
     _segmentDirectoryLoaderContext = segmentDirectoryLoaderContext;
+    _maxMmapPrefetchPages = toPrefetchPages(getMaxMmapPrefetchBytes(segmentDirectoryLoaderContext));
 
     try {
       load();
@@ -299,6 +300,17 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  private static long toPrefetchPages(long maxMmapPrefetchBytes) {
+    Preconditions.checkArgument(maxMmapPrefetchBytes >= 0, "Max mmap prefetch bytes must be non-negative, got: %s",
+        maxMmapPrefetchBytes);
+    return maxMmapPrefetchBytes / PAGE_SIZE_BYTES;
+  }
+
+  private static long getMaxMmapPrefetchBytes(@Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext) {
+    return segmentDirectoryLoaderContext == null ? CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES
+        : segmentDirectoryLoaderContext.getMaxMmapPrefetchBytes();
+  }
+
   private PinotDataBuffer getIndexForColumn(String column, IndexType<?, ?, ?> type)
       throws IOException {
     PinotDataBuffer buffer;
@@ -331,11 +343,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     // an optimization.
 
     // Prefetch limit and slowdown percentage are arbitrary
-    if (PREFETCHED_PAGES.get() >= MAX_MMAP_PREFETCH_PAGES) {
+    if (PREFETCHED_PAGES.get() >= _maxMmapPrefetchPages) {
       return;
     }
 
-    final long prefetchSlowdownPageLimit = (long) (PREFETCH_SLOWDOWN_PCT * MAX_MMAP_PREFETCH_PAGES);
+    final long prefetchSlowdownPageLimit = (long) (PREFETCH_SLOWDOWN_PCT * _maxMmapPrefetchPages);
     if (PREFETCHED_PAGES.get() >= prefetchSlowdownPageLimit) {
       if (0 < buffer.size()) {
         buffer.getByte(0);
