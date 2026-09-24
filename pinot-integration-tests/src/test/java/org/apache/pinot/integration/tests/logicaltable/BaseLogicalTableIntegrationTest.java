@@ -550,20 +550,21 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       throws Exception {
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
-        + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
+        + "'arg0 + arg1', FlightNum, Origin) FROM " + getLogicalTableName();
 
-    // Enable groovy for this logical table: the query must stop failing.
+    // Every step has to flip the outcome of the step before it. A wait whose condition already holds under the
+    // previous config returns immediately and proves nothing, so the config being cleared is checked from the
+    // enabled state: the cluster default disables Groovy exactly like the explicit override does.
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, false, null, null, null, null),
-        () -> {
-          postQuery(groovyQuery);
-          return true;
-        }, "Groovy query kept failing after groovy was enabled");
+        () -> succeeds(groovyQuery), "Groovy query kept failing after groovy was enabled");
 
-    // Disable groovy explicitly.
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, true, null, null, null, null),
         () -> failsWithGroovyDisabled(groovyQuery), "Groovy query kept succeeding after groovy was disabled");
 
-    // Removing the query config falls back to the cluster default, which also disables groovy.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, false, null, null, null, null),
+        () -> succeeds(groovyQuery), "Groovy query kept failing after groovy was enabled again");
+
+    // Removing the query config falls back to the cluster default, which disables groovy again.
     applyQueryConfigAndAwait(logicalTableConfig, null, () -> failsWithGroovyDisabled(groovyQuery),
         "Groovy query kept succeeding after the query config was removed");
   }
@@ -586,7 +587,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Test
   public void testMaxQueryResponseSizeTableConfig()
       throws Exception {
-    String starQuery = "SELECT * from mytable";
+    String starQuery = "SELECT * from " + getLogicalTableName();
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
 
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 100L, null),
@@ -597,7 +598,12 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 1000000L, null),
         () -> succeeds(starQuery), "Query kept failing under a high response size limit");
 
-    // Reset to no limit.
+    // Restore the restrictive limit so that clearing it below is observable: waiting for success straight after
+    // the high limit would be satisfied by the high limit itself.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, 100L, null),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled after the 100 byte response size limit was restored");
+
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
         () -> succeeds(starQuery), "Query kept failing after the response size limit was cleared");
   }
@@ -605,32 +611,24 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Test
   public void testMaxServerResponseSizeTableConfig()
       throws Exception {
-    String starQuery = "SELECT * from mytable";
-
-    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L);
+    String starQuery = "SELECT * from " + getLogicalTableName();
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    JsonNode response = postQuery(starQuery);
-    JsonNode exceptions = response.get("exceptions");
-    assertTrue(!exceptions.isEmpty()
-        && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
 
-    // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(null, null, null, null, null, 1000000L);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000L),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled under a 1000 byte server response size limit");
 
-    //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+    // Query succeeds with a high limit.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000000L),
+        () -> succeeds(starQuery), "Query kept failing under a high server response size limit");
+
+    // Restore the restrictive limit so that clearing it below is observable.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, 1000L),
+        () -> failsWith(starQuery, QueryErrorCode.QUERY_CANCELLATION),
+        "Query was not cancelled after the 1000 byte server response size limit was restored");
+
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
+        () -> succeeds(starQuery), "Query kept failing after the server response size limit was cleared");
   }
 
   @Test
@@ -652,7 +650,12 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(1000000L, null, null, null, null, null),
         () -> succeeds(starQuery), "Query kept failing under a high timeout");
 
-    // Reset to no timeout override.
+    // Restore the 1 ms timeout so that clearing the override below is observable.
+    applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(1L, null, null, null, null, null),
+        () -> failsWith(starQuery, QueryErrorCode.BROKER_TIMEOUT, QueryErrorCode.SERVER_NOT_RESPONDING,
+            QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, QueryErrorCode.EXECUTION_TIMEOUT),
+        "Query did not time out after the 1 ms timeout was restored");
+
     applyQueryConfigAndAwait(logicalTableConfig, new QueryConfig(null, null, null, null, null, null),
         () -> succeeds(starQuery), "Query kept failing after the timeout override was cleared");
   }
