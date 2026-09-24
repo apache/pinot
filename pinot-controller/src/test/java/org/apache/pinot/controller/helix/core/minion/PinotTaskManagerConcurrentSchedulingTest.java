@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -324,13 +327,19 @@ public class PinotTaskManagerConcurrentSchedulingTest {
   // ---------- createTask: does another table's request wait on the monitor? ----------
 
   /// Table A's generation parks inside createTask until released; table B's records that it got in.
-  private PinotTaskManager blockingAdhocManager(boolean tablesOptIn, CountDownLatch aEntered,
+  /// [#prepTaskQueue] runs for real — only the Helix and ZK boundaries are mocked — because it is where a
+  /// concurrent caller can still meet the manager's monitor.
+  private PinotTaskManager blockingAdhocManager(boolean aOptsIn, boolean bOptsIn, CountDownLatch aEntered,
       CountDownLatch releaseA, CountDownLatch bEntered)
       throws Exception {
     PinotHelixResourceManager rm = Mockito.mock(PinotHelixResourceManager.class);
-    Mockito.when(rm.getTableConfig(TABLE_A)).thenReturn(tableConfigWith(TABLE_A, tablesOptIn));
-    Mockito.when(rm.getTableConfig(TABLE_B)).thenReturn(tableConfigWith(TABLE_B, tablesOptIn));
+    Mockito.when(rm.getTableConfig(TABLE_A)).thenReturn(tableConfigWith(TABLE_A, aOptsIn));
+    Mockito.when(rm.getTableConfig(TABLE_B)).thenReturn(tableConfigWith(TABLE_B, bOptsIn));
+    Mockito.when(rm.getPropertyStore()).thenReturn(Mockito.mock(ZkHelixPropertyStore.class));
     PinotTaskManager manager = adhocManager(false, true, rm);
+    FieldUtils.writeField(manager, "_helixTaskResourceManager", Mockito.mock(PinotHelixTaskResourceManager.class),
+        true);
+    FieldUtils.writeField(manager, "_taskTypeMetricsUpdaterMap", new ConcurrentHashMap<>(), true);
 
     PinotTaskGenerator generator = Mockito.mock(PinotTaskGenerator.class);
     Mockito.when(generator.generateTasks(any(TableConfig.class), anyMap())).thenAnswer(invocation -> {
@@ -343,7 +352,6 @@ public class PinotTaskManagerConcurrentSchedulingTest {
       }
       return List.of();
     });
-    Mockito.doNothing().when(manager).prepTaskQueue(anyString());
     Mockito.doReturn(true).when(manager).isTaskSchedulable(anyString(), anyList());
     Mockito.doReturn("parent").when(manager).getParentTaskName(anyString(), anyString(), any());
     Mockito.doReturn(List.of(TABLE_A)).when(manager).getTableNameWithTypes(TABLE_A);
@@ -366,25 +374,44 @@ public class PinotTaskManagerConcurrentSchedulingTest {
     return thread;
   }
 
+  private static void assertBGetsInWhileAHolds(PinotTaskManager manager, CountDownLatch aEntered,
+      CountDownLatch releaseA, CountDownLatch bEntered, String message)
+      throws Exception {
+    Thread a = createTaskAsync(manager, TABLE_A);
+    assertTrue(aEntered.await(10, TimeUnit.SECONDS), "table A never started generating");
+    Thread b = createTaskAsync(manager, TABLE_B);
+    try {
+      assertTrue(bEntered.await(10, TimeUnit.SECONDS), message);
+    } finally {
+      releaseA.countDown();
+      a.join(10_000);
+      b.join(10_000);
+    }
+  }
+
   @Test
   public void testAdhocForAnotherTableDoesNotWaitWhenTablesOptIn()
       throws Exception {
     CountDownLatch aEntered = new CountDownLatch(1);
     CountDownLatch releaseA = new CountDownLatch(1);
     CountDownLatch bEntered = new CountDownLatch(1);
-    PinotTaskManager manager = blockingAdhocManager(true, aEntered, releaseA, bEntered);
+    PinotTaskManager manager = blockingAdhocManager(true, true, aEntered, releaseA, bEntered);
+    assertBGetsInWhileAHolds(manager, aEntered, releaseA, bEntered,
+        "table B waited on table A although both opted into concurrent scheduling");
+  }
 
-    Thread a = createTaskAsync(manager, TABLE_A);
-    assertTrue(aEntered.await(10, TimeUnit.SECONDS), "table A never started generating");
-    Thread b = createTaskAsync(manager, TABLE_B);
-    try {
-      assertTrue(bEntered.await(10, TimeUnit.SECONDS),
-          "table B waited on table A although both opted into concurrent scheduling");
-    } finally {
-      releaseA.countDown();
-      a.join(10_000);
-      b.join(10_000);
-    }
+  /// The case a partial rollout hits: a table still on the legacy path holds the monitor for the whole of
+  /// its generation. An opted-in table must not wait on it anywhere — including in prepTaskQueue's
+  /// once-per-type metrics registration, which used to take that same monitor.
+  @Test
+  public void testOptedInAdhocDoesNotWaitOnALegacyTableHoldingTheMonitor()
+      throws Exception {
+    CountDownLatch aEntered = new CountDownLatch(1);
+    CountDownLatch releaseA = new CountDownLatch(1);
+    CountDownLatch bEntered = new CountDownLatch(1);
+    PinotTaskManager manager = blockingAdhocManager(false, true, aEntered, releaseA, bEntered);
+    assertBGetsInWhileAHolds(manager, aEntered, releaseA, bEntered,
+        "opted-in table B waited on legacy table A's monitor");
   }
 
   /// The pre-existing behaviour, kept for tables that do not opt in: B blocks on the monitor A holds.
@@ -394,7 +421,7 @@ public class PinotTaskManagerConcurrentSchedulingTest {
     CountDownLatch aEntered = new CountDownLatch(1);
     CountDownLatch releaseA = new CountDownLatch(1);
     CountDownLatch bEntered = new CountDownLatch(1);
-    PinotTaskManager manager = blockingAdhocManager(false, aEntered, releaseA, bEntered);
+    PinotTaskManager manager = blockingAdhocManager(false, false, aEntered, releaseA, bEntered);
 
     Thread a = createTaskAsync(manager, TABLE_A);
     assertTrue(aEntered.await(10, TimeUnit.SECONDS), "table A never started generating");
@@ -412,5 +439,38 @@ public class PinotTaskManagerConcurrentSchedulingTest {
       b.join(10_000);
     }
     assertEquals(bEntered.getCount(), 0L, "table B never ran after table A released the monitor");
+  }
+
+  /// Registering the per-type listener once must survive concurrent first calls, now that no monitor
+  /// serialises them.
+  @Test
+  public void testMetricsUpdaterIsRegisteredOncePerTaskTypeUnderConcurrency()
+      throws Exception {
+    PinotHelixResourceManager rm = Mockito.mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore propertyStore = Mockito.mock(ZkHelixPropertyStore.class);
+    Mockito.when(rm.getPropertyStore()).thenReturn(propertyStore);
+    PinotTaskManager manager = newManager(false, rm);
+    FieldUtils.writeField(manager, "_taskTypeMetricsUpdaterMap", new ConcurrentHashMap<>(), true);
+
+    int threads = 16;
+    CountDownLatch start = new CountDownLatch(1);
+    List<Thread> workers = new ArrayList<>();
+    for (int i = 0; i < threads; i++) {
+      Thread t = new Thread(() -> {
+        try {
+          start.await();
+          manager.addTaskTypeMetricsUpdaterIfNeeded("TestTask");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      });
+      t.start();
+      workers.add(t);
+    }
+    start.countDown();
+    for (Thread t : workers) {
+      t.join(10_000);
+    }
+    Mockito.verify(propertyStore, Mockito.times(1)).subscribeDataChanges(anyString(), any());
   }
 }

@@ -1364,13 +1364,17 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  protected synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
-    if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
-      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
+  /// Registers the per-task-type metrics listener once. Not `synchronized` on the manager: this runs from
+  /// [#prepTaskQueue] on every generation path, the concurrent ones included, so taking the manager's monitor
+  /// here made each concurrent caller wait out any legacy-path generation still holding it. `computeIfAbsent`
+  /// keeps the once-per-type guarantee without that coupling.
+  protected void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+    _taskTypeMetricsUpdaterMap.computeIfAbsent(taskType, type -> {
+      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(type, this);
       _pinotHelixResourceManager.getPropertyStore()
-          .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
-      _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
-    }
+          .subscribeDataChanges(getPropertyStorePathForTaskQueue(type), taskTypeMetricsUpdater);
+      return taskTypeMetricsUpdater;
+    });
   }
 
   protected boolean isTaskSchedulable(String taskType, List<String> tables) {
