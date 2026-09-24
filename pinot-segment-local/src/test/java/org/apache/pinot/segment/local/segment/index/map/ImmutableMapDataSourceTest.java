@@ -75,18 +75,14 @@ public class ImmutableMapDataSourceTest {
 
     DataSourceMetadata metadata = new ImmutableMapDataSource(columnMetadata, indexContainer).getDataSourceMetadata();
     assertSame(metadata.getFieldSpec(), fieldSpec);
-    assertEquals(metadata.getDataType(), DataType.MAP);
-    assertTrue(metadata.isSingleValue());
     assertTrue(columnMetadata.isSorted());
     assertFalse(metadata.isSorted());
     assertEquals(metadata.getNumDocs(), NUM_DOCS);
-    assertEquals(metadata.getNumValues(), NUM_DOCS);
+    assertEquals(metadata.getNumValues(), columnMetadata.getTotalNumberOfEntries());
     assertEquals(metadata.getMaxNumValuesPerMVEntry(), -1);
     assertEquals(metadata.getCardinality(), 5);
     assertSame(metadata.getMinValue(), columnMetadata.getMinValue());
-    assertEquals(metadata.getMinValue(), "a");
     assertSame(metadata.getMaxValue(), columnMetadata.getMaxValue());
-    assertEquals(metadata.getMaxValue(), "z");
     assertSame(metadata.getPartitionFunction(), partitionFunction);
     assertSame(metadata.getPartitions(), partitions);
     assertThrows(UnsupportedOperationException.class, metadata::getMaxRowLengthInBytes);

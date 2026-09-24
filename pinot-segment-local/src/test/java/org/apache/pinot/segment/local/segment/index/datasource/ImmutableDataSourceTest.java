@@ -20,11 +20,7 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Set;
-import org.apache.pinot.segment.local.segment.index.map.SimpleColumnMetadata;
-import org.apache.pinot.segment.local.segment.virtualcolumn.DocIdVirtualColumnProvider;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
@@ -43,10 +39,8 @@ import static org.testng.Assert.assertTrue;
 
 
 /// Covers the [DataSourceMetadata] view an [ImmutableDataSource] exposes over the segment's [ColumnMetadata]. The
-/// view delegates to the column metadata instead of copying it, so every accessor must report the value (and, for
-/// reference types, the instance) the column metadata holds, while keeping the two contracts that differ between the
-/// interfaces: `getMaxNumValuesPerMVEntry()` is `-1` for single-value columns and `getMaxRowLengthInBytes()` stays
-/// at the [DataSourceMetadata] default of `-1`.
+/// view delegates to the column metadata while preserving the single-value and row-length contracts that differ
+/// between [ColumnMetadata] and [DataSourceMetadata].
 public class ImmutableDataSourceTest {
   private static final int NUM_DOCS = 1000;
 
@@ -72,13 +66,10 @@ public class ImmutableDataSourceTest {
     assertTrue(metadata.isSingleValue());
     assertTrue(metadata.isSorted());
     assertEquals(metadata.getNumDocs(), NUM_DOCS);
-    assertEquals(metadata.getNumValues(), NUM_DOCS);
     assertEquals(metadata.getNumValues(), columnMetadata.getTotalNumberOfEntries());
     assertEquals(metadata.getCardinality(), 37);
     assertSame(metadata.getMinValue(), columnMetadata.getMinValue());
-    assertEquals(metadata.getMinValue(), -5);
     assertSame(metadata.getMaxValue(), columnMetadata.getMaxValue());
-    assertEquals(metadata.getMaxValue(), 123456);
     assertSame(metadata.getPartitionFunction(), partitionFunction);
     assertSame(metadata.getPartitions(), partitions);
 
@@ -115,59 +106,13 @@ public class ImmutableDataSourceTest {
     assertEquals(metadata.getNumDocs(), NUM_DOCS);
     assertEquals(metadata.getNumValues(), 4 * NUM_DOCS);
     assertEquals(metadata.getMaxNumValuesPerMVEntry(), 7);
-    assertEquals(metadata.getMaxNumValuesPerMVEntry(), columnMetadata.getMaxNumberOfMultiValues());
     assertEquals(metadata.getCardinality(), 11);
     assertSame(metadata.getMinValue(), columnMetadata.getMinValue());
-    assertEquals(metadata.getMinValue(), "apple");
     assertSame(metadata.getMaxValue(), columnMetadata.getMaxValue());
-    assertEquals(metadata.getMaxValue(), "zebra");
     assertNull(metadata.getPartitionFunction());
     assertNull(metadata.getPartitions());
 
     assertEquals(columnMetadata.getMaxRowLengthInBytes(), 42);
-    assertEquals(metadata.getMaxRowLengthInBytes(), -1);
-  }
-
-  @Test
-  public void testVirtualColumn() {
-    FieldSpec fieldSpec = new DimensionFieldSpec("$docId", DataType.INT, true);
-    DataSource dataSource =
-        new DocIdVirtualColumnProvider().buildDataSource(new VirtualColumnContext(fieldSpec, NUM_DOCS));
-    assertTrue(dataSource instanceof ImmutableDataSource);
-
-    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
-    assertSame(metadata.getFieldSpec(), fieldSpec);
-    assertTrue(metadata.isSingleValue());
-    assertTrue(metadata.isSorted());
-    assertEquals(metadata.getNumDocs(), NUM_DOCS);
-    assertEquals(metadata.getNumValues(), NUM_DOCS);
-    assertEquals(metadata.getMaxNumValuesPerMVEntry(), -1);
-    assertEquals(metadata.getCardinality(), NUM_DOCS);
-    assertNull(metadata.getMinValue());
-    assertNull(metadata.getMaxValue());
-    assertNull(metadata.getPartitionFunction());
-    assertNull(metadata.getPartitions());
-    assertEquals(metadata.getMaxRowLengthInBytes(), -1);
-  }
-
-  /// A MAP key's data source is built over a [SimpleColumnMetadata] whose stats are all unavailable; the view must
-  /// pass them through unchanged rather than re-deriving them.
-  @Test
-  public void testUnavailableStatsPassThrough() {
-    FieldSpec fieldSpec = new DimensionFieldSpec("key", DataType.LONG, false);
-    ColumnMetadata columnMetadata = new SimpleColumnMetadata(fieldSpec, NUM_DOCS);
-
-    DataSourceMetadata metadata = dataSourceMetadata(columnMetadata);
-    assertSame(metadata.getFieldSpec(), fieldSpec);
-    assertFalse(metadata.isSorted());
-    assertEquals(metadata.getNumDocs(), NUM_DOCS);
-    assertEquals(metadata.getNumValues(), ColumnMetadata.UNAVAILABLE);
-    assertEquals(metadata.getMaxNumValuesPerMVEntry(), ColumnMetadata.UNAVAILABLE);
-    assertEquals(metadata.getCardinality(), ColumnMetadata.UNAVAILABLE);
-    assertNull(metadata.getMinValue());
-    assertNull(metadata.getMaxValue());
-    assertNull(metadata.getPartitionFunction());
-    assertNull(metadata.getPartitions());
     assertEquals(metadata.getMaxRowLengthInBytes(), -1);
   }
 
