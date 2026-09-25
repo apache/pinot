@@ -38,8 +38,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkState;
-
 
 /// Index readers of one physical column of an immutable segment.
 ///
@@ -50,6 +48,9 @@ import static com.google.common.base.Preconditions.checkState;
 /// which is why the layout matters: the mask replaces a nested map object and a reader array spanning the whole
 /// numeric-id range of the present readers.
 ///
+/// The mask is one `long`, so it covers at most 64 index types. [IndexService#MAX_INDEX_TYPES] states that limit in
+/// the index SPI and [IndexService] enforces it when it is built; the two must change together.
+///
 /// Thread safety: immutable after construction except for the multi-column text reader reference, which is set
 /// once during segment load and cleared on [#close()].
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
@@ -59,8 +60,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.DICTIONARY_ID, StandardIndexes.NULL_VALUE_VECTOR_ID);
   private static final IndexReader[] EMPTY_READERS = new IndexReader[0];
 
-  // Bit i is set when the index type with numeric id i has a reader in this column. Numeric ids are validated to fit
-  // in the mask at construction time.
+  // Bit i is set when the index type with numeric id i has a reader in this column. IndexService.MAX_INDEX_TYPES keeps
+  // numeric ids below 64 and is tied to this mask: widening the mask is what raises that SPI limit.
   private final long _presentMask;
   // Readers ordered by numeric index id, holding only the present ones: the reader for id i sits at the number of
   // bits set in _presentMask below bit i.
@@ -85,21 +86,21 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
     IndexService indexService = IndexService.getInstance();
     List<IndexType<?, ?, ?>> allIndexes = indexService.getAllIndexes();
-    int numIndexTypes = allIndexes.size();
-    checkState(numIndexTypes <= Long.SIZE,
-        "Cannot track %s index types in a %s-bit presence mask, column: %s", numIndexTypes, Long.SIZE, columnName);
 
-    // Scratch array indexed by numeric id; compacted into the exactly-sized _readers below.
-    IndexReader[] readersById = new IndexReader[numIndexTypes];
+    // Scratch array indexed by numeric id; compacted into the exactly-sized _readers below. Numeric ids are dense in
+    // [0, allIndexes.size()), and IndexService caps that size at IndexService.MAX_INDEX_TYPES, the width of the mask.
+    IndexReader[] readersById = new IndexReader[allIndexes.size()];
     long presentMask = 0L;
     boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
-      for (int indexId = 0; indexId < numIndexTypes; indexId++) {
-        IndexType<?, ?, ?> indexType = allIndexes.get(indexId);
+      for (IndexType<?, ?, ?> indexType : allIndexes) {
         if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {
           continue;
         }
         if (segmentReader.hasIndexFor(columnName, indexType)) {
+          // Resolve the id the same way getIndex() does, and before creating the reader, so that nothing can throw
+          // between creating a reader and recording it for cleanup.
+          short indexId = indexService.getNumericId(indexType);
           IndexReaderFactory<?> readerProvider = indexType.getReaderFactory();
           try {
             IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
@@ -161,12 +162,29 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   public void close()
       throws IOException {
     // TODO (index-spi): Verify that readers can be closed in any order
+    // Close every reader even if one fails, then rethrow the first failure with the others suppressed.
+    Exception failure = null;
     for (IndexReader reader : _readers) {
-      reader.close();
+      try {
+        reader.close();
+      } catch (IOException | RuntimeException e) {
+        if (failure == null) {
+          failure = e;
+        } else {
+          failure.addSuppressed(e);
+        }
+      }
     }
 
     // This reader is closed on segment destroy()
     _multiColTextReader = null;
+
+    if (failure instanceof IOException) {
+      throw (IOException) failure;
+    }
+    if (failure != null) {
+      throw (RuntimeException) failure;
+    }
   }
 
   public MultiColumnLuceneTextIndexReader getMultiColumnTextIndex() {
