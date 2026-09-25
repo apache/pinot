@@ -44,6 +44,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -135,6 +136,10 @@ public class QueryContext {
   private int _streamingGroupByFlushThreshold;
   // Flush threshold for streaming distinct (0 = disabled)
   private int _streamingDistinctFlushThreshold;
+  private int _streamingDistinctMaxTrackedCardinality =
+      QueryOptionValue.DEFAULT_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY;
+  private int _streamingDistinctEstimatedExitStdDev =
+      QueryOptionValue.DEFAULT_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -507,6 +512,22 @@ public class QueryContext {
 
   public void setStreamingDistinctFlushThreshold(int streamingDistinctFlushThreshold) {
     _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
+  }
+
+  public int getStreamingDistinctMaxTrackedCardinality() {
+    return _streamingDistinctMaxTrackedCardinality;
+  }
+
+  public void setStreamingDistinctMaxTrackedCardinality(int streamingDistinctMaxTrackedCardinality) {
+    _streamingDistinctMaxTrackedCardinality = streamingDistinctMaxTrackedCardinality;
+  }
+
+  public int getStreamingDistinctEstimatedExitStdDev() {
+    return _streamingDistinctEstimatedExitStdDev;
+  }
+
+  public void setStreamingDistinctEstimatedExitStdDev(int streamingDistinctEstimatedExitStdDev) {
+    _streamingDistinctEstimatedExitStdDev = streamingDistinctEstimatedExitStdDev;
   }
 
   public boolean isNullHandlingEnabled() {

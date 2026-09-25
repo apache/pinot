@@ -148,29 +148,8 @@ public class StreamingDistinctCombineOperatorTest {
   public void testAccumulatorMergesAcrossSegmentsBeforeFlushing()
       throws Exception {
     File disjointDir = new File(FileUtils.getTempDirectory(), "StreamingDistinctCombineOperatorTest_disjoint");
-    FileUtils.deleteDirectory(disjointDir);
-    List<IndexSegment> segments = new ArrayList<>(NUM_SEGMENTS);
+    List<IndexSegment> segments = createDisjointSegments(disjointDir, NUM_SEGMENTS);
     try {
-      for (int index = 0; index < NUM_SEGMENTS; index++) {
-        List<GenericRow> records = new ArrayList<>(NUM_DISTINCT_VALUES);
-        for (int i = index * NUM_DISTINCT_VALUES; i < (index + 1) * NUM_DISTINCT_VALUES; i++) {
-          GenericRow record = new GenericRow();
-          record.putValue(INT_COLUMN, i);
-          record.putValue(DICT_STRING_COLUMN, "d" + i);
-          record.putValue(RAW_STRING_COLUMN, "r" + i);
-          records.add(record);
-        }
-        SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-        segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-        String segmentName = "disjointSegment_" + index;
-        segmentGeneratorConfig.setSegmentName(segmentName);
-        segmentGeneratorConfig.setOutDir(disjointDir.getPath());
-        SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-        driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
-        driver.build();
-        segments.add(ImmutableSegmentLoader.load(new File(disjointDir, segmentName), ReadMode.mmap));
-      }
-
       // Threshold above one segment's cardinality (50), so at least two segments must merge before a flush.
       QueryContext queryContext =
           newQueryContext("SELECT DISTINCT intColumn FROM testTable" + MATCH_ALL + NO_LIMIT);
@@ -538,6 +517,164 @@ public class StreamingDistinctCombineOperatorTest {
     }
   }
 
+  /// The cross-segment early exit, which flushing would otherwise give up: the accumulator is emptied long before
+  /// it can reach LIMIT, so DistinctResultsBlockMerger#isQuerySatisfied never fires. The cumulative cardinality
+  /// tracker restores it.
+  ///
+  /// 8 disjoint segments of 50 hold 400 distinct values; a flush threshold of 60 makes each window span two
+  /// segments; a LIMIT of 120 is reached after two windows, so the consumer stops after emitting 200 of the 400.
+  /// maxExecutionThreads(1) pins the order the blocks are queued in, so which 200 is deterministic.
+  ///
+  /// This pins the *emission* side only. With the default 100-block pending queue the single worker enqueues all 8
+  /// segments long before the consumer notices satisfaction, so every segment is still scanned here -- see
+  /// [#testEarlyExitAvoidsScanningRemainingSegments] for the case where scan work is actually saved.
+  @Test
+  public void testCrossSegmentEarlyExitStopsEmittingOnceLimitIsReached()
+      throws Exception {
+    File dir = new File(FileUtils.getTempDirectory(), "StreamingDistinctCombineOperatorTest_earlyExit");
+    List<IndexSegment> segments = createDisjointSegments(dir, 8);
+    try {
+      FlushResult result = runStreaming(segments, "SELECT DISTINCT intColumn FROM testTable" + MATCH_ALL
+          + " LIMIT 120", 60, 1);
+
+      Set<Object> values = distinctValues(result);
+      assertEquals(result._numBlocks, 2, "Expected to stop after the window that crossed LIMIT");
+      assertEquals(values.size(), 200, "Expected the first four segments only, not all eight");
+      for (int i = 0; i < 200; i++) {
+        assertTrue(values.contains(i), "Missing value " + i);
+      }
+      // Reaching LIMIT is a complete result, not a truncated one. If this ever became a truncation reason the
+      // broker would start reporting every early-exiting distinct query as partial.
+      assertEquals(result._earlyTerminationReason, EarlyTerminationReason.NONE);
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(dir);
+    }
+  }
+
+  /// The benefit the early exit exists for: segments that are never scanned.
+  ///
+  /// It only materializes when the worker cannot run ahead of the consumer. `maxStreamingPendingBlocks` bounds the
+  /// hand-off queue, so with a queue of 1 and a single worker the worker blocks on offer() and is cancelled by
+  /// stopProcess() once the consumer is satisfied. The bound below is deliberately loose rather than exact: the
+  /// terminal metadata block is built while the workers are still being cancelled, so the scanned-doc total is
+  /// whatever they reached. The worker can be at most (blocks consumed + queue capacity + 1) segments ahead, which
+  /// with 16 segments leaves a wide margin below a full scan.
+  @Test
+  public void testEarlyExitAvoidsScanningRemainingSegments()
+      throws Exception {
+    File dir = new File(FileUtils.getTempDirectory(), "StreamingDistinctCombineOperatorTest_scanSaved");
+    List<IndexSegment> segments = createDisjointSegments(dir, 16);
+    try {
+      FlushResult result = runStreaming(segments,
+          "SET maxStreamingPendingBlocks = 1; SELECT DISTINCT intColumn FROM testTable" + MATCH_ALL + " LIMIT 120",
+          60, 1);
+
+      long fullScan = 16L * NUM_DISTINCT_VALUES;
+      assertTrue(result._numDocsScanned < fullScan,
+          "Expected the early exit to leave segments unscanned, but scanned all " + result._numDocsScanned);
+      assertTrue(distinctValues(result).size() >= 120,
+          "The leaf must still emit at least LIMIT distinct values, or the result is silently truncated");
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(dir);
+    }
+  }
+
+  /// The multi-column path through a real query. The other multi-column tests all run with an unbounded leaf LIMIT,
+  /// which means no tracker is built at all, so nothing verified that the schema's stored types and the actual
+  /// boxed values in a Record agree -- a mismatch there is a ClassCastException on a query that works today.
+  @Test
+  public void testMultiColumnEarlyExitThroughRealSegments()
+      throws Exception {
+    File dir = new File(FileUtils.getTempDirectory(), "StreamingDistinctCombineOperatorTest_multiColumn");
+    List<IndexSegment> segments = createDisjointSegments(dir, 8);
+    try {
+      FlushResult result = runStreaming(segments,
+          "SELECT DISTINCT intColumn, dictStringColumn FROM testTable" + MATCH_ALL + " LIMIT 120", 60, 1);
+
+      Set<List<Object>> rows = distinctRows(result);
+      assertEquals(rows.size(), 200, "Expected the first four segments only, not all eight");
+      for (List<Object> row : rows) {
+        assertEquals(row.size(), 2);
+        assertEquals(row.get(1), "d" + row.get(0), "Columns must stay paired through the streaming combine");
+      }
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(dir);
+    }
+  }
+
+  /// Why the tracker cannot be a row counter. Flush windows overlap: the shared fixture's four identical segments
+  /// emit 200 rows over only 50 distinct values, so a counter of emitted rows would sail past a LIMIT of 60 and exit
+  /// having emitted 50 -- a silently truncated result. Cumulative cardinality must keep scanning instead.
+  @Test
+  public void testOverlappingFlushWindowsDoNotTriggerEarlyExit() {
+    FlushResult result =
+        runStreaming("SELECT DISTINCT intColumn FROM testTable" + MATCH_ALL + " LIMIT 60", 10);
+
+    assertEquals(result._numBlocks, NUM_SEGMENTS, "Every segment must still be scanned");
+    assertEquals(result._rows.size(), NUM_SEGMENTS * NUM_DISTINCT_VALUES,
+        "Fixture assumption: each segment is flushed whole, so rows overlap across windows");
+    assertEquals(distinctValues(result), expectedIntValues(),
+        "A row counter would have exited here after 60 rows, dropping most of the distinct set");
+    assertEquals(result._numDocsScanned, TOTAL_NUM_DOCS);
+  }
+
+  /// An MSE leaf with no LIMIT pushed down runs with Integer.MAX_VALUE, which no cardinality can reach. The tracker
+  /// must stay out of the way rather than exiting on some estimate.
+  @Test
+  public void testUnboundedLeafLimitNeverExitsEarly()
+      throws Exception {
+    File dir = new File(FileUtils.getTempDirectory(), "StreamingDistinctCombineOperatorTest_unbounded");
+    List<IndexSegment> segments = createDisjointSegments(dir, 8);
+    try {
+      FlushResult result =
+          runStreaming(segments, "SELECT DISTINCT intColumn FROM testTable" + MATCH_ALL + NO_LIMIT, 60, 1);
+
+      assertEquals(distinctValues(result).size(), 8 * NUM_DISTINCT_VALUES, "Every segment must be scanned");
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(dir);
+    }
+  }
+
+  /// Builds `numSegments` segments whose value ranges do not overlap: segment `i` holds `[i*50, (i+1)*50)`. The
+  /// shared fixture cannot be used where cross-segment accumulation matters, because its segments are identical.
+  private List<IndexSegment> createDisjointSegments(File dir, int numSegments)
+      throws Exception {
+    FileUtils.deleteDirectory(dir);
+    List<IndexSegment> segments = new ArrayList<>(numSegments);
+    for (int index = 0; index < numSegments; index++) {
+      List<GenericRow> records = new ArrayList<>(NUM_DISTINCT_VALUES);
+      for (int i = index * NUM_DISTINCT_VALUES; i < (index + 1) * NUM_DISTINCT_VALUES; i++) {
+        GenericRow record = new GenericRow();
+        record.putValue(INT_COLUMN, i);
+        record.putValue(DICT_STRING_COLUMN, "d" + i);
+        record.putValue(RAW_STRING_COLUMN, "r" + i);
+        records.add(record);
+      }
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+      segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+      String segmentName = "disjointSegment_" + index;
+      segmentGeneratorConfig.setSegmentName(segmentName);
+      segmentGeneratorConfig.setOutDir(dir.getPath());
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+      driver.build();
+      segments.add(ImmutableSegmentLoader.load(new File(dir, segmentName), ReadMode.mmap));
+    }
+    return segments;
+  }
+
   private BaseCombineOperator<?> buildCombineOperator(String query, int flushThreshold,
       boolean serverReturnFinalResult) {
     return buildCombineOperator(query, flushThreshold, serverReturnFinalResult, false);
@@ -559,9 +696,18 @@ public class StreamingDistinctCombineOperatorTest {
   }
 
   private FlushResult runStreaming(String query, int flushThreshold) {
+    return runStreaming(_indexSegments, query, flushThreshold, -1);
+  }
+
+  /// @param maxExecutionThreads pins the order blocks reach the consumer when positive; -1 leaves it unset.
+  private FlushResult runStreaming(List<IndexSegment> indexSegments, String query, int flushThreshold,
+      int maxExecutionThreads) {
     QueryContext queryContext = newQueryContext(query);
-    List<Operator> operators = new ArrayList<>(NUM_SEGMENTS);
-    for (IndexSegment indexSegment : _indexSegments) {
+    if (maxExecutionThreads > 0) {
+      queryContext.setMaxExecutionThreads(maxExecutionThreads);
+    }
+    List<Operator> operators = new ArrayList<>(indexSegments.size());
+    for (IndexSegment indexSegment : indexSegments) {
       operators.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext).run());
     }
     StreamingDistinctCombineOperator combineOperator =

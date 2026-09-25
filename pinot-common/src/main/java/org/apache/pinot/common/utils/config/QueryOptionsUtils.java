@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
@@ -600,6 +601,26 @@ public class QueryOptionsUtils {
   public static Integer getStreamingDistinctFlushThreshold(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD);
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);
+  }
+
+  @Nullable
+  public static Integer getStreamingDistinctMaxTrackedCardinality(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY, value);
+  }
+
+  /// Zero (or unset) disables the estimated early exit; otherwise the value is the number of standard deviations for
+  /// the sketch's lower bound, which the underlying `BinomialBoundsN` accepts only as 1, 2 or 3. Rejected here with
+  /// a clear message rather than left to fail mid-query as a SketchesArgumentException.
+  @Nullable
+  public static Integer getStreamingDistinctEstimatedExitStdDev(Map<String, String> queryOptions) {
+    String optionName = QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV;
+    Integer value = checkedParseIntNonNegative(optionName, queryOptions.get(optionName));
+    if (value != null && value > QueryOptionValue.MAX_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV) {
+      throw new IllegalArgumentException(optionName + " must be between 0 and "
+          + QueryOptionValue.MAX_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV + ", got: " + value);
+    }
+    return value;
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {

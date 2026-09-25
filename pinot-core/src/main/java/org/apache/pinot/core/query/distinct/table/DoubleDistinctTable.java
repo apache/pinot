@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -212,6 +213,15 @@ public class DoubleDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpression == null && _valueSet.size() >= _limitWithoutNull;
+  }
+
+  /// NaN bit patterns collapse here exactly as they do in the DoubleOpenHashSet these values came out of.
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    DoubleIterator doubleIterator = _valueSet.iterator();
+    while (doubleIterator.hasNext()) {
+      sink.accept(Double.doubleToLongBits(doubleIterator.nextDouble()));
+    }
   }
 
   @Override

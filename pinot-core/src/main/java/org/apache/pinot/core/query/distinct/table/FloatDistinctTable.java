@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -208,6 +209,15 @@ public class FloatDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpression == null && _valueSet.size() >= _limitWithoutNull;
+  }
+
+  /// NaN bit patterns collapse here exactly as they do in the FloatOpenHashSet these values came out of.
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    FloatIterator floatIterator = _valueSet.iterator();
+    while (floatIterator.hasNext()) {
+      sink.accept(Float.floatToIntBits(floatIterator.nextFloat()));
+    }
   }
 
   @Override

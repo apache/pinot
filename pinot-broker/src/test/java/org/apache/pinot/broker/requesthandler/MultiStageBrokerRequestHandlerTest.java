@@ -62,8 +62,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
@@ -209,20 +211,97 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         "No option should be injected when the broker default is unset");
   }
 
+  /// The estimated early exit has no soundness guarantee, so it must stay off unless a cluster explicitly opts in,
+  /// and a per-query SET must still win.
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsStreamingDistinctEstimatedExitStdDev()
+      throws Exception {
+    MultiStageBrokerRequestHandler off = newHandlerWithEstimatedExitStdDev(null);
+    Map<String, String> queryOptions = new HashMap<>();
+    off.applyBrokerDefaultQueryOptions(queryOptions);
+    assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV),
+        "The unsound estimated exit must not be injected unless the cluster opts in");
+
+    MultiStageBrokerRequestHandler on = newHandlerWithEstimatedExitStdDev("3");
+    queryOptions.clear();
+    on.applyBrokerDefaultQueryOptions(queryOptions);
+    assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV), "3");
+
+    queryOptions.clear();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV, "0");
+    on.applyBrokerDefaultQueryOptions(queryOptions);
+    assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV), "0",
+        "Per-query SET = 0 must be able to opt back out of a cluster that enabled it");
+  }
+
+  /// A cluster configured out of range must fail at startup, where the message names the config. Without this it
+  /// starts cleanly and then fails every MSE DISTINCT query at plan time, blaming the query.
+  @Test
+  public void testOutOfRangeEstimatedExitStdDevConfigIsRejectedAtStartup() {
+    for (String value : new String[]{"4", "99"}) {
+      try {
+        newHandlerWithEstimatedExitStdDev(value);
+        Assert.fail("Expected the broker to reject std dev " + value);
+      } catch (IllegalArgumentException e) {
+        assertTrue(e.getMessage().contains(QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV),
+            e.getMessage());
+      } catch (Exception e) {
+        Assert.fail("Expected IllegalArgumentException but got: " + e);
+      }
+    }
+  }
+
+  /// The exact regime is on by default, so the cluster needs a way to turn it off without touching every client.
+  /// `0` is a real value here, not an unset marker, so it has to be injectable.
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsStreamingDistinctMaxTrackedCardinality()
+      throws Exception {
+    MultiStageBrokerRequestHandler unset = newHandlerWithMaxTrackedCardinality(null);
+    Map<String, String> queryOptions = new HashMap<>();
+    unset.applyBrokerDefaultQueryOptions(queryOptions);
+    assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY),
+        "Nothing should be injected when the cluster has not set it");
+
+    MultiStageBrokerRequestHandler killed = newHandlerWithMaxTrackedCardinality("0");
+    queryOptions.clear();
+    killed.applyBrokerDefaultQueryOptions(queryOptions);
+    assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY), "0",
+        "0 is the kill switch and must reach the servers");
+
+    queryOptions.clear();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY, "4096");
+    killed.applyBrokerDefaultQueryOptions(queryOptions);
+    assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY), "4096",
+        "Per-query SET must take precedence over the cluster default");
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithMaxTrackedCardinality(
+      @Nullable String maxTrackedCardinality)
+      throws Exception {
+    return newHandlerWithFlushThresholds(null, null, null, maxTrackedCardinality);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithEstimatedExitStdDev(
+      @Nullable String estimatedExitStdDev)
+      throws Exception {
+    return newHandlerWithFlushThresholds(null, null, estimatedExitStdDev, null);
+  }
+
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
       @Nullable String streamingGroupByFlushThreshold)
       throws Exception {
-    return newHandlerWithFlushThresholds(streamingGroupByFlushThreshold, null);
+    return newHandlerWithFlushThresholds(streamingGroupByFlushThreshold, null, null, null);
   }
 
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingDistinctFlushThreshold(
       @Nullable String streamingDistinctFlushThreshold)
       throws Exception {
-    return newHandlerWithFlushThresholds(null, streamingDistinctFlushThreshold);
+    return newHandlerWithFlushThresholds(null, streamingDistinctFlushThreshold, null, null);
   }
 
   private static MultiStageBrokerRequestHandler newHandlerWithFlushThresholds(
-      @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold)
+      @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold,
+      @Nullable String estimatedExitStdDev, @Nullable String maxTrackedCardinality)
       throws Exception {
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
@@ -234,6 +313,14 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     if (streamingDistinctFlushThreshold != null) {
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
           streamingDistinctFlushThreshold);
+    }
+    if (estimatedExitStdDev != null) {
+      config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV,
+          estimatedExitStdDev);
+    }
+    if (maxTrackedCardinality != null) {
+      config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY,
+          maxTrackedCardinality);
     }
     BrokerQueryEventListenerFactory.init(config);
     BrokerMetrics.register(mock(BrokerMetrics.class));

@@ -40,7 +40,8 @@ public class QueryOptionsUtilsTest {
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW);
   private static final List<String> NON_NEGATIVE_INT_KEYS =
-      List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
+      List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD,
+          STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY);
   private static final List<String> UNBOUNDED_INT_KEYS =
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
@@ -331,6 +332,38 @@ public class QueryOptionsUtilsTest {
     }
   }
 
+  /// The sketch's lower bound accepts only 1, 2 or 3 standard deviations. Out-of-range values have to be refused
+  /// where the option is parsed; otherwise they reach `BinomialBoundsN` and surface as a mid-query server exception
+  /// on every DISTINCT query rather than as a rejected setting.
+  @Test
+  public void testStreamingDistinctEstimatedExitStdDevRejectsOutOfRangeValues() {
+    for (String value : new String[]{"4", "10", String.valueOf(Integer.MAX_VALUE)}) {
+      try {
+        QueryOptionsUtils.getStreamingDistinctEstimatedExitStdDev(
+            Map.of(STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV, value));
+        fail("Expected " + value + " to be rejected");
+      } catch (IllegalArgumentException e) {
+        assertEquals(e.getMessage(),
+            STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV + " must be between 0 and 3, got: " + value);
+      }
+    }
+    for (String value : new String[]{"-1", "abc"}) {
+      try {
+        QueryOptionsUtils.getStreamingDistinctEstimatedExitStdDev(
+            Map.of(STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV, value));
+        fail("Expected " + value + " to be rejected");
+      } catch (IllegalArgumentException e) {
+        // Rejected by the shared non-negative-int parse before the range check.
+        assertTrue(e.getMessage().contains(STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV), e.getMessage());
+      }
+    }
+    // 0 disables the estimated exit; 1..3 are the values the sketch accepts.
+    for (int value = 0; value <= 3; value++) {
+      assertEquals(QueryOptionsUtils.getStreamingDistinctEstimatedExitStdDev(
+          Map.of(STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV, Integer.toString(value))), Integer.valueOf(value));
+    }
+  }
+
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {
       // Positive ints
@@ -353,6 +386,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMultiStageLeafLimit(map);
       case STREAMING_GROUP_BY_FLUSH_THRESHOLD:
         return QueryOptionsUtils.getStreamingGroupByFlushThreshold(map);
+      case STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY:
+        return QueryOptionsUtils.getStreamingDistinctMaxTrackedCardinality(map);
       case STREAMING_DISTINCT_FLUSH_THRESHOLD:
         return QueryOptionsUtils.getStreamingDistinctFlushThreshold(map);
       // Unbounded ints

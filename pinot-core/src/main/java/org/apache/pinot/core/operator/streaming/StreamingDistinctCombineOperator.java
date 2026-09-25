@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.DistinctResultsBlockMerger;
+import org.apache.pinot.core.query.distinct.DistinctCardinalityTracker;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -54,6 +56,12 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// distinct set, and one value can span several flush windows. Leaves that must return final results are rejected in
 /// the constructor as a backstop -- the real gate is in [org.apache.pinot.core.plan.CombinePlanNode], but this
 /// operator is public and nothing else would catch a direct construction, which would silently emit duplicate rows.
+///
+/// The cross-segment early exit survives the flushing. [DistinctResultsBlockMerger#isQuerySatisfied] alone cannot
+/// see it -- it reads the accumulated table, which flushing empties long before it can reach LIMIT -- so the
+/// operator carries a [DistinctCardinalityTracker] across flush windows and exits once the *union* of everything
+/// flushed so far reaches LIMIT. A row counter would not do, because flush windows overlap; see that class for the
+/// full argument and for why the exit reads a lower confidence bound rather than a point estimate.
 ///
 /// Unlike [StreamingGroupByCombineOperator], no `detachFromWorkerThreadState` hook is needed: a per-segment
 /// `DistinctTable` is allocated per [org.apache.pinot.core.operator.query.DistinctOperator] invocation and the
@@ -86,6 +94,10 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
   private DistinctResultsBlock _mergedBlock;
   private long _numDocsScanned;
   private EarlyTerminationReason _earlyTerminationReason = EarlyTerminationReason.NONE;
+  // Main-thread-only, like _numDocsScanned and for the same reason: it has to survive the flush boundary. Null when
+  // the leaf's LIMIT makes an early exit impossible or unnecessary -- see DistinctCardinalityTracker#createIfUseful.
+  @Nullable
+  private final DistinctCardinalityTracker _cardinalityTracker;
 
   public StreamingDistinctCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, int flushThreshold) {
@@ -94,6 +106,11 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
         !queryContext.isServerReturnFinalResult() && !queryContext.isServerReturnFinalResultKeyUnpartitioned(),
         "Streaming distinct combine requires a leaf whose results are de-duplicated by a later stage");
     _flushThreshold = flushThreshold;
+    // DistinctExecutorFactory builds every per-segment DistinctTable with this same limit, so it is exactly the
+    // bound that DistinctTable#isSatisfied() would compare against on the non-streaming path.
+    _cardinalityTracker = DistinctCardinalityTracker.createIfUseful(queryContext.getLimit(), flushThreshold,
+        queryContext.getOrderByExpressions() != null, queryContext.getStreamingDistinctMaxTrackedCardinality(),
+        queryContext.getStreamingDistinctEstimatedExitStdDev());
   }
 
   @Override
@@ -111,11 +128,10 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
   /// of two reasons: the group-by one never lets a worker read a published block, and the selection-only one never
   /// mutates one. This operator would otherwise be the only one doing both.
   ///
-  /// Nothing is lost: the consumer still evaluates satisfaction itself in [#mergeBlock] via the results-block
-  /// merger, and the cross-segment early exit is already given up in this mode by construction (flushing empties the
-  /// accumulator long before it can reach LIMIT -- see the gate in
-  /// [org.apache.pinot.core.plan.CombinePlanNode]). Returning `false` also removes the hazard of a worker returning
-  /// early without emitting its `LAST_RESULTS_BLOCK`.
+  /// Nothing is lost: the consumer still evaluates satisfaction itself, in [#mergeBlock] via the results-block
+  /// merger and in [#flush()] via the cumulative cardinality tracker. A worker could not evaluate the cross-segment
+  /// exit anyway -- it sees only its own segment, never the union across flush windows. Returning `false` also
+  /// removes the hazard of a worker returning early without emitting its `LAST_RESULTS_BLOCK`.
   @Override
   protected boolean isQuerySatisfied(DistinctResultsBlock resultsBlock, Object tracker) {
     return false;
@@ -149,12 +165,14 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
           return flush();
         }
       }
+      // All operators done (or the query is satisfied) — flush any remaining accumulated data. Inside the try
+      // because flush() folds the block into the cardinality tracker and can therefore throw, where it could not
+      // before; nextBlock() must still return an ExceptionResultsBlock rather than propagate.
+      if (_mergedBlock != null && _mergedBlock.getDistinctTable().size() > 0) {
+        return flush();
+      }
     } catch (Exception e) {
       return createExceptionResultsBlockAndAttachExecutionStats(e, "streaming distinct results");
-    }
-    // All operators done (or the query is satisfied) — flush any remaining accumulated data
-    if (_mergedBlock != null && _mergedBlock.getDistinctTable().size() > 0) {
-      return flush();
     }
     // Return final metadata block. The early-termination reason is carried over from the accumulated block: the
     // blocking path reports it on the single results block, but here that block has already been streamed out, so
@@ -185,8 +203,20 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
     _querySatisfied = _resultsBlockMerger.isQuerySatisfied(_mergedBlock);
   }
 
+  /// Hands the accumulated block to the consumer and starts a new flush window.
+  ///
+  /// Folding the block into the cardinality tracker here, rather than per merge, is what restores the cross-segment
+  /// early exit that flushing would otherwise give up: the accumulator is emptied long before it can reach LIMIT, so
+  /// the merger's own [DistinctResultsBlockMerger#isQuerySatisfied] can only ever see one window's worth. Checking at
+  /// flush boundaries costs at most one extra window and avoids hashing every value on every merge.
   private DistinctResultsBlock flush() {
     DistinctResultsBlock block = _mergedBlock;
+    if (_cardinalityTracker != null) {
+      // Before dropping the accumulator, so that a throwing fold leaves _mergedBlock consistent.
+      _cardinalityTracker.add(block.getDistinctTable());
+      // OR rather than assign: the merger may already have satisfied the query within this window.
+      _querySatisfied |= _cardinalityTracker.hasReachedLimit();
+    }
     _mergedBlock = null;
     return block;
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.distinct.table;
 import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -28,14 +29,17 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.IntFunction;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -256,6 +260,54 @@ public class MultiColumnDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpressions == null && _recordSet.size() == _limit;
+  }
+
+  /// Resolves the per-column stored type once, then walks the records without re-dispatching per value. The row
+  /// hash is order-sensitive, so `(1, 2)` and `(2, 1)` are two distinct values as they should be.
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    int numColumns = _dataSchema.size();
+    ColumnDataType[] storedTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      storedTypes[i] = _dataSchema.getColumnDataType(i).getStoredType();
+    }
+    for (Record record : _recordSet) {
+      Object[] values = record.getValues();
+      long hash = numColumns;
+      for (int i = 0; i < numColumns; i++) {
+        hash = mixValueHash(hash, hashColumnValue(storedTypes[i], values[i]));
+      }
+      sink.accept(hash);
+    }
+  }
+
+  /// Nulls live inside the records here (this table rejects [#addNull()]), so they are handled per column.
+  ///
+  /// Array, MAP, OBJECT and UNKNOWN stored types fall through to [#UNKNOWN_TYPE_HASH] on purpose rather than
+  /// throwing: they all collapse to one hash, which undercounts and therefore only delays the consumer's decision,
+  /// where throwing would fail a query that works today.
+  private static long hashColumnValue(ColumnDataType storedType, @Nullable Object value) {
+    if (value == null) {
+      return NULL_VALUE_HASH;
+    }
+    switch (storedType) {
+      case INT:
+        return (Integer) value;
+      case LONG:
+        return (Long) value;
+      case FLOAT:
+        return Float.floatToIntBits((Float) value);
+      case DOUBLE:
+        return Double.doubleToLongBits((Double) value);
+      case BIG_DECIMAL:
+        return hashValue((BigDecimal) value);
+      case STRING:
+        return hashValue((String) value);
+      case BYTES:
+        return hashValue((ByteArray) value);
+      default:
+        return UNKNOWN_TYPE_HASH;
+    }
   }
 
   @Override

@@ -27,6 +27,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -210,6 +211,14 @@ public class LongDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpression == null && _valueSet.size() >= _limitWithoutNull;
+  }
+
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    LongIterator longIterator = _valueSet.iterator();
+    while (longIterator.hasNext()) {
+      sink.accept(longIterator.nextLong());
+    }
   }
 
   @Override

@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -73,6 +74,14 @@ public class DictIdDistinctTable extends IntDistinctTable {
 
   @Override
   public boolean mergeDataTable(DataTable dataTable) {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Dict ids are segment-local, so hashing them would measure something meaningless. Unreachable in practice:
+  /// [org.apache.pinot.core.operator.query.DistinctOperator] converts this table with [#toTypedDistinctTable] before
+  /// the block leaves the segment, which is why the siblings below throw too.
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
     throw new UnsupportedOperationException();
   }
 
