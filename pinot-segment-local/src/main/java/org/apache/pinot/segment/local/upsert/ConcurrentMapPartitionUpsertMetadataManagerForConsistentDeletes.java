@@ -367,6 +367,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               IndexSegment prevSegment = prevLocation.getSegment();
               // Read lock: prevSegment cannot be destroyed while its columns are read
               if (!tryAcquireSegmentReadLock(prevSegment)) {
+                _logger.warn("Previous segment: {} is destroyed, dropping primary key instead of reverting to it",
+                    prevSegment.getSegmentName());
                 return null;
               }
               try {
@@ -575,6 +577,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               } finally {
                 releaseSegmentReadLock(currentSegment);
               }
+            } else {
+              _logger.warn("Current segment: {} is destroyed, storing record without merging the previous row",
+                  currentSegment.getSegmentName());
             }
           }
           return recordLocation;

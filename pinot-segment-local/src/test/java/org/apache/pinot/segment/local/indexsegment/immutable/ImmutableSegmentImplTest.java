@@ -136,6 +136,28 @@ public class ImmutableSegmentImplTest {
     }
   }
 
+  @Test
+  public void testDestroyDoesNotWaitOnAnotherSegmentsReader()
+      throws Exception {
+    // The guard is per segment, so a reader pinning one segment must not hold up destroy of an unrelated one. Under
+    // a lock shared across the partition this times out.
+    ImmutableSegmentImpl reading = createSegment(mock(SegmentDirectory.class));
+    SegmentDirectory destroyedDirectory = mock(SegmentDirectory.class);
+    ImmutableSegmentImpl destroyed = createSegment(destroyedDirectory);
+    assertTrue(reading.tryAcquireReadLock());
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      executor.submit(destroyed::destroy).get(10, TimeUnit.SECONDS);
+      assertTrue(destroyed.isDestroyed());
+      verify(destroyedDirectory).close();
+      assertFalse(reading.isDestroyed());
+    } finally {
+      reading.releaseReadLock();
+      executor.shutdownNow();
+    }
+  }
+
   private static ImmutableSegmentImpl createSegment(SegmentDirectory segmentDirectory) {
     return createSegment(segmentDirectory, Map.of());
   }
