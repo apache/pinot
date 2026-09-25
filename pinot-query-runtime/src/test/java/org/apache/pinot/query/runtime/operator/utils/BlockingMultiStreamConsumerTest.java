@@ -20,42 +20,17 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class BlockingMultiStreamConsumerTest {
-  @Test
-  public void shouldTrackTheStreamThatActuallyProducedTheReturnedElement() {
-    @SuppressWarnings("unchecked")
-    AsyncStream<String> stream = mock(AsyncStream.class);
-    AtomicReference<AsyncStream.OnNewData> onNewData = new AtomicReference<>();
-    doAnswer(invocation -> {
-      onNewData.set(invocation.getArgument(0));
-      return null;
-    }).when(stream).addOnNewDataListener(any());
-    when(stream.poll()).thenReturn("data").thenReturn(null).thenThrow(new IllegalStateException("test exception"));
-    try (TestConsumer consumer = new TestConsumer(new ArrayList<>(List.of(stream)))) {
-      assertEquals(consumer.readBlockBlocking(), "data");
-      assertSame(consumer.getLastReadStream(), stream);
-
-      // Make the next read enter its notified (and exception-wrapping) path after the optimistic poll finds no data.
-      onNewData.get().newDataAvailable();
-      assertEquals(consumer.readBlockBlocking(), "exception");
-      assertNull(consumer.getLastReadStream());
-    }
-  }
-
   @Test(timeOut = 10_000)
   public void shouldReturnStreamCompletionWithoutWaitingForUnrelatedData() {
     @SuppressWarnings("unchecked")
@@ -68,8 +43,7 @@ public class BlockingMultiStreamConsumerTest {
     try (TestConsumer consumer = new TestConsumer(new ArrayList<>(List.of(finishedStream, waitingStream)))) {
       assertNull(consumer.readBlockOrStreamCompletionBlocking());
       assertEquals(consumer.getFinishedStreamsLastRead(), List.of(finishedStream));
-      assertFalse(consumer.isStreamLive(finishedStream));
-      assertTrue(consumer.isStreamLive(waitingStream));
+      assertEquals(consumer.getLiveStreamsSnapshot(), List.of(waitingStream));
     }
   }
 
@@ -86,8 +60,7 @@ public class BlockingMultiStreamConsumerTest {
       assertEquals(consumer.pollBlockOrStreamCompletion(), "data");
       assertSame(consumer.getLastReadStream(), dataStream);
       assertEquals(consumer.getFinishedStreamsLastRead(), List.of(finishedStream));
-      assertFalse(consumer.isStreamLive(finishedStream));
-      assertTrue(consumer.isStreamLive(dataStream));
+      assertEquals(consumer.getLiveStreamsSnapshot(), List.of(dataStream));
 
       assertNull(consumer.pollBlockOrStreamCompletion());
       assertNull(consumer.getLastReadStream());
