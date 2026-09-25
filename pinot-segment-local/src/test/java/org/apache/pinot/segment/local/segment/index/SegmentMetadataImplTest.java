@@ -412,6 +412,7 @@ public class SegmentMetadataImplTest {
     } finally {
       segment.destroy();
     }
+  }
 
   /// The columns are held as sorted arrays; the `TreeMap` view exists only for compatibility and costs a map entry
   /// per column, so it is derived on the first getColumnMetadataMap() and never by the accessors the load and query
@@ -440,6 +441,36 @@ public class SegmentMetadataImplTest {
 
   /// getAllColumns() is a view of the metadata's own name array, so it must refuse every mutator rather than let a
   /// caller narrow a loaded segment's columns, and it must not reflect later column changes.
+  /// The map handed out by getColumnMetadataMap() is derived from the column arrays, so a write to it would reach no
+  /// other accessor. It therefore rejects writes, through every view too, while the metadata keeps changing through
+  /// addColumnMetadata()/removeColumn() and a fresh map reflects that.
+  @Test
+  public void testColumnMetadataMapRejectsWrites()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    TreeMap<String, ColumnMetadata> map = metadata.getColumnMetadataMap();
+    String column = map.firstKey();
+    ColumnMetadata columnMetadata = map.get(column);
+    assertThrows(UnsupportedOperationException.class, () -> map.put("added", columnMetadata));
+    assertThrows(UnsupportedOperationException.class, () -> map.remove(column));
+    assertThrows(UnsupportedOperationException.class, map::clear);
+    assertThrows(UnsupportedOperationException.class, () -> map.computeIfAbsent("added", k -> columnMetadata));
+    assertThrows(UnsupportedOperationException.class, () -> map.keySet().remove(column));
+    assertThrows(UnsupportedOperationException.class, () -> map.navigableKeySet().pollFirst());
+    assertThrows(UnsupportedOperationException.class, () -> map.values().clear());
+    Iterator<Map.Entry<String, ColumnMetadata>> entries = map.entrySet().iterator();
+    entries.next();
+    assertThrows(UnsupportedOperationException.class, entries::remove);
+    assertThrows(UnsupportedOperationException.class, () -> map.headMap(column, true).clear());
+    assertThrows(UnsupportedOperationException.class, () -> map.descendingMap().remove(column));
+    assertTrue(map.containsKey(column));
+
+    metadata.addColumnMetadata("added", columnMetadata);
+    assertFalse(map.containsKey("added"), "an earlier map is a snapshot");
+    assertTrue(metadata.getColumnMetadataMap().containsKey("added"));
+    assertSame(metadata.getColumnMetadataFor("added"), columnMetadata);
+  }
+
   @Test
   public void testGetAllColumnsIsAnUnmodifiableSnapshot()
       throws Exception {
