@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.index.creator.inv;
 import com.google.common.collect.Collections2;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +33,7 @@ import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.mockito.InOrder;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -41,7 +44,13 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class BitmapInvertedIndexWriterTest implements PinotBuffersAfterMethodCheckRule {
@@ -113,6 +122,50 @@ public class BitmapInvertedIndexWriterTest implements PinotBuffersAfterMethodChe
       }
     }
     verifyReadable(bitmaps);
+  }
+
+  @Test
+  public void testCloseForcesChannelBeforeClosing()
+      throws Exception {
+    BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_file, 1);
+    writer.add(small());
+
+    Field channelField = BitmapInvertedIndexWriter.class.getDeclaredField("_fileChannel");
+    channelField.setAccessible(true);
+    FileChannel realChannel = (FileChannel) channelField.get(writer);
+    FileChannel spyChannel = spy(realChannel);
+    channelField.set(writer, spyChannel);
+
+    writer.close();
+
+    InOrder order = inOrder(spyChannel);
+    order.verify(spyChannel).truncate(anyLong());
+    order.verify(spyChannel).force(true);
+    order.verify(spyChannel).close();
+  }
+
+  @Test
+  public void testCloseAlwaysClosesChannelEvenIfForceFails()
+      throws Exception {
+    BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_file, 1);
+    writer.add(small());
+
+    Field channelField = BitmapInvertedIndexWriter.class.getDeclaredField("_fileChannel");
+    channelField.setAccessible(true);
+    FileChannel realChannel = (FileChannel) channelField.get(writer);
+    FileChannel spyChannel = spy(realChannel);
+    doThrow(new IOException("force failed")).when(spyChannel).force(true);
+    channelField.set(writer, spyChannel);
+
+    try {
+      writer.close();
+      fail("Expected IOException");
+    } catch (IOException e) {
+      assertEquals(e.getMessage(), "force failed");
+    }
+
+    // The channel must still be closed even though force() failed, so the fd isn't leaked.
+    verify(spyChannel).close();
   }
 
   private void verifyReadable(RoaringBitmap[] bitmaps)

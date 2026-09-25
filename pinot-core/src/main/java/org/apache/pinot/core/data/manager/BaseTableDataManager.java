@@ -1513,7 +1513,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       // If an exception is thrown when untarring, it means the tar file is broken or not found after the retry. Thus,
       // there's no need to retry again.
-      File untarredSegmentDir = TarCompressionUtils.untar(segmentTarFile, untarDir).get(0);
+      File untarredSegmentDir = TarCompressionUtils.untarDurably(segmentTarFile, untarDir).get(0);
       _logger.info("Untarred segment: {} into: {}", segmentName, untarredSegmentDir);
       return untarredSegmentDir;
     } catch (Exception e) {

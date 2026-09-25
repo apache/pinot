@@ -317,6 +317,40 @@ public abstract class PinotDataBuffer implements DataBuffer {
     return bufferInfo;
   }
 
+  /// Flushes each buffer's dirty pages to durable storage before closing it. Without this, a write can sit
+  /// unconfirmed in the page cache, and a fault before the OS's own lazy writeback runs can leave bad bytes on
+  /// disk with no error. Every buffer is attempted even if an earlier one fails to flush or close. A buffer
+  /// always attempts release after a flush failure, and later buffers are still attempted.
+  ///
+  /// @param buffers one or more writable buffers to flush and close
+  /// @throws IOException the first exception encountered while flushing or closing, with the rest suppressed
+  public static void flushAndClose(PinotDataBuffer... buffers)
+      throws IOException {
+    Exception topLevelException = null;
+
+    for (PinotDataBuffer buffer : buffers) {
+      if (buffer == null) {
+        continue;
+      }
+      try {
+        buffer.close();
+      } catch (Exception e) {
+        if (topLevelException == null) {
+          topLevelException = e;
+        } else {
+          topLevelException.addSuppressed(e);
+        }
+      }
+    }
+
+    if (topLevelException != null) {
+      if (topLevelException instanceof IOException) {
+        throw (IOException) topLevelException;
+      }
+      throw new IOException("Caught exception while flushing/closing data buffers", topLevelException);
+    }
+  }
+
   @VisibleForTesting
   public static void closeOpenBuffers() {
     for (PinotDataBuffer buffer : BUFFER_CONTEXT_MAP.keySet()) {
@@ -348,6 +382,21 @@ public abstract class PinotDataBuffer implements DataBuffer {
   public synchronized void close()
       throws IOException {
     if (_closeable) {
+      Exception topLevelException = null;
+      try {
+        flush();
+      } catch (Exception e) {
+        topLevelException = e;
+      }
+      try {
+        release();
+      } catch (Exception e) {
+        if (topLevelException == null) {
+          topLevelException = e;
+        } else {
+          topLevelException.addSuppressed(e);
+        }
+      }
       BufferContext bufferContext;
       bufferContext = BUFFER_CONTEXT_MAP.remove(this);
       if (bufferContext != null) {
@@ -359,9 +408,16 @@ public abstract class PinotDataBuffer implements DataBuffer {
           MMAP_BUFFER_USAGE.getAndAdd(-bufferContext._size);
         }
       }
-      flush();
-      release();
       _closeable = false;
+      if (topLevelException instanceof IOException) {
+        throw (IOException) topLevelException;
+      }
+      if (topLevelException instanceof RuntimeException) {
+        throw (RuntimeException) topLevelException;
+      }
+      if (topLevelException != null) {
+        throw new IOException("Caught exception while closing data buffer", topLevelException);
+      }
     }
   }
 
