@@ -1242,7 +1242,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       throw new SQLDataException("Data type not supported for column " + columnIndex);
     }
 
-    var value = getObject(columnIndex, dataType);
+    Object value = getObject(columnIndex, dataType);
     if (wasNull()) {
       return null;
     }
