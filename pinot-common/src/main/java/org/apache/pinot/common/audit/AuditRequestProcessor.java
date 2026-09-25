@@ -44,6 +44,11 @@ import org.slf4j.LoggerFactory;
 /// Handles all the complex logic for IP address extraction, user identification,
 /// and request payload capture for audit logging purposes.
 /// Uses dynamic configuration to control audit behavior.
+///
+/// Everything captured from the caller - query parameters, allow-listed headers and the request
+/// body - passes through [AuditRedactor] before it reaches the [AuditEvent], so that credentials
+/// sent to an audited endpoint are not written to the audit log. That step is unconditional and
+/// has no corresponding configuration key.
 @Singleton
 public class AuditRequestProcessor {
 
@@ -153,7 +158,7 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       MultivaluedMap<String, String> queryParams = uriInfo.getQueryParameters();
       if (!queryParams.isEmpty()) {
-        payload.setQueryParameters(toMap(queryParams));
+        payload.setQueryParameters(AuditRedactor.redact(toMap(queryParams)));
       }
 
       final AuditConfig config = _configManager.getCurrentConfig();
@@ -164,7 +169,7 @@ public class AuditRequestProcessor {
         if (!allHeaders.isEmpty()) {
           Map<String, Object> filteredHeaders = toMap(allHeaders, allowedHeaders);
           if (!filteredHeaders.isEmpty()) {
-            payload.setHeaders(filteredHeaders);
+            payload.setHeaders(AuditRedactor.redact(filteredHeaders));
           }
         }
       }
@@ -172,7 +177,7 @@ public class AuditRequestProcessor {
       if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
         String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
         if (StringUtils.isNotBlank(requestBody)) {
-          payload.setBody(requestBody);
+          payload.setBody(AuditRedactor.redactBody(requestBody));
         }
       }
 
