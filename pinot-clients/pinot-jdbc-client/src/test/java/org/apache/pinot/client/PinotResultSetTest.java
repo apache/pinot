@@ -313,30 +313,6 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testGetCalculatedScale() {
-    PinotResultSet pinotResultSet = new PinotResultSet();
-    int calculatedResult;
-
-    calculatedResult = pinotResultSet.getCalculatedScale("1");
-    Assert.assertEquals(calculatedResult, 0);
-
-    calculatedResult = pinotResultSet.getCalculatedScale("1.0");
-    Assert.assertEquals(calculatedResult, 1);
-
-    calculatedResult = pinotResultSet.getCalculatedScale("1.2");
-    Assert.assertEquals(calculatedResult, 1);
-
-    calculatedResult = pinotResultSet.getCalculatedScale("1.23");
-    Assert.assertEquals(calculatedResult, 2);
-
-    calculatedResult = pinotResultSet.getCalculatedScale("1.234");
-    Assert.assertEquals(calculatedResult, 3);
-
-    calculatedResult = pinotResultSet.getCalculatedScale("-1.234");
-    Assert.assertEquals(calculatedResult, 3);
-  }
-
-  @Test
   public void testDateFromStringConcurrent()
       throws Throwable {
     ExecutorService executorService = Executors.newFixedThreadPool(10);

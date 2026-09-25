@@ -51,6 +51,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.client.utils.BigDecimalUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
@@ -146,16 +147,11 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   public BigDecimal getBigDecimal(int columnIndex, int scale)
       throws SQLException {
     try {
-      String value = this.getString(columnIndex);
-      return value == null ? null : new BigDecimal(value).setScale(getCalculatedScale(value));
+      String value = getString(columnIndex);
+      return BigDecimalUtils.getBigDecimalFromString(value);
     } catch (Exception e) {
       throw new SQLDataException("Unable to fetch BigDecimal value", e);
     }
-  }
-
-  public int getCalculatedScale(String value) {
-    int index = value.indexOf(".");
-    return index == -1 ? 0 : value.length() - index - 1;
   }
 
   @Nullable
