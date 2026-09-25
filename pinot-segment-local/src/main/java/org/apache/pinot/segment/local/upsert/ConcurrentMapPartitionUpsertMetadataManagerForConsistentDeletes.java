@@ -380,14 +380,17 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       prevLocation.getComparisonValue(),
                       RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
                 } catch (Exception e) {
-                  _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                      e);
+                  _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to revert to previous segment: {}, "
+                      + "removing key", segment.getSegmentName(), prevSegment.getSegmentName(), e);
+                  _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                      ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                   return null;
                 }
               } else {
                 // Should not happen
-                _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
-                    prevSegment.getSegmentName());
+                _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to find valid doc ids in previous "
+                    + "segment: {}, removing key", segment.getSegmentName(), prevSegment.getSegmentName());
+                _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                 return null;
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {

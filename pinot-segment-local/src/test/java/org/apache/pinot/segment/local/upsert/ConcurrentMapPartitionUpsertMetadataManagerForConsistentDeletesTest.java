@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -38,6 +39,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -57,6 +59,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedConstruction;
@@ -64,6 +67,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -71,6 +75,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -1269,6 +1276,69 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
         "fc2159b78d07f803fdfb0b727315a445");
     assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
         "37fab5ef0ea39711feabcdc623cb8a4e");
+  }
+
+  @DataProvider
+  public Object[][] revertFailureCases() {
+    return new Object[][]{
+        {"reader"}, {"bitmap"}, {"none"}
+    };
+  }
+
+  @Test(dataProvider = "revertFailureCases")
+  public void testRevertFailureReporting(String failure) {
+    ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
+    ConsumingSegmentConsistencyModeListener.Mode originalMode = listener.getConsistencyMode();
+    ServerMetrics originalMetrics = ServerMetrics.get();
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    ServerMetrics.register(metrics);
+    listener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+    try {
+      UpsertContext context = _contextBuilder.setDropOutOfOrderRecord(true).setHashFunction(HashFunction.NONE).build();
+      ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes manager =
+          new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0, context);
+      ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+      validDocIds.add(0);
+      MutableSegment segment = mockMutableSegmentWithDataSource(1, validDocIds, null, new int[]{10});
+      ImmutableSegmentImpl previousSegment = mock(ImmutableSegmentImpl.class);
+      when(previousSegment.getSegmentName()).thenReturn(getSegmentName(0));
+      ThreadSafeMutableRoaringBitmap previousValidDocIds = new ThreadSafeMutableRoaringBitmap();
+      when(previousSegment.getValidDocIds()).thenReturn(failure.equals("bitmap") ? null : previousValidDocIds);
+      PrimaryKey key = makePrimaryKey(10);
+      manager._primaryKeyToRecordLocationMap.put(key, new RecordLocation(segment, 0, 200, 2));
+      manager._previousKeyToRecordLocationMap.put(key, new RecordLocation(previousSegment, 0, 100, 2));
+      manager._trackedSegments.add(segment);
+      try (MockedConstruction<UpsertUtils.RecordInfoReader> readers =
+          mockConstruction(UpsertUtils.RecordInfoReader.class, (reader, construction) -> {
+            if (failure.equals("reader")) {
+              when(reader.getRecordInfo(0)).thenThrow(new IllegalStateException("previous reader failed"));
+            } else {
+              when(reader.getRecordInfo(0)).thenReturn(new RecordInfo(key, 0, 100, false));
+            }
+          })) {
+        manager.removeSegment(segment);
+        assertFalse(manager._trackedSegments.contains(segment));
+        assertEquals(readers.constructed().size(), failure.equals("bitmap") ? 0 : 1);
+      }
+      boolean successfulRevert = failure.equals("none");
+      if (successfulRevert) {
+        checkRecordLocation(manager._primaryKeyToRecordLocationMap, 10, previousSegment, 0, 100, 1, HashFunction.NONE);
+        assertTrue(previousValidDocIds.contains(0));
+        assertFalse(validDocIds.contains(0));
+      } else {
+        assertFalse(manager._primaryKeyToRecordLocationMap.containsKey(key),
+            "Preserve the existing key-removal fallback");
+      }
+      assertTrue(manager._previousKeyToRecordLocationMap.isEmpty());
+      verify(metrics, times(successfulRevert ? 0 : 1))
+          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+      verify(context.getTableDataManager(), never()).addSegmentError(anyString(), any());
+    } finally {
+      listener.setMode(originalMode);
+      ServerMetrics.deregister();
+      ServerMetrics.register(originalMetrics);
+    }
   }
 
   @Test
