@@ -39,7 +39,9 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -50,6 +52,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.EmptyColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -381,8 +384,9 @@ public class SegmentMetadataImplTest {
   }
 
   /// A server checks whether a segment needs preprocessing before it loads it, on the same metadata instance
-  /// (`BaseTableDataManager` calls `needPreprocess(segmentDirectory, …)` and then `load(segmentDirectory, …)`), and
-  /// the check may derive the schema. Whatever it derives must not survive as a stale schema: once the loader has
+  /// (`BaseTableDataManager` calls `needPreprocess(segmentDirectory, …)` and then `load(segmentDirectory, …)`). The
+  /// check must not derive the schema (that is what this PR moves the forward-index handler and the min/max generator
+  /// off), and whatever another pre-load caller derives must not survive as a stale schema: once the loader has
   /// registered the built-in virtual columns, the schema handed out afterwards includes them, exactly as the eagerly
   /// built one did.
   @Test
@@ -397,7 +401,11 @@ public class SegmentMetadataImplTest {
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_segmentDirectory, ReadMode.mmap);
     ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
-    assertTrue(segmentDirectory.getSegmentMetadata().isSchemaMaterialized(), "the check derived the schema");
+    assertFalse(segmentDirectory.getSegmentMetadata().isSchemaMaterialized(),
+        "the preprocess check must not derive the segment schema");
+    // A pre-load caller that does derive it (a custom SegmentDirectoryLoader, a preprocess extension) must still get
+    // the virtual columns afterwards
+    segmentDirectory.getSegmentMetadata().getSchema();
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
     try {
       SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
