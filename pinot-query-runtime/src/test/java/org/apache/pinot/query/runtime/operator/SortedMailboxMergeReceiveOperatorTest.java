@@ -399,6 +399,29 @@ public class SortedMailboxMergeReceiveOperatorTest {
     }
   }
 
+  @Test(timeOut = 10_000)
+  public void shouldDrainBufferedRowsAfterTheirSenderFinishes() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    Object[] row1 = new Object[]{1, 1};
+    Object[] row3 = new Object[]{3, 1};
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row1, row3),
+        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    Object[] row2 = new Object[]{2, 2};
+    Object[] row4 = new Object[]{4, 2};
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row2),
+        null,
+        OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, row4),
+        OperatorTestUtil.eosWithEmptyStats());
+
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
+        RelDistribution.Type.HASH_DISTRIBUTED)) {
+      assertEquals(drain(operator), List.of(row1, row2, row3, row4));
+    }
+  }
+
   @Test
   public void shouldReleaseBufferedCursorsOnSenderError() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
