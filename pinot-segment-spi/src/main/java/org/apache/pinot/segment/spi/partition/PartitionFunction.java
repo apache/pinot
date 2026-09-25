@@ -32,11 +32,24 @@ import javax.annotation.Nullable;
 /// result. Implementations must also be safe for concurrent invocation by multiple threads.
 public interface PartitionFunction extends Serializable {
 
+  /// Returned by [#getPartition(String)] when the function cannot derive a partition for the value --
+  /// typically because the value is not a legal member of the partition column's domain, so hashing it
+  /// would be a guess.
+  ///
+  /// Pruners must treat it as "this value says nothing about which segments can match" and keep every
+  /// segment, because pruning on a guessed id can drop a segment that does hold matching rows. It is
+  /// deliberately outside the `[0, numPartitions)` range every id normalizer produces, so no existing
+  /// function can return it by accident.
+  int UNKNOWN_PARTITION = -1;
+
   /// Method to compute and return partition id for the given value.
   /// NOTE: The value is expected to be a string representation of the actual value.
   ///
+  /// A function that cannot derive an id for the value returns [#UNKNOWN_PARTITION] rather than a
+  /// fallback id, so that callers can tell "I do not know" apart from a real partition.
+  ///
   /// @param value Value for which to determine the partition id.
-  /// @return partition id for the value.
+  /// @return partition id for the value, or [#UNKNOWN_PARTITION] when it cannot be derived.
   int getPartition(String value);
 
   /// Returns the canonical name of the partition function.

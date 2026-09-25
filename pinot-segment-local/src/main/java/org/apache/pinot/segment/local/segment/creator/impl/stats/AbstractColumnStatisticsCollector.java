@@ -179,6 +179,12 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   protected void updatePartition(String value) {
-    _partitions.add(_partitionFunction.getPartition(value));
+    int partition = _partitionFunction.getPartition(value);
+    // A value the function cannot place tells us nothing to record. Stamping UNKNOWN_PARTITION would put
+    // an id outside [0, numPartitions) into the segment's metadata, where every reader would treat it as
+    // a real partition.
+    if (partition != PartitionFunction.UNKNOWN_PARTITION) {
+      _partitions.add(partition);
+    }
   }
 }
