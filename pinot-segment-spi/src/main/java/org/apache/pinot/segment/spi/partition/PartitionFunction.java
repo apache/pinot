@@ -58,7 +58,7 @@ public interface PartitionFunction extends Serializable {
   /// @return Number of possible partitions.
   int getNumPartitions();
 
-  /// Returns the immutable configuration used to construct this function, or null if none is exposed.
+  /// Returns the configuration used to construct this function, or null if none is exposed.
   @Nullable
   default Map<String, String> getFunctionConfig() {
     return null;
