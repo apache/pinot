@@ -25,12 +25,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
@@ -56,6 +59,8 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -364,6 +369,50 @@ public class PinotClientRequestTest {
     assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
     verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testDmlOnGetQueryEndpointReturnsError()
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+    when(request.getHeaderNames()).thenReturn(List.of());
+
+    // A GET must not modify data, e.g. when a browser holding credentials follows a link
+    _pinotClientRequest.processSqlQueryGet("DELETE FROM myTable WHERE col1 = 'a'", null, asyncResponse, request,
+        _httpHeaders);
+
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.SQL_PARSING.getId());
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDmlOnPostQueryEndpointIsExecutedWithTheRequestHeaders()
+      throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+    when(request.getHeaderNames()).thenReturn(List.of("Authorization"));
+    when(request.getHeaders("Authorization")).thenReturn(List.of("Basic abc"));
+    when(_sqlQueryExecutor.executeDMLStatement(any(), any())).thenReturn(new BrokerResponseNative());
+
+    _pinotClientRequest.processSqlQueryPost("{\"sql\": \"DELETE FROM myTable WHERE col1 = 'a'\"}", asyncResponse,
+        false, 0, request, _httpHeaders);
+
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getStatus(), Response.Status.OK.getStatusCode());
+    assertEquals(captor.getValue().getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1);
+    // The executor authorizes the caller with the request headers
+    verify(_sqlQueryExecutor).executeDMLStatement(argThat(sqlNodeAndOptions ->
+            sqlNodeAndOptions.getSqlType() == PinotSqlType.DML && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete),
+        eq(Map.of("Authorization", "Basic abc")));
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
   }
 
   @Test

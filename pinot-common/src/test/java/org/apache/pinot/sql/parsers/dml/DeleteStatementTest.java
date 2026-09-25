@@ -19,7 +19,6 @@
 package org.apache.pinot.sql.parsers.dml;
 
 import java.util.Map;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -44,9 +43,10 @@ public class DeleteStatementTest {
     assertEquals(statement.getTableName(), "myTable");
     assertEquals(statement.getPredicate(), "userId = 'u1' AND ts < 1700000000000");
     assertNull(statement.getDatabase());
-    // Query options are not options of the statement
+    // Every option but the database reaches the executor, query options included (with their canonical keys)
     assertEquals(statement.getOptions(),
-        Map.of("taskName", "gdpr-42", "dryRun", "true", "purge.query.max-segments", "500"));
+        Map.of("taskName", "gdpr-42", "dryRun", "true", "purge.query.max-segments", "500", "timeoutMs", "1000",
+            "useMultistageEngine", "true"));
     assertEquals(statement.getExecutionType(), DataManipulationStatement.ExecutionType.HTTP);
   }
 
@@ -71,24 +71,15 @@ public class DeleteStatementTest {
 
   @Test
   public void testParseRequestOptions() {
-    // Options of the request are options of the statement too, unless they are query or request options
+    // Options of the request are options of the statement too, SET taking precedence
     DeleteStatement statement = DeleteStatement.parse(RequestUtils.parseQuery(
-        "SET taskName = 'gdpr-42'; DELETE FROM myTable WHERE userId = 'u1'",
+        "SET taskName = 'gdpr-42'; SET dryRun = false; DELETE FROM myTable WHERE userId = 'u1'",
         JsonUtils.newObjectNode().put(Request.QUERY_OPTIONS, "dryRun=true;timeoutMs=1000;groupByMode=sql;"
             + "responseFormat=sql;database=db1").put(Request.TRACE, true)));
 
     assertEquals(statement.getDatabase(), "db1");
-    assertEquals(statement.getOptions(), Map.of("taskName", "gdpr-42", "dryRun", "true"));
-  }
-
-  @Test
-  public void testParseExcludesRegisteredQueryOptions() {
-    QueryOptionsUtils.registerSqlQueryOptionKey("deleteStatementTestPluginOption");
-
-    DeleteStatement statement =
-        parse("SET deleteStatementTestPluginOption = 'x'; SET dryRun = true; DELETE FROM myTable WHERE userId = 'u1'");
-
-    assertEquals(statement.getOptions(), Map.of("dryRun", "true"));
+    assertEquals(statement.getOptions(), Map.of("taskName", "gdpr-42", "dryRun", "false", "timeoutMs", "1000",
+        "groupByMode", "sql", "responseFormat", "sql", "trace", "true"));
   }
 
   @Test

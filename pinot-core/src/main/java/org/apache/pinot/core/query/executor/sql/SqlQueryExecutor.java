@@ -60,13 +60,18 @@ public class SqlQueryExecutor {
     _helixManager = null;
   }
 
-  private static String getControllerBaseUrl(HelixManager helixManager) {
-    String instanceId = LeadControllerUtils.getHelixClusterLeader(helixManager);
+  /// Base URL of the controller that executes the DML statements: the configured controller URL, or else the current
+  /// lead controller, looked up on each call.
+  protected String getControllerBaseUrl() {
+    if (_helixManager == null) {
+      return _controllerUrl;
+    }
+    String instanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
     if (instanceId == null) {
       throw new RuntimeException("Unable to locate the leader pinot controller, please retry later...");
     }
 
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
     ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(helixDataAccessor.getProperty(
         keyBuilder.instanceConfig(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + instanceId)));
@@ -88,7 +93,9 @@ public class SqlQueryExecutor {
     try {
       statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+      // e.g. a DELETE without a WHERE clause, or a DML kind that Pinot parses but does not execute (UPDATE, MERGE)
+      String message = e.getMessage() != null ? e.getMessage() : e.toString();
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, message);
     }
     if (statement instanceof DeleteStatement) {
       return executeDelete((DeleteStatement) statement, headers);
@@ -127,8 +134,9 @@ public class SqlQueryExecutor {
   /// Like other DML statements, the broker and the controller hand `DELETE` to this executor without authorizing the
   /// caller for the table, applying quotas or logging it as a query. Implementations must authorize the caller
   /// themselves with the request headers, e.g. by forwarding them to a controller API that checks table access, and
-  /// validate the predicate (see [DeleteStatement#getPredicate()]) and the database (see
-  /// [DeleteStatement#getDatabase()]) before deleting rows.
+  /// validate the predicate (see [DeleteStatement#getPredicate()]), the database (see
+  /// [DeleteStatement#getDatabase()]) and the options they read (see [DeleteStatement#getOptions()]) before deleting
+  /// rows.
   ///
   /// @param statement parsed statement
   /// @param headers headers of the original request, e.g. to authorize the caller
@@ -139,9 +147,6 @@ public class SqlQueryExecutor {
 
   private MinionClient getMinionClient() {
     // NOTE: using null auth provider here as auth headers injected by caller in "executeDMLStatement()"
-    if (_helixManager != null) {
-      return new MinionClient(getControllerBaseUrl(_helixManager), null);
-    }
-    return new MinionClient(_controllerUrl, null);
+    return new MinionClient(getControllerBaseUrl(), null);
   }
 }

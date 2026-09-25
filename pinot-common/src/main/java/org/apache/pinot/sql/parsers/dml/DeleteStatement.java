@@ -36,7 +36,6 @@ import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -52,9 +51,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 /// executes the parsed statement by overriding `SqlQueryExecutor#executeDelete`. The generic [#execute()] and
 /// [#generateAdhocTaskConfig()] do not apply to it.
 ///
-/// Its options, from `SET` statements and from the request, are split into the [#getDatabase()] of an unqualified
-/// table name, the query and request options, which are ignored (see [QueryOptionsUtils#isQueryOptionKey]), and the
-/// [#getOptions()] of the statement, which configure the deletion.
+/// Its options are the `SET` statements, the legacy `OPTION(...)` suffix and the request `queryOptions` of the
+/// statement (`SET` takes precedence). The `database` option is lifted into [#getDatabase()]; every other option,
+/// including query options such as `timeoutMs`, reaches the executor as written through [#getOptions()], so that an
+/// option the executor relies on (e.g. a dry run) cannot be reclassified as a query option and silently dropped.
 ///
 /// Instances are immutable and thread-safe.
 public class DeleteStatement implements DataManipulationStatement {
@@ -100,7 +100,7 @@ public class DeleteStatement implements DataManipulationStatement {
     _tableName = tableName;
     _predicate = predicate;
     _database = database;
-    _options = Collections.unmodifiableMap(options);
+    _options = Collections.unmodifiableMap(new HashMap<>(options));
   }
 
   /// Parses a `DELETE` statement.
@@ -130,7 +130,7 @@ public class DeleteStatement implements DataManipulationStatement {
         // Queries ignore it, as they only read the `database` option: fail rather than delete from another table
         throw new IllegalArgumentException(
             "Unsupported option: " + key + ", set the database with the '" + CommonConstants.DATABASE + "' option");
-      } else if (!QueryOptionsUtils.isQueryOptionKey(key)) {
+      } else {
         options.put(key, option.getValue());
       }
     }
@@ -186,19 +186,23 @@ public class DeleteStatement implements DataManipulationStatement {
 
   /// Database of an unqualified table name set with the `database` option, e.g. `SET database = '...'`, if any.
   ///
-  /// Queries also read the database from the `database` request header, which takes precedence and must match the
-  /// option when both are set (see `DatabaseUtils#extractDatabaseFromQueryRequest`): executors resolve it the same way
-  /// with the headers they are given.
+  /// Queries also read the database from the `database` request header (header names are case-insensitive), which
+  /// takes precedence and must match the option when both are set (see
+  /// `DatabaseUtils#extractDatabaseFromQueryRequest`), and a `database.table` name must match the resolved database
+  /// (see `DatabaseUtils#translateTableName`): executors resolve it the same way with the headers they are given.
   @Nullable
   public String getDatabase() {
     return _database;
   }
 
-  /// Options of the statement other than the database and the query and request options, with the keys as written.
+  /// Options of the statement other than the database, with the keys as written: the `SET` statements, the legacy
+  /// `OPTION(...)` suffix and the request `queryOptions`, `SET` taking precedence over request options with the same
+  /// key. Query options such as `timeoutMs` or `useMultistageEngine` are included: executors read the options they
+  /// support and ignore the others.
   ///
-  /// `SET` options take precedence over request options with the same key. Keys are case-sensitive here, so the same
-  /// option may appear with different cases, e.g. `dryRun` set with `SET` and `dryrun` in the request: executors that
-  /// read options case-insensitively should reject such duplicates rather than pick one.
+  /// Keys are case-sensitive here, so the same option may appear with different cases, e.g. `dryRun` set with `SET`
+  /// and `dryrun` in the request: executors that read options case-insensitively should reject such duplicates rather
+  /// than pick one.
   public Map<String, String> getOptions() {
     return _options;
   }
