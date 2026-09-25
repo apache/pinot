@@ -122,7 +122,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   /// Key of [#_canonicalCodecSpecs]: the configured codec spec plus the stored type it is validated against.
-  private record CodecSpecKey(String _spec, DataType _storedType) {
+  private record CodecSpecKey(String spec, DataType storedType) {
   }
 
   @VisibleForTesting
@@ -555,7 +555,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       // Compare canonical forms so equivalent spellings (case, aliases, default arguments) do not trigger a rewrite.
       DataType storedType = existingColMetadata.getDataType().getStoredType();
       String canonicalNewSpec = _canonicalCodecSpecs.computeIfAbsent(new CodecSpecKey(newCodecSpec, storedType),
-          key -> CodecPipelineExecutor.create(key._spec(), key._storedType()).getCanonicalSpec());
+          key -> CodecPipelineExecutor.create(key.spec(), key.storedType()).getCanonicalSpec());
       return !canonicalNewSpec.equals(existingCodecSpec);
     }
 

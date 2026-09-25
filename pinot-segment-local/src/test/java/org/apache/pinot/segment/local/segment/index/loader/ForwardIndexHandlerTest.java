@@ -2859,6 +2859,46 @@ public class ForwardIndexHandlerTest {
         .build());
     applyCodecRewrite(DIM_LZ4_INTEGER);
     assertRawForwardIndexState(DIM_LZ4_INTEGER, null, ChunkCompressionType.LZ4);
+
+    // Leaving V7 with an explicit legacy codec lands on that codec rather than the field-type default.
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "T64,LZ4"));
+    applyCodecRewrite(DIM_LZ4_INTEGER);
+    assertRawForwardIndexState(DIM_LZ4_INTEGER, "T64,LZ4", null);
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, new FieldConfig.Builder(DIM_LZ4_INTEGER)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.ZSTANDARD)
+        .build());
+    applyCodecRewrite(DIM_LZ4_INTEGER);
+    assertRawForwardIndexState(DIM_LZ4_INTEGER, null, ChunkCompressionType.ZSTANDARD);
+  }
+
+  /// The relaxed reload gate also applies to legacy tables: a `compressionCodec` change on a RAW column
+  /// is now applied in the same reload as a standalone-dictionary toggle instead of being deferred.
+  @Test
+  public void testDictionaryToggleAndCompressionCodecTogether()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    _invertedIndexColumns.add(column);
+    _noDictionaryColumns.remove(column);
+    _fieldConfigMap.put(column, new FieldConfig(column, FieldConfig.EncodingType.RAW, null,
+        List.of(FieldConfig.IndexType.INVERTED), CompressionCodec.ZSTANDARD, null, indexes, null, null));
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, null, ChunkCompressionType.ZSTANDARD);
+    assertStandaloneDictionaryState(column, true);
+
+    _invertedIndexColumns.remove(column);
+    _noDictionaryColumns.add(column);
+    _fieldConfigMap.put(column, new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.SNAPPY)
+        .build());
+    applyOperations(column, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY,
+        ForwardIndexHandler.Operation.REWRITE_FORWARD_INDEX));
+    assertRawForwardIndexState(column, null, ChunkCompressionType.SNAPPY);
+    assertStandaloneDictionaryState(column, false);
   }
 
   private void assertNoCodecRewrite(String column)

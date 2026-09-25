@@ -44,6 +44,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// [ByteBuffer] returned by `getChunkBuffer` is the context's reusable scratch buffer —
 /// its position/limit are mutated on every chunk transition and it must not be retained across
 /// subsequent `getInt`/`getLong` calls.
+///
+/// Byte-range prefetch hints (`isBufferByteRangeInfoSupported` and friends) are deliberately not
+/// implemented yet for this format and fall back to the interface defaults.
 public final class FixedByteChunkSVForwardIndexReaderV7
     implements ForwardIndexReader<FixedByteChunkSVForwardIndexReaderV7.Context> {
 
@@ -370,9 +373,9 @@ public final class FixedByteChunkSVForwardIndexReaderV7
   // -------------------------------------------------------------------------
 
   private ByteBuffer getChunkBuffer(int docId, Context context) {
-    if (docId < 0 || docId >= _totalDocs) {
-      throw new IndexOutOfBoundsException("docId " + docId + " is out of bounds [0, " + _totalDocs + ")");
-    }
+    // No per-row bounds check, matching the legacy fixed-byte readers: an out-of-range docId maps to a
+    // chunk id that loadChunk rejects, and a row past totalDocs inside the last chunk is caught by the
+    // decoded buffer's limit on the absolute get.
     int chunkId = docId >>> _shift;
     if (context._chunkId == chunkId) {
       return context._chunkBuffer;
@@ -385,6 +388,10 @@ public final class FixedByteChunkSVForwardIndexReaderV7
     // native memory. Checked once per chunk transition, so it stays off the per-row read path.
     if (context._closed) {
       throw new IllegalStateException("V7 forward-index reader context is closed");
+    }
+    if (chunkId >= _numChunks) {
+      throw new IndexOutOfBoundsException(
+          "Chunk " + chunkId + " is out of bounds [0, " + _numChunks + "); totalDocs=" + _totalDocs);
     }
     long chunkStart = getChunkOffset(chunkId);
     // Validate the chunk offset before using it as a buffer index. The constructor validates the

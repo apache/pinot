@@ -80,7 +80,6 @@ public class ForwardIndexCreatorFactory {
       // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
       ForwardIndexCreator creator = null;
-      ChunkCompressionType chunkCompressionType = null;
 
       // codecSpec always selects the self-describing V7 codec-pipeline format. The legacy raw
       // writers remain available only through compressionCodec/chunkCompressionType.
@@ -103,9 +102,7 @@ public class ForwardIndexCreatorFactory {
       }
 
       if (creator == null) {
-        if (chunkCompressionType == null) {
-          chunkCompressionType = indexConfig.getChunkCompressionType();
-        }
+        ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
         if (chunkCompressionType == null) {
           chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
         }

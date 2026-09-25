@@ -275,10 +275,17 @@ public class ForwardIndexCreatorFactoryTest {
         writer.putInt(3);
         expectThrows(IllegalStateException.class, () -> writer.putInt(4));
       }
+      // Closing early (the state of every creator when a segment build aborts) must not throw, must leave
+      // a file that is not recognized as V7, and must reject further writes; a second close is a no-op.
       FixedByteChunkForwardIndexWriterV7 shortWriter =
           new FixedByteChunkForwardIndexWriterV7(indexFile, intExecutor, 3, 2, Integer.BYTES);
       shortWriter.putInt(1);
-      expectThrows(IllegalStateException.class, shortWriter::close);
+      shortWriter.close();
+      shortWriter.close();
+      expectThrows(IllegalStateException.class, () -> shortWriter.putInt(2));
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+        assertFalse(FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(buffer));
+      }
 
       try (FixedByteChunkForwardIndexWriterV7 writer = new FixedByteChunkForwardIndexWriterV7(indexFile,
           CodecPipelineExecutor.create("LZ4", DataType.LONG), 2, 2, Long.BYTES)) {
@@ -445,6 +452,54 @@ public class ForwardIndexCreatorFactoryTest {
         });
       }
       assertTrue(failure.getMessage().contains(message), failure.getMessage());
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /// Corrupt payload bytes (headers intact) fail inside the codec pipeline rather than in the frame
+  /// checks. The failure must not poison the context: the previously decoded chunk stays readable and
+  /// the corrupt chunk is re-attempted rather than served from a half-written scratch buffer.
+  @Test
+  public void testCorruptPayloadFailsAndInvalidatesCachedChunk()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      int numDocs = 12;
+      int docsPerChunk = 4;
+      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("DELTA,LZ4").withTargetDocsPerChunk(docsPerChunk).build();
+      try (ForwardIndexCreator creator =
+          ForwardIndexCreatorFactory.createIndexCreator(newContext(indexDir, false, numDocs), config)) {
+        for (int i = 0; i < numDocs; i++) {
+          creator.putInt(i * 7 + 3);
+        }
+        creator.seal();
+      }
+      File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+      byte[] bytes = Files.readAllBytes(indexFile.toPath());
+      ByteBuffer header = ByteBuffer.wrap(bytes);
+      int offsetTable = header.getInt(7 * Integer.BYTES);
+      int secondFrame = Math.toIntExact(header.getLong(offsetTable + Long.BYTES));
+      int secondPayloadStart = secondFrame + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
+      int secondPayloadEnd = secondPayloadStart + header.getInt(secondFrame);
+      for (int i = secondPayloadStart; i < secondPayloadEnd; i++) {
+        bytes[i] ^= 0x5A;
+      }
+      Files.write(indexFile.toPath(), bytes);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+        FixedByteChunkSVForwardIndexReaderV7 reader = new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT);
+        try (FixedByteChunkSVForwardIndexReaderV7.Context context = reader.createContext()) {
+          assertEquals(reader.getInt(0, context), 3);
+          expectThrows(RuntimeException.class, () -> reader.getInt(docsPerChunk, context));
+          expectThrows(RuntimeException.class, () -> reader.getInt(docsPerChunk + 1, context));
+          assertEquals(reader.getInt(0, context), 3);
+          assertEquals(reader.getInt(1, context), 10);
+          assertEquals(reader.getInt(2 * docsPerChunk, context), 2 * docsPerChunk * 7 + 3);
+          expectThrows(IndexOutOfBoundsException.class, () -> reader.getInt(numDocs, context));
+          expectThrows(IndexOutOfBoundsException.class, () -> reader.getInt(-1, context));
+        }
+      }
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }

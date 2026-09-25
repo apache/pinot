@@ -29,6 +29,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Chunk-based raw (non-dictionary-encoded) forward index writer for single-value fixed-width
@@ -59,9 +61,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// are 8-byte longs to support files larger than 2 GB.  The per-chunk size header allows readers
 /// to verify decoded output and to skip/read chunks without scanning adjacent offsets.
 ///
+/// Closing the writer before every declared document was written releases its resources and leaves
+/// the file without a header, so it can never be mistaken for a valid index; it does not throw. That
+/// is the state of every creator when a segment build aborts, and a throwing `close()` would mask the
+/// original failure and stop sibling creators from being closed.
+///
 /// This class is *not* thread-safe.
 @NotThreadSafe
 public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteChunkForwardIndexWriterV7.class);
 
   /// Frozen on-disk format version. The version must be paired with [#FORMAT_MAGIC] because legacy
   /// fixed-byte writers also accept arbitrary versions greater than or equal to 4.
@@ -99,6 +107,7 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
   // Hold both the RAF and its FileChannel: closing the channel closes the underlying FD, but
   // some JVM finalizers close the FD when the RAF becomes unreachable. Holding the RAF as a
   // field anchors it to the writer's lifetime and removes any reliance on finalizer ordering.
+  private final File _file;
   private final RandomAccessFile _raf;
   private final FileChannel _dataFile;
   private final CodecPipelineExecutor _executor;
@@ -109,13 +118,14 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
   private final int _maxFullChunkEncodedSize;
   private final ByteBuffer _header;
   private final ByteBuffer _chunkBuffer;
-  private final ByteBuffer _chunkHeaderBuffer = ByteBuffer.allocateDirect(CHUNK_HEADER_BYTES);
+  private final ByteBuffer _chunkHeaderBuffer;
   private final int _numChunks;
   private final int _totalDocs;
 
   private long _dataOffset;
   private int _docsWritten;
   private int _chunksWritten;
+  private boolean _closed;
 
   /// Creates a new writer.
   ///
@@ -130,6 +140,7 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
     if (totalDocs < 0) {
       throw new IllegalArgumentException("totalDocs must be non-negative, got: " + totalDocs);
     }
+    _file = file;
     _executor = executor;
     _numDocsPerChunk = validateAndNormalizeNumDocsPerChunk(executor, sizeOfEntry, numDocsPerChunk);
     _sizeOfEntry = sizeOfEntry;
@@ -164,7 +175,37 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
     int dataHeaderStart = (int) dataHeaderStartLong;
     int totalHeaderBytes = (int) totalHeaderBytesLong;
 
-    _header = ByteBuffer.allocateDirect(totalHeaderBytes);
+    _dataOffset = totalHeaderBytes;
+
+    // Open the file first, then allocate every direct buffer under one try/catch, so that a failure
+    // at any point releases the descriptor and whatever was allocated so far. The caller never gets
+    // a reference to a partially-constructed writer and cannot invoke close() itself.
+    RandomAccessFile raf = new RandomAccessFile(file, "rw");
+    ByteBuffer header = null;
+    ByteBuffer chunkBuffer = null;
+    ByteBuffer chunkHeaderBuffer = null;
+    try {
+      raf.setLength(0L);
+      header = ByteBuffer.allocateDirect(totalHeaderBytes);
+      chunkBuffer = ByteBuffer.allocateDirect((int) chunkSizeLong);
+      chunkHeaderBuffer = ByteBuffer.allocateDirect(CHUNK_HEADER_BYTES);
+    } catch (Throwable t) {
+      CleanerUtil.cleanQuietly(header);
+      CleanerUtil.cleanQuietly(chunkBuffer);
+      CleanerUtil.cleanQuietly(chunkHeaderBuffer);
+      try {
+        raf.close();
+      } catch (IOException closeEx) {
+        t.addSuppressed(closeEx);
+      }
+      throw t;
+    }
+    _raf = raf;
+    _dataFile = raf.getChannel();
+    _header = header;
+    _chunkBuffer = chunkBuffer;
+    _chunkHeaderBuffer = chunkHeaderBuffer;
+
     _header.putInt(VERSION);
     _header.putInt(FORMAT_MAGIC);
     _header.putInt(_numChunks);
@@ -175,27 +216,6 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
     _header.putInt(dataHeaderStart);
     _header.put(specBytes);
     // chunk offsets will be filled in during writeChunk() calls
-
-    _dataOffset = totalHeaderBytes;
-
-    // Open file first, then allocate the direct buffer under a try/catch so that an OOM during
-    // allocation closes the already-open file descriptor (the caller has no reference to a
-    // partially-constructed object and cannot invoke close() itself).
-    RandomAccessFile raf = new RandomAccessFile(file, "rw");
-    FileChannel channel = raf.getChannel();
-    try {
-      raf.setLength(0L);
-      _chunkBuffer = ByteBuffer.allocateDirect((int) chunkSizeLong);
-    } catch (Throwable t) {
-      try {
-        raf.close();
-      } catch (IOException closeEx) {
-        t.addSuppressed(closeEx);
-      }
-      throw t;
-    }
-    _raf = raf;
-    _dataFile = channel;
   }
 
   /// Writes a 4-byte integer value.
@@ -239,6 +259,9 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
   /// guard the writer keeps producing chunks past the declared length and only `close()` catches
   /// the mismatch, leaving a semantically-invalid partial file behind.
   private void checkRoomForOneMore() {
+    if (_closed) {
+      throw new IllegalStateException("V7 forward index writer for " + _file + " is closed");
+    }
     if (_docsWritten >= _totalDocs) {
       throw new IllegalStateException(
           "Cannot write past declared totalDocs=" + _totalDocs + " (already wrote " + _docsWritten + ")");
@@ -285,23 +308,30 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
     _chunkBuffer.clear();
   }
 
+  /// Idempotent. Writes the header only when every declared document was written; otherwise logs a
+  /// warning and leaves the file header-less (see the class Javadoc), releasing resources either way.
   @Override
   public void close()
       throws IOException {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
     try {
-      if (_chunkBuffer.position() > 0) {
-        writeChunk();
+      if (_docsWritten == _totalDocs) {
+        if (_chunkBuffer.position() > 0) {
+          writeChunk();
+        }
+        if (_chunksWritten != _numChunks) {
+          throw new IllegalStateException(
+              "Expected " + _numChunks + " chunks but wrote " + _chunksWritten);
+        }
+        _header.flip();
+        writeFully(_header, 0);
+      } else {
+        LOGGER.warn("Closing V7 forward index writer for {} after {} of {} declared docs; the file is left without a"
+            + " header and cannot be loaded", _file, _docsWritten, _totalDocs);
       }
-      if (_docsWritten != _totalDocs) {
-        throw new IllegalStateException(
-            "Expected " + _totalDocs + " docs but only " + _docsWritten + " were written");
-      }
-      if (_chunksWritten != _numChunks) {
-        throw new IllegalStateException(
-            "Expected " + _numChunks + " chunks but wrote " + _chunksWritten);
-      }
-      _header.flip();
-      writeFully(_header, 0);
     } finally {
       // Close the RAF (which closes its FileChannel) so the underlying file descriptor is released
       // by an explicit call rather than relying on JVM finalizers.
