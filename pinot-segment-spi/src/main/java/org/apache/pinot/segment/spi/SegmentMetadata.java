@@ -118,7 +118,8 @@ public interface SegmentMetadata {
   /// empty for a segment that holds none (a CONSUMING one, which answers [#getColumnMetadataFor(String)] with `null`
   /// for every column of its schema).
   default Collection<ColumnMetadata> getAllColumnMetadata() {
-    return getColumnMetadataMap().values();
+    TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+    return columnMetadataMap != null ? columnMetadataMap.values() : List.of();
   }
 
   /// Returns the whole column metadata as a map, for callers that need one.
@@ -130,6 +131,11 @@ public interface SegmentMetadata {
   /// [#getAllColumnMetadata()], and mutate through
   /// [#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)] rather than through the returned map,
   /// whose writes an implementation is free not to see.
+  ///
+  /// Returns `null` for an implementation that holds no column metadata (a CONSUMING segment, built from an explicit
+  /// schema); the defaults above and below answer that with an empty collection, `null` or an
+  /// [IllegalStateException] rather than a [NullPointerException].
+  @Nullable
   TreeMap<String, ColumnMetadata> getColumnMetadataMap();
 
   /// Returns the metadata of the given column, or `null` if the segment has no such column.
@@ -141,7 +147,11 @@ public interface SegmentMetadata {
   /// Registers the metadata of a column, replacing any metadata already registered under the same name. An
   /// implementation that holds no column metadata (a CONSUMING segment) may reject this.
   default void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
-    getColumnMetadataMap().put(column, columnMetadata);
+    TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+    if (columnMetadataMap == null) {
+      throw new IllegalStateException("Segment holds no column metadata to register column: " + column + " in");
+    }
+    columnMetadataMap.put(column, columnMetadata);
   }
 
   /// Removes a column from the segment metadata. An implementation that holds no column metadata (a CONSUMING

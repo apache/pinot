@@ -40,11 +40,15 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -471,7 +475,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public NavigableSet<String> getAllColumns() {
     Columns columns = _columns;
-    return columns != null ? new SortedStringArraySet(columns._names) : getSchema().getColumnNames();
+    return columns != null ? new SortedStringArraySet(columns._names)
+        : Collections.unmodifiableNavigableSet(getSchema().getColumnNames());
   }
 
   /// An unmodifiable view of the column metadata array, in the natural column-name order of [#getAllColumns()], and
@@ -590,8 +595,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   ///
   /// Built from the column arrays on the first call and cached until the columns change, so a caller pays one map
   /// entry per column and the segment keeps it for its lifetime. Nothing on the load or query path should call this
-  /// — see the accessors listed on [SegmentMetadata#getColumnMetadataMap()]. Writes to the returned map do not reach
-  /// the segment metadata; use [#addColumnMetadata(String, ColumnMetadata)] and [#removeColumn(String)] instead.
+  /// — see the accessors listed on [SegmentMetadata#getColumnMetadataMap()]. The returned map is a read-only copy:
+  /// a write to it (or to one of its views) throws [UnsupportedOperationException] rather than silently missing
+  /// every other accessor; use [#addColumnMetadata(String, ColumnMetadata)] and [#removeColumn(String)] instead.
   ///
   /// Returns `null` for a CONSUMING segment, which holds no column metadata.
   @Nullable
@@ -614,12 +620,159 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private TreeMap<String, ColumnMetadata> buildColumnMetadataMap() {
-    TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
-    Columns columns = Preconditions.checkNotNull(_columns);
-    for (int i = 0; i < columns._names.length; i++) {
-      columnMetadataMap.put(columns._names[i], columns._metadata[i]);
+    return new DerivedColumnMetadataMap(Preconditions.checkNotNull(_columns));
+  }
+
+  /// The map [#getColumnMetadataMap()] hands out: a copy of the column arrays that rejects every write, including
+  /// through its key, value, entry and range views, so a caller cannot put a column into it that no other accessor
+  /// ever sees. It is a [TreeMap] subclass rather than [Collections#unmodifiableNavigableMap] only because the SPI
+  /// return type is the concrete class.
+  private static final class DerivedColumnMetadataMap extends TreeMap<String, ColumnMetadata> {
+    DerivedColumnMetadataMap(Columns columns) {
+      for (int i = 0; i < columns._names.length; i++) {
+        super.put(columns._names[i], columns._metadata[i]);
+      }
     }
-    return columnMetadataMap;
+
+    private static UnsupportedOperationException readOnly() {
+      return new UnsupportedOperationException(
+          "The column metadata map is a read-only view; use addColumnMetadata / removeColumn");
+    }
+
+    @Override
+    public ColumnMetadata put(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public void putAll(Map<? extends String, ? extends ColumnMetadata> map) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata remove(Object key) {
+      throw readOnly();
+    }
+
+    @Override
+    public void clear() {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata putIfAbsent(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata compute(String key,
+        BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata computeIfAbsent(String key,
+        Function<? super String, ? extends ColumnMetadata> mappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata computeIfPresent(String key,
+        BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata merge(String key, ColumnMetadata value,
+        BiFunction<? super ColumnMetadata, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata replace(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public boolean replace(String key, ColumnMetadata oldValue, ColumnMetadata newValue) {
+      throw readOnly();
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> function) {
+      throw readOnly();
+    }
+
+    @Override
+    public Map.Entry<String, ColumnMetadata> pollFirstEntry() {
+      throw readOnly();
+    }
+
+    @Override
+    public Map.Entry<String, ColumnMetadata> pollLastEntry() {
+      throw readOnly();
+    }
+
+    @Override
+    public Set<String> keySet() {
+      return Collections.unmodifiableSet(super.keySet());
+    }
+
+    @Override
+    public NavigableSet<String> navigableKeySet() {
+      return Collections.unmodifiableNavigableSet(super.navigableKeySet());
+    }
+
+    @Override
+    public NavigableSet<String> descendingKeySet() {
+      return Collections.unmodifiableNavigableSet(super.descendingKeySet());
+    }
+
+    @Override
+    public Collection<ColumnMetadata> values() {
+      return Collections.unmodifiableCollection(super.values());
+    }
+
+    @Override
+    public Set<Map.Entry<String, ColumnMetadata>> entrySet() {
+      return Collections.unmodifiableSet(super.entrySet());
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> descendingMap() {
+      return Collections.unmodifiableNavigableMap(super.descendingMap());
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> subMap(String fromKey, boolean fromInclusive, String toKey,
+        boolean toInclusive) {
+      return Collections.unmodifiableNavigableMap(super.subMap(fromKey, fromInclusive, toKey, toInclusive));
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> headMap(String toKey, boolean inclusive) {
+      return Collections.unmodifiableNavigableMap(super.headMap(toKey, inclusive));
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> tailMap(String fromKey, boolean inclusive) {
+      return Collections.unmodifiableNavigableMap(super.tailMap(fromKey, inclusive));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> subMap(String fromKey, String toKey) {
+      return Collections.unmodifiableSortedMap(super.subMap(fromKey, toKey));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> headMap(String toKey) {
+      return Collections.unmodifiableSortedMap(super.headMap(toKey));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> tailMap(String fromKey) {
+      return Collections.unmodifiableSortedMap(super.tailMap(fromKey));
+    }
   }
 
   /// Whether [#getColumnMetadataMap()] has been called (and its map cached) since the columns last changed.
