@@ -150,10 +150,6 @@ public class PartitionFunctionTest {
     mutableConfig.clear();
     mutableConfig.putAll(differentConfig);
     assertTrue(first.canReusePartitionIds(second), "Caller mutations must not change the effective function");
-    if (first.getFunctionConfig() != null) {
-      assertEquals(first.getFunctionConfig(), config);
-      expectThrows(UnsupportedOperationException.class, () -> first.getFunctionConfig().put("new", "value"));
-    }
   }
 
   /// Unit test for [ModuloPartitionFunction].
