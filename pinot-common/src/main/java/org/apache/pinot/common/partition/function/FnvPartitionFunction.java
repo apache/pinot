@@ -20,7 +20,6 @@ package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -52,8 +51,7 @@ public class FnvPartitionFunction implements PartitionFunction {
   public FnvPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
-    functionConfig = functionConfig != null ? Collections.unmodifiableMap(new HashMap<>(functionConfig)) : null;
-    _functionConfig = functionConfig;
+    _functionConfig = functionConfig != null ? Collections.unmodifiableMap(functionConfig) : null;
 
     FnvHashFunctions.Variant variant = DEFAULT_VARIANT;
     boolean useRawBytes = false;

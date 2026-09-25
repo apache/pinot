@@ -20,7 +20,6 @@ package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -50,8 +49,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   public MurmurPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
-    functionConfig = functionConfig != null ? Collections.unmodifiableMap(new HashMap<>(functionConfig)) : null;
-    _functionConfig = functionConfig;
+    _functionConfig = functionConfig != null ? Collections.unmodifiableMap(functionConfig) : null;
     _useRawBytes = functionConfig != null && Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
     _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
