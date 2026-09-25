@@ -32,6 +32,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -390,5 +391,29 @@ public class QueryOptionsUtilsTest {
     // Zero
     queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
     assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
+  }
+
+  @Test
+  public void testGetSealedInListThreshold() {
+    Map<String, String> queryOptions = new HashMap<>();
+
+    // Absent → default
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 20);
+
+    // Present → parsed value
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, " 100 ");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 100);
+
+    // Zero or negative → returned as is, which turns sealing off
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "0");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), 0);
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "-1");
+    assertEquals(QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20), -1);
+
+    // Not an integer → error that names the option
+    queryOptions.put(SEALED_IN_LIST_THRESHOLD, "twenty");
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20));
+    assertTrue(e.getMessage().contains(SEALED_IN_LIST_THRESHOLD), e.getMessage());
   }
 }

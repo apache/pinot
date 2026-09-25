@@ -1035,4 +1035,12 @@ public class QueryOptionsUtils {
     }
     return i;
   }
+
+  /// Returns the [QueryOptionKey#SEALED_IN_LIST_THRESHOLD] option, or `defaultValue` when the option is not set.
+  public static int getSealedInListThreshold(Map<String, String> options, int defaultValue) {
+    String threshold = options.get(QueryOptionKey.SEALED_IN_LIST_THRESHOLD);
+    Integer value =
+        uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
+    return value != null ? value : defaultValue;
+  }
 }

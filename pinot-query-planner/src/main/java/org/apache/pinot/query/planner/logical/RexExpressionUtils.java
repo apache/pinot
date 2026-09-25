@@ -20,10 +20,13 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BoundType;
+import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.Range;
+import com.google.common.collect.RangeSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -50,6 +53,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.calcite.util.TimestampString;
+import org.apache.pinot.calcite.rex.PinotSealedSearchOperator;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -279,13 +283,19 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression fromRexCall(RexCall rexCall) {
+    if (rexCall.op instanceof PinotSealedSearchOperator) {
+      // Sealed searches are restored to SEARCH at the end of optimization. Convert them the same way in case a
+      // conversion runs before that.
+      return handleSearch(rexCall.operands.get(0), ((PinotSealedSearchOperator) rexCall.op).getSargLiteral());
+    }
     switch (rexCall.op.kind) {
       case CAST:
         return handleCast(rexCall);
       case REINTERPRET:
         return handleReinterpret(rexCall);
       case SEARCH:
-        return handleSearch(rexCall);
+        assert rexCall.operands.size() == 2;
+        return handleSearch(rexCall.operands.get(0), (RexLiteral) rexCall.operands.get(1));
       case MINUS_PREFIX:
         // Without this explicit case the default branch calls getFunctionName(), which returns
         // SqlKind.MINUS_PREFIX.name() = "MINUS_PREFIX". That canonicalizes to "minusprefix", which is
@@ -346,10 +356,7 @@ public class RexExpressionUtils {
     return fromRexNode(rexCall.operands.get(0));
   }
 
-  private static RexExpression handleSearch(RexCall rexCall) {
-    assert rexCall.operands.size() == 2;
-    RexNode leftOperand = rexCall.operands.get(0);
-    RexLiteral searchArgument = (RexLiteral) rexCall.operands.get(1);
+  private static RexExpression handleSearch(RexNode leftOperand, RexLiteral searchArgument) {
     ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(searchArgument.getType());
     Sarg sarg = searchArgument.getValueAs(Sarg.class);
     assert sarg != null;
@@ -371,9 +378,87 @@ public class RexExpressionUtils {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
       }
-      RexExpression orExpr = convertRangesToOr(dataType, leftOperand, sarg.rangeSet.asRanges());
-      return addNullCheckIfRequired(leftOperand, sarg.nullAs, orExpr);
+      RexExpression rangesExpr = convertRanges(dataType, leftOperand, sarg.rangeSet);
+      return addNullCheckIfRequired(leftOperand, sarg.nullAs, rangesExpr);
     }
+  }
+
+  /// The smallest number of single values in a range set with other ranges that ships as one `IN` or `NOT_IN`.
+  /// Below it, one range per value costs the servers little.
+  static final int MIN_POINTS_FOR_IN = 20;
+
+  /// Converts a range set that is neither only points nor only the complement of points.
+  ///
+  /// Each range becomes comparisons, except when the range set holds many single points. A large OR of
+  /// `x >= v AND x <= v` terms costs the servers one scan per value, so:
+  /// - When the ranges hold at least [#MIN_POINTS_FOR_IN] points, for example `x IN (<list>) OR x > 10`, the points
+  ///   become one `IN` and only the other ranges become comparisons: `OR(IN(x, <list>), x > 10)`.
+  /// - When the complement holds at least [#MIN_POINTS_FOR_IN] points, for example `x NOT IN (<list>) AND x > 0`, the
+  ///   result is `AND(NOT_IN(x, <list>), x > 0)`.
+  /// - When both forms apply, the one with fewer values is used.
+  ///
+  /// `BIG_DECIMAL` ranges always become comparisons: an intermediate stage matches `IN` values with `equals`, which
+  /// depends on the scale of the value.
+  private static RexExpression convertRanges(ColumnDataType dataType, RexNode leftOperand, RangeSet rangeSet) {
+    Set<Range> ranges = rangeSet.asRanges();
+    if (dataType == ColumnDataType.BIG_DECIMAL) {
+      return convertRangesToOr(dataType, leftOperand, ranges);
+    }
+    List<Range> points = new ArrayList<>();
+    List<Range> others = new ArrayList<>();
+    splitPoints(ranges, points, others);
+    List<Range> complementPoints = new ArrayList<>();
+    List<Range> complementOthers = new ArrayList<>();
+    splitPoints(rangeSet.complement().asRanges(), complementPoints, complementOthers);
+    boolean inForm = points.size() >= MIN_POINTS_FOR_IN;
+    boolean notInForm = complementPoints.size() >= MIN_POINTS_FOR_IN;
+    if (inForm && notInForm) {
+      // Use the form with fewer values. A range costs up to 2 values.
+      inForm = points.size() + 2 * others.size() <= complementPoints.size() + 2 * complementOthers.size();
+      notInForm = !inForm;
+    }
+    if (inForm) {
+      List<RexExpression> terms = new ArrayList<>(1 + others.size());
+      terms.add(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+          toSearchFunctionOperands(leftOperand, points, dataType)));
+      for (Range range : others) {
+        terms.add(convertRangesToOr(dataType, leftOperand, Set.of(range)));
+      }
+      return combine(SqlKind.OR, terms);
+    }
+    if (notInForm) {
+      List<RexExpression> terms = new ArrayList<>(1 + complementOthers.size());
+      terms.add(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+          toSearchFunctionOperands(leftOperand, complementPoints, dataType)));
+      for (Range range : complementOthers) {
+        // x is not in the range: x is in one of the (at most two) ranges of the range's complement.
+        terms.add(convertRangesToOr(dataType, leftOperand, ImmutableRangeSet.of(range).complement().asRanges()));
+      }
+      return combine(SqlKind.AND, terms);
+    }
+    return convertRangesToOr(dataType, leftOperand, ranges);
+  }
+
+  private static RexExpression combine(SqlKind kind, List<RexExpression> terms) {
+    if (terms.size() == 1) {
+      return terms.get(0);
+    }
+    return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, kind.name(), terms);
+  }
+
+  private static void splitPoints(Set<Range> ranges, List<Range> points, List<Range> others) {
+    for (Range range : ranges) {
+      if (isPoint(range)) {
+        points.add(range);
+      } else {
+        others.add(range);
+      }
+    }
+  }
+
+  private static boolean isPoint(Range range) {
+    return range.hasLowerBound() && range.hasUpperBound() && range.lowerBoundType() == BoundType.CLOSED
+        && range.upperBoundType() == BoundType.CLOSED && range.lowerEndpoint().compareTo(range.upperEndpoint()) == 0;
   }
 
   private static RexExpression evaluateLiteralIn(RexLiteral leftOperand, Set<Range> ranges, RexUnknownAs nullAs) {
@@ -512,8 +597,8 @@ public class RexExpressionUtils {
         List.of(leftOperand, fromRexLiteralValue(dataType, range.upperEndpoint())));
   }
 
-  /// Transforms a set of **point based** ranges into a list of expressions.
-  private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Set<Range> ranges,
+  /// Transforms a collection of **point based** ranges into a list of expressions.
+  private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Collection<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> operands = new ArrayList<>(1 + ranges.size());
     operands.add(fromRexNode(leftOperand));

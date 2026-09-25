@@ -19,11 +19,13 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
@@ -34,6 +36,8 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -301,5 +305,26 @@ public class PinotRuleUtils {
       }
       return null;
     }
+  }
+
+  /// Returns `rel` with the given traits. `LogicalJoin#copy` and `LogicalAsofJoin#copy` drop the trait set they are
+  /// given, so a copy of a join loses for example its distribution. This creates them again with the traits instead.
+  public static RelNode withTraits(RelNode rel, RelTraitSet traitSet) {
+    if (rel.getTraitSet().equals(traitSet)) {
+      return rel;
+    }
+    if (rel instanceof LogicalJoin) {
+      LogicalJoin join = (LogicalJoin) rel;
+      return new LogicalJoin(join.getCluster(), traitSet, join.getHints(), join.getLeft(), join.getRight(),
+          join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
+          ImmutableList.copyOf(join.getSystemFieldList()));
+    }
+    if (rel instanceof LogicalAsofJoin) {
+      LogicalAsofJoin join = (LogicalAsofJoin) rel;
+      return new LogicalAsofJoin(join.getCluster(), traitSet, join.getHints(), join.getLeft(), join.getRight(),
+          join.getCondition(), join.getMatchCondition(), join.getJoinType(),
+          ImmutableList.copyOf(join.getSystemFieldList()));
+    }
+    return rel.copy(traitSet, rel.getInputs());
   }
 }
