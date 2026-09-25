@@ -94,7 +94,7 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 ///
 /// The saving over the eight ints, six refs and flags byte this replaced is not in the object itself, which is the
 /// same 72 bytes, but in what it no longer retains: a fixed-width column holds no box per min/max value, which is
-/// ~32 bytes and two surviving objects per numeric column.
+/// two surviving objects per numeric column, 16 bytes each for an INT/FLOAT and 24 bytes each for a LONG/DOUBLE.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnMetadataImpl implements ColumnMetadata {
   private static final long SIZE_MASK = 0xffffffffffffL;
@@ -142,8 +142,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   ///   by [#MIN_VALUE_IN_WORD] / [#MAX_VALUE_IN_WORD]. The element lengths are dead here because [Builder#build()]
   ///   pins them to `storedType.size()`.
   /// - otherwise: `_minWord` packs `lengthOfShortestElement` (high half) and `lengthOfLongestElement` (low half),
-  ///   `_maxWord` holds `maxRowLengthInBytes`. The value words are dead here because a STRING, BYTES, BIG_DECIMAL or
-  ///   COMPLEX min/max is an object, kept in [#_minValue] / [#_maxValue].
+  ///   `_maxWord` holds `maxRowLengthInBytes`. The value words are dead here because a STRING, BYTES or BIG_DECIMAL
+  ///   min/max is an object, kept in [#_minValue] / [#_maxValue] (a COMPLEX column has no min/max at all).
   ///
   /// A fixed-width column whose builder was handed a min/max that is not the box class of its stored type falls back
   /// to [#_minValue] / [#_maxValue] as well, so no caller can lose a value by handing over an unexpected type.
@@ -1089,15 +1089,13 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       Comparable<?> minValue = _minValue;
       Comparable<?> maxValue = _maxValue;
       if (storedType.isFixedWidth()) {
-        Long minBits = toValueWord(storedType, minValue);
-        if (minBits != null) {
-          minWord = minBits;
+        if (holdsValueWord(storedType, minValue)) {
+          minWord = toValueWord(storedType, minValue);
           minValue = null;
           flags |= MIN_VALUE_IN_WORD;
         }
-        Long maxBits = toValueWord(storedType, maxValue);
-        if (maxBits != null) {
-          maxWord = maxBits;
+        if (holdsValueWord(storedType, maxValue)) {
+          maxWord = toValueWord(storedType, maxValue);
           maxValue = null;
           flags |= MAX_VALUE_IN_WORD;
         }
@@ -1114,24 +1112,40 @@ public class ColumnMetadataImpl implements ColumnMetadata {
               _dictionaryUncompressedValueSizeInBytes));
     }
 
-    /// Returns the raw bits of a min/max value of a fixed-width stored type, or `null` when there is no value or the
-    /// value is not the box class of the stored type (in which case it stays an object ref, so an unexpected type
-    /// from a [Builder] caller is preserved rather than dropped or mistranslated). FLOAT and DOUBLE go through
-    /// [Float#floatToIntBits] / [Double#doubleToLongBits] rather than the raw variants, so a NaN keeps comparing
-    /// equal to a NaN exactly as [Float#equals] does today.
-    @Nullable
-    private static Long toValueWord(DataType storedType, @Nullable Comparable<?> value) {
+    /// Whether a min/max value is held as raw bits: it has to be the box class of the fixed-width stored type.
+    /// Otherwise it stays an object ref, so an unexpected type from a [Builder] caller is preserved rather than
+    /// dropped or mistranslated.
+    private static boolean holdsValueWord(DataType storedType, @Nullable Comparable<?> value) {
       switch (storedType) {
         case INT:
-          return value instanceof Integer ? (long) (Integer) value : null;
+          return value instanceof Integer;
         case LONG:
-          return value instanceof Long ? (Long) value : null;
+          return value instanceof Long;
         case FLOAT:
-          return value instanceof Float ? (long) Float.floatToIntBits((Float) value) : null;
+          return value instanceof Float;
         case DOUBLE:
-          return value instanceof Double ? Double.doubleToLongBits((Double) value) : null;
+          return value instanceof Double;
         default:
-          return null;
+          return false;
+      }
+    }
+
+    /// The raw bits of a value [#holdsValueWord] accepted, as a primitive so a build allocates nothing for it (the
+    /// constant virtual columns rebuild their metadata per query per segment). FLOAT and DOUBLE go through
+    /// [Float#floatToIntBits] / [Double#doubleToLongBits] rather than the raw variants, so a NaN keeps comparing
+    /// equal to a NaN exactly as [Float#equals] does today.
+    private static long toValueWord(DataType storedType, Comparable<?> value) {
+      switch (storedType) {
+        case INT:
+          return (Integer) value;
+        case LONG:
+          return (Long) value;
+        case FLOAT:
+          return Float.floatToIntBits((Float) value);
+        case DOUBLE:
+          return Double.doubleToLongBits((Double) value);
+        default:
+          throw new IllegalArgumentException("No value word for stored type: " + storedType);
       }
     }
   }
