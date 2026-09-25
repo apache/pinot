@@ -397,6 +397,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     setValueOfGauge(value, fullGaugeName);
   }
 
+  /// Sets the value of a table gauge keyed by an arbitrary compound key, via the cached
+  /// [#setValueOfGauge(long, String)] path (reuses the registration; the composed name is still rebuilt each call).
+  ///
+  /// @param tableName The table name
+  /// @param key The key associated with this gauge
+  /// @param gauge The gauge to use
+  /// @param value The value to set the gauge to
+  public void setValueOfTableGauge(final String tableName, final String key, final G gauge, final long value) {
+    final String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
+    setValueOfGauge(value, fullGaugeName);
+  }
+
   /// Sets the value of a custom global gauge.
   ///
   /// @param suffix The suffix to attach to the gauge name
