@@ -348,6 +348,18 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (streamingDistinctFlushThreshold != null) {
         queryContext.setStreamingDistinctFlushThreshold(streamingDistinctFlushThreshold);
       }
+      // Set streamingDistinctMaxTrackedCardinality
+      Integer streamingDistinctMaxTrackedCardinality =
+          QueryOptionsUtils.getStreamingDistinctMaxTrackedCardinality(queryOptions);
+      if (streamingDistinctMaxTrackedCardinality != null) {
+        queryContext.setStreamingDistinctMaxTrackedCardinality(streamingDistinctMaxTrackedCardinality);
+      }
+      // Set streamingDistinctEstimatedExitStdDev
+      Integer streamingDistinctEstimatedExitStdDev =
+          QueryOptionsUtils.getStreamingDistinctEstimatedExitStdDev(queryOptions);
+      if (streamingDistinctEstimatedExitStdDev != null) {
+        queryContext.setStreamingDistinctEstimatedExitStdDev(streamingDistinctEstimatedExitStdDev);
+      }
     }
   }
 

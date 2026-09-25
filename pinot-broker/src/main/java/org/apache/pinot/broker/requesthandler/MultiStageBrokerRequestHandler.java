@@ -149,6 +149,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
   protected final String _defaultStreamingDistinctFlushThreshold;
+  @Nullable
+  protected final String _defaultStreamingDistinctEstimatedExitStdDev;
+  @Nullable
+  protected final String _defaultStreamingDistinctMaxTrackedCardinality;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -255,6 +259,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD);
     _defaultStreamingDistinctFlushThreshold =
         streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
+    // Opting the cluster into an early exit that is only probabilistically sound. Off unless set explicitly; see
+    // QueryOptionKey#STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV.
+    int streamingDistinctEstimatedExitStdDev = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV,
+        CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV);
+    // Validated through the query-option parser rather than here, so the accepted range lives in exactly one place.
+    // Without this a cluster configured out of range would start cleanly and then fail every MSE DISTINCT query at
+    // plan time, with the error pointing at the query rather than at the config.
+    QueryOptionsUtils.getStreamingDistinctEstimatedExitStdDev(
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV,
+            Integer.toString(streamingDistinctEstimatedExitStdDev)));
+    _defaultStreamingDistinctEstimatedExitStdDev =
+        streamingDistinctEstimatedExitStdDev > 0 ? Integer.toString(streamingDistinctEstimatedExitStdDev) : null;
+
+    // Cluster-level kill switch for the exact regime, which is on by default. Negative means unset; 0 is a real
+    // value (off), so it must still be injected.
+    int streamingDistinctMaxTrackedCardinality = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY,
+        CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY);
+    _defaultStreamingDistinctMaxTrackedCardinality =
+        streamingDistinctMaxTrackedCardinality >= 0 ? Integer.toString(streamingDistinctMaxTrackedCardinality) : null;
   }
 
   @Override
@@ -625,6 +650,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (_defaultStreamingDistinctFlushThreshold != null) {
       queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD,
           _defaultStreamingDistinctFlushThreshold);
+    }
+    if (_defaultStreamingDistinctEstimatedExitStdDev != null) {
+      queryOptions.putIfAbsent(
+          CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV,
+          _defaultStreamingDistinctEstimatedExitStdDev);
+    }
+    if (_defaultStreamingDistinctMaxTrackedCardinality != null) {
+      queryOptions.putIfAbsent(
+          CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY,
+          _defaultStreamingDistinctMaxTrackedCardinality);
     }
   }
 

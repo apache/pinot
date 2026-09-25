@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -212,6 +213,14 @@ public class IntDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpression == null && _valueSet.size() >= _limitWithoutNull;
+  }
+
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    IntIterator intIterator = _valueSet.iterator();
+    while (intIterator.hasNext()) {
+      sink.accept(intIterator.nextInt());
+    }
   }
 
   @Override

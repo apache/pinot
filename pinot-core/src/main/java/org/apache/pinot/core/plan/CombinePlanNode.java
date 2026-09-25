@@ -152,10 +152,10 @@ public class CombinePlanNode implements PlanNode {
           // aggregates with no aggregate calls. So the leaf table is normally bounded at LIMIT already, and this
           // feature is for the case where that LIMIT is far larger than the memory we want to spend.
           //
-          // This branch DOES give up the cross-segment early exit: DistinctResultsBlockMerger#isQuerySatisfied can
-          // only fire once the accumulated table reaches LIMIT, and flushing empties it well before that, so every
-          // segment gets scanned. That is the deliberate trade -- a lower memory ceiling for more scan work. When
-          // LIMIT is at or below the threshold there is no memory to save, so the short-circuit wins instead.
+          // When LIMIT is at or below the threshold the accumulated table reaches LIMIT inside a single flush
+          // window, so DistinctResultsBlockMerger#isQuerySatisfied already short-circuits and there is no memory to
+          // save by streaming. Above the threshold the streaming operator restores that short-circuit itself, by
+          // tracking cardinality across flush windows -- see DistinctCardinalityTracker.
           && _queryContext.getLimit() > distinctFlushThreshold
           && !leafReturnsFinalResult) {
         return createStreamingDistinctCombineOperator(operators);

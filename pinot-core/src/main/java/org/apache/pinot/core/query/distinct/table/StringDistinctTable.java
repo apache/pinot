@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
@@ -208,6 +209,13 @@ public class StringDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return _orderByExpression == null && _valueSet.size() >= _limitWithoutNull;
+  }
+
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
+    for (String value : _valueSet) {
+      sink.accept(hashValue(value));
+    }
   }
 
   @Override

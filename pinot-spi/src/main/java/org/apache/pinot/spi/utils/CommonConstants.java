@@ -630,6 +630,28 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
+
+    /// Cluster-wide default for the `streamingDistinctMaxTrackedCardinality` query option. When set (including to
+    /// `0`, which switches the early exit off), the broker injects it for MSE queries that do not already specify
+    /// it.
+    ///
+    /// Unlike the sibling below, the behaviour this governs is on by default, so this exists mainly as a
+    /// cluster-level kill switch: without it, backing the feature out would mean getting every client to append
+    /// `SET streamingDistinctMaxTrackedCardinality = 0`.
+    public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY =
+        "pinot.broker.mse.streaming.distinct.max.tracked.cardinality";
+    /// Negative means "not set", leaving the server-side default in place. `0` is a meaningful value (off), so it
+    /// cannot double as the unset marker the way the flush thresholds' `-1` does.
+    public static final int DEFAULT_MSE_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY = -1;
+
+    /// Cluster-wide default for the `streamingDistinctEstimatedExitStdDev` query option. When positive, the broker
+    /// injects it for MSE queries that do not already specify it.
+    ///
+    /// See [Request.QueryOptionKey#STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV]: this opts the cluster into an early
+    /// exit that is probabilistically, not provably, sound, and is therefore `0` (off) by default.
+    public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV =
+        "pinot.broker.mse.streaming.distinct.estimated.exit.std.dev";
+    public static final int DEFAULT_MSE_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV = 0;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -920,6 +942,40 @@ public class CommonConstants {
         /// there is no such stage and the client would observe duplicate rows across flush windows.
         public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
 
+        /// Largest leaf-stage LIMIT for which the streaming distinct leaf tracks its cumulative cardinality
+        /// *exactly*, and the nominal-entry bound for the sketch it falls back to above that. Only meaningful
+        /// alongside [#STREAMING_DISTINCT_FLUSH_THRESHOLD].
+        ///
+        /// Flushing empties the accumulated table, so the leaf needs cumulative state to know when it has emitted
+        /// LIMIT distinct values and can stop. At or below this value that state is an exact hash of the emitted
+        /// values, bounded at LIMIT entries, and the early exit fires at exactly LIMIT. Above it the state is a
+        /// theta sketch of this many nominal entries -- constant memory whatever the LIMIT -- and the exit reads a
+        /// lower confidence bound, which can fire slightly late (typically ~1.02x LIMIT) and, in the worst
+        /// alignment, slightly early (~0.1% of queries, returning marginally fewer than LIMIT rows).
+        ///
+        /// Raise it to buy exactness for larger LIMITs at ~16 bytes per unit of memory; set it to `0` to disable
+        /// the early exit entirely and always scan every segment.
+        public static final String STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY =
+            "streamingDistinctMaxTrackedCardinality";
+
+        /// Number of standard deviations for the lower confidence bound that lets the streaming distinct leaf exit
+        /// early when its cumulative cardinality is *estimated* rather than counted exactly -- that is, when the
+        /// leaf-stage LIMIT exceeds [#STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY]. Must be `1`, `2` or `3`.
+        ///
+        /// **Defaults to `0`, which disables the estimated early exit**, leaving those queries to read every segment
+        /// exactly as they do without this feature. This is deliberate: at or below the max tracked cardinality the
+        /// exit is *provably* sound -- the leaf holds an exact hash of every value it emitted, so reaching LIMIT is a
+        /// counted fact. Above it the leaf holds a theta sketch, and a sketch lower bound is a confidence bound, not
+        /// a guarantee. No setting of this option makes the estimated exit sound; it only chooses how unlikely an
+        /// unsound exit is.
+        ///
+        /// An unsound exit means the leaf stops having emitted slightly fewer than LIMIT distinct values, and the
+        /// query returns marginally fewer rows than it should, with no error and no partial-result flag. Measured
+        /// per-query probability in the worst flush alignment, which does not grow with LIMIT: ~2.2% at `2` and
+        /// ~0.12% at `3`. Set this only where that is an acceptable trade for not scanning every segment.
+        public static final String STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV =
+            "streamingDistinctEstimatedExitStdDev";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
@@ -1183,6 +1239,14 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
+        /// Caps the streaming distinct cardinality tracker at ~256 KiB while keeping the early exit exact for every
+        /// LIMIT at or below it.
+        public static final int DEFAULT_STREAMING_DISTINCT_MAX_TRACKED_CARDINALITY = 16384;
+        /// Off by default: the estimated early exit has no soundness guarantee. See
+        /// [QueryOptionKey#STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV].
+        public static final int DEFAULT_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV = 0;
+        /// Largest value the theta sketch's lower bound accepts; BinomialBoundsN rejects anything else.
+        public static final int MAX_STREAMING_DISTINCT_ESTIMATED_EXIT_STD_DEV = 3;
         public static final int DEFAULT_REGEX_DICT_SIZE_THRESHOLD = 10000;
       }
     }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.distinct.table;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.function.LongConsumer;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -55,6 +56,10 @@ public class EmptyDistinctTable extends DistinctTable {
   @Override
   public boolean isSatisfied() {
     return false;
+  }
+
+  @Override
+  protected void forEachNonNullValueHash(LongConsumer sink) {
   }
 
   @Override

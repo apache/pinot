@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.LongConsumer;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -135,6 +136,13 @@ public class DistinctResultsBlockMergerTest {
     @Override
     public boolean mergeDataTable(DataTable dataTable) {
       throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected void forEachNonNullValueHash(LongConsumer sink) {
+      for (int value : _values) {
+        sink.accept(value);
+      }
     }
 
     @Override
