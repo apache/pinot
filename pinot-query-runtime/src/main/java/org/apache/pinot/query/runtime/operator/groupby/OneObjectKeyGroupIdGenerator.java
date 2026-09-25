@@ -21,7 +21,9 @@ package org.apache.pinot.query.runtime.operator.groupby;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.function.ToIntFunction;
 
 
@@ -41,6 +43,9 @@ public class OneObjectKeyGroupIdGenerator implements GroupIdGenerator {
 
   @Override
   public int getGroupId(Object key) {
+    if (key != null && key.getClass().isArray()) {
+      key = new ArrayKey(key);
+    }
     if (_groupIdMap.size() < _numGroupsLimit) {
       return _groupIdMap.computeIfAbsent(key, _groupIdGenerator);
     } else {
@@ -68,9 +73,29 @@ public class OneObjectKeyGroupIdGenerator implements GroupIdGenerator {
       public GroupKey next() {
         Object2IntMap.Entry<Object> entry = _entryIterator.next();
         Object[] row = new Object[numColumns];
-        row[0] = entry.getKey();
+        Object key = entry.getKey();
+        row[0] = key instanceof ArrayKey ? ((ArrayKey) key)._value : key;
         return new GroupKey(entry.getIntValue(), row);
       }
     };
+  }
+
+  /// Keeps array-valued keys equal across serialized spill rounds without changing their output representation.
+  private static final class ArrayKey {
+    private final Object _value;
+
+    private ArrayKey(Object value) {
+      _value = value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof ArrayKey && Objects.deepEquals(_value, ((ArrayKey) other)._value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.deepHashCode(new Object[]{_value});
+    }
   }
 }

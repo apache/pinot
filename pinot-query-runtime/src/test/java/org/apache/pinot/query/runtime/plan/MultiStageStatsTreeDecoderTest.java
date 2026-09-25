@@ -134,6 +134,16 @@ public class MultiStageStatsTreeDecoderTest {
     MultiStageStatsTreeDecoder.decode(proto);
   }
 
+  @Test(expectedExceptions = MultiStageStatsTreeDecoder.DecodeFailedException.class)
+  public void testDecodeUnknownStatOrdinalDegrades()
+      throws Exception {
+    Worker.StageStatsNode node = Worker.StageStatsNode.newBuilder()
+        .setOperatorTypeId(MultiStageOperator.Type.AGGREGATE.getId())
+        .setStatMap(ByteString.copyFrom(new byte[]{1, 127}))
+        .build();
+    MultiStageStatsTreeDecoder.decodeNode(node);
+  }
+
   /// A chain exactly at the depth limit (MAX_OPERATOR_TREE_DEPTH nodes → leaf at decode-depth
   /// MAX_OPERATOR_TREE_DEPTH - 1) must decode successfully.
   @Test

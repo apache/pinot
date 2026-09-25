@@ -264,6 +264,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     K[] keys = keys();
     for (byte i = 0; i < serializedKeys; i++) {
       int ordinal = input.readByte();
+      if (ordinal < 0 || ordinal >= keys.length) {
+        throw new IllegalArgumentException("Unknown stat key ordinal: " + ordinal);
+      }
       K key = keys[ordinal];
       switch (key.getType()) {
         case BOOLEAN:

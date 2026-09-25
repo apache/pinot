@@ -33,6 +33,14 @@ import org.testng.annotations.Test;
 
 
 public class StatMapTest {
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testMergeRejectsUnknownStatOrdinal()
+      throws IOException {
+    ByteArrayDataOutput output = ByteStreams.newDataOutput();
+    output.writeByte(1);
+    output.writeByte(127);
+    new StatMap<>(MyStats.class).merge(ByteStreams.newDataInput(output.toByteArray()));
+  }
 
   @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
   public void dynamicTypeCheckWhenAddInt(MyStats stat) {

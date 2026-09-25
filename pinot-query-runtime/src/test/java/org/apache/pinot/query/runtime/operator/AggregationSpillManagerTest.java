@@ -39,6 +39,55 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests partitioning, serialization, and cleanup behavior of [AggregationSpillManager].
 public class AggregationSpillManagerTest {
+  @Test
+  public void testSpillByteLimits()
+      throws IOException {
+    Path root = Files.createTempDirectory("aggregation-budget-test-");
+    DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
+    AggregationSpillManager first =
+        new AggregationSpillManager(1, 1, schema, new AggregationFunction[0], root, 1024, 1024);
+    AggregationSpillManager second = null;
+    AggregationSpillManager third = null;
+    try {
+      long bytes = first.spill(List.<Object[]>of(new Object[]{1}).iterator()).getBytes();
+      second = new AggregationSpillManager(1, 1, schema, new AggregationFunction[0], root, bytes, 1024);
+      third = new AggregationSpillManager(1, 1, schema, new AggregationFunction[0], root, 1024, bytes, "other");
+      AggregationSpillManager sameQuery = second;
+      AggregationSpillManager otherQuery = third;
+      assertThrows(RuntimeException.class, () -> sameQuery.spill(List.<Object[]>of(new Object[]{2}).iterator()));
+      assertThrows(RuntimeException.class, () -> otherQuery.spill(List.<Object[]>of(new Object[]{3}).iterator()));
+    } finally {
+      if (second != null) {
+        second.close();
+      }
+      if (third != null) {
+        third.close();
+      }
+      first.close();
+    }
+    AggregationSpillManager small =
+        new AggregationSpillManager(1, 1, schema, new AggregationFunction[0], root, 1, 1024);
+    try {
+      assertThrows(RuntimeException.class, () -> small.spill(List.<Object[]>of(new Object[]{1}).iterator()));
+    } finally {
+      small.close();
+      Files.delete(root);
+    }
+  }
+
+  @Test
+  public void testStartupSweepLeavesUnrelatedFilesAlone()
+      throws IOException {
+    Path root = Files.createTempDirectory("aggregation-startup-test-");
+    Path orphan = Files.createDirectory(root.resolve("pinot-aggregation-spill-orphan"));
+    Path unrelated = Files.createFile(root.resolve("unrelated"));
+    Files.createFile(orphan.resolve("partition-0.spill"));
+    AggregationSpillManager.cleanOrphanedSpillFiles(root);
+    assertFalse(Files.exists(orphan));
+    assertTrue(Files.exists(unrelated));
+    Files.delete(unrelated);
+    Files.delete(root);
+  }
   @DataProvider(name = "equivalentValues")
   public Object[][] equivalentValues() {
     return new Object[][]{

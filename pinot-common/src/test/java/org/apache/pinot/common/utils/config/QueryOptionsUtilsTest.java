@@ -39,7 +39,7 @@ import static org.testng.Assert.fail;
 public class QueryOptionsUtilsTest {
   private static final List<String> POSITIVE_INT_KEYS =
       List.of(NUM_REPLICA_GROUPS_TO_QUERY, MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, MSE_AGGREGATION_SPILL_THRESHOLD);
+          MAX_STREAMING_PENDING_BLOCKS, MAX_ROWS_IN_JOIN, MAX_ROWS_IN_WINDOW, MSE_AGGREGATION_SPILL_MAX_GROUPS);
   private static final List<String> NON_NEGATIVE_INT_KEYS =
       List.of(MULTI_STAGE_LEAF_LIMIT, STREAMING_GROUP_BY_FLUSH_THRESHOLD, STREAMING_DISTINCT_FLUSH_THRESHOLD);
   private static final List<String> UNBOUNDED_INT_KEYS =
@@ -364,8 +364,8 @@ public class QueryOptionsUtilsTest {
         return QueryOptionsUtils.getMaxRowsInJoin(map);
       case MAX_ROWS_IN_WINDOW:
         return QueryOptionsUtils.getMaxRowsInWindow(map);
-      case MSE_AGGREGATION_SPILL_THRESHOLD:
-        return QueryOptionsUtils.getMSEAggregationSpillThreshold(map);
+      case MSE_AGGREGATION_SPILL_MAX_GROUPS:
+        return QueryOptionsUtils.getMSEAggregationSpillMaxGroups(map);
       case MSE_AGGREGATION_SPILL_PARTITIONS:
         return QueryOptionsUtils.getMSEAggregationSpillPartitions(map);
       // Non-negative ints

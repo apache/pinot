@@ -550,9 +550,9 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Integer getMSEAggregationSpillThreshold(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD);
-    return checkedParseIntPositive(QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, value);
+  public static Integer getMSEAggregationSpillMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, value);
   }
 
   public static boolean isMSEAggregationSpillEnabled(Map<String, String> queryOptions) {

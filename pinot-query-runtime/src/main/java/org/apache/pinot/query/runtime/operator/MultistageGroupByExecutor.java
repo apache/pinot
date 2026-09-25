@@ -65,6 +65,7 @@ public class MultistageGroupByExecutor {
   private final DataSchema _resultSchema;
   private int _rowsProcessed;
   private final int _numGroupsLimit;
+  private final int _spillTriggerMaxGroups;
   private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
 
@@ -80,27 +81,27 @@ public class MultistageGroupByExecutor {
       int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
       Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     this(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult, resultSchema,
-        opChainMetadata, nodeHint, null, null);
+        opChainMetadata, nodeHint, null, null, 0);
   }
 
   static MultistageGroupByExecutor forSpillInput(int[] groupKeyIds, AggregationFunction[] aggFunctions,
       int[] filterArgIds, int maxFilterArgId, AggType aggType, DataSchema resultSchema,
-      Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, int spillThreshold) {
+      Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, int spillTriggerMaxGroups) {
     return new MultistageGroupByExecutor(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, false,
-        resultSchema, opChainMetadata, nodeHint, Integer.MAX_VALUE, spillThreshold);
+        resultSchema, opChainMetadata, nodeHint, null, spillTriggerMaxGroups, spillTriggerMaxGroups);
   }
 
   static MultistageGroupByExecutor forSpillMerge(int[] groupKeyIds, AggregationFunction[] aggFunctions,
       int[] filterArgIds, int maxFilterArgId, AggType aggType, DataSchema resultSchema,
       Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint, int maxInitialCapacity) {
     return new MultistageGroupByExecutor(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, false,
-        resultSchema, opChainMetadata, nodeHint, null, maxInitialCapacity);
+        resultSchema, opChainMetadata, nodeHint, null, maxInitialCapacity, 0);
   }
 
   private MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
       int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
       Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint, @Nullable Integer numGroupsLimit,
-      @Nullable Integer maxInitialCapacity) {
+      @Nullable Integer maxInitialCapacity, int spillTriggerMaxGroups) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -115,6 +116,7 @@ public class MultistageGroupByExecutor {
     }
 
     _numGroupsLimit = numGroupsLimit != null ? numGroupsLimit : getNumGroupsLimit(opChainMetadata, nodeHint);
+    _spillTriggerMaxGroups = spillTriggerMaxGroups;
     _numGroupsWarningLimit = getNumGroupsWarningLimit(opChainMetadata);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
@@ -200,6 +202,11 @@ public class MultistageGroupByExecutor {
 
   public int getNumGroupsLimit() {
     return _numGroupsLimit;
+  }
+
+  boolean shouldSpill() {
+    return _spillTriggerMaxGroups > 0
+        && _groupIdGenerator.getNumGroups() >= Math.min(_spillTriggerMaxGroups, _numGroupsLimit);
   }
 
   public int getNumGroupsWarningLimit() {

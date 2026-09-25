@@ -45,6 +45,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.slf4j.Logger;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 /// Manages hash-partitioned aggregation spill files for one operator. The caller must finish reading before calling
 /// [#close()], which recursively removes the operator-scoped directory. This class is not thread-safe.
 @SuppressWarnings("rawtypes")
-class AggregationSpillManager implements AutoCloseable {
+public class AggregationSpillManager implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregationSpillManager.class);
   private static final String SPILL_FILE_PREFIX = "partition-";
   private static final String SPILL_FILE_SUFFIX = ".spill";
@@ -61,17 +62,35 @@ class AggregationSpillManager implements AutoCloseable {
   private static final String RESTORE_SCOPE = "AggregationSpillManager#consumePartition";
   private static final int MAX_BUFFERED_ROWS = 1024;
   private static final int MAX_BUFFERED_PARTITIONS = 8;
+  private static final Map<String, Long> QUERY_SPILL_BYTES = new HashMap<>();
+  private static long _processSpillBytes;
 
   private final int _numPartitions;
   private final int _numGroupKeys;
   private final DataSchema _spillSchema;
   private final AggregationFunction[] _aggFunctions;
   private final Path _spillDirectory;
+  private final long _maxSpillBytes;
+  private final long _maxServerSpillBytes;
+  private final String _queryId;
+  private long _reservedBytes;
   private final Map<Integer, FileChannel> _spillWriters = new HashMap<>();
   private final ByteBuffer _recordLengthBuffer = ByteBuffer.allocate(Integer.BYTES);
 
-  AggregationSpillManager(int numPartitions, int numGroupKeys, DataSchema spillSchema,
+  public AggregationSpillManager(int numPartitions, int numGroupKeys, DataSchema spillSchema,
       AggregationFunction[] aggFunctions) {
+    this(numPartitions, numGroupKeys, spillSchema, aggFunctions, Path.of(System.getProperty("java.io.tmpdir")),
+        Server.DEFAULT_MSE_AGGREGATION_SPILL_MAX_BYTES, Server.DEFAULT_MSE_AGGREGATION_SPILL_SERVER_MAX_BYTES, "test");
+  }
+
+  AggregationSpillManager(int numPartitions, int numGroupKeys, DataSchema spillSchema,
+      AggregationFunction[] aggFunctions, Path spillRoot, long maxSpillBytes, long maxServerSpillBytes) {
+    this(numPartitions, numGroupKeys, spillSchema, aggFunctions, spillRoot, maxSpillBytes, maxServerSpillBytes, "test");
+  }
+
+  public AggregationSpillManager(int numPartitions, int numGroupKeys, DataSchema spillSchema,
+      AggregationFunction[] aggFunctions, Path spillRoot, long maxSpillBytes, long maxServerSpillBytes,
+      String queryId) {
     if (numPartitions <= 0 || numPartitions > Server.MAX_MSE_AGGREGATION_SPILL_PARTITIONS) {
       throw new IllegalArgumentException(
           "Number of spill partitions must be between 1 and " + Server.MAX_MSE_AGGREGATION_SPILL_PARTITIONS);
@@ -83,10 +102,30 @@ class AggregationSpillManager implements AutoCloseable {
     _numGroupKeys = numGroupKeys;
     _spillSchema = spillSchema;
     _aggFunctions = aggFunctions;
+    _maxSpillBytes = maxSpillBytes;
+    _maxServerSpillBytes = maxServerSpillBytes;
+    _queryId = queryId;
     try {
-      _spillDirectory = Files.createTempDirectory("pinot-aggregation-spill-");
+      Files.createDirectories(spillRoot);
+      _spillDirectory = Files.createTempDirectory(spillRoot, "pinot-aggregation-spill-");
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to create aggregation spill directory", e);
+    }
+  }
+
+  /// Remove only directories owned by aggregation spill. Call at startup before any query uses this instance's
+  /// dedicated spill root. The root must not be shared by concurrently running server instances.
+  public static void cleanOrphanedSpillFiles(Path spillRoot) {
+    if (!Files.exists(spillRoot)) {
+      return;
+    }
+    try (var children = Files.list(spillRoot)) {
+      for (Path child : children.filter(path -> path.getFileName().toString().startsWith("pinot-aggregation-spill-"))
+          .toList()) {
+        deleteSpillDirectory(child);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to clean aggregation spill root: " + spillRoot, e);
     }
   }
 
@@ -209,9 +248,6 @@ class AggregationSpillManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (!Files.exists(_spillDirectory)) {
-      return;
-    }
     RuntimeException failure = null;
     try {
       closeSpillWriters();
@@ -219,7 +255,37 @@ class AggregationSpillManager implements AutoCloseable {
       failure = e;
     }
     try {
-      Files.walkFileTree(_spillDirectory, new SimpleFileVisitor<>() {
+      if (Files.exists(_spillDirectory)) {
+        deleteSpillDirectory(_spillDirectory);
+      }
+    } catch (RuntimeException e) {
+      if (failure != null) {
+        failure.addSuppressed(e);
+      } else {
+        failure = e;
+      }
+    } finally {
+      if (!Files.exists(_spillDirectory)) {
+        synchronized (QUERY_SPILL_BYTES) {
+          _processSpillBytes -= _reservedBytes;
+          long remaining = QUERY_SPILL_BYTES.getOrDefault(_queryId, 0L) - _reservedBytes;
+          if (remaining == 0) {
+            QUERY_SPILL_BYTES.remove(_queryId);
+          } else {
+            QUERY_SPILL_BYTES.put(_queryId, remaining);
+          }
+          _reservedBytes = 0;
+        }
+      }
+    }
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static void deleteSpillDirectory(Path directory) {
+    try {
+      Files.walkFileTree(directory, new SimpleFileVisitor<>() {
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
             throws IOException {
@@ -238,16 +304,7 @@ class AggregationSpillManager implements AutoCloseable {
         }
       });
     } catch (IOException e) {
-      RuntimeException cleanupFailure =
-          new UncheckedIOException("Failed to delete aggregation spill directory", e);
-      if (failure != null) {
-        failure.addSuppressed(cleanupFailure);
-      } else {
-        failure = cleanupFailure;
-      }
-    }
-    if (failure != null) {
-      throw failure;
+      throw new UncheckedIOException("Failed to delete aggregation spill directory: " + directory, e);
     }
   }
 
@@ -272,6 +329,8 @@ class AggregationSpillManager implements AutoCloseable {
     return serializedBytes;
   }
 
+  /// Equal keys after DataBlock serialization must hash to the same partition here; otherwise restore can emit
+  /// duplicate groups. In particular, hash array keys by content, not by identity.
   private int getPartition(Object[] row) {
     int hash = 1;
     for (int i = 0; i < _numGroupKeys; i++) {
@@ -317,6 +376,7 @@ class AggregationSpillManager implements AutoCloseable {
     try {
       List<ByteBuffer> buffers = dataBlock.serialize();
       int recordLength = getRecordLength(buffers);
+      reserveSpillBytes(Integer.BYTES + (long) recordLength);
       FileChannel output = getSpillWriter(partitionId);
       _recordLengthBuffer.clear();
       _recordLengthBuffer.putInt(recordLength).flip();
@@ -327,6 +387,21 @@ class AggregationSpillManager implements AutoCloseable {
       return Integer.BYTES + (long) recordLength;
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to spill aggregation partition: " + partitionId, e);
+    }
+  }
+
+  private void reserveSpillBytes(long bytes) {
+    synchronized (QUERY_SPILL_BYTES) {
+      long queryBytes = QUERY_SPILL_BYTES.getOrDefault(_queryId, 0L);
+      if (bytes > _maxSpillBytes - queryBytes) {
+        throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Query aggregation spill byte limit exceeded");
+      }
+      if (bytes > _maxServerSpillBytes - _processSpillBytes) {
+        throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Server aggregation spill byte limit exceeded");
+      }
+      QUERY_SPILL_BYTES.put(_queryId, queryBytes + bytes);
+      _processSpillBytes += bytes;
+      _reservedBytes += bytes;
     }
   }
 

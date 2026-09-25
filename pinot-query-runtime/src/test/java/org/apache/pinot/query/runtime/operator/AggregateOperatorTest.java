@@ -258,6 +258,26 @@ public class AggregateOperatorTest {
   }
 
   @Test
+  public void testSpillMergesArrayKeyAcrossRuns() {
+    DataSchema inputSchema = new DataSchema(new String[]{"key", "value"},
+        new ColumnDataType[]{ColumnDataType.STRING_ARRAY, DOUBLE});
+    _input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(new String[]{"a", "b"}, 1.0)
+        .finishBlock()
+        .addRow(new String[]{"a", "b"}, 2.0)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"key", "sum"},
+        new ColumnDataType[]{ColumnDataType.STRING_ARRAY, DOUBLE});
+    AggregateOperator operator = getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(1))),
+        List.of(-1), List.of(0), PlanNode.NodeHint.EMPTY, spillOptions(1, 8));
+
+    List<Object[]> rows = drainRows(operator);
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], new String[]{"a", "b"});
+    assertEquals(rows.get(0)[1], 3.0);
+  }
+
+  @Test
   public void testGroupBySpillWritesMultipleBoundedRecords() {
     DataSchema inputSchema = new DataSchema(new String[]{"group"}, new ColumnDataType[]{INT});
     BlockListMultiStageOperator.Builder inputBuilder = new BlockListMultiStageOperator.Builder(inputSchema);
@@ -410,7 +430,7 @@ public class AggregateOperatorTest {
     AggregateOperator operator =
         getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(1))), List.of(-1), List.of(0), nodeHint,
             Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED, "true",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, "1",
+                QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, "1",
                 QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "2",
                 QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT, "true"));
 
@@ -425,7 +445,7 @@ public class AggregateOperatorTest {
   }
 
   @Test
-  public void testSpillErrorsWhenRestoredPartitionExceedsThreshold() {
+  public void testSpillRestoresPartitionBeyondTriggerUpToNumGroupsLimit() {
     DataSchema inputSchema = new DataSchema(new String[]{"group"}, new ColumnDataType[]{INT});
     _input = new BlockListMultiStageOperator.Builder(inputSchema)
         .addRow(1)
@@ -435,10 +455,10 @@ public class AggregateOperatorTest {
     AggregateOperator operator =
         getOperator(inputSchema, List.of(), List.of(), List.of(0), PlanNode.NodeHint.EMPTY, spillOptions(2, 1));
 
-    MseBlock block = operator.nextBlock();
+    List<Object[]> rows = drainRows(operator);
     Path spillDirectory = operator.getSpillDirectory();
 
-    assertTrue(block.isError());
+    assertEquals(rows.size(), 3);
     assertNotNull(spillDirectory);
     assertFalse(Files.exists(spillDirectory));
   }
@@ -504,8 +524,8 @@ public class AggregateOperatorTest {
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getContext(
             Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED, "true",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, "0",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "0")), _input, node);
+                QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, "1",
+                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "2")), _input, node);
 
     assertTrue(operator.nextBlock().isData());
     assertNull(operator.getSpillDirectory());
@@ -522,8 +542,8 @@ public class AggregateOperatorTest {
     AggregateOperator operator =
         getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(0))), List.of(-1), List.of(),
             PlanNode.NodeHint.EMPTY, Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED, "true",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, "0",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "0"));
+                QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, "1",
+                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "2"));
 
     List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
@@ -545,11 +565,19 @@ public class AggregateOperatorTest {
     AggregateOperator operator =
         getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(1))), List.of(-1), List.of(0),
             PlanNode.NodeHint.EMPTY, Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED, "false",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, "0",
-                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "0"));
+                QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, "1",
+                QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "2"));
 
     assertTrue(operator.nextBlock().isData());
     assertNull(operator.getSpillDirectory());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSpillPartitionsValidatedWithoutThreshold() {
+    DataSchema schema = new DataSchema(new String[]{"group"}, new ColumnDataType[]{INT});
+    _input = new BlockListMultiStageOperator.Builder(schema).addRow(1).buildWithEos();
+    getOperator(schema, List.of(), List.of(), List.of(0), PlanNode.NodeHint.EMPTY,
+        Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, "999"));
   }
 
   @Test
@@ -577,11 +605,12 @@ public class AggregateOperatorTest {
   }
 
   @Test
-  public void testSpillDoesNotApplyNumGroupsLimitPerRun() {
+  public void testSpillRetainsNumGroupsLimitForEachRun() {
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     _input = new BlockListMultiStageOperator.Builder(inputSchema)
         .addRow(1, 1.0)
         .addRow(2, 2.0)
+        .finishBlock()
         .addRow(3, 5.0)
         .finishBlock()
         .addRow(3, 7.0)
@@ -658,7 +687,7 @@ public class AggregateOperatorTest {
   }
 
   @Test(dataProvider = "numGroupsLimitModes")
-  public void testSpillEnabledWithoutSpillStillEnforcesNumGroupsLimit(boolean errorOnLimit) {
+  public void testSpillAtNumGroupsLimitBackstop(boolean errorOnLimit) {
     DataSchema inputSchema = new DataSchema(new String[]{"group"}, new ColumnDataType[]{INT});
     _input = new BlockListMultiStageOperator.Builder(inputSchema)
         .addRow(1)
@@ -672,7 +701,11 @@ public class AggregateOperatorTest {
         getOperator(inputSchema, List.of(), List.of(), List.of(0), PlanNode.NodeHint.EMPTY, options);
 
     if (errorOnLimit) {
-      assertTrue(operator.nextBlock().isError());
+      MseBlock block = operator.nextBlock();
+      while (block.isData()) {
+        block = operator.nextBlock();
+      }
+      assertTrue(block.isError());
     } else {
       assertEquals(drainRows(operator).size(), 2);
       StatMap<AggregateOperator.StatKey> statMap =
@@ -680,7 +713,7 @@ public class AggregateOperatorTest {
       assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
       assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 2);
     }
-    assertNull(operator.getSpillDirectory());
+    assertNotNull(operator.getSpillDirectory());
   }
 
   @Test
@@ -951,7 +984,7 @@ public class AggregateOperatorTest {
 
   private static Map<String, String> spillOptions(int threshold, int partitions) {
     return Map.of(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED, "true",
-        QueryOptionKey.MSE_AGGREGATION_SPILL_THRESHOLD, Integer.toString(threshold),
+        QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_GROUPS, Integer.toString(threshold),
         QueryOptionKey.MSE_AGGREGATION_SPILL_PARTITIONS, Integer.toString(partitions));
   }
 

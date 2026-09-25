@@ -76,7 +76,7 @@ public final class MultiStageStatsTreeDecoder {
     StatMap<?> statMap;
     try {
       statMap = deserializeStatMap(node.getStatMap(), type);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       throw new DecodeFailedException("Failed to deserialize StatMap for operator type " + type.name(), e);
     }
     List<StageStatsTreeNode> children = new ArrayList<>(node.getChildrenCount());

@@ -20,6 +20,9 @@ package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -191,11 +194,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @Test
-  public void testMSEAggregationSpill() {
+  public void testMSEAggregationSpill()
+      throws IOException {
     String query = "SELECT col1, SUM(col3), AVG(col3) FROM a GROUP BY col1 ORDER BY col1";
     ResultTable expected = queryRunner(query, false).getResultTable();
     String spillQuery =
-        "SET mseAggregationSpillThreshold = 2; SET mseAggregationSpillPartitions = 8; " + query;
+        "SET mseAggregationSpillMaxGroups = 2; SET mseAggregationSpillPartitions = 8; " + query;
     QueryDispatcher.QueryResult queryResult = queryRunner(spillQuery, true);
     ResultTable actual = queryResult.getResultTable();
 
@@ -210,6 +214,26 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Assertions.assertThat(spillStats.path("spillCount").asLong()).isPositive();
     Assertions.assertThat(spillStats.path("spilledRows").asLong()).isPositive();
     Assertions.assertThat(spillStats.path("spilledBytes").asLong()).isPositive();
+
+    for (QueryServerEnclosure server : _servers.values()) {
+      Path spillRoot = Path.of(Server.DEFAULT_INSTANCE_DATA_DIR, "aggregation-spill",
+          "localhost-" + server.getPort());
+      if (Files.exists(spillRoot)) {
+        try (var directories = Files.list(spillRoot)) {
+          Assertions.assertThat(directories).isEmpty();
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testMSEAggregationSpillDistinctCountIntermediate() {
+    String query = "SELECT col1, DISTINCTCOUNT(col3) FROM a GROUP BY col1 ORDER BY col1";
+    ResultTable expected = queryRunner(query, false).getResultTable();
+    QueryDispatcher.QueryResult spilled = queryRunner(
+        "SET mseAggregationSpillMaxGroups = 2; SET mseAggregationSpillPartitions = 8; " + query, true);
+    Assertions.assertThat(spilled.getResultTable().getRows()).containsExactlyElementsOf(expected.getRows());
+    Assertions.assertThat(spilled.getResultTable().getDataSchema()).isEqualTo(expected.getDataSchema());
   }
 
   /// Asserts that no self stat in the tree is negative, and returns how many were checked.

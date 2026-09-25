@@ -21,6 +21,8 @@ package org.apache.pinot.query.runtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,6 +57,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.AggregationSpillManager;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -112,7 +115,9 @@ public class QueryRunner {
   @Nullable
   private Integer _mseMinGroupTrimSize;
   private boolean _mseAggregationSpillEnabled;
-  private SendStatsPredicate.Mode _sendStatsMode = SendStatsPredicate.Mode.ALWAYS;
+  private Path _aggregationSpillDir;
+  private long _aggregationSpillMaxBytes;
+  private long _aggregationSpillServerMaxBytes;
 
   @Nullable
   private Integer _maxInitialResultHolderCapacity;
@@ -136,7 +141,6 @@ public class QueryRunner {
   /// at startup time. **May be overridden per-request** via the `KEY_OF_STATS_REPORTING_MODE` metadata key —
   /// see [#effectiveSendStats(Map)].
   private BooleanSupplier _sendStats;
-  private BooleanSupplier _clusterVersionCompatible;
   private BooleanSupplier _keepPipelineBreakerStats;
 
   /// Initializes the query runner.
@@ -147,8 +151,7 @@ public class QueryRunner {
   ///                            for processing leaf-stage queries. When null, only intermediate-stage execution
   ///                            is supported.
   public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier clusterVersionCompatible,
-      BooleanSupplier keepPipelineBreakerStats) {
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
@@ -167,6 +170,13 @@ public class QueryRunner {
     _mseMinGroupTrimSize = mseMinGroupTrimSizeStr != null ? Integer.parseInt(mseMinGroupTrimSizeStr) : null;
 
     initAggregationSpillConfig(serverConf);
+    if (_mseAggregationSpillEnabled) {
+      String configuredRoot = serverConf.getProperty(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_DIR,
+          Paths.get(serverConf.getProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR),
+              "aggregation-spill").toString());
+      _aggregationSpillDir = Paths.get(configuredRoot, instanceId != null ? instanceId : hostname + "-" + port);
+      AggregationSpillManager.cleanOrphanedSpillFiles(_aggregationSpillDir);
+    }
 
     String maxInitialGroupHolderCapacity =
         serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
@@ -247,7 +257,6 @@ public class QueryRunner {
     }
 
     _sendStats = sendStats;
-    _clusterVersionCompatible = clusterVersionCompatible;
     _keepPipelineBreakerStats = keepPipelineBreakerStats;
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
@@ -261,7 +270,7 @@ public class QueryRunner {
       _mailboxService = sharedMailboxService;
       _ownsMailboxService = false;
     }
-    init(serverConf, instanceId, instanceDataManager, tlsConfig, sendStats, () -> false, keepPipelineBreakerStats);
+    init(serverConf, instanceId, instanceDataManager, tlsConfig, sendStats, keepPipelineBreakerStats);
   }
 
   public void start() {
@@ -308,8 +317,7 @@ public class QueryRunner {
     // MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE; in stream mode stats travel out-of-band
     // and we suppress the mailbox-side path to avoid duplication.
     boolean sendStats = effectiveSendStats(requestMetadata);
-    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata,
-        canEnableAggregationSpill(_sendStatsMode, _clusterVersionCompatible.getAsBoolean()));
+    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
@@ -470,7 +478,7 @@ public class QueryRunner {
 
   @VisibleForTesting
   Map<String, String> consolidateMetadata(Map<String, String> customProperties,
-      Map<String, String> requestMetadata, boolean spillStatsCompatible) {
+      Map<String, String> requestMetadata) {
     Map<String, String> opChainMetadata = new HashMap<>();
     // 1. put all request level metadata
     opChainMetadata.putAll(requestMetadata);
@@ -481,7 +489,14 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, Integer.toString(_numGroupsWarningLimit));
     }
     opChainMetadata.put(QueryOptionKey.MSE_AGGREGATION_SPILL_ENABLED,
-        Boolean.toString(_mseAggregationSpillEnabled && spillStatsCompatible));
+        Boolean.toString(_mseAggregationSpillEnabled));
+    if (_mseAggregationSpillEnabled) {
+      opChainMetadata.put(QueryOptionKey.MSE_AGGREGATION_SPILL_DIR, _aggregationSpillDir.toString());
+      opChainMetadata.put(QueryOptionKey.MSE_AGGREGATION_SPILL_MAX_BYTES,
+          Long.toString(_aggregationSpillMaxBytes));
+      opChainMetadata.put(QueryOptionKey.MSE_AGGREGATION_SPILL_SERVER_MAX_BYTES,
+          Long.toString(_aggregationSpillServerMaxBytes));
+    }
     // 4. add all overrides from config if anything is still empty.
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     if (numGroupsLimit == null) {
@@ -562,17 +577,19 @@ public class QueryRunner {
   }
 
   @VisibleForTesting
-  static boolean canEnableAggregationSpill(SendStatsPredicate.Mode sendStatsMode, boolean homogeneousCluster) {
-    // AggregateOperator stats use enum ordinals in both mailbox and stream transports. Only SAFE mode proves that
-    // every broker and server can decode the spill stat keys.
-    return sendStatsMode == SendStatsPredicate.Mode.SAFE && homogeneousCluster;
-  }
-
-  @VisibleForTesting
   void initAggregationSpillConfig(PinotConfiguration serverConf) {
     _mseAggregationSpillEnabled = serverConf.getProperty(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_ENABLED,
         Server.DEFAULT_MSE_AGGREGATION_SPILL_ENABLED);
-    _sendStatsMode = SendStatsPredicate.getMode(serverConf);
+    _aggregationSpillDir = Paths.get(serverConf.getProperty(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_DIR,
+        Paths.get(serverConf.getProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR),
+            "aggregation-spill").toString()));
+    _aggregationSpillMaxBytes = serverConf.getProperty(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_MAX_BYTES,
+        Server.DEFAULT_MSE_AGGREGATION_SPILL_MAX_BYTES);
+    _aggregationSpillServerMaxBytes = serverConf.getProperty(Server.CONFIG_OF_MSE_AGGREGATION_SPILL_SERVER_MAX_BYTES,
+        Server.DEFAULT_MSE_AGGREGATION_SPILL_SERVER_MAX_BYTES);
+    if (_aggregationSpillMaxBytes <= 0 || _aggregationSpillServerMaxBytes <= 0) {
+      throw new IllegalArgumentException("Aggregation spill byte limits must be positive");
+    }
   }
 
   public MailboxService getMailboxService() {
@@ -624,8 +641,7 @@ public class QueryRunner {
     }
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
-    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata,
-        canEnableAggregationSpill(_sendStatsMode, _clusterVersionCompatible.getAsBoolean()));
+    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
       //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714

@@ -46,7 +46,7 @@ public class WorkerQueryServer {
         MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     _queryRunner = new QueryRunner();
     _queryRunner.init(serverConf, instanceDataManager.getInstanceId(), instanceDataManager, tlsConfig,
-        sendStats::isSendStats, sendStats::isClusterVersionCompatible, keepPipelineBreakerStatsPredicate::isEnabled);
+        sendStats::isSendStats, keepPipelineBreakerStatsPredicate::isEnabled);
     _queryWorkerService =
         new QueryServer(serverConf, instanceDataManager.getInstanceId(), _queryServicePort, _queryRunner, tlsConfig,
             threadAccountant);
