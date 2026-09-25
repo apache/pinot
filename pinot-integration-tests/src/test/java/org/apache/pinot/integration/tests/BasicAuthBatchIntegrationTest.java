@@ -32,6 +32,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.testng.Assert;
@@ -42,6 +43,9 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Integration test that provides example of
@@ -53,6 +57,9 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String CONFIG_FILE = "baseballStats_offline_table_config.json";
   private static final String DATA_FILE = "baseballStats_data.csv";
   private static final String JOB_FILE = "ingestionJobSpec.yaml";
+  // Broker principal granted the DELETE permission, which the broker requires to delete rows
+  private static final Map<String, String> AUTH_HEADER_DELETER =
+      Map.of("Authorization", "Basic ZGVsZXRlcjpkZWxzZWNyZXQ="); // deleter:delsecret
 
   @BeforeClass
   public void setUp()
@@ -85,6 +92,9 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     BasicAuthTestUtils.addBrokerConfiguration(brokerConf);
+    brokerConf.setProperty("pinot.broker.access.control.principals", "admin, user, deleter");
+    brokerConf.setProperty("pinot.broker.access.control.principals.deleter.password", "delsecret");
+    brokerConf.setProperty("pinot.broker.access.control.principals.deleter.permissions", "read, delete");
     brokerConf.setProperty("pinot.broker.server.admin.auth.token", AUTH_TOKEN);
   }
 
@@ -124,6 +134,47 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
+  }
+
+  @Test
+  public void testDeleteRequiresTheDeletePermission()
+      throws Exception {
+    // user may only query userTableOnly, with the read permission; admin has every table, and on the controller every
+    // permission
+    String request = "{\"sql\":\"DELETE FROM baseballStats WHERE playerID = 'unknown'\"}";
+    String userTableRequest = "{\"sql\":\"DELETE FROM userTableOnly WHERE playerID = 'unknown'\"}";
+
+    // The broker requires the checks of a query on the table, and the DELETE permission granted explicitly
+    String brokerUrl = "http://localhost:" + getRandomBrokerPort() + "/query/sql";
+    assertForbidden(brokerUrl, request, AUTH_HEADER_USER);
+    assertForbidden(brokerUrl, userTableRequest, AUTH_HEADER_USER);
+    assertForbidden(brokerUrl, request, AUTH_HEADER);
+    // An authorized DELETE reaches the SQL executor, which does not implement it by default
+    assertNotSupported(sendPostRequest(brokerUrl, request, AUTH_HEADER_DELETER));
+
+    // The controller requires the READ and DELETE access types on the table
+    String controllerUrl = "http://localhost:" + getControllerPort() + "/sql";
+    assertAccessDenied(sendPostRequest(controllerUrl, request, AUTH_HEADER_USER));
+    assertAccessDenied(sendPostRequest(controllerUrl, userTableRequest, AUTH_HEADER_USER));
+    assertNotSupported(sendPostRequest(controllerUrl, request, AUTH_HEADER));
+  }
+
+  private static void assertForbidden(String url, String request, Map<String, String> headers) {
+    IOException e = expectThrows(IOException.class, () -> sendPostRequest(url, request, headers));
+    assertEquals(((HttpErrorStatusException) e.getCause()).getStatusCode(), 403, e.getMessage());
+  }
+
+  private static void assertAccessDenied(String response)
+      throws IOException {
+    JsonNode exception = JsonUtils.stringToJsonNode(response).get("exceptions").get(0);
+    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.ACCESS_DENIED.getId(), response);
+  }
+
+  private static void assertNotSupported(String response)
+      throws IOException {
+    JsonNode exception = JsonUtils.stringToJsonNode(response).get("exceptions").get(0);
+    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId(), response);
+    assertTrue(exception.get("message").asText().contains("DELETE is not supported"), response);
   }
 
   @Test

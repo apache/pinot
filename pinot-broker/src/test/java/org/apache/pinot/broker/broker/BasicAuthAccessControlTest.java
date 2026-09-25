@@ -35,10 +35,15 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 public class BasicAuthAccessControlTest {
   private static final String TOKEN_USER = "Basic dXNlcjpzZWNyZXQ"; // user:secret
   private static final String TOKEN_ADMIN = "Basic YWRtaW46dmVyeXNlY3JldA"; // admin:verysecret
+  private static final String TOKEN_DELETER = "Basic ZGVsZXRlcjpkZWxzZWNyZXQ="; // deleter:delsecret
+  private static final String TOKEN_READER = "Basic cmVhZGVyOnJlYWRzZWNyZXQ="; // reader:readsecret
+  private static final String TOKEN_EXCLUDER = "Basic ZXhjbHVkZXI6ZXhjbHNlY3JldA=="; // excluder:exclsecret
 
   private static final String HEADER_AUTHORIZATION = "authorization";
 
@@ -49,10 +54,19 @@ public class BasicAuthAccessControlTest {
   @BeforeClass
   public void setup() {
     Map<String, Object> config = new HashMap<>();
-    config.put("principals", "admin,user");
+    config.put("principals", "admin,user,deleter,reader,excluder");
     config.put("principals.admin.password", "verysecret");
     config.put("principals.user.password", "secret");
     config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
+    config.put("principals.deleter.password", "delsecret");
+    config.put("principals.deleter.tables", "lessImportantStuff");
+    config.put("principals.deleter.permissions", "read,delete");
+    config.put("principals.reader.password", "readsecret");
+    config.put("principals.reader.tables", "lessImportantStuff");
+    config.put("principals.reader.permissions", "read");
+    config.put("principals.excluder.password", "exclsecret");
+    config.put("principals.excluder.excludeTables", "billing");
+    config.put("principals.excluder.permissions", "read,delete");
 
     _tableNames = new HashSet<>();
     _tableNames.add("lessImportantStuff");
@@ -198,5 +212,45 @@ public class BasicAuthAccessControlTest {
 
     Assert.assertTrue(_accessControl.authorize(identity, request).hasAccess());
     Assert.assertTrue(_accessControl.authorize(identity, _tableNames).hasAccess());
+  }
+
+  @Test
+  public void testDeleteRowsRequiresTheDeletePermission() {
+    assertDeleteRows(TOKEN_DELETER, "lessImportantStuff", true, "");
+    assertDeleteRows(TOKEN_DELETER, "veryImportantStuff", false,
+        "Principal: deleter does not have access to table: veryImportantStuff");
+    assertDeleteRows(TOKEN_READER, "lessImportantStuff", false,
+        "Principal: reader is not granted the DELETE permission");
+    // Principals configured without permissions query their tables, but only delete rows when granted the permission
+    assertDeleteRows(TOKEN_USER, "lessImportantStuff", false, "Principal: user is not granted the DELETE permission");
+    assertDeleteRows(TOKEN_ADMIN, "lessImportantStuff", false, "Principal: admin is not granted the DELETE permission");
+    assertDeleteRows(null, "lessImportantStuff", false, "Missing or invalid credentials");
+    assertDeleteRows("Basic d3Jvbmc6Y3JlZGVudGlhbHM=", "lessImportantStuff", false, "Missing or invalid credentials");
+  }
+
+  @Test
+  public void testDeleteRowsChecksTheRawTableName() {
+    // excludeTables lists raw names: a type suffix does not bypass it
+    assertDeleteRows(TOKEN_EXCLUDER, "billing", false, "Principal: excluder does not have access to table: billing");
+    for (String tableName : new String[]{"billing_OFFLINE", "billing_REALTIME"}) {
+      assertDeleteRows(TOKEN_EXCLUDER, tableName, false,
+          "Principal: excluder does not have access to table: " + tableName);
+    }
+    assertDeleteRows(TOKEN_EXCLUDER, "other_OFFLINE", true, "");
+    // A principal listing its tables by raw name deletes from them by raw name, as it queries them
+    assertDeleteRows(TOKEN_DELETER, "lessImportantStuff_OFFLINE", false,
+        "Principal: deleter does not have access to table: lessImportantStuff_OFFLINE");
+  }
+
+  private void assertDeleteRows(String token, String tableName, boolean expectedAccess, String expectedMessage) {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    if (token != null) {
+      headers.put(HEADER_AUTHORIZATION, token);
+    }
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
+    AuthorizationResult result = _accessControl.authorizeDeleteRows(identity, null, tableName);
+    assertEquals(result.hasAccess(), expectedAccess, token + " on " + tableName);
+    assertEquals(result.getFailureMessage(), expectedMessage);
   }
 }

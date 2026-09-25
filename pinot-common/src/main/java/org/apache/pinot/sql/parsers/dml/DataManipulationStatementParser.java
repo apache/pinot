@@ -20,22 +20,35 @@ package org.apache.pinot.sql.parsers.dml;
 
 import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 
 
+/// Parses the DML statements that Pinot executes: `INSERT INTO ... FROM FILE` and `DELETE`.
 public class DataManipulationStatementParser {
   private DataManipulationStatementParser() {
   }
 
+  /// Parses a DML statement.
+  ///
+  /// @throws QueryException with [QueryErrorCode#SQL_PARSING] if it is not a DML statement that Pinot executes, e.g. an
+  ///                        `UPDATE`, or not a valid one, e.g. a `DELETE` without a WHERE clause
   public static DataManipulationStatement parse(SqlNodeAndOptions sqlNodeAndOptions) {
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
-    if (sqlNode instanceof SqlInsertFromFile) {
-      return InsertIntoFile.parse(sqlNodeAndOptions);
+    try {
+      if (sqlNode instanceof SqlInsertFromFile) {
+        return InsertIntoFile.parse(sqlNodeAndOptions);
+      }
+      if (sqlNode instanceof SqlDelete) {
+        return DeleteStatement.parse(sqlNodeAndOptions);
+      }
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw QueryErrorCode.SQL_PARSING.asException(e.getMessage() != null ? e.getMessage() : e.toString(), e);
     }
-    if (sqlNode instanceof SqlDelete) {
-      return DeleteStatement.parse(sqlNodeAndOptions);
-    }
-    throw new UnsupportedOperationException("Unsupported DML SqlKind - " + sqlNode.getKind());
+    throw QueryErrorCode.SQL_PARSING.asException("Unsupported DML SqlKind - " + sqlNode.getKind());
   }
 }

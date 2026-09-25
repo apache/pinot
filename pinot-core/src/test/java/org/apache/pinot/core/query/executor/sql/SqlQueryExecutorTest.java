@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.executor.sql;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -29,6 +30,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -41,10 +43,50 @@ public class SqlQueryExecutorTest {
 
   @Test
   public void testDeleteIsNotSupportedByDefault() {
-    BrokerResponse response = new SqlQueryExecutor(CONTROLLER_URL).executeDMLStatement(
-        CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM myTable WHERE col1 = 'a'"), null);
+    BrokerResponse response = new SqlQueryExecutor(CONTROLLER_URL).executeStatement(
+        resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
 
     assertError(response, QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
+  }
+
+  @Test
+  public void testDeleteFromSqlIsNotExecuted() {
+    // The SQL entry point cannot authorize the caller, so it does not execute a DELETE, even when the executor
+    // implements it
+    AtomicReference<DeleteStatement> executedStatement = new AtomicReference<>();
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        executedStatement.set(statement);
+        return new BrokerResponseNative();
+      }
+    };
+
+    BrokerResponse response = sqlQueryExecutor.executeDMLStatement(
+        CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.ACCESS_DENIED, SqlQueryExecutor.UNAUTHORIZED_DELETE_MESSAGE);
+    assertNull(executedStatement.get());
+  }
+
+  @Test
+  public void testUnresolvedDeleteIsNotExecuted() {
+    // A DELETE whose table is not resolved has not been authorized either
+    AtomicReference<DeleteStatement> executedStatement = new AtomicReference<>();
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        executedStatement.set(statement);
+        return new BrokerResponseNative();
+      }
+    };
+
+    BrokerResponse response = sqlQueryExecutor.executeStatement(DeleteStatement.parse(
+        CalciteSqlParser.compileToSqlNodeAndOptions("SET database = 'db1'; DELETE FROM myTable WHERE col1 = 'a'")),
+        null);
+
+    assertError(response, QueryErrorCode.ACCESS_DENIED, SqlQueryExecutor.UNAUTHORIZED_DELETE_MESSAGE);
+    assertNull(executedStatement.get());
   }
 
   @Test
@@ -77,19 +119,27 @@ public class SqlQueryExecutorTest {
       }
     };
 
-    BrokerResponse response = sqlQueryExecutor.executeDMLStatement(CalciteSqlParser.compileToSqlNodeAndOptions(
-        "SET database = 'db1'; SET taskName = 'purge'; DELETE FROM myTable WHERE col1 = 'a'"),
-        Map.of("Authorization", "Basic abc"));
+    DeleteStatement resolvedStatement =
+        resolvedDelete("SET database = 'db1'; SET taskName = 'purge'; DELETE FROM myTable WHERE col1 = 'a'");
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedStatement, Map.of("Authorization", "Basic abc"));
 
     assertSame(response, deleteResponse);
     DeleteStatement statement = executedStatement.get();
-    assertEquals(statement.getTableName(), "myTable");
+    assertSame(statement, resolvedStatement);
+    assertEquals(statement.getTableName(), "db1.myTable");
     assertEquals(statement.getPredicate(), "col1 = 'a'");
-    assertEquals(statement.getDatabase(), "db1");
     assertEquals(statement.getOptions(), Map.of("taskName", "purge"));
     assertEquals(executedHeaders.get(), Map.of("Authorization", "Basic abc"));
     // The controller an overriding executor can send the statement to
     assertEquals(sqlQueryExecutor.getControllerBaseUrl(), CONTROLLER_URL);
+  }
+
+  /// A DELETE with its table resolved, as the broker and the controller hand it to the executor once they authorized
+  /// the caller.
+  private static DeleteStatement resolvedDelete(String sql) {
+    return DeleteStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(sql))
+        .resolveTableName(null, mock(TableCache.class));
   }
 
   private static void assertError(BrokerResponse response, QueryErrorCode expectedErrorCode,

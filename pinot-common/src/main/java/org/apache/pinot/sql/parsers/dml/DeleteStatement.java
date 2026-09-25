@@ -21,7 +21,9 @@ package org.apache.pinot.sql.parsers.dml;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlDelete;
@@ -34,9 +36,15 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -51,10 +59,14 @@ import static com.google.common.base.Preconditions.checkArgument;
 /// executes the parsed statement by overriding `SqlQueryExecutor#executeDelete`. The generic [#execute()] and
 /// [#generateAdhocTaskConfig()] do not apply to it.
 ///
+/// Before handing the statement to the executor, the broker and the controller resolve its table with
+/// [#resolveTableName] and authorize the caller to delete rows from that table.
+///
 /// Its options are the `SET` statements, the legacy `OPTION(...)` suffix and the request `queryOptions` of the
-/// statement (`SET` takes precedence). The `database` option is lifted into [#getDatabase()]; every other option,
-/// including query options such as `timeoutMs`, reaches the executor as written through [#getOptions()], so that an
-/// option the executor relies on (e.g. a dry run) cannot be reclassified as a query option and silently dropped.
+/// statement (`SET` takes precedence). The `database` option only qualifies the table name, see [#resolveTableName].
+/// Every other option, including query options such as `timeoutMs`, reaches the executor as written through
+/// [#getOptions()], so that an option the executor relies on (e.g. a dry run) cannot be reclassified as a query option
+/// and silently dropped.
 ///
 /// Instances are immutable and thread-safe.
 public class DeleteStatement implements DataManipulationStatement {
@@ -90,23 +102,40 @@ public class DeleteStatement implements DataManipulationStatement {
     }
   };
 
+  /// Canonical names (lower case, without underscores) of the functions that read another table than the one the
+  /// statement deletes from, which the caller is not authorized to read.
+  private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("lookup", "insubquery", "inpartitionedsubquery");
+
   private final String _tableName;
   private final String _predicate;
   @Nullable
   private final String _database;
   private final Map<String, String> _options;
+  private final boolean _resolved;
 
+  /// @param tableName table name, see [#getTableName()]
+  /// @param predicate WHERE clause, see [#getPredicate()]
+  /// @param database `database` option of the statement, which qualifies an unqualified table name when the table is
+  ///                 resolved, see [#resolveTableName]
+  /// @param options other options of the statement, see [#getOptions()]
   public DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options) {
+    this(tableName, predicate, database, options, false);
+  }
+
+  private DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options,
+      boolean resolved) {
     _tableName = tableName;
     _predicate = predicate;
     _database = database;
     _options = Collections.unmodifiableMap(new HashMap<>(options));
+    _resolved = resolved;
   }
 
   /// Parses a `DELETE` statement.
   ///
   /// @throws IllegalArgumentException if the statement is not a supported `DELETE`: it must have a WHERE clause, no
-  ///                                  table alias, a WHERE clause that Pinot can parse as an expression, and set the
+  ///                                  table alias, a WHERE clause that Pinot can parse as an expression and that does
+  ///                                  not read another table (e.g. with `lookUp` or `IN_SUBQUERY`), and set the
   ///                                  database with the `database` option only
   public static DeleteStatement parse(SqlNodeAndOptions sqlNodeAndOptions) {
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
@@ -141,9 +170,11 @@ public class DeleteStatement implements DataManipulationStatement {
     // Table hints and EXTEND clauses parse into other node types
     checkArgument(targetTable instanceof SqlIdentifier, "DELETE only supports a plain table name, got: %s",
         targetTable);
-    SqlIdentifier identifier = (SqlIdentifier) targetTable;
-    checkArgument(identifier.names.size() <= 2, "Invalid table name: %s, expected [database.]table", identifier);
-    return String.join(".", identifier.names);
+    // A quoted name part may contain a dot, which splits it like the table name of a query
+    String tableName = String.join(".", ((SqlIdentifier) targetTable).names);
+    checkArgument(DatabaseUtils.splitTableName(tableName).length <= 2,
+        "Invalid table name: %s, expected [database.]table", tableName);
+    return tableName;
   }
 
   /// Serializes a WHERE clause back into SQL, and verifies that Pinot parses it into the same expression.
@@ -165,10 +196,69 @@ public class DeleteStatement implements DataManipulationStatement {
     // Fail rather than hand over a predicate that selects other rows than the statement
     checkArgument(serializedExpression.equals(expression),
         "Unsupported WHERE clause in DELETE, it cannot be serialized back into the same expression: %s", condition);
+    checkNoCrossTableFunction(expression);
     return predicate;
   }
 
-  /// Table name as written in the statement: `table` or `database.table`, optionally with a type suffix.
+  /// Rejects the functions that read another table: the caller is only authorized for the table it deletes from.
+  private static void checkNoCrossTableFunction(Expression expression) {
+    if (expression.getType() != ExpressionType.FUNCTION) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    String functionName = function.getOperator().replace("_", "").toLowerCase(Locale.ROOT);
+    checkArgument(!CROSS_TABLE_FUNCTIONS.contains(functionName),
+        "Unsupported WHERE clause in DELETE, %s reads another table", function.getOperator());
+    if (function.getOperands() != null) {
+      for (Expression operand : function.getOperands()) {
+        checkNoCrossTableFunction(operand);
+      }
+    }
+  }
+
+  /// Returns the statement with its table name resolved: qualified with the database of the request, and in the case
+  /// the table is defined with (table names are case-insensitive by default). The broker and the controller authorize
+  /// the caller for the resolved table name, and hand the resolved statement to the executor.
+  ///
+  /// The database of the request is the `database` request header, else the `database` option of the statement, as
+  /// for a multi-stage query (see `DatabaseUtils#extractDatabaseFromQueryRequest`). They must match when both are set,
+  /// and the database of a `database.table` name must match them.
+  ///
+  /// @param databaseHeader value of the `database` request header, if any
+  /// @param tableCache tables of the cluster, to resolve the case of the table name. A table name it does not know
+  ///                   keeps the case of the statement.
+  /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the `database` header, the `database` option
+  ///                        and the database of a `database.table` name do not match (a
+  ///                        `DatabaseConflictException`), or if the table is a logical table, which `DELETE` does
+  ///                        not support
+  public DeleteStatement resolveTableName(@Nullable String databaseHeader, TableCache tableCache)
+      throws QueryException {
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(_database, databaseHeader);
+    String tableName;
+    try {
+      tableName = DatabaseUtils.translateTableName(_tableName, database, tableCache.isIgnoreCase());
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid table name in DELETE: " + e.getMessage(), e);
+    }
+    String actualTableName = tableCache.getActualTableName(tableName);
+    if (actualTableName == null && tableCache.getActualLogicalTableName(tableName) != null) {
+      // Deleting from a logical table would delete from physical tables the caller is not authorized for
+      throw QueryErrorCode.QUERY_VALIDATION.asException("DELETE does not support logical tables: " + tableName);
+    }
+    return new DeleteStatement(actualTableName != null ? actualTableName : tableName, _predicate, null, _options, true);
+  }
+
+  /// Whether the table name is resolved with [#resolveTableName]. The executor only executes a resolved statement.
+  public boolean isResolved() {
+    return _resolved;
+  }
+
+  /// Table name: as written in the statement (`table` or `database.table`, optionally with a type suffix), or, once
+  /// resolved with [#resolveTableName], qualified with its database and in the case the table is defined with.
+  ///
+  /// The statement handed to the executor is resolved, and the caller is authorized to delete rows from this table.
+  /// Executors delete from this exact table: resolving the name again, e.g. case-insensitively, could delete from
+  /// another table than the one the caller is authorized for.
   public String getTableName() {
     return _tableName;
   }
@@ -182,17 +272,6 @@ public class DeleteStatement implements DataManipulationStatement {
   /// or that it has no aggregation, so executors must validate it before deleting rows.
   public String getPredicate() {
     return _predicate;
-  }
-
-  /// Database of an unqualified table name set with the `database` option, e.g. `SET database = '...'`, if any.
-  ///
-  /// Queries also read the database from the `database` request header (header names are case-insensitive), which
-  /// takes precedence and must match the option when both are set (see
-  /// `DatabaseUtils#extractDatabaseFromQueryRequest`), and a `database.table` name must match the resolved database
-  /// (see `DatabaseUtils#translateTableName`): executors resolve it the same way with the headers they are given.
-  @Nullable
-  public String getDatabase() {
-    return _database;
   }
 
   /// Options of the statement other than the database, with the keys as written: the `SET` statements, the legacy

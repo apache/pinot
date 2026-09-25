@@ -114,6 +114,8 @@ public class Actions {
     public static final String CREATE_TABLE = "CreateTable";
     public static final String DELETE_INSTANCE_PARTITIONS = "DeleteInstancePartitions";
     public static final String DELETE_ROUTING = "DeleteRouting";
+    /// Delete rows from a table with a SQL `DELETE` statement.
+    public static final String DELETE_ROWS = "DeleteRows";
     public static final String DELETE_SCHEMA = "DeleteSchema";
     public static final String DELETE_SEGMENT = "DeleteSegment";
     public static final String DELETE_TABLE = "DeleteTable";
