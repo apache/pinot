@@ -194,6 +194,46 @@ public class ImmutableSegmentImplTest {
     segment.destroy();
   }
 
+  /// The metadata answered without a data source has to be the one the data source would carry: a MAP column's map
+  /// metadata, an OPEN_STRUCT parent's synthesized metadata, and, once a column is materialized, that data source's
+  /// own. A materialized child stays reachable only through its parent, so asking for it fails as before.
+  @Test
+  public void testDataSourceMetadataMatchesTheDataSourceKindWithoutMaterializing()
+      throws Exception {
+    ComplexFieldSpec mapSpec = new ComplexFieldSpec("m", FieldSpec.DataType.MAP, true,
+        Map.of(ComplexFieldSpec.KEY_FIELD, new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true),
+            ComplexFieldSpec.VALUE_FIELD, new DimensionFieldSpec("value", FieldSpec.DataType.INT, true)));
+    ComplexFieldSpec metrics = new ComplexFieldSpec("metrics", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true)));
+    String viewsColumn = OpenStructNaming.materializedColumnName("metrics", "views");
+    ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
+    ColumnMetadataImpl m = columnMetadata(mapSpec, null);
+    ColumnMetadataImpl parent = columnMetadata(metrics, null);
+    ColumnMetadataImpl views =
+        columnMetadata(new DimensionFieldSpec(viewsColumn, FieldSpec.DataType.LONG, true), "metrics");
+    ColumnIndexContainer containerA = mock(ColumnIndexContainer.class);
+    ColumnMaterializer materializer = mock(ColumnMaterializer.class);
+    when(materializer.createIndexContainer(a)).thenReturn(containerA);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, a, m, parent, views);
+    Schema schema = mock(Schema.class);
+
+    DataSourceMetadata mapMetadata = segment.getDataSourceMetadata("m", schema);
+    assertFalse(mapMetadata.isSorted());
+    assertThrows(UnsupportedOperationException.class, mapMetadata::getMaxRowLengthInBytes);
+    DataSourceMetadata parentMetadata = segment.getDataSourceMetadata("metrics", schema);
+    assertSame(parentMetadata.getFieldSpec(), metrics);
+    assertNull(parentMetadata.getMinValue());
+    assertNull(parentMetadata.getPartitionFunction());
+    assertEquals(parentMetadata.getNumDocs(), parent.getTotalDocs());
+    assertThrows(IllegalStateException.class, () -> segment.getDataSourceMetadata(viewsColumn, schema));
+    verifyNoInteractions(materializer);
+
+    DataSource dataSourceA = segment.getDataSource("a", schema);
+    assertSame(segment.getDataSourceMetadata("a", schema), dataSourceA.getDataSourceMetadata());
+    verify(materializer, times(1)).createIndexContainer(a);
+    segment.destroy();
+  }
+
   @Test
   public void testLazyModeMaterializesEachColumnOnceUnderConcurrentAccess()
       throws Exception {
