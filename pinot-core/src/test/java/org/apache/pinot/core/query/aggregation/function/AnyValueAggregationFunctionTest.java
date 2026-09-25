@@ -18,12 +18,32 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.nio.ByteBuffer;
+import java.util.List;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 public class AnyValueAggregationFunctionTest extends AbstractAggregationFunctionTest {
+  @Test
+  void testBytesIntermediateResultRoundTrip() {
+    AnyValueAggregationFunction function =
+        new AnyValueAggregationFunction(List.of(ExpressionContext.forIdentifier("myField")), true);
+    byte[] original = new byte[]{1, 2, 3};
+    AggregationFunction.SerializedIntermediateResult serialized = function.serializeIntermediateResult(original);
+    Object restored = function.deserializeIntermediateResult(
+        new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+
+    assertEquals(restored, new ByteArray(original));
+    assertEquals(function.extractFinalResult(restored), new ByteArray(original));
+    assertEquals(function.serializeIntermediateResult(restored).getBytes(), serialized.getBytes());
+  }
 
   // Constants for standardized test queries and expected results
   private static final String STANDARD_GROUP_BY_QUERY_TEMPLATE =

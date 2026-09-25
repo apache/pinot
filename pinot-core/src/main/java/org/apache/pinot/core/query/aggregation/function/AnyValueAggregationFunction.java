@@ -36,6 +36,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /// AnyValue aggregation function returns any arbitrary NON-NULL value from the column for each group.
@@ -268,6 +269,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       return serializeVariableValue(DataType.BIG_DECIMAL, value.toString().getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof byte[]) {
       return serializeVariableValue(DataType.BYTES, (byte[]) value);
+    } else if (value instanceof ByteArray) {
+      return serializeVariableValue(DataType.BYTES, ((ByteArray) value).getBytes());
     } else {
       throw new IllegalStateException("Unsupported value type for serialization: " + value.getClass().getName());
     }
@@ -309,7 +312,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BIG_DECIMAL:
         return new BigDecimal(new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8));
       case BYTES:
-        return deserializeVariableBytes(buffer);
+        return new ByteArray(deserializeVariableBytes(buffer));
       default:
         throw new IllegalStateException("Unsupported data type for deserialization: " + dataType);
     }
