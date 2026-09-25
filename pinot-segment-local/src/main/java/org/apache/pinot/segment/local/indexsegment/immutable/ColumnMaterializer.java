@@ -48,9 +48,9 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 /// becomes the implicit default, and only the columns that differ from it keep an entry (keyed by the column-name
 /// strings the segment metadata already holds). A column absent from the loading config maps to
 /// [FieldIndexConfigs#EMPTY], exactly what the eager path hands to the container. Collapsing relies on the value
-/// equality of the index configs; a config type that inherits the enabled/disabled-only equality of `IndexConfig`
-/// collapses on that alone, which is safe as long as its reader factory ignores the config (true of OPEN_STRUCT, the
-/// one such type today).
+/// equality of the index configs, which every config type with settings of its own defines (`OpenStructIndexConfig`
+/// included); a type with no setting beyond enabled/disabled, such as `FstIndexConfig`, inherits exactly that
+/// equality from `IndexConfig`.
 ///
 /// Thread-safe: immutable after construction, and creating a container mutates nothing here.
 class ColumnMaterializer {

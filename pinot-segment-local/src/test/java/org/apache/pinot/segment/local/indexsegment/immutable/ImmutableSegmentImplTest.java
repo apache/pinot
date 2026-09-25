@@ -316,6 +316,51 @@ public class ImmutableSegmentImplTest {
     verify(materializer, times(1)).createIndexContainer(any());
   }
 
+  /// The read/write lock exists for one interleaving: a materialization that has passed the destroyed check when
+  /// `destroy()` starts. `destroy()` has to wait for it, so the container it registers is closed rather than leaked,
+  /// and has to refuse everything that starts afterwards.
+  @Test
+  public void testDestroyWaitsForInFlightMaterializationAndClosesIt()
+      throws Exception {
+    ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
+    ColumnMetadataImpl b = columnMetadata(intColumn("b"), null);
+    ColumnIndexContainer containerA = mock(ColumnIndexContainer.class);
+    ColumnMaterializer materializer = mock(ColumnMaterializer.class);
+    CountDownLatch creationStarted = new CountDownLatch(1);
+    CountDownLatch allowCreation = new CountDownLatch(1);
+    when(materializer.createIndexContainer(a)).thenAnswer(invocation -> {
+      creationStarted.countDown();
+      allowCreation.await();
+      return containerA;
+    });
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, schema(a, b), materializer, a, b);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<DataSource> materialization = executor.submit(() -> segment.getDataSourceNullable("a"));
+      assertTrue(creationStarted.await(5, TimeUnit.SECONDS));
+      Future<?> destroy = executor.submit(segment::destroy);
+      // destroy() blocks behind the materialization that is already past the destroyed check ...
+      assertThrows(TimeoutException.class, () -> destroy.get(200, TimeUnit.MILLISECONDS));
+      verify(containerA, never()).close();
+      verify(segmentDirectory, never()).close();
+
+      allowCreation.countDown();
+      // ... and then closes exactly what that materialization registered
+      destroy.get(5, TimeUnit.SECONDS);
+      assertNotNull(materialization.get(5, TimeUnit.SECONDS));
+      verify(containerA, times(1)).close();
+      verify(segmentDirectory).close();
+      // while anything that starts afterwards is refused without touching the materializer
+      assertThrows(IllegalStateException.class, () -> segment.getDataSourceNullable("b"));
+      verify(materializer, never()).createIndexContainer(b);
+    } finally {
+      allowCreation.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   @Test
   public void testGetIndexMaterializesAndSharesTheContainerWithTheDataSource() {
     ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
