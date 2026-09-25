@@ -27,5 +27,4 @@ public class BigDecimalUtilsTest {
     calculatedResult = BigDecimalUtils.getCalculatedScale("-1.234");
     Assert.assertEquals(calculatedResult, 3);
   }
-
 }
