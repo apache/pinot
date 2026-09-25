@@ -304,13 +304,33 @@ public class ImmutableSegmentLoader {
 
     StarTreeIndexContainer starTreeIndexContainer = null;
     if (segmentReader.hasStarTreeIndex()) {
-      starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata,
-          column -> indexContainerMap.computeIfAbsent(column,
-              k -> columnMaterializer.createIndexContainer(columnMetadataMap.get(k))));
+      try {
+        starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata,
+            column -> indexContainerMap.computeIfAbsent(column,
+                k -> columnMaterializer.createIndexContainer(columnMetadataMap.get(k))));
+      } catch (Throwable t) {
+        // Unlike the eager path, the multi-column text reader has to exist before the star-tree here (the
+        // materializer holds it), so release it, and the containers materialized so far, when the star-tree fails
+        for (ColumnIndexContainer container : indexContainerMap.values()) {
+          closeQuietly(container, t);
+        }
+        if (mcTextReader != null) {
+          closeQuietly(mcTextReader, t);
+        }
+        throw t;
+      }
     }
 
     return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, columnMaterializer, indexContainerMap,
         starTreeIndexContainer, mcTextReader);
+  }
+
+  private static void closeQuietly(AutoCloseable closeable, Throwable cause) {
+    try {
+      closeable.close();
+    } catch (Throwable t) {
+      cause.addSuppressed(t);
+    }
   }
 
   /// Adds the built-in virtual columns to the segment schema and creates their index containers and metadata.

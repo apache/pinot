@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
@@ -65,6 +66,24 @@ public class ColumnMaterializerTest {
     assertSame(materializer.getFieldIndexConfigs("c"), other);
     assertSame(materializer.getFieldIndexConfigs("missing"), FieldIndexConfigs.EMPTY);
     assertEquals(materializer.getFieldIndexConfigOverrides().keySet(), Set.of("c", "missing"));
+  }
+
+  /// Collapsing by value must keep two OPEN_STRUCT columns apart when their settings differ, so a column is never
+  /// materialized with another column's dense-key selection.
+  @Test
+  public void testOpenStructConfigsThatDifferAreNotCollapsed() {
+    OpenStructIndexConfig keysA =
+        new OpenStructIndexConfig(false, null, null, Set.of("a"), null, null, null, null, null);
+    OpenStructIndexConfig keysB =
+        new OpenStructIndexConfig(false, null, null, Set.of("b"), null, null, null, null, null);
+    FieldIndexConfigs a = new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), keysA).build();
+    FieldIndexConfigs b = new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), keysB).build();
+
+    ColumnMaterializer materializer = new ColumnMaterializer(mock(SegmentDirectory.Reader.class), List.of("a", "b"),
+        Map.of("a", a, "b", b), false, null, Set.of());
+
+    assertSame(materializer.getFieldIndexConfigs("a").getConfig(StandardIndexes.openStruct()), keysA);
+    assertSame(materializer.getFieldIndexConfigs("b").getConfig(StandardIndexes.openStruct()), keysB);
   }
 
   @Test
