@@ -42,12 +42,10 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Reproduction attempt for PINOT-489 / pinot-planning#491:
- * {@code dateTrunc(json_extract_scalar(...))} combined with a second group-by key computed by
- * {@code json_extract_index(...)} is reported to return non-deterministic per-bucket attribution on the
- * multistage engine, while the single-key variant and the single-stage engine are correct.
- */
+/// Reproduction attempt for PINOT-489 / pinot-planning#491:
+/// `dateTrunc(json_extract_scalar(...))` combined with a second group-by key computed by
+/// `json_extract_index(...)` is reported to return non-deterministic per-bucket attribution on the
+/// multistage engine, while the single-key variant and the single-stage engine are correct.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class JsonExtractIndexGroupByTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "JsonExtractIndexGroupByTest";
@@ -73,9 +71,9 @@ public class JsonExtractIndexGroupByTest extends CustomDataQueryClusterIntegrati
   protected static final String SUM_EXPR =
       "sumprecision(json_extract_scalar(properties, '$.hs_mrr_in_company_currency', 'Double', 0))";
 
-  /** month start epoch millis -> movement type -> expected sum, for all rows */
+  /// month start epoch millis -> movement type -> expected sum, for all rows
   protected final Map<Long, Map<String, BigDecimal>> _expected = new LinkedHashMap<>();
-  /** month start epoch millis -> movement type -> expected sum, restricted to bucket = SELECTED_BUCKET */
+  /// month start epoch millis -> movement type -> expected sum, restricted to bucket = SELECTED_BUCKET
   protected final Map<Long, Map<String, BigDecimal>> _expectedFiltered = new LinkedHashMap<>();
   protected final Map<Long, BigDecimal> _expectedByMonth = new LinkedHashMap<>();
 
@@ -203,10 +201,8 @@ public class JsonExtractIndexGroupByTest extends CustomDataQueryClusterIntegrati
     assertTwoKeyGroupBy(TYPE_KEY_SCALAR, null, _expected);
   }
 
-  /**
-   * Same as above but with a sparse filter, so the doc-id sets handed to the JSON index reader are a small,
-   * scattered subset of each block. This is the shape the production query has.
-   */
+  /// Same as above but with a sparse filter, so the doc-id sets handed to the JSON index reader are a small,
+  /// scattered subset of each block. This is the shape the production query has.
   @Test(dataProvider = "useBothQueryEngines")
   public void testTwoKeyGroupByWithSparseFilter(boolean useMultiStageQueryEngine)
       throws Exception {

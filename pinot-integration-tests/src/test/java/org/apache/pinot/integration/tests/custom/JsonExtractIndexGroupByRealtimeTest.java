@@ -26,10 +26,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 
-/**
- * Same as {@link JsonExtractIndexGroupByTest} but against a realtime table, so the JSON index being read is the
- * mutable (consuming segment) implementation. The production table in PINOT-489 is realtime.
- */
+/// Same as [JsonExtractIndexGroupByTest] but against a realtime table, so the JSON index being read is the mutable
+/// (consuming segment) implementation. The production table in PINOT-489 is realtime.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class JsonExtractIndexGroupByRealtimeTest extends JsonExtractIndexGroupByTest {
   private static final String TABLE_NAME = "RTJsonExtractIndexGroupByTest";
