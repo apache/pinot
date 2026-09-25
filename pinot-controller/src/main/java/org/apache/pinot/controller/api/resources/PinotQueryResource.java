@@ -142,7 +142,7 @@ public class PinotQueryResource {
     if (requestJson.has("queryOptions")) {
       queryOptions = requestJson.get("queryOptions").asText();
     }
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, false);
   }
 
   @GET
@@ -150,7 +150,8 @@ public class PinotQueryResource {
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    // A GET must not modify data, e.g. when a browser holding credentials follows a link, so it only runs queries
+    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, true);
   }
 
   @GET
@@ -365,9 +366,9 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions) {
+      String queryOptions, boolean onlyDql) {
     try {
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, onlyDql);
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
@@ -384,7 +385,7 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      @Nullable String queryOptions)
+      @Nullable String queryOptions, boolean onlyDql)
       throws Exception {
     LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
     // Parse with the exact payload forwarded to the broker, so that the options used to route the query (engine,
@@ -396,6 +397,10 @@ public class PinotQueryResource {
     if (sqlType == PinotSqlType.DDL) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
           "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
+    }
+    if (onlyDql && sqlType == PinotSqlType.DML) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "DML statements are not supported on GET /sql; use POST /sql instead.");
     }
 
     // Determine which engine to used based on query options.

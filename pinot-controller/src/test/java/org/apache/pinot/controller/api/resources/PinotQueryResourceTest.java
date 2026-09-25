@@ -19,15 +19,21 @@
 package org.apache.pinot.controller.api.resources;
 
 import java.io.ByteArrayOutputStream;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.mockito.AdditionalAnswers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -37,8 +43,11 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -54,6 +63,8 @@ public class PinotQueryResourceTest {
   AccessControlFactory _accessControlFactory;
   @Mock
   ControllerConf _controllerConf;
+  @Mock
+  SqlQueryExecutor _sqlQueryExecutor;
   @InjectMocks
   PinotQueryResource _pinotQueryResource;
 
@@ -90,6 +101,30 @@ public class PinotQueryResourceTest {
     );
     Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())));
     Assert.assertTrue(response.contains("/sql/ddl"));
+  }
+
+  @Test
+  public void testDmlOnGetQueryEndpointReturnsValidationError() {
+    for (String dml : new String[]{"DELETE FROM t WHERE a = 1", "INSERT INTO t FROM FILE 'file:///tmp/data'"}) {
+      String response = streamingOutputToString(_pinotQueryResource.handleGetSql(dml, null, null, null));
+      Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
+      Assert.assertTrue(response.contains("use POST /sql instead"), response);
+    }
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+  }
+
+  @Test
+  public void testDmlOnPostQueryEndpointIsExecuted() {
+    when(_sqlQueryExecutor.executeDMLStatement(any(), any())).thenReturn(new BrokerResponseNative());
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+
+    streamingOutputToString(
+        _pinotQueryResource.handlePostSql("{\"sql\": \"DELETE FROM t WHERE a = 1\"}", httpHeaders));
+
+    verify(_sqlQueryExecutor).executeDMLStatement(argThat(sqlNodeAndOptions ->
+        sqlNodeAndOptions.getSqlType() == PinotSqlType.DML && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete),
+        any());
   }
 
   @Test

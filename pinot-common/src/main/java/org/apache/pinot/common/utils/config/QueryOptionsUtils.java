@@ -67,7 +67,7 @@ public class QueryOptionsUtils {
   public enum SqlOptionsMode {
     /// The options are applied. Default.
     ALLOW,
-    /// The options are dropped.
+    /// The options are dropped, except that a DML statement carrying any fails, since its options configure it.
     IGNORE,
     /// The statement fails.
     REJECT
@@ -81,6 +81,10 @@ public class QueryOptionsUtils {
   /// Lower-case keys accepted in SQL `SET`/`OPTION(...)` that are not declared on [QueryOptionKey].
   private static final Set<String> ADDITIONAL_SQL_OPTION_KEYS =
       Set.of(CommonConstants.Broker.Request.TRACE.toLowerCase(), CommonConstants.DATABASE.toLowerCase());
+
+  /// Lower-case keys of legacy query options that Pinot ignores but that clients still send with every request, e.g.
+  /// the Java client's default `groupByMode=sql;responseFormat=sql`.
+  private static final Set<String> LEGACY_REQUEST_OPTION_KEYS = Set.of("groupbymode", "responseformat");
 
   /// Row-level-security options are injected by the broker after parsing and must never be settable
   /// from user SQL, not even through [#registerSqlQueryOptionKey]. Matched as a lower-case prefix so
@@ -152,6 +156,20 @@ public class QueryOptionsUtils {
     }
 
     return resolved;
+  }
+
+  /// Returns whether the key, ignoring case, is a query or request option rather than an option of a statement: a
+  /// [QueryOptionKey], `trace` or `database`, a legacy option that clients still send with every request (e.g. the
+  /// Java client's `groupByMode` and `responseFormat`), or a key registered with [#registerSqlQueryOptionKey]. DML
+  /// statements use it to tell their own options from the query options. As keys are registered per process, the
+  /// processes that execute DML (brokers and controllers) should register the same keys.
+  public static boolean isQueryOptionKey(String key) {
+    if (CLASS_LOAD_ERROR != null) {
+      throw CLASS_LOAD_ERROR;
+    }
+    String lowerCaseKey = key.toLowerCase();
+    return CONFIG_RESOLVER.containsKey(lowerCaseKey) || ADDITIONAL_SQL_OPTION_KEYS.contains(lowerCaseKey)
+        || LEGACY_REQUEST_OPTION_KEYS.contains(lowerCaseKey) || REGISTERED_SQL_OPTION_KEYS.contains(lowerCaseKey);
   }
 
   public static SqlQueryOptionValidationMode getSqlQueryOptionValidationMode() {

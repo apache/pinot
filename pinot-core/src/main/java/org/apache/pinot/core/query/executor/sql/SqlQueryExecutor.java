@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 
 
 /// SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
@@ -83,7 +84,15 @@ public class SqlQueryExecutor {
   /// @return BrokerResponse is the DML executed response
   public BrokerResponse executeDMLStatement(SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable Map<String, String> headers) {
-    DataManipulationStatement statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
+    DataManipulationStatement statement;
+    try {
+      statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
+    } catch (Exception e) {
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+    }
+    if (statement instanceof DeleteStatement) {
+      return executeDelete((DeleteStatement) statement, headers);
+    }
     BrokerResponseNative result = new BrokerResponseNative();
     switch (statement.getExecutionType()) {
       case MINION:
@@ -110,6 +119,22 @@ public class SqlQueryExecutor {
         break;
     }
     return result;
+  }
+
+  /// Executes a `DELETE` statement. Pinot does not delete rows itself, so this implementation answers with a
+  /// [QueryErrorCode#QUERY_VALIDATION] error: executors that implement row deletion override it.
+  ///
+  /// Like other DML statements, the broker and the controller hand `DELETE` to this executor without authorizing the
+  /// caller for the table, applying quotas or logging it as a query. Implementations must authorize the caller
+  /// themselves with the request headers, e.g. by forwarding them to a controller API that checks table access, and
+  /// validate the predicate (see [DeleteStatement#getPredicate()]) and the database (see
+  /// [DeleteStatement#getDatabase()]) before deleting rows.
+  ///
+  /// @param statement parsed statement
+  /// @param headers headers of the original request, e.g. to authorize the caller
+  /// @return the response of the statement
+  protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+    return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
   }
 
   private MinionClient getMinionClient() {

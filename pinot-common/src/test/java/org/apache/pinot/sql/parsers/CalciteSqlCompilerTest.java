@@ -24,6 +24,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.sql.SqlDelete;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -3377,6 +3379,23 @@ public class CalciteSqlCompilerTest {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+  }
+
+  @Test
+  public void testDeleteIsClassifiedAsDml() {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SET taskName = 'purge-1'; DELETE FROM db.tbl WHERE col1 = 'a' AND col2 > 10");
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("taskName"), "purge-1");
+    SqlDelete sqlDelete = (SqlDelete) sqlNodeAndOptions.getSqlNode();
+    Assert.assertEquals(((SqlIdentifier) sqlDelete.getTargetTable()).names, List.of("db", "tbl"));
+    Assert.assertNotNull(sqlDelete.getCondition());
+
+    // A DELETE is an executable DML statement, so it cannot be combined with a query
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM tbl WHERE col1 = 1; SELECT * FROM tbl"));
+    Assert.assertTrue(e.getMessage().contains("executable statement already exist with type: DML"), e.getMessage());
   }
 
   @Test

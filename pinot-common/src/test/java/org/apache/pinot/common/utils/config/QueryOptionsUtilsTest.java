@@ -391,4 +391,20 @@ public class QueryOptionsUtilsTest {
     queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
     assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
   }
+
+  @Test
+  public void testIsQueryOptionKey() {
+    assertTrue(QueryOptionsUtils.isQueryOptionKey(TIMEOUT_MS));
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("USEMULTISTAGEENGINE"));
+    // Request options that are not query option keys
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("trace"));
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("Database"));
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("groupByMode"));
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("responseFormat"));
+    assertFalse(QueryOptionsUtils.isQueryOptionKey("taskName"));
+    assertFalse(QueryOptionsUtils.isQueryOptionKey("isQueryOptionKeyTestPluginOption"));
+    // Keys registered by plugins are query options too
+    QueryOptionsUtils.registerSqlQueryOptionKey("isQueryOptionKeyTestPluginOption");
+    assertTrue(QueryOptionsUtils.isQueryOptionKey("ISQUERYOPTIONKEYTESTPLUGINOPTION"));
+  }
 }

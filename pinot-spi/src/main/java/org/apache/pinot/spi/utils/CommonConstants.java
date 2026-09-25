@@ -395,8 +395,9 @@ public class CommonConstants {
     /// How the legacy PQL-style `OPTION(key=value)` query option suffix is handled.
     /// Cluster config key: `pinot.broker.query.option.legacySyntaxMode`, applied live and not read from the broker
     /// instance config. One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
-    /// `IGNORE` strips the suffix and drops its options, `REJECT` fails the statement with an error pointing at
-    /// `SET`. Applies to every statement type, since `SET` covers them all.
+    /// `IGNORE` strips the suffix and drops its options, except that a DML statement using the suffix fails since its
+    /// options configure it, `REJECT` fails the statement with an error pointing at `SET`. Applies to every statement
+    /// type, since `SET` covers them all.
     public static final String CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE =
         "pinot.broker.query.option.legacySyntaxMode";
     public static final String DEFAULT_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE = "ALLOW";
@@ -928,7 +929,8 @@ public class CommonConstants {
         /// How query options embedded in the SQL text (`SET` statements and the legacy `OPTION(...)` suffix) are
         /// handled for this request, one of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) merges them with
         /// precedence over the request options, as always; `IGNORE` drops them so that only the request options
-        /// apply; `REJECT` fails the query when it carries any. Only honored from the request payload
+        /// apply, except that a DML statement carrying any fails since its options configure it; `REJECT` fails the
+        /// query when it carries any. Only honored from the request payload
         /// (`queryOptions`, gRPC metadata), never from the SQL itself, so a gateway that sets request options on
         /// behalf of its users can guarantee the query text cannot override them.
         public static final String SQL_OPTIONS_MODE = "sqlOptionsMode";
