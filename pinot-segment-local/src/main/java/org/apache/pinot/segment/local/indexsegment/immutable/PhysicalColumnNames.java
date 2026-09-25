@@ -32,7 +32,8 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 /// It is a view rather than a copy so a segment retains nothing per column for it: the segment schema this replaces
 /// held a `TreeMap` entry per column, and a cached `TreeSet` would hold the same. `contains` is one map lookup and
 /// iteration is a filtered pass over the map. The virtual column count is taken once at construction, which is sound
-/// because the column metadata map is fixed once the segment is loaded.
+/// only because every change to the map precedes it: the loader registers the built-in virtual columns and removes
+/// the columns the table schema dropped before it constructs the segment, and nothing writes the map afterwards.
 ///
 /// Thread-safe for reads, like the underlying map once loaded.
 final class PhysicalColumnNames extends AbstractSet<String> {
