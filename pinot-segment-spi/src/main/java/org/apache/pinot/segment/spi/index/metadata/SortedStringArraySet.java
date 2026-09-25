@@ -46,6 +46,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 /// `subSet`/`headSet`/`tailSet` are ranges of the same array, and like every [NavigableSet] range view they reject
 /// an argument outside their own range rather than silently widening it.
 ///
+/// Unlike a [TreeSet], `contains(null)` is `false` rather than a [NullPointerException]; no column name is null.
+///
 /// Immutable and thread-safe as long as the backing array is not written in place.
 final class SortedStringArraySet extends AbstractSet<String> implements NavigableSet<String> {
   private final String[] _elements;
