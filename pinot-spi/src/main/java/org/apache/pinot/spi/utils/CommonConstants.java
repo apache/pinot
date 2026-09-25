@@ -798,6 +798,27 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
+    /// Config for the smallest IN list that the multi-stage planner hides from Calcite's optimizer.
+    ///
+    /// Calcite keeps an IN list as one `SEARCH` call over a sorted range set. Many planner rules and metadata
+    /// handlers rebuild that range set every time they touch the predicate, so planning time grows with the list size
+    /// times the number of touches. IN lists (and `OR` chains of equalities in a filter) with at least this many values
+    /// are sealed into an opaque predicate during optimization and restored afterwards.
+    ///
+    /// Predicates in the same filter or join condition still fold into the list first, as without sealing. Sealed lists
+    /// lose Calcite's value-level reasoning across plan nodes: a predicate that a rule moves next to a sealed list on
+    /// the same column is not merged into it. For example, an `x IS NOT NULL` in another clause than a sealed list on
+    /// `x` is dropped as redundant when the two meet, which is correct in SQL. With null handling disabled, the servers
+    /// then do not filter the rows where `x` is null, as today for `x < 5 AND x IS NOT NULL`.
+    ///
+    /// A value of 0 or less disables sealing. Planning outside the broker's multi-stage request handler (for example
+    /// for the controller `/sql` endpoint) does not read this broker config and uses the default. The query option
+    /// works everywhere.
+    public static final String CONFIG_OF_SEALED_IN_LIST_THRESHOLD = "pinot.broker.multistage.sealed.in.list.threshold";
+    /// Same as the default of Calcite's `SqlToRelConverter.Config#getInSubQueryThreshold()`: the size from which
+    /// Calcite itself stops treating an IN list as a scalar predicate.
+    public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1147,6 +1168,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
+        public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
 
         // Vector search query options
 
