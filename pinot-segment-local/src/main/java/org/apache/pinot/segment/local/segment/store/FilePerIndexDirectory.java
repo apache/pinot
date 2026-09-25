@@ -38,6 +38,11 @@ import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
+/// Column index directory of a v1/v2 segment: one file per (column, index type), mapped on first access and cached.
+///
+/// Thread-safe. Lazy column materialization (see [ImmutableSegmentImpl]) opens the buffers of distinct columns from
+/// concurrent query threads, so every access to the buffer cache is serialized on this instance: two threads asking
+/// for the same index get the one buffer mapped for it, and every mapped buffer is released by [#close()].
 class FilePerIndexDirectory extends ColumnIndexDirectory {
   /// Suffix of the [IllegalArgumentException] message thrown when `getIndexFor` resolves
   /// an on-disk artifact that is a directory (e.g. a legacy HNSW/text Lucene directory) rather than
@@ -75,14 +80,14 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
+  public synchronized PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
       throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
+  public synchronized PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getWriteBufferFor(key, sizeBytes);
@@ -95,7 +100,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void close()
+  public synchronized void close()
       throws IOException {
     for (PinotDataBuffer dataBuffer : _indexBuffers.values()) {
       dataBuffer.close();
@@ -103,7 +108,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
+  public synchronized void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
     IndexKey key = new IndexKey(columnName, indexType);
     // Fetch the buffer without removing it from the map first; the mapping is removed only after close() succeeds.
     // If close() throws, the entry stays in _indexBuffers so a subsequent directory close() can attempt to release
