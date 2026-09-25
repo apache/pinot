@@ -357,8 +357,7 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
-    <junit-platform.version>1.14.4</junit-platform.version>
+    <junit.version>6.1.3</junit.version>
     <testng-engine.version>1.1.0</testng-engine.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
@@ -2038,7 +2037,7 @@
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit-jupiter-api.version}</version>
+        <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
 
@@ -2097,13 +2096,13 @@
       <dependency>
         <groupId>org.junit.platform</groupId>
         <artifactId>junit-platform-suite</artifactId>
-        <version>${junit-platform.version}</version>
+        <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.junit.platform</groupId>
         <artifactId>junit-platform-launcher</artifactId>
-        <version>${junit-platform.version}</version>
+        <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
