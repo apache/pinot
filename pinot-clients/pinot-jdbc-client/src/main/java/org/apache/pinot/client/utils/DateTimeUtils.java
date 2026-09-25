@@ -57,8 +57,20 @@ public class DateTimeUtils {
       throws ParseException {
     SimpleDateFormat timestampFormat = TIMESTAMP_FORMAT.get();
     timestampFormat.setTimeZone(cal.getTimeZone());
-    java.util.Date date = timestampFormat.parse(value);
-    return new Timestamp(date.getTime());
+    // Response timestamps may include variable-width fractional seconds; parse them separately so the shared
+    // seconds-only formatter remains compatible with time parsing and formatting.
+    int decimalIndex = value.indexOf('.');
+    String timestampValue = decimalIndex >= 0 ? value.substring(0, decimalIndex) : value;
+    java.util.Date date = timestampFormat.parse(timestampValue);
+    Timestamp timestamp = new Timestamp(date.getTime());
+    if (decimalIndex >= 0) {
+      String fractionalSeconds = value.substring(decimalIndex + 1);
+      if (fractionalSeconds.isEmpty() || fractionalSeconds.length() > 9 || !fractionalSeconds.matches("\\d+")) {
+        throw new ParseException("Invalid fractional seconds in timestamp: " + value, decimalIndex + 1);
+      }
+      timestamp.setNanos(Integer.parseInt((fractionalSeconds + "000000000").substring(0, 9)));
+    }
+    return timestamp;
   }
 
   public static Timestamp getTimestampFromLong(Long value) {

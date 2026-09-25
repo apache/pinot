@@ -79,7 +79,7 @@ public class PinotResultSetTest {
         + "\"DOUBLE_ARRAY\",\"BIG_DECIMAL_ARRAY\",\"TIMESTAMP_ARRAY\",\"STRING_ARRAY\",\"BYTES_ARRAY\","
         + "\"UUID_ARRAY\"]},"
         + "\"rows\":[[[true,false],[1,null,2],[2147483648,3],[1.25,2.5],[1.5,2.75],"
-        + "[\"1.20\",\"3.4\"],[\"2020-01-01 12:00:00\",\"2021-02-03 04:05:06\"],"
+        + "[\"1.20\",\"3.4\"],[\"2020-01-01 12:00:00\",\"2021-02-03 04:05:06.123\"],"
         + "[\"first\",\"second\"],[\"00ff\",\"1020\"],"
         + "[\"00000000-0000-0000-0000-000000000001\",\"00000000-0000-0000-0000-000000000002\"]]]}}");
 
@@ -91,7 +91,7 @@ public class PinotResultSetTest {
     Assert.assertEquals(resultSet.getObject(5), List.of(1.5, 2.75));
     Assert.assertEquals(resultSet.getObject(6), List.of(new BigDecimal("1.20"), new BigDecimal("3.4")));
     Assert.assertEquals(resultSet.getObject(7),
-        List.of(Timestamp.valueOf("2020-01-01 12:00:00"), Timestamp.valueOf("2021-02-03 04:05:06")));
+        List.of(Timestamp.valueOf("2020-01-01 12:00:00"), Timestamp.valueOf("2021-02-03 04:05:06.123")));
     Assert.assertEquals(resultSet.getObject(8), List.of("first", "second"));
     List<?> bytes = (List<?>) resultSet.getObject(9);
     Assert.assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
