@@ -87,7 +87,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   /// Rows buffered only for the mixed-version fallback. The sorted list is handed downstream as-is, so cleanup must
   /// drop this reference rather than clear it.
   @Nullable
-  private List<Object[]> _rows = new ArrayList<>();
+  private List<Object[]> _rows;
 
   @Nullable
   private MseBlock _eosBlock;
@@ -219,7 +219,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
             List<SenderCursor> exhausted = _readyCursors.advanceEqualHeads(rows);
             if (exhausted != null) {
               for (SenderCursor cursor : exhausted) {
-                if (_multiConsumer.isStreamLive(cursor._stream)) {
+                if (!cursor._finished) {
                   _starvedCursors.add(cursor);
                 }
               }
@@ -242,7 +242,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
         // The cursor's key can only move forward, so restoring the heap from the root takes one sift-down. A generic
         // PriorityQueue poll followed by add performs two independent heap repairs for every emitted row.
         _readyCursors.updateTop();
-      } else if (_multiConsumer.isStreamLive(cursor._stream)) {
+      } else if (!cursor._finished) {
         _readyCursors.removeTop();
         _starvedCursors.add(cursor);
         _tryEqualHeadMerge = false;
@@ -278,6 +278,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return null;
     }
     if (block.isEos()) {
+      updateFinishedCursors();
       MseBlock.Eos eos = (MseBlock.Eos) block;
       if (eos.isError()) {
         return eos;
@@ -312,9 +313,12 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private void updateFinishedCursors() {
     for (AsyncStream<ReceivingMailbox.MseBlockWithStats> stream : _multiConsumer.getFinishedStreamsLastRead()) {
       SenderCursor cursor = _cursorsByStream.get(stream);
-      if (cursor != null && !cursor.hasRow()) {
-        _starvedCursors.remove(cursor);
-        _cursorsByStream.remove(stream);
+      if (cursor != null) {
+        cursor._finished = true;
+        if (!cursor.hasRow()) {
+          _starvedCursors.remove(cursor);
+          _cursorsByStream.remove(stream);
+        }
       }
     }
   }
@@ -323,7 +327,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   private void fallbackToFullSort(List<Object[]> unconfirmedRows) {
     Preconditions.checkState(!_mergeOutputStarted,
         "Sender stopped confirming sorted data after merge output started on stage: %s", _context.getStageId());
-    assert _rows != null : "Fallback rows must not be released while the operator is running";
+    _rows = new ArrayList<>();
     for (SenderCursor cursor : _cursorsByStream.values()) {
       cursor.drainTo(_rows);
     }
@@ -430,6 +434,7 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   private static class SenderCursor {
     final AsyncStream<ReceivingMailbox.MseBlockWithStats> _stream;
+    private boolean _finished;
     private final Deque<List<Object[]>> _pending = new ArrayDeque<>();
     private List<Object[]> _rows = List.of();
     private int _index;
