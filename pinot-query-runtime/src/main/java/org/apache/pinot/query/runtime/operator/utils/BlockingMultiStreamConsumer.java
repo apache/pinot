@@ -21,9 +21,7 @@ package org.apache.pinot.query.runtime.operator.utils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -60,7 +58,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// The invariant is that we are always going to start reading from `_lastRead + 1`.
   /// Therefore [#_lastRead] must be in the range `[-1, mailbox.size() - 1]`
   protected int _lastRead;
-  private final Set<AsyncStream<E>> _liveStreams = Collections.newSetFromMap(new IdentityHashMap<>());
   @Nullable
   private AsyncStream<E> _lastReadStream;
   private final List<AsyncStream<E>> _finishedStreamsLastRead = new ArrayList<>();
@@ -74,7 +71,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     _deadlineMs = deadlineMs;
     AsyncStream.OnNewData onNewData = this::onData;
     _mailboxes = asyncProducers;
-    _liveStreams.addAll(asyncProducers);
     _mailboxes.forEach(blockProducer -> blockProducer.addOnNewDataListener(onNewData));
     _lastRead = _mailboxes.size() - 1;
   }
@@ -282,7 +278,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       // we have read an EOS
       assert !_mailboxes.isEmpty() : "readBlockOrNull should return null when there are no mailboxes";
       AsyncStream<E> removed = _mailboxes.remove(_lastRead);
-      _liveStreams.remove(removed);
       _finishedStreamsLastRead.add(removed);
       _lastReadStream = null;
       // this is done in order to keep the invariant.
@@ -349,16 +344,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// This method is called by the consumer thread.
   public List<AsyncStream<E>> getLiveStreamsSnapshot() {
     return new ArrayList<>(_mailboxes);
-  }
-
-  /// Returns whether the given stream has still to emit its EOS.
-  ///
-  /// [#readBlockBlocking()] consumes the EOS of each stream without returning it, so this is how a consumer finds
-  /// out that one specific stream is over while the others are still producing.
-  ///
-  /// This method is called by the consumer thread.
-  public boolean isStreamLive(AsyncStream<E> stream) {
-    return _liveStreams.contains(stream);
   }
 
   /// The utility method that actually does the circular reading trying to be fair.
