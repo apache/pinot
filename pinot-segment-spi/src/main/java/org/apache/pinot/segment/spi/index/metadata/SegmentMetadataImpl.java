@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -403,9 +404,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   ///
   /// For a metadata-backed segment the schema is built from the column metadata map on the first call (one
   /// `FieldSpec` per column, the built-in virtual columns included once the loader has registered them) and cached
-  /// until [#removeColumn(String)]. Nothing on the load or query path should call this: a caller there re-inflates
-  /// the per-column schema footprint for every segment it touches. Column names are available through
-  /// [#getAllColumns()] and field specs through [#getColumnMetadataFor(String)].
+  /// until the columns change ([#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)]). Load- and
+  /// query-path code should not call this: a caller there re-inflates the per-column schema footprint for every
+  /// segment it touches and a server keeps it for the segment's lifetime. Column names are available through
+  /// [#getAllColumns()] and field specs through [#getColumnMetadataFor(String)]; the remaining load-path callers
+  /// (the forward-index handler and the column min/max generator) are moved off it in a follow-up.
   @Override
   public Schema getSchema() {
     Schema schema = _schema;
@@ -436,11 +439,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _schema != null;
   }
 
-  /// The keys of the column metadata map, i.e. the same names as `getSchema().getColumnNames()` without building the
-  /// schema. Falls back to the explicit schema of a CONSUMING segment, which has no column metadata map.
+  /// An unmodifiable view of the keys of the column metadata map, i.e. the same names as
+  /// `getSchema().getColumnNames()` without building the schema. Falls back to the explicit schema of a CONSUMING
+  /// segment, which has no column metadata map. Unmodifiable so a caller cannot narrow a serving segment's columns
+  /// behind the back of [#removeColumn(String)] (which also drops the cached schema and guards the time column).
   @Override
   public NavigableSet<String> getAllColumns() {
-    return _columnMetadataMap != null ? _columnMetadataMap.navigableKeySet() : getSchema().getColumnNames();
+    return Collections.unmodifiableNavigableSet(
+        _columnMetadataMap != null ? _columnMetadataMap.navigableKeySet() : getSchema().getColumnNames());
   }
 
   @Override
@@ -540,8 +546,20 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _columnMetadataMap;
   }
 
+  /// Registers the metadata of a column (the loader does this for each built-in virtual column), replacing any
+  /// metadata already registered under the name, and drops the derived schema so the next [#getSchema()] includes
+  /// the column. A write to the map returned by [#getColumnMetadataMap()] bypasses this and leaves a cached schema
+  /// stale, which is why the loader goes through here. Held under the same monitor [#getSchema()] builds under, so a
+  /// schema can never be cached from columns this call has already replaced. Throws for a CONSUMING segment, which
+  /// holds no column metadata.
+  public synchronized void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
+    Preconditions.checkState(_columnMetadataMap != null, "Segment: %s holds no column metadata", _segmentName);
+    _columnMetadataMap.put(column, columnMetadata);
+    _schema = null;
+  }
+
   @Override
-  public void removeColumn(String column) {
+  public synchronized void removeColumn(String column) {
     Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
     _columnMetadataMap.remove(column);
     // Drop the derived schema, if one was built, so the next getSchema() rebuilds it without the column

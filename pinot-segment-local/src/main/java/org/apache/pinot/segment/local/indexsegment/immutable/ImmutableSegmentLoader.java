@@ -353,7 +353,7 @@ public class ImmutableSegmentLoader {
           new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), segmentMetadata);
       VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
       indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-      columnMetadataMap.put(columnName, provider.buildMetadata(context));
+      segmentMetadata.addColumnMetadata(columnName, provider.buildMetadata(context));
     }
   }
 

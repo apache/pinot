@@ -256,7 +256,7 @@ public class ImmutableSegmentImplTest {
       return containerA;
     });
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, schema(a, b), materializer, a, b);
+    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, materializer, a, b);
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     try {
