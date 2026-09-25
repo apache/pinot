@@ -672,6 +672,67 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest1, onlineSegments), Set.of(segment0));
   }
 
+  /// A function that cannot place the query's literal must not prune anything. Before the
+  /// [PartitionFunction#UNKNOWN_PARTITION] sentinel existed, such a function had to return a real
+  /// partition id, and the only way to stay correct was for every segment to also claim that id -- which
+  /// costs pruning on every query whose literal genuinely hashes there.
+  @Test
+  public void testUnknownPartitionKeepsEverySegment() {
+    BrokerRequest equalsQuery = CalciteSqlCompiler.compileToBrokerRequest(QUERY_2);
+    BrokerRequest inQuery = CalciteSqlCompiler.compileToBrokerRequest(QUERY_3);
+
+    IdealState idealState = Mockito.mock(IdealState.class);
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+
+    SinglePartitionColumnSegmentPruner pruner =
+        new SinglePartitionColumnSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN_1);
+    SegmentZkMetadataFetcher fetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    fetcher.register(pruner);
+    Set<String> onlineSegments = new HashSet<>();
+    fetcher.init(idealState, externalView, onlineSegments);
+
+    // Two segments holding disjoint partitions: whatever the literal resolved to, at most one could match
+    // if the id were taken at face value.
+    String segmentA = "unknownPartitionSegmentA";
+    String segmentB = "unknownPartitionSegmentB";
+    setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segmentA, UnknownPartitionFunction.NAME, 4, 1);
+    setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segmentB, UnknownPartitionFunction.NAME, 4, 2);
+    onlineSegments.add(segmentA);
+    onlineSegments.add(segmentB);
+    fetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    Set<String> input = Set.of(segmentA, segmentB);
+    assertEquals(pruner.prune(equalsQuery, input), input, "EQUALS on an unplaceable value must keep both");
+    assertEquals(pruner.prune(inQuery, input), input, "IN on unplaceable values must keep both");
+  }
+
+  /// The same guarantee for the multi-column pruner, which walks a separate code path.
+  @Test
+  public void testUnknownPartitionKeepsEverySegmentForMultiColumnPruner() {
+    BrokerRequest equalsQuery = CalciteSqlCompiler.compileToBrokerRequest(QUERY_2);
+
+    IdealState idealState = Mockito.mock(IdealState.class);
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+
+    MultiPartitionColumnsSegmentPruner pruner =
+        new MultiPartitionColumnsSegmentPruner(OFFLINE_TABLE_NAME, Set.of(PARTITION_COLUMN_1));
+    SegmentZkMetadataFetcher fetcher = new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    fetcher.register(pruner);
+    Set<String> onlineSegments = new HashSet<>();
+    fetcher.init(idealState, externalView, onlineSegments);
+
+    String segment = "unknownPartitionMultiSegment";
+    Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
+    columnPartitionMap.put(PARTITION_COLUMN_1,
+        new ColumnPartitionMetadata(UnknownPartitionFunction.NAME, 4, Set.of(3), null));
+    setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment, columnPartitionMap);
+    onlineSegments.add(segment);
+    fetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    Set<String> input = Set.of(segment);
+    assertEquals(pruner.prune(equalsQuery, input), input, "an unplaceable value must not prune the segment");
+  }
+
   private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment, String partitionFunction,
       int numPartitions, int partitionId) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);

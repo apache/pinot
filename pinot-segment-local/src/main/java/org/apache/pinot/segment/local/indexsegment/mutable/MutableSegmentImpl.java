@@ -637,7 +637,10 @@ public class MutableSegmentImpl implements MutableSegment {
       IndexContainer indexContainer = _indexContainerMap.get(_partitionColumn);
       String stringValue = indexContainer._fieldSpec.getDataType().toString(value);
       int partition = _partitionFunction.getPartition(stringValue);
-      if (partition != _mainPartitionId) {
+      // A value the function cannot place is not evidence of a mismatch: the stream already decided this
+      // row belongs to this partition, and recording UNKNOWN_PARTITION would put an id outside
+      // [0, numPartitions) into the segment's metadata.
+      if (partition != PartitionFunction.UNKNOWN_PARTITION && partition != _mainPartitionId) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
         }

@@ -102,7 +102,10 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     if (partitionFunction != null) {
       Set<Integer> partitions = dataSourceMetadata.getPartitions();
       assert partitions != null;
-      if (!partitions.contains(partitionFunction.getPartition(cachedValue.getValue()))) {
+      // UNKNOWN_PARTITION says nothing about where the value lives, so the segment is kept: pruning on a
+      // guessed id can drop a segment that does hold matching rows.
+      int partition = partitionFunction.getPartition(cachedValue.getValue());
+      if (partition != PartitionFunction.UNKNOWN_PARTITION && !partitions.contains(partition)) {
         return true;
       }
     }
