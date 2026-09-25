@@ -263,6 +263,13 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     }
   }
 
+  /// The data-source metadata of an OPEN_STRUCT parent column, without a data source: what
+  /// [#getDataSourceMetadata()] would report (no statistics, unknown cardinality), for a caller that must not
+  /// materialize the parent's children to read it.
+  public static DataSourceMetadata metadataOf(FieldSpec fieldSpec, int numDocs) {
+    return new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs);
+  }
+
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {
     private final FieldSpec _fieldSpec;
     private final int _numDocs;

@@ -35,6 +35,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class ImmutableMapDataSource extends BaseMapDataSource {
   private final MapIndexReader _mapIndexReader;
 
+  /// The data-source metadata of a MAP column, without a data source: what [#getDataSourceMetadata()] would report,
+  /// for a caller that must not materialize the column to read its statistics.
+  public static DataSourceMetadata metadataOf(ColumnMetadata columnMetadata) {
+    return new ImmutableMapDataSourceMetadata(columnMetadata);
+  }
+
   public ImmutableMapDataSource(ColumnMetadata columnMetadata, ColumnIndexContainer columnIndexContainer) {
     super(new ImmutableMapDataSourceMetadata(columnMetadata), columnIndexContainer);
     MapIndexReader mapIndexReader;
