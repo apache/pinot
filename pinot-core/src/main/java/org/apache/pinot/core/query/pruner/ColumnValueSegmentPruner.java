@@ -221,8 +221,9 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   /// Pruning reads only the column's statistics, so an immutable segment answers from its column metadata rather
-  /// than materializing the column. A mutable segment keeps the per-segment data-source cache it had, where the
-  /// lookup is a map read and the metadata is not derivable without the data source.
+  /// than materializing the column. A mutable segment keeps the per-segment data-source cache it had: its metadata
+  /// is not derivable without the data source, and `MutableSegmentImpl` builds a new data source on every call, so
+  /// the cache is what keeps that to one per column and query.
   private static DataSourceMetadata getDataSourceMetadata(IndexSegment segment, String column,
       Map<String, DataSource> dataSourceCache, QueryContext query) {
     if (segment instanceof ImmutableSegment) {
