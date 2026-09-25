@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -82,16 +81,12 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
-    String segmentName = immutableSegment.getSegmentName();
-    Preconditions.checkState(!_shutDown,
-        "Table data manager is already shut down, cannot add segment: %s to table: %s",
-        segmentName, _tableNameWithType);
+  protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     if (isUpsertEnabled()) {
       handleUpsert(immutableSegment, zkMetadata);
       return;
     }
-    super.addSegment(immutableSegment, zkMetadata);
+    super.doAddSegment(immutableSegment, zkMetadata);
   }
 
   @Override

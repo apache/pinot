@@ -30,14 +30,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -89,6 +92,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -161,6 +167,100 @@ public class BaseTableDataManagerTest {
     // Setup crypter
     properties.put("class.fakePinotCrypter", BaseTableDataManagerTest.FakePinotCrypter.class.getName());
     PinotCrypterFactory.init(new PinotConfiguration(properties));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testOnlineSegmentLoadedDuringShutdownIsDestroyed()
+      throws Exception {
+    BaseTableDataManager table = spy(createTableManager());
+    ServerMetrics metrics = table._serverMetrics;
+    clearInvocations(metrics);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    CountDownLatch loading = new CountDownLatch(1);
+    CountDownLatch finishLoading = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      loading.countDown();
+      assertTrue(finishLoading.await(10, TimeUnit.SECONDS));
+      table.addSegment(segment, null);
+      return null;
+    }).when(table).doAddOnlineSegment(SEGMENT_NAME);
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addOnlineSegment(SEGMENT_NAME);
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "load-online-segment");
+    try {
+      additionThread.start();
+      assertTrue(loading.await(10, TimeUnit.SECONDS));
+      table.shutDown();
+      finishLoading.countDown();
+      ExecutionException failure = expectThrows(ExecutionException.class, () -> addition.get(10, TimeUnit.SECONDS));
+      assertTrue(failure.getCause() instanceof IllegalStateException);
+      assertEquals(table.getNumSegments(), 0);
+      verify(segment).destroy();
+      verify(metrics, never()).addValueToTableGauge(eq(OFFLINE_TABLE_NAME), eq(ServerGauge.SEGMENT_COUNT), anyLong());
+      verify(metrics, never()).addValueToTableGauge(eq(OFFLINE_TABLE_NAME), eq(ServerGauge.DOCUMENT_COUNT), anyLong());
+    } finally {
+      finishLoading.countDown();
+      additionThread.join(10000);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testShutdownWaitsForImmutableSegmentRegistration()
+      throws Exception {
+    BaseTableDataManager table = spy(createTableManager());
+    ServerMetrics metrics = table._serverMetrics;
+    clearInvocations(metrics);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(5);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    CountDownLatch registering = new CountDownLatch(1);
+    CountDownLatch finishRegistration = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      registering.countDown();
+      assertTrue(finishRegistration.await(10, TimeUnit.SECONDS));
+      return invocation.callRealMethod();
+    }).when(table).registerSegment(eq(SEGMENT_NAME), any());
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addSegment(segment, null);
+      return null;
+    });
+    FutureTask<Void> shutdown = new FutureTask<>(() -> {
+      table.shutDown();
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "register-immutable-segment");
+    Thread shutdownThread = new Thread(shutdown, "shutdown-immutable-table");
+    try {
+      additionThread.start();
+      assertTrue(registering.await(10, TimeUnit.SECONDS));
+      shutdownThread.start();
+      TestUtils.waitForCondition(ignored -> shutdown.isDone() || (table.isShutDown()
+          && (shutdownThread.getState() == Thread.State.WAITING
+          || shutdownThread.getState() == Thread.State.TIMED_WAITING)), 10, 10000,
+          "Shutdown did not wait for the admitted segment");
+      assertFalse(shutdown.isDone(), "Shutdown must wait for the admitted segment to finish registration");
+      verify(segment, never()).destroy();
+      finishRegistration.countDown();
+      addition.get(10, TimeUnit.SECONDS);
+      shutdown.get(10, TimeUnit.SECONDS);
+      assertEquals(table.getNumSegments(), 0);
+      verify(segment).destroy();
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.SEGMENT_COUNT, 1L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.SEGMENT_COUNT, -1L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.DOCUMENT_COUNT, 5L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.DOCUMENT_COUNT, -5L);
+    } finally {
+      finishRegistration.countDown();
+      additionThread.join(10000);
+      shutdownThread.join(10000);
+    }
   }
 
   @Test
@@ -865,6 +965,31 @@ public class BaseTableDataManagerTest {
     } catch (Exception e) {
       // expected.
     }
+  }
+
+  // Regression for the same-name table recreation race on the ONLINE path: after shutdown, a stale download must not
+  // replace the segment data directory, which a recreated same-name table may already own.
+  @Test
+  public void testMoveSegmentRejectedAfterShutdown()
+      throws IOException {
+    BaseTableDataManager tableDataManager = createTableManager();
+    File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-move-after-shutdown");
+
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "input");
+    FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir", StandardCharsets.UTF_8);
+    TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    File segmentDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    File marker = new File(segmentDir, "marker");
+    FileUtils.write(marker, "recreated owner's data", StandardCharsets.UTF_8);
+
+    tableDataManager.shutDown();
+    expectThrows(IllegalStateException.class,
+        () -> tableDataManager.untarAndMoveSegment(SEGMENT_NAME, tempTar, tempRootDir));
+    assertEquals(FileUtils.readFileToString(marker, StandardCharsets.UTF_8), "recreated owner's data",
+        "Stale download must not replace the segment data directory after shutdown");
   }
 
   @Test
