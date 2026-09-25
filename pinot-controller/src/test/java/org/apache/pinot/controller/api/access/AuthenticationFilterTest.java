@@ -25,9 +25,14 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import org.apache.pinot.controller.api.resources.PinotBrokerRestletResource;
@@ -36,12 +41,17 @@ import org.apache.pinot.controller.api.resources.PinotControllerPeriodicTaskRest
 import org.apache.pinot.controller.api.resources.PinotInstanceRestletResource;
 import org.apache.pinot.controller.api.resources.PinotQueryResource;
 import org.apache.pinot.controller.api.resources.PinotTableRestletResource;
+import org.apache.pinot.controller.api.resources.ZookeeperResource;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.glassfish.grizzly.http.server.Request;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -82,6 +92,15 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
     assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "C");
+  }
+
+  @Test
+  public void testExtractTableNameWithMaterializedViewNameInPathParams() {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    pathParams.putSingle("materializedViewTableName", "mv_OFFLINE");
+
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "mv_OFFLINE");
   }
 
   @Test
@@ -205,6 +224,45 @@ public class AuthenticationFilterTest {
       assertEquals(_authFilter.extractAccessType(method), AccessType.READ,
           resourceClass.getSimpleName() + "." + methodName);
     }
+  }
+
+  @Test
+  public void testAuthorizeAnnotationIsProtectedWhenProtectAnnotatedOnly()
+      throws Exception {
+    AuthenticationFilter authFilter = new AuthenticationFilter();
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.protectAnnotatedOnly()).thenReturn(true);
+
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+    authFilter._accessControlFactory = accessControlFactory;
+
+    Request request = mock(Request.class);
+    when(request.getRequestURI()).thenReturn("/zk/get");
+    when(request.getContextPath()).thenReturn("");
+    authFilter._requestProvider = () -> request;
+
+    ResourceInfo resourceInfo = mock(ResourceInfo.class);
+    when(resourceInfo.getResourceMethod()).thenReturn(ZookeeperResource.class.getMethod("getData", String.class));
+    authFilter._resourceInfo = resourceInfo;
+
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    authFilter._httpHeaders = httpHeaders;
+
+    UriInfo uriInfo = mock(UriInfo.class);
+    when(uriInfo.getPath()).thenReturn("zk/get");
+    when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+    when(requestContext.getUriInfo()).thenReturn(uriInfo);
+
+    when(accessControl.hasAccess(AccessType.READ, httpHeaders, "/zk/get")).thenReturn(true);
+    when(accessControl.hasAccess(httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE)).thenReturn(false);
+
+    WebApplicationException exception = expectThrows(WebApplicationException.class,
+        () -> authFilter.filter(requestContext));
+    assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    verify(accessControl).hasAccess(httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE);
   }
 
   // DataProvider supplying test cases
