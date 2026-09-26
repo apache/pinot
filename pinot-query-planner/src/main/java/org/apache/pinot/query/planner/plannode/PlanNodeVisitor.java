@@ -59,6 +59,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitWindow(WindowNode node, C context);
 
+  T visitMatch(MatchNode node, C context);
+
   T visitSetOp(SetOpNode node, C context);
 
   T visitExchange(ExchangeNode node, C context);
@@ -208,6 +210,13 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitWindow(WindowNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitMatch(MatchNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);
