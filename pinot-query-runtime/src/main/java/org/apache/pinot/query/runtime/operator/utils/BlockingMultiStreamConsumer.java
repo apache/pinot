@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +58,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// The invariant is that we are always going to start reading from `_lastRead + 1`.
   /// Therefore [#_lastRead] must be in the range `[-1, mailbox.size() - 1]`
   protected int _lastRead;
+  @Nullable
+  private AsyncStream<E> _lastReadStream;
+  private final List<AsyncStream<E>> _finishedStreamsLastRead = new ArrayList<>();
+  private final List<AsyncStream<E>> _finishedStreamsLastReadView =
+      Collections.unmodifiableList(_finishedStreamsLastRead);
   @Nullable
   private E _errorBlock = null;
 
@@ -169,16 +176,39 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   ///
   /// This method is called by the consumer thread.
   public E readBlockBlocking() {
-    if (LOGGER.isTraceEnabled()) {
-      String mailboxIds = _mailboxes.stream()
-          .map(AsyncStream::getId)
-          .map(Object::toString)
-          .collect(Collectors.joining(","));
-      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _id + ". Mailboxes: " + mailboxIds);
-    }
-    // Standard optimistic execution. First we try to read without acquiring the lock.
+    E block = readBlockBlocking(false);
+    assert block != null;
+    return block;
+  }
+
+  /// Reads the next block or returns `null` as soon as at least one stream finishes successfully.
+  ///
+  /// A consumer that keeps per-stream state may be able to make progress when one stream finishes even though no
+  /// other stream has a new block. It can use [#getFinishedStreamsLastRead()] to identify the completed streams before
+  /// calling this method again. Ordinary consumers should use [#readBlockBlocking()], which only returns aggregate
+  /// EOS after every stream finishes.
+  ///
+  /// This method is called by the consumer thread.
+  @Nullable
+  public E readBlockOrStreamCompletionBlocking() {
+    return readBlockBlocking(true);
+  }
+
+  /// Polls the next block without waiting. A `null` result can mean either that no stream is currently ready or that
+  /// one or more streams finished successfully; [#getFinishedStreamsLastRead()] distinguishes those cases.
+  ///
+  /// This method is called by the consumer thread.
+  @Nullable
+  public E pollBlockOrStreamCompletion() {
+    prepareRead();
+    return readDroppingSuccessEos();
+  }
+
+  @Nullable
+  private E readBlockBlocking(boolean returnOnStreamFinished) {
+    prepareRead();
     E block = readDroppingSuccessEos();
-    if (block != null) {
+    if (block != null || (returnOnStreamFinished && !_finishedStreamsLastRead.isEmpty())) {
       return block;
     }
     try {
@@ -194,11 +224,12 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
             LOGGER.warn("==[RECEIVE]== Timeout on: " + _id);
           }
           _errorBlock = onTimeout();
+          _lastReadStream = null;
           return _errorBlock;
         }
         LOGGER.debug("==[RECEIVE]== More data available. Trying to read again");
         block = readDroppingSuccessEos();
-        if (block != null) {
+        if (block != null || (returnOnStreamFinished && !_finishedStreamsLastRead.isEmpty())) {
           if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
           }
@@ -207,7 +238,20 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       }
     } catch (Exception e) {
       _errorBlock = onException(e);
+      _lastReadStream = null;
       return _errorBlock;
+    }
+  }
+
+  private void prepareRead() {
+    _lastReadStream = null;
+    _finishedStreamsLastRead.clear();
+    if (LOGGER.isTraceEnabled()) {
+      String mailboxIds = _mailboxes.stream()
+          .map(AsyncStream::getId)
+          .map(Object::toString)
+          .collect(Collectors.joining(","));
+      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _id + ". Mailboxes: " + mailboxIds);
     }
   }
 
@@ -234,6 +278,8 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       // we have read an EOS
       assert !_mailboxes.isEmpty() : "readBlockOrNull should return null when there are no mailboxes";
       AsyncStream<E> removed = _mailboxes.remove(_lastRead);
+      _finishedStreamsLastRead.add(removed);
+      _lastReadStream = null;
       // this is done in order to keep the invariant.
       _lastRead--;
       if (LOGGER.isDebugEnabled()) {
@@ -269,6 +315,37 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     return block;
   }
 
+  /// Returns the stream that produced the element the last blocking read returned.
+  ///
+  /// This is only meaningful right after that call returned a data or an error element. The element that ends all
+  /// the streams is not produced by any of them, and a stream that emitted its EOS is dropped from the ones this
+  /// consumer tracks, so `null` is returned in both cases.
+  ///
+  /// Consumers that need to keep the elements of each stream apart, like a merge of already sorted streams, use
+  /// this to tell which stream the element they just read belongs to.
+  ///
+  /// This method is called by the consumer thread.
+  @Nullable
+  public AsyncStream<E> getLastReadStream() {
+    return _lastReadStream;
+  }
+
+  /// Returns the streams whose successful EOS was consumed during the last blocking read. The returned view is
+  /// reused and must not be retained across another read.
+  ///
+  /// This method is called by the consumer thread.
+  public List<AsyncStream<E>> getFinishedStreamsLastRead() {
+    return _finishedStreamsLastReadView;
+  }
+
+  /// Returns a point-in-time copy of the streams that have not yet completed. The snapshot does not track later EOS
+  /// removals and should only be retained while the caller still has per-stream state to release.
+  ///
+  /// This method is called by the consumer thread.
+  public List<AsyncStream<E>> getLiveStreamsSnapshot() {
+    return new ArrayList<>(_mailboxes);
+  }
+
   /// The utility method that actually does the circular reading trying to be fair.
   /// @return The first block that is found on any mailbox, including EOS.
   @Nullable
@@ -279,6 +356,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       E block = mailbox.poll();
       if (block != null) {
         _lastRead = i;
+        _lastReadStream = mailbox;
         return block;
       }
     }
@@ -287,6 +365,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       E block = mailbox.poll();
       if (block != null) {
         _lastRead = i;
+        _lastReadStream = mailbox;
         return block;
       }
     }
@@ -310,6 +389,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Nullable
     private MultiStageQueryStats _stats;
     private final int _senderStageId;
+    private boolean _lastBlockSortedOnSender;
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
@@ -416,7 +496,42 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     /// Operators should call this method instead of [#readBlockBlocking()] to get the next block, given stats are not
     /// useful for them while reading the blocks.
     public MseBlock readMseBlockBlocking() {
-      return readBlockBlocking().getBlock();
+      return extractMseBlock(readBlockBlocking());
+    }
+
+    /// Reads the next MSE block or returns `null` when at least one sender finished without another block being ready.
+    /// Callers that keep per-sender state use that completion event to advance their ordering frontier.
+    @Nullable
+    public MseBlock readMseBlockOrStreamCompletionBlocking() {
+      ReceivingMailbox.MseBlockWithStats blockWithStats = readBlockOrStreamCompletionBlocking();
+      if (blockWithStats == null) {
+        _lastBlockSortedOnSender = false;
+        return null;
+      }
+      return extractMseBlock(blockWithStats);
+    }
+
+    /// Polls the next MSE block without waiting. A `null` result can also report sender completion through
+    /// [#getFinishedStreamsLastRead()].
+    @Nullable
+    public MseBlock pollMseBlockOrStreamCompletion() {
+      ReceivingMailbox.MseBlockWithStats blockWithStats = pollBlockOrStreamCompletion();
+      if (blockWithStats == null) {
+        _lastBlockSortedOnSender = false;
+        return null;
+      }
+      return extractMseBlock(blockWithStats);
+    }
+
+    private MseBlock extractMseBlock(ReceivingMailbox.MseBlockWithStats blockWithStats) {
+      _lastBlockSortedOnSender = blockWithStats.isSortedOnSender();
+      return blockWithStats.getBlock();
+    }
+
+    /// Returns whether the data block returned by the last [#readMseBlockBlocking()] call carried an explicit
+    /// confirmation that its sender established the exchange ordering before transport.
+    public boolean isLastBlockSortedOnSender() {
+      return _lastBlockSortedOnSender;
     }
   }
 }

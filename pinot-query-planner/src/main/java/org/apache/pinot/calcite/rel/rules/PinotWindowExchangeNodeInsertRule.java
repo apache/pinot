@@ -23,7 +23,9 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
@@ -47,6 +49,9 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /// Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
@@ -77,8 +82,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     if (input instanceof Exchange) {
       return false;
     }
-    // This rule leaves a Sort over the exchange when the window needs ordered input (see onMatch), so that shape also
-    // means the window has already been processed. Without this the rule re-fires on its own output forever.
+    // The receiver-sort fallback leaves a Sort over the exchange when the window needs ordered input (see onMatch), so
+    // that shape also means the window has already been processed. The sender-sort path is covered by the Exchange
+    // guard above. Without these guards the rule re-fires on its own output forever.
     //
     // The shape has to match exactly. A Sort that orders by something else, or that trims, belongs to another part of
     // the plan - treating it as this rule's own output would leave the window with neither its exchange nor the
@@ -120,13 +126,13 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(List.of()));
       } else {
         // Only ORDER BY
-        // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key.
-        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
-        // operator - see the comment at the transformTo call.
+        // When enabled, sort each sender explicitly and merge the sorted mailbox streams at the receiver. Otherwise,
+        // retain the legacy post-exchange full-sort path. This switch supports rolling upgrades and rapid rollback.
         // TODO: Revisit whether we should use hash distribution
+        boolean sortOnSender = isWindowSortOnSenderEnabled(call);
         exchange =
-            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, false,
-                false);
+            PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys,
+                sortOnSender, sortOnSender);
       }
     } else {
       // All other variants
@@ -141,25 +147,40 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
-        // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys.
-        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
-        // operator - see the comment at the transformTo call.
+        // Keep the receiver full-sort path for a partitioned exchange. Sorting before the hash exchange compares rows
+        // routed to different receivers and blocks streaming; the explicit Sort retained above the exchange establishes
+        // the required ordering after partitioning.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
             windowGroup.orderKeys, false, false, prePartitioned);
       }
     }
-    // WindowAggregateOperator requires its input ordered on the ORDER BY keys and does no ordering of its own, so
-    // where the exchange carries a collation the ordering has to be established above it. Place an explicit Sort
-    // rather than asking the receive operator to sort: SortOperator is the operator that knows fetch/offset, and
-    // SortedMailboxReceiveOperator is deprecated. The Sort carries no fetch, so it keeps every row - the same
-    // semantics as the unbounded list the receive operator used.
+    // WindowAggregateOperator requires its input ordered on the ORDER BY keys and does no ordering of its own. A sort
+    // exchange that sorts on the receiver establishes that contract itself; adding another Sort above it would make
+    // old servers sort the same rows twice during a rolling upgrade. Keep an explicit Sort only for post-exchange
+    // full-sort paths.
     // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
     // exchange. PinotSortExchangeCopyRule does not either: it declines when there is no fetch.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
-        ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
+        && !((PinotLogicalSortExchange) exchange).isSortOnReceiver()
+            ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
     call.transformTo(LogicalWindow.create(window.getTraitSet(), windowInput, window.constants, window.getRowType(),
         List.of(windowGroup)));
+  }
+
+  private static boolean isWindowSortOnSenderEnabled(RelOptRuleCall call) {
+    RelOptPlanner planner = call.getPlanner();
+    if (planner != null) {
+      Context context = planner.getContext();
+      if (context != null) {
+        PlannerContext plannerContext = context.unwrap(PlannerContext.class);
+        if (plannerContext != null) {
+          return QueryOptionsUtils.isWindowSortOnSender(plannerContext.getOptions(),
+              plannerContext.getEnvConfig().defaultWindowSortOnSender());
+        }
+      }
+    }
+    return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {

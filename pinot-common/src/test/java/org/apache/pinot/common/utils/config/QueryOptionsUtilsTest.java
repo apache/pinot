@@ -111,6 +111,14 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldResolveWindowSortOnSenderOptionOverDefault() {
+    assertFalse(QueryOptionsUtils.isWindowSortOnSender(Map.of(), false));
+    assertTrue(QueryOptionsUtils.isWindowSortOnSender(Map.of(), true));
+    assertTrue(QueryOptionsUtils.isWindowSortOnSender(Map.of(WINDOW_SORT_ON_SENDER, "true"), false));
+    assertFalse(QueryOptionsUtils.isWindowSortOnSender(Map.of(WINDOW_SORT_ON_SENDER, "false"), true));
+  }
+
+  @Test
   public void shouldReadInPredicatePruningThresholdOption() {
     // Any integer is accepted; a negative value means always attempt IN-predicate pruning
     assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "20")), 20);

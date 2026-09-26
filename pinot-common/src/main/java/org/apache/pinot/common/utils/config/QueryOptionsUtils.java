@@ -761,6 +761,11 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  public static boolean isWindowSortOnSender(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.WINDOW_SORT_ON_SENDER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`
   /// dispatch path. See [QueryOptionKey#STREAM_STATS].
   public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {

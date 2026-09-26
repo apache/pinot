@@ -92,7 +92,8 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats,
+            true);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
@@ -103,7 +104,7 @@ public class MailboxServiceTest {
     });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i - 1);
-      List<Object[]> rows = getRows(receivingMailbox);
+      List<Object[]> rows = getSortedRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
@@ -339,7 +340,8 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats,
+            true);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
@@ -355,7 +357,7 @@ public class MailboxServiceTest {
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
-      List<Object[]> rows = getRows(receivingMailbox);
+      List<Object[]> rows = getSortedRows(receivingMailbox);
       assertEquals(rows.size(), 1);
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
@@ -632,6 +634,14 @@ public class MailboxServiceTest {
     ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
     assertNotNull(block);
     assertTrue(block.getBlock().isData());
+    return ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
+  }
+
+  private static List<Object[]> getSortedRows(ReceivingMailbox receivingMailbox) {
+    ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
+    assertNotNull(block);
+    assertTrue(block.getBlock().isData());
+    assertTrue(block.isSortedOnSender());
     return ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
   }
 

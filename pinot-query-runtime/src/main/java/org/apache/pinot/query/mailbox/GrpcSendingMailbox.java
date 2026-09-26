@@ -75,6 +75,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final int _maxByteStringSize;
+  private final boolean _sortedOnSender;
   /// Kill-switch for the sender-side `isReady()` gate. When `false`, `awaitReady` short-circuits like the bypass
   /// path and the sender pushes unconditionally — restoring the pre-1.6 behaviour. Plumbed from
   /// `pinot.query.runner.grpc.sender.backpressure.enabled` so it can be flipped without code changes if the gate
@@ -98,6 +99,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled) {
+    this(id, channelManager, hostname, port, deadlineMs, statMap, maxInboundMessageSize, backpressureEnabled, false);
+  }
+
+  GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled,
+      boolean sortedOnSender) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -105,6 +112,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     _backpressureEnabled = backpressureEnabled;
+    _sortedOnSender = sortedOnSender;
     // TODO: tune the maxByteStringSize based on experiments. We know the maxInboundMessageSize on the receiver side,
     //  but we want to leave some room for extra stuff for other fields like metadata, mailbox id, etc, whose size
     //  we don't know at the time of writing into the stream as it is serialized by protobuf.
@@ -205,11 +213,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
     return true;
-  }
-
-  private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
-      throws IOException {
-    processAndSend(block, serializedStats, false);
   }
 
   /// Same as [#processAndSend(MseBlock, List)] but with a flag to bypass the [#awaitReady] gate. Used by the
@@ -432,12 +435,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
       if (!bypassReady && isTerminated()) {
         return;
       }
-      MailboxContent content = MailboxContent.newBuilder()
+      MailboxContent.Builder contentBuilder = MailboxContent.newBuilder()
           .setMailboxId(_id)
           .setPayload(byteString)
-          .setWaitForMore(waitForMore)
-          .build();
-      _contentObserver.onNext(content);
+          .setWaitForMore(waitForMore);
+      if (_sortedOnSender) {
+        contentBuilder.putMetadata(ChannelUtils.MAILBOX_METADATA_SORTED_ON_SENDER, Boolean.TRUE.toString());
+      }
+      _contentObserver.onNext(contentBuilder.build());
     } finally {
       _readyLock.unlock();
     }

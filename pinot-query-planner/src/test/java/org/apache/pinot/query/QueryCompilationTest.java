@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
@@ -1285,23 +1286,84 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "Sort exchange should also auto-detect pre-partitioning when the table is partitioned by the window key");
   }
 
+  /// A global ordered window keeps the sender-sort/receiver-merge path. Sender-sorted exchanges must express their
+  /// ordering as an operator in the sending fragment: the send node's flag alone is only metadata.
+  @Test
+  public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
+    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(query);
+    MailboxSendNode sendNode = findWindowInputSendNode(plan);
+
+    assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
+    assertTrue(sendNode.hasExplicitSortInput(),
+        "The sender sort flag must be backed by a matching SortNode directly below MailboxSendNode");
+    assertEquals(sendNode.getInputs().size(), 1);
+    assertTrue(sendNode.getInputs().get(0) instanceof SortNode);
+    SortNode sortNode = (SortNode) sendNode.getInputs().get(0);
+    assertEquals(sortNode.getCollations(), sendNode.getCollations());
+    assertEquals(sortNode.getFetch(), Integer.MAX_VALUE);
+    assertEquals(sortNode.getOffset(), -1);
+    assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
+
+    WindowNode window = findWindowNode(plan);
+    assertTrue(window.getInputs().get(0) instanceof MailboxReceiveNode,
+        "The merge receiver itself establishes ordering; no redundant SortNode should remain above it");
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) window.getInputs().get(0);
+    assertTrue(receiveNode.isSort());
+    assertTrue(receiveNode.isSortedOnSender());
+
+    String explain = _queryEnvironment.explainQuery(
+        "SET windowSortOnSender=true; EXPLAIN IMPLEMENTATION PLAN FOR "
+            + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d", RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("[SORTED]"), explain);
+    assertTrue(explain.contains("SORT LIMIT 2147483647"), explain);
+  }
+
+  @Test
+  public void testGlobalOrderedWindowSenderSortIsDisabledByDefault() {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(
+        "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+    MailboxSendNode sendNode = findWindowInputSendNode(plan);
+
+    assertFalse(sendNode.isSort());
+    assertFalse(sendNode.hasExplicitSortInput());
+    assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
+        "The disabled path must retain the legacy post-exchange full sort");
+  }
+
+  /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
+  @Test
+  public void testPartitionedOrderedWindowUsesReceiverFullSort() {
+    String query = "SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM d";
+    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+
+    assertFalse(sendNode.isSort(), "The partitioned exchange must not advertise a globally sorted sender stream");
+    assertFalse(sendNode.hasExplicitSortInput(), "The partitioned exchange must not sort before hash distribution");
+    assertFalse(sendNode.getInputs().get(0) instanceof SortNode,
+        "The explicit full sort belongs in the receiving fragment after hash distribution");
+  }
+
   /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
   /// the exchange inserted directly below the window. The `prePartitioned` flag lives on this send node.
   private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
-    WindowNode window = null;
-    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
-      window = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), WindowNode.class);
-      if (window != null) {
-        break;
-      }
-    }
-    assertNotNull(window, "Expected a WINDOW node in the plan");
+    WindowNode window = findWindowNode(dispatchableSubPlan);
     MailboxReceiveNode receiveNode = findNodeOfType(window, MailboxReceiveNode.class);
     assertNotNull(receiveNode, "Expected the WINDOW input to be a mailbox exchange");
     PlanNode senderRoot =
         dispatchableSubPlan.getQueryStageMap().get(receiveNode.getSenderStageId()).getPlanFragment().getFragmentRoot();
     assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
     return (MailboxSendNode) senderRoot;
+  }
+
+  private WindowNode findWindowNode(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      WindowNode window = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), WindowNode.class);
+      if (window != null) {
+        return window;
+      }
+    }
+    fail("Expected a WINDOW node in the plan");
+    throw new AssertionError("unreachable");
   }
 
   /// The `setOpOptions(is_colocated_by_set_op_keys='true')` hint forces a pre-partitioned (direct) exchange on
