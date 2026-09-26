@@ -41,6 +41,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -435,6 +438,9 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
+    private static final Map<String, ColumnDataType> NAME_TO_TYPES = Arrays
+        .stream(ColumnDataType.values())
+        .collect(Collectors.toUnmodifiableMap(ColumnDataType::name, Function.identity()));
 
     // stored data type.
     private final ColumnDataType _storedColumnDataType;
@@ -1162,6 +1168,19 @@ public class DataSchema {
         default:
           throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }
+    }
+
+    @Nullable
+    public static ColumnDataType forName(String typeName) {
+      return NAME_TO_TYPES.get(typeName);
+    }
+
+    public static boolean isArray(String typeName) {
+      ColumnDataType type = NAME_TO_TYPES.get(typeName);
+      if (type == null) {
+        return false;
+      }
+      return type.isArray();
     }
 
     /// Renders a single UUID as its canonical lowercase RFC 4122 string. Accepts every representation
