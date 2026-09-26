@@ -194,6 +194,9 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
+        // isSort is the receiver's ordering contract. A new broker sets both flags only when an explicit sender Sort
+        // backs the exchange, selecting the streaming merge with a mixed-version fallback. isSort without the sender
+        // guarantee retains the full mailbox sort; a false isSort leaves ordering to a separate SortNode above it.
         if (node.isSort() && node.isSortedOnSender()) {
           return new SortedMailboxMergeReceiveOperator(context, node);
         } else if (node.isSort()) {
