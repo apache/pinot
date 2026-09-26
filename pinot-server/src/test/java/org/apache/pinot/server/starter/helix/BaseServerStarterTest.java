@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.Map;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -57,18 +58,32 @@ public class BaseServerStarterTest {
     assertFalse(Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
 
     HelixServerStarter serverStarter = new HelixServerStarter();
-    assertFalse(serverStarter.isServerReadyForHealthCheck());
+    serverStarter._instanceId = "Server_localhost_8098";
+    ServiceStatus.ServiceStatusCallback serviceStatusCallback = mock(ServiceStatus.ServiceStatusCallback.class);
+    ServiceStatus.setServiceStatusCallback(serverStarter._instanceId, serviceStatusCallback);
+    try {
+      when(serviceStatusCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.STARTING);
+      assertFalse(serverStarter.isServerReadyForHealthCheck());
 
-    serverStarter._isServerReadyToServeQueries = true;
-    assertTrue(serverStarter.isServerReadyForHealthCheck());
+      serverStarter._isServerReadyToServeQueries = true;
+      assertFalse(serverStarter.isServerReadyForHealthCheck());
 
-    BrokerRoutingReadyChecker brokerRoutingReadyChecker = mock(BrokerRoutingReadyChecker.class);
-    serverStarter._brokerRoutingReadyChecker = brokerRoutingReadyChecker;
-    when(brokerRoutingReadyChecker.isReady()).thenReturn(false);
-    assertFalse(serverStarter.isServerReadyForHealthCheck());
+      when(serviceStatusCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.BAD);
+      assertFalse(serverStarter.isServerReadyForHealthCheck());
 
-    when(brokerRoutingReadyChecker.isReady()).thenReturn(true);
-    assertTrue(serverStarter.isServerReadyForHealthCheck());
+      when(serviceStatusCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.GOOD);
+      assertTrue(serverStarter.isServerReadyForHealthCheck());
+
+      BrokerRoutingReadyChecker brokerRoutingReadyChecker = mock(BrokerRoutingReadyChecker.class);
+      serverStarter._brokerRoutingReadyChecker = brokerRoutingReadyChecker;
+      when(brokerRoutingReadyChecker.isReady()).thenReturn(false);
+      assertFalse(serverStarter.isServerReadyForHealthCheck());
+
+      when(brokerRoutingReadyChecker.isReady()).thenReturn(true);
+      assertTrue(serverStarter.isServerReadyForHealthCheck());
+    } finally {
+      ServiceStatus.removeServiceStatusCallback(serverStarter._instanceId);
+    }
   }
 
   @Test

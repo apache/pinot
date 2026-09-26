@@ -54,6 +54,7 @@ import static org.testng.Assert.assertTrue;
 public class BrokerRoutingReadyCheckerTest {
   private static final String SERVER_INSTANCE = "Server_localhost_8098";
   private static final String BROKER_INSTANCE = "Broker_localhost_8099";
+  private static final String SECOND_BROKER_INSTANCE = "Broker_localhost_8100";
 
   @Test
   public void testBrokerRequestUsesAuthProvider() throws Exception {
@@ -148,8 +149,70 @@ public class BrokerRoutingReadyCheckerTest {
     assertFalse(checker.isReady());
 
     currentTimeMs.set(6_000L);
-    checker.check();
     assertTrue(checker.isReady());
+  }
+
+  @Test
+  public void testFailOpenDeadlineStopsSequentialBrokerSweep() {
+    AtomicLong currentTimeMs = new AtomicLong(1_000L);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+    when(helixManager.getInstanceName()).thenReturn(SERVER_INSTANCE);
+    ExternalView brokerResource = new ExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    brokerResource.setStateMap("0", Map.of(BROKER_INSTANCE, "ONLINE", SECOND_BROKER_INSTANCE, "ONLINE"));
+    when(helixAdmin.getResourceExternalView("testCluster", CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
+        .thenReturn(brokerResource);
+    when(helixAdmin.getInstanceConfig("testCluster", BROKER_INSTANCE))
+        .thenReturn(createBrokerInstanceConfig(BROKER_INSTANCE, "8099"));
+    when(helixAdmin.getInstanceConfig("testCluster", SECOND_BROKER_INSTANCE))
+        .thenReturn(createBrokerInstanceConfig(SECOND_BROKER_INSTANCE, "8100"));
+    AtomicInteger requests = new AtomicInteger();
+    BrokerRoutingReadyChecker.RoutingStatusClient routingStatusClient = (uri, authHeaders) -> {
+      requests.incrementAndGet();
+      currentTimeMs.set(6_000L);
+      return new SimpleHttpResponse(200, CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
+    };
+
+    try (BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(helixManager, 5_000L, true,
+        new NullAuthProvider(), routingStatusClient, currentTimeMs::get)) {
+      checker.check();
+      assertTrue(checker.isReady());
+      assertEquals(requests.get(), 1);
+    }
+  }
+
+  @Test
+  public void testReadinessHonorsFailOpenDeadlineWhileCheckIsInFlight()
+      throws Exception {
+    AtomicLong currentTimeMs = new AtomicLong(1_000L);
+    CountDownLatch checkStarted = new CountDownLatch(1);
+    CountDownLatch releaseCheck = new CountDownLatch(1);
+    BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(SERVER_INSTANCE,
+        () -> Set.of(BROKER_INSTANCE), brokers -> {
+          checkStarted.countDown();
+          try {
+            assertTrue(releaseCheck.await(5, TimeUnit.SECONDS));
+            return false;
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+          }
+        }, 5_000L, true, currentTimeMs::get);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> check = executor.submit(checker::check);
+      assertTrue(checkStarted.await(5, TimeUnit.SECONDS));
+      currentTimeMs.set(6_000L);
+      assertTrue(checker.isReady());
+      releaseCheck.countDown();
+      check.get(5, TimeUnit.SECONDS);
+    } finally {
+      releaseCheck.countDown();
+      checker.close();
+      executor.shutdownNow();
+    }
   }
 
   @Test
@@ -327,5 +390,12 @@ public class BrokerRoutingReadyCheckerTest {
     }
     when(helixAdmin.getInstanceConfig("testCluster", BROKER_INSTANCE)).thenReturn(instanceConfig);
     return helixManager;
+  }
+
+  private InstanceConfig createBrokerInstanceConfig(String instanceId, String port) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort(port);
+    return instanceConfig;
   }
 }

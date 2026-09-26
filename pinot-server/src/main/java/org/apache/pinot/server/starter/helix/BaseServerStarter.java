@@ -984,7 +984,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected boolean isServerReadyForHealthCheck() {
-    return isServerReadyToServeQueries()
+    return ServiceStatus.getServiceStatus(_instanceId) == Status.GOOD && isServerReadyToServeQueries()
         && (_brokerRoutingReadyChecker == null || _brokerRoutingReadyChecker.isReady());
   }
 

@@ -20,12 +20,14 @@ package org.apache.pinot.common.utils.http;
 
 import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +62,7 @@ import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -162,11 +165,17 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable List<Header> headers, long socketTimeoutMs,
       long connectionRequestTimeoutMs)
       throws IOException {
+    return sendGetRequest(uri, headers, socketTimeoutMs, connectionRequestTimeoutMs, Integer.MAX_VALUE);
+  }
+
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable List<Header> headers, long socketTimeoutMs,
+      long connectionRequestTimeoutMs, int maxResponseLength)
+      throws IOException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     if (headers != null) {
       headers.forEach(requestBuilder::addHeader);
     }
-    return sendRequest(requestBuilder.build(), socketTimeoutMs, connectionRequestTimeoutMs);
+    return sendRequest(requestBuilder.build(), socketTimeoutMs, connectionRequestTimeoutMs, maxResponseLength);
   }
 
   /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
@@ -307,6 +316,12 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs,
       long connectionRequestTimeoutMs)
       throws IOException {
+    return sendRequest(request, socketTimeoutMs, connectionRequestTimeoutMs, Integer.MAX_VALUE);
+  }
+
+  public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs,
+      long connectionRequestTimeoutMs, int maxResponseLength)
+      throws IOException {
 
     // Besides the per-request response (socket) timeout, explicitly bound the connection-request
     // (pool checkout) wait instead of silently inheriting the Apache HttpClient default, so a
@@ -321,7 +336,9 @@ public class HttpClient implements AutoCloseable {
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
 
-    try (CloseableHttpResponse response = _httpClient.execute(request, clientContext)) {
+    CloseableHttpResponse response = _httpClient.execute(request, clientContext);
+    boolean closeImmediately = false;
+    try {
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
         String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
         String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
@@ -329,10 +346,18 @@ public class HttpClient implements AutoCloseable {
             controllerVersion);
       }
       int statusCode = response.getCode();
+      BoundedResponseContent responseContent = readResponseContent(response.getEntity(), maxResponseLength);
+      closeImmediately = responseContent._truncated;
       if (statusCode >= 300) {
-        return new SimpleHttpResponse(statusCode, getErrorMessage(request, response));
+        return new SimpleHttpResponse(statusCode, getErrorMessage(request, response, responseContent._content));
       }
-      return new SimpleHttpResponse(statusCode, httpEntityToString(response.getEntity()));
+      return new SimpleHttpResponse(statusCode, responseContent._content);
+    } finally {
+      if (closeImmediately) {
+        response.close(CloseMode.IMMEDIATE);
+      } else {
+        response.close();
+      }
     }
   }
 
@@ -373,10 +398,55 @@ public class HttpClient implements AutoCloseable {
 
   private static String httpEntityToString(HttpEntity httpEntity)
       throws IOException {
+    return httpEntityToString(httpEntity, Integer.MAX_VALUE);
+  }
+
+  private static String httpEntityToString(HttpEntity httpEntity, int maxResponseLength)
+      throws IOException {
     try {
-      return EntityUtils.toString(httpEntity);
+      return EntityUtils.toString(httpEntity, maxResponseLength);
     } catch (ParseException exception) {
       throw new RuntimeException(exception);
+    }
+  }
+
+  private static BoundedResponseContent readResponseContent(HttpEntity httpEntity, int maxResponseLength)
+      throws IOException {
+    Preconditions.checkArgument(maxResponseLength >= 0, "Maximum response length must be non-negative");
+    if (maxResponseLength == Integer.MAX_VALUE) {
+      return new BoundedResponseContent(httpEntityToString(httpEntity), false);
+    }
+    if (httpEntity == null) {
+      return new BoundedResponseContent(null, false);
+    }
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxResponseLength, 1_024));
+    byte[] buffer = new byte[Math.min(Math.max(maxResponseLength, 1), 1_024)];
+    InputStream input = httpEntity.getContent();
+    while (output.size() < maxResponseLength) {
+      int bytesRead = input.read(buffer, 0, Math.min(buffer.length, maxResponseLength - output.size()));
+      if (bytesRead < 0) {
+        return new BoundedResponseContent(decodeResponseContent(output, httpEntity), false);
+      }
+      output.write(buffer, 0, bytesRead);
+    }
+    boolean truncated = httpEntity.getContentLength() < 0 || httpEntity.getContentLength() > maxResponseLength;
+    return new BoundedResponseContent(decodeResponseContent(output, httpEntity), truncated);
+  }
+
+  private static String decodeResponseContent(ByteArrayOutputStream output, HttpEntity httpEntity) {
+    ContentType contentType = ContentType.parseLenient(httpEntity.getContentType());
+    Charset charset = contentType != null ? contentType.getCharset(UTF_8) : UTF_8;
+    return output.toString(charset);
+  }
+
+  private static final class BoundedResponseContent {
+    private final String _content;
+    private final boolean _truncated;
+
+    private BoundedResponseContent(String content, boolean truncated) {
+      _content = content;
+      _truncated = truncated;
     }
   }
 
@@ -592,6 +662,22 @@ public class HttpClient implements AutoCloseable {
   }
 
   private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response) {
+    return getErrorMessage(request, response, Integer.MAX_VALUE);
+  }
+
+  private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response,
+      int maxResponseLength) {
+    String entityStr;
+    try {
+      entityStr = EntityUtils.toString(response.getEntity(), maxResponseLength);
+    } catch (Exception e) {
+      entityStr = String.format("Failed to get a reason, exception: %s", e);
+    }
+    return getErrorMessage(request, response, entityStr);
+  }
+
+  private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response,
+      String entityStr) {
     String controllerHost = null;
     String controllerVersion = null;
     if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
@@ -600,14 +686,9 @@ public class HttpClient implements AutoCloseable {
     }
     String reason;
     try {
-      String entityStr = EntityUtils.toString(response.getEntity());
-      try {
-        reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
-      } catch (Exception e) {
-        reason = entityStr;
-      }
+      reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
     } catch (Exception e) {
-      reason = String.format("Failed to get a reason, exception: %s", e);
+      reason = entityStr;
     }
     String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
         response.getCode(), response.getReasonPhrase(), reason, request.getRequestUri());

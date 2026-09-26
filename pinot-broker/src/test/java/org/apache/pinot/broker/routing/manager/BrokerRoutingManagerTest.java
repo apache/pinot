@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -70,6 +71,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -157,6 +159,7 @@ public class BrokerRoutingManagerTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
+    _routingManager.stop();
     _mocks.close();
   }
 
@@ -831,8 +834,14 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testServerIsNotAcknowledgedUntilRoutingUpdateCompletes()
+  public void testOnlyChangedServerIsNotAcknowledgedUntilRoutingUpdateCompletes()
       throws Exception {
+    String newServerInstanceId = "Server_localhost_8001";
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
     CountDownLatch routingUpdateStarted = new CountDownLatch(1);
     CountDownLatch releaseRoutingUpdate = new CountDownLatch(1);
     InstanceSelector instanceSelector = mock(InstanceSelector.class);
@@ -844,23 +853,76 @@ public class BrokerRoutingManagerTest {
     putRoutingEntry(TEST_TABLE,
         createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
-        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID),
+            createEnabledServerZNRecord(newServerInstanceId)));
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
       Future<?> update = executor.submit(() -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
       assertTrue(routingUpdateStarted.await(5, TimeUnit.SECONDS));
 
-      assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
-      assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+      assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(newServerInstanceId));
+      assertFalse(_routingManager.isServerEnabled(newServerInstanceId));
+      assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
 
       releaseRoutingUpdate.countDown();
       update.get(5, TimeUnit.SECONDS);
+      assertTrue(_routingManager.isServerEnabled(newServerInstanceId));
       assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
     } finally {
       releaseRoutingUpdate.countDown();
       executor.shutdownNow();
     }
+  }
+
+  @Test
+  public void testServerIsAcknowledgedOnlyAfterFailedRoutingUpdateIsRetried()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (updateAttempts.getAndIncrement() == 0) {
+        throw new RuntimeException("simulated routing update failure");
+      }
+      return null;
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerEnabled(SERVER_INSTANCE_ID), 50L, 5_000L,
+        "Server was not acknowledged after the routing update retry succeeded");
+    verify(instanceSelector, times(2)).onInstancesChange(any(), any());
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 1_000L);
+  }
+
+  @Test
+  public void testPersistentRoutingUpdateFailureBacksOffRetries()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    AtomicInteger updateAttempts = new AtomicInteger();
+    doAnswer(invocation -> {
+      updateAttempts.incrementAndGet();
+      throw new RuntimeException("simulated persistent routing update failure");
+    }).when(instanceSelector).onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 2_000L);
+    TestUtils.waitForCondition(
+        aVoid -> updateAttempts.get() >= 2 && _routingManager.getInstanceConfigRetryDelayMs() == 4_000L
+            && _routingManager.isInstanceConfigRetryScheduled(),
+        50L, 3_000L, "The first routing update retry did not schedule with backoff");
+    assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 4_000L);
+    assertTrue(_routingManager.isInstanceConfigRetryScheduled());
   }
 
   /// Creates a ZNRecord representing an enabled server instance.
