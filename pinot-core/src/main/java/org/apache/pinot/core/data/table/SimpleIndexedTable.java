@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
@@ -33,6 +34,14 @@ public class SimpleIndexedTable extends IndexedTable {
       int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>(initialCapacity),
         executorService);
+  }
+
+  /// Wraps an already-populated lookup map instead of inserting record by record, avoiding a full re-hash of
+  /// every key. The caller hands over ownership: the map must not be read or mutated externally afterwards.
+  /// Used by the grouping-sets derive to adopt its merged task-local maps directly.
+  public SimpleIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
+      int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, lookupMap, executorService);
   }
 
   /// Non thread safe implementation of upsert to insert [Record] into the [Table]

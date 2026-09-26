@@ -44,6 +44,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -250,6 +251,26 @@ public class QueryContext {
   /// grouping-set query (the `$groupingId` discriminator column), 0 otherwise.
   public int getNumExtraGroupByKeyColumns() {
     return isGroupingSets() ? 1 : 0;
+  }
+
+  /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
+  /// and derive the individual grouping-set records from those base groups, instead of expanding every input
+  /// row into one group per grouping set. Enabled by default; the `groupingSetsBaseAggregation=false` query
+  /// option forces the legacy per-row expansion path. See [CommonConstants.Broker.Request.QueryOptionKey].
+  ///
+  /// Only the standard [org.apache.pinot.core.operator.combine.GroupByCombineOperator] performs the merge-time
+  /// derive that turns the emitted base groups back into grouping-set records. Base aggregation is therefore
+  /// disabled whenever a different combine path would run: filtered aggregations (distinct shared group-key
+  /// generator), the streaming combine used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`, which
+  /// flushes incrementally and cannot derive over the fully-merged base table), and the sorted-aggregate combine
+  /// ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted rows
+  /// already carry the $groupingId discriminator.
+  public boolean isGroupingSetsBaseAggregation() {
+    if (_hasFilteredAggregations || _streamingGroupByFlushThreshold > 0 || shouldSortAggregateUnderSafeTrim()) {
+      return false;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
+    return option == null || Boolean.parseBoolean(option);
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
@@ -582,6 +603,33 @@ public class QueryContext {
       return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
     }
     return -1;
+  }
+
+  /// Returns the maximum estimated base-group count for which base aggregation is used (above it the per-row
+  /// expansion path is used: overflowing base groups would be dropped from every derived set -- corrupting the
+  /// totals -- and the derived output would grow unbounded). Reads the `groupingSetsBaseAggregationMaxGroups`
+  /// query option, defaulting to `numGroupsLimit` when unset. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
+  /// Returns the effective PER-grouping-set server-side keep size for a base-aggregation grouping-set query
+  /// (`max(5 * LIMIT, groupingSetsMinServerTrimSize)`, mirroring `minServerGroupTrimSize` semantics), or -1 to
+  /// disable (no ORDER BY, or the option is unset/non-positive). When enabled, the server keeps that many groups
+  /// WITHIN each grouping set after deriving them (bucketed by the $groupingId discriminator), bounding each
+  /// server's derived output without starving low-magnitude sets. The broker still applies the final ORDER BY +
+  /// LIMIT. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_MIN_SERVER_TRIM_SIZE].
+  public int getGroupingSetServerTrimSize() {
+    if (!isGroupingSets() || getOrderByExpressions() == null) {
+      return -1;
+    }
+    Integer minGroupTrimSize = QueryOptionsUtils.getGroupingSetsMinServerTrimSize(_queryOptions);
+    if (minGroupTrimSize == null || minGroupTrimSize <= 0) {
+      return -1;
+    }
+    return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
   }
 
   private int calculateEffectiveSegmentGroupTrimSize() {
