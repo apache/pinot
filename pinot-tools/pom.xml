@@ -49,6 +49,25 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
     </dependency>
+    <!--
+      pinot-tools depends on plugin modules, and ideally it would not. The quickstarts and the
+      admin commands reach for plugin classes: a few by import (pinot-avro, pinot-json,
+      pinot-parquet, pinot-minion-builtin-tasks below), but most only by fully-qualified name at
+      runtime, through a table config, a job spec or a ServiceLoader lookup.
+
+      The consequence is that a binary distribution would carry these plugins twice: once shaded
+      into lib/pinot-all.jar because pinot-tools pulls them in, and once as the plugin itself under
+      plugins/ with its dependencies in plugin-libs/. pinot-distribution therefore excludes the
+      ones pinot-tools does not actually compile against, and its pom carries the list; see the
+      comment on its pinot-tools dependency.
+
+      Declaring these `provided` here would be cleaner than excluding them there, because the list
+      would live in one place next to the dependencies it describes. It is not done because
+      `provided` is absent from the runtime classpath, so every quickstart that needs one of these
+      plugins would stop working when launched from Maven or an IDE, where there is no plugins/
+      directory for PluginManager to load them from. If that trade is ever acceptable, `provided`
+      is the better mechanism.
+    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion-builtin-tasks</artifactId>
