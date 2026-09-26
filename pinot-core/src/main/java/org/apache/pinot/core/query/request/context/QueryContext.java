@@ -605,22 +605,31 @@ public class QueryContext {
     return -1;
   }
 
-  /// Returns the PER-grouping-set server-side trim size for a base-aggregation grouping-set query, or -1 to
-  /// disable (no ORDER BY, or the `groupingSetsServerTrimSize` option is unset/non-positive). When positive, the
-  /// server keeps up to this many groups WITHIN each grouping set after deriving them (bucketed by the
-  /// $groupingId discriminator), bounding each server's derived output without starving low-magnitude sets. The
-  /// broker still applies the final ORDER BY + LIMIT. See
-  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_SERVER_TRIM_SIZE].
+  /// Returns the maximum estimated base-group count for which base aggregation is used (above it the per-row
+  /// expansion path is used: overflowing base groups would be dropped from every derived set -- corrupting the
+  /// totals -- and the derived output would grow unbounded). Reads the `groupingSetsBaseAggregationMaxGroups`
+  /// query option, defaulting to `numGroupsLimit` when unset. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
+  /// Returns the effective PER-grouping-set server-side keep size for a base-aggregation grouping-set query
+  /// (`max(5 * LIMIT, groupingSetsMinServerTrimSize)`, mirroring `minServerGroupTrimSize` semantics), or -1 to
+  /// disable (no ORDER BY, or the option is unset/non-positive). When enabled, the server keeps that many groups
+  /// WITHIN each grouping set after deriving them (bucketed by the $groupingId discriminator), bounding each
+  /// server's derived output without starving low-magnitude sets. The broker still applies the final ORDER BY +
+  /// LIMIT. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_MIN_SERVER_TRIM_SIZE].
   public int getGroupingSetServerTrimSize() {
     if (!isGroupingSets() || getOrderByExpressions() == null) {
       return -1;
     }
-    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_SERVER_TRIM_SIZE);
-    if (option == null) {
+    Integer minGroupTrimSize = QueryOptionsUtils.getGroupingSetsMinServerTrimSize(_queryOptions);
+    if (minGroupTrimSize == null || minGroupTrimSize <= 0) {
       return -1;
     }
-    int minGroupTrimSize = Integer.parseInt(option);
-    return minGroupTrimSize > 0 ? GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize) : -1;
+    return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
   }
 
   private int calculateEffectiveSegmentGroupTrimSize() {
