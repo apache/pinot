@@ -86,6 +86,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -137,10 +138,23 @@ public class BaseTableDataManagerTest {
       new SegmentOperationsThrottler(2, 4, true),
       new SegmentOperationsThrottler(2, 4, true));
 
+  private ServerMetrics _previousServerMetrics;
+
+  /// Registers the mock the tests verify against. [ServerMetrics#register] only swaps in against the NOOP default,
+  /// so the instance an earlier test class in the same JVM registered is cleared first, and restored in [#tearDown]
+  /// for the test classes that run afterwards.
   @BeforeClass
   public void setUp()
       throws Exception {
+    _previousServerMetrics = ServerMetrics.get();
+    ServerMetrics.deregister();
     ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown() {
+    ServerMetrics.deregister();
+    ServerMetrics.register(_previousServerMetrics);
   }
 
   @BeforeMethod
