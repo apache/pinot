@@ -36,6 +36,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -731,6 +732,19 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdCountMap = new Int2IntOpenHashMap();
+    }
+  }
+
+  /// Service registration for MODE.
+  public static final class Provider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.MODE;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ModeAggregationFunction(function.getArguments(), nullHandlingEnabled);
     }
   }
 }
