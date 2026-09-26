@@ -76,17 +76,17 @@ public class PinotBrokerRouting {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/server/{instanceId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
-  @ApiOperation(value = "Check whether a server is enabled for broker routing")
+  @ApiOperation(value = "Check whether a server is routable by the broker")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Server is enabled for routing"),
-      @ApiResponse(code = 503, message = "Server is not enabled for routing")
+      @ApiResponse(code = 200, message = "Server is routable"),
+      @ApiResponse(code = 503, message = "Server is not routable")
   })
   public String getServerRoutingStatus(
       @ApiParam(value = "Server instance id") @PathParam("instanceId") String instanceId) {
-    if (_routingManager.isServerEnabled(instanceId)) {
+    if (_routingManager.isServerRoutable(instanceId)) {
       return CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE;
     }
-    String errorMessage = String.format("Server %s is not enabled for routing", instanceId);
+    String errorMessage = String.format("Server %s is not routable", instanceId);
     throw new WebApplicationException(errorMessage,
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errorMessage).build());
   }

@@ -90,8 +90,8 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
   @VisibleForTesting
   BrokerRoutingReadyChecker(HelixManager helixManager, long timeoutMs, boolean failOpen, AuthProvider authProvider,
       RoutingStatusClient routingStatusClient, LongSupplier currentTimeMs) {
-    this(createContext(helixManager, routingStatusClient, null, authProvider, new AtomicReference<>(State.CHECKING)),
-        timeoutMs, failOpen, currentTimeMs, authProvider);
+    this(createContext(helixManager, routingStatusClient, null, authProvider), timeoutMs, failOpen, currentTimeMs,
+        authProvider);
   }
 
   private BrokerRoutingReadyChecker(ProductionContext context, long timeoutMs, boolean failOpen,
@@ -103,7 +103,7 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
       LongSupplier currentTimeMs, AuthProvider authProvider) {
     this(context._serverInstanceId, context._onlineBrokersSupplier, context._allBrokersReady,
         context._checkExecutor, context._routingStatusClient, timeoutMs, failOpen, currentTimeMs,
-        authProvider, context._state);
+        authProvider);
   }
 
   @VisibleForTesting
@@ -116,14 +116,13 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
   BrokerRoutingReadyChecker(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
       Predicate<Set<String>> allBrokersReady, long timeoutMs, boolean failOpen, LongSupplier currentTimeMs) {
     this(serverInstanceId, onlineBrokersSupplier, (brokers, shouldStop) -> allBrokersReady.test(brokers), null,
-        RoutingStatusClient.NOOP, timeoutMs, failOpen, currentTimeMs, new NullAuthProvider(),
-        new AtomicReference<>(State.CHECKING));
+        RoutingStatusClient.NOOP, timeoutMs, failOpen, currentTimeMs, new NullAuthProvider());
   }
 
   private BrokerRoutingReadyChecker(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
       BrokersReadyEvaluator allBrokersReady, @Nullable ScheduledExecutorService checkExecutor,
       RoutingStatusClient routingStatusClient, long timeoutMs, boolean failOpen, LongSupplier currentTimeMs,
-      AuthProvider authProvider, AtomicReference<State> state) {
+      AuthProvider authProvider) {
     _serverInstanceId = serverInstanceId;
     _onlineBrokersSupplier = onlineBrokersSupplier;
     _allBrokersReady = allBrokersReady;
@@ -134,7 +133,7 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     _deadlineMs = timeoutMs >= Long.MAX_VALUE - nowMs ? Long.MAX_VALUE : nowMs + Math.max(timeoutMs, 0L);
     _failOpen = failOpen;
     _authProvider = authProvider;
-    _state = state;
+    _state = new AtomicReference<>(State.CHECKING);
     if (_checkExecutor != null) {
       _checkExecutor.scheduleWithFixedDelay(this::check, 0L, CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS);
     }
@@ -217,12 +216,11 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
         new HttpRoutingStatusClient(new HttpClient(httpClientConfig, TlsUtils.getSslContext(), true)));
     ScheduledExecutorService checkExecutor = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("broker-routing-ready-check-%d").setDaemon(true).build());
-    return createContext(helixManager, routingStatusClient, checkExecutor, authProvider,
-        new AtomicReference<>(State.CHECKING));
+    return createContext(helixManager, routingStatusClient, checkExecutor, authProvider);
   }
 
   private static ProductionContext createContext(HelixManager helixManager, RoutingStatusClient routingStatusClient,
-      @Nullable ScheduledExecutorService checkExecutor, AuthProvider authProvider, AtomicReference<State> state) {
+      @Nullable ScheduledExecutorService checkExecutor, AuthProvider authProvider) {
     String serverInstanceId = helixManager.getInstanceName();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
@@ -236,7 +234,7 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
             : new SecureRoutingStatusClient(routingStatusClient);
     BrokersReadyEvaluator allBrokersReady = (brokers, shouldStop) -> {
       for (String broker : brokers) {
-        if (shouldStop.getAsBoolean() || state.get() != State.CHECKING || Thread.currentThread().isInterrupted()) {
+        if (shouldStop.getAsBoolean()) {
           return false;
         }
         if (!checkBroker(serverInstanceId, helixAdmin, clusterName, broker, authProvider,
@@ -247,7 +245,7 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
       return true;
     };
     return new ProductionContext(serverInstanceId, onlineBrokersSupplier, allBrokersReady, checkExecutor,
-        secureRoutingStatusClient, state);
+        secureRoutingStatusClient);
   }
 
   private static boolean checkBroker(String serverInstanceId, HelixAdmin helixAdmin, String clusterName, String broker,
@@ -290,17 +288,15 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     @Nullable
     private final ScheduledExecutorService _checkExecutor;
     private final RoutingStatusClient _routingStatusClient;
-    private final AtomicReference<State> _state;
 
     private ProductionContext(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
         BrokersReadyEvaluator allBrokersReady, @Nullable ScheduledExecutorService checkExecutor,
-        RoutingStatusClient routingStatusClient, AtomicReference<State> state) {
+        RoutingStatusClient routingStatusClient) {
       _serverInstanceId = serverInstanceId;
       _onlineBrokersSupplier = onlineBrokersSupplier;
       _allBrokersReady = allBrokersReady;
       _checkExecutor = checkExecutor;
       _routingStatusClient = routingStatusClient;
-      _state = state;
     }
   }
 

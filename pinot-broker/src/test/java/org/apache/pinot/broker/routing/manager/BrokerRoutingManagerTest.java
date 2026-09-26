@@ -286,22 +286,25 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testServerEnabledState() {
-    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+  public void testServerRoutableState() {
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
     _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
-    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(List.of());
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
   }
 
   @Test
@@ -840,7 +843,7 @@ public class BrokerRoutingManagerTest {
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
         .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
     CountDownLatch routingUpdateStarted = new CountDownLatch(1);
     CountDownLatch releaseRoutingUpdate = new CountDownLatch(1);
@@ -862,13 +865,13 @@ public class BrokerRoutingManagerTest {
       assertTrue(routingUpdateStarted.await(5, TimeUnit.SECONDS));
 
       assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(newServerInstanceId));
-      assertFalse(_routingManager.isServerEnabled(newServerInstanceId));
-      assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+      assertFalse(_routingManager.isServerRoutable(newServerInstanceId));
+      assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
       releaseRoutingUpdate.countDown();
       update.get(5, TimeUnit.SECONDS);
-      assertTrue(_routingManager.isServerEnabled(newServerInstanceId));
-      assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+      assertTrue(_routingManager.isServerRoutable(newServerInstanceId));
+      assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
     } finally {
       releaseRoutingUpdate.countDown();
       executor.shutdownNow();
@@ -893,9 +896,9 @@ public class BrokerRoutingManagerTest {
 
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
-    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
 
-    TestUtils.waitForCondition(aVoid -> _routingManager.isServerEnabled(SERVER_INSTANCE_ID), 50L, 5_000L,
+    TestUtils.waitForCondition(aVoid -> _routingManager.isServerRoutable(SERVER_INSTANCE_ID), 50L, 5_000L,
         "Server was not acknowledged after the routing update retry succeeded");
     verify(instanceSelector, times(2)).onInstancesChange(any(), any());
     assertEquals(_routingManager.getInstanceConfigRetryDelayMs(), 1_000L);

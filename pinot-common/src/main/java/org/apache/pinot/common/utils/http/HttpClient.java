@@ -413,11 +413,11 @@ public class HttpClient implements AutoCloseable {
   private static BoundedResponseContent readResponseContent(HttpEntity httpEntity, int maxResponseLength)
       throws IOException {
     Preconditions.checkArgument(maxResponseLength >= 0, "Maximum response length must be non-negative");
-    if (maxResponseLength == Integer.MAX_VALUE) {
-      return new BoundedResponseContent(httpEntityToString(httpEntity), false);
-    }
     if (httpEntity == null) {
       return new BoundedResponseContent(null, false);
+    }
+    if (maxResponseLength == Integer.MAX_VALUE) {
+      return new BoundedResponseContent(httpEntityToString(httpEntity), false);
     }
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxResponseLength, 1_024));

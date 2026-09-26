@@ -1453,11 +1453,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
-  /// Returns whether the broker sees the server as enabled.
-  public boolean isServerEnabled(String instanceId) {
+  /// Returns whether the broker sees the server as routable.
+  public boolean isServerRoutable(String instanceId) {
     // Read the map first. A new entry is inserted only after the server is marked pending, and removing the pending
     // marker publishes all routing-entry updates that precede it.
-    return _enabledServerInstanceMap.containsKey(instanceId) && !_serversPendingRoutingUpdate.contains(instanceId);
+    return _routableServerInstanceMap.containsKey(instanceId) && !_serversPendingRoutingUpdate.contains(instanceId);
   }
 
   /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not

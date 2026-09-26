@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.testng.annotations.Test;
 
@@ -96,6 +97,36 @@ public class HttpClientTest {
       assertTrue(error.getResponse().contains("x".repeat(32)));
       assertFalse(error.getResponse().contains("x".repeat(33)));
       assertTrue(error.getResponse().length() < 512);
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  public void testBodylessResponses()
+      throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext("/not-modified", exchange -> {
+      exchange.sendResponseHeaders(304, -1);
+      exchange.close();
+    });
+    server.createContext("/head-error", exchange -> {
+      exchange.sendResponseHeaders(503, -1);
+      exchange.close();
+    });
+    server.start();
+
+    try (HttpClient client = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, null)) {
+      String baseUrl = "http://localhost:" + server.getAddress().getPort();
+      SimpleHttpResponse unbounded = client.sendGetRequest(URI.create(baseUrl + "/not-modified"));
+      assertEquals(unbounded.getStatusCode(), 304);
+
+      SimpleHttpResponse bounded = client.sendGetRequest(URI.create(baseUrl + "/not-modified"), List.of(), 5_000L,
+          5_000L, 32);
+      assertEquals(bounded.getStatusCode(), 304);
+
+      SimpleHttpResponse head = client.sendRequest(ClassicRequestBuilder.head(baseUrl + "/head-error").build());
+      assertEquals(head.getStatusCode(), 503);
     } finally {
       server.stop(0);
     }
