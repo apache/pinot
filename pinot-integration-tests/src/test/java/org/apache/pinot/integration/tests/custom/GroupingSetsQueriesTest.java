@@ -439,7 +439,7 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
   @Test
   public void testServerTrimSizeBoundsWithoutStarvingSets()
       throws Exception {
-    // groupingSetsServerTrimSize applies a per-set (bucketed on $groupingId) top-K on the server-derived
+    // groupingSetsMinServerTrimSize applies a per-set (bucketed on $groupingId) top-K on the server-derived
     // grouping sets, but must never starve a set: every requested grouping set -- including the grand total --
     // must still be represented, and with a K large enough to hold every group the result must be exact.
     setUseMultiStageQueryEngine(false);
@@ -450,14 +450,14 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     // the result must equal the untrimmed (exact) run.
     Map<String, String> untrimmed = rowsByKey(postQuery("SET enableNullHandling=true; " + query));
     Map<String, String> largeK = rowsByKey(
-        postQuery("SET enableNullHandling=true; SET groupingSetsServerTrimSize=100; " + query));
+        postQuery("SET enableNullHandling=true; SET groupingSetsMinServerTrimSize=100; " + query));
     assertEquals(largeK, untrimmed, "a per-set trim larger than every set must not drop any group");
     assertEquals(untrimmed.size(), 9);
 
     // With K = 1 the server keeps only the top row per set, but every set (grouping-id 0,0 / 0,1 / 1,0 / 1,1)
     // must still contribute at least one row -- no set is starved, including the grand total (1,1).
     JsonNode rows =
-        postQuery("SET enableNullHandling=true; SET groupingSetsServerTrimSize=1; " + query).get("resultTable")
+        postQuery("SET enableNullHandling=true; SET groupingSetsMinServerTrimSize=1; " + query).get("resultTable")
             .get("rows");
     Set<String> groupingIds = new HashSet<>();
     for (JsonNode row : rows) {
@@ -465,6 +465,89 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     }
     assertTrue(groupingIds.contains("1,1"), "grand-total set must survive a small per-set trim");
     assertTrue(groupingIds.size() >= 3, "multiple grouping sets must survive the per-set trim, not just one");
+  }
+
+  @Test
+  public void testNumGroupsLimitPressureKeepsTotalsExactByDefault()
+      throws Exception {
+    // Under numGroupsLimit pressure, the expansion path keeps the grand total exact (the coarse groups are
+    // created on the first row and keep aggregating after the limit), while an ungated base path would drop
+    // overflowing BASE keys from EVERY derived set, corrupting the totals. The cardinality gate (default
+    // groupingSetsBaseAggregationMaxGroups = numGroupsLimit) must therefore route this query to expansion and
+    // keep the grand total exact. This fails without the gate.
+    //
+    // The table has 4 distinct (d1, d2) base groups per segment. numGroupsLimit=3 makes both paths hit the
+    // limit: expansion creates exactly its first row's 3 groups -- (d1,d2), (d1) and the grand total -- so the
+    // grand total exists and stays exact; the base path can only keep 3 of the 4 base groups.
+    setUseMultiStageQueryEngine(false);
+    long expectedTotal = postQuery("SELECT COUNT(*) FROM " + getTableName())
+        .get("resultTable").get("rows").get(0).get(0).asLong();
+
+    String query = "SET enableNullHandling=true; SET numGroupsLimit=3; SELECT " + D1 + ", " + D2 + ", COUNT(*), "
+        + "GROUPING(" + D1 + "), GROUPING(" + D2 + ") FROM " + getTableName()
+        + " GROUP BY ROLLUP(" + D1 + ", " + D2 + ") LIMIT 10000";
+    JsonNode rows = postQuery(query).get("resultTable").get("rows");
+    long grandTotal = -1;
+    for (JsonNode row : rows) {
+      if (row.get(3).asInt() == 1 && row.get(4).asInt() == 1) {
+        grandTotal = row.get(2).asLong();
+      }
+    }
+    assertEquals(grandTotal, expectedTotal,
+        "grand total must stay exact under numGroupsLimit pressure (cardinality gate must route to expansion)");
+
+    // When the user overrides the gate (accepting the risk), dropped base keys must at least be surfaced via
+    // the numGroupsLimitReached flag instead of failing silently.
+    JsonNode forcedBase = postQuery("SET enableNullHandling=true; SET numGroupsLimit=3; "
+        + "SET groupingSetsBaseAggregationMaxGroups=1000000; SELECT " + D1 + ", " + D2 + ", COUNT(*) FROM "
+        + getTableName() + " GROUP BY ROLLUP(" + D1 + ", " + D2 + ") LIMIT 10000");
+    assertTrue(forcedBase.get("numGroupsLimitReached").asBoolean(),
+        "dropping base groups under an overridden gate must surface numGroupsLimitReached");
+  }
+
+  @Test
+  public void testBaseAggregationBypassesSegmentTrim()
+      throws Exception {
+    // On the base-aggregation path the per-set segment trim (minSegmentGroupTrimSize bucketed by $groupingId)
+    // does not apply: segments emit BASE groups, which cannot be trimmed per set safely. This is a documented
+    // behavior change vs the expansion path; the base path stays exact instead. Assert that an aggressive
+    // segment trim setting does not change base-aggregation results (trim is bypassed, not misapplied).
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + D2 + ", COUNT(*), SUM(" + LNG + ") FROM " + getTableName()
+        + " GROUP BY ROLLUP(" + D1 + ", " + D2 + ") ORDER BY COUNT(*) DESC, " + D1 + ", " + D2 + " LIMIT 500";
+
+    Map<String, String> unTrimmed = rowsByKey(postQuery(
+        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; " + query));
+    Map<String, String> aggressiveSegmentTrim = rowsByKey(postQuery(
+        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; SET minSegmentGroupTrimSize=1; "
+            + query));
+
+    assertEquals(aggressiveSegmentTrim, unTrimmed,
+        "segment trim must be bypassed (not misapplied) on the base-aggregation path");
+    assertFalse(unTrimmed.isEmpty());
+  }
+
+  @Test
+  public void testBaseAggregationCardinalityGateFallsBackToExpansion()
+      throws Exception {
+    // When the estimated base-group count exceeds groupingSetsBaseAggregationMaxGroups, the engine falls back
+    // to the per-row expansion path even though groupingSetsBaseAggregation is on. maxGroups=1 makes any
+    // multi-column base grouping estimate exceed the threshold. This asserts end-to-end result equivalence
+    // between the gated (expansion) and default (base-aggregation) runs; that the estimate actually crosses the
+    // threshold and disables base aggregation is verified directly in EstimateBaseGroupCountTest (unit).
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", " + D2 + ", DISTINCTCOUNT(" + LNG + "), COUNT(*), GROUPING(" + D1 + "), "
+        + "GROUPING(" + D2 + ") FROM " + getTableName() + " GROUP BY CUBE(" + D1 + ", " + D2 + ")";
+
+    Map<String, String> gatedToExpansion = rowsByKey(postQuery(
+        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; "
+            + "SET groupingSetsBaseAggregationMaxGroups=1; " + query));
+    Map<String, String> baseAgg = rowsByKey(postQuery(
+        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; " + query));
+
+    assertEquals(gatedToExpansion, baseAgg,
+        "cardinality-gated expansion must match the base-aggregation path");
+    assertFalse(baseAgg.isEmpty());
   }
 
   /// The base-aggregation derive path (default) must produce results identical to the legacy per-row expansion

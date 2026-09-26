@@ -863,14 +863,16 @@ public class CommonConstants {
 
         /// For GROUP BY GROUPING SETS / ROLLUP / CUBE using base aggregation (see
         /// [#GROUPING_SETS_BASE_AGGREGATION]) WITH an ORDER BY: after deriving the grouping sets on the server,
-        /// keep at most this many groups WITHIN each grouping set (a per-set top-K bucketed by the $groupingId
-        /// discriminator, so a global top-K can never starve a low-magnitude set such as the grand total). This
-        /// bounds each server's derived output for high-cardinality unions at the cost of an approximate top-K
-        /// (a group ranked below K on one server may still be globally in the top-K once servers merge). The
-        /// broker still applies the final ORDER BY + LIMIT across all sets. Non-positive or unset (default)
-        /// disables the server-side trim, so all derived groups are kept and only the broker trims -- the exact
-        /// (but higher memory/network) policy. Ignored without an ORDER BY.
-        public static final String GROUPING_SETS_SERVER_TRIM_SIZE = "groupingSetsServerTrimSize";
+        /// keep `max(5 * LIMIT, this value)` groups WITHIN each grouping set (a per-set top-K bucketed by the
+        /// $groupingId discriminator, so a global top-K can never starve a low-magnitude set such as the grand
+        /// total). Like [#MIN_SERVER_GROUP_TRIM_SIZE], the value is a MINIMUM per-set keep, not an exact cap.
+        /// This bounds each server's derived output for high-cardinality unions at the cost of an approximate
+        /// top-K (a group ranked below the keep on one server may still be globally in the top-K once servers
+        /// merge); when it drops groups, the response is flagged as trimmed. The broker still applies the final
+        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables the server-side trim, so
+        /// all derived groups are kept and only the broker trims -- the exact (but higher memory/network)
+        /// policy. Ignored without an ORDER BY.
+        public static final String GROUPING_SETS_MIN_SERVER_TRIM_SIZE = "groupingSetsMinServerTrimSize";
 
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
         public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
@@ -890,7 +892,23 @@ public class CommonConstants {
         /// replaces expanding every input row into one group per grouping set, moving the per-set fan-out from
         /// O(rows) to O(base groups) and onto the multi-threaded combine. Set to `false` to fall back to the
         /// legacy per-row expansion path.
+        ///
+        /// Base aggregation is used only when the estimated base-group count (the product of the union columns'
+        /// dictionary cardinalities) does not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]; above that
+        /// estimate the per-row expansion path is used instead. This matters for correctness, not just speed:
+        /// if base groups overflow `numGroupsLimit`, a dropped base key vanishes from EVERY derived set --
+        /// including the grand total -- whereas the expansion path creates coarse groups up front and keeps
+        /// them exact under the limit. The gate keeps base aggregation on the workloads where base groups
+        /// provably fit.
         public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
+
+        /// Upper bound on the estimated base-group count (product of the union columns' dictionary
+        /// cardinalities) for which [#GROUPING_SETS_BASE_AGGREGATION] is used; above it the per-row expansion
+        /// path is used. Defaults to the query's `numGroupsLimit` when unset: if the base grouping alone could
+        /// approach the group limit, base groups could be dropped -- corrupting the derived totals -- and the
+        /// derived output (up to estimate x numSets rows per server) could grow unbounded. Ignored when base
+        /// aggregation is disabled.
+        public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 
         /// Number of threads used in the final reduce.
         /// This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive

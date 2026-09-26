@@ -53,8 +53,9 @@ public class TableResizer {
   private final DataSchema _dataSchema;
   private final boolean _hasFinalInput;
   private final int _numGroupByExpressions;
-  /// Number of key columns preceding the aggregation columns in a record: the group-by (union) columns plus
-  /// the synthetic $groupingId column for grouping-set queries. Equals _numGroupByExpressions otherwise.
+  /// Number of key columns preceding the aggregation columns in a record, derived from the schema (total
+  /// columns minus aggregation columns). Includes the synthetic $groupingId column for grouping-set records
+  /// that carry it; equals the union-column count for base-aggregation combine records that omit it.
   private final int _numKeyColumns;
   /// Per grouping set (in ordinal order), the participating union-column indexes; null when the query has no
   /// grouping sets. Read by the GROUPING()/GROUPING_ID() ORDER BY extractor.
@@ -81,7 +82,6 @@ public class TableResizer {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
-    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _groupingSets = queryContext.getGroupingSets();
     _groupByExpressionIndexMap = new HashMap<>();
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -90,6 +90,11 @@ public class TableResizer {
 
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
+    // Derive the key-column count from the schema (total columns minus aggregation columns) so it always matches
+    // the record layout being resized, exactly like IndexedTable. Using queryContext.getNumGroupByKeyColumns()
+    // here would be wrong for the base-aggregation grouping-set combine table, whose records omit the synthetic
+    // $groupingId column.
+    _numKeyColumns = dataSchema.size() - _aggregationFunctions.length;
     _filteredAggregationIndexMap = queryContext.getFilteredAggregationsIndexMap();
     assert _filteredAggregationIndexMap != null;
 
@@ -413,35 +418,6 @@ public class TableResizer {
         /// 'record' ranks ahead of this set's current worst kept record: replace it.
         heap.poll();
         heap.offer(record);
-      }
-    }
-    List<IntermediateRecord> result = new ArrayList<>();
-    for (PriorityQueue<IntermediateRecord> heap : bucketsByGroupingId.values()) {
-      result.addAll(heap);
-    }
-    return result;
-  }
-
-  /// Per-set bucketed trim over already-built [IntermediateRecord]s (the base-aggregation derive path produces
-  /// these directly rather than via a [GroupKeyGenerator]). Keeps the top `perSetSize` records WITHIN each
-  /// grouping set, bucketed by the `discriminatorColumnIndex` ($groupingId) value, with the same across-set
-  /// anti-starvation guarantee and approximation caveats as [#trimInSegmentResultsByGroupingSet].
-  public List<IntermediateRecord> trimInSegmentRecordsByGroupingSet(Collection<IntermediateRecord> records,
-      int perSetSize, int discriminatorColumnIndex) {
-    Comparator<IntermediateRecord> worstFirst = _intermediateRecordComparator.reversed();
-    Map<Integer, PriorityQueue<IntermediateRecord>> bucketsByGroupingId = new HashMap<>();
-    for (IntermediateRecord record : records) {
-      // The derive path builds IntermediateRecords without order-by values; recompute them so the per-set
-      // comparator can rank records within each bucket.
-      IntermediateRecord withValues = getIntermediateRecord(record._key, record._record);
-      int groupingId = ((Number) withValues._record.getValues()[discriminatorColumnIndex]).intValue();
-      PriorityQueue<IntermediateRecord> heap =
-          bucketsByGroupingId.computeIfAbsent(groupingId, k -> new PriorityQueue<>(worstFirst));
-      if (heap.size() < perSetSize) {
-        heap.offer(withValues);
-      } else if (_intermediateRecordComparator.compare(withValues, heap.peek()) < 0) {
-        heap.poll();
-        heap.offer(withValues);
       }
     }
     List<IntermediateRecord> result = new ArrayList<>();

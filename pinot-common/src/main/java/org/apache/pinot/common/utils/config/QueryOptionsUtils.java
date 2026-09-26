@@ -558,6 +558,22 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
   }
 
+  /// Maximum estimated base-group count for which grouping-set base aggregation is used; `null` lets the
+  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
+  @Nullable
+  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
+  }
+
+  @Nullable
+  public static Integer getGroupingSetsMinServerTrimSize(Map<String, String> queryOptions) {
+    String groupingSetsMinServerTrimSizeString =
+        queryOptions.get(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the per-set server trim for grouping-set base aggregation
+    return uncheckedParseInt(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, groupingSetsMinServerTrimSizeString);
+  }
+
   @Nullable
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
