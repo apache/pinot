@@ -68,6 +68,19 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// read-compare-update.
   void preloadSegment(ImmutableSegment segment);
 
+  /// Returns true if a newer record already exists for this primary key. Does not mutate metadata.
+  ///
+  /// Used to drop or mark out-of-order records before the physical write so a failed write cannot wipe the previous
+  /// valid location. A stopped manager reports out-of-order so the caller skips a write it can never claim.
+  default boolean isOutOfOrderRecord(RecordInfo recordInfo) {
+    return false;
+  }
+
+  /// Returns false when [addRecord] will no-op because the manager is stopped.
+  default boolean isAcceptingRecords() {
+    return true;
+  }
+
   /// Updates the upsert metadata for a new consumed record in the given consuming segment.
   boolean addRecord(MutableSegment segment, RecordInfo recordInfo);
 
