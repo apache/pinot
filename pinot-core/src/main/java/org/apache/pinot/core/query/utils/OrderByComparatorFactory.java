@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -70,11 +71,15 @@ public class OrderByComparatorFactory {
     return (k1, k2) -> valueComparator.compare(k1.getValues(), k2.getValues());
   }
 
-  private static Map<String, Integer> getGroupByExpressionIndexMap(List<ExpressionContext> groupByExpressions) {
-    Map<String, Integer> groupByExpressionIndexMap = new HashMap<>();
+  private static Map<ExpressionContext, Integer> getGroupByExpressionIndexMap(
+      List<ExpressionContext> groupByExpressions) {
+    Map<ExpressionContext, Integer> groupByExpressionIndexMap = new HashMap<>();
     int numGroupByExpressions = groupByExpressions.size();
     for (int i = 0; i < numGroupByExpressions; i++) {
-      groupByExpressionIndexMap.put(groupByExpressions.get(i).getIdentifier(), i);
+      // NOTE: Key on the whole expression, not on getIdentifier(). getIdentifier() is null for anything that is not a
+      //       plain column reference, so keying on it collapses every transform group-by key onto a single null entry
+      //       and makes all ORDER BY expressions resolve to the same column index.
+      groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
     }
     return groupByExpressionIndexMap;
   }
@@ -93,12 +98,14 @@ public class OrderByComparatorFactory {
   /// Add an index for each orderby expression with respect to its position in the group keys
   private static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
       List<OrderByExpressionContext> rowOrderByExpressions, List<ExpressionContext> groupByExpressions) {
-    Map<String, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
+    Map<ExpressionContext, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
     List<OrderByExpressionWithIndex> result = new ArrayList<>();
     // get index wrt group key for each order by expression
-    rowOrderByExpressions.forEach(expr ->
-        result.add(
-            new OrderByExpressionWithIndex(expr, groupByExpressionIndexMap.get(expr.getExpression().getIdentifier()))));
+    rowOrderByExpressions.forEach(expr -> {
+      Integer index = groupByExpressionIndexMap.get(expr.getExpression());
+      Preconditions.checkState(index != null, "ORDER BY expression: %s is not a GROUP BY key", expr.getExpression());
+      result.add(new OrderByExpressionWithIndex(expr, index));
+    });
     return result;
   }
 

@@ -22,9 +22,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
@@ -184,6 +186,47 @@ public class NoDictionaryGroupKeyGeneratorTest {
     for (int i = 0; i < NUM_COLUMNS - 1; i++) {
       testGroupKeyGenerator(new int[]{i, NUM_COLUMNS - 1});
     }
+  }
+
+  /// When the group limit is reached, the multi-column generator must still look up each row's own key. The test
+  /// data contains no null values, so enabling null handling must not change the generated group keys at all.
+  @Test
+  public void testMultiColumnGroupKeyGeneratorAtGroupsLimitWithNullHandling() {
+    int numGroupsLimit = 5;
+    ExpressionContext[] groupByExpressions = new ExpressionContext[]{
+        ExpressionContext.forIdentifier(INT_COLUMN), ExpressionContext.forIdentifier(LONG_COLUMN)
+    };
+
+    int[] groupKeysWithoutNullHandling = new int[NUM_RECORDS];
+    new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions, numGroupsLimit, false,
+        null).generateKeysForBlock(_valueBlock, groupKeysWithoutNullHandling);
+
+    int[] groupKeysWithNullHandling = new int[NUM_RECORDS];
+    new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions, numGroupsLimit, true,
+        null).generateKeysForBlock(_valueBlock, groupKeysWithNullHandling);
+
+    assertEquals(groupKeysWithNullHandling, groupKeysWithoutNullHandling);
+
+    // Sanity check the absolute values too, derived from the block's own contents rather than from an assumed row
+    // layout: the first 'numGroupsLimit' distinct keys encountered get sequential ids, and every key first seen after
+    // the limit is reached stays invalid forever.
+    int numDocs = _valueBlock.getNumDocs();
+    assertEquals(numDocs, NUM_RECORDS);
+    int[] intValues = _valueBlock.getBlockValueSet(groupByExpressions[0]).getIntValuesSV();
+    long[] longValues = _valueBlock.getBlockValueSet(groupByExpressions[1]).getLongValuesSV();
+    Map<List<Object>, Integer> keyToId = new HashMap<>();
+    int[] expectedGroupKeys = new int[NUM_RECORDS];
+    int nextId = 0;
+    for (int row = 0; row < numDocs; row++) {
+      List<Object> key = List.of(intValues[row], longValues[row]);
+      Integer id = keyToId.get(key);
+      if (id == null) {
+        id = nextId < numGroupsLimit ? nextId++ : GroupKeyGenerator.INVALID_ID;
+        keyToId.put(key, id);
+      }
+      expectedGroupKeys[row] = id;
+    }
+    assertEquals(groupKeysWithNullHandling, expectedGroupKeys);
   }
 
   private void testGroupKeyGenerator(int[] groupByColumnIndexes) {
