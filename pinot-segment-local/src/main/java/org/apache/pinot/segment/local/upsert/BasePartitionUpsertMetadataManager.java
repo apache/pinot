@@ -730,7 +730,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         segmentName);
     // Revert the keys in the segment to previous location and remove the newly added keys
     removeSegment(oldSegment, validDocIdsForOldSegment);
-    if (getPrevKeyToRecordLocationSize() == 0) {
+    if (!hasPrevKeyToRecordLocations()) {
       _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
       return;
     }
@@ -1361,6 +1361,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected abstract int getPrevKeyToRecordLocationSize();
+
+  protected boolean hasPrevKeyToRecordLocations() {
+    return getPrevKeyToRecordLocationSize() > 0;
+  }
 
   protected abstract void clearPrevKeyToRecordLocation();
 }
