@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.docidsets;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// A DocIdSet used for early short-circuiting that behaves like an empty set
@@ -41,6 +43,11 @@ public final class ShortCircuitingDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return _numEntriesScannedInFilter;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    return new MutableRoaringBitmap();
   }
 
   @Override
