@@ -61,7 +61,7 @@
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
     <RollingFile
-        name="querylog"
+        name="queryLog"
         fileName="${env:LOG_DIR}/querylog.log"
         filePattern="${env:LOG_DIR}/querylog.%d{yyyy-MM-dd}.%i.log.gz"
         immediateFlush="false">

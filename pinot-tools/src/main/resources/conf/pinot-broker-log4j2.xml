@@ -36,7 +36,7 @@
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
     </RandomAccessFile>
-    <RandomAccessFile name="querylog" fileName="querylog.log" immediateFlush="false">
+    <RandomAccessFile name="queryLog" fileName="querylog.log" immediateFlush="false">
       <PatternLayout>
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
@@ -55,7 +55,7 @@
     </Logger>
     <!-- Output query logs to a dedicated file-->
     <Logger name="org.apache.pinot.broker.querylog.QueryLogger" level="debug" additivity="false">
-      <AppenderRef ref="querylog"/>
+      <AppenderRef ref="queryLog"/>
     </Logger>
     <!-- Output broker starter logs to the console -->
     <Logger name="org.apache.pinot.broker.broker.helix.HelixBrokerStarter" level="info" additivity="false">
