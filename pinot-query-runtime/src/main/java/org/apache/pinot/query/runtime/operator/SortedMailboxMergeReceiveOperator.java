@@ -230,6 +230,10 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
           _readyCursors.ensureOrdered();
         }
       }
+      if (_readyCursors.size() == 4) {
+        advanceFourCursors(rows);
+        continue;
+      }
       SenderCursor cursor = _readyCursors.peek();
       rows.add(cursor.next());
       if (cursor.hasRow()) {
@@ -380,6 +384,102 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     }
   }
 
+  /// Merges the common four-sender case with two comparisons per row instead of a heap sift-down. Stop when one
+  /// cursor runs dry because its next block may contain the global minimum.
+  private void advanceFourCursors(List<Object[]> output) {
+    SenderCursor cursor0 = _readyCursors.get(0);
+    SenderCursor cursor1 = _readyCursors.get(1);
+    SenderCursor cursor2 = _readyCursors.get(2);
+    SenderCursor cursor3 = _readyCursors.get(3);
+    _readyCursors.clear();
+
+    Object[] head0 = cursor0.peek();
+    Object[] head1 = cursor1.peek();
+    Object[] head2 = cursor2.peek();
+    Object[] head3 = cursor3.peek();
+    int leftWinner = betterHead(head0, 0, head1, 1);
+    int rightWinner = betterHead(head2, 2, head3, 3);
+    int winner = betterWinner(leftWinner, head0, head1, rightWinner, head2, head3);
+    boolean exhausted = false;
+    while (output.size() < SortOperator.DEFAULT_MAX_ROWS_PER_BLOCK && !exhausted) {
+      switch (winner) {
+        case 0:
+          output.add(head0);
+          cursor0.advance();
+          head0 = cursor0.hasRow() ? cursor0.peek() : null;
+          exhausted = head0 == null;
+          leftWinner = betterHead(head0, 0, head1, 1);
+          break;
+        case 1:
+          output.add(head1);
+          cursor1.advance();
+          head1 = cursor1.hasRow() ? cursor1.peek() : null;
+          exhausted = head1 == null;
+          leftWinner = betterHead(head0, 0, head1, 1);
+          break;
+        case 2:
+          output.add(head2);
+          cursor2.advance();
+          head2 = cursor2.hasRow() ? cursor2.peek() : null;
+          exhausted = head2 == null;
+          rightWinner = betterHead(head2, 2, head3, 3);
+          break;
+        case 3:
+          output.add(head3);
+          cursor3.advance();
+          head3 = cursor3.hasRow() ? cursor3.peek() : null;
+          exhausted = head3 == null;
+          rightWinner = betterHead(head2, 2, head3, 3);
+          break;
+        default:
+          throw new IllegalStateException("Four-cursor tournament has no winner");
+      }
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(output.size(), MERGE_SCOPE,
+          _context.getActiveDeadlineMs());
+      if (!exhausted) {
+        winner = betterWinner(leftWinner, head0, head1, rightWinner, head2, head3);
+      }
+    }
+
+    int cursorState = restoreFourCursor(cursor0, head0) | restoreFourCursor(cursor1, head1)
+        | restoreFourCursor(cursor2, head2) | restoreFourCursor(cursor3, head3);
+    if ((cursorState & 1) != 0) {
+      _tryEqualHeadMerge = false;
+    } else if ((cursorState & 2) != 0) {
+      _tryEqualHeadMerge = true;
+    }
+  }
+
+  /// Returns bit 0 for a starved cursor and bit 1 for a finished cursor.
+  private int restoreFourCursor(SenderCursor cursor, @Nullable Object[] head) {
+    if (head != null) {
+      _readyCursors.add(cursor);
+      return 0;
+    }
+    if (!cursor._finished) {
+      _starvedCursors.add(cursor);
+      return 1;
+    }
+    return 2;
+  }
+
+  private int betterWinner(int leftWinner, Object[] head0, Object[] head1, int rightWinner, Object[] head2,
+      Object[] head3) {
+    Object[] leftHead = leftWinner == 0 ? head0 : head1;
+    Object[] rightHead = rightWinner == 2 ? head2 : head3;
+    return betterHead(leftHead, leftWinner, rightHead, rightWinner);
+  }
+
+  private int betterHead(@Nullable Object[] left, int leftCursor, @Nullable Object[] right, int rightCursor) {
+    if (left == null) {
+      return right == null ? -1 : rightCursor;
+    }
+    if (right == null) {
+      return leftCursor;
+    }
+    return _comparator.compare(left, right) <= 0 ? leftCursor : rightCursor;
+  }
+
   /// Drops data that raced with early termination until aggregate EOS or a sender error arrives.
   private MseBlock readUntilEos() {
     while (true) {
@@ -462,6 +562,10 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
       return _rows.get(_index++);
     }
 
+    void advance() {
+      _index++;
+    }
+
     int getCappedAvailableRowCount(int limit) {
       int rowCount = _rows.size() - _index;
       if (rowCount >= limit) {
@@ -527,6 +631,10 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
     SenderCursor peek() {
       return _heap[0];
+    }
+
+    SenderCursor get(int index) {
+      return _heap[index];
     }
 
     void updateTop() {

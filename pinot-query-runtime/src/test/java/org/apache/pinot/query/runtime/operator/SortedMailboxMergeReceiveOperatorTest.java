@@ -340,6 +340,42 @@ public class SortedMailboxMergeReceiveOperatorTest {
     }
   }
 
+  @Test(timeOut = 10_000)
+  public void shouldMergeFourSendersAcrossOutputBlocks() {
+    List<Integer> senderIds = List.of(0, 1, 2, 3);
+    MailboxInfos mailboxInfos = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, senderIds));
+    StageMetadata stageMetadata = new StageMetadata(0,
+        senderIds.stream().map(id -> new WorkerMetadata(id, Map.of(1, mailboxInfos), Map.of()))
+            .collect(Collectors.toList()), Map.of());
+    for (int senderId : senderIds) {
+      ReceivingMailbox mailbox = mock(ReceivingMailbox.class);
+      String mailboxId = MailboxIdUtils.toMailboxId(0, 1, senderId, 0, 0);
+      when(mailbox.getId()).thenReturn(mailboxId);
+      when(mailbox.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+      when(_mailboxService.getReceivingMailbox(eq(mailboxId))).thenReturn(mailbox);
+      Object[][] rows = new Object[3_000][];
+      for (int i = 0; i < rows.length; i++) {
+        rows[i] = new Object[]{i * 4 + senderId, senderId};
+      }
+      when(mailbox.poll()).thenReturn(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, rows),
+          OperatorTestUtil.eosWithEmptyStats());
+    }
+
+    try (SortedMailboxMergeReceiveOperator operator = getOperator(stageMetadata,
+        RelDistribution.Type.HASH_DISTRIBUTED)) {
+      for (int blockIndex = 0; blockIndex < 2; blockIndex++) {
+        List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+        int expectedSize = blockIndex == 0 ? 10_000 : 2_000;
+        assertEquals(rows.size(), expectedSize);
+        for (int i = 0; i < expectedSize; i++) {
+          assertEquals(rows.get(i)[0], blockIndex * 10_000 + i);
+        }
+      }
+      assertTrue(operator.nextBlock().isSuccess());
+      assertEquals(operator.getRetainedCursorRowCount(), 0);
+    }
+  }
+
   @Test
   public void shouldEmitFallbackRowsInBoundedBlocks() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
