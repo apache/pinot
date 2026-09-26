@@ -75,8 +75,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -813,29 +813,30 @@ public class BrokerRoutingManagerTest {
   @Test
   public void testPartitionPruningThresholdUpdates()
       throws Exception {
-    String key = CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
+    String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
     _routingManager = spy(_routingManager);
-    doNothing().when(_routingManager).buildRouting(any());
     putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
     DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
     ClusterConfig config = new ClusterConfig("testCluster");
     config.getRecord().setSimpleField(key, "128");
     handler.onClusterConfigChange(config, null);
     handler.registerClusterConfigChangeListener(_routingManager);
-    assertEquals(_routingManager.getPartitionPruningMinSegments(), 128);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), 128);
 
     config.getRecord().setSimpleField(key, "-1");
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningMinSegments(), -1);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), -1);
 
     config.getRecord().setSimpleField(key, "invalid");
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningMinSegments(), DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
 
     config.getRecord().getSimpleFields().clear();
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningMinSegments(), DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
-    verify(_routingManager, times(3)).buildRouting(TEST_TABLE);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+    verify(_routingManager, never()).buildRouting(TEST_TABLE);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.
