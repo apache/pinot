@@ -59,6 +59,7 @@ public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager 
 
   public void shutdown() {
     _routingChangeExecutor.shutdownNow();
+    super.stop();
   }
 
   public void determineRoutingChangeForTables() {
@@ -132,6 +133,7 @@ public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager 
 
   @VisibleForTesting
   boolean isExecutorShutdown() {
-    return _routingChangeExecutor.isShutdown() || _routingChangeExecutor.isTerminated();
+    return (_routingChangeExecutor.isShutdown() || _routingChangeExecutor.isTerminated())
+        && isInstanceConfigRetryExecutorShutdown();
   }
 }
