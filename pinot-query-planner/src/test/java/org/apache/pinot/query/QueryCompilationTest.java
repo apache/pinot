@@ -1290,8 +1290,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// ordering as an operator in the sending fragment: the send node's flag alone is only metadata.
   @Test
   public void testGlobalOrderedWindowSenderHasExplicitMatchingSortInput() {
-    String query = "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
-    MailboxSendNode sendNode = findWindowInputSendNode(_queryEnvironment.planQuery(query));
+    String query = "SET windowSortOnSender=true; SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d";
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(query);
+    MailboxSendNode sendNode = findWindowInputSendNode(plan);
 
     assertTrue(sendNode.isSort(), "The ordered window exchange should advertise sorted sender streams");
     assertTrue(sendNode.hasExplicitSortInput(),
@@ -1303,6 +1304,31 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(sortNode.getFetch(), Integer.MAX_VALUE);
     assertEquals(sortNode.getOffset(), -1);
     assertEquals(sortNode.getInputs().size(), 1, "The explicit sender sort should preserve the exchange input");
+
+    WindowNode window = findWindowNode(plan);
+    assertTrue(window.getInputs().get(0) instanceof MailboxReceiveNode,
+        "The merge receiver itself establishes ordering; no redundant SortNode should remain above it");
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) window.getInputs().get(0);
+    assertTrue(receiveNode.isSort());
+    assertTrue(receiveNode.isSortedOnSender());
+
+    String explain = _queryEnvironment.explainQuery(
+        "SET windowSortOnSender=true; EXPLAIN IMPLEMENTATION PLAN FOR "
+            + "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d", RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("[SORTED]"), explain);
+    assertTrue(explain.contains("SORT LIMIT 2147483647"), explain);
+  }
+
+  @Test
+  public void testGlobalOrderedWindowSenderSortIsDisabledByDefault() {
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(
+        "SELECT col1, SUM(col3) OVER (ORDER BY col3) FROM d");
+    MailboxSendNode sendNode = findWindowInputSendNode(plan);
+
+    assertFalse(sendNode.isSort());
+    assertFalse(sendNode.hasExplicitSortInput());
+    assertTrue(findWindowNode(plan).getInputs().get(0) instanceof SortNode,
+        "The disabled path must retain the legacy post-exchange full sort");
   }
 
   /// A partitioned ordered window keeps its authoritative full sort after the hash exchange.
@@ -1320,20 +1346,24 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// Finds the [MailboxSendNode] that feeds the (single) WINDOW stage's input exchange, i.e. the sender side of
   /// the exchange inserted directly below the window. The `prePartitioned` flag lives on this send node.
   private MailboxSendNode findWindowInputSendNode(DispatchableSubPlan dispatchableSubPlan) {
-    WindowNode window = null;
-    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
-      window = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), WindowNode.class);
-      if (window != null) {
-        break;
-      }
-    }
-    assertNotNull(window, "Expected a WINDOW node in the plan");
+    WindowNode window = findWindowNode(dispatchableSubPlan);
     MailboxReceiveNode receiveNode = findNodeOfType(window, MailboxReceiveNode.class);
     assertNotNull(receiveNode, "Expected the WINDOW input to be a mailbox exchange");
     PlanNode senderRoot =
         dispatchableSubPlan.getQueryStageMap().get(receiveNode.getSenderStageId()).getPlanFragment().getFragmentRoot();
     assertTrue(senderRoot instanceof MailboxSendNode, "Sender fragment root should be a MailboxSendNode");
     return (MailboxSendNode) senderRoot;
+  }
+
+  private WindowNode findWindowNode(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      WindowNode window = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), WindowNode.class);
+      if (window != null) {
+        return window;
+      }
+    }
+    fail("Expected a WINDOW node in the plan");
+    throw new AssertionError("unreachable");
   }
 
   /// The `setOpOptions(is_colocated_by_set_op_keys='true')` hint forces a pre-partitioned (direct) exchange on
