@@ -19,19 +19,52 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class InMemorySendingMailboxTest {
+
+  @Test(dataProvider = "cancellationErrors")
+  public void cancelPreservesQueryErrorCode(Exception exception, QueryErrorCode expectedCode) {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("test-mailbox", 1);
+    receivingMailbox.registeredReader(mock(ReceivingMailbox.Reader.class));
+    MailboxService mailboxService = mock(MailboxService.class);
+    when(mailboxService.getReceivingMailbox("test-mailbox")).thenReturn(receivingMailbox);
+    InMemorySendingMailbox mailbox = new InMemorySendingMailbox("test-mailbox", mailboxService, Long.MAX_VALUE,
+        new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    mailbox.cancel(exception);
+
+    ErrorMseBlock errorBlock = (ErrorMseBlock) receivingMailbox.poll().getBlock();
+    assertEquals(errorBlock.getErrorMessages(),
+        Map.of(expectedCode, "Cancelled by sender with exception: " + exception.getMessage()));
+  }
+
+  @DataProvider(name = "cancellationErrors")
+  public Object[][] cancellationErrors() {
+    return new Object[][]{
+        {new QueryException(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "CPU limit"),
+            QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED},
+        {new RuntimeException("ordinary cancellation"), QueryErrorCode.QUERY_CANCELLATION}
+    };
+  }
 
   @Test
   public void sendDataThrowsWhenQueryTerminated() {

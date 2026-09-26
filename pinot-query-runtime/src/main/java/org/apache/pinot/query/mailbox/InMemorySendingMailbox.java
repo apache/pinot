@@ -24,7 +24,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,8 +120,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
     _receivingMailbox.setErrorBlock(
-        ErrorMseBlock.fromException(new QueryCancelledException(
-            "Cancelled by sender with exception: " + t.getMessage())), List.of());
+        ErrorMseBlock.fromError(QueryErrorCode.fromThrowable(t, QueryErrorCode.QUERY_CANCELLATION),
+            "Cancelled by sender with exception: " + t.getMessage()), List.of());
   }
 
   @Override
