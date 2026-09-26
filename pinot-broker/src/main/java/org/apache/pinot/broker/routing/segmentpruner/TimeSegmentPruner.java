@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,7 +62,19 @@ public class TimeSegmentPruner implements SegmentPruner {
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
 
+  /// Interval tree over [#_intervalMap], or `null` once a segment change has invalidated it.
+  ///
+  /// A rebuild is O(n log n) over every segment of the table, while a change usually touches a single segment, so the
+  /// tree is invalidated on change and rebuilt on read by [#getIntervalTree()] instead of being rebuilt per change.
+  /// That matters because the controller broadcasts a segment refresh message to every broker whenever a REALTIME
+  /// segment commits, while queries are spread across the brokers: one broker absorbs several refreshes per query it
+  /// serves, and rebuilding on read collapses them into one rebuild.
+  ///
+  /// Rebuilding on read rather than on a timer is required, not just convenient: [#prune(BrokerRequest, Set)] takes
+  /// the segments it returns from the tree, so a segment the tree does not know about is dropped from the routing
+  /// rather than merely left unpruned.
   private volatile IntervalTree<String> _intervalTree;
+  /// Guarded by the lock on this pruner, both for writes and for the reads that [#getIntervalTree()] makes.
   private final Map<String, Interval> _intervalMap = new HashMap<>();
 
   public TimeSegmentPruner(TableConfig tableConfig, DateTimeFieldSpec timeFieldSpec) {
@@ -71,7 +84,7 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
+  public synchronized void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
       List<ZNRecord> znRecords) {
     // Bulk load time info for all online segments
     for (int idx = 0; idx < onlineSegments.size(); idx++) {
@@ -107,20 +120,45 @@ public class TimeSegmentPruner implements SegmentPruner {
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    int numSegmentsBefore = _intervalMap.size();
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
       _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
     }
-    _intervalMap.keySet().retainAll(onlineSegments);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    // Only insertions can change the size because computeIfAbsent never replaces an existing interval. An external
+    // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
+    boolean segmentsChanged = _intervalMap.size() != numSegmentsBefore;
+    segmentsChanged |= _intervalMap.keySet().retainAll(onlineSegments);
+    if (segmentsChanged) {
+      _intervalTree = null;
+    }
   }
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecord);
-    _intervalMap.put(segment, interval);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    // A segment is commonly refreshed onto the time interval it already has (e.g. an OFFLINE segment replaced with a
+    // new build of the same time range), which leaves the tree correct as is
+    if (!interval.equals(_intervalMap.put(segment, interval))) {
+      _intervalTree = null;
+    }
+  }
+
+  /// Returns the interval tree, rebuilding it first if a segment change has invalidated it.
+  @VisibleForTesting
+  IntervalTree<String> getIntervalTree() {
+    IntervalTree<String> intervalTree = _intervalTree;
+    if (intervalTree == null) {
+      synchronized (this) {
+        intervalTree = _intervalTree;
+        if (intervalTree == null) {
+          intervalTree = new IntervalTree<>(_intervalMap);
+          _intervalTree = intervalTree;
+        }
+      }
+    }
+    return intervalTree;
   }
 
   /// NOTE: Pruning is done by searching \_intervalTree based on request time interval and check if the results
@@ -128,7 +166,6 @@ public class TimeSegmentPruner implements SegmentPruner {
   ///       M: # of qualified intersected segments).
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    IntervalTree<String> intervalTree = _intervalTree;
     Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
     if (filterExpression == null) {
       return segments;
@@ -144,6 +181,9 @@ public class TimeSegmentPruner implements SegmentPruner {
       return Set.of();
     }
 
+    // Read the tree only once it is known to be needed, so that queries without a prunable time filter never pay for
+    // a rebuild
+    IntervalTree<String> intervalTree = getIntervalTree();
     Set<String> selectedSegments = new HashSet<>();
     for (Interval interval : intervals) {
       for (String segment : intervalTree.searchAll(interval)) {
