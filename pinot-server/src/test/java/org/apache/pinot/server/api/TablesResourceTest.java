@@ -855,6 +855,74 @@ public class TablesResourceTest extends BaseResourceTest {
     }
   }
 
+  /// `GET /tables/{table}/metadata?columns=*` intersects the column sets of all segments. The first segment's
+  /// `getAllColumns()` is a view of that segment's own metadata, so intersecting in place would delete every column a
+  /// later segment lacks from the serving segment, and schema evolution makes that the normal case. Three segments
+  /// with pairwise different column sets lose a column on every iteration order if the view is narrowed in place.
+  @Test
+  public void testTableMetadataWithAllColumnsLeavesSegmentColumnsIntact()
+      throws Exception {
+    String tableName = "columnSetTable_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    try {
+      segments.add(buildSegment(tableName, "allColumns", List.of("column1", "column2", "column3")));
+      segments.add(buildSegment(tableName, "noColumn2", List.of("column1", "column3")));
+      segments.add(buildSegment(tableName, "noColumn3", List.of("column1", "column2")));
+      Map<String, Set<String>> columnsBefore = new HashMap<>();
+      for (ImmutableSegment segment : segments) {
+        _tableDataManagerMap.get(tableName).addSegment(segment);
+        columnsBefore.put(segment.getSegmentName(), Set.copyOf(segment.getColumnNames()));
+      }
+
+      String response = _webTarget.path("/tables/" + tableName + "/metadata").queryParam("columns", "*").request()
+          .get(String.class);
+      TableMetadataInfo metadata = JsonUtils.stringToObject(response, TableMetadataInfo.class);
+
+      // The response covers the column every segment has ...
+      assertTrue(metadata.getColumnLengthMap().containsKey("column1"));
+      // ... and computing it left every segment's own column set untouched
+      for (ImmutableSegment segment : segments) {
+        String segmentName = segment.getSegmentName();
+        Set<String> expected = columnsBefore.get(segmentName);
+        assertEquals(Set.copyOf(segment.getColumnNames()), expected, segmentName);
+        assertEquals(Set.copyOf(segment.getSegmentMetadata().getAllColumns()), expected, segmentName);
+        assertEquals(Set.copyOf(segment.getSegmentMetadata().getSchema().getColumnNames()), expected, segmentName);
+      }
+    } finally {
+      for (ImmutableSegment segment : segments) {
+        segment.offload();
+        segment.destroy();
+      }
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
+
+  private ImmutableSegment buildSegment(String tableNameWithType, String segmentName, List<String> columns)
+      throws Exception {
+    Schema.SchemaBuilder schemaBuilder =
+        new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType));
+    for (String column : columns) {
+      schemaBuilder.addSingleValueDimension(column, DataType.INT);
+    }
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      GenericRow row = new GenericRow();
+      for (String column : columns) {
+        row.putValue(column, i);
+      }
+      rows.add(row);
+    }
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameWithType).build(), schemaBuilder.build());
+    config.setOutDir(new File(_tempDir, tableNameWithType).getAbsolutePath());
+    config.setSegmentName(segmentName);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    return ImmutableSegmentLoader.load(new File(config.getOutDir(), driver.getSegmentName()), ReadMode.mmap);
+  }
+
   // Override to use data with delete records
   @Override
   protected String getAvroFileName() {
