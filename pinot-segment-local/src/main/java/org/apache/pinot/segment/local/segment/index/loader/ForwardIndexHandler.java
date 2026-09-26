@@ -248,14 +248,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     Map<String, List<Operation>> columnOperationsMap = new HashMap<>();
-    Set<String> existingAllColumns = segmentMetadata.getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
     Set<String> existingInvertedIndexColumns =
         segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
     String segmentName = segmentMetadata.getName();
 
-    for (String column : existingAllColumns) {
+    for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
+      if (columnMetadata.getFieldSpec().isVirtualColumn()) {
+        continue;
+      }
+      String column = columnMetadata.getColumnName();
       if (!_schema.hasColumn(column)) {
         // _schema will be null only in tests
         LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column, segmentName);
@@ -270,7 +273,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       // Forward-index encoding is the source-of-truth for "does forward exist and how is it laid out". Three
       // states: DICTIONARY (dict-encoded forward), RAW (raw forward), null (forward disabled / not on disk).
       EncodingType existingFwdEncoding = existingForwardIndexColumns.contains(column)
-          ? segmentMetadata.getColumnMetadataFor(column).getForwardIndexEncoding()
+          ? columnMetadata.getForwardIndexEncoding()
           : null;
       ForwardIndexConfig newFwdConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
       EncodingType newFwdEncoding = newFwdConf.isEnabled() ? newFwdConf.getEncodingType() : null;
