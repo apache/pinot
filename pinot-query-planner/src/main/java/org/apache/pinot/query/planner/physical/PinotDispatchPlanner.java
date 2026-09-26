@@ -217,6 +217,8 @@ public class PinotDispatchPlanner {
       fragmentMap.put(0, reduceStage);
     }
     WorkerMetadata workerMetadata = workerMetadataList.get(0);
+    // Stage-0 workers never carry segment maps, and this keeps it that way now that they live outside the custom
+    // properties: the copy below takes the custom properties only.
     reduceStage.setWorkerMetadataList(List.of(
         new WorkerMetadata(workerMetadata.getWorkerId(), Map.of(), workerMetadata.getCustomProperties())));
   }

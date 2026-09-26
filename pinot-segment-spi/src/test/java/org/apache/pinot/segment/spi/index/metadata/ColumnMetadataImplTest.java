@@ -20,9 +20,15 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -43,6 +49,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
@@ -382,8 +389,10 @@ public class ColumnMetadataImplTest {
     assertNotSame(negativeZero.getDefaultNullValue(), FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_FLOAT);
     assertEquals(negativeZero.getDefaultNullValueString(), "-0.0");
 
+    String literal = ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, new String("-1"));
+    assertEquals(literal, "-1");
     assertSame(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, new String("-1")),
-        "-1");
+        literal);
     assertNull(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.INT, null));
   }
 
@@ -463,13 +472,15 @@ public class ColumnMetadataImplTest {
   /// keeps parsing the literal instead of failing on the type-default lookup.
   @Test
   public void literalWithoutTypeDefaultIsKept() {
+    String literal =
+        ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.METRIC, DataType.BOOLEAN, new String("1"));
+    assertEquals(literal, "1");
     assertSame(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.METRIC, DataType.BOOLEAN, new String("1")),
-        "1");
+        literal);
     assertEquals(parse(FieldType.METRIC, DataType.BOOLEAN, "1").getDefaultNullValue(), 1);
   }
 
-  /// The strings a column retains for its lifetime alias the JVM-wide interned instances, so every segment of the
-  /// table shares them.
+  /// Column names and parent names share the same interner across metadata loads.
   @Test
   public void columnNameAndParentColumnAreInterned() {
     PropertiesConfiguration config = baseConfig("metrics$cpu");
@@ -478,12 +489,65 @@ public class ColumnMetadataImplTest {
 
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "metrics$cpu");
 
-    assertSame(metadata.getFieldSpec().getName(), "cpu");
-    assertSame(metadata.getParentColumn(), "metrics");
+    assertEquals(metadata.getFieldSpec().getName(), "cpu");
+    assertSame(metadata.getFieldSpec().getName(), ColumnNameInterner.intern(new String("cpu")));
+    assertEquals(metadata.getParentColumn(), "metrics");
+    assertSame(metadata.getParentColumn(), ColumnNameInterner.intern(new String("metrics")));
+    assertNull(ColumnNameInterner.intern(null));
     // Without an explicit COLUMN_NAME the key itself is the name.
     String column = new String("plain");
     FieldSpec spec = ColumnMetadataImpl.extractFieldSpec(column, baseConfigWithoutName(column));
-    assertSame(spec.getName(), "plain");
+    assertEquals(spec.getName(), "plain");
+    assertSame(spec.getName(), ColumnNameInterner.intern(new String("plain")));
+  }
+
+  @Test
+  public void columnNamesAndDefaultsUseSeparateInterners() {
+    String value = "metadata_" + UUID.randomUUID();
+    String pooled = new String(value).intern();
+    String name = ColumnNameInterner.intern(new String(value));
+    String defaultValue =
+        ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.STRING, new String(value));
+    assertEquals(name, value);
+    assertEquals(defaultValue, value);
+    assertNotSame(name, pooled);
+    assertNotSame(defaultValue, pooled);
+    assertNotSame(name, defaultValue);
+    assertSame(ColumnNameInterner.intern(new String(value)), name);
+    assertSame(ColumnMetadataImpl.canonicalDefaultNullValue(FieldType.DIMENSION, DataType.STRING, new String(value)),
+        defaultValue);
+  }
+
+  @Test
+  public void columnNamesAndDefaultsAreSharedDuringConcurrentParsing()
+      throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      List<Future<FieldSpec>> results = new ArrayList<>();
+      for (int i = 0; i < 32; i++) {
+        int maxLength = 100 + i;
+        results.add(executor.submit(() -> {
+          assertTrue(start.await(10, TimeUnit.SECONDS));
+          PropertiesConfiguration config =
+              configFor(FieldType.DIMENSION, DataType.STRING, new String("shared-default"));
+          config.setProperty(Column.getKeyFor("col", Column.COLUMN_NAME), new String("shared-column"));
+          config.setProperty(Column.getKeyFor("col", Column.SCHEMA_MAX_LENGTH), maxLength);
+          return ColumnMetadataImpl.extractFieldSpec("col", config);
+        }));
+      }
+      start.countDown();
+      FieldSpec first = results.get(0).get(10, TimeUnit.SECONDS);
+      for (int i = 1; i < results.size(); i++) {
+        FieldSpec other = results.get(i).get(10, TimeUnit.SECONDS);
+        assertNotSame(other, first, "Different max lengths must not share a FieldSpec");
+        assertSame(other.getName(), first.getName());
+        assertSame(other.getDefaultNullValue(), first.getDefaultNullValue());
+      }
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
   }
 
   /// A server retains one FieldSpec per (segment, column) and every segment of a table parses the same column
@@ -597,8 +661,7 @@ public class ColumnMetadataImplTest {
     assertNotSame(ColumnMetadataImpl.extractFieldSpec("col", otherGranularity), dateTime, "granularity");
   }
 
-  /// [ComplexFieldSpec] does not override equals/hashCode, so two structs with the same name but different children
-  /// are equal under [FieldSpec#equals]; interning the parent would alias them. Only the children are interned.
+  /// Complex parents retain independent child maps, while equal child specs are shared.
   @Test
   public void complexParentIsNotInternedWhileChildrenAre() {
     PropertiesConfiguration twoChildren = complexConfig("metrics", "cpu", "host");
@@ -608,8 +671,8 @@ public class ColumnMetadataImplTest {
         (ComplexFieldSpec) ColumnMetadataImpl.extractFieldSpec("metrics", complexConfig("metrics", "cpu"));
     assertNotSame(second, first);
     assertNotSame(narrower, first);
-    // The guard is real: the parents are equal despite their different children.
-    assertEquals(narrower, first);
+    assertEquals(second, first);
+    assertNotEquals(narrower, first);
     assertEquals(first.getChildFieldSpecs().keySet(), Set.of("cpu", "host"));
     assertEquals(narrower.getChildFieldSpecs().keySet(), Set.of("cpu"));
     assertSame(second.getChildFieldSpec("cpu"), first.getChildFieldSpec("cpu"));

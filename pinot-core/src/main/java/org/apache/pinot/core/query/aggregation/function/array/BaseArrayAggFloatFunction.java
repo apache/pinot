@@ -20,10 +20,15 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.floats.FloatCollection;
+import it.unimi.dsi.fastutil.floats.FloatIterator;
+import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -39,6 +44,23 @@ public abstract class BaseArrayAggFloatFunction<I extends FloatCollection>
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          FloatSet set = ObjectSerDeUtils.FLOAT_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.FLOAT));
+          FloatIterator iterator = set.iterator();
+          while (iterator.hasNext()) {
+            setGroupByResult(groupByResultHolder, groupKey, iterator.nextFloat());
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       float[] values = blockValSet.getFloatValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -64,6 +86,24 @@ public abstract class BaseArrayAggFloatFunction<I extends FloatCollection>
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          FloatSet set = ObjectSerDeUtils.FLOAT_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.FLOAT));
+          for (int groupKey : groupKeysArray[i]) {
+            FloatIterator iterator = set.iterator();
+            while (iterator.hasNext()) {
+              setGroupByResult(groupByResultHolder, groupKey, iterator.nextFloat());
+            }
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       float[] values = blockValSet.getFloatValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {

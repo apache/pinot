@@ -184,9 +184,10 @@ public class OperatorBufferReleaseTest {
 
   @Test
   public void shouldReleaseSortRowsOnError() {
-    // No collations => the operator buffers into _rows instead of the priority queue.
+    // No fetch => nothing bounds the result, so the operator buffers every row into _rows instead of a heap.
     givenInputProducesThenFails();
-    SortOperator operator = sortOperator(_input, List.of());
+    SortOperator operator =
+        sortOperator(_input, List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST)), -1);
 
     assertTrue(operator.nextBlock().isError());
     assertTrue(operator.hasBufferedState(), "the sort is still holding its rows when the error propagates");
@@ -208,20 +209,35 @@ public class OperatorBufferReleaseTest {
     verify(_input, times(1)).cancel(ERROR);
   }
 
-  /// The block [SortOperator] emits is a sublist view of `_rows`, and a block handed to a local mailbox can still be
-  /// read after this op chain has been closed. Releasing must therefore drop the reference, never empty the list.
+  /// The block the buffer-and-sort implementation emits is a sublist view of `_rows`, and a block handed to a local
+  /// mailbox can still be read after this op chain has been closed. Releasing must therefore drop the reference,
+  /// never empty the list.
   @Test
   public void shouldNotEmptyTheBlockEmittedBySort() {
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(SCHEMA, new Object[]{2, "b"}, new Object[]{1, "a"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
-    SortOperator operator = sortOperator(_input, List.of());
+    SortOperator operator =
+        sortOperator(_input, List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST)), -1);
     List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(rows.size(), 2);
 
     operator.close();
 
     assertEquals(rows.size(), 2, "the emitted block must survive the operator being closed");
-    assertEquals(rows.get(0), new Object[]{2, "b"});
+    assertEquals(rows.get(0), new Object[]{1, "a"});
+  }
+
+  /// The streaming implementation, chosen when there is no collation, forwards input blocks as they arrive and keeps
+  /// no cross-block state, so there is nothing for it to hold on to in the first place.
+  @Test
+  public void shouldHoldNothingWhenTheSortIsAStreamingLimit() {
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(SCHEMA, new Object[]{2, "b"}, new Object[]{1, "a"}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    SortOperator operator = sortOperator(_input, List.of());
+
+    assertTrue(operator.nextBlock().isData());
+
+    assertFalse(operator.hasBufferedState(), "a streaming limit buffers nothing to release");
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -443,10 +459,14 @@ public class OperatorBufferReleaseTest {
     }
   }
 
+  /// A collation with no fetch: nothing bounds the result, so every row is buffered and sorted. The no-collation
+  /// case is deliberately absent - that implementation streams its input straight through and holds nothing, which
+  /// [#shouldHoldNothingWhenTheSortIsAStreamingLimit()] pins instead.
   private MultiStageOperator sortHoldingRows() {
     resetMocks();
     givenInputProducesThenFails();
-    SortOperator operator = sortOperator(_input, List.of());
+    SortOperator operator =
+        sortOperator(_input, List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST)), -1);
     operator.nextBlock();
     return operator;
   }
@@ -553,8 +573,14 @@ public class OperatorBufferReleaseTest {
   }
 
   private SortOperator sortOperator(MultiStageOperator input, List<RelFieldCollation> collations) {
-    return new SortOperator(OperatorTestUtil.getTracingContext(), input,
-        new SortNode(-1, SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), collations, 10, 0));
+    return sortOperator(input, collations, 10);
+  }
+
+  /// SortOperator is a factory over three implementations chosen by what bounds the result: a fetch selects the
+  /// bounded heap, no fetch selects the buffer-and-sort, and no collation selects the streaming limit.
+  private SortOperator sortOperator(MultiStageOperator input, List<RelFieldCollation> collations, int fetch) {
+    return SortOperator.create(OperatorTestUtil.getTracingContext(), input,
+        new SortNode(-1, SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), collations, fetch, 0));
   }
 
   private AggregateOperator aggregateOperator(List<Integer> groupKeys) {

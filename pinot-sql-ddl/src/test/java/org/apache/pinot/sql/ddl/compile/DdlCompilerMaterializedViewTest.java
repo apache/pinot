@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -421,6 +422,27 @@ public class DdlCompilerMaterializedViewTest {
     CompiledCreateMaterializedView c = compileMaterializedView(sql);
     assertEquals(materializedViewTaskConfig(c.getTableConfig()).get(MaterializedViewTask.DEFINED_SQL_KEY),
         "Select Carrier /* hot column */, ts From src");
+  }
+
+  /// A PostgreSQL bytea constant in the view body must leave the statement a materialized view (rewriting it once
+  /// rebuilt the statement as a plain call, which was then classified as a query), and the stored text must be
+  /// exactly what the user typed, since it is sliced from the union of every node's parser position.
+  @Test
+  public void definedSqlWithPostgreSqlByteaConstant() {
+    for (String bytea : List.of("'\\x01'::bytea", "CAST('\\x01' AS BYTEA)")) {
+      String query = "SELECT ts, carrier FROM src WHERE payload = " + bytea + " AND carrier <> 'x'";
+      CompiledCreateMaterializedView c = compileMaterializedView(
+          "CREATE MATERIALIZED VIEW mv ("
+              + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:DAYS',"
+              + "  carrier STRING"
+              + ")"
+              + " REFRESH EVERY 1 DAY"
+              + " PROPERTIES ('timeColumnName' = 'ts', 'bucketTimePeriod' = '1d')"
+              + " AS " + query);
+      assertEquals(c.getOperation(), DdlOperation.CREATE_MATERIALIZED_VIEW, bytea);
+      assertEquals(materializedViewTaskConfig(c.getTableConfig()).get(MaterializedViewTask.DEFINED_SQL_KEY), query,
+          bytea);
+    }
   }
 
   @Test

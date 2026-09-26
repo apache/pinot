@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import java.io.File;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -68,6 +70,10 @@ public class ControllerFilePathProviderTest {
     assertEquals(fileDownloadTempDir, new File(LOCAL_TEMP_DIR, "fileDownloadTemp"));
     checkDirExistAndEmpty(fileDownloadTempDir);
 
+    File multiPartTempDir = provider.getMultiPartTempDir();
+    assertEquals(multiPartTempDir, new File(LOCAL_TEMP_DIR, "multipartTemp"));
+    checkDirExistAndEmpty(multiPartTempDir);
+
     assertEquals(provider.getVip(), "http://localhost:12345");
 
     FileUtils.forceDelete(DATA_DIR);
@@ -102,6 +108,10 @@ public class ControllerFilePathProviderTest {
     assertEquals(fileDownloadTempDir, new File(DATA_DIR, "localhost_12345/fileDownloadTemp"));
     checkDirExistAndEmpty(fileDownloadTempDir);
 
+    File multiPartTempDir = provider.getMultiPartTempDir();
+    assertEquals(multiPartTempDir, new File(DATA_DIR, "localhost_12345/multipartTemp"));
+    checkDirExistAndEmpty(multiPartTempDir);
+
     assertEquals(provider.getVip(), "http://localhost:12345");
 
     FileUtils.forceDelete(DATA_DIR);
@@ -133,9 +143,14 @@ public class ControllerFilePathProviderTest {
     assertEquals(fileDownloadTempDir, new File(LOCAL_TEMP_DIR, "fileDownloadTemp"));
     checkDirExistAndEmpty(fileDownloadTempDir);
 
+    File multiPartTempDir = provider.getMultiPartTempDir();
+    assertEquals(multiPartTempDir, new File(LOCAL_TEMP_DIR, "multipartTemp"));
+    checkDirExistAndEmpty(multiPartTempDir);
+
     FileUtils.deleteQuietly(fileUploadTempDir);
     FileUtils.deleteQuietly(untarredFileTempDir);
     FileUtils.deleteQuietly(fileDownloadTempDir);
+    FileUtils.deleteQuietly(multiPartTempDir);
 
     fileUploadTempDir = provider.getFileUploadTempDir();
     assertEquals(fileUploadTempDir, new File(LOCAL_TEMP_DIR, "fileUploadTemp"));
@@ -148,6 +163,39 @@ public class ControllerFilePathProviderTest {
     fileDownloadTempDir = provider.getFileDownloadTempDir();
     assertEquals(fileDownloadTempDir, new File(LOCAL_TEMP_DIR, "fileDownloadTemp"));
     checkDirExistAndEmpty(fileDownloadTempDir);
+
+    multiPartTempDir = provider.getMultiPartTempDir();
+    assertEquals(multiPartTempDir, new File(LOCAL_TEMP_DIR, "multipartTemp"));
+    checkDirExistAndEmpty(multiPartTempDir);
+  }
+
+  /// The multipart directory exists so that parts Jersey orphans on a failed parse are reclaimed on restart rather
+  /// than accumulating in java.io.tmpdir, so the startup clean is the behavior that matters.
+  @Test
+  public void testStaleMultiPartFilesClearedOnInit()
+      throws Exception {
+    FileUtils.deleteQuietly(DATA_DIR);
+    PinotFSFactory.init(new PinotConfiguration());
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerHost(HOST);
+    controllerConf.setControllerPort(PORT);
+    controllerConf.setDataDir(DATA_DIR.getPath());
+    controllerConf.setLocalTempDir(LOCAL_TEMP_DIR.getPath());
+    ControllerFilePathProvider.init(controllerConf);
+
+    // Stand in for a part Jersey spilled to disk and then abandoned when the request failed to parse
+    File orphan = new File(ControllerFilePathProvider.getInstance().getMultiPartTempDir(), "MIME1234567890");
+    FileUtils.writeStringToFile(orphan, "orphaned part", StandardCharsets.UTF_8);
+    assertTrue(orphan.exists());
+
+    // Restart
+    ControllerFilePathProvider.init(controllerConf);
+
+    assertFalse(orphan.exists());
+    checkDirExistAndEmpty(ControllerFilePathProvider.getInstance().getMultiPartTempDir());
+
+    FileUtils.forceDelete(DATA_DIR);
   }
 
   private void checkDirExistAndEmpty(File dir) {

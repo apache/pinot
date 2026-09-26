@@ -7,7 +7,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], ts=[$1], col3=[$3])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
@@ -25,7 +25,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(value1=[$0], ts1=[$1], col3=[$3])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",

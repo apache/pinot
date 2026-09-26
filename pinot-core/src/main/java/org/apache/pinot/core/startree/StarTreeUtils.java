@@ -39,6 +39,8 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
+import org.apache.pinot.core.query.aggregation.function.array.BaseArrayAggFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -65,12 +67,24 @@ public class StarTreeUtils {
   @Nullable
   public static AggregationFunctionColumnPair[] extractAggregationFunctionPairs(
       AggregationFunction[] aggregationFunctions) {
+    return extractAggregationFunctionPairs(aggregationFunctions, false);
+  }
+
+  /// Extracts the [AggregationFunctionColumnPair]s from the given [AggregationFunction]s, resolving them against
+  /// either a regular or a null-aware star-tree. Returns `null` if any [AggregationFunction] cannot be represented as
+  /// an [AggregationFunctionColumnPair].
+  ///
+  /// The only pair that differs between the two is `COUNT`: a regular star-tree stores a single `count__*` of every
+  /// row, while a null-aware star-tree stores a `count__column` holding the count of that column's non-null values.
+  @Nullable
+  public static AggregationFunctionColumnPair[] extractAggregationFunctionPairs(
+      AggregationFunction[] aggregationFunctions, boolean nullHandlingEnabled) {
     int numAggregationFunctions = aggregationFunctions.length;
     AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
         new AggregationFunctionColumnPair[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionColumnPair aggregationFunctionColumnPair =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
+          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i], nullHandlingEnabled);
       if (aggregationFunctionColumnPair != null) {
         aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
       } else {
@@ -349,6 +363,16 @@ public class StarTreeUtils {
       // Do not use star-tree for the following predicates because:
       //   - REGEXP_LIKE: Need to scan the whole dictionary to gather the matching dictionary ids
       //   - TEXT_MATCH/IS_NULL/IS_NOT_NULL: No way to gather the matching dictionary ids
+      // TODO: Support IS_NULL / IS_NOT_NULL on a null-aware star-tree.
+      //   Nothing in the tree prevents it: a null-aware star-tree groups nulls under a reserved dictionary id one
+      //   past the column's last real id, so IS_NULL matches that id alone and IS_NOT_NULL matches every real id.
+      //   Null rows form their own child node, and StarTreeFilterOperator already skips the star node for a
+      //   predicated dimension, so nulls cannot leak in through it (at the cost of enumerating real children for
+      //   IS_NOT_NULL). Two gaps: FilterPlanNode answers both straight from the segment's null vector with a
+      //   BitmapBasedFilterOperator and never builds a predicate evaluator, so there is no getMatchingDictIds() to
+      //   call here; and the reserved id only exists in the tree, since the forward index stores the column's
+      //   default null value, so a leftover predicate could not re-apply it. Supporting them needs a star-tree
+      //   specific evaluator that knows the reserved id.
       case REGEXP_LIKE:
       case TEXT_MATCH:
       case IS_NULL:
@@ -378,9 +402,19 @@ public class StarTreeUtils {
         dataSource.getDataSourceMetadata().getDataType(), null);
   }
 
-  /// Returns a [BaseProjectOperator] when the filter can be solved with star-tree, or `null` otherwise.
+  /// Returns an [AggregationInfo] reading a star-tree when the filter can be solved with one, or `null` otherwise.
+  ///
+  /// The resolved [AggregationFunctionColumnPair]s travel with the project operator because they depend on which
+  /// star-tree was picked: a null-aware star-tree resolves `COUNT(column)` to `count__column`, while a regular one
+  /// resolves it to `count__*`. The aggregation executors must read back the same columns that were projected.
+  ///
+  /// A star-tree is only consistent with one null-handling mode. A regular star-tree folds nulls into the column's
+  /// default null value and includes them in the pre-aggregation, matching null-handling-off semantics; a null-aware
+  /// star-tree keeps nulls apart and excludes them, matching null-handling-on semantics. Queries are therefore routed
+  /// to a star-tree built in the matching mode, except that a null-handling-on query may still fall back to a regular
+  /// star-tree when none of the columns it touches actually contains a null value.
   @Nullable
-  public static BaseProjectOperator<?> createStarTreeBasedProjectOperator(IndexSegment indexSegment,
+  public static AggregationInfo createStarTreeBasedAggregationInfo(IndexSegment indexSegment,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
@@ -388,10 +422,29 @@ public class StarTreeUtils {
       return null;
     }
 
+    // Resolved here only for the checks below, which do not depend on which star-tree is picked. The pairs the
+    // projection reads are resolved per star-tree in createAggregationInfo, because COUNT differs between the two.
     AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
         extractAggregationFunctionPairs(aggregationFunctions);
     if (aggregationFunctionColumnPairs == null) {
       return null;
+    }
+
+    // A star-tree arrayAgg cell stores elements of the source column's stored type. A query declaring a different
+    // element type (e.g. arrayAgg(intCol, 'LONG', true)) is only answerable through the raw path's read-time
+    // conversion, so fall back to a raw scan instead of misreading the cells. The declared element type is recovered
+    // from the array result type (e.g. LONG_ARRAY -> LONG).
+    for (int i = 0; i < aggregationFunctions.length; i++) {
+      if (aggregationFunctions[i] instanceof BaseArrayAggFunction) {
+        String column = aggregationFunctionColumnPairs[i].getColumn();
+        DataSource dataSource = indexSegment.getDataSourceNullable(column);
+        if (dataSource == null || dataSource.getDataSourceMetadata().getDataType().getStoredType()
+            != aggregationFunctions[i].getFinalResultColumnType().toDataType().getStoredType()) {
+          LOGGER.debug("Cannot use star-tree index because arrayAgg element type does not match the stored type of "
+              + "column: '{}'", column);
+          return null;
+        }
+      }
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
@@ -405,82 +458,117 @@ public class StarTreeUtils {
             .toArray(new ExpressionContext[0]) : null;
 
     if (queryContext.isNullHandlingEnabled()) {
-      // We can still use the star-tree index if there aren't actually any null values in this segment for all the
-      // metrics being aggregated, all the dimensions being filtered on / grouped by.
-      for (int i = 0; i < aggregationFunctionColumnPairs.length; i++) {
-        AggregationFunctionColumnPair aggregationFunctionColumnPair = aggregationFunctionColumnPairs[i];
-        if (aggregationFunctionColumnPair == AggregationFunctionColumnPair.COUNT_STAR) {
-          // COUNT aggregation function returns a non-empty input expressions list only when null handling is enabled
-          // and the input operand is a non-star identifier or function.
-          List<ExpressionContext> inputExpressions = aggregationFunctions[i].getInputExpressions();
-          if (!inputExpressions.isEmpty()) {
-            if (inputExpressions.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-              DataSource dataSource = indexSegment.getDataSource(inputExpressions.get(0).getIdentifier());
-              if (FilterOperatorUtils.hasNulls(dataSource)) {
-                return null;
-              }
-            }
-          }
-          // Null handling is irrelevant for COUNT(*), COUNT(literal), COUNT(nonNullColumn)
-          continue;
-        }
+      // A null-aware star-tree pre-aggregates with exactly the semantics the query asks for
+      AggregationInfo aggregationInfo = createAggregationInfo(indexSegment, queryContext, starTrees, true,
+          aggregationFunctions, groupByExpressions, predicateEvaluatorsMap);
+      if (aggregationInfo != null) {
+        return aggregationInfo;
+      }
+    }
+    return createAggregationInfo(indexSegment, queryContext, starTrees, false, aggregationFunctions,
+        groupByExpressions, predicateEvaluatorsMap);
+  }
 
-        String column = aggregationFunctionColumnPair.getColumn();
-        DataSource dataSource = indexSegment.getDataSourceNullable(column);
-        if (dataSource == null) {
-          LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' does not exist", column);
-          return null;
-        }
-        if (FilterOperatorUtils.hasNulls(dataSource)) {
-          LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
-          return null;
-        }
-      }
-
-      for (String column : predicateEvaluatorsMap.keySet()) {
-        DataSource dataSource = indexSegment.getDataSourceNullable(column);
-        if (dataSource == null) {
-          LOGGER.debug("Cannot use star-tree index because filter column: '{}' does not exist", column);
-          return null;
-        }
-        if (FilterOperatorUtils.hasNulls(dataSource)) {
-          LOGGER.debug("Cannot use star-tree index because filter column: '{}' has null values", column);
-          return null;
-        }
-      }
-
-      Set<String> groupByColumns = new HashSet<>();
-      if (groupByExpressions != null) {
-        for (ExpressionContext groupByExpression : groupByExpressions) {
-          groupByExpression.getColumns(groupByColumns);
-        }
-      }
-      for (String column : groupByColumns) {
-        DataSource dataSource = indexSegment.getDataSourceNullable(column);
-        if (dataSource == null) {
-          LOGGER.debug("Cannot use star-tree index because group-by column: '{}' does not exist", column);
-          return null;
-        }
-        if (FilterOperatorUtils.hasNulls(dataSource)) {
-          LOGGER.debug("Cannot use star-tree index because group-by column: '{}' has null values", column);
-          return null;
-        }
-      }
+  /// Returns an [AggregationInfo] built on the first star-tree that both matches `nullAware` and fits the query, or
+  /// `null` if there is none.
+  ///
+  /// Resolves the function-column pairs against the same mode, because a null-aware star-tree stores `COUNT` per
+  /// column while a regular one stores a single count of every row, and the executors have to read back whichever
+  /// was projected.
+  @Nullable
+  private static AggregationInfo createAggregationInfo(IndexSegment indexSegment, QueryContext queryContext,
+      List<StarTreeV2> starTrees, boolean nullAware, AggregationFunction[] aggregationFunctions,
+      @Nullable ExpressionContext[] groupByExpressions,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
+    // Only `COUNT` resolves differently between the two, and never to `null`, so a query that cannot be represented
+    // as pairs at all fails here for either kind of star-tree
+    AggregationFunctionColumnPair[] functionColumnPairs =
+        extractAggregationFunctionPairs(aggregationFunctions, nullAware);
+    if (functionColumnPairs == null) {
+      return null;
+    }
+    // A regular star-tree folded nulls into the column's default value and counted them, so it can only answer a
+    // null-handling-on query when nothing the query touches is actually null
+    if (!nullAware && queryContext.isNullHandlingEnabled() && !hasNoNullValues(indexSegment, aggregationFunctions,
+        functionColumnPairs, predicateEvaluatorsMap.keySet(), groupByExpressions)) {
+      return null;
     }
 
     List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations =
         new ArrayList<>(aggregationFunctions.length);
     for (int i = 0; i < aggregationFunctions.length; i++) {
-      aggregations.add(Pair.of(aggregationFunctions[i], aggregationFunctionColumnPairs[i]));
+      aggregations.add(Pair.of(aggregationFunctions[i], functionColumnPairs[i]));
     }
 
     for (StarTreeV2 starTreeV2 : starTrees) {
-      if (isFitForStarTree(starTreeV2.getMetadata(), aggregations, groupByExpressions,
-          predicateEvaluatorsMap.keySet())) {
-        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
-            predicateEvaluatorsMap).run();
+      StarTreeV2Metadata metadata = starTreeV2.getMetadata();
+      if (metadata.isNullHandlingEnabled() != nullAware) {
+        continue;
+      }
+      if (isFitForStarTree(metadata, aggregations, groupByExpressions, predicateEvaluatorsMap.keySet())) {
+        BaseProjectOperator<?> projectOperator =
+            new StarTreeProjectPlanNode(queryContext, starTreeV2, functionColumnPairs, groupByExpressions,
+                predicateEvaluatorsMap).run();
+        return new AggregationInfo(aggregationFunctions, projectOperator, functionColumnPairs);
       }
     }
     return null;
+  }
+
+  /// Returns whether none of the columns the query touches contains a null value in this segment, in which case a
+  /// regular star-tree produces the same result as a null-aware one and can serve a null-handling-on query.
+  private static boolean hasNoNullValues(IndexSegment indexSegment, AggregationFunction[] aggregationFunctions,
+      AggregationFunctionColumnPair[] functionColumnPairs, Set<String> predicateColumns,
+      @Nullable ExpressionContext[] groupByExpressions) {
+    for (int i = 0; i < functionColumnPairs.length; i++) {
+      AggregationFunctionColumnPair functionColumnPair = functionColumnPairs[i];
+      if (functionColumnPair == AggregationFunctionColumnPair.COUNT_STAR) {
+        // COUNT aggregation function returns a non-empty input expressions list only when null handling is enabled
+        // and the input operand is a non-star identifier or function. Null handling is irrelevant for COUNT(*),
+        // COUNT(literal) and COUNT(nonNullColumn).
+        List<ExpressionContext> inputExpressions = aggregationFunctions[i].getInputExpressions();
+        if (!inputExpressions.isEmpty() && inputExpressions.get(0).getType() == ExpressionContext.Type.IDENTIFIER
+            && !hasNoNullValues(indexSegment, inputExpressions.get(0).getIdentifier(), "aggregation")) {
+          return false;
+        }
+        continue;
+      }
+
+      if (!hasNoNullValues(indexSegment, functionColumnPair.getColumn(), "aggregation")) {
+        return false;
+      }
+    }
+
+    for (String column : predicateColumns) {
+      if (!hasNoNullValues(indexSegment, column, "filter")) {
+        return false;
+      }
+    }
+
+    Set<String> groupByColumns = new HashSet<>();
+    if (groupByExpressions != null) {
+      for (ExpressionContext groupByExpression : groupByExpressions) {
+        groupByExpression.getColumns(groupByColumns);
+      }
+    }
+    for (String column : groupByColumns) {
+      if (!hasNoNullValues(indexSegment, column, "group-by")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean hasNoNullValues(IndexSegment indexSegment, String column, String columnRole) {
+    DataSource dataSource = indexSegment.getDataSourceNullable(column);
+    if (dataSource == null) {
+      LOGGER.debug("Cannot use star-tree index because {} column: '{}' does not exist", columnRole, column);
+      return false;
+    }
+    if (FilterOperatorUtils.hasNulls(dataSource)) {
+      LOGGER.debug("Cannot use star-tree index because {} column: '{}' has null values", columnRole, column);
+      return false;
+    }
+    return true;
   }
 }

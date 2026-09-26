@@ -669,6 +669,21 @@ public class CommonConstants {
     public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
     public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
 
+    /// Whether a multi-stage query ships its leaf-stage segment lists as native protobuf fields of the worker
+    /// metadata, which skips a JSON encode per leaf-stage worker on the broker and a JSON parse per worker on the
+    /// server, instead of the legacy JSON string custom property.
+    ///
+    /// Ships disabled, and must stay disabled until every server the broker dispatches to runs a version that
+    /// understands the proto fields, including the servers of remote clusters when multi-cluster routing is used: an
+    /// older server finds no segments under them, concludes the worker is not a leaf-stage worker and fails the leaf
+    /// stage. Turn it on once the rolling upgrade has finished.
+    ///
+    /// Read from cluster config as well as from the static broker config, cluster config winning and taking effect on
+    /// the next query, so it can be turned on, and off again, without restarting the brokers. Anything in cluster
+    /// config other than `true` — the key cleared, or a value that is not a boolean — disables it.
+    public static final String CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST = "pinot.broker.mse.enable.proto.segment.list";
+    public static final boolean DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
@@ -3023,5 +3038,13 @@ public class CommonConstants {
     /// - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
     /// - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
     public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
+
+    /// Cluster config key to control whether the protobuf decoder falls back to the last successfully fetched
+    /// (and resolved) descriptor when the remote descriptor fetch fails, so a transient DNS / object-store outage
+    /// does not permanently fail the CONSUMING transition. Enabled by default; set to 'false' to fail fast
+    /// instead. Dynamically updatable without a server restart; a table-level decoder prop
+    /// ('descriptorFileFallbackEnabled') overrides this cluster-wide value.
+    public static final String PROTOBUF_DESCRIPTOR_FALLBACK_ENABLED =
+        "pinot.server.protobuf.descriptor.fallback.enabled";
   }
 }
