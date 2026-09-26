@@ -107,6 +107,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String DISABLE_DIMENSION_TABLE_PRELOAD = "disable.dimension.table.preload";
   private static final boolean DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD = false;
 
+  // Whether to create the index container and data source of a physical column on first access instead of for every
+  // column at segment load. Off by default. See InstanceDataManagerConfig#isLazyColumnMaterialization().
+  public static final String LAZY_COLUMN_MATERIALIZATION = "segment.lazy.column.materialization";
+  private static final boolean DEFAULT_LAZY_COLUMN_MATERIALIZATION = false;
+
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
 
@@ -356,5 +361,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public boolean isDimensionTablePreloadDisabled() {
     return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
         DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
+  }
+
+  @Override
+  public boolean isLazyColumnMaterialization() {
+    return _serverConfig.getProperty(LAZY_COLUMN_MATERIALIZATION, DEFAULT_LAZY_COLUMN_MATERIALIZATION);
   }
 }

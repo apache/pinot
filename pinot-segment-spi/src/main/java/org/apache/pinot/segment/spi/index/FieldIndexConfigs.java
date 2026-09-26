@@ -59,6 +59,19 @@ public class FieldIndexConfigs {
   }
 
   @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    return o instanceof FieldIndexConfigs && _configMap.equals(((FieldIndexConfigs) o)._configMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return _configMap.hashCode();
+  }
+
+  @Override
   public String toString() {
     try {
       return JsonUtils.objectToString(unwrapIndexes());

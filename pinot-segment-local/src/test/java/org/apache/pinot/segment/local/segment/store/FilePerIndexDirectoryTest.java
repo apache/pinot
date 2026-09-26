@@ -21,12 +21,17 @@ package org.apache.pinot.segment.local.segment.store;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -49,6 +54,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -96,6 +102,47 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
       assertEquals(readBuffer.getLong(0), 0xbadfadL);
       assertEquals(readBuffer.getInt(8), 51);
       assertEquals(readBuffer.getInt(101), 55);
+    }
+  }
+
+  /// Lazy column materialization opens the buffers of distinct columns from concurrent query threads. Every caller of
+  /// a column must get the one buffer mapped for it: a second mapping of the same file would escape [#close()] (the
+  /// after-method buffer check catches that) and leave two views of one index in flight.
+  @Test
+  public void testConcurrentGetBufferMapsEachIndexOnce()
+      throws Exception {
+    int numColumns = 8;
+    try (FilePerIndexDirectory writer = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      for (int i = 0; i < numColumns; i++) {
+        writer.newBuffer("col" + i, StandardIndexes.dictionary(), 1024).putInt(0, i);
+      }
+    }
+
+    int numThreads = 8;
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    try (FilePerIndexDirectory reader = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      CountDownLatch start = new CountDownLatch(1);
+      List<Future<List<PinotDataBuffer>>> futures = new ArrayList<>(numThreads);
+      for (int t = 0; t < numThreads; t++) {
+        futures.add(executor.submit(() -> {
+          start.await();
+          List<PinotDataBuffer> buffers = new ArrayList<>(numColumns);
+          for (int i = 0; i < numColumns; i++) {
+            buffers.add(reader.getBuffer("col" + i, StandardIndexes.dictionary()));
+          }
+          return buffers;
+        }));
+      }
+      start.countDown();
+      List<PinotDataBuffer> first = futures.get(0).get();
+      for (int i = 0; i < numColumns; i++) {
+        assertEquals(first.get(i).getInt(0), i);
+        for (Future<List<PinotDataBuffer>> future : futures) {
+          assertSame(future.get().get(i), first.get(i), "col" + i);
+        }
+      }
+    } finally {
+      executor.shutdownNow();
     }
   }
 

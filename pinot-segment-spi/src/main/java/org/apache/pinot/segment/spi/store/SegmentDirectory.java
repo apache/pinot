@@ -163,6 +163,11 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract class Reader implements Closeable {
 
     /// Get columnar index data buffer.
+    ///
+    /// Thread-safety: a server that materializes columns lazily calls this and [#hasIndexFor(String, IndexType)] from
+    /// concurrent query threads, for distinct columns of one segment, so an implementation must be safe for concurrent
+    /// reads. The local file-system readers are; an external reader (a tiered or remote store) must be as well before
+    /// lazy column materialization is enabled on a server that uses it.
     /// @param column column name
     /// @param type index type
     /// @return a bytebuffer-like buffer holding index data
