@@ -103,6 +103,7 @@
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
+    <!-- Runtime dependency of the embedded Kafka broker (EmbeddedKafkaCluster); not a test framework -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
