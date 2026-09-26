@@ -94,7 +94,7 @@ public class ImmutableOpenStructDataSourceTest {
         sparseDs,
         meta,
         container,
-        null);
+        null, null);
 
     assertSame(ds.getDataSource("clicks"), clicksDs);
     // Absent key with mock sparse (no real forward index) resolves to an all-null STRING source
@@ -109,7 +109,7 @@ public class ImmutableOpenStructDataSourceTest {
   public void testAbsentDeclaredKeyReadsDeclaredDefault() {
     ComplexFieldSpec spec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true,
         Map.of("score", new DimensionFieldSpec("score", DataType.STRING, true, "N/A")));
-    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(spec, Map.of(), null, 7, null);
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(spec, Map.of(), null, 7, null, null);
 
     DataSource scoreDs = ds.getDataSource("score");
     assertTrue(scoreDs instanceof NullDataSource);
@@ -131,7 +131,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         meta,
         container,
-        null);
+        null, null);
 
     assertTrue(ds.isMaterialized("clicks"));
     assertFalse(ds.isMaterialized("absent"));
@@ -148,7 +148,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         meta,
         container,
-        null);
+        null, null);
 
     assertTrue(ds.isFullyMaterialized());
   }
@@ -165,7 +165,7 @@ public class ImmutableOpenStructDataSourceTest {
         sparseDs,
         meta,
         container,
-        null);
+        null, null);
 
     assertFalse(ds.isFullyMaterialized());
   }
@@ -181,7 +181,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         meta,
         container,
-        null);
+        null, null);
 
     ComplexFieldSpec fieldSpec = ds.getFieldSpec();
     assertNotNull(fieldSpec);
@@ -203,7 +203,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         topMeta,
         container,
-        null);
+        null, null);
 
     assertSame(ds.getDataSourceMetadata("clicks"), clicksMeta);
     assertEquals(ds.getDataSourceMetadata("absent").getDataType(), DataType.STRING);
@@ -222,7 +222,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         meta,
         container,
-        null);
+        null, null);
 
     assertEquals(ds.getDataSources(), perKeyMap);
   }
@@ -238,7 +238,7 @@ public class ImmutableOpenStructDataSourceTest {
         null,
         meta,
         container,
-        null);
+        null, null);
 
     assertSame(ds.getDataSourceMetadata(), meta);
     assertSame(ds.getIndexContainer(), container);
@@ -252,7 +252,7 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of("clicks", clicksDs),
         null,
         42,
-        null);
+        null, null);
 
     DataSourceMetadata meta = ds.getDataSourceMetadata();
     assertNotNull(meta);
@@ -332,7 +332,7 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         sparseDs,
         blobs.length,
-        List.of("region"));
+        List.of("region"), null);
 
     DataSource regionDs = ds.getDataSource("region");
     assertNotNull(regionDs);
@@ -354,7 +354,7 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         sparseDs,
         blobs.length,
-        null);
+        null, null);
 
     DataSource anyDs = ds.getDataSource("anything");
     assertNotNull(anyDs);
@@ -374,7 +374,7 @@ public class ImmutableOpenStructDataSourceTest {
         Map.of(),
         sparseDs,
         blobs.length,
-        List.of("latencyMs"));
+        List.of("latencyMs"), null);
 
     DataSource latDs = ds.getDataSource("latencyMs");
     assertNotNull(latDs);
@@ -390,14 +390,14 @@ public class ImmutableOpenStructDataSourceTest {
     doReturn(mockJsonIdx).when(sparseDs).getJsonIndex();
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of(), sparseDs, blobs.length, null);
+        openStructSpec("event"), Map.of(), sparseDs, blobs.length, null, null);
     assertSame(ds.getSparseJsonIndex(), mockJsonIdx);
   }
 
   @Test
   public void testGetSparseJsonIndexNullWhenNoSparseColumn() {
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of(), null, 5, null);
+        openStructSpec("event"), Map.of(), null, 5, null, null);
     assertNull(ds.getSparseJsonIndex());
   }
 
@@ -411,7 +411,7 @@ public class ImmutableOpenStructDataSourceTest {
     perKey.put("name", nameDs);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), perKey, null, 2, null);
+        openStructSpec("event"), perKey, null, 2, null, null);
 
     Map<String, Object> doc0 = ds.getMapValue(0);
     assertNotNull(doc0);
@@ -441,7 +441,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource rawDs = mockRawDenseDataSource(storedType, expected);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of("k", rawDs), null, 2, null);
+        openStructSpec("event"), Map.of("k", rawDs), null, 2, null, null);
 
     Map<String, Object> doc0 = ds.getMapValue(0);
     assertNotNull(doc0);
@@ -505,7 +505,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource clicksDs = mockDenseDataSource(DataType.INT, 10, true);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of("clicks", clicksDs), null, 2, null);
+        openStructSpec("event"), Map.of("clicks", clicksDs), null, 2, null, null);
 
     // doc 1 has null for clicks → no keys → null map
     Map<String, Object> doc1 = ds.getMapValue(1);
@@ -518,7 +518,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource sparseDs = mockSparseDataSource("{\"rare_key\":\"val\"}", true);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of("clicks", clicksDs), sparseDs, 2, null);
+        openStructSpec("event"), Map.of("clicks", clicksDs), sparseDs, 2, null, null);
 
     Map<String, Object> doc0 = ds.getMapValue(0);
     assertNotNull(doc0);
@@ -538,7 +538,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource sparseDs = mockSparseDataSource("{\"region\":\"us\"}", false);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of("event", eventKeyDs), sparseDs, 2, null);
+        openStructSpec("event"), Map.of("event", eventKeyDs), sparseDs, 2, null, null);
 
     try (MapValueReader reader = ds.openMapValueReader()) {
       Map<String, Object> doc0 = reader.getMapValue(0);
@@ -553,7 +553,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource sparseDs = mockSparseDataSource("not-json", false);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of(), sparseDs, 2, null);
+        openStructSpec("event"), Map.of(), sparseDs, 2, null, null);
 
     RuntimeException e = expectThrows(RuntimeException.class, () -> ds.getMapValue(0));
     assertTrue(e.getMessage().contains("docId 0"));
@@ -574,7 +574,7 @@ public class ImmutableOpenStructDataSourceTest {
     perKey.put("b", ds2);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), perKey, null, 1, null);
+        openStructSpec("event"), perKey, null, 1, null, null);
 
     MapValueReader reader = ds.openMapValueReader();
     reader.getMapValue(0);
@@ -609,7 +609,7 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource sparseDs = mockSparseDataSource("{\"rare_key\":\"val\"}", true);
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of(), sparseDs, 2, null);
+        openStructSpec("event"), Map.of(), sparseDs, 2, null, null);
 
     // doc 1: sparse is null
     Map<String, Object> doc1 = ds.getMapValue(1);
@@ -619,7 +619,7 @@ public class ImmutableOpenStructDataSourceTest {
   @Test
   public void testGetMapValueEmptySegment() {
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
-        openStructSpec("event"), Map.of(), null, 0, null);
+        openStructSpec("event"), Map.of(), null, 0, null, null);
 
     assertNull(ds.getMapValue(0));
   }

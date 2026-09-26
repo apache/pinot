@@ -167,6 +167,12 @@ public class MapFilterOperator extends BaseFilterOperator {
     if (sparseKeyDs.getDataSourceMetadata().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
       return null;
     }
+    if (!sparseKeyDs.getDataSourceMetadata().isSingleValue()) {
+      // The blob holds a multi-value key as a JSON array, and the index flattens an array element-wise, while
+      // the predicate here names the key itself -- so the postings answer a different question than the scan
+      // over the key's values does. A multi-value key never takes the fast path.
+      return null;
+    }
     List<String> values;
     boolean negated;
     switch (_predicate.getType()) {

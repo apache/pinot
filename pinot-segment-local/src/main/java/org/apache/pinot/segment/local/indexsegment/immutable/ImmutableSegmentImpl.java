@@ -155,11 +155,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           continue;
         }
         ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
-        List<String> sparseKeys =
-            parentMetadata instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
+        List<String> sparseKeys = null;
+        Map<String, Integer> sparseMultiValueKeys = null;
+        if (parentMetadata instanceof ColumnMetadataImpl impl) {
+          sparseKeys = impl.getSparseKeys();
+          sparseMultiValueKeys = impl.getSparseMultiValueKeys();
+        }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
-            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys));
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys,
+            sparseMultiValueKeys));
       }
     }
 

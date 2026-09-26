@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -27,7 +30,6 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doReturn;
@@ -35,10 +37,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 /// Covers projection over an OPEN_STRUCT column, where the parent data source carries no readers of its own and every
@@ -121,17 +123,98 @@ public class ProjectionBlockOpenStructTest {
     dataFetcher.close();
   }
 
-  /// Selecting the parent column itself is not supported. It must fail as a bad request pointing at the per-key syntax
-  /// rather than an NPE from the reader the DataFetcher never registered.
+  /// Selecting the parent column reads the whole struct as a JSON document. It used to throw, which also took out
+  /// `SELECT *` on any table carrying an OPEN_STRUCT column — the first query anyone runs.
   @Test
-  public void testSelectingOpenStructParentFailsWithClearMessage() {
-    Map<String, DataSource> dataSourceMap = new HashMap<>();
-    dataSourceMap.put(OPEN_STRUCT_COLUMN, mockOpenStructDataSource());
-    ProjectionBlock projectionBlock =
-        new ProjectionBlock(dataSourceMap, new DataBlockCache(new DataFetcher(dataSourceMap, Map.of())));
+  public void testSelectingOpenStructParentReadsTheWholeDocument() {
+    BlockValSet values = project(Map.of("errors", 3L));
+    assertEquals(values.getValueType(), FieldSpec.DataType.STRING);
+    assertTrue(values.isSingleValue());
+    assertEquals(values.getStringValuesSV()[0], "{\"errors\":3}");
+  }
 
-    BadQueryRequestException e =
-        expectThrows(BadQueryRequestException.class, () -> projectionBlock.getBlockValueSet(OPEN_STRUCT_COLUMN));
-    assertTrue(e.getMessage().contains(OPEN_STRUCT_COLUMN + "['key']"), e.getMessage());
+  /// A key that lives only in the sparse blob has no DataSource of its own, so walking
+  /// {@link OpenStructDataSource#getDataSources()} would drop it from the document without a word. The document has
+  /// to come from the reconstruction the data source owns.
+  @Test
+  public void testSparseOnlyKeyIsInTheDocument() {
+    assertEquals(project(Map.of("sparseOnly", "kept")).getStringValuesSV()[0], "{\"sparseOnly\":\"kept\"}");
+  }
+
+  /// A nested object reads back nested, the shape the source had, rather than as the flat dotted paths its leaves
+  /// are materialized under.
+  @Test
+  public void testNestedObjectReadsBackNested() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("configApi.timeTaken", 106.0);
+    document.put("configApi.message", "success_v2");
+    document.put("configApi", new LinkedHashMap<>(Map.of("message", "success_v2")));
+    document.put("device_os", "android");
+
+    assertEquals(project(document).getStringValuesSV()[0],
+        "{\"configApi\":{\"message\":\"success_v2\"},\"device_os\":\"android\"}");
+  }
+
+  /// `.` is an ordinary key character with no escape, so a dotted key whose prefix is not itself an object of this
+  /// document was never a path and must stay a key spelled with a dot.
+  @Test
+  public void testLiteralDottedKeyIsNotSplit() {
+    assertEquals(project(Map.of("a.b", 1)).getStringValuesSV()[0], "{\"a.b\":1}");
+  }
+
+  /// A prefix that is a key but not an object leaves the dotted key alone: only an object can be the thing the path
+  /// was a path into.
+  @Test
+  public void testDottedKeyWhosePrefixIsAScalarIsNotSplit() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("a", 1);
+    document.put("a.b", 2);
+
+    assertEquals(project(document).getStringValuesSV()[0], "{\"a\":1,\"a.b\":2}");
+  }
+
+  /// Nesting is cleaned up at every level, not only the top one.
+  @Test
+  public void testNestingIsResolvedInsideNestedObjects() {
+    Map<String, Object> inner = new LinkedHashMap<>();
+    inner.put("b.c", 1);
+    inner.put("b", new LinkedHashMap<>(Map.of("c", 2)));
+
+    assertEquals(project(Map.of("a", inner)).getStringValuesSV()[0], "{\"a\":{\"b\":{\"c\":2}}}");
+  }
+
+  /// BYTES reads as hex, the way every other path out of Pinot renders it — Jackson would have base64'd it.
+  @Test
+  public void testBytesRenderAsHex() {
+    assertEquals(project(Map.of("raw", new byte[]{0x0a, (byte) 0xff})).getStringValuesSV()[0], "{\"raw\":\"0aff\"}");
+  }
+
+  /// A row with no keys at all is an empty document, not a null.
+  @Test
+  public void testRowWithNoKeysIsAnEmptyDocument() {
+    OpenStructDataSource openStruct = mockOpenStructDataSource();
+    when(openStruct.openMapValueReader()).thenReturn(docId -> null);
+    assertEquals(projectWith(openStruct).getStringValuesSV()[0], "{}");
+  }
+
+  /// Arrays keep their element order and are rendered element by element.
+  @Test
+  public void testListValuesAreRendered() {
+    assertEquals(project(Map.of("tags", List.of("a", "b"))).getStringValuesSV()[0], "{\"tags\":[\"a\",\"b\"]}");
+  }
+
+  /// Projects a single-row block whose OPEN_STRUCT column reconstructs to `document`.
+  private static BlockValSet project(Map<String, Object> document) {
+    OpenStructDataSource openStruct = mockOpenStructDataSource();
+    when(openStruct.openMapValueReader()).thenReturn(docId -> document);
+    return projectWith(openStruct);
+  }
+
+  private static BlockValSet projectWith(OpenStructDataSource openStruct) {
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put(OPEN_STRUCT_COLUMN, openStruct);
+    DataBlockCache dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap, Map.of()));
+    dataBlockCache.initNewBlock(new int[]{0}, 1);
+    return new ProjectionBlock(dataSourceMap, dataBlockCache).getBlockValueSet(OPEN_STRUCT_COLUMN);
   }
 }
