@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +48,9 @@ import org.slf4j.LoggerFactory;
 /// be found in that way. In case we need to change the default behavior, the static instance can be changed with
 /// [#setInstance(IndexService)].
 ///
+/// Every index type gets a numeric id ([#getNumericId(IndexType)]): its position in [#getAllIndexes()]. An
+/// IndexService holds at most [#MAX_INDEX_TYPES] index types, so numeric ids are always in `[0, MAX_INDEX_TYPES)`.
+///
 /// Thread safety: All methods in this class, including static ones, are thread safe.
 ///
 /// Note: This class offers a singleton interface, but callers are encouraged to receive a IndexService instance in
@@ -57,12 +61,22 @@ public class IndexService {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexService.class);
 
   public static final short UNKNOWN_INDEX = (short) -1;
+
+  /// Maximum number of index types across all registered [IndexPlugin]s, which bounds numeric ids to `[0, 64)`.
+  ///
+  /// The limit comes from `PhysicalColumnIndexContainer` in `pinot-segment-local`, which records the index readers of
+  /// each (segment, column) as bits of one `long`. The constructor rejects a larger plugin set, so an oversized set
+  /// fails when the index plugins are loaded rather than on every segment load. Raising the limit needs a code change
+  /// in that class, for example a `long[]` mask or a fallback layout.
+  public static final int MAX_INDEX_TYPES = Long.SIZE;
+
   private static volatile IndexService _instance = fromServiceLoader();
 
   private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
   private final Object2ShortOpenHashMap<String> _allIndexPosById;
 
+  /// @throws IllegalArgumentException if the plugins register more than [#MAX_INDEX_TYPES] distinct index types.
   public IndexService(Set<IndexPlugin<?>> allPlugins) {
     HashMap<String, IndexPlugin<?>> pluginsById = new HashMap<>();
 
@@ -95,6 +109,9 @@ public class IndexService {
     // Sort index types so that servers can loop over and process them in a more deterministic order.
     List<String> allIndexIds = new ArrayList<>(_allIndexesById.keySet());
     Collections.sort(allIndexIds);
+    Preconditions.checkArgument(allIndexIds.size() <= MAX_INDEX_TYPES,
+        "Cannot register %s index types, at most %s are supported: %s", allIndexIds.size(), MAX_INDEX_TYPES,
+        allIndexIds);
     _allIndexes = new ArrayList<>();
     allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
 
@@ -130,6 +147,9 @@ public class IndexService {
   }
 
   /// Returns a set with all the index types stored by this index service.
+  ///
+  /// The list is sorted by index id, and the position of an index type in it is its numeric id
+  /// ([#getNumericId(IndexType)]). It holds at most [#MAX_INDEX_TYPES] entries.
   ///
   /// @return an immutable list with all index types known by this instance.
   public List<IndexType<?, ?, ?>> getAllIndexes() {
@@ -179,6 +199,10 @@ public class IndexService {
     return id;
   }
 
+  /// Returns the numeric id of the given index type: its position in [#getAllIndexes()], in
+  /// `[0, getAllIndexes().size())` and therefore below [#MAX_INDEX_TYPES].
+  ///
+  /// @throws IllegalArgumentException if the index type is not registered in this instance.
   public short getNumericId(IndexType indexType) {
     short id = _allIndexPosById.getShort(indexType.getId());
     if (id == UNKNOWN_INDEX) {
