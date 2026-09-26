@@ -339,6 +339,10 @@ public class CommonConstants {
   }
 
   public static class Broker {
+    /// Minimum candidate segments for preparing a partition-pruning predicate. A negative value disables preparation.
+    public static final String CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD =
+        "pinot.broker.partition.pruning.preparation.threshold";
+    public static final int DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD = 32;
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     /// Namespace for service credentials used by the broker when invoking Server admin APIs.
@@ -1008,6 +1012,10 @@ public class CommonConstants {
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
         /// Query-level override for `inpredicate.threshold`. Negative means always prune.
         public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
+
+        /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+        /// A negative value disables preparation, but does not disable partition pruning itself.
+        public static final String PARTITION_PRUNING_PREPARATION_THRESHOLD = "partitionPruningPreparationThreshold";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids

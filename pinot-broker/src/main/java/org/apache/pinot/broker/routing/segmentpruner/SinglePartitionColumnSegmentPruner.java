@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -34,6 +39,9 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -42,11 +50,23 @@ import org.apache.pinot.sql.FilterKind;
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final String _tableNameWithType;
   private final String _partitionColumn;
+  private final IntSupplier _preparationThreshold;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
+    this(tableNameWithType, partitionColumn, Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+  }
+
+  public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn,
+      int minSegmentsForPreparation) {
+    this(tableNameWithType, partitionColumn, () -> minSegmentsForPreparation);
+  }
+
+  public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn,
+      IntSupplier preparationThreshold) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
+    _preparationThreshold = preparationThreshold;
   }
 
   @Override
@@ -94,11 +114,39 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
+    Integer queryMinSegments =
+        QueryOptionsUtils.getPartitionPruningPreparationThreshold(brokerRequest.getPinotQuery().getQueryOptions());
+    int minSegmentsForPreparation = queryMinSegments != null ? queryMinSegments : _preparationThreshold.getAsInt();
+    if (minSegmentsForPreparation >= 0 && segments.size() >= minSegmentsForPreparation) {
+      return pruneWithPreparedPredicate(filterExpression, segments);
+    }
     Set<String> selectedSegments = new HashSet<>();
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO || isPartitionMatch(
           filterExpression, partitionInfo)) {
+        selectedSegments.add(segment);
+      }
+    }
+    return selectedSegments;
+  }
+
+  private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
+    Set<String> selectedSegments = new HashSet<>();
+    Map<PartitionFunction, PreparedPredicate> predicates = new HashMap<>();
+    for (String segment : segments) {
+      SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+      if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+        selectedSegments.add(segment);
+        continue;
+      }
+      PartitionFunction function = partitionInfo.getPartitionFunction();
+      PreparedPredicate predicate = predicates.get(function);
+      if (predicate == null) {
+        predicate = new PreparedPredicate(filterExpression, function);
+        predicates.put(function, predicate);
+      }
+      if (predicate.matches(partitionInfo.getPartitions())) {
         selectedSegments.add(segment);
       }
     }
@@ -150,6 +198,108 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       }
       default:
         return true;
+    }
+  }
+
+  /// Lazily prepares only visited expressions and values. Instances belong to one prune call, never shared by queries.
+  private final class PreparedPredicate {
+    private final Expression _expression;
+    private final PartitionFunction _partitionFunction;
+    private FilterKind _kind;
+    private List<Expression> _operands;
+    private PreparedPredicate[] _children;
+    private boolean _isPartitionPredicate;
+    private Integer _singlePartitionId;
+    private IntSet _partitionIds;
+    private int _numEvaluatedValues;
+
+    private PreparedPredicate(Expression expression, PartitionFunction partitionFunction) {
+      _expression = expression;
+      _partitionFunction = partitionFunction;
+    }
+
+    private boolean matches(Set<Integer> partitions) {
+      if (_kind == null) {
+        Function function = _expression.getFunctionCall();
+        _kind = FilterKind.valueOf(function.getOperator());
+        _operands = function.getOperands();
+        if (_kind == FilterKind.AND || _kind == FilterKind.OR) {
+          _children = new PreparedPredicate[_operands.size()];
+          for (int i = 0; i < _children.length; i++) {
+            _children[i] = new PreparedPredicate(_operands.get(i), _partitionFunction);
+          }
+        } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
+          Identifier identifier = _operands.get(0).getIdentifier();
+          _isPartitionPredicate = identifier != null && identifier.getName().equals(_partitionColumn);
+        }
+      }
+      switch (_kind) {
+        case AND:
+          for (PreparedPredicate child : _children) {
+            if (!child.matches(partitions)) {
+              return false;
+            }
+          }
+          return true;
+        case OR:
+          for (PreparedPredicate child : _children) {
+            if (child.matches(partitions)) {
+              return true;
+            }
+          }
+          return false;
+        case EQUALS:
+        case IN:
+          if (_isPartitionPredicate) {
+            int numValues = _kind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
+            if (numValues == 1) {
+              if (_singlePartitionId == null) {
+                _singlePartitionId =
+                    _partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(1)));
+              }
+              return partitions.contains(_singlePartitionId);
+            }
+            if (_partitionIds == null) {
+              // Grow only as literals are visited: a long IN can match its first value on every segment.
+              _partitionIds = new IntOpenHashSet(1);
+            }
+            // Probe the smaller set; a segment can itself contain many partitions.
+            if (_partitionIds.size() == 1) {
+              if (partitions.contains(_singlePartitionId)) {
+                return true;
+              }
+            } else if (_partitionIds.size() <= partitions.size()) {
+              IntIterator iterator = _partitionIds.iterator();
+              while (iterator.hasNext()) {
+                if (partitions.contains(iterator.nextInt())) {
+                  return true;
+                }
+              }
+            } else {
+              for (int partition : partitions) {
+                if (_partitionIds.contains(partition)) {
+                  return true;
+                }
+              }
+            }
+            while (_numEvaluatedValues < numValues) {
+              int partitionId = _partitionFunction.getPartition(
+                  RequestContextUtils.getStringValue(_operands.get(_numEvaluatedValues + 1)));
+              if (_numEvaluatedValues == 0) {
+                _singlePartitionId = partitionId;
+              }
+              _numEvaluatedValues++;
+              _partitionIds.add(partitionId);
+              if (partitions.contains(partitionId)) {
+                return true;
+              }
+            }
+            return false;
+          }
+          return true;
+        default:
+          return true;
+      }
     }
   }
 }

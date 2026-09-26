@@ -30,6 +30,8 @@ import javax.annotation.Nullable;
 /// Implementations of this interface are assumed not to be stateful. That is, two invocations of
 /// `PartitionFunction.getPartition(value)` with the same value are expected to produce the same
 /// result. Implementations must also be safe for concurrent invocation by multiple threads.
+/// Functions with equal identity may reuse partition ids during broker pruning. Implementations that override
+/// `equals` and `hashCode` must include every setting that affects partition ids, including subclass state.
 public interface PartitionFunction extends Serializable {
 
   /// Method to compute and return partition id for the given value.
@@ -58,6 +60,7 @@ public interface PartitionFunction extends Serializable {
   /// @return Number of possible partitions.
   int getNumPartitions();
 
+  /// Returns the configuration used to construct this function, or null if none is exposed.
   @Nullable
   default Map<String, String> getFunctionConfig() {
     return null;

@@ -28,10 +28,12 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -41,6 +43,114 @@ import static org.testng.Assert.expectThrows;
 public class PartitionFunctionTest {
   private static final int NUM_ROUNDS = 1000;
   private static final int MAX_NUM_PARTITIONS = 100;
+
+  @Test
+  public void testPartitionIdReuse() {
+    PartitionFunction function = new MurmurPartitionFunction(8, null);
+    PartitionFunction emptyConfig = new MurmurPartitionFunction(8, Map.of());
+    assertTrue(function.equals(emptyConfig));
+    assertTrue(emptyConfig.equals(function));
+    PartitionFunction third = new MurmurPartitionFunction(8, Map.of());
+    assertTrue(emptyConfig.equals(third));
+    assertTrue(function.equals(third));
+    assertFalse(function.equals(new MurmurPartitionFunction(16, null)));
+    assertFalse(function.equals(new Murmur3PartitionFunction(8, null)));
+
+    PartitionFunction configured = new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"));
+    assertTrue(configured.equals(configured));
+    assertFalse(function.equals(configured));
+    assertFalse(configured.equals(function));
+    assertTrue(configured.equals(new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"))));
+
+    PartitionFunction modulo = new ModuloPartitionFunction(8, null);
+    PartitionFunction abs = new ModuloPartitionFunction(8, Map.of("partitionIdNormalizer", "ABS"));
+    assertFalse(modulo.equals(abs));
+    assertFalse(abs.equals(modulo));
+  }
+
+  @DataProvider
+  public Object[][] reuseConfigurations() {
+    return new Object[][]{
+        {"Murmur", Map.of("useRawBytes", "true"), Map.of("useRawBytes", "TRUE"),
+            Map.of("useRawBytes", "false")},
+        {"Murmur3", Map.of("seed", "7"), Map.of("seed", "07", "variant", "x86_32"), Map.of("seed", "8")},
+        {"Murmur3", Map.of("variant", "x64_32"), Map.of("variant", "x64_32", "seed", "0"),
+            Map.of("variant", "x86_32")},
+        {"Murmur3", Map.of("useRawBytes", "true"), Map.of("useRawBytes", "TRUE"),
+            Map.of("useRawBytes", "false")},
+        {"FNV", Map.of("variant", "FNV1_64"), Map.of("variant", "FNV1_64", "useRawBytes", "false"),
+            Map.of("variant", "FNV1A_64")},
+        {"FNV", Map.of("useRawBytes", "true"), Map.of("useRawBytes", "TRUE"), Map.of("useRawBytes", "false")},
+        {"Modulo", Map.of("partitionIdNormalizer", "ABS"), Map.of("partitionIdNormalizer", " abs "),
+            Map.of("partitionIdNormalizer", "POSITIVE_MODULO")},
+        {"HashCode", Map.of(), Map.of("partitionIdNormalizer", "PRE_MODULO_ABS"),
+            Map.of("partitionIdNormalizer", "MASK")},
+        {"ByteArray", Map.of(), Map.of("partitionIdNormalizer", "PRE_MODULO_ABS"),
+            Map.of("partitionIdNormalizer", "MASK")}
+    };
+  }
+
+  @Test
+  public void testComplexFunctionsAndSubclasses() {
+    Map<String, String> config = Map.of("columnValues", "a|b", "columnValuesDelimiter", "|");
+    PartitionFunction bounded = new BoundedColumnValuePartitionFunction(3, config);
+    assertTrue(bounded.equals(bounded));
+    assertFalse(bounded.equals(new BoundedColumnValuePartitionFunction(3, config)));
+    class CustomMurmur extends MurmurPartitionFunction {
+      CustomMurmur() {
+        super(8, null);
+      }
+    }
+    PartitionFunction subclass = new CustomMurmur();
+    PartitionFunction another = new CustomMurmur();
+    assertTrue(subclass.equals(subclass));
+    assertTrue(subclass.equals(another));
+    assertFalse(subclass.equals(new MurmurPartitionFunction(8, null)));
+    assertFalse(new MurmurPartitionFunction(8, null).equals(subclass));
+  }
+
+  @Test
+  public void testHashCollisionDoesNotImplyEquality() {
+    // Increasing the partition count and decreasing the seed compensates in the 31-based hash.
+    PartitionFunction first = new Murmur3PartitionFunction(8, Map.of("seed", "961"));
+    PartitionFunction second = new Murmur3PartitionFunction(9, Map.of("seed", "0"));
+    assertEquals(first.hashCode(), second.hashCode());
+    assertNotEquals(first, second);
+    assertFalse(first.equals(second));
+  }
+
+  @Test(dataProvider = "reuseConfigurations")
+  public void testConfiguredPartitionIdReuse(String name, Map<String, String> config,
+      Map<String, String> equivalentConfig, Map<String, String> differentConfig) {
+    Map<String, String> mutableConfig = new HashMap<>(config);
+    PartitionFunction first = PartitionFunctionFactory.getPartitionFunction(name, 8, mutableConfig);
+    PartitionFunction second = PartitionFunctionFactory.getPartitionFunction(name, 8, equivalentConfig);
+    PartitionFunction third = PartitionFunctionFactory.getPartitionFunction(name, 8, new HashMap<>(equivalentConfig));
+    assertTrue(first.equals(first));
+    assertEquals(first, second);
+    assertEquals(first.hashCode(), second.hashCode());
+    assertFalse(first.equals(null));
+    assertTrue(first.equals(second));
+    assertTrue(second.equals(first));
+    assertTrue(second.equals(third));
+    assertTrue(first.equals(third));
+    for (String value : new String[]{"00", "1234", "abcd"}) {
+      if (!name.equals("Modulo") || !value.equals("abcd")) {
+        assertEquals(first.getPartition(value), second.getPartition(value));
+      }
+    }
+    PartitionFunction different = PartitionFunctionFactory.getPartitionFunction(name, 8, differentConfig);
+    assertFalse(first.equals(different));
+    assertFalse(different.equals(first));
+    assertFalse(first.equals(PartitionFunctionFactory.getPartitionFunction(name, 16, config)));
+    Map<String, String> otherNormalizer = new HashMap<>(config);
+    otherNormalizer.put("partitionIdNormalizer",
+        first.getPartitionIdNormalizer().name().equals("MASK") ? "ABS" : "MASK");
+    assertFalse(first.equals(PartitionFunctionFactory.getPartitionFunction(name, 8, otherNormalizer)));
+    mutableConfig.clear();
+    mutableConfig.putAll(differentConfig);
+    assertTrue(first.equals(second), "Caller mutations must not change the effective function");
+  }
 
   /// Unit test for [ModuloPartitionFunction].
   ///
@@ -143,6 +253,7 @@ public class PartitionFunctionTest {
       // Create partition function with function config present but no seed value present.
       PartitionFunction partitionFunction2 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction2, functionName, numPartitions, functionConfig);
 
       // Get partition number with random value.
       int partitionNumWithNoSeedValue = partitionFunction2.getPartition(valueTobeHashed);
@@ -156,12 +267,14 @@ public class PartitionFunctionTest {
       // Create partition function with function config present but random seed value present in function config.
       PartitionFunction partitionFunction3 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction3, functionName, numPartitions, functionConfig);
 
       // Create partition function with function config present with random seed value
       // and with variant provided as "x64_32" in function config.
       functionConfig.put("variant", "x64_32");
       PartitionFunction partitionFunction4 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction4, functionName, numPartitions, functionConfig);
 
       // Put variant value as "x86_32" in function config.
       functionConfig.put("variant", "x86_32");
@@ -172,6 +285,7 @@ public class PartitionFunctionTest {
       // Create partition function with function config present with variant provided as "x86_32" in function config.
       PartitionFunction partitionFunction5 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction5, functionName, numPartitions, functionConfig);
 
       // Partition number should be equal as partitionNumWithNullConfig and partitionNumWithNoSeedValue as this is
       // default behavior.
@@ -184,6 +298,7 @@ public class PartitionFunctionTest {
       // value in functionConfig.
       PartitionFunction partitionFunction6 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction6, functionName, numPartitions, functionConfig);
 
       // Partition number should be equal as partitionNumWithNullConfig and partitionNumWithNoSeedValue as this is
       // default behavior.
@@ -201,11 +316,6 @@ public class PartitionFunctionTest {
       assertEquals(partitionFunction7.getPartition(valueTobeHashed), partitionNumWithNullConfig);
 
       testBasicProperties(partitionFunction1, functionName, numPartitions);
-      testBasicProperties(partitionFunction2, functionName, numPartitions, functionConfig);
-      testBasicProperties(partitionFunction3, functionName, numPartitions, functionConfig);
-      testBasicProperties(partitionFunction4, functionName, numPartitions, functionConfig);
-      testBasicProperties(partitionFunction5, functionName, numPartitions, functionConfig);
-      testBasicProperties(partitionFunction6, functionName, numPartitions, functionConfig);
       testBasicProperties(partitionFunction7, functionName, numPartitions, functionConfig);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {

@@ -118,6 +118,16 @@ public class QueryOptionsUtilsTest {
     assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
   }
 
+  @Test
+  public void shouldReadPartitionPruningPreparationThresholdOption() {
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(Map.of()));
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(null));
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void shouldRejectInvalidInPredicatePruningThreshold() {
     QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
