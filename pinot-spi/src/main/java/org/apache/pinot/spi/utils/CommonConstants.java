@@ -856,6 +856,8 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
         public static final String QUERY_HASH = "queryHash";
+        /// Query option to skip Expired Records from segments based on your retention time.
+        public static final String SKIP_EXPIRED_RECORDS = "skipExpiredRecords";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When

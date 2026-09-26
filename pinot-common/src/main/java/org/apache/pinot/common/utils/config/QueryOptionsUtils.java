@@ -373,6 +373,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_DELETE));
   }
 
+  public static boolean isSkipExpiredRecords(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_EXPIRED_RECORDS));
+  }
+
   public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.TRACE_RULE_PRODUCTIONS));
   }
