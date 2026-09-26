@@ -390,6 +390,167 @@ public class StreamingSelectionOrderByCombineOperatorTest {
         "SELECT sortedCol, tailCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 40", false);
   }
 
+  /// Pins the tie-deferral itself: under a single order-by expression, every `_lowCardSegments` segment's sortedCol
+  /// minimum ties at 0, so a LIMIT satisfiable from one segment's leading run of 0s (25 rows) must not activate any
+  /// other segment. Before `_deferTiedCursors` existed, every cursor tied the (unknown-yet) frontier at activation
+  /// time and all of them activated up front, each scanning its first block (about LIMIT docs), so docs scanned
+  /// pre-fix is about `NUM_SEGMENTS * 20`. Post-fix only the leading segment (in cursor order) is ever touched, so docs
+  /// scanned is bounded by one segment's worth.
+  @Test
+  public void testTieDeferralBoundsDocsScannedToLeadingSegment() {
+    Result result = run(_lowCardSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 20", true,
+        false, true, 0);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(result._rows.size(), 20);
+    for (Object[] row : result._rows) {
+      assertEquals((int) row[0], 0, "LIMIT 20 must be satisfiable entirely from sortedCol=0 rows");
+    }
+    assertTrue(result._numDocsScanned <= NUM_RECORDS_PER_SEGMENT,
+        "A LIMIT satisfiable from one segment's leading run must not activate any other tied segment; docs scanned: "
+            + result._numDocsScanned);
+  }
+
+  /// DESC counterpart of [#testTieDeferralBoundsDocsScannedToLeadingSegment]: every `_lowCardSegments` segment's
+  /// sortedCol maximum ties at 3, so `sortsBeyond`'s `_asc ? cmp >= 0 : cmp <= 0` DESC branch is the one under test
+  /// here rather than the ASC one above. A sign flip in that branch would either over-scan (fail this test the same
+  /// way the pre-fix code fails the ASC test) or, worse, prune a segment that still had rows to give -- which the
+  /// row-count / row-value assertions below would catch.
+  @Test
+  public void testTieDeferralBoundsDocsScannedToLeadingSegmentDesc() {
+    Result result = run(_lowCardSegments,
+        "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC LIMIT 20", true,
+        false, true, 0);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(result._rows.size(), 20);
+    for (Object[] row : result._rows) {
+      assertEquals((int) row[0], 3, "LIMIT 20 DESC must be satisfiable entirely from sortedCol=3 rows");
+    }
+    assertTrue(result._numDocsScanned <= NUM_RECORDS_PER_SEGMENT,
+        "A LIMIT satisfiable from one segment's leading run must not activate any other tied segment; docs scanned: "
+            + result._numDocsScanned);
+  }
+
+  /// Correctness under single-column ties, LIMIT straddling a tied group: with `ORDER BY sortedCol` alone every
+  /// segment ties at every one of the 4 distinct values, so a LIMIT of 30 forces the merge past the sortedCol=0
+  /// boundary (only 25 such rows per segment) partway through a block from the leading segment. A wrongly-timed
+  /// reactivation here would either drop true sortedCol=0 rows from other segments (undercount at the tie) or emit
+  /// out of order. [#assertParity]'s full-row multiset check does not apply: with sortedCol as the only key, a
+  /// different (equally valid) tied row may be returned than the MinMax baseline picks, so only the order-by column
+  /// values -- whose multiset *is* pinned by the LIMIT boundary, unlike the underlying rows -- are compared.
+  @Test
+  public void testSingleColumnTieDeferralPreservesOrderByValuesAcrossLimitStraddle() {
+    @Language("sql") String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 30";
+    Result baseline = run(_lowCardSegments, query, false, false, false, 0);
+    Result streamed = run(_lowCardSegments, query, true, false, true, 3);
+    assertTrue(streamed._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(streamed._rows.size(), 30);
+    assertSorted(streamed._rows, orderByComparator(query, false));
+    assertEquals(orderByColumnValues(streamed._rows), orderByColumnValues(baseline._rows),
+        "Multiset of sortedCol values must match the MinMax baseline even though the underlying rows may differ");
+  }
+
+  /// Correctness under single-column ties with an OFFSET: LIMIT 10 OFFSET 20 straddles the same sortedCol=0/1
+  /// boundary as [#testSingleColumnTieDeferralPreservesOrderByValuesAcrossLimitStraddle] (limit + offset = 30), but
+  /// exercises it with a nonzero offset. As [#testLimitOffsetParity] documents, the server (and this combine) retains
+  /// {@code limit + offset} rows -- the offset is trimmed by the broker afterwards -- so 30, not 10, rows come back
+  /// here too; what differs from the straddle test is only the query shape, not the row count.
+  @Test
+  public void testSingleColumnTieDeferralPreservesOrderByValuesAcrossOffset() {
+    @Language("sql") String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 10 OFFSET 20";
+    Result baseline = run(_lowCardSegments, query, false, false, false, 0);
+    Result streamed = run(_lowCardSegments, query, true, false, true, 3);
+    assertTrue(streamed._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(streamed._rows.size(), 30, "Server retains limit + offset rows; the broker trims the offset later");
+    assertSorted(streamed._rows, orderByComparator(query, false));
+    assertEquals(orderByColumnValues(streamed._rows), orderByColumnValues(baseline._rows),
+        "Multiset of sortedCol values must match the MinMax baseline even though the underlying rows may differ");
+  }
+
+  /// Condition 1 (the two-expression gate): `_lowCardSegments` still tie on sortedCol alone, but a second order-by
+  /// expression (valCol) makes the full order-by key a total order, so full-row parity applies unlike the
+  /// single-column tests above. `_deferTiedCursors` must be false here (`orderByExpressions.size() == 1` fails), so
+  /// this pins the same shape both before and after the production change: a wrongly-deferred cursor on this shape
+  /// would drop a row that sorts earlier on valCol despite tying on sortedCol, which parity would catch as a missing
+  /// row rather than merely a reordered one.
+  @Test
+  public void testTwoExpressionOrderByDoesNotDeferTiedCursors() {
+    assertParity(_lowCardSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 30",
+        false);
+  }
+
+  /// Condition 2 (no under-delivery when the heap drains): a single-column ORDER BY with a LIMIT covering every row
+  /// of `_lowCardSegments` forces every segment to eventually activate no matter how aggressively ties are deferred
+  /// -- deferral only postpones a cursor, it never removes it from consideration, and the
+  /// `(leader != null || top != null)` guard in `activateEligibleCursors` forces activation once the heap and leader
+  /// both go empty. Asserts the full row count comes back with none missing.
+  @Test
+  public void testSingleColumnTieDeferralNeverUnderDeliversAtFullDrain() {
+    int totalRows = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT;
+    @Language("sql") String query =
+        "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT " + totalRows;
+    Result baseline = run(_lowCardSegments, query, false, false, false, 0);
+    Result streamed = run(_lowCardSegments, query, true, false, true, 7);
+    assertTrue(streamed._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(streamed._rows.size(), totalRows, "Every row must be delivered when the LIMIT covers the whole set");
+    assertSorted(streamed._rows, orderByComparator(query, false));
+    assertEquals(orderByColumnValues(streamed._rows), orderByColumnValues(baseline._rows),
+        "Multiset of sortedCol values must match the MinMax baseline when the merge drains completely");
+  }
+
+  /// Each `_lowCardSegments` segment holds only 25 rows at the tied minimum, so a LIMIT past 25 moves the leader's head
+  /// to sortedCol=1 while the other segments still tie at 0. The next row out is then the smaller of the leader's and
+  /// the heap's heads, and a waiting cursor must be deferred against that row, not against the leader alone: checking
+  /// the leader activates every remaining tied segment the moment one of them has been opened. Activating one segment
+  /// per 25-row run is the minimum, so at most `ceil(limit / 25)` segments are matched (a segment is matched once
+  /// activation reads its first block).
+  @Test
+  public void testTieDeferralActivatesOneSegmentPerTiedRunPastLeaderRun() {
+    for (int limit : new int[]{30, 60, 90}) {
+      Result result = run(_lowCardSegments, "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT " + limit,
+          true, false, true, 0);
+      assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+      assertEquals(result._rows.size(), limit);
+      int numZeros = Math.min(limit, 25 * NUM_SEGMENTS);
+      assertEquals(result._rows.stream().filter(row -> (int) row[0] == 0).count(), numZeros,
+          "Every returned row must come from the tied minimum while enough such rows exist");
+      int maxSegments = (limit + 24) / 25;
+      assertTrue(result._numSegmentsMatched <= maxSegments,
+          "LIMIT " + limit + " should activate at most " + maxSegments + " segments; activated: "
+              + result._numSegmentsMatched);
+    }
+  }
+
+  /// DESC counterpart of [#testTieDeferralActivatesOneSegmentPerTiedRunPastLeaderRun]: the leader leaves the tied
+  /// maximum (3) for 2 while the waiting segments still tie at 3.
+  @Test
+  public void testTieDeferralActivatesOneSegmentPerTiedRunPastLeaderRunDesc() {
+    Result result = run(_lowCardSegments,
+        "SET allowReverseOrder=true; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC LIMIT 30", true,
+        false, true, 0);
+    assertTrue(result._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(result._rows.size(), 30);
+    for (Object[] row : result._rows) {
+      assertEquals((int) row[0], 3, "LIMIT 30 DESC must be satisfiable entirely from sortedCol=3 rows");
+    }
+    assertTrue(result._numSegmentsMatched <= 2,
+        "LIMIT 30 DESC should activate at most 2 segments; activated: " + result._numSegmentsMatched);
+  }
+
+  /// Same shape with a 7-row output block, so the leader is handed back to the heap and re-chosen mid-run: deferral
+  /// against the next row must hold across block boundaries too, and the rows must still match the baseline's values.
+  @Test
+  public void testTieDeferralPastLeaderRunAcrossOutputBlocks() {
+    @Language("sql") String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol LIMIT 60";
+    Result baseline = run(_lowCardSegments, query, false, false, false, 0);
+    Result streamed = run(_lowCardSegments, query, true, false, true, 7);
+    assertTrue(streamed._combineOperator instanceof StreamingSelectionOrderByCombineOperator);
+    assertEquals(streamed._rows.size(), 60);
+    assertSorted(streamed._rows, orderByComparator(query, false));
+    assertEquals(orderByColumnValues(streamed._rows), orderByColumnValues(baseline._rows));
+    assertTrue(streamed._numSegmentsMatched <= 3,
+        "LIMIT 60 should activate at most 3 segments; activated: " + streamed._numSegmentsMatched);
+  }
+
   @Test
   public void testTwoPhaseSelectNonOrderByParity() {
     // tailCol is selected but not an order-by key -> the streaming children take the two-phase (order-by-then-fetch)
@@ -964,6 +1125,7 @@ public class StreamingSelectionOrderByCombineOperatorTest {
             result._schema = block.getDataSchema();
           }
           result._numDocsScanned = block.getNumDocsScanned();
+          result._numSegmentsMatched = block.getNumSegmentsMatched();
           break;
         }
         SelectionResultsBlock dataBlock = (SelectionResultsBlock) block;
@@ -1026,6 +1188,14 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     }).sorted().collect(Collectors.toList());
   }
 
+  /// Extracts the ORDER BY column (projected at index 0 in every query these tests use) as a sorted multiset,
+  /// ignoring every other projected column. Used where a full-row [#assertMultisetEquals] would be too strong: under
+  /// a single order-by expression a tied value may be satisfied by different underlying rows than the MinMax
+  /// baseline picks, but the count of each order-by value in the result is still pinned by the LIMIT boundary.
+  private static List<Integer> orderByColumnValues(List<Object[]> rows) {
+    return rows.stream().map(row -> (Integer) row[0]).sorted().collect(Collectors.toList());
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {
@@ -1047,5 +1217,6 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     private List<Integer> _blockSizes;
     private int _numBlocks;
     private long _numDocsScanned;
+    private int _numSegmentsMatched;
   }
 }
