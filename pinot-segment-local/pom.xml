@@ -39,6 +39,11 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
+    <!-- zstd-jni exposes JetBrains annotations in its API but declares them as provided. -->
+    <dependency>
+      <groupId>org.jetbrains</groupId>
+      <artifactId>annotations</artifactId>
+    </dependency>
 
     <!-- Lucene dependencies -->
     <dependency>

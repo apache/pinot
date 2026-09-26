@@ -45,6 +45,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
@@ -83,6 +84,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
+    SegmentGenerationJobUtils.resolveAndPersistIngestionGroovyPolicy(_spec);
 
     if (_spec.getInputDirURI() == null) {
       throw new RuntimeException("Missing property 'inputDirURI' in 'jobSpec' file");
@@ -245,6 +247,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setSequenceId(seqId);
     taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
     taskSpec.setCreateMetadataTarGz(_spec.isCreateMetadataTarGz());
+    boolean isGroovyDisabled = SegmentGenerationJobUtils.isIngestionGroovyDisabled(_spec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
     // If there's already been a failure, log and skip this file. Do this check right before the
@@ -261,7 +264,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       File localSegmentTarFile = null;
       try {
         //invoke segmentGenerationTask
-        SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
+        SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec,
+            IngestionGroovyPolicy.fromDisabled(isGroovyDisabled));
         String segmentName = taskRunner.run();
         // Tar segment directory to compress file
         localSegmentDir = new File(localOutputTempDir, segmentName);

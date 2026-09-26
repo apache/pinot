@@ -296,6 +296,8 @@ public class SegmentProcessorFramework {
     String segmentNamePostfix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePostfix();
     String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setIngestionGroovyDisabled(
+        _segmentProcessorConfig.getIngestionGroovyPolicy().isIngestionGroovyDisabled());
     generatorConfig.setInstanceType(InstanceType.MINION);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();

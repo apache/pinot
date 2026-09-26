@@ -60,6 +60,7 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -230,7 +231,8 @@ public class PinotIngestionRestletResource {
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
             new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider,
-            _controllerConf.isIngestFromUriLocalFileSystemAllowed());
+            _controllerConf.isIngestFromUriLocalFileSystemAllowed(),
+            IngestionGroovyPolicy.fromDisabled(_controllerConf.isDisableIngestionGroovy()));
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 
