@@ -606,6 +606,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean preferSelectAliasInGroupBy = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY,
         CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY);
+    boolean windowSortOnSender = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_WINDOW_SORT_ON_SENDER,
+        CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -647,6 +650,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
         .meterGroupByAliasShadowedByColumn(true)
+        .defaultWindowSortOnSender(windowSortOnSender)
         .build();
   }
 
