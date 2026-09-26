@@ -46,7 +46,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
 /// entry fall back to `defaultValueFieldConfig`. When neither is set, the built-in default is
-/// DICTIONARY encoding with an inverted index.
+/// DICTIONARY encoding with an inverted index. A per-key config selects the dictionary vs raw
+/// encoding and the dictionary, inverted, range and bloom filter indexes; forward-index tuning is not
+/// configurable per key (a raw key always uses LZ4 compression), and a per-key `codecSpec` is rejected.
 public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DISABLED = new OpenStructIndexConfig(false);
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);

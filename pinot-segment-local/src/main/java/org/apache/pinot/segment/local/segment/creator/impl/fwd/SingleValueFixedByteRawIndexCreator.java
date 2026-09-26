@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
@@ -40,7 +41,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
   private final FixedByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  @Nullable
   private final ChunkCompressionType _chunkCompressionType;
+  // Whether compression-statistics tracking was requested. Mirrors the legacy writer's contract of
+  // reporting an uncompressed value size only when tracking is enabled.
+  private boolean _trackUncompressedValueSize;
 
   /// Constructor for the class
   ///
@@ -138,20 +143,26 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
 
   @Override
   public long getRawForwardIndexUncompressedValueSizeInBytes() {
-    // Compression-statistics metadata supports only the legacy single-compressor format.
     if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
       return legacyWriter.getRawForwardIndexUncompressedValueSizeInBytes();
+    }
+    // V7 codec-pipeline writer: like the legacy writer, report the value bytes actually written, or -1 unless
+    // tracking was requested.
+    if (_trackUncompressedValueSize && _indexWriter instanceof FixedByteChunkForwardIndexWriterV7 v7Writer) {
+      return v7Writer.getUncompressedValueSizeInBytes();
     }
     return -1;
   }
 
   @Override
+  @Nullable
   public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
     return _chunkCompressionType;
   }
 
   @Override
   public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _trackUncompressedValueSize = true;
     if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
       legacyWriter.enableRawForwardIndexUncompressedValueSizeTracking();
     }
