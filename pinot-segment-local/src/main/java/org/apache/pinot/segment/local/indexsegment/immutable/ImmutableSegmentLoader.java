@@ -39,7 +39,6 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -214,9 +213,8 @@ public class ImmutableSegmentLoader {
     indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
 
     // Remove columns not in schema from the metadata
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     if (schema != null) {
-      Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
+      Set<String> columnsInMetadata = new HashSet<>(segmentMetadata.getAllColumns());
       columnsInMetadata.removeIf(schema::hasColumn);
       // Materialized OPEN_STRUCT child columns (col$key, col$__sparse__) live in segment metadata
       // but not in the user-facing schema. Keep them when the parent OPEN_STRUCT column is in the
@@ -236,7 +234,7 @@ public class ImmutableSegmentLoader {
         }
       }
     } else {
-      indexLoadingConfig = indexLoadingConfig.withKnownColumns(columnMetadataMap.keySet());
+      indexLoadingConfig = indexLoadingConfig.withKnownColumns(segmentMetadata.getAllColumns());
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
@@ -248,11 +246,13 @@ public class ImmutableSegmentLoader {
       return segment;
     }
 
-    Map<String, ColumnIndexContainer> indexContainerMap = new Object2ObjectOpenHashMap<>(columnMetadataMap.size());
-    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+    Map<String, ColumnIndexContainer> indexContainerMap =
+        new Object2ObjectOpenHashMap<>(segmentMetadata.getAllColumns().size());
+    for (String column : segmentMetadata.getAllColumns()) {
       // FIXME: text-index only works with local SegmentDirectory
-      indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+      indexContainerMap.put(column,
+          new PhysicalColumnIndexContainer(segmentReader, segmentMetadata.getColumnMetadataFor(column),
+              indexLoadingConfig));
     }
 
     instantiateVirtualColumns(segmentMetadata, indexContainerMap);
@@ -289,14 +289,13 @@ public class ImmutableSegmentLoader {
       SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig)
       throws IOException {
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     MultiColumnLuceneTextIndexReader mcTextReader = null;
     Set<String> mcTextColumns = Set.of();
     if (segmentReader.hasMultiColumnTextIndex()) {
       mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
       mcTextColumns = Set.copyOf(segmentMetadata.getMultiColumnTextMetadata().getColumns());
     }
-    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, columnMetadataMap.keySet(),
+    ColumnMaterializer columnMaterializer = new ColumnMaterializer(segmentReader, segmentMetadata.getAllColumns(),
         indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.isForwardIndexOnly(), mcTextReader,
         mcTextColumns);
 
@@ -308,7 +307,7 @@ public class ImmutableSegmentLoader {
       try {
         starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata,
             column -> indexContainerMap.computeIfAbsent(column,
-                k -> columnMaterializer.createIndexContainer(columnMetadataMap.get(k))));
+                k -> columnMaterializer.createIndexContainer(segmentMetadata.getColumnMetadataFor(k))));
       } catch (Throwable t) {
         // Unlike the eager path, the multi-column text reader has to exist before the star-tree here (the
         // materializer holds it), so release it, and the containers materialized so far, when the star-tree fails
@@ -336,16 +335,15 @@ public class ImmutableSegmentLoader {
 
   /// Creates the index containers and column metadata of the built-in virtual columns and registers them in the
   /// segment metadata. Registering the metadata is what makes the segment schema include the virtual columns: the
-  /// schema is derived from the column metadata map on demand ([SegmentMetadataImpl#getSchema()]) and is deliberately
+  /// schema is derived from the column metadata on demand ([SegmentMetadataImpl#getSchema()]) and is deliberately
   /// not built here, so a loaded segment retains no per-column schema entries until something asks for its schema.
   /// A physical column of the same name wins, as in the schema-based registration this replaces.
   private static void instantiateVirtualColumns(SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap) {
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     String segmentName = segmentMetadata.getName();
     for (BuiltInVirtualColumnDefinitions.Definition definition : BuiltInVirtualColumnDefinitions.DEFINITIONS) {
       String columnName = definition.getName();
-      if (columnMetadataMap.containsKey(columnName)) {
+      if (segmentMetadata.getColumnMetadataFor(columnName) != null) {
         continue;
       }
       FieldSpec fieldSpec = VirtualColumnProviderFactory.createBuiltInFieldSpec(definition, segmentName);

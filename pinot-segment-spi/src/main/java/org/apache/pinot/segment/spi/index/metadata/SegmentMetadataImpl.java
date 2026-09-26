@@ -31,6 +31,8 @@ import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -38,11 +40,15 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -77,27 +83,45 @@ import org.slf4j.LoggerFactory;
 /// Segment metadata parsed from `metadata.properties` (plus `creation.meta` and the v3 `index_map`), or built for a
 /// CONSUMING segment from an explicit [Schema].
 ///
-/// The segment [Schema] of a metadata-backed instance is derived from [#getColumnMetadataMap()] on the first
-/// [#getSchema()] call and cached; it is not built at load. A server retains one instance per loaded segment for the
-/// segment's lifetime, and a Schema costs a `TreeMap` entry plus list slots per column on top of the column metadata
-/// that already holds every [org.apache.pinot.spi.data.FieldSpec], so building it eagerly doubled the per-column
-/// metadata footprint of a wide segment that is never asked for its schema. Everything on the load and query paths
-/// reads the column metadata map (or [#getAllColumns()], a view of its keys) instead. Once the loader has registered
-/// the built-in virtual columns in the map, the derived schema includes them, exactly as the eagerly built one did.
-/// [#removeColumn(String)] drops the cached schema so it is rebuilt without the column. The explicit-schema
-/// constructor keeps the caller's Schema as is.
+/// A server retains one instance per loaded segment for the segment's lifetime, so the columns are held as two
+/// parallel arrays — the names in natural order and their metadata at the same index — rather than as a map: two
+/// array slots per column instead of a red-black-tree node, which on a segment of a thousand columns is the
+/// difference between a few kilobytes and tens of kilobytes of pure bookkeeping. Lookups
+/// ([#getColumnMetadataFor(String)]) binary-search the name array, and [#getAllColumns()] is a view of it. The
+/// [#getColumnMetadataMap()] map and the segment [Schema] are both derived from the arrays only when something asks
+/// for them, and cached until the columns change; nothing on the load or query path asks.
 ///
-/// Thread-safe for the schema cache (double-checked on a volatile, so one instance per metadata); the rest is
-/// populated at load before the metadata is published.
+/// Once the loader has registered the built-in virtual columns through [#addColumnMetadata(String, ColumnMetadata)],
+/// the derived schema includes them, exactly as the eagerly built one did. [#removeColumn(String)] and
+/// [#addColumnMetadata(String, ColumnMetadata)] replace both arrays at once and drop both derived views. The
+/// explicit-schema constructor keeps the caller's Schema as is and holds no column metadata at all, so those two
+/// mutators reject such a metadata rather than drop the schema it was given: a CONSUMING segment answers
+/// [#getAllColumns()] from that schema and reports no column metadata at all
+/// ([#getColumnMetadataFor(String)] `null`, [#getAllColumnMetadata()] empty,
+/// [#getColumnMetadataMap()] `null`).
+///
+/// Thread-safe: the two arrays are published together in one immutable holder, so no reader can see the names of
+/// one version beside the metadata of another, and the derived schema and map are built under the instance monitor
+/// the mutators hold as well, so neither can be cached from columns that have already been replaced.
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
+  /// The columns of a metadata-backed segment, or `null` for a CONSUMING segment, which is constructed with an
+  /// explicit schema and holds no column metadata. Replaced as a whole (never written in place) by
+  /// [#addColumnMetadata(String, ColumnMetadata)] and [#removeColumn(String)], so a view handed out earlier stays a
+  /// consistent snapshot, and volatile so a metadata published without other synchronization is seen with its
+  /// columns.
+  @Nullable
+  private volatile Columns _columns;
   /// The explicit schema of a CONSUMING segment, or the lazily derived schema of a metadata-backed segment (null
-  /// until [#getSchema()] builds it, and again after [#removeColumn(String)]).
+  /// until [#getSchema()] builds it, and again whenever the columns change).
   @Nullable
   private volatile Schema _schema;
+  /// The lazily derived map view of the two column arrays (null until [#getColumnMetadataMap()] builds it, and again
+  /// whenever the columns change).
+  @Nullable
+  private volatile TreeMap<String, ColumnMetadata> _columnMetadataMapView;
   private String _segmentName;
   private int _totalDocs;
   private SegmentVersion _segmentVersion;
@@ -130,7 +154,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
       throws IOException, ConfigurationException {
     _indexDir = null;
-    _columnMetadataMap = new TreeMap<>();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
         CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
@@ -148,7 +171,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(File indexDir)
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
-    _columnMetadataMap = new TreeMap<>();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
         SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
@@ -164,7 +186,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /// For REALTIME consuming segments.
   public SegmentMetadataImpl(String rawTableName, String segmentName, Schema schema, long creationTime) {
     _indexDir = null;
-    _columnMetadataMap = null;
     _rawTableName = rawTableName;
     _segmentName = segmentName;
     _schema = schema;
@@ -252,13 +273,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     addPhysicalColumns(segmentMetadata.getList(Segment.DATETIME_COLUMNS), physicalColumns);
     addPhysicalColumns(segmentMetadata.getList(Segment.COMPLEX_COLUMNS), physicalColumns);
 
-    // Build the column metadata map (the schema is derived from it on demand, see getSchema()). Empty segments use a
-    // stripped-down [EmptyColumnMetadata] since the shape stats (cardinality, element lengths, etc.) are meaningless
-    // when there are no rows.
+    // Build the sorted column arrays (the map view and the schema are derived from them on demand, see
+    // getColumnMetadataMap() and getSchema()). Empty segments use a stripped-down [EmptyColumnMetadata] since the
+    // shape stats (cardinality, element lengths, etc.) are meaningless when there are no rows. Both arrays are
+    // filled before they are published below, so a reader never sees a half-built one.
+    String[] columns = physicalColumns.toArray(new String[0]);
+    Arrays.sort(columns);
+    ColumnMetadata[] columnMetadata = new ColumnMetadata[columns.length];
     if (_totalDocs > 0) {
-      for (String column : physicalColumns) {
-        _columnMetadataMap.put(column,
-            ColumnMetadataImpl.fromPropertiesConfiguration(segmentMetadata, _totalDocs, column));
+      for (int i = 0; i < columns.length; i++) {
+        columnMetadata[i] = ColumnMetadataImpl.fromPropertiesConfiguration(segmentMetadata, _totalDocs, columns[i]);
       }
 
       // Load index metadata
@@ -273,8 +297,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
               String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
               if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
                 short indexType = indexService.getNumericId(parsedKeys[1]);
-                ((ColumnMetadataImpl) _columnMetadataMap.get(parsedKeys[0])).addIndexSize(indexType,
-                    mapConfig.getLong(key));
+                // The arrays are not published yet, so this looks the column up in the local one
+                int index = Arrays.binarySearch(columns, parsedKeys[0]);
+                Preconditions.checkState(index >= 0, "Column: %s is not in the segment metadata", parsedKeys[0]);
+                ((ColumnMetadataImpl) columnMetadata[index]).addIndexSize(indexType, mapConfig.getLong(key));
               }
             } catch (Exception e) {
               LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
@@ -283,10 +309,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         }
       }
     } else {
-      for (String column : physicalColumns) {
-        _columnMetadataMap.put(column, EmptyColumnMetadata.fromPropertiesConfiguration(segmentMetadata, column));
+      for (int i = 0; i < columns.length; i++) {
+        columnMetadata[i] = EmptyColumnMetadata.fromPropertiesConfiguration(segmentMetadata, columns[i]);
       }
     }
+    _columns = new Columns(columns, columnMetadata);
 
     // Build star-tree v2 metadata
     int starTreeV2Count =
@@ -402,11 +429,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   /// {@inheritDoc}
   ///
-  /// For a metadata-backed segment the schema is built from the column metadata map on the first call (one
-  /// `FieldSpec` per column, the built-in virtual columns included once the loader has registered them) and cached
-  /// until the columns change ([#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)]). Load- and
-  /// query-path code should not call this: a caller there re-inflates the per-column schema footprint for every
-  /// segment it touches and a server keeps it for the segment's lifetime. Column names are available through
+  /// For a metadata-backed segment the schema is built from the column metadata on the first call (one `FieldSpec`
+  /// per column, the built-in virtual columns included once the loader has registered them) and cached until the
+  /// columns change ([#addColumnMetadata(String, ColumnMetadata)] / [#removeColumn(String)]). Load- and query-path
+  /// code should not call this: a caller there re-inflates the per-column schema footprint for every segment it
+  /// touches and a server keeps it for the segment's lifetime. Column names are available through
   /// [#getAllColumns()] and field specs through [#getColumnMetadataFor(String)]; the remaining load-path callers
   /// (the forward-index handler and the column min/max generator) are moved off it in a follow-up.
   @Override
@@ -425,8 +452,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private Schema buildSchema() {
+    // Only a metadata-backed segment gets here: a CONSUMING one is constructed with its schema, so getSchema()
+    // returns before building one
+    Columns columns = Preconditions.checkNotNull(_columns, "Segment: %s holds no column metadata", _segmentName);
     Schema schema = new Schema();
-    for (ColumnMetadata columnMetadata : _columnMetadataMap.values()) {
+    for (ColumnMetadata columnMetadata : columns._metadata) {
       schema.addField(columnMetadata.getFieldSpec());
     }
     return schema;
@@ -439,14 +469,34 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _schema != null;
   }
 
-  /// An unmodifiable view of the keys of the column metadata map, i.e. the same names as
-  /// `getSchema().getColumnNames()` without building the schema. Falls back to the explicit schema of a CONSUMING
-  /// segment, which has no column metadata map. Unmodifiable so a caller cannot narrow a serving segment's columns
-  /// behind the back of [#removeColumn(String)] (which also drops the cached schema and guards the time column).
+  /// An unmodifiable view of the sorted column name array, i.e. the same names as `getSchema().getColumnNames()`
+  /// without building the schema. Falls back to the explicit schema of a CONSUMING segment, which has no column
+  /// metadata. The view is a snapshot: it does not reflect columns added or removed after this call.
   @Override
   public NavigableSet<String> getAllColumns() {
-    return Collections.unmodifiableNavigableSet(
-        _columnMetadataMap != null ? _columnMetadataMap.navigableKeySet() : getSchema().getColumnNames());
+    Columns columns = _columns;
+    return columns != null ? new SortedStringArraySet(columns._names)
+        : Collections.unmodifiableNavigableSet(getSchema().getColumnNames());
+  }
+
+  /// An unmodifiable view of the column metadata array, in the natural column-name order of [#getAllColumns()], and
+  /// empty for a CONSUMING segment, which holds no column metadata (see the class documentation). Like
+  /// [#getAllColumns()] it is a snapshot.
+  @Override
+  public Collection<ColumnMetadata> getAllColumnMetadata() {
+    Columns columns = _columns;
+    return columns != null ? Collections.unmodifiableList(Arrays.asList(columns._metadata)) : List.of();
+  }
+
+  @Nullable
+  @Override
+  public ColumnMetadata getColumnMetadataFor(String column) {
+    Columns columns = _columns;
+    if (columns == null) {
+      return null;
+    }
+    int index = columns.indexOf(column);
+    return index >= 0 ? columns._metadata[index] : null;
   }
 
   @Override
@@ -541,29 +591,256 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _endOffset;
   }
 
+  /// {@inheritDoc}
+  ///
+  /// Built from the column arrays on the first call and cached until the columns change, so a caller pays one map
+  /// entry per column and the segment keeps it for its lifetime. Nothing on the load or query path should call this
+  /// — see the accessors listed on [SegmentMetadata#getColumnMetadataMap()]. The returned map is a read-only copy:
+  /// a write to it (or to one of its views) throws [UnsupportedOperationException] rather than silently missing
+  /// every other accessor; use [#addColumnMetadata(String, ColumnMetadata)] and [#removeColumn(String)] instead.
+  ///
+  /// Returns `null` for a CONSUMING segment, which holds no column metadata.
+  @Nullable
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return _columnMetadataMap;
+    if (_columns == null) {
+      return null;
+    }
+    TreeMap<String, ColumnMetadata> columnMetadataMap = _columnMetadataMapView;
+    if (columnMetadataMap == null) {
+      synchronized (this) {
+        columnMetadataMap = _columnMetadataMapView;
+        if (columnMetadataMap == null) {
+          columnMetadataMap = buildColumnMetadataMap();
+          _columnMetadataMapView = columnMetadataMap;
+        }
+      }
+    }
+    return columnMetadataMap;
   }
 
-  /// Registers the metadata of a column (the loader does this for each built-in virtual column), replacing any
-  /// metadata already registered under the name, and drops the derived schema so the next [#getSchema()] includes
-  /// the column. A write to the map returned by [#getColumnMetadataMap()] bypasses this and leaves a cached schema
-  /// stale, which is why the loader goes through here. Held under the same monitor [#getSchema()] builds under, so a
-  /// schema can never be cached from columns this call has already replaced. Throws for a CONSUMING segment, which
-  /// holds no column metadata.
+  private TreeMap<String, ColumnMetadata> buildColumnMetadataMap() {
+    return new DerivedColumnMetadataMap(Preconditions.checkNotNull(_columns));
+  }
+
+  /// The map [#getColumnMetadataMap()] hands out: a copy of the column arrays that rejects every write, including
+  /// through its key, value, entry and range views, so a caller cannot put a column into it that no other accessor
+  /// ever sees. It is a [TreeMap] subclass rather than [Collections#unmodifiableNavigableMap] only because the SPI
+  /// return type is the concrete class.
+  private static final class DerivedColumnMetadataMap extends TreeMap<String, ColumnMetadata> {
+    DerivedColumnMetadataMap(Columns columns) {
+      for (int i = 0; i < columns._names.length; i++) {
+        super.put(columns._names[i], columns._metadata[i]);
+      }
+    }
+
+    private static UnsupportedOperationException readOnly() {
+      return new UnsupportedOperationException(
+          "The column metadata map is a read-only view; use addColumnMetadata / removeColumn");
+    }
+
+    @Override
+    public ColumnMetadata put(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public void putAll(Map<? extends String, ? extends ColumnMetadata> map) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata remove(Object key) {
+      throw readOnly();
+    }
+
+    @Override
+    public void clear() {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata putIfAbsent(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata compute(String key,
+        BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata computeIfAbsent(String key,
+        Function<? super String, ? extends ColumnMetadata> mappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata computeIfPresent(String key,
+        BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata merge(String key, ColumnMetadata value,
+        BiFunction<? super ColumnMetadata, ? super ColumnMetadata, ? extends ColumnMetadata> remappingFunction) {
+      throw readOnly();
+    }
+
+    @Override
+    public ColumnMetadata replace(String key, ColumnMetadata value) {
+      throw readOnly();
+    }
+
+    @Override
+    public boolean replace(String key, ColumnMetadata oldValue, ColumnMetadata newValue) {
+      throw readOnly();
+    }
+
+    @Override
+    public void replaceAll(BiFunction<? super String, ? super ColumnMetadata, ? extends ColumnMetadata> function) {
+      throw readOnly();
+    }
+
+    @Override
+    public Map.Entry<String, ColumnMetadata> pollFirstEntry() {
+      throw readOnly();
+    }
+
+    @Override
+    public Map.Entry<String, ColumnMetadata> pollLastEntry() {
+      throw readOnly();
+    }
+
+    @Override
+    public Set<String> keySet() {
+      return Collections.unmodifiableSet(super.keySet());
+    }
+
+    @Override
+    public NavigableSet<String> navigableKeySet() {
+      return Collections.unmodifiableNavigableSet(super.navigableKeySet());
+    }
+
+    @Override
+    public NavigableSet<String> descendingKeySet() {
+      return Collections.unmodifiableNavigableSet(super.descendingKeySet());
+    }
+
+    @Override
+    public Collection<ColumnMetadata> values() {
+      return Collections.unmodifiableCollection(super.values());
+    }
+
+    @Override
+    public Set<Map.Entry<String, ColumnMetadata>> entrySet() {
+      return Collections.unmodifiableSet(super.entrySet());
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> descendingMap() {
+      return Collections.unmodifiableNavigableMap(super.descendingMap());
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> subMap(String fromKey, boolean fromInclusive, String toKey,
+        boolean toInclusive) {
+      return Collections.unmodifiableNavigableMap(super.subMap(fromKey, fromInclusive, toKey, toInclusive));
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> headMap(String toKey, boolean inclusive) {
+      return Collections.unmodifiableNavigableMap(super.headMap(toKey, inclusive));
+    }
+
+    @Override
+    public NavigableMap<String, ColumnMetadata> tailMap(String fromKey, boolean inclusive) {
+      return Collections.unmodifiableNavigableMap(super.tailMap(fromKey, inclusive));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> subMap(String fromKey, String toKey) {
+      return Collections.unmodifiableSortedMap(super.subMap(fromKey, toKey));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> headMap(String toKey) {
+      return Collections.unmodifiableSortedMap(super.headMap(toKey));
+    }
+
+    @Override
+    public SortedMap<String, ColumnMetadata> tailMap(String fromKey) {
+      return Collections.unmodifiableSortedMap(super.tailMap(fromKey));
+    }
+  }
+
+  /// Whether [#getColumnMetadataMap()] has been called (and its map cached) since the columns last changed.
+  @VisibleForTesting
+  public boolean isColumnMetadataMapMaterialized() {
+    return _columnMetadataMapView != null;
+  }
+
+  /// {@inheritDoc}
+  ///
+  /// Inserts the column in natural order, or replaces the metadata already registered under the name, either way by
+  /// copying both arrays: a view handed out earlier is documented as a snapshot, and the loader adds a handful of
+  /// virtual columns once per segment, so this is not a hot path.
+  ///
+  /// Throws for a CONSUMING segment, which was given an explicit schema and holds no column metadata to add to.
+  @Override
   public synchronized void addColumnMetadata(String column, ColumnMetadata columnMetadata) {
-    Preconditions.checkState(_columnMetadataMap != null, "Segment: %s holds no column metadata", _segmentName);
-    _columnMetadataMap.put(column, columnMetadata);
-    _schema = null;
+    Columns columns = _columns;
+    Preconditions.checkState(columns != null, "Segment: %s holds no column metadata", _segmentName);
+    int index = columns.indexOf(column);
+    if (index >= 0) {
+      ColumnMetadata[] metadata = columns._metadata.clone();
+      metadata[index] = columnMetadata;
+      _columns = new Columns(columns._names, metadata);
+    } else {
+      int insertionPoint = -index - 1;
+      _columns = new Columns(insert(columns._names, insertionPoint, column),
+          insert(columns._metadata, insertionPoint, columnMetadata));
+    }
+    invalidateDerivedViews();
   }
 
+  /// {@inheritDoc}
+  ///
+  /// Throws for a CONSUMING segment, which holds no column metadata: dropping its explicit schema instead would
+  /// leave it with neither.
   @Override
   public synchronized void removeColumn(String column) {
     Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
-    _columnMetadataMap.remove(column);
-    // Drop the derived schema, if one was built, so the next getSchema() rebuilds it without the column
+    Columns columns = _columns;
+    Preconditions.checkState(columns != null, "Segment: %s holds no column metadata", _segmentName);
+    int index = columns.indexOf(column);
+    if (index < 0) {
+      return;
+    }
+    _columns = new Columns(delete(columns._names, index), delete(columns._metadata, index));
+    invalidateDerivedViews();
+  }
+
+  /// Drops the schema and the map derived from the columns, so the next caller rebuilds them from the current
+  /// arrays. Called while holding the instance monitor, which [#getSchema()] and [#getColumnMetadataMap()] also hold
+  /// while they build and cache, so a view derived from the replaced columns cannot survive this.
+  private void invalidateDerivedViews() {
     _schema = null;
+    _columnMetadataMapView = null;
+  }
+
+  private static <E> E[] insert(E[] array, int index, E element) {
+    E[] extended = Arrays.copyOf(array, array.length + 1);
+    System.arraycopy(array, index, extended, index + 1, array.length - index);
+    extended[index] = element;
+    return extended;
+  }
+
+  private static <E> E[] delete(E[] array, int index) {
+    E[] shortened = Arrays.copyOf(array, array.length - 1);
+    System.arraycopy(array, index + 1, shortened, index, array.length - index - 1);
+    return shortened;
   }
 
   @Override
@@ -611,11 +888,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
 
-    if (_columnMetadataMap != null) {
+    Columns columns = _columns;
+    if (columns != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
-        if (columnFilter == null || columnFilter.contains(entry.getKey())) {
-          columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
+      for (int i = 0; i < columns._names.length; i++) {
+        if (columnFilter == null || columnFilter.contains(columns._names[i])) {
+          columnsMetadata.add(JsonUtils.objectToJsonNode(columns._metadata[i]));
         }
       }
       segmentMetadata.set("columns", columnsMetadata);
@@ -627,5 +905,25 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String toString() {
     return toJson(null).toString();
+  }
+
+  /// The columns of a metadata-backed segment: the names in natural order, and their metadata at the same index.
+  ///
+  /// The two arrays live in one immutable object so that every publication is atomic — a reader that sees a name
+  /// array never sees the metadata array of another version beside it — and so that the arrays a view was handed
+  /// stay exactly as they were.
+  private static final class Columns {
+    final String[] _names;
+    final ColumnMetadata[] _metadata;
+
+    Columns(String[] names, ColumnMetadata[] metadata) {
+      _names = names;
+      _metadata = metadata;
+    }
+
+    /// Index of the column in both arrays, or `-(insertion point) - 1`.
+    int indexOf(String column) {
+      return Arrays.binarySearch(_names, column);
+    }
   }
 }

@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -499,8 +498,7 @@ public class IndexLoadingConfig {
     ResolvedIndexState resolvedIndexState = getResolvedIndexState();
     Map<String, FieldIndexConfigs> indexConfigsByColName = resolvedIndexState._indexConfigsByColName;
     Map<String, FieldIndexConfigs> updatedConfigs = null;
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      String childColumn = entry.getKey();
+    for (String childColumn : segmentMetadata.getAllColumns()) {
       if (!childColumn.contains(OpenStructNaming.SEPARATOR) || indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
@@ -522,7 +520,7 @@ public class IndexLoadingConfig {
       if (keyFieldConfig == null) {
         keyFieldConfig = openStructConfig.getDefaultValueFieldConfig();
       }
-      FieldSpec childFieldSpec = entry.getValue().getFieldSpec();
+      FieldSpec childFieldSpec = segmentMetadata.getColumnMetadataFor(childColumn).getFieldSpec();
       boolean enableInverted = openStructConfig.shouldEnableInvertedIndexForKey(key);
       FieldIndexConfigs childConfigs = new FieldIndexConfigs.Builder(
           FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))

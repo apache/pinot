@@ -24,7 +24,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
@@ -88,17 +87,14 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     List<String> partitionInfo = new ArrayList<>();
     SegmentMetadata segmentMetadata = context.getSegmentMetadata();
 
-    if (segmentMetadata != null && segmentMetadata.getColumnMetadataMap() != null) {
+    if (segmentMetadata != null) {
       // Get partition info from all partitioned columns in the segment metadata
-      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-      for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-        String columnName = entry.getKey();
-        ColumnMetadata columnMetadata = entry.getValue();
+      for (ColumnMetadata columnMetadata : segmentMetadata.getAllColumnMetadata()) {
         Set<Integer> partitions = columnMetadata.getPartitions();
-        if (partitions != null && !partitions.isEmpty()) {
+        if (partitions != null) {
           // Add all partition IDs for this column
           for (Integer partitionId : partitions) {
-            partitionInfo.add(columnName + "_" + partitionId);
+            partitionInfo.add(columnMetadata.getColumnName() + "_" + partitionId);
           }
         }
       }
