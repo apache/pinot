@@ -339,12 +339,10 @@ public class CommonConstants {
   }
 
   public static class Broker {
-    /// Minimum candidate segments for query-local partition-ID caching. Cluster config supports per-table overrides
-    /// by appending `.<tableNameWithType>` to this key. Zero enables caching for any candidate count.
-    /// Invalid or removed table overrides fall back to the cluster default, then the built-in default.
-    public static final String CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS =
-        "pinot.broker.partition.pruning.cache.min.segments";
-    public static final int DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS = 32;
+    /// Minimum candidate segments for preparing a partition-pruning predicate. A negative value disables preparation.
+    public static final String CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS =
+        "pinot.broker.partition.pruning.min.segments";
+    public static final int DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS = 32;
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     /// Namespace for service credentials used by the broker when invoking Server admin APIs.
@@ -1000,9 +998,9 @@ public class CommonConstants {
         /// Query-level override for `inpredicate.threshold`. Negative means always prune.
         public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
-        /// Set false to use the uncached single-column broker partition pruner. Defaults to true; the cache is only
-        /// used at the configured minimum segment count (default 32). Does not disable partition pruning itself.
-        public static final String ENABLE_PARTITION_PRUNING_CACHE = "enablePartitionPruningCache";
+        /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+        /// A negative value disables preparation, but does not disable partition pruning itself.
+        public static final String PARTITION_PRUNING_MIN_SEGMENTS = "partitionPruningMinSegments";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids

@@ -75,8 +75,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -811,41 +811,30 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testPartitionPruningCacheThresholdUpdates()
+  public void testPartitionPruningThresholdUpdates()
       throws Exception {
-    String key = CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+    String key = CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
     _routingManager = spy(_routingManager);
     doNothing().when(_routingManager).buildRouting(any());
     putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
     DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
     ClusterConfig config = new ClusterConfig("testCluster");
     config.getRecord().setSimpleField(key, "128");
-    config.getRecord().setSimpleField(key + "." + TEST_TABLE, "32");
     handler.onClusterConfigChange(config, null);
     handler.registerClusterConfigChangeListener(_routingManager);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 32);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments("other_OFFLINE"), 128);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments("testTable_REALTIME"), 128);
+    assertEquals(_routingManager.getPartitionPruningMinSegments(), 128);
 
-    config.getRecord().setSimpleField(key + "." + TEST_TABLE, "0");
+    config.getRecord().setSimpleField(key, "-1");
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 0);
-    for (String invalid : List.of("-1", "not-an-int", "2147483648")) {
-      config.getRecord().setSimpleField(key + "." + TEST_TABLE, invalid);
-      handler.onClusterConfigChange(config, null);
-      assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 128);
-    }
-    config.getRecord().getSimpleFields().remove(key + "." + TEST_TABLE);
-    handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE), 128);
+    assertEquals(_routingManager.getPartitionPruningMinSegments(), -1);
+
     config.getRecord().setSimpleField(key, "invalid");
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE),
-        DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    assertEquals(_routingManager.getPartitionPruningMinSegments(), DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
+
     config.getRecord().getSimpleFields().clear();
     handler.onClusterConfigChange(config, null);
-    assertEquals(_routingManager.getPartitionPruningCacheMinSegments(TEST_TABLE),
-        DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    assertEquals(_routingManager.getPartitionPruningMinSegments(), DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
     verify(_routingManager, times(3)).buildRouting(TEST_TABLE);
   }
 

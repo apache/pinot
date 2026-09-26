@@ -118,6 +118,16 @@ public class QueryOptionsUtilsTest {
     assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
   }
 
+  @Test
+  public void shouldReadPartitionPruningMinSegmentsOption() {
+    assertEquals(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of(PARTITION_PRUNING_MIN_SEGMENTS, "20")),
+        20);
+    assertEquals(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of(PARTITION_PRUNING_MIN_SEGMENTS, "-1")),
+        -1);
+    assertNull(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of()));
+    assertNull(QueryOptionsUtils.getPartitionPruningMinSegments(null));
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void shouldRejectInvalidInPredicatePruningThreshold() {
     QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));

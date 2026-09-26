@@ -87,18 +87,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public boolean canReusePartitionIds(PartitionFunction other) {
-    return equals(other);
-  }
-
-  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;
     }
-    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
-    if (other == null || getClass() != MurmurPartitionFunction.class
-        || other.getClass() != MurmurPartitionFunction.class) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     }
     MurmurPartitionFunction that = (MurmurPartitionFunction) other;

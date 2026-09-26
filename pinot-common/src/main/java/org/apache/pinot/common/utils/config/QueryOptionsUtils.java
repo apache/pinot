@@ -352,6 +352,14 @@ public class QueryOptionsUtils {
         queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
   }
 
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningMinSegments(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS)) : null;
+  }
+
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
   /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
   /// MV minion executor sets it to `false` so a materialization query is never rewritten back

@@ -59,7 +59,7 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 
-/// Exercises query-local partition ID caching with real metadata initialization and refresh, without ZooKeeper.
+/// Exercises query-local partition predicate preparation with real metadata initialization and refresh, without ZK.
 public class SinglePartitionColumnSegmentPrunerTest {
   private static final String COLUMN = "memberId";
   private static final String TABLE = "testTable_OFFLINE";
@@ -69,8 +69,8 @@ public class SinglePartitionColumnSegmentPrunerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE).build();
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(
         new SegmentPartitionConfig(Map.of(COLUMN, new ColumnPartitionConfig("PrunerCounting", 8))));
-    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null));
-    SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, 2).get(0);
+    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null, 2));
+    SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, 100).get(0);
     pruner.init(null, null, List.of("first", "second"),
         List.of(metadata("first", "PrunerCounting", 8, Set.of(1), null),
             metadata("second", "PrunerCounting", 8, Set.of(2), null)));
@@ -78,14 +78,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
     assertEquals(CountingPartitionFunction.CALLS.get(), 1);
-    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE, "false"));
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, "-1"));
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
     assertEquals(CountingPartitionFunction.CALLS.get(), 2);
   }
 
   @Test
-  public void testHashesOnceAcrossDistinctMetadataInstancesPerQuery() throws Exception {
+  public void testComputesPartitionIdOnceAcrossDistinctMetadataInstancesPerQuery() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     Set<String> expected = new HashSet<>();
     for (int i = 0; i < 256; i++) {
@@ -101,11 +101,12 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner.prune(request, records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 1);
     assertEquals(pruner.prune(request, records.keySet()), expected);
-    assertEquals(CountingPartitionFunction.CALLS.get(), 2, "Computed hashes must not survive a prune call");
-    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE, "false"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 2, "Prepared IDs must not survive a prune call");
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, "-1"));
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, records.keySet()), expected);
-    assertEquals(CountingPartitionFunction.CALLS.get(), 256, "Disabling the cache must use per-segment evaluation");
+    assertEquals(CountingPartitionFunction.CALLS.get(), 256,
+        "Disabling predicate preparation must use per-segment evaluation");
   }
 
   @Test
@@ -126,21 +127,21 @@ public class SinglePartitionColumnSegmentPrunerTest {
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
-    assertEquals(CountingPartitionFunction.CALLS.get(), 4,
-        "Only functions compatible with the first segment may reuse its partition IDs");
+    assertEquals(CountingPartitionFunction.CALLS.get(), 3,
+        "Each distinct function should prepare its partition ID once");
     records.put("b", metadata("b", "PrunerCounting", 16, Set.of(11), null));
     records.put("d", metadata("d", "PrunerCounting", 8, Set.of(3), null));
     expected.add("d");
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner(records).prune(request(predicate("EQUALS", "11")), records.keySet()), expected);
-    assertEquals(CountingPartitionFunction.CALLS.get(), 3,
+    assertEquals(CountingPartitionFunction.CALLS.get(), 2,
         "Different partition counts must not reuse partition IDs");
   }
 
   @Test
   public void testEqualConfigurationsReusePartitionIds() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
-    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS; i++) {
+    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(4), Map.of("offset", "1")));
     }
@@ -182,7 +183,8 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testLargeConfigurationsAndUnrelatedPredicates(int numSegments, boolean cacheEnabled) throws Exception {
+  public void testLargeConfigurationsAndUnrelatedPredicates(int numSegments, @Nullable Integer queryMinSegments)
+      throws Exception {
     String values = "first|" + "x".repeat(100_000);
     Map<String, String> config = Map.of("columnValues", values, "columnValuesDelimiter", "|");
     ZNRecord first = metadata("first", "BoundedColumnValue", 3, Set.of(1), config);
@@ -194,8 +196,10 @@ public class SinglePartitionColumnSegmentPrunerTest {
     }
     SinglePartitionColumnSegmentPruner pruner = pruner(records);
     BrokerRequest request = request(predicate("EQUALS", "first"));
-    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE,
-        Boolean.toString(cacheEnabled)));
+    if (queryMinSegments != null) {
+      request.getPinotQuery().setQueryOptions(
+          Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, queryMinSegments.toString()));
+    }
     assertEquals(pruner.prune(request, records.keySet()), Set.of("first"));
     request.getPinotQuery().setFilterExpression(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
         RequestUtils.getLiteralExpression("value")));
@@ -250,18 +254,19 @@ public class SinglePartitionColumnSegmentPrunerTest {
 
   @DataProvider
   public Object[][] candidateCounts() {
-    int threshold = Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
-    return new Object[][]{{1, true}, {2, true}, {threshold - 1, true}, {threshold, true}, {threshold, false}};
+    int threshold = Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+    return new Object[][]{{1, null}, {2, null}, {threshold - 1, null}, {threshold, null}, {threshold, -1}};
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testAndOrUnsupportedPredicatesAndLazyInValues(int numSegments, boolean cacheEnabled) throws Exception {
+  public void testAndOrUnsupportedPredicatesAndLazyInValues(int numSegments, @Nullable Integer queryMinSegments)
+      throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "Modulo", 8, Set.of(1), null));
     }
-    SinglePartitionColumnSegmentPruner pruner = pruner(records, cacheEnabled);
+    SinglePartitionColumnSegmentPruner pruner = pruner(records, queryMinSegments);
     Set<String> segments = records.keySet();
     Expression invalidValue = predicate("EQUALS", "invalid-number");
     assertEquals(pruner.prune(request(predicate("IN", "1", "invalid-number")), segments), segments);
@@ -298,9 +303,10 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testUnknownMetadataIsConservativeAndDoesNotEvaluateFilter(int numSegments, boolean cacheEnabled)
+  public void testUnknownMetadataIsConservativeAndDoesNotEvaluateFilter(int numSegments,
+      @Nullable Integer queryMinSegments)
       throws Exception {
-    SinglePartitionColumnSegmentPruner pruner = pruner(Map.of(), cacheEnabled);
+    SinglePartitionColumnSegmentPruner pruner = pruner(Map.of(), queryMinSegments);
     ZNRecord invalid = new ZNRecord("invalid");
     invalid.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, "invalid-json");
     pruner.init(null, null, List.of("missing", "empty", "invalid"),
@@ -314,13 +320,14 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test(dataProvider = "candidateCounts")
-  public void testRefreshUsesCurrentPartitionsAndConfiguration(int numSegments, boolean cacheEnabled) throws Exception {
+  public void testRefreshUsesCurrentPartitionsAndConfiguration(int numSegments, @Nullable Integer queryMinSegments)
+      throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < numSegments; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(3), null));
     }
-    SinglePartitionColumnSegmentPruner pruner = pruner(records, cacheEnabled);
+    SinglePartitionColumnSegmentPruner pruner = pruner(records, queryMinSegments);
     Set<String> segments = records.keySet();
     BrokerRequest request = request(predicate("EQUALS", "3"));
     assertEquals(pruner.prune(request, segments), segments);
@@ -339,7 +346,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
   }
 
   @Test
-  public void testConcurrentQueriesKeepSeparateCachedValues() throws Exception {
+  public void testConcurrentQueriesKeepSeparatePreparedValues() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
     for (int i = 0; i < 256; i++) {
       String segment = "segment_" + i;
@@ -375,12 +382,15 @@ public class SinglePartitionColumnSegmentPrunerTest {
     return pruner;
   }
 
-  private static SinglePartitionColumnSegmentPruner pruner(Map<String, ZNRecord> records, boolean cacheEnabled) {
+  private static SinglePartitionColumnSegmentPruner pruner(Map<String, ZNRecord> records,
+      @Nullable Integer queryMinSegments) {
     SinglePartitionColumnSegmentPruner pruner = new SinglePartitionColumnSegmentPruner(TABLE, COLUMN) {
       @Override
       public Set<String> prune(BrokerRequest request, Set<String> segments) {
-        request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE,
-            Boolean.toString(cacheEnabled)));
+        if (queryMinSegments != null) {
+          request.getPinotQuery().setQueryOptions(
+              Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, queryMinSegments.toString()));
+        }
         return super.prune(request, segments);
       }
     };
@@ -454,14 +464,25 @@ public class SinglePartitionColumnSegmentPrunerTest {
     }
 
     @Override
-    public boolean canReusePartitionIds(PartitionFunction other) {
-      return other instanceof CountingPartitionFunction
-          && _numPartitions == other.getNumPartitions() && _offset == ((CountingPartitionFunction) other)._offset;
+    public PartitionIdNormalizer getPartitionIdNormalizer() {
+      return PartitionIdNormalizer.POSITIVE_MODULO;
     }
 
     @Override
-    public PartitionIdNormalizer getPartitionIdNormalizer() {
-      return PartitionIdNormalizer.POSITIVE_MODULO;
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      CountingPartitionFunction that = (CountingPartitionFunction) other;
+      return _numPartitions == that._numPartitions && _offset == that._offset;
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * _numPartitions + _offset;
     }
   }
 }

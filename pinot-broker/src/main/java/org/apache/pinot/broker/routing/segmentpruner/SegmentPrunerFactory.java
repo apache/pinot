@@ -52,11 +52,11 @@ public class SegmentPrunerFactory {
 
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    return getSegmentPruners(tableConfig, propertyStore, Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    return getSegmentPruners(tableConfig, propertyStore, Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
   }
 
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, int partitionPruningCacheMinSegments) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int defaultPartitionPruningMinSegments) {
     List<SegmentPruner> segmentPruners = new ArrayList<>();
     boolean needsEmptySegment = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
     if (needsEmptySegment) {
@@ -72,7 +72,7 @@ public class SegmentPrunerFactory {
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             SegmentPruner partitionSegmentPruner =
-                getPartitionSegmentPruner(tableConfig, partitionPruningCacheMinSegments);
+                getPartitionSegmentPruner(tableConfig, defaultPartitionPruningMinSegments);
             if (partitionSegmentPruner != null) {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
@@ -96,7 +96,7 @@ public class SegmentPrunerFactory {
             routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
           SegmentPruner partitionSegmentPruner =
-              getPartitionSegmentPruner(tableConfig, partitionPruningCacheMinSegments);
+              getPartitionSegmentPruner(tableConfig, defaultPartitionPruningMinSegments);
           if (partitionSegmentPruner != null) {
             segmentPruners.add(partitionSegmentPruner);
           }
@@ -108,7 +108,7 @@ public class SegmentPrunerFactory {
 
   @Nullable
   private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
-      int partitionPruningCacheMinSegments) {
+      int defaultPartitionPruningMinSegments) {
     String tableNameWithType = tableConfig.getTableName();
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
@@ -123,8 +123,12 @@ public class SegmentPrunerFactory {
     Set<String> partitionColumns = columnPartitionMap.keySet();
     LOGGER.info("Using PartitionSegmentPruner on partition columns: {} for table: {}", partitionColumns,
         tableNameWithType);
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    Integer tableMinSegments = routingConfig != null ? routingConfig.getPartitionPruningMinSegments() : null;
+    int partitionPruningMinSegments =
+        tableMinSegments != null ? tableMinSegments : defaultPartitionPruningMinSegments;
     return partitionColumns.size() == 1 ? new SinglePartitionColumnSegmentPruner(tableNameWithType,
-        partitionColumns.iterator().next(), partitionPruningCacheMinSegments)
+        partitionColumns.iterator().next(), partitionPruningMinSegments)
         : new MultiPartitionColumnsSegmentPruner(tableNameWithType, partitionColumns);
   }
 

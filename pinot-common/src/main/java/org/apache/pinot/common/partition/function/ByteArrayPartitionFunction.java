@@ -65,18 +65,11 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public boolean canReusePartitionIds(PartitionFunction other) {
-    return equals(other);
-  }
-
-  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;
     }
-    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
-    if (other == null || getClass() != ByteArrayPartitionFunction.class
-        || other.getClass() != ByteArrayPartitionFunction.class) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     }
     ByteArrayPartitionFunction that = (ByteArrayPartitionFunction) other;
