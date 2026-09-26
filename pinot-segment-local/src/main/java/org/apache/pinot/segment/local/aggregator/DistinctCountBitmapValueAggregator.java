@@ -22,8 +22,14 @@ import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapLazyUnion;
 
 
+/// For serialized-bitmap (`byte[]`) raw values, the aggregated value is unioned lazily and repaired in
+/// [#serializeAggregatedValue]. A given metric column always provides either serialized bitmaps or plain raw values,
+/// never both, so the [#addToValue] path never observes a lazy accumulator. The `_maxByteSize` tracking stays valid
+/// on a lazy accumulator: serialized container sizes do not depend on the deferred cardinality values, and a lazy
+/// bitmap container measures at its full fixed size, which upper-bounds the size after repair.
 public class DistinctCountBitmapValueAggregator implements ValueAggregator<Object, RoaringBitmap> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
@@ -61,7 +67,7 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   @Override
   public RoaringBitmap applyRawValue(RoaringBitmap value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      value.or(deserializeAggregatedValue((byte[]) rawValue));
+      RoaringBitmapLazyUnion.lazyOr(value, deserializeAggregatedValue((byte[]) rawValue));
     } else {
       addToValue(value, rawValue);
     }
@@ -83,7 +89,10 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public RoaringBitmap applyAggregatedValue(RoaringBitmap value, RoaringBitmap aggregatedValue) {
-    value.or(aggregatedValue);
+    // The input may itself be a lazy accumulator (e.g. an on-heap star-tree record built through applyRawValue);
+    // repair it before the union because lazy unions require a non-lazy input
+    RoaringBitmapLazyUnion.repair(aggregatedValue);
+    RoaringBitmapLazyUnion.lazyOr(value, aggregatedValue);
     _maxByteSize = Math.max(_maxByteSize, value.serializedSizeInBytes());
     return value;
   }
@@ -105,6 +114,7 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public byte[] serializeAggregatedValue(RoaringBitmap value) {
+    RoaringBitmapLazyUnion.repair(value);
     return RoaringBitmapUtils.serialize(value);
   }
 

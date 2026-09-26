@@ -42,8 +42,10 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
@@ -391,6 +393,55 @@ public class AggregateOperatorTest {
         "Num groups limit should not be reached when groups are below limit");
     assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
         "Num groups should equal 1");
+  }
+
+  @DataProvider
+  public Object[][] bitmapMergeGrouping() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "bitmapMergeGrouping")
+  public void testBitmapIntermediateMergeFeedsFinalStage(boolean groupBy) {
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "bitmap"},
+        new ColumnDataType[]{INT, ColumnDataType.OBJECT});
+    RoaringBitmap first = new RoaringBitmap();
+    RoaringBitmap second = new RoaringBitmap();
+    RoaringBitmap third = new RoaringBitmap();
+    first.add(0L, 3_000L);
+    second.add(2_000L, 6_000L);
+    third.add(5_000L, 9_000L);
+    first.add(-1);
+    third.add(Integer.MIN_VALUE);
+    RoaringBitmap expected = RoaringBitmap.or(RoaringBitmap.or(first, second), third);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(7, first).finishBlock().addRow(7, second).finishBlock().addRow(7, third).buildWithEos();
+    List<Integer> groupKeys = groupBy ? List.of(0) : List.of();
+    DataSchema intermediateSchema = groupBy ? inputSchema
+        : new DataSchema(new String[]{"bitmap"}, new ColumnDataType[]{ColumnDataType.OBJECT});
+    List<RexExpression.FunctionCall> intermediateCalls = List.of(new RexExpression.FunctionCall(
+        INT, "DISTINCTCOUNTBITMAP", List.of(new RexExpression.InputRef(1))));
+    AggregateOperator intermediate = new AggregateOperator(OperatorTestUtil.getTracingContext(), input,
+        new AggregateNode(-1, intermediateSchema, PlanNode.NodeHint.EMPTY, List.of(), intermediateCalls, List.of(-1),
+            groupKeys, AggType.INTERMEDIATE, false, null, 0));
+    MseBlock.Data mergedBlock = (MseBlock.Data) intermediate.nextBlock();
+    int valueIndex = groupBy ? 1 : 0;
+    RoaringBitmap merged = (RoaringBitmap) mergedBlock.asRowHeap().getRows().get(0)[valueIndex];
+    assertEquals(merged, expected);
+    assertEquals(merged.getCardinality(), expected.getCardinality());
+
+    // Pass the raw intermediate directly to another stage, without relying on serialization to repair it.
+    when(_input.nextBlock()).thenReturn(mergedBlock).thenReturn(SuccessMseBlock.INSTANCE);
+    DataSchema resultSchema = groupBy
+        ? new DataSchema(new String[]{"group", "count"}, new ColumnDataType[]{INT, INT})
+        : new DataSchema(new String[]{"count"}, new ColumnDataType[]{INT});
+    List<RexExpression.FunctionCall> finalCalls = List.of(new RexExpression.FunctionCall(
+        INT, "DISTINCTCOUNTBITMAP", List.of(new RexExpression.InputRef(valueIndex))));
+    AggregateOperator finalStage = new AggregateOperator(OperatorTestUtil.getTracingContext(), _input,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), finalCalls, List.of(-1), groupKeys,
+            AggType.FINAL, false, null, 0));
+    List<Object[]> rows = ((MseBlock.Data) finalStage.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[valueIndex], expected.getCardinality());
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
