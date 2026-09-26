@@ -109,8 +109,21 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-                  _executorService);
+              try {
+                _indexedTable = createIndexedTable(resultsBlock);
+              } catch (RuntimeException | Error failure) {
+                AggregationGroupByResult result = resultsBlock.getAggregationGroupByResult();
+                if (result != null) {
+                  try {
+                    result.closeGroupKeyGenerator();
+                  } catch (RuntimeException | Error closeFailure) {
+                    if (failure != closeFailure) {
+                      failure.addSuppressed(closeFailure);
+                    }
+                  }
+                }
+                throw failure;
+              }
             }
           }
         }
@@ -168,6 +181,24 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
+      }
+    }
+  }
+
+  /// Construction hook for alternate indexed-table storage; the default keeps the standard combine behavior.
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+        _executorService);
+  }
+
+  @Override
+  protected void onProcessStopped() {
+    IndexedTable table = _indexedTable;
+    if (table instanceof AutoCloseable closeable) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to release group-by table storage", e);
       }
     }
   }

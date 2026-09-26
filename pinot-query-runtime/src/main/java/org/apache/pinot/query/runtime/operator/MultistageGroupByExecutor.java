@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -42,7 +43,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
-import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
+import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorProvider;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.PeekableIntIterator;
@@ -51,7 +52,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 /// Class that executes the keyed group by aggregations for the multistage AggregateOperator.
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class MultistageGroupByExecutor {
+public class MultistageGroupByExecutor implements AutoCloseable {
   private final int[] _groupKeyIds;
   private final AggregationFunction[] _aggFunctions;
   private final int[] _filterArgIds;
@@ -75,6 +76,14 @@ public class MultistageGroupByExecutor {
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
       int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
       Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+    this(groupKeyIds, aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult, resultSchema,
+        opChainMetadata, nodeHint, GroupIdGeneratorProvider.DEFAULT);
+  }
+
+  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
+      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
+      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint,
+      GroupIdGeneratorProvider groupIdGeneratorProvider) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -105,9 +114,79 @@ public class MultistageGroupByExecutor {
       _aggregateResultHolders = null;
     }
 
-    _groupIdGenerator =
-        GroupIdGeneratorFactory.getGroupIdGenerator(_resultSchema.getStoredColumnDataTypes(), groupKeyIds.length,
-            _numGroupsLimit, maxInitialResultHolderCapacity);
+    GroupIdGeneratorProvider provider = Objects.requireNonNull(groupIdGeneratorProvider);
+    ColumnDataType[] storedTypes = _resultSchema.getStoredColumnDataTypes();
+    // A custom provider may allocate native memory. Defer it until the operator actually executes so a failed
+    // parent/sibling plan construction cannot orphan a generator before the op chain has a cleanup owner.
+    _groupIdGenerator = provider == GroupIdGeneratorProvider.DEFAULT
+        ? Objects.requireNonNull(provider.create(storedTypes, groupKeyIds.length, _numGroupsLimit,
+            maxInitialResultHolderCapacity))
+        : new LazyGroupIdGenerator(provider, storedTypes.clone(), groupKeyIds.length, _numGroupsLimit,
+            maxInitialResultHolderCapacity);
+  }
+
+  @Override
+  public void close() {
+    _groupIdGenerator.close();
+  }
+
+  private static final class LazyGroupIdGenerator implements GroupIdGenerator {
+    private final GroupIdGeneratorProvider _provider;
+    private final ColumnDataType[] _storedTypes;
+    private final int _numKeyColumns;
+    private final int _numGroupsLimit;
+    private final int _initialCapacity;
+    @Nullable
+    private GroupIdGenerator _delegate;
+    private boolean _closed;
+
+    private LazyGroupIdGenerator(GroupIdGeneratorProvider provider, ColumnDataType[] storedTypes, int numKeyColumns,
+        int numGroupsLimit, int initialCapacity) {
+      _provider = provider;
+      _storedTypes = storedTypes;
+      _numKeyColumns = numKeyColumns;
+      _numGroupsLimit = numGroupsLimit;
+      _initialCapacity = initialCapacity;
+    }
+
+    private GroupIdGenerator delegate() {
+      if (_closed) {
+        throw new IllegalStateException("Group-ID generator is closed");
+      }
+      if (_delegate == null) {
+        _delegate = Objects.requireNonNull(_provider.create(_storedTypes, _numKeyColumns, _numGroupsLimit,
+            _initialCapacity));
+      }
+      return _delegate;
+    }
+
+    @Override
+    public int getGroupId(Object key) {
+      return delegate().getGroupId(key);
+    }
+
+    @Override
+    public int getNumGroups() {
+      return delegate().getNumGroups();
+    }
+
+    @Override
+    public Iterator<GroupKey> getGroupKeyIterator(int numColumns) {
+      return delegate().getGroupKeyIterator(numColumns);
+    }
+
+    @Override
+    public void close() {
+      if (_closed) {
+        return;
+      }
+      _closed = true;
+      GroupIdGenerator delegate = _delegate;
+      _delegate = null;
+      if (delegate != null) {
+        delegate.close();
+      }
+    }
   }
 
   private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {

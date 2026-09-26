@@ -52,6 +52,16 @@ public class Record {
     return _values;
   }
 
+  /// Reads one column without requiring a complete row to be materialized.
+  public Object getValue(int index) {
+    return _values[index];
+  }
+
+  /// Replaces one column without requiring a complete row to be materialized.
+  public void setValue(int index, Object value) {
+    _values[index] = value;
+  }
+
   // NOTE: Not check class for performance concern
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override

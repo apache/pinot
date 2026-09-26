@@ -28,8 +28,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
@@ -206,6 +210,52 @@ public class StreamingGroupByCombineOperatorTest {
     // Should get exactly 1 data block since threshold > total distinct groups
     assertEquals(dataBlocks.size(), 1, "Expected single data block with high threshold");
     assertEquals(dataBlocks.get(0).getRows().size(), NUM_DISTINCT_GROUPS);
+  }
+
+  @Test
+  public void testFlushedTableClosesAndReturnedRowsRemainDetached() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(GROUP_BY_SUM);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    AtomicInteger created = new AtomicInteger();
+    AtomicInteger closed = new AtomicInteger();
+    class TrackingTable extends SimpleIndexedTable implements AutoCloseable {
+      TrackingTable(DataSchema schema, int initialCapacity) {
+        super(schema, false, queryContext, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE,
+            initialCapacity, EXECUTOR);
+      }
+
+      @Override
+      public void close() {
+        closed.incrementAndGet();
+      }
+    }
+    StreamingGroupByCombineOperator combineOperator =
+        new StreamingGroupByCombineOperator(buildOperators(queryContext), queryContext, EXECUTOR, 10) {
+          @Override
+          protected IndexedTable createNewIndexedTable(DataSchema schema, int initialCapacity) {
+            created.incrementAndGet();
+            return new TrackingTable(schema, initialCapacity);
+          }
+        };
+
+    List<GroupByResultsBlock> blocks = new ArrayList<>();
+    combineOperator.start();
+    try {
+      BaseResultsBlock block = combineOperator.nextBlock();
+      while (!(block instanceof MetadataResultsBlock)) {
+        assertNull(block.getErrorMessages());
+        blocks.add((GroupByResultsBlock) block);
+        block = combineOperator.nextBlock();
+      }
+    } finally {
+      combineOperator.stop();
+    }
+    assertTrue(blocks.size() > 1);
+    assertEquals(created.get(), blocks.size(), "No unused replacement table should be allocated after a flush");
+    assertEquals(closed.get(), created.get(), "Each flushed table must be closed exactly once");
+    for (GroupByResultsBlock block : blocks) {
+      assertTrue(block.getRows().size() > 0, "Rows must remain usable after table close");
+    }
   }
 
   @Test
