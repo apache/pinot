@@ -225,6 +225,12 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   /// Returns the structurally normalized codec specification, or `null` for the legacy compression path.
+  ///
+  /// Any non-null specification selects the V7 on-disk format, which honors `targetDocsPerChunk` but not
+  /// `rawIndexWriterVersion`, `deriveNumDocsPerChunk` or `targetMaxChunkSize`. Before enabling it, upgrade every
+  /// component that may build or read segments. Before rolling those components back, remove the specification and
+  /// regenerate or re-push affected segments so the deep-store copy is in a legacy format; a reload alone only
+  /// rewrites the server-local copy and a later re-download would bring back an unreadable V7 index.
   @Nullable
   public String getCodecSpec() {
     return _codecSpec;
