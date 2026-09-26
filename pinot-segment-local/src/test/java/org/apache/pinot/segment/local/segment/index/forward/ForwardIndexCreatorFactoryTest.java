@@ -135,46 +135,14 @@ public class ForwardIndexCreatorFactoryTest {
       throws Exception {
     File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
     try {
-      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
-          .withCodecSpec(codecSpec)
-          .withTargetDocsPerChunk(2)
-          .build();
-      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-      // Legacy compression stats are opted in here on purpose: a codecSpec column never reports them.
-      tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
       long[] values = storedType == DataType.INT
           ? new long[]{11, 13, 21}
           : new long[]{Long.MIN_VALUE, (long) Integer.MAX_VALUE + 1, Long.MAX_VALUE};
-      try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
-          newContext(indexDir, false, tableConfig, values.length, storedType), config)) {
-        assertFalse(creator.isDictionaryEncoded());
-        assertNull(creator.getRawForwardIndexChunkCompressionType());
-        for (long value : values) {
-          if (storedType == DataType.INT) {
-            creator.putInt((int) value);
-          } else {
-            creator.putLong(value);
-          }
-        }
-        creator.seal();
-        assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L);
-      }
-      File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-      assertTrue(indexFile.exists());
-      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
-          ForwardIndexReader<?> reader =
-              ForwardIndexReaderFactory.getInstance().createRawIndexReader(buffer, storedType, true)) {
-        assertTrue(reader instanceof FixedByteChunkSVForwardIndexReaderV7,
-            "codecSpec was routed to " + reader.getClass().getSimpleName());
+      // Legacy compression stats are opted in here on purpose: a codecSpec column never reports them.
+      File indexFile = roundTripCodecSpecIndex(indexDir, codecSpec, storedType, 2, values, true, 0);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
         assertEquals(buffer.getInt(0), FixedByteChunkSVForwardIndexReaderV7.VERSION);
         assertEquals(FixedByteChunkSVForwardIndexReaderV7.readCodecSpec(buffer), codecSpec);
-        FixedByteChunkSVForwardIndexReaderV7 v7Reader = (FixedByteChunkSVForwardIndexReaderV7) reader;
-        try (FixedByteChunkSVForwardIndexReaderV7.Context context = v7Reader.createContext()) {
-          for (int i = 0; i < values.length; i++) {
-            assertEquals(storedType == DataType.INT ? v7Reader.getInt(i, context) : v7Reader.getLong(i, context),
-                values[i]);
-          }
-        }
       }
     } finally {
       FileUtils.deleteQuietly(indexDir);
@@ -205,45 +173,66 @@ public class ForwardIndexCreatorFactoryTest {
       for (int i = 0; i < numDocs; i++) {
         values[i] = storedType == DataType.INT ? random.nextInt() : random.nextLong();
       }
-      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
-          .withCodecSpec(codecSpec)
-          .withTargetDocsPerChunk(1000)
-          .build();
-      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-      try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
-          newContext(indexDir, false, tableConfig, numDocs, storedType), config)) {
-        for (long value : values) {
-          if (storedType == DataType.INT) {
-            creator.putInt((int) value);
-          } else {
-            creator.putLong(value);
-          }
-        }
-        creator.seal();
-      }
-      File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
-          ForwardIndexReader<?> reader =
-              ForwardIndexReaderFactory.getInstance().createRawIndexReader(buffer, storedType, true)) {
-        FixedByteChunkSVForwardIndexReaderV7 v7Reader = (FixedByteChunkSVForwardIndexReaderV7) reader;
+      File indexFile = roundTripCodecSpecIndex(indexDir, codecSpec, storedType, 1000, values, false, 2000);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
         // Header ints: version, magic, numChunks, numDocsPerChunk, sizeOfEntry, totalDocs
         assertEquals(buffer.getInt(3 * Integer.BYTES), 1024, "targetDocsPerChunk=1000 should normalize to 1024");
         assertEquals(buffer.getInt(2 * Integer.BYTES), (numDocs + 1023) / 1024);
         assertEquals(buffer.getInt(5 * Integer.BYTES), numDocs);
-        try (FixedByteChunkSVForwardIndexReaderV7.Context sequential = v7Reader.createContext();
-            FixedByteChunkSVForwardIndexReaderV7.Context randomAccess = v7Reader.createContext()) {
-          for (int docId = 0; docId < numDocs; docId++) {
-            assertEquals(readValue(v7Reader, storedType, docId, sequential), values[docId], "docId " + docId);
-          }
-          for (int i = 0; i < 2000; i++) {
-            int docId = random.nextInt(numDocs);
-            assertEquals(readValue(v7Reader, storedType, docId, randomAccess), values[docId], "docId " + docId);
-          }
-        }
       }
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
+  }
+
+  /// Writes `values` through a `codecSpec` forward-index creator and reads every one of them back, then
+  /// returns the index file so the caller can assert on its header. Covers the parts both codecSpec round
+  /// trips share: the creator contract that holds for any codecSpec column (not dictionary encoded, no
+  /// legacy chunk compression type, and no legacy uncompressed value size even when the table opts into
+  /// compression stats), that the pipeline routed the file to the V7 reader, and a sequential read of every
+  /// value. `randomReads` further reads land on random doc ids through a second, random-access context.
+  private static File roundTripCodecSpecIndex(File indexDir, String codecSpec, DataType storedType,
+      int targetDocsPerChunk, long[] values, boolean compressionStatsEnabled, int randomReads)
+      throws Exception {
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).withCodecSpec(codecSpec)
+        .withTargetDocsPerChunk(targetDocsPerChunk).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    tableConfig.getIndexingConfig().setCompressionStatsEnabled(compressionStatsEnabled);
+    try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(
+        newContext(indexDir, false, tableConfig, values.length, storedType), config)) {
+      assertFalse(creator.isDictionaryEncoded());
+      assertNull(creator.getRawForwardIndexChunkCompressionType());
+      for (long value : values) {
+        if (storedType == DataType.INT) {
+          creator.putInt((int) value);
+        } else {
+          creator.putLong(value);
+        }
+      }
+      creator.seal();
+      assertEquals(creator.getRawForwardIndexUncompressedValueSizeInBytes(), -1L);
+    }
+    File indexFile = new File(indexDir, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    assertTrue(indexFile.exists());
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        ForwardIndexReader<?> reader =
+            ForwardIndexReaderFactory.getInstance().createRawIndexReader(buffer, storedType, true)) {
+      assertTrue(reader instanceof FixedByteChunkSVForwardIndexReaderV7,
+          "codecSpec was routed to " + reader.getClass().getSimpleName());
+      FixedByteChunkSVForwardIndexReaderV7 v7Reader = (FixedByteChunkSVForwardIndexReaderV7) reader;
+      try (FixedByteChunkSVForwardIndexReaderV7.Context sequential = v7Reader.createContext();
+          FixedByteChunkSVForwardIndexReaderV7.Context randomAccess = v7Reader.createContext()) {
+        for (int docId = 0; docId < values.length; docId++) {
+          assertEquals(readValue(v7Reader, storedType, docId, sequential), values[docId], "docId " + docId);
+        }
+        Random random = new Random(7);
+        for (int i = 0; i < randomReads; i++) {
+          int docId = random.nextInt(values.length);
+          assertEquals(readValue(v7Reader, storedType, docId, randomAccess), values[docId], "docId " + docId);
+        }
+      }
+    }
+    return indexFile;
   }
 
   private static long readValue(FixedByteChunkSVForwardIndexReaderV7 reader, DataType storedType, int docId,
