@@ -1032,6 +1032,12 @@ public class QueryEnvironment {
     default boolean meterGroupByAliasShadowedByColumn() {
       return false;
     }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER]
+    @Value.Default
+    default boolean defaultWindowSortOnSender() {
+      return CommonConstants.Broker.DEFAULT_WINDOW_SORT_ON_SENDER;
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
