@@ -115,9 +115,8 @@ public class MultiStageWithoutStatsIntegrationTest extends BaseClusterIntegratio
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return List.of(
-        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(),
-            FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
+    return List.of(fieldConfigWithForwardEncoding("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(),
+        FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
   }
 
   /// This is a regression test. In older versions there were issues with stats in intersection queries.

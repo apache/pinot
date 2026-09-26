@@ -19,9 +19,11 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,19 +34,20 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new Scenario(DataType.INT, true),
-        new Scenario(DataType.INT, false),
-        new Scenario(DataType.LONG, false),
-        new Scenario(DataType.FLOAT, false),
-        new Scenario(DataType.DOUBLE, false),
+        new Scenario(FieldSpec.DataType.INT, true),
+
+        new Scenario(FieldSpec.DataType.INT, false),
+        new Scenario(FieldSpec.DataType.LONG, false),
+        new Scenario(FieldSpec.DataType.FLOAT, false),
+        new Scenario(FieldSpec.DataType.DOUBLE, false),
     };
   }
 
   public class Scenario {
-    private final DataType _dataType;
+    private final FieldSpec.DataType _dataType;
     private final boolean _dictionary;
 
-    public Scenario(DataType dataType, boolean dictionary) {
+    public Scenario(FieldSpec.DataType dataType, boolean dictionary) {
       _dataType = dataType;
       _dictionary = dictionary;
     }
@@ -53,8 +56,12 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
       FieldConfig.EncodingType encodingType =
           _dictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
       return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled, builder -> {
-        builder.withEncodingType(encodingType);
-        builder.withCompressionCodec(FieldConfig.CompressionCodec.PASS_THROUGH);
+        ObjectNode indexes = JsonUtils.newObjectNode();
+        ObjectNode forward = JsonUtils.newObjectNode();
+        forward.put("encodingType", encodingType.name());
+        forward.put("compressionCodec", FieldConfig.CompressionCodec.PASS_THROUGH.name());
+        indexes.set("forward", forward);
+        builder.withIndexes(indexes);
       });
     }
 
@@ -67,41 +74,51 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   @Test(dataProvider = "scenarios")
   void aggrWithoutNullAndEmptySegments(Scenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField", "null", "null")
-        .andOnSecondInstance("myField", "null", "null")
-        .whenQuery("select mode(myField) as mode from testTable")
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
         .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
   }
 
   @Test(dataProvider = "scenarios")
   void aggrWithNullAndEmptySegments(Scenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField", "null", "null")
-        .andOnSecondInstance("myField", "null", "null")
-        .whenQuery("select mode(myField) as mode from testTable")
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
         .thenResultIs("DOUBLE", "null");
   }
 
-  String aggrWithoutNullResult(DataType dt) {
+  String aggrWithoutNullResult(FieldSpec.DataType dt) {
     switch (dt) {
-      case INT:
-        return "-2.147483648E9";
-      case LONG:
-        return "-9.223372036854776E18";
-      case FLOAT:
-        return "-Infinity";
-      case DOUBLE:
-        return "-Infinity";
-      default:
-        throw new IllegalArgumentException(dt.toString());
+      case INT: return "-2.147483648E9";
+      case LONG: return "-9.223372036854776E18";
+      case FLOAT: return "-Infinity";
+      case DOUBLE: return "-Infinity";
+      default: throw new IllegalArgumentException(dt.toString());
     }
   }
 
   @Test(dataProvider = "scenarios")
   void aggrWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        )
         .whenQuery("select mode(myField) as mode from testTable")
         .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
   }
@@ -109,42 +126,55 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   @Test(dataProvider = "scenarios")
   void aggrWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
-        .whenQuery("select mode(myField) as mode from testTable")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
         .thenResultIs("DOUBLE", "1");
   }
 
-  String aggrSvWithoutNullResult(DataType dt) {
+  String aggrSvWithoutNullResult(FieldSpec.DataType dt) {
     switch (dt) {
-      case INT:
-        return "-2.147483648E9";
-      case LONG:
-        return "-9.223372036854776E18";
-      case FLOAT:
-        return "-Infinity";
-      case DOUBLE:
-        return "-Infinity";
-      default:
-        throw new IllegalArgumentException(dt.toString());
+      case INT: return "-2.147483648E9";
+      case LONG: return "-9.223372036854776E18";
+      case FLOAT: return "-Infinity";
+      case DOUBLE: return "-Infinity";
+      default: throw new IllegalArgumentException(dt.toString());
     }
   }
 
   @Test(dataProvider = "scenarios")
   void aggrSvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
-        .whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
         .thenResultIs("STRING | DOUBLE", "cte | " + aggrSvWithoutNullResult(scenario._dataType));
   }
 
   @Test(dataProvider = "scenarios")
   void aggrSvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
-        .whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
         .thenResultIs("STRING | DOUBLE", "cte | 1");
   }
 
@@ -171,15 +201,19 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     }
 
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField", "null", "1", "2")
-        .andOnSecondInstance("myField", "null", "1", "2")
-        .whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
-        .thenResultIs(
-            pinotDataType + " | DOUBLE",
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
+        .thenResultIs(pinotDataType + " | DOUBLE",
             defaultNullValue + " | " + aggrSvWithoutNullResult(scenario._dataType),
             "1           | 1",
-            "2           | 2"
-        );
+            "2           | 2");
   }
 
   @Test(dataProvider = "scenarios")
@@ -187,29 +221,25 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     PinotDataType pinotDataType = PinotDataType.valueOf(scenario._dataType.name());
 
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField", "null", "1", "2")
-        .andOnSecondInstance("myField", "null", "1", "2")
-        .whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
-        .thenResultIs(
-            pinotDataType + " | DOUBLE",
-            "1 | 1",
-            "2 | 2",
-            "null | null"
-        );
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
+        .thenResultIs(pinotDataType + " | DOUBLE", "1 | 1", "2 | 2", "null | null");
   }
 
-  String aggrMvWithoutNullResult(DataType dt) {
+  String aggrMvWithoutNullResult(FieldSpec.DataType dt) {
     switch (dt) {
-      case INT:
-        return "-2.147483648E9";
-      case LONG:
-        return "-9.223372036854776E18";
-      case FLOAT:
-        return "-Infinity";
-      case DOUBLE:
-        return "-Infinity";
-      default:
-        throw new IllegalArgumentException(dt.toString());
+      case INT: return "-2.147483648E9";
+      case LONG: return "-9.223372036854776E18";
+      case FLOAT: return "-Infinity";
+      case DOUBLE: return "-Infinity";
+      default: throw new IllegalArgumentException(dt.toString());
     }
   }
 
@@ -217,9 +247,15 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   void aggrMvWithoutNull(Scenario scenario) {
     // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
-        .whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
         .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | " + aggrMvWithoutNullResult(scenario._dataType));
   }
 
@@ -227,9 +263,15 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   void aggrMvWithNull(Scenario scenario) {
     // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField", "null", "1", "null")
-        .andOnSecondInstance("myField", "null", "1", "null")
-        .whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "null"
+        ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
         .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | 1");
   }
 }
