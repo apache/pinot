@@ -42,16 +42,26 @@ public class RoutingConfig extends BaseJsonConfig {
   private final List<String> _segmentPrunerTypes;
   private final String _instanceSelectorType;
   private final Boolean _useFixedReplica;
+  private final Integer _partitionPruningMinSegments;
+
+  public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
+      @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
+      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
+      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica) {
+    this(routingTableBuilderName, segmentPrunerTypes, instanceSelectorType, useFixedReplica, null);
+  }
 
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
       @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
-      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica) {
+      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica,
+      @JsonProperty("partitionPruningMinSegments") @Nullable Integer partitionPruningMinSegments) {
     _routingTableBuilderName = routingTableBuilderName;
     _segmentPrunerTypes = segmentPrunerTypes;
     _instanceSelectorType = instanceSelectorType;
     _useFixedReplica = useFixedReplica;
+    _partitionPruningMinSegments = partitionPruningMinSegments;
   }
 
   @Nullable
@@ -72,5 +82,12 @@ public class RoutingConfig extends BaseJsonConfig {
   @Nullable
   public Boolean getUseFixedReplica() {
     return _useFixedReplica;
+  }
+
+  /// Returns the table-level override for the minimum candidate segments needed to prepare a partition-pruning
+  /// predicate. A negative value disables preparation. Null means use the cluster-level value.
+  @Nullable
+  public Integer getPartitionPruningMinSegments() {
+    return _partitionPruningMinSegments;
   }
 }

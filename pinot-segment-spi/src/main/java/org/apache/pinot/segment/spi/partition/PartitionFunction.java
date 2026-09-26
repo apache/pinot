@@ -65,11 +65,10 @@ public interface PartitionFunction extends Serializable {
   }
 
   /// Returns whether this function and `other` produce identical partition ids for every input.
-  /// Implementations may opt in using immutable value equality over every output-affecting setting.
-  /// Equality must be reflexive, symmetric and transitive; matching hash codes alone are insufficient.
-  /// The default permits reuse only for the same instance, including for existing plugins with unrelated equality.
+  /// Implementations that override [#equals(Object)] must include every setting that affects partition ids.
+  /// Matching hash codes alone are insufficient.
   default boolean canReusePartitionIds(PartitionFunction other) {
-    return this == other;
+    return equals(other);
   }
 
   /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id

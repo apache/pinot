@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,9 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -52,7 +53,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
-    this(tableNameWithType, partitionColumn, Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS);
+    this(tableNameWithType, partitionColumn, Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS);
   }
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn,
@@ -107,12 +108,11 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
-    if (segments.size() >= _minSegmentsForPreparation) {
-      Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-      if (queryOptions == null
-          || !"false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.ENABLE_PARTITION_PRUNING_CACHE))) {
-        return pruneWithPreparedPredicate(filterExpression, segments);
-      }
+    Integer queryMinSegments =
+        QueryOptionsUtils.getPartitionPruningMinSegments(brokerRequest.getPinotQuery().getQueryOptions());
+    int minSegmentsForPreparation = queryMinSegments != null ? queryMinSegments : _minSegmentsForPreparation;
+    if (minSegmentsForPreparation >= 0 && segments.size() >= minSegmentsForPreparation) {
+      return pruneWithPreparedPredicate(filterExpression, segments);
     }
     Set<String> selectedSegments = new HashSet<>();
     for (String segment : segments) {
@@ -127,8 +127,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   private Set<String> pruneWithPreparedPredicate(Expression filterExpression, Set<String> segments) {
     Set<String> selectedSegments = new HashSet<>();
-    PreparedPredicate predicate = null;
-    PartitionFunction cachedFunction = null;
+    List<PreparedPredicate> predicates = new ArrayList<>();
     for (String segment : segments) {
       SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
       if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
@@ -136,13 +135,19 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         continue;
       }
       PartitionFunction function = partitionInfo.getPartitionFunction();
-      if (predicate == null) {
-        predicate = new PreparedPredicate(filterExpression);
-        cachedFunction = function;
+      int functionHashCode = function.hashCode();
+      PreparedPredicate predicate = null;
+      for (PreparedPredicate candidate : predicates) {
+        if (candidate.canReusePartitionIds(function, functionHashCode)) {
+          predicate = candidate;
+          break;
+        }
       }
-      // Reuse the filter structure even when the functions cannot share partition ids.
-      boolean reusePartitionIds = cachedFunction.canReusePartitionIds(function);
-      if (predicate.matches(partitionInfo.getPartitions(), function, reusePartitionIds)) {
+      if (predicate == null) {
+        predicate = new PreparedPredicate(filterExpression, function, functionHashCode);
+        predicates.add(predicate);
+      }
+      if (predicate.matches(partitionInfo.getPartitions())) {
         selectedSegments.add(segment);
       }
     }
@@ -200,6 +205,8 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   /// Lazily prepares only visited expressions and values. Instances belong to one prune call, never shared by queries.
   private final class PreparedPredicate {
     private final Expression _expression;
+    private final PartitionFunction _partitionFunction;
+    private final int _partitionFunctionHashCode;
     private FilterKind _kind;
     private List<Expression> _operands;
     private PreparedPredicate[] _children;
@@ -208,11 +215,18 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     private IntSet _partitionIds;
     private int _numEvaluatedValues;
 
-    private PreparedPredicate(Expression expression) {
+    private PreparedPredicate(Expression expression, PartitionFunction partitionFunction, int functionHashCode) {
       _expression = expression;
+      _partitionFunction = partitionFunction;
+      _partitionFunctionHashCode = functionHashCode;
     }
 
-    private boolean matches(Set<Integer> partitions, PartitionFunction partitionFunction, boolean reusePartitionIds) {
+    private boolean canReusePartitionIds(PartitionFunction partitionFunction, int functionHashCode) {
+      return _partitionFunctionHashCode == functionHashCode
+          && _partitionFunction.canReusePartitionIds(partitionFunction);
+    }
+
+    private boolean matches(Set<Integer> partitions) {
       if (_kind == null) {
         Function function = _expression.getFunctionCall();
         _kind = FilterKind.valueOf(function.getOperator());
@@ -220,7 +234,8 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         if (_kind == FilterKind.AND || _kind == FilterKind.OR) {
           _children = new PreparedPredicate[_operands.size()];
           for (int i = 0; i < _children.length; i++) {
-            _children[i] = new PreparedPredicate(_operands.get(i));
+            _children[i] =
+                new PreparedPredicate(_operands.get(i), _partitionFunction, _partitionFunctionHashCode);
           }
         } else if (_kind == FilterKind.EQUALS || _kind == FilterKind.IN) {
           Identifier identifier = _operands.get(0).getIdentifier();
@@ -230,14 +245,14 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       switch (_kind) {
         case AND:
           for (PreparedPredicate child : _children) {
-            if (!child.matches(partitions, partitionFunction, reusePartitionIds)) {
+            if (!child.matches(partitions)) {
               return false;
             }
           }
           return true;
         case OR:
           for (PreparedPredicate child : _children) {
-            if (child.matches(partitions, partitionFunction, reusePartitionIds)) {
+            if (child.matches(partitions)) {
               return true;
             }
           }
@@ -246,19 +261,10 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         case IN:
           if (_isPartitionPredicate) {
             int numValues = _kind == FilterKind.EQUALS ? 1 : _operands.size() - 1;
-            if (!reusePartitionIds) {
-              for (int i = 0; i < numValues; i++) {
-                if (partitions.contains(
-                    partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(i + 1))))) {
-                  return true;
-                }
-              }
-              return false;
-            }
             if (numValues == 1) {
               if (_singlePartitionId == null) {
                 _singlePartitionId =
-                    partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(1)));
+                    _partitionFunction.getPartition(RequestContextUtils.getStringValue(_operands.get(1)));
               }
               return partitions.contains(_singlePartitionId);
             }
@@ -286,7 +292,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
               }
             }
             while (_numEvaluatedValues < numValues) {
-              int partitionId = partitionFunction.getPartition(
+              int partitionId = _partitionFunction.getPartition(
                   RequestContextUtils.getStringValue(_operands.get(_numEvaluatedValues + 1)));
               if (_numEvaluatedValues == 0) {
                 _singlePartitionId = partitionId;

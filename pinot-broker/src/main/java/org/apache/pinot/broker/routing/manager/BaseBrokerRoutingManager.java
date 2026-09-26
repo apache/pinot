@@ -139,7 +139,8 @@ public abstract class BaseBrokerRoutingManager
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
-  private volatile Map<String, Integer> _partitionPruningCacheMinSegments = Map.of();
+  private volatile int _partitionPruningMinSegments =
+      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
@@ -214,47 +215,33 @@ public abstract class BaseBrokerRoutingManager
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
-    String tablePrefix = key + ".";
-    Map<String, Integer> thresholds = new HashMap<>();
-    clusterConfigs.forEach((name, value) -> {
-      if (name.equals(key) || name.startsWith(tablePrefix) && name.length() > tablePrefix.length()) {
-        try {
-          int threshold = Integer.parseInt(value);
-          Preconditions.checkArgument(threshold >= 0, "Threshold must be non-negative");
-          thresholds.put(name.equals(key) ? "" : name.substring(tablePrefix.length()), threshold);
-        } catch (IllegalArgumentException e) {
-          LOGGER.warn("Ignoring invalid partition pruning cache threshold: {}={}", name, value);
-        }
+    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
+    int updatedThreshold = CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+    String value = clusterConfigs.get(key);
+    if (value != null) {
+      try {
+        updatedThreshold = Integer.parseInt(value);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Ignoring invalid partition pruning threshold: {}={}", key, value);
       }
-    });
-    Map<String, Integer> previousThresholds = _partitionPruningCacheMinSegments;
-    Map<String, Integer> updatedThresholds = Map.copyOf(thresholds);
-    _partitionPruningCacheMinSegments = updatedThresholds;
+    }
+    int previousThreshold = _partitionPruningMinSegments;
+    _partitionPruningMinSegments = updatedThreshold;
+    if (previousThreshold == updatedThreshold) {
+      return;
+    }
     for (String tableNameWithType : _routingEntryMap.keySet()) {
-      if (resolvePartitionPruningCacheMinSegments(previousThresholds, tableNameWithType)
-          != resolvePartitionPruningCacheMinSegments(updatedThresholds, tableNameWithType)) {
-        try {
-          buildRouting(tableNameWithType);
-        } catch (Exception e) {
-          LOGGER.error("Failed to rebuild routing for table: {} after partition pruning cache threshold change",
-              tableNameWithType, e);
-        }
+      try {
+        buildRouting(tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.error("Failed to rebuild routing for table: {} after partition pruning threshold change",
+            tableNameWithType, e);
       }
     }
   }
 
-  int getPartitionPruningCacheMinSegments(String tableNameWithType) {
-    return resolvePartitionPruningCacheMinSegments(_partitionPruningCacheMinSegments, tableNameWithType);
-  }
-
-  private static int resolvePartitionPruningCacheMinSegments(Map<String, Integer> thresholds,
-      String tableNameWithType) {
-    Integer threshold = thresholds.get(tableNameWithType);
-    if (threshold == null) {
-      threshold = thresholds.get("");
-    }
-    return threshold != null ? threshold : CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_CACHE_MIN_SEGMENTS;
+  int getPartitionPruningMinSegments() {
+    return _partitionPruningMinSegments;
   }
 
   /// Sets a callback to be invoked when a server is re-enabled after being excluded.
@@ -861,7 +848,7 @@ public abstract class BaseBrokerRoutingManager
 
       // Register segment pruners and initialize segment zk metadata fetcher.
       List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore,
-          getPartitionPruningCacheMinSegments(tableNameWithType));
+          getPartitionPruningMinSegments());
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);

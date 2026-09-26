@@ -61,18 +61,11 @@ public class ModuloPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public boolean canReusePartitionIds(PartitionFunction other) {
-    return equals(other);
-  }
-
-  @Override
   public boolean equals(Object other) {
     if (this == other) {
       return true;
     }
-    // Subclasses may introduce partitioning state; they must explicitly define their own equality.
-    if (other == null || getClass() != ModuloPartitionFunction.class
-        || other.getClass() != ModuloPartitionFunction.class) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     }
     ModuloPartitionFunction that = (ModuloPartitionFunction) other;

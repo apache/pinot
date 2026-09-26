@@ -91,7 +91,7 @@ public class PartitionFunctionTest {
   }
 
   @Test
-  public void testComplexFunctionsAndSubclassesKeepInstanceEquality() {
+  public void testComplexFunctionsAndSubclasses() {
     Map<String, String> config = Map.of("columnValues", "a|b", "columnValuesDelimiter", "|");
     PartitionFunction bounded = new BoundedColumnValuePartitionFunction(3, config);
     assertTrue(bounded.canReusePartitionIds(bounded));
@@ -104,7 +104,7 @@ public class PartitionFunctionTest {
     PartitionFunction subclass = new CustomMurmur();
     PartitionFunction another = new CustomMurmur();
     assertTrue(subclass.canReusePartitionIds(subclass));
-    assertFalse(subclass.canReusePartitionIds(another));
+    assertTrue(subclass.canReusePartitionIds(another));
     assertFalse(subclass.canReusePartitionIds(new MurmurPartitionFunction(8, null)));
     assertFalse(new MurmurPartitionFunction(8, null).canReusePartitionIds(subclass));
   }
