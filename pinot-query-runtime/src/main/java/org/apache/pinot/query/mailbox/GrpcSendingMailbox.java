@@ -134,8 +134,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // and must always reach the receiver, so they bypass the back-pressure gate. Bypassing also disables the
     // cooperative termination poll inside [#awaitReady]; without it, a terminate signal raised while the sender is
     // mid-way through pushing an error EOS would unwind [#sendInternal] with a TerminationException, leave
-    // [#_senderSideClosed] false, and let [#cancel] run and overwrite the original error code with
-    // QUERY_CANCELLATION on the receiver side.
+    // [#_senderSideClosed] false, and let [#cancel] run and replace the original error code with
+    // QUERY_CANCELLATION if its throwable does not carry a QueryErrorCode.
     //
     // Race against a concurrent [#cancel]: both paths perform an early `isTerminated()` check before taking
     // [#_readyLock], so two threads can both pass that check and enter their respective lock sections. The cancel
@@ -297,7 +297,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
       MseBlock errorBlock = ErrorMseBlock.fromError(
-          QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
+          QueryErrorCode.fromThrowable(t, QueryErrorCode.QUERY_CANCELLATION),
+          "Cancelled by sender with exception: " + msg);
       processAndSend(errorBlock, List.of(), /* bypassReady */ true);
       _contentObserver.onCompleted();
     } catch (Exception e) {
