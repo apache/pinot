@@ -41,3 +41,9 @@ operations:
     useMultiStageQueryEngine: true
     queryFileName: queries/feature-test-multi-stage.queries
     expectedResultsFileName: query-results/feature-test-multi-stage.results
+  - type: queryOp
+    description: Verify the VARIANT wire query after both servers are upgraded
+    useMultiStageQueryEngine: true
+    nullHandlingEnabled: true
+    queryFileName: queries/variant-wire.queries
+    expectedResultsFileName: query-results/variant-wire.results
