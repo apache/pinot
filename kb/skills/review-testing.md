@@ -11,7 +11,8 @@ impact; pattern matches are investigation triggers, not findings or automatic se
 - Map changed behavior to existing and new tests. A production-file change without a test-file change is not itself a
   coverage gap; identify the behavior or failure mode that lacks coverage.
 - Find new tests and scan for:
-  - Test framework: TestNG (`import org.testng.annotations.Test`) unless the file uses JUnit consistently.
+  - Test framework: TestNG (`import org.testng.annotations.Test`); JUnit test APIs are not allowed. Only the JUnit
+    Platform suite API (`org.junit.platform.suite.api`) is used, to group TestNG tests.
   - Mocks: inspect whether mocks of `Dictionary`, `ForwardIndexReader`, or `NullValueVectorReader` omit semantics needed
     by the assertion. Prefer real instances when encoding or storage behavior matters (see PR 18189).
   - `assertTrue` / `assertFalse` on compound expressions — prefer `assertEquals` / `assertThrows`.
