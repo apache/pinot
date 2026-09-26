@@ -139,8 +139,8 @@ public abstract class BaseBrokerRoutingManager
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
-  private volatile int _partitionPruningMinSegments =
-      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+  private volatile int _partitionPruningPreparationThreshold =
+      CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
@@ -215,8 +215,8 @@ public abstract class BaseBrokerRoutingManager
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_MIN_SEGMENTS;
-    int updatedThreshold = CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+    String key = CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    int updatedThreshold = CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
     String value = clusterConfigs.get(key);
     if (value != null) {
       try {
@@ -225,23 +225,11 @@ public abstract class BaseBrokerRoutingManager
         LOGGER.warn("Ignoring invalid partition pruning threshold: {}={}", key, value);
       }
     }
-    int previousThreshold = _partitionPruningMinSegments;
-    _partitionPruningMinSegments = updatedThreshold;
-    if (previousThreshold == updatedThreshold) {
-      return;
-    }
-    for (String tableNameWithType : _routingEntryMap.keySet()) {
-      try {
-        buildRouting(tableNameWithType);
-      } catch (Exception e) {
-        LOGGER.error("Failed to rebuild routing for table: {} after partition pruning threshold change",
-            tableNameWithType, e);
-      }
-    }
+    _partitionPruningPreparationThreshold = updatedThreshold;
   }
 
-  int getPartitionPruningMinSegments() {
-    return _partitionPruningMinSegments;
+  int getPartitionPruningPreparationThreshold() {
+    return _partitionPruningPreparationThreshold;
   }
 
   /// Sets a callback to be invoked when a server is re-enabled after being excluded.
@@ -848,7 +836,7 @@ public abstract class BaseBrokerRoutingManager
 
       // Register segment pruners and initialize segment zk metadata fetcher.
       List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore,
-          getPartitionPruningMinSegments());
+          this::getPartitionPruningPreparationThreshold);
 
       AdaptiveServerSelector adaptiveServerSelector =
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);

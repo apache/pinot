@@ -42,7 +42,7 @@ public class RoutingConfig extends BaseJsonConfig {
   private final List<String> _segmentPrunerTypes;
   private final String _instanceSelectorType;
   private final Boolean _useFixedReplica;
-  private final Integer _partitionPruningMinSegments;
+  private final Integer _partitionPruningPreparationThreshold;
 
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
@@ -56,12 +56,12 @@ public class RoutingConfig extends BaseJsonConfig {
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
       @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
       @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica,
-      @JsonProperty("partitionPruningMinSegments") @Nullable Integer partitionPruningMinSegments) {
+      @JsonProperty("partitionPruningPreparationThreshold") @Nullable Integer partitionPruningPreparationThreshold) {
     _routingTableBuilderName = routingTableBuilderName;
     _segmentPrunerTypes = segmentPrunerTypes;
     _instanceSelectorType = instanceSelectorType;
     _useFixedReplica = useFixedReplica;
-    _partitionPruningMinSegments = partitionPruningMinSegments;
+    _partitionPruningPreparationThreshold = partitionPruningPreparationThreshold;
   }
 
   @Nullable
@@ -87,7 +87,7 @@ public class RoutingConfig extends BaseJsonConfig {
   /// Returns the table-level override for the minimum candidate segments needed to prepare a partition-pruning
   /// predicate. A negative value disables preparation. Null means use the cluster-level value.
   @Nullable
-  public Integer getPartitionPruningMinSegments() {
-    return _partitionPruningMinSegments;
+  public Integer getPartitionPruningPreparationThreshold() {
+    return _partitionPruningPreparationThreshold;
   }
 }

@@ -119,13 +119,13 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
-  public void shouldReadPartitionPruningMinSegmentsOption() {
-    assertEquals(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of(PARTITION_PRUNING_MIN_SEGMENTS, "20")),
-        20);
-    assertEquals(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of(PARTITION_PRUNING_MIN_SEGMENTS, "-1")),
-        -1);
-    assertNull(QueryOptionsUtils.getPartitionPruningMinSegments(Map.of()));
-    assertNull(QueryOptionsUtils.getPartitionPruningMinSegments(null));
+  public void shouldReadPartitionPruningPreparationThresholdOption() {
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getPartitionPruningPreparationThreshold(
+        Map.of(PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(Map.of()));
+    assertNull(QueryOptionsUtils.getPartitionPruningPreparationThreshold(null));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
