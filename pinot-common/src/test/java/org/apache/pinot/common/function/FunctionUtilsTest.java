@@ -304,6 +304,7 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getColumnDataType(boolean[].class), ColumnDataType.BOOLEAN_ARRAY);
     assertEquals(FunctionUtils.getColumnDataType(Timestamp[].class), ColumnDataType.TIMESTAMP_ARRAY);
     assertEquals(FunctionUtils.getColumnDataType(byte[][].class), ColumnDataType.BYTES_ARRAY);
+    assertEquals(FunctionUtils.getColumnDataType(UUID[].class), ColumnDataType.UUID_ARRAY);
     // Object
     assertEquals(FunctionUtils.getColumnDataType(Object.class), ColumnDataType.OBJECT);
     // Unknown class

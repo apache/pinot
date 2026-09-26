@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -153,8 +154,6 @@ public class LiteralContext {
     _pinotDataType = getPinotDataType(type, value);
   }
 
-  // TODO: Revisit MV support for BOOLEAN, BIG_DECIMAL and UUID.
-  //       https://github.com/apache/pinot/issues/19338
   @Nullable
   private static PinotDataType getPinotDataType(DataType type, @Nullable Object value) {
     if (value == null) {
@@ -169,8 +168,8 @@ public class LiteralContext {
     boolean singleValue = !value.getClass().isArray();
     switch (type) {
       case BOOLEAN:
-        Preconditions.checkState(singleValue, "Boolean array is not supported");
-        return PinotDataType.BOOLEAN;
+        return singleValue ? PinotDataType.BOOLEAN
+            : (value instanceof boolean[] ? PinotDataType.PRIMITIVE_BOOLEAN_ARRAY : PinotDataType.BOOLEAN_ARRAY);
       case INT:
         return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
       case LONG:
@@ -180,13 +179,13 @@ public class LiteralContext {
       case DOUBLE:
         return singleValue ? PinotDataType.DOUBLE : PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
       case BIG_DECIMAL:
-        Preconditions.checkState(singleValue, "BigDecimal array is not supported");
-        return PinotDataType.BIG_DECIMAL;
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case TIMESTAMP:
+        return singleValue ? PinotDataType.TIMESTAMP : PinotDataType.TIMESTAMP_ARRAY;
       case STRING:
         return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
       case UUID:
-        Preconditions.checkState(singleValue, "UUID array is not supported");
-        return PinotDataType.UUID;
+        return singleValue ? PinotDataType.UUID : PinotDataType.UUID_ARRAY;
       default:
         throw new IllegalStateException("Unsupported DataType: " + type);
     }
@@ -340,6 +339,14 @@ public class LiteralContext {
         return "'" + Arrays.toString((float[]) _value) + "'";
       case PRIMITIVE_DOUBLE_ARRAY:
         return "'" + Arrays.toString((double[]) _value) + "'";
+      case BIG_DECIMAL_ARRAY:
+        return "'" + Arrays.toString((BigDecimal[]) _value) + "'";
+      case PRIMITIVE_BOOLEAN_ARRAY:
+        return "'" + Arrays.toString((boolean[]) _value) + "'";
+      case BOOLEAN_ARRAY:
+        return "'" + Arrays.toString((Boolean[]) _value) + "'";
+      case TIMESTAMP_ARRAY:
+        return "'" + Arrays.toString((Timestamp[]) _value) + "'";
       case STRING_ARRAY:
         return "'" + Arrays.toString((String[]) _value) + "'";
       case BYTES_ARRAY: {
@@ -350,6 +357,8 @@ public class LiteralContext {
         }
         return "'" + Arrays.toString(hexValues) + "'";
       }
+      case UUID_ARRAY:
+        return "'" + Arrays.toString((UUID[]) _value) + "'";
       default:
         throw new IllegalStateException("Unsupported PinotDataType: " + _pinotDataType);
     }
