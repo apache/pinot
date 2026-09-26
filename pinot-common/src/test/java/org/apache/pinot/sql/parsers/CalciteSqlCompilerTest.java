@@ -42,6 +42,9 @@ import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+
 
 /// Some tests for the SQL compiler.
 public class CalciteSqlCompilerTest {
@@ -2819,6 +2822,20 @@ public class CalciteSqlCompilerTest {
     expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertFalse(expression.getLiteral().getBoolValue());
+  }
+
+  @Test
+  public void testLegacyCompileTimeInvokerPreservesJsonExtractScalarResultType() {
+    for (String expressionString : List.of(
+        "jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN')",
+        "jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY')",
+        "jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')",
+        "jsonExtractScalar('{\"v\":[1.5]}', '$.v', 'BIG_DECIMAL_ARRAY')")) {
+      Expression expression = compileToExpression(expressionString);
+      expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+      assertNotNull(expression.getFunctionCall(), expressionString);
+      assertEquals(expression.getFunctionCall().getOperator(), "jsonextractscalar");
+    }
   }
 
   @Test

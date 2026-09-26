@@ -35,6 +35,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class ArrayLiteralTransformFunctionTest {
@@ -68,6 +69,22 @@ public class ArrayLiteralTransformFunctionTest {
     Assert.assertEquals(intArray.getIntArrayLiteral(), new int[]{
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     });
+  }
+
+  @Test
+  public void testBooleanArrayLiteralTransformFunction() {
+    List<ExpressionContext> arrayExpressions = List.of(
+        ExpressionContext.forLiteral(DataType.BOOLEAN, true),
+        ExpressionContext.forLiteral(DataType.BOOLEAN, false));
+
+    ArrayLiteralTransformFunction booleanArray = new ArrayLiteralTransformFunction(arrayExpressions);
+    assertEquals(booleanArray.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    assertEquals(booleanArray.getIntArrayLiteral(), new int[]{1, 0});
+    int[][] values = booleanArray.transformToIntValuesMV(_projectionBlock);
+    assertEquals(values.length, NUM_DOCS);
+    for (int[] value : values) {
+      assertEquals(value, new int[]{1, 0});
+    }
   }
 
   @Test

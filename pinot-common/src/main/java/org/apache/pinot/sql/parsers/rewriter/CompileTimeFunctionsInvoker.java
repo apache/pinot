@@ -36,6 +36,7 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class CompileTimeFunctionsInvoker implements QueryRewriter {
+  private static final String JSON_EXTRACT_SCALAR_FUNCTION_NAME = "jsonextractscalar";
 
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
@@ -87,6 +88,12 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return expression;
     }
     String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    // The legacy request literal has no place to retain jsonExtractScalar's resultType-driven logical type. Folding
+    // BOOLEAN, TIMESTAMP_ARRAY, BOOLEAN_ARRAY, or BIG_DECIMAL_ARRAY here would replace the transform with a literal
+    // inferred only from its Java storage class. The typed multi-stage planner performs its own safe literal folding.
+    if (JSON_EXTRACT_SCALAR_FUNCTION_NAME.equals(canonicalName)) {
+      return expression;
+    }
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       return expression;
