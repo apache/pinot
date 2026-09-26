@@ -110,6 +110,9 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
 
   private final boolean _asc;
   private final boolean _pruningEnabled;
+  /// Whether a cursor whose bound *ties* the merge frontier may be deferred, not only one sorting strictly
+  /// beyond it. Only correct under a single order-by expression: see {@link #sortsBeyond}.
+  private final boolean _deferTiedCursors;
   private final int _numRowsToKeep;
   private final int _blockSize;
   private final Comparator<Object[]> _comparator;
@@ -156,6 +159,10 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         firstOrderByExpressionContext.getType() == ExpressionContext.Type.IDENTIFIER
             ? firstOrderByExpressionContext.getIdentifier() : null;
     _pruningEnabled = firstOrderByColumn != null && !queryContext.isNullHandlingEnabled();
+    // A column-0 tie only proves the segment cannot supply an *earlier* row when column 0 is the whole sort key.
+    // With two or more expressions a tie on column 0 can hide a row sorting earlier on column 1, so ties must
+    // still activate (same gate as MinMaxValueBasedSelectionOrderByCombineOperator's numOrderByExpressions == 1).
+    _deferTiedCursors = orderByExpressions.size() == 1;
 
     // Build one cursor per segment operator and read its first order-by column min/max for lazy activation ordering.
     // Reading DataSourceMetadata does not touch column buffers, so no segment acquire is needed here (mirrors
@@ -325,11 +332,15 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   /// Cursors are visited in min/max order and {@code _nextToActivate} advances only on a real activation, so a
   /// {@code break} defers the current cursor to a later call with a risen frontier rather than skipping it. Deferring
   /// is safe because the first order-by column is the primary sort key: a cursor whose range starts past the frontier
-  /// holds no row sorting before it. With no frontier known yet, activation is forced.
+  /// holds no row sorting before it. With no frontier known yet, activation is forced. Under a single order-by
+  /// expression a cursor whose bound merely *ties* the frontier is deferred too, which is what keeps a long run of
+  /// equal segment minima from activating every segment at once; see {@link #sortsBeyond}.
   ///
   /// The frontier is the row about to be emitted. Understating it defers a cursor that could have supplied that row
   /// and the merge emits out of order, where overstating it only activates a segment early. The leader is retained
-  /// outside the heap, so that row is either its head or the heap head: a bound past both is past the frontier.
+  /// outside the heap, so that row is the smaller of its head and the heap head: a bound past either is past the
+  /// frontier. Checking the leader alone would overstate it whenever the leader has moved past the heap head, which
+  /// happens both on entry (the leader just advanced) and within this loop (an activation offers a smaller head).
   private void activateEligibleCursors(@Nullable SegmentCursor leader) {
     while (_nextToActivate < _sortedCursors.length) {
       SegmentCursor cursor = _sortedCursors[_nextToActivate];
@@ -338,7 +349,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         // Re-read per iteration: each activation below can offer a smaller head into the heap.
         SegmentCursor top = _priorityQueue.peek();
         // A null bound always activates, and with no candidate at all there is no frontier to prune against.
-        if (bound != null && (leader != null || top != null) && sortsBeyond(bound, leader) && sortsBeyond(bound, top)) {
+        if (bound != null && (leader != null || top != null) && sortsBeyond(bound, leader, top)) {
           break;
         }
       }
@@ -350,21 +361,34 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     }
   }
 
-  /// Whether `bound` sorts past the cursor's head on the first order-by column, so that segment cannot supply the
-  /// head. An absent cursor imposes no constraint; a null head cannot be compared, so this reports `false` and the
-  /// caller activates. Tests column 0 only, as the pruning bound always has, rather than the full-row comparator --
-  /// which would put every order-by column on the per-row path.
-  private boolean sortsBeyond(Comparable bound, @Nullable SegmentCursor cursor) {
-    if (cursor == null) {
-      return true;
-    }
-    Object headValue = cursor.currentHead()[0];
-    if (headValue == null) {
+  /// Whether `bound` sorts past the frontier -- the smaller of the two candidates' heads -- on the first order-by
+  /// column, so that segment cannot supply the next row. An absent candidate imposes no constraint; a null head cannot
+  /// be compared, so this reports `false` and the caller activates. Tests column 0 only, as the pruning bound always
+  /// has, rather than the full-row comparator -- which would put every order-by column on the per-row path.
+  ///
+  /// Under a single order-by expression ({@code _deferTiedCursors}) a *tie* also defers, which only postpones a
+  /// cursor: {@code _nextToActivate} does not advance, and the caller force-activates once heap and leader drain.
+  /// Since {@code bound} bounds every row in the segment, a deferred cursor holds no row sorting strictly before an
+  /// emitted one -- only ties, interchangeable when column 0 is the whole sort key. Note this is *not*
+  /// {@link MinMaxValueBasedSelectionOrderByCombineOperator}'s justification: its bound is a complete top-K's k-th
+  /// row, this one is the live frontier. It changes which tied rows are returned, already documented as arbitrary.
+  private boolean sortsBeyond(Comparable bound, @Nullable SegmentCursor leader, @Nullable SegmentCursor top) {
+    Object leaderHead = leader != null ? leader.currentHead()[0] : null;
+    Object topHead = top != null ? top.currentHead()[0] : null;
+    if ((leader != null && leaderHead == null) || (top != null && topHead == null)) {
       return false;
     }
+    // Past either head is past the smaller one.
+    return (leader != null && sortsBeyond(bound, leaderHead)) || (top != null && sortsBeyond(bound, topHead));
+  }
+
+  private boolean sortsBeyond(Comparable bound, Object headValue) {
     // Both come from the same first order-by column: the metadata min/max and the materialized row[0] share the
     // column's stored type, so this comparison is type-safe (same assumption as MinMaxValueBased...).
     int cmp = bound.compareTo(headValue);
+    if (_deferTiedCursors) {
+      return _asc ? cmp >= 0 : cmp <= 0;
+    }
     return _asc ? cmp > 0 : cmp < 0;
   }
 
