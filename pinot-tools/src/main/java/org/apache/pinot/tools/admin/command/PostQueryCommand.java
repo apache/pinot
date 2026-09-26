@@ -89,6 +89,12 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   private AuthProvider _authProvider;
 
+  /// Whether the most recent `formatResponse()` call rendered the response in the requested
+  /// `_outputFormat`, as opposed to falling back to the raw response because the response could
+  /// not be rendered as CSV. `execute()` reads this to decide whether writing `-outputFile` is
+  /// safe; it stays `true` for the default JSON format, which never falls back.
+  private boolean _lastResponseRenderedAsRequested = true;
+
   @Override
   public String getName() {
     return "PostQuery";
@@ -179,9 +185,13 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   /// Renders the raw broker response according to `_outputFormat`. Never throws for a
   /// CSV-incompatible response: falls back to the raw response whenever the response isn't valid
-  /// JSON, or has no `resultTable` (e.g. the query errored out), so no error detail is ever lost.
+  /// JSON, or has no `resultTable` (e.g. the query errored out), so no error detail is ever lost
+  /// from the logged/returned string. Sets `_lastResponseRenderedAsRequested` to `false` whenever
+  /// this fallback happens, so `execute()` can refuse to write a non-CSV body to `-outputFile`
+  /// when CSV was requested.
   String formatResponse(String rawResponse) {
     if (_outputFormat != OutputFormat.CSV) {
+      _lastResponseRenderedAsRequested = true;
       return rawResponse;
     }
     JsonNode root;
@@ -190,12 +200,14 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     } catch (IOException e) {
       LOGGER.warn("Response is not valid JSON (e.g. a broker/proxy error page); "
           + "falling back to the raw response instead of CSV.", e);
+      _lastResponseRenderedAsRequested = false;
       return rawResponse;
     }
     JsonNode resultTable = root.get("resultTable");
     if (resultTable == null || resultTable.isNull()) {
       LOGGER.warn("Response has no 'resultTable' (e.g. the query may have errored out); "
           + "falling back to JSON output instead of CSV.");
+      _lastResponseRenderedAsRequested = false;
       return rawResponse;
     }
     JsonNode exceptions = root.path("exceptions");
@@ -216,7 +228,23 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
         Iterator<JsonNode> cells = row.elements();
         while (cells.hasNext()) {
           JsonNode cell = cells.next();
-          csvPrinter.print(cell.isTextual() ? cell.asText() : cell.toString());
+          // SQL NULL (JSON null) must render as an empty CSV field, matching Pinot CLI's
+          // existing CSV output convention. Without this, a null cell and a STRING cell holding
+          // the literal text "null" would be indistinguishable in the export. Note:
+          // csvPrinter.print(null) (not print("")) is used here for correctness in the general
+          // case: for a *leading* column, commons-csv's MINIMAL quote mode quotes an explicit
+          // empty string as `""` (to keep it distinguishable from a null/omitted leading field)
+          // but leaves print(null) unquoted, so only print(null) is guaranteed to produce an
+          // unquoted empty field regardless of column position. (For non-leading columns,
+          // print("") and print(null) already produce the same unquoted output; a STRING cell
+          // holding an actual empty string in a non-leading column remains indistinguishable
+          // from NULL either way -- a pre-existing, unrelated ambiguity this change does not
+          // introduce or attempt to fix.)
+          if (cell.isNull()) {
+            csvPrinter.print(null);
+          } else {
+            csvPrinter.print(cell.isTextual() ? cell.asText() : cell.toString());
+          }
         }
         csvPrinter.println();
       }
@@ -224,8 +252,10 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       // CSVPrinter only throws IOException for the underlying Appendable; a StringWriter never
       // throws, so this is unreachable in practice. Fall back to JSON rather than propagate.
       LOGGER.warn("Unexpected error rendering CSV; falling back to JSON output.", e);
+      _lastResponseRenderedAsRequested = false;
       return rawResponse;
     }
+    _lastResponseRenderedAsRequested = true;
     return stringWriter.toString();
   }
 
@@ -235,6 +265,15 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     String result = run();
     LOGGER.info("Result: {}", result);
     if (_outputFile != null) {
+      if (_outputFormat == OutputFormat.CSV && !_lastResponseRenderedAsRequested) {
+        // The response could not be rendered as CSV (e.g. a broker error or non-JSON body), so
+        // `result` is the raw fallback, not CSV. Do not let a file consumer mistake this
+        // non-CSV body for a successful CSV export; refuse the write and report failure instead.
+        // The raw response is still visible above via LOGGER.info("Result: {}", ...).
+        LOGGER.warn("Not writing '{}': response could not be rendered as CSV. Use "
+            + "-outputFormat JSON to inspect the full response.", _outputFile);
+        return false;
+      }
       Files.write(new File(_outputFile).toPath(), result.getBytes(StandardCharsets.UTF_8));
     }
     return true;
