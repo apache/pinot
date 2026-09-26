@@ -69,16 +69,29 @@ public class SinglePartitionColumnSegmentPrunerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE).build();
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(
         new SegmentPartitionConfig(Map.of(COLUMN, new ColumnPartitionConfig("PrunerCounting", 8))));
+    AtomicInteger clusterThreshold = new AtomicInteger(100);
+    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null));
+    SegmentPruner livePruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, clusterThreshold::get).get(0);
+    List<String> segments = List.of("first", "second");
+    List<ZNRecord> metadata = List.of(metadata("first", "PrunerCounting", 8, Set.of(1), null),
+        metadata("second", "PrunerCounting", 8, Set.of(2), null));
+    livePruner.init(null, null, segments, metadata);
+    BrokerRequest request = request(predicate("EQUALS", "1"));
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(livePruner.prune(request, Set.of("first", "second")), Set.of("first"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 2);
+    clusterThreshold.set(2);
+    CountingPartitionFunction.CALLS.set(0);
+    assertEquals(livePruner.prune(request, Set.of("first", "second")), Set.of("first"));
+    assertEquals(CountingPartitionFunction.CALLS.get(), 1);
+
     tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("partition"), null, null, 2));
     SegmentPruner pruner = SegmentPrunerFactory.getSegmentPruners(tableConfig, null, 100).get(0);
-    pruner.init(null, null, List.of("first", "second"),
-        List.of(metadata("first", "PrunerCounting", 8, Set.of(1), null),
-            metadata("second", "PrunerCounting", 8, Set.of(2), null)));
-    BrokerRequest request = request(predicate("EQUALS", "1"));
+    pruner.init(null, null, segments, metadata);
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
     assertEquals(CountingPartitionFunction.CALLS.get(), 1);
-    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, "-1"));
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1"));
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, Set.of("first", "second")), Set.of("first"));
     assertEquals(CountingPartitionFunction.CALLS.get(), 2);
@@ -102,7 +115,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(CountingPartitionFunction.CALLS.get(), 1);
     assertEquals(pruner.prune(request, records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 2, "Prepared IDs must not survive a prune call");
-    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, "-1"));
+    request.getPinotQuery().setQueryOptions(Map.of(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD, "-1"));
     CountingPartitionFunction.CALLS.set(0);
     assertEquals(pruner.prune(request, records.keySet()), expected);
     assertEquals(CountingPartitionFunction.CALLS.get(), 256,
@@ -141,7 +154,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
   @Test
   public void testEqualConfigurationsReusePartitionIds() throws Exception {
     Map<String, ZNRecord> records = new LinkedHashMap<>();
-    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS; i++) {
+    for (int i = 0; i < Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD; i++) {
       String segment = "segment_" + i;
       records.put(segment, metadata(segment, "PrunerCounting", 8, Set.of(4), Map.of("offset", "1")));
     }
@@ -198,7 +211,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
     BrokerRequest request = request(predicate("EQUALS", "first"));
     if (queryMinSegments != null) {
       request.getPinotQuery().setQueryOptions(
-          Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, queryMinSegments.toString()));
+          Map.of(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD, queryMinSegments.toString()));
     }
     assertEquals(pruner.prune(request, records.keySet()), Set.of("first"));
     request.getPinotQuery().setFilterExpression(function("EQUALS", RequestUtils.getIdentifierExpression("other"),
@@ -254,7 +267,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
 
   @DataProvider
   public Object[][] candidateCounts() {
-    int threshold = Broker.DEFAULT_PARTITION_PRUNING_MIN_SEGMENTS;
+    int threshold = Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
     return new Object[][]{{1, null}, {2, null}, {threshold - 1, null}, {threshold, null}, {threshold, -1}};
   }
 
@@ -389,7 +402,7 @@ public class SinglePartitionColumnSegmentPrunerTest {
       public Set<String> prune(BrokerRequest request, Set<String> segments) {
         if (queryMinSegments != null) {
           request.getPinotQuery().setQueryOptions(
-              Map.of(QueryOptionKey.PARTITION_PRUNING_MIN_SEGMENTS, queryMinSegments.toString()));
+              Map.of(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD, queryMinSegments.toString()));
         }
         return super.prune(request, segments);
       }

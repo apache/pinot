@@ -48,24 +48,24 @@ public class PartitionFunctionTest {
   public void testPartitionIdReuse() {
     PartitionFunction function = new MurmurPartitionFunction(8, null);
     PartitionFunction emptyConfig = new MurmurPartitionFunction(8, Map.of());
-    assertTrue(function.canReusePartitionIds(emptyConfig));
-    assertTrue(emptyConfig.canReusePartitionIds(function));
+    assertTrue(function.equals(emptyConfig));
+    assertTrue(emptyConfig.equals(function));
     PartitionFunction third = new MurmurPartitionFunction(8, Map.of());
-    assertTrue(emptyConfig.canReusePartitionIds(third));
-    assertTrue(function.canReusePartitionIds(third));
-    assertFalse(function.canReusePartitionIds(new MurmurPartitionFunction(16, null)));
-    assertFalse(function.canReusePartitionIds(new Murmur3PartitionFunction(8, null)));
+    assertTrue(emptyConfig.equals(third));
+    assertTrue(function.equals(third));
+    assertFalse(function.equals(new MurmurPartitionFunction(16, null)));
+    assertFalse(function.equals(new Murmur3PartitionFunction(8, null)));
 
     PartitionFunction configured = new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"));
-    assertTrue(configured.canReusePartitionIds(configured));
-    assertFalse(function.canReusePartitionIds(configured));
-    assertFalse(configured.canReusePartitionIds(function));
-    assertTrue(configured.canReusePartitionIds(new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"))));
+    assertTrue(configured.equals(configured));
+    assertFalse(function.equals(configured));
+    assertFalse(configured.equals(function));
+    assertTrue(configured.equals(new MurmurPartitionFunction(8, Map.of("useRawBytes", "true"))));
 
     PartitionFunction modulo = new ModuloPartitionFunction(8, null);
     PartitionFunction abs = new ModuloPartitionFunction(8, Map.of("partitionIdNormalizer", "ABS"));
-    assertFalse(modulo.canReusePartitionIds(abs));
-    assertFalse(abs.canReusePartitionIds(modulo));
+    assertFalse(modulo.equals(abs));
+    assertFalse(abs.equals(modulo));
   }
 
   @DataProvider
@@ -94,8 +94,8 @@ public class PartitionFunctionTest {
   public void testComplexFunctionsAndSubclasses() {
     Map<String, String> config = Map.of("columnValues", "a|b", "columnValuesDelimiter", "|");
     PartitionFunction bounded = new BoundedColumnValuePartitionFunction(3, config);
-    assertTrue(bounded.canReusePartitionIds(bounded));
-    assertFalse(bounded.canReusePartitionIds(new BoundedColumnValuePartitionFunction(3, config)));
+    assertTrue(bounded.equals(bounded));
+    assertFalse(bounded.equals(new BoundedColumnValuePartitionFunction(3, config)));
     class CustomMurmur extends MurmurPartitionFunction {
       CustomMurmur() {
         super(8, null);
@@ -103,10 +103,10 @@ public class PartitionFunctionTest {
     }
     PartitionFunction subclass = new CustomMurmur();
     PartitionFunction another = new CustomMurmur();
-    assertTrue(subclass.canReusePartitionIds(subclass));
-    assertTrue(subclass.canReusePartitionIds(another));
-    assertFalse(subclass.canReusePartitionIds(new MurmurPartitionFunction(8, null)));
-    assertFalse(new MurmurPartitionFunction(8, null).canReusePartitionIds(subclass));
+    assertTrue(subclass.equals(subclass));
+    assertTrue(subclass.equals(another));
+    assertFalse(subclass.equals(new MurmurPartitionFunction(8, null)));
+    assertFalse(new MurmurPartitionFunction(8, null).equals(subclass));
   }
 
   @Test
@@ -116,7 +116,7 @@ public class PartitionFunctionTest {
     PartitionFunction second = new Murmur3PartitionFunction(9, Map.of("seed", "0"));
     assertEquals(first.hashCode(), second.hashCode());
     assertNotEquals(first, second);
-    assertFalse(first.canReusePartitionIds(second));
+    assertFalse(first.equals(second));
   }
 
   @Test(dataProvider = "reuseConfigurations")
@@ -126,30 +126,30 @@ public class PartitionFunctionTest {
     PartitionFunction first = PartitionFunctionFactory.getPartitionFunction(name, 8, mutableConfig);
     PartitionFunction second = PartitionFunctionFactory.getPartitionFunction(name, 8, equivalentConfig);
     PartitionFunction third = PartitionFunctionFactory.getPartitionFunction(name, 8, new HashMap<>(equivalentConfig));
-    assertTrue(first.canReusePartitionIds(first));
+    assertTrue(first.equals(first));
     assertEquals(first, second);
     assertEquals(first.hashCode(), second.hashCode());
     assertFalse(first.equals(null));
-    assertTrue(first.canReusePartitionIds(second));
-    assertTrue(second.canReusePartitionIds(first));
-    assertTrue(second.canReusePartitionIds(third));
-    assertTrue(first.canReusePartitionIds(third));
+    assertTrue(first.equals(second));
+    assertTrue(second.equals(first));
+    assertTrue(second.equals(third));
+    assertTrue(first.equals(third));
     for (String value : new String[]{"00", "1234", "abcd"}) {
       if (!name.equals("Modulo") || !value.equals("abcd")) {
         assertEquals(first.getPartition(value), second.getPartition(value));
       }
     }
     PartitionFunction different = PartitionFunctionFactory.getPartitionFunction(name, 8, differentConfig);
-    assertFalse(first.canReusePartitionIds(different));
-    assertFalse(different.canReusePartitionIds(first));
-    assertFalse(first.canReusePartitionIds(PartitionFunctionFactory.getPartitionFunction(name, 16, config)));
+    assertFalse(first.equals(different));
+    assertFalse(different.equals(first));
+    assertFalse(first.equals(PartitionFunctionFactory.getPartitionFunction(name, 16, config)));
     Map<String, String> otherNormalizer = new HashMap<>(config);
     otherNormalizer.put("partitionIdNormalizer",
         first.getPartitionIdNormalizer().name().equals("MASK") ? "ABS" : "MASK");
-    assertFalse(first.canReusePartitionIds(PartitionFunctionFactory.getPartitionFunction(name, 8, otherNormalizer)));
+    assertFalse(first.equals(PartitionFunctionFactory.getPartitionFunction(name, 8, otherNormalizer)));
     mutableConfig.clear();
     mutableConfig.putAll(differentConfig);
-    assertTrue(first.canReusePartitionIds(second), "Caller mutations must not change the effective function");
+    assertTrue(first.equals(second), "Caller mutations must not change the effective function");
   }
 
   /// Unit test for [ModuloPartitionFunction].
