@@ -27,18 +27,23 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /// Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
@@ -49,7 +54,13 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// pinot.broker.access.control.principals.admin123.password=verysecret
 /// pinot.broker.access.control.principals.user456.password=kindasecret
 /// pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// pinot.broker.access.control.principals.user456.permissions=read,delete
 /// ```
+///
+/// Principals query the tables they have access to. Deleting rows with a SQL `DELETE` also requires the `delete`
+/// permission, granted explicitly: unlike on the controller, where a principal without permissions has them all, a
+/// principal without permissions (or with `*`) does not delete rows, since the broker did not check the permissions
+/// of its principals before.
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
 
@@ -131,6 +142,27 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
+      if (principalOpt.isEmpty()) {
+        return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
+      }
+      BasicAuthPrincipal principal = principalOpt.get();
+      // The table checks match the name as given, while `excludeTables` lists raw names: check both, so that a name
+      // with a type suffix cannot bypass an excluded table
+      if (!principal.hasTable(tableName) || !principal.hasTable(TableNameBuilder.extractRawTableName(tableName))) {
+        return new BasicAuthorizationResultImpl(false,
+            "Principal: " + principal.getName() + " does not have access to table: " + tableName);
+      }
+      if (!principal.hasExplicitPermission(AccessType.DELETE.name())) {
+        return new BasicAuthorizationResultImpl(false,
+            "Principal: " + principal.getName() + " is not granted the DELETE permission");
+      }
+      return BasicAuthorizationResultImpl.success();
     }
 
     @Override

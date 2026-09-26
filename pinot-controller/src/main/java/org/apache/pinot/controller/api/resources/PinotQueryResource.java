@@ -57,6 +57,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
@@ -77,6 +78,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
@@ -93,6 +95,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
@@ -106,6 +110,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
+  private static final String SQL_ENDPOINT = "/sql";
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -121,7 +126,7 @@ public class PinotQueryResource {
 
   @POST
   @Path("sql")
-  @ManualAuthorization // performed by broker
+  @ManualAuthorization // performed by the broker for queries, and by this resource for DML statements
   public StreamingOutput handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     JsonNode requestJson;
     try {
@@ -142,7 +147,7 @@ public class PinotQueryResource {
     if (requestJson.has("queryOptions")) {
       queryOptions = requestJson.get("queryOptions").asText();
     }
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, false);
   }
 
   @GET
@@ -150,7 +155,8 @@ public class PinotQueryResource {
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+    // A GET must not modify data, e.g. when a browser holding credentials follows a link, so it only runs queries
+    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, true);
   }
 
   @GET
@@ -365,9 +371,9 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions) {
+      String queryOptions, boolean onlyDql) {
     try {
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, onlyDql);
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
@@ -384,7 +390,7 @@ public class PinotQueryResource {
   }
 
   private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      @Nullable String queryOptions)
+      @Nullable String queryOptions, boolean onlyDql)
       throws Exception {
     LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
     // Parse with the exact payload forwarded to the broker, so that the options used to route the query (engine,
@@ -396,6 +402,10 @@ public class PinotQueryResource {
     if (sqlType == PinotSqlType.DDL) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
           "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
+    }
+    if (onlyDql && sqlType == PinotSqlType.DML) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "DML statements are not supported on GET /sql; use POST /sql instead.");
     }
 
     // Determine which engine to used based on query options.
@@ -413,6 +423,9 @@ public class PinotQueryResource {
             ? getMultiStageQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders)
             : getQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders);
       case DML:
+        if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+          return executeDelete(sqlNodeAndOptions, httpHeaders);
+        }
         Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
           try (OutputStream os = output) {
@@ -421,6 +434,40 @@ public class PinotQueryResource {
         };
       default:
         throw QueryErrorCode.INTERNAL.asException("Unsupported SQL type - " + sqlType);
+    }
+  }
+
+  /// Executes a `DELETE` once the caller is authorized to delete rows from its table, see [#authorizeDelete]. The
+  /// table is resolved first, with the database of the request and in the case it is defined with, and the executor
+  /// deletes rows from that exact table.
+  private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders) {
+    DeleteStatement statement = ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions))
+        .resolveTableName(httpHeaders.getHeaderString(CommonConstants.DATABASE),
+            _pinotHelixResourceManager.getTableCache());
+    // Before the response streams, so that a denied statement fails the request and is not executed
+    authorizeDelete(statement.getTableName(), httpHeaders);
+    Map<String, String> headers = extractHeaders(httpHeaders);
+    return output -> {
+      try (OutputStream os = output) {
+        _sqlQueryExecutor.executeStatement(statement, headers).toOutputStream(os);
+      }
+    };
+  }
+
+  /// Authorizes the caller to delete rows from the table: the checks of a query on the table, since the WHERE clause
+  /// reads it (the `READ` access type and the [Actions.Table#QUERY] action), and those of the other deletions of the
+  /// controller, e.g. of segments (the `DELETE` access type and the [Actions.Table#DELETE_ROWS] action). Like them, it
+  /// checks the raw table name, and does not apply the row-level security of the brokers.
+  ///
+  /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, as for queries
+  private void authorizeDelete(String tableName, HttpHeaders httpHeaders) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, SQL_ENDPOINT)
+        || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.QUERY)
+        || !accessControl.hasAccess(rawTableName, AccessType.DELETE, httpHeaders, SQL_ENDPOINT)
+        || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS)) {
+      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows from table: " + tableName);
     }
   }
 

@@ -34,14 +34,19 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 
 
 /// SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
 public class SqlQueryExecutor {
+  public static final String UNAUTHORIZED_DELETE_MESSAGE = "DELETE is only executed once its table is resolved and "
+      + "the caller authorized to delete rows from it: send it to the query endpoint of a broker or a controller";
+
   private final String _controllerUrl;
   private final HelixManager _helixManager;
 
@@ -59,13 +64,18 @@ public class SqlQueryExecutor {
     _helixManager = null;
   }
 
-  private static String getControllerBaseUrl(HelixManager helixManager) {
-    String instanceId = LeadControllerUtils.getHelixClusterLeader(helixManager);
+  /// Base URL of the controller that executes the DML statements: the configured controller URL, or else the current
+  /// lead controller, looked up on each call.
+  protected String getControllerBaseUrl() {
+    if (_helixManager == null) {
+      return _controllerUrl;
+    }
+    String instanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
     if (instanceId == null) {
       throw new RuntimeException("Unable to locate the leader pinot controller, please retry later...");
     }
 
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
     ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(helixDataAccessor.getProperty(
         keyBuilder.instanceConfig(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + instanceId)));
@@ -76,14 +86,48 @@ public class SqlQueryExecutor {
     return controllerBaseUrl;
   }
 
-  /// Execute DML Statement
+  /// Parses and executes a DML statement.
+  ///
+  /// A `DELETE` is refused with a [QueryErrorCode#ACCESS_DENIED] error, since this method cannot authorize the caller:
+  /// it is executed with [#executeStatement] once its table is resolved and the caller authorized to delete rows from
+  /// it, as the query endpoints of the broker and the controller do.
   ///
   /// @param sqlNodeAndOptions Parsed DML object
   /// @param headers extra headers map for minion task submission
   /// @return BrokerResponse is the DML executed response
   public BrokerResponse executeDMLStatement(SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable Map<String, String> headers) {
-    DataManipulationStatement statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
+    DataManipulationStatement statement;
+    try {
+      statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);
+    } catch (QueryException e) {
+      // e.g. a DELETE without a WHERE clause, or a DML kind that Pinot parses but does not execute (UPDATE, MERGE)
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
+    if (statement instanceof DeleteStatement) {
+      return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, UNAUTHORIZED_DELETE_MESSAGE);
+    }
+    return executeStatement(statement, headers);
+  }
+
+  /// Executes a parsed DML statement, e.g. from [DataManipulationStatementParser#parse].
+  ///
+  /// It does not authorize the caller. The table of a [DeleteStatement] must be resolved with
+  /// [DeleteStatement#resolveTableName] and the caller authorized to delete rows from it before it is executed, as the
+  /// query endpoints of the broker and the controller do: an unresolved `DELETE` is refused with a
+  /// [QueryErrorCode#ACCESS_DENIED] error.
+  ///
+  /// @param statement parsed statement
+  /// @param headers headers of the original request, e.g. for minion task submission
+  /// @return the response of the statement
+  public BrokerResponse executeStatement(DataManipulationStatement statement, @Nullable Map<String, String> headers) {
+    if (statement instanceof DeleteStatement) {
+      DeleteStatement deleteStatement = (DeleteStatement) statement;
+      if (!deleteStatement.isResolved()) {
+        return new BrokerResponseNative(QueryErrorCode.ACCESS_DENIED, UNAUTHORIZED_DELETE_MESSAGE);
+      }
+      return executeDelete(deleteStatement, headers);
+    }
     BrokerResponseNative result = new BrokerResponseNative();
     switch (statement.getExecutionType()) {
       case MINION:
@@ -112,11 +156,30 @@ public class SqlQueryExecutor {
     return result;
   }
 
+  /// Executes a `DELETE` statement. Pinot does not delete rows itself, so this implementation answers with a
+  /// [QueryErrorCode#QUERY_VALIDATION] error: executors that implement row deletion override it.
+  ///
+  /// The query endpoints of the broker and the controller call it once the caller is authorized to delete rows from
+  /// the table of the statement, resolved with [DeleteStatement#resolveTableName]: implementations delete rows from
+  /// that exact table, [DeleteStatement#getTableName()]. Both require the checks of a query on the table, since the
+  /// WHERE clause reads it, plus the right to delete rows: on the broker, `AccessControl#authorizeDeleteRows`, which
+  /// denies by default, and no row-level security filter on the table; on the controller, the `DELETE` access type
+  /// and the `DeleteRows` table action (`Actions.Table#DELETE_ROWS`). Neither applies quotas nor logs the statement
+  /// as a query.
+  ///
+  /// Implementations validate the predicate (see [DeleteStatement#getPredicate()]) and the options they read (see
+  /// [DeleteStatement#getOptions()]) before deleting rows, and forward the request headers to the APIs they call, which
+  /// authorize the caller again.
+  ///
+  /// @param statement parsed statement, with its table resolved
+  /// @param headers headers of the original request, e.g. to authorize the caller
+  /// @return the response of the statement
+  protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+    return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
+  }
+
   private MinionClient getMinionClient() {
-    // NOTE: using null auth provider here as auth headers injected by caller in "executeDMLStatement()"
-    if (_helixManager != null) {
-      return new MinionClient(getControllerBaseUrl(_helixManager), null);
-    }
-    return new MinionClient(_controllerUrl, null);
+    // NOTE: using null auth provider here as auth headers injected by caller in "executeStatement()"
+    return new MinionClient(getControllerBaseUrl(), null);
   }
 }

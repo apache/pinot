@@ -39,8 +39,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
@@ -60,10 +62,14 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -82,6 +88,8 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -95,6 +103,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
@@ -133,6 +143,12 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  @Inject
+  private AccessControlFactory _accessControlFactory;
+
+  @Inject
+  private TableCache _tableCache;
 
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
@@ -703,7 +719,13 @@ public class PinotClientRequest {
           Map<String, String> headers = new HashMap<>();
           httpRequesterIdentity.getHttpHeaders().entries()
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+            return executeDelete(sqlNodeAndOptions, headers, httpRequesterIdentity, httpHeaders);
+          }
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
+        } catch (WebApplicationException e) {
+          // The caller is not authorized to delete rows from the table
+          throw e;
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
@@ -711,6 +733,73 @@ public class PinotClientRequest {
       default:
         return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
     }
+  }
+
+  /// Executes a `DELETE` once the caller is authorized to delete rows from its table, see [#authorizeDelete]. The
+  /// table is resolved first, with the database of the request and in the case it is defined with, and the executor
+  /// deletes rows from that exact table.
+  private BrokerResponse executeDelete(SqlNodeAndOptions sqlNodeAndOptions, Map<String, String> headers,
+      HttpRequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders) {
+    DeleteStatement statement;
+    try {
+      String databaseHeader = httpHeaders != null ? httpHeaders.getHeaderString(CommonConstants.DATABASE) : null;
+      statement = ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions))
+          .resolveTableName(databaseHeader, _tableCache);
+    } catch (QueryException e) {
+      // e.g. an invalid statement, a logical table, or a database header that does not match the statement
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
+    authorizeDelete(statement.getTableName(), requesterIdentity, httpHeaders);
+    return _sqlQueryExecutor.executeStatement(statement, headers);
+  }
+
+  /// Authorizes the caller to delete rows from the table.
+  ///
+  /// The caller must pass the checks of a query on the table, since the WHERE clause reads it: the first-step access
+  /// control, access to the table and the [Actions.Table#QUERY] action. No row-level security filter may apply to the
+  /// table, since it would not restrict the rows the statement deletes. Last, the access control must allow deleting
+  /// rows, see [AccessControl#authorizeDeleteRows].
+  ///
+  /// @throws WebApplicationException with status 403 if the caller is not authorized
+  private void authorizeDelete(String tableName, HttpRequesterIdentity requesterIdentity,
+      @Nullable HttpHeaders httpHeaders) {
+    AccessControl accessControl = _accessControlFactory.create();
+    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (authorizationResult.hasAccess()) {
+      authorizationResult = accessControl.authorize(requesterIdentity, Set.of(tableName));
+    }
+    if (authorizationResult.hasAccess()) {
+      authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
+    }
+    if (authorizationResult.hasAccess() && hasRowFilters(accessControl, requesterIdentity, tableName)) {
+      authorizationResult = new BasicAuthorizationResultImpl(false,
+          "Row-level security applies to the table, and would not restrict the rows the statement deletes");
+    }
+    if (authorizationResult.hasAccess()) {
+      authorizationResult = accessControl.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName);
+    }
+    if (!authorizationResult.hasAccess()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      String reason = authorizationResult.getFailureMessage();
+      LOGGER.info("Access denied to delete rows from table: {}, reason: {}", tableName, reason);
+      String message = "Permission denied to delete rows from table: " + tableName;
+      if (reason != null && !reason.isBlank()) {
+        message += ". Reason: " + reason;
+      }
+      throw new WebApplicationException(message, Response.Status.FORBIDDEN);
+    }
+  }
+
+  /// Returns whether row-level security filters apply to the table for the caller, when the broker enables row-level
+  /// security.
+  private boolean hasRowFilters(AccessControl accessControl, RequesterIdentity requesterIdentity, String tableName) {
+    if (!_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)) {
+      return false;
+    }
+    List<String> rowFilters =
+        accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters().orElse(null);
+    return rowFilters != null && !rowFilters.isEmpty();
   }
 
   @VisibleForTesting

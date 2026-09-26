@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.api;
 
 import java.util.Set;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -111,6 +113,24 @@ public interface AccessControl extends FineGrainedAccessControl {
         : new TableAuthorizationResult(tables);
   }
 
+
+  /// Verifies that the requester can delete rows from the table with a SQL `DELETE` statement. The broker calls it
+  /// once the requester passed the checks of a query on the table, since the WHERE clause of the statement reads it.
+  ///
+  /// Denied by default, so that an access control written before `DELETE` existed does not let everyone who can query
+  /// a table delete its rows. Implementations that allow it override this method, e.g. with the fine-grained
+  /// `Actions.Table#DELETE_ROWS` action: `authorize(httpHeaders, TargetType.TABLE, tableName,
+  /// Actions.Table.DELETE_ROWS)`.
+  ///
+  /// @param requesterIdentity requester identity
+  /// @param httpHeaders headers of the request
+  /// @param tableName table the statement deletes rows from, qualified with its database, in the case the table is
+  ///                  defined with, and with a type suffix if the statement named one
+  /// @return `AuthorizationResult` with the result of the access control check
+  default AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+      @Nullable HttpHeaders httpHeaders, String tableName) {
+    return new BasicAuthorizationResultImpl(false, "The access control of the broker does not allow deleting rows");
+  }
 
   /// Returns RLS/CLS filters for a particular table. By default, there are no RLS/CLS filters on any table.
   /// @param requesterIdentity requested identity
