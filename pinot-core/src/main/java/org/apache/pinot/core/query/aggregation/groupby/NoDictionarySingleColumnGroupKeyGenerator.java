@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -38,7 +39,12 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapBytesGroupIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapGroupByUtils;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapIntGroupIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapLongGroupIdMap;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -50,6 +56,11 @@ import org.roaringbitmap.RoaringBitmap;
 /// null value, which is what a null row is physically stored as. The object-keyed maps hold the null key directly,
 /// while the primitive-keyed maps cannot, so the null group id is tracked beside them. Both the single-value and the
 /// multi-value key paths recognize nulls.
+///
+/// Off-heap mode caveat for STRING keys: keys are grouped by their UTF-8 encoding (byte-identical to
+/// `String#getBytes(UTF_8)`), so two strings that differ only in unpaired surrogates collapse into one group
+/// (both encode to `'?'`), and the emitted group key is the re-decoded string — whereas the on-heap
+/// `Object2IntOpenHashMap<String>` keeps such (malformed) strings distinct. Valid strings are unaffected.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
@@ -62,18 +73,68 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private Integer _groupIdForNullValue;
   private int _numGroups;
 
+  // Off-heap mode (see the offHeap constructor param): exactly one of the two maps below is non-null and
+  // _groupKeyMap is null. Null keys never enter the off-heap maps: for every type the null group is tracked via
+  // _groupIdForNullValue, with _nullGroupIdMapSize recording the map size at the moment the null group was
+  // assigned, so map-internal ids at/after that point shift up by one to keep the global ids dense in assignment
+  // order (matching the on-heap _numGroups counter semantics).
+  private final OffHeapIntGroupIdMap _offHeapIntKeyMap;
+  private final OffHeapLongGroupIdMap _offHeapLongKeyMap;
+  private final OffHeapBytesGroupIdMap _offHeapBytesKeyMap;
+  private int _nullGroupIdMapSize = -1;
+  private byte[] _stringEncodeScratch = new byte[64];
+
   public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled,
       @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
+    this(projectOperator, groupByExpression, numGroupsLimit, nullHandlingEnabled,
+        groupByExpressionSizesFromPredicates, false);
+  }
+
+  public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
+      ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled,
+      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates, boolean offHeap) {
     _groupByExpression = groupByExpression;
     ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
     _storedType = columnContext.getDataType().getStoredType();
-    _groupKeyMap = createGroupKeyMap(_storedType);
     if (groupByExpressionSizesFromPredicates != null) {
       Integer size = groupByExpressionSizesFromPredicates.get(groupByExpression);
       _globalGroupIdUpperBound = size != null ? Math.min(size, numGroupsLimit) : numGroupsLimit;
     } else {
       _globalGroupIdUpperBound = numGroupsLimit;
+    }
+    if (offHeap) {
+      _groupKeyMap = null;
+      switch (_storedType) {
+        case INT:
+        case FLOAT:
+          // 32-bit keys go to the 8-byte-slot int map for better probe locality (FLOAT keys are stored as
+          // floatToIntBits, which never produces -1 — all NaNs canonicalize — and INT -1 is held out-of-band)
+          _offHeapIntKeyMap = new OffHeapIntGroupIdMap(Math.min(_globalGroupIdUpperBound, 8192));
+          _offHeapLongKeyMap = null;
+          _offHeapBytesKeyMap = null;
+          break;
+        case LONG:
+        case DOUBLE:
+          _offHeapIntKeyMap = null;
+          _offHeapLongKeyMap = new OffHeapLongGroupIdMap(Math.min(_globalGroupIdUpperBound, 8192));
+          _offHeapBytesKeyMap = null;
+          break;
+        case BIG_DECIMAL:
+        case STRING:
+        case BYTES:
+          _offHeapIntKeyMap = null;
+          _offHeapLongKeyMap = null;
+          _offHeapBytesKeyMap = new OffHeapBytesGroupIdMap(Math.min(_globalGroupIdUpperBound, 8192));
+          break;
+        default:
+          throw new IllegalStateException("Illegal data type for no-dictionary key generator: " + _storedType);
+      }
+    } else {
+      _groupKeyMap = createGroupKeyMap(_storedType);
+      _offHeapIntKeyMap = null;
+      _offHeapLongKeyMap = null;
+      _offHeapBytesKeyMap = null;
     }
     _nullHandlingEnabled = nullHandlingEnabled;
     _isSingleValueExpression = columnContext.isSingleValue();
@@ -367,11 +428,23 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   /// primitive-keyed maps cannot hold a null key, so the group count has to come from the id counter itself.
   @Override
   public int getCurrentGroupKeyUpperBound() {
+    if (_groupKeyMap == null) {
+      return getOffHeapNumGroups();
+    }
     return _numGroups;
   }
 
   @Override
   public Iterator<GroupKey> getGroupKeys() {
+    if (_offHeapIntKeyMap != null) {
+      return new OffHeapIntKeyIterator();
+    }
+    if (_offHeapLongKeyMap != null) {
+      return new OffHeapLongKeyIterator();
+    }
+    if (_offHeapBytesKeyMap != null) {
+      return new OffHeapBytesKeyIterator();
+    }
     return switch (_storedType) {
       case INT -> new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
       case LONG -> new LongGroupKeyIterator((Long2IntOpenHashMap) _groupKeyMap, _groupIdForNullValue);
@@ -383,6 +456,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForNullValue() {
+    if (_groupKeyMap == null) {
+      return getOffHeapNullGroupId();
+    }
     if (_groupIdForNullValue != null) {
       return _groupIdForNullValue;
     }
@@ -395,10 +471,67 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public int getNumKeys() {
+    if (_groupKeyMap == null) {
+      return getOffHeapNumGroups();
+    }
     return _numGroups;
   }
 
+  @Override
+  public void close() {
+    if (_offHeapIntKeyMap != null) {
+      _offHeapIntKeyMap.close();
+    }
+    if (_offHeapLongKeyMap != null) {
+      _offHeapLongKeyMap.close();
+    }
+    if (_offHeapBytesKeyMap != null) {
+      _offHeapBytesKeyMap.close();
+    }
+  }
+
+  private int getOffHeapMapSize() {
+    if (_offHeapIntKeyMap != null) {
+      return _offHeapIntKeyMap.size();
+    }
+    return _offHeapLongKeyMap != null ? _offHeapLongKeyMap.size() : _offHeapBytesKeyMap.size();
+  }
+
+  private int getOffHeapNumGroups() {
+    return getOffHeapMapSize() + (_groupIdForNullValue != null ? 1 : 0);
+  }
+
+  // Upper bound to pass to the off-heap map: reserve one group id for the null group once it is assigned
+  private int getOffHeapMapUpperBound() {
+    return _groupIdForNullValue != null ? _globalGroupIdUpperBound - 1 : _globalGroupIdUpperBound;
+  }
+
+  // Map-internal ids assigned at/after the null group shift up by one to keep global ids dense in assignment order
+  private int toGlobalId(int mapId) {
+    return mapId != INVALID_ID && _nullGroupIdMapSize >= 0 && mapId >= _nullGroupIdMapSize ? mapId + 1 : mapId;
+  }
+
+  private int getOffHeapNullGroupId() {
+    if (_groupIdForNullValue != null) {
+      return _groupIdForNullValue;
+    }
+    if (getOffHeapNumGroups() < _globalGroupIdUpperBound) {
+      _nullGroupIdMapSize = getOffHeapMapSize();
+      // The null group takes the next dense id: all existing map ids stay put, later map ids shift up by one
+      _groupIdForNullValue = _nullGroupIdMapSize;
+      return _groupIdForNullValue;
+    }
+    return INVALID_ID;
+  }
+
+  private int getOffHeapKeyForBytes(byte[] bytes) {
+    return toGlobalId(_offHeapBytesKeyMap.getGroupId(bytes, 0, bytes.length, getOffHeapMapUpperBound()));
+  }
+
   private int getKeyForValue(int value) {
+    if (_offHeapIntKeyMap != null) {
+      return toGlobalId(_offHeapIntKeyMap.getGroupId(value, getOffHeapMapUpperBound()));
+    }
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -409,6 +542,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(long value) {
+    if (_offHeapLongKeyMap != null) {
+      return toGlobalId(_offHeapLongKeyMap.getGroupId(value, getOffHeapMapUpperBound()));
+    }
     Long2IntMap map = (Long2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -419,6 +555,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(float value) {
+    if (_offHeapIntKeyMap != null) {
+      // floatToIntBits (not raw) matches fastutil semantics: all NaNs collapse, +0.0f and -0.0f stay distinct
+      return toGlobalId(_offHeapIntKeyMap.getGroupId(Float.floatToIntBits(value), getOffHeapMapUpperBound()));
+    }
     Float2IntMap map = (Float2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -429,6 +569,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(double value) {
+    if (_offHeapLongKeyMap != null) {
+      // doubleToLongBits (not raw) matches fastutil semantics: all NaNs collapse, +0.0 and -0.0 stay distinct
+      return toGlobalId(_offHeapLongKeyMap.getGroupId(Double.doubleToLongBits(value), getOffHeapMapUpperBound()));
+    }
     Double2IntMap map = (Double2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -439,6 +583,13 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(BigDecimal value) {
+    if (_offHeapBytesKeyMap != null) {
+      if (value == null) {
+        return getOffHeapNullGroupId();
+      }
+      // The serialized form preserves scale and unscaled value, so byte equality == BigDecimal#equals
+      return getOffHeapKeyForBytes(BigDecimalUtils.serialize(value));
+    }
     Object2IntMap<BigDecimal> map = (Object2IntMap<BigDecimal>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -449,6 +600,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(String value) {
+    if (_offHeapBytesKeyMap != null) {
+      if (value == null) {
+        return getOffHeapNullGroupId();
+      }
+      int maxLength = value.length() * 3;
+      byte[] scratch = OffHeapGroupByUtils.ensureByteCapacity(_stringEncodeScratch, maxLength);
+      _stringEncodeScratch = scratch;
+      int length = OffHeapGroupByUtils.encodeUtf8(value, scratch);
+      return toGlobalId(_offHeapBytesKeyMap.getGroupId(scratch, 0, length, getOffHeapMapUpperBound()));
+    }
     Object2IntMap<String> map = (Object2IntMap<String>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -459,6 +620,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   private int getKeyForValue(ByteArray value) {
+    if (_offHeapBytesKeyMap != null) {
+      if (value == null) {
+        return getOffHeapNullGroupId();
+      }
+      return getOffHeapKeyForBytes(value.getBytes());
+    }
     Object2IntMap<ByteArray> map = (Object2IntMap<ByteArray>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
@@ -466,6 +633,138 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       map.put(value, groupId);
     }
     return groupId;
+  }
+
+  /// Iterator for the off-heap int-key map (INT/FLOAT stored types). Emits the null group (if assigned) first,
+  /// then the map entries with their map-internal ids converted to global ids.
+  private class OffHeapIntKeyIterator implements Iterator<GroupKey> {
+    private final Iterator<OffHeapIntGroupIdMap.Entry> _iterator = _offHeapIntKeyMap.iterator();
+    private final GroupKey _groupKey = new GroupKey();
+    private boolean _nullValuePending = _groupIdForNullValue != null;
+
+    @Override
+    public boolean hasNext() {
+      return _nullValuePending || _iterator.hasNext();
+    }
+
+    @Override
+    public GroupKey next() {
+      if (_nullValuePending) {
+        _groupKey._groupId = _groupIdForNullValue;
+        _groupKey._keys = new Object[]{null};
+        _nullValuePending = false;
+        return _groupKey;
+      }
+      OffHeapIntGroupIdMap.Entry entry = _iterator.next();
+      _groupKey._groupId = toGlobalId(entry._groupId);
+      _groupKey._keys = new Object[]{decodeIntKey(entry._rawKey)};
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private Object decodeIntKey(int rawKey) {
+    switch (_storedType) {
+      case INT:
+        return rawKey;
+      case FLOAT:
+        return Float.intBitsToFloat(rawKey);
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  /// Iterator for the off-heap long-key map (LONG/DOUBLE stored types). Emits the null group (if assigned) first,
+  /// then the map entries with their map-internal ids converted to global ids.
+  private class OffHeapLongKeyIterator implements Iterator<GroupKey> {
+    private final Iterator<OffHeapLongGroupIdMap.Entry> _iterator = _offHeapLongKeyMap.iterator();
+    private final GroupKey _groupKey = new GroupKey();
+    private boolean _nullValuePending = _groupIdForNullValue != null;
+
+    @Override
+    public boolean hasNext() {
+      return _nullValuePending || _iterator.hasNext();
+    }
+
+    @Override
+    public GroupKey next() {
+      if (_nullValuePending) {
+        _groupKey._groupId = _groupIdForNullValue;
+        _groupKey._keys = new Object[]{null};
+        _nullValuePending = false;
+        return _groupKey;
+      }
+      OffHeapLongGroupIdMap.Entry entry = _iterator.next();
+      _groupKey._groupId = toGlobalId(entry._groupId);
+      _groupKey._keys = new Object[]{decodeLongKey(entry._rawKey)};
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private Object decodeLongKey(long rawKey) {
+    switch (_storedType) {
+      case LONG:
+        return rawKey;
+      case DOUBLE:
+        return Double.longBitsToDouble(rawKey);
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  /// Iterator for the off-heap bytes-key map (STRING/BYTES/BIG_DECIMAL stored types). Emits the null group (if
+  /// assigned) first, then the dense map ids converted to global ids.
+  private class OffHeapBytesKeyIterator implements Iterator<GroupKey> {
+    private final GroupKey _groupKey = new GroupKey();
+    private boolean _nullValuePending = _groupIdForNullValue != null;
+    private int _mapId;
+
+    @Override
+    public boolean hasNext() {
+      return _nullValuePending || _mapId < _offHeapBytesKeyMap.size();
+    }
+
+    @Override
+    public GroupKey next() {
+      if (_nullValuePending) {
+        _groupKey._groupId = _groupIdForNullValue;
+        _groupKey._keys = new Object[]{null};
+        _nullValuePending = false;
+        return _groupKey;
+      }
+      byte[] keyBytes = _offHeapBytesKeyMap.getKey(_mapId);
+      _groupKey._groupId = toGlobalId(_mapId);
+      _groupKey._keys = new Object[]{decodeBytesKey(keyBytes)};
+      _mapId++;
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private Object decodeBytesKey(byte[] bytes) {
+    switch (_storedType) {
+      case STRING:
+        return new String(bytes, StandardCharsets.UTF_8);
+      case BYTES:
+        return new ByteArray(bytes);
+      case BIG_DECIMAL:
+        return BigDecimalUtils.deserialize(bytes);
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   private static class IntGroupKeyIterator implements Iterator<GroupKey> {
