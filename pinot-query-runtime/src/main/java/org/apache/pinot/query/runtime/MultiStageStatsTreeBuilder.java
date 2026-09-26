@@ -51,6 +51,9 @@ public class MultiStageStatsTreeBuilder {
   private final Map<Integer, DispatchablePlanFragment> _planFragments;
   @Nullable
   private final Map<Integer, StageStatsTreeNode> _stageStatsTrees;
+  /// Row counts the optimizer estimated, keyed by plan node. Empty unless the caller asked for
+  /// them, which is what keeps the estimate fields off every query's stats.
+  private final Map<PlanNode, Double> _estimatedRowCounts;
 
   public MultiStageStatsTreeBuilder(Map<Integer, DispatchablePlanFragment> planFragments,
       List<? extends MultiStageQueryStats.StageStats> queryStats) {
@@ -60,6 +63,14 @@ public class MultiStageStatsTreeBuilder {
   public MultiStageStatsTreeBuilder(Map<Integer, DispatchablePlanFragment> planFragments,
       List<? extends MultiStageQueryStats.StageStats> queryStats,
       @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
+    this(planFragments, queryStats, stageStatsTrees, Map.of());
+  }
+
+  public MultiStageStatsTreeBuilder(Map<Integer, DispatchablePlanFragment> planFragments,
+      List<? extends MultiStageQueryStats.StageStats> queryStats,
+      @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees,
+      Map<PlanNode, Double> estimatedRowCounts) {
+    _estimatedRowCounts = estimatedRowCounts;
     _planFragments = planFragments;
     _planNodes = Maps.newHashMapWithExpectedSize(planFragments.size());
     for (Map.Entry<Integer, DispatchablePlanFragment> entry : planFragments.entrySet()) {
@@ -90,7 +101,10 @@ public class MultiStageStatsTreeBuilder {
       }
       return jsonNodes;
     }
-    InStageStatsTreeBuilder treeBuilder = new InStageStatsTreeBuilder(stageStats, this::jsonStatsByStage);
+    // Same estimates for the plan-visiting renderer: a query takes one path or the other, so both
+    // must annotate or the field would appear only for some queries.
+    InStageStatsTreeBuilder treeBuilder =
+        new InStageStatsTreeBuilder(stageStats, this::jsonStatsByStage, _estimatedRowCounts);
     return planNode.visit(treeBuilder, new InStageStatsTreeBuilder.Context(1));
   }
 
@@ -113,6 +127,27 @@ public class MultiStageStatsTreeBuilder {
     return jsonFromStatsTreeNode(statsTree, planNodesById, parallelism);
   }
 
+  /// Adds the optimizer's estimate next to the actual counts, so estimate error is readable
+  /// without re-deriving it from EXPLAIN by hand.
+  ///
+  /// A stats node can cover several plan nodes -- operators fuse, and a leaf stage compiles its
+  /// whole pushed-down subtree into ONE operator with a single emitted-row count. There is
+  /// therefore no per-plan-node actual to pair with inside such a group, so the estimate reported
+  /// is the one for the FIRST (topmost) plan node in it: that is the node whose output the group's
+  /// emitted rows actually represent. Attributing to any other member would silently compare
+  /// unrelated numbers.
+  private void addEstimatedRows(ObjectNode json, List<Integer> planNodeIds,
+      Map<Integer, PlanNode> planNodesById) {
+    if (_estimatedRowCounts.isEmpty()) {
+      return;
+    }
+    PlanNode topmost = planNodesById.get(planNodeIds.get(0));
+    Double estimate = topmost == null ? null : _estimatedRowCounts.get(topmost);
+    if (estimate != null) {
+      json.put("estimatedRows", estimate);
+    }
+  }
+
   private ObjectNode jsonFromStatsTreeNode(StageStatsTreeNode node, Map<Integer, PlanNode> planNodesById,
       int parallelism) {
     ObjectNode json = JsonUtils.newObjectNode();
@@ -132,6 +167,7 @@ public class MultiStageStatsTreeBuilder {
       ArrayNode planNodeIds = JsonUtils.newArrayNode();
       node.getPlanNodeIds().forEach(planNodeIds::add);
       json.set("planNodeIds", planNodeIds);
+      addEstimatedRows(json, node.getPlanNodeIds(), planNodesById);
     }
 
     ArrayNode children = JsonUtils.newArrayNode();

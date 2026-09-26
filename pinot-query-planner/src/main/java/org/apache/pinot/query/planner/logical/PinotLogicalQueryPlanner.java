@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,12 +59,24 @@ public class PinotLogicalQueryPlanner {
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       String hashFunction, boolean pruneUnnestColumns) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
-        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
+    return makePlan(relRoot, tracker, useSpools, hashFunction, pruneUnnestColumns, false);
+  }
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
+  /// Converts a Calcite [RelRoot] into a Pinot [SubPlan], optionally capturing the optimizer's row
+  /// count estimate for each node so it can later be compared against what the runtime reports.
+  public static SubPlan makePlan(RelRoot relRoot,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
+      String hashFunction, boolean pruneUnnestColumns, boolean captureEstimatedRowCounts) {
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(tracker, hashFunction,
+        !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns, captureEstimatedRowCounts);
+    PlanNode rootNode = converter.toPlanNode(relRoot.rel);
+
+    IdentityHashMap<PlanNode, Double> estimatedRowCounts = converter.getEstimatedRowCounts();
+    PlanFragment rootFragment =
+        planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction, estimatedRowCounts);
     return new SubPlan(rootFragment,
-        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
+        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of(),
+        estimatedRowCounts);
 
     // TODO: Currently we don't support multiple sub-plans. Revisit the following logic when we add the support.
     // Fragment the stage tree into multiple SubPlans.
@@ -107,7 +120,7 @@ public class PinotLogicalQueryPlanner {
 
   private static PlanFragment planNodeToPlanFragment(
       PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction) {
+      String hashFunction, IdentityHashMap<PlanNode, Double> estimatedRowCounts) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
@@ -159,6 +172,43 @@ public class PinotLogicalQueryPlanner {
       }
     }
 
+    if (!estimatedRowCounts.isEmpty()) {
+      copyEstimatesToMailboxNodes(fragmenter, node, subPlanRootSenderNode, rootReceiveNode, estimatedRowCounts);
+    }
+
     return new PlanFragment(0, rootReceiveNode, List.of(planFragment1));
+  }
+
+  /// Carries row-count estimates across the one boundary at which fragmentation does not preserve
+  /// plan node identity.
+  ///
+  /// [PlanFragmenter#process] rewrites ordinary nodes in place, so their estimates survive as they
+  /// are. Exchanges do not: [PlanFragmenter] discards each [ExchangeNode] and builds a fresh
+  /// [MailboxSendNode]/[MailboxReceiveNode] pair in its place. Without this copy, no stage root and
+  /// no mailbox receive leaf would ever carry an estimate — the field would be missing from exactly
+  /// the nodes a reader looks at first. The fragmenter retains the mapping back to the discarded
+  /// exchange for this reason, and the transformation tracker above uses it the same way.
+  ///
+  /// An exchange only moves rows, so its estimate describes both halves of the pair it becomes. The
+  /// outermost pair is built here rather than by the fragmenter and carries the plan root's output,
+  /// so it takes the root's estimate.
+  private static void copyEstimatesToMailboxNodes(PlanFragmenter fragmenter, PlanNode subPlanRoot,
+      MailboxSendNode subPlanRootSenderNode, MailboxReceiveNode rootReceiveNode,
+      IdentityHashMap<PlanNode, Double> estimatedRowCounts) {
+    Iterator<Map.Entry<? extends BasePlanNode, ExchangeNode>> it = Iterators.concat(
+        fragmenter.getMailboxSendToExchangeNodeMap().entrySet().iterator(),
+        fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator());
+    while (it.hasNext()) {
+      Map.Entry<? extends BasePlanNode, ExchangeNode> entry = it.next();
+      Double estimate = estimatedRowCounts.get(entry.getValue());
+      if (estimate != null) {
+        estimatedRowCounts.put(entry.getKey(), estimate);
+      }
+    }
+    Double rootEstimate = estimatedRowCounts.get(subPlanRoot);
+    if (rootEstimate != null) {
+      estimatedRowCounts.put(subPlanRootSenderNode, rootEstimate);
+      estimatedRowCounts.put(rootReceiveNode, rootEstimate);
+    }
   }
 }
