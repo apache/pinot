@@ -23,7 +23,6 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +42,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.local.upsert.UpsertViewManager;
@@ -69,7 +69,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,14 +187,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Nullable
   public MutableRoaringBitmap loadDocIdsFromSnapshot(String fileName) {
+    DocIdsSnapshot snapshot = loadDocIdsSnapshot(fileName);
+    return snapshot != null ? snapshot.docIds() : null;
+  }
+
+  @Nullable
+  public DocIdsSnapshot loadDocIdsSnapshot(String fileName) {
     File docIdsSnapshotFile = getSnapshotFile(fileName);
     if (docIdsSnapshotFile.exists()) {
       try {
         byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
-        MutableRoaringBitmap docIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
+        DocIdsSnapshot snapshot = DocIdsSnapshot.fromBytes(bytes);
         LOGGER.info("Loaded docIds from snapshot for segment: {} with: {} docs", getSegmentName(),
-            docIds.getCardinality());
-        return docIds;
+            snapshot.docIds().getCardinality());
+        return snapshot;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while loading docIds from snapshot file: {}, ignoring the snapshot",
             docIdsSnapshotFile);

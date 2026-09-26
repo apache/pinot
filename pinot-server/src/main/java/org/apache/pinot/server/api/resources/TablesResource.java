@@ -104,6 +104,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -660,10 +661,11 @@ public class TablesResource {
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+      final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
+      MutableRoaringBitmap validDocIdSnapshot =
+          validDocIdsSnapshotPair.getRight() != null ? validDocIdsSnapshotPair.getRight().docIds() : null;
 
       if (validDocIdSnapshot == null) {
         String msg = String.format(
@@ -743,10 +745,11 @@ public class TablesResource {
           continue;
         }
 
-        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+        final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdSnapshotPair =
             getValidDocIds(indexSegment, validDocIdsType);
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
-        MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
+        DocIdsSnapshot snapshot = validDocIdSnapshotPair.getRight();
+        MutableRoaringBitmap validDocIdsSnapshot = snapshot != null ? snapshot.docIds() : null;
         if (validDocIdsSnapshot == null) {
           if (LOGGER.isDebugEnabled()) {
             String msg = String.format(
@@ -760,6 +763,9 @@ public class TablesResource {
         }
 
         Map<String, Object> validDocIdsMetadata = new HashMap<>();
+        if (snapshot.metadata() != null) {
+          validDocIdsMetadata.put("diagnostics", snapshot.metadata().toResponse(System.currentTimeMillis()));
+        }
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdsSnapshot.getCardinality();
         int totalInvalidDocs = totalDocs - totalValidDocs;
@@ -805,32 +811,34 @@ public class TablesResource {
     return dataCrc >= 0 ? Long.toString(dataCrc) : null;
   }
 
-  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+  private Pair<ValidDocIdsType, DocIdsSnapshot> getValidDocIds(IndexSegment indexSegment,
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT,
-          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
       case SNAPSHOT_WITH_DELETE:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
                 V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
-        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getValidDocIds().getMutableRoaringBitmap(), null));
       case IN_MEMORY_WITH_DELETE:
-        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getQueryableDocIds().getMutableRoaringBitmap(), null));
       default:
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
         return Pair.of(ValidDocIdsType.SNAPSHOT,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 

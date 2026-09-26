@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -75,6 +76,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -408,6 +410,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
     assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
@@ -444,6 +447,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
     assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
@@ -459,6 +463,49 @@ public class TablesResourceTest extends BaseResourceTest {
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
     assertNotNull(serverStatus, "Server status should not be null");
     assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+  }
+
+  @DataProvider
+  public Object[][] diagnosticBitmapTypes() {
+    return new Object[][] {{null}, {"SNAPSHOT"}, {"SNAPSHOT_WITH_DELETE"}, {"IN_MEMORY"}, {"IN_MEMORY_WITH_DELETE"}};
+  }
+
+  @Test(dataProvider = "diagnosticBitmapTypes")
+  public void testValidDocIdsMetadataDiagnostics(String bitmapType)
+      throws IOException {
+    ImmutableSegmentImpl segment = (ImmutableSegmentImpl) _realtimeIndexSegments.get(0);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, segment);
+    // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
+    DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
+    for (String file : List.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
+        V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME)) {
+      ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(file));
+      segment.persistDocIdsSnapshot(file, DocIdsSnapshot.capture(bitmap, trigger));
+    }
+    long beforeRequest = System.currentTimeMillis();
+    String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
+        .queryParam("validDocIdsType", bitmapType)
+        .request().post(Entity.json(new TableSegments(List.of(segment.getSegmentName()))), String.class);
+    long afterRequest = System.currentTimeMillis();
+    JsonNode metadata = JsonUtils.stringToJsonNode(response).get(0);
+    assertEquals(metadata.get("totalValidDocs").asInt(), 8);
+    String expectedType = bitmapType != null ? bitmapType : "SNAPSHOT";
+    assertEquals(metadata.get("validDocIdsType").asText(), expectedType);
+    if (expectedType.startsWith("IN_MEMORY")) {
+      assertFalse(metadata.has("diagnostics"));
+      return;
+    }
+    JsonNode diagnostics = metadata.get("diagnostics");
+    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME
+        : V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME;
+    long capturedAt = segment.loadDocIdsSnapshot(file).metadata().snapshotCapturedAtMs();
+    assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
+    assertEquals(diagnostics.get("snapshotTriggerSegmentName").asText(), trigger.segmentName());
+    assertEquals(diagnostics.get("snapshotTriggerStartOffset").asText(), trigger.startOffset());
+    assertEquals(diagnostics.get("validDocIdsCrc32").asLong(),
+        expectedType.equals("SNAPSHOT") ? 4200314552L : 569535174L);
   }
 
   // Verify metadata file from segments.
