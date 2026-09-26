@@ -74,6 +74,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -737,13 +738,26 @@ public class AggregationFunctionUtils {
     return ((Number) dataSource.getDataSourceMetadata().getMaxValue()).longValue();
   }
 
+  /// Converts the given dictionary/metadata min/max value to a `double`, for the numeric MIN/MAX/MINMAXRANGE
+  /// dictionary/metadata based resolution (see [#getMinValueNumeric] and [#getMaxValueNumeric]).
+  ///
+  /// @throws BadQueryRequestException if `value` is not a [Number] and cannot be parsed as one, which happens when
+  /// MIN/MAX is applied to a non-numeric (e.g. STRING) column; the message points the caller to MINSTRING/MAXSTRING
+  /// and the `autoRewriteAggregationType` query option instead of surfacing a raw [NumberFormatException].
   private static Double toDouble(Comparable<?> value) {
     if (value instanceof Double) {
       return (Double) value;
     } else if (value instanceof Number) {
       return ((Number) value).doubleValue();
-    } else {
+    }
+    try {
       return Double.parseDouble(value.toString());
+    } catch (NumberFormatException e) {
+      throw new BadQueryRequestException(
+          "Cannot compute MIN/MAX on non-numeric value: \"" + value + "\". MIN/MAX only support numeric columns; "
+              + "use MINSTRING/MAXSTRING for string columns, or set the query option "
+              + "'autoRewriteAggregationType=true' to automatically rewrite MIN/MAX to MINSTRING/MAXSTRING on "
+              + "string columns.", e);
     }
   }
 
