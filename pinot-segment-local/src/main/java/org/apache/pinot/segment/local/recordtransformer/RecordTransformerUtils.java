@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -72,6 +73,14 @@ public class RecordTransformerUtils {
   public static List<RecordTransformer> getTransformers(TableConfig tableConfig, @Nullable Schema schema,
       boolean skipPreComplexTypeTransformers, boolean skipComplexTypeTransformer,
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
+    return getTransformers(tableConfig, schema, skipPreComplexTypeTransformers, skipComplexTypeTransformer,
+        skipPostComplexTypeTransformers, skipFilterTransformer, Set.of(), Set.of());
+  }
+
+  private static List<RecordTransformer> getTransformers(TableConfig tableConfig, @Nullable Schema schema,
+      boolean skipPreComplexTypeTransformers, boolean skipComplexTypeTransformer,
+      boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer, Set<String> columnsToPreserve,
+      Set<String> trustedTransformOutputs) {
     List<RecordTransformer> transformers = new ArrayList<>();
     if (!skipPreComplexTypeTransformers) {
       addSourceFieldDataTypeTransformer(tableConfig, transformers, true);
@@ -87,7 +96,8 @@ public class RecordTransformerUtils {
         "Schema must be provided when post complex type transformers are requested");
     addSourceFieldDataTypeTransformer(tableConfig, transformers, false);
     addRecordEnricherTransformers(tableConfig, transformers, false);
-    addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
+    addIfNotNoOp(transformers,
+        new ExpressionTransformer(tableConfig, schema, columnsToPreserve, trustedTransformOutputs));
     if (!skipFilterTransformer) {
       addIfNotNoOp(transformers, new FilterTransformer(tableConfig));
     }
@@ -102,6 +112,21 @@ public class RecordTransformerUtils {
 
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     return getTransformers(tableConfig, schema, false, false, false, false);
+  }
+
+  /// Returns the default transformer chain while preserving replayed values for the given transform output columns,
+  /// including values marked null.
+  public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema,
+      Set<String> columnsToPreserve) {
+    return getDefaultTransformers(tableConfig, schema, columnsToPreserve, Set.of());
+  }
+
+  /// Returns the default replay transformer chain and identifies preserved outputs whose dependency provenance is
+  /// trusted under the active transform graph.
+  public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema,
+      Set<String> columnsToPreserve, Set<String> trustedTransformOutputs) {
+    return getTransformers(tableConfig, schema, false, false, false, false, columnsToPreserve,
+        trustedTransformOutputs);
   }
 
   /// Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid

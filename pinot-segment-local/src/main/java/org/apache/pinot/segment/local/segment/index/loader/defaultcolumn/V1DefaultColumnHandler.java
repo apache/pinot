@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import java.io.File;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -39,16 +40,35 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
-    // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata
-    if (action.isUpdateAction() || action.isRemoveAction()) {
-      removeColumnIndices(column);
+    if (action.isUpdateAction()) {
+      try (PreparedColumnUpdate preparedColumnUpdate = prepareColumnUpdate(column)) {
+        if (preparedColumnUpdate == null) {
+          return false;
+        }
+        removeColumnIndices(column);
+        File[] indexFiles = preparedColumnUpdate.getIndexDir().listFiles();
+        if (indexFiles == null) {
+          throw new IllegalStateException(
+              "Failed to list prepared indices for default column: " + column);
+        }
+        for (File indexFile : indexFiles) {
+          FileUtils.moveFileToDirectory(indexFile, _indexDir, false);
+        }
+        commitPreparedColumnMetadata(column, preparedColumnUpdate);
+        return true;
+      }
     }
 
-    // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
-    if (action.isAddAction() || action.isUpdateAction()) {
-      return createColumnV1Indices(column);
-    } else {
+    // For REMOVE action, delete existing dictionary and forward index, and remove column metadata
+    if (action.isRemoveAction()) {
+      removeColumnIndices(column);
       return true;
     }
+
+    // For ADD action, create new dictionary and forward index, and update column metadata
+    if (action.isAddAction()) {
+      return createColumnV1Indices(column);
+    }
+    throw new IllegalStateException("Unsupported default column action: " + action);
   }
 }

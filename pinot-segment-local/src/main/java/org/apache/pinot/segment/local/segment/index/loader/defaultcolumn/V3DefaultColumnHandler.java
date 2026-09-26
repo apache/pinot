@@ -44,19 +44,35 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
-    // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata
-    if (action.isUpdateAction() || action.isRemoveAction()) {
-      removeColumnIndices(column);
-      if (action.isRemoveAction()) {
-        // No more to do for REMOVE action.
+    if (action.isUpdateAction()) {
+      try (PreparedColumnUpdate preparedColumnUpdate = prepareColumnUpdate(column)) {
+        if (preparedColumnUpdate == null) {
+          return false;
+        }
+        removeColumnIndices(column);
+        writeColumnV1IndicesToV3(column, preparedColumnUpdate.getIndexDir());
+        commitPreparedColumnMetadata(column, preparedColumnUpdate);
         return true;
       }
     }
-    // For ADD and UPDATE action, need to create new dictionary and forward index,
+
+    // For REMOVE action, delete existing dictionary and forward index, and remove column metadata
+    if (action.isRemoveAction()) {
+      removeColumnIndices(column);
+      return true;
+    }
+
+    // For ADD action, need to create new dictionary and forward index,
     // update column metadata, and write out with V3 format.
     if (!createColumnV1Indices(column)) {
       return false;
     }
+    writeColumnV1IndicesToV3(column, _indexDir);
+    return true;
+  }
+
+  private void writeColumnV1IndicesToV3(String column, File v1IndexDir)
+      throws Exception {
     // Write index to V3 format
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
@@ -66,22 +82,25 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     File invertedIndexFile = null;
 
     if (isSingleValue) {
-      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      forwardIndexFile = new File(v1IndexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       if (!forwardIndexFile.exists()) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile =
+            new File(v1IndexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
       if (!forwardIndexFile.exists()) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile = new File(v1IndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else {
       if (forwardIndexDisabled) {
         // An inverted index is created instead of forward index for multi-value columns with forward index disabled
         // Note that we don't currently support creation of forward index disabled derived columns
-        invertedIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+        invertedIndexFile =
+            new File(v1IndexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
       } else {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile =
+            new File(v1IndexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         if (!forwardIndexFile.exists()) {
-          forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+          forwardIndexFile = new File(v1IndexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         }
       }
     }
@@ -93,15 +112,15 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, StandardIndexes.inverted());
     }
 
-    File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+    File dictionaryFile = new File(v1IndexDir, column + V1Constants.Dict.FILE_EXTENSION);
     if (dictionaryFile.exists()) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
     }
 
-    File nullValueVectorFile = new File(_indexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+    File nullValueVectorFile =
+        new File(v1IndexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
     if (nullValueVectorFile.exists()) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, nullValueVectorFile, StandardIndexes.nullValueVector());
     }
-    return true;
   }
 }
