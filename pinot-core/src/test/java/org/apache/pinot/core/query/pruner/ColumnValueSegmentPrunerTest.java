@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -53,8 +54,11 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -396,6 +400,39 @@ public class ColumnValueSegmentPrunerTest {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
     }
+  }
+
+  /// An immutable segment is pruned from its column statistics alone: the pruner asks for the data-source metadata
+  /// and never for the data source, which under lazy column materialization would build the column's index readers
+  /// for a segment about to be discarded. Same decisions as the mutable path, reached without a data source.
+  @Test
+  public void testImmutableSegmentIsPrunedFromDataSourceMetadataOnly() {
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(20);
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getDataType()).thenReturn(DataType.INT);
+    when(metadata.getMinValue()).thenReturn(10);
+    when(metadata.getMaxValue()).thenReturn(20);
+    when(metadata.getPartitionFunction()).thenReturn(PartitionFunctionFactory.getPartitionFunction("Modulo", 5, null));
+    when(metadata.getPartitions()).thenReturn(Set.of(2));
+    when(segment.getDataSourceMetadata(eq("column"), any(Schema.class))).thenReturn(metadata);
+
+    // Min/max: EQ, RANGE and IN
+    assertTrue(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
+    assertFalse(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column = 12"));
+    assertTrue(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column > 20"));
+    assertFalse(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 15 AND 30"));
+    assertTrue(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 30)"));
+    assertFalse(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 12)"));
+    // Partition: 12 % 5 = 2 is held, 11 % 5 = 1 is not
+    assertTrue(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column = 11"));
+    assertFalse(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column = 12"));
+
+    verify(segment, never()).getDataSource(anyString(), any(Schema.class));
+    verify(segment, never()).getDataSource(anyString());
   }
 
   private QueryContext pruningQuery() {

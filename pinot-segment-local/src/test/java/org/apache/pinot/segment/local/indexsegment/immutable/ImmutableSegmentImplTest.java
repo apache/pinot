@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.index.openstruct.ImmutableOpenStru
 import org.apache.pinot.segment.local.segment.virtualcolumn.DocIdVirtualColumnProvider;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.testng.annotations.Test;
 
@@ -160,6 +162,76 @@ public class ImmutableSegmentImplTest {
 
     segment.destroy();
     verify(segmentDirectory).close();
+  }
+
+  /// Segment pruning reads a column's statistics for every segment the server holds, to decide which segments can
+  /// match at all. Reaching those statistics must not materialize the column: under lazy materialization that would
+  /// build an index container — and for an external table parse a Parquet footer — on the query thread, for a segment
+  /// that is about to be pruned away.
+  @Test
+  public void testDataSourceMetadataDoesNotMaterializeTheColumn()
+      throws Exception {
+    ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
+    ColumnMetadataImpl b = columnMetadata(intColumn("b"), null);
+    ColumnMaterializer materializer = mock(ColumnMaterializer.class);
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    ImmutableSegmentImpl segment = lazySegment(segmentDirectory, materializer, a, b);
+
+    DataSourceMetadata metadata = segment.getDataSourceMetadata("a", mock(Schema.class));
+    assertNotNull(metadata);
+    assertEquals(metadata.getFieldSpec(), a.getFieldSpec());
+    assertEquals(metadata.getDataType(), a.getDataType());
+    assertEquals(metadata.getNumDocs(), a.getTotalDocs());
+    assertEquals(metadata.isSorted(), a.isSorted());
+    // The whole point: reading the statistics built nothing.
+    verifyNoInteractions(materializer);
+
+    // It agrees with what the materialized data source reports, and only THAT materializes.
+    assertEquals(segment.getDataSource("a", mock(Schema.class)).getDataSourceMetadata().getDataType(),
+        metadata.getDataType());
+    verify(materializer, times(1)).createIndexContainer(a);
+
+    segment.destroy();
+  }
+
+  /// The metadata answered without a data source has to be the one the data source would carry: a MAP column's map
+  /// metadata, an OPEN_STRUCT parent's synthesized metadata, and, once a column is materialized, that data source's
+  /// own. A materialized child stays reachable only through its parent, so asking for it fails as before.
+  @Test
+  public void testDataSourceMetadataMatchesTheDataSourceKindWithoutMaterializing()
+      throws Exception {
+    ComplexFieldSpec mapSpec = new ComplexFieldSpec("m", FieldSpec.DataType.MAP, true,
+        Map.of(ComplexFieldSpec.KEY_FIELD, new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true),
+            ComplexFieldSpec.VALUE_FIELD, new DimensionFieldSpec("value", FieldSpec.DataType.INT, true)));
+    ComplexFieldSpec metrics = new ComplexFieldSpec("metrics", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("views", new DimensionFieldSpec("views", FieldSpec.DataType.LONG, true)));
+    String viewsColumn = OpenStructNaming.materializedColumnName("metrics", "views");
+    ColumnMetadataImpl a = columnMetadata(intColumn("a"), null);
+    ColumnMetadataImpl m = columnMetadata(mapSpec, null);
+    ColumnMetadataImpl parent = columnMetadata(metrics, null);
+    ColumnMetadataImpl views =
+        columnMetadata(new DimensionFieldSpec(viewsColumn, FieldSpec.DataType.LONG, true), "metrics");
+    ColumnIndexContainer containerA = mock(ColumnIndexContainer.class);
+    ColumnMaterializer materializer = mock(ColumnMaterializer.class);
+    when(materializer.createIndexContainer(a)).thenReturn(containerA);
+    ImmutableSegmentImpl segment = lazySegment(mock(SegmentDirectory.class), materializer, a, m, parent, views);
+    Schema schema = mock(Schema.class);
+
+    DataSourceMetadata mapMetadata = segment.getDataSourceMetadata("m", schema);
+    assertFalse(mapMetadata.isSorted());
+    assertThrows(UnsupportedOperationException.class, mapMetadata::getMaxRowLengthInBytes);
+    DataSourceMetadata parentMetadata = segment.getDataSourceMetadata("metrics", schema);
+    assertSame(parentMetadata.getFieldSpec(), metrics);
+    assertNull(parentMetadata.getMinValue());
+    assertNull(parentMetadata.getPartitionFunction());
+    assertEquals(parentMetadata.getNumDocs(), parent.getTotalDocs());
+    assertThrows(IllegalStateException.class, () -> segment.getDataSourceMetadata(viewsColumn, schema));
+    verifyNoInteractions(materializer);
+
+    DataSource dataSourceA = segment.getDataSource("a", schema);
+    assertSame(segment.getDataSourceMetadata("a", schema), dataSourceA.getDataSourceMetadata());
+    verify(materializer, times(1)).createIndexContainer(a);
+    segment.destroy();
   }
 
   @Test
