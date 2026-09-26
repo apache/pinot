@@ -1275,6 +1275,34 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testNewOfflineOnlineSegmentUsesUpdatedSchemaWithoutRefreshMessage()
+      throws Exception {
+    BaseTableDataManager manager = spy(createTableManager());
+    manager._propertyStore = new FakePropertyStore();
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, DEFAULT_TABLE_CONFIG);
+    ZKMetadataProvider.setSchema(manager._propertyStore, SCHEMA);
+
+    Schema updatedSchema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+        .addMetric(LONG_COLUMN, DataType.LONG)
+        .addSingleValueDimension("newColumn", DataType.STRING).build();
+    ZKMetadataProvider.setSchema(manager._propertyStore, updatedSchema);
+
+    SegmentZKMetadata metadata = mock(SegmentZKMetadata.class);
+    when(metadata.getSegmentName()).thenReturn("newSegment");
+    seedZKMetadata(manager, "newSegment", metadata);
+    List<Schema> loadingSchemas = new ArrayList<>();
+    doAnswer(invocation -> {
+      loadingSchemas.add(((IndexLoadingConfig) invocation.getArgument(1)).getSchema());
+      return null;
+    }).when(manager).addNewOnlineSegment(eq(metadata), any(IndexLoadingConfig.class));
+
+    manager.addOnlineSegment("newSegment");
+    assertEquals(loadingSchemas.size(), 1);
+    assertTrue(loadingSchemas.get(0).hasColumn("newColumn"), "New ONLINE load should use the updated schema");
+  }
+
+  @Test
   public void testGetCachedIndexLoadingConfigDerivesSegmentTier() {
     TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = createSchemaReuseSchema();
