@@ -186,6 +186,8 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
     // Create a new context for the next PlanFragment with MailboxSendNode as the root node.
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, new Context(senderPlanFragmentId));
+    Preconditions.checkState(!node.isSortOnSender() || node.isSortOnReceiver(),
+        "Sender sorting requires the receiver merge-sort contract");
     if (node.isSortOnSender()) {
       Preconditions.checkState(!node.getCollations().isEmpty(),
           "Sender sorting requires a non-empty exchange collation");

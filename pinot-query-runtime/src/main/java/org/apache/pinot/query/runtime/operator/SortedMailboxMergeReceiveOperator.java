@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -41,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,19 +58,19 @@ import org.slf4j.LoggerFactory;
 /// recovered into that fallback.
 ///
 /// The merge reads whichever mailbox is ready instead of blocking on one sender. This prevents a sender that is
-/// backpressured by another receiver from creating a cross-receiver wait cycle. Rows are emitted in blocks of at most
-/// 10,000 while cursor state carries the ordering frontier across calls. A fast sender can be read ahead while another
+/// backpressured by another receiver from creating a cross-receiver wait cycle. Multi-sender merge and fallback rows
+/// are emitted in blocks of at most 10,000 while cursor state carries the ordering frontier across calls. A confirmed
+/// single sender is passed through with its original block boundaries. A fast sender can be read ahead while another
 /// sender is starved, so retained input is workload-dependent and can approach the legacy full receiver sort in the
 /// worst case.
 ///
 /// This operator is driven by a single consumer thread and is not thread-safe.
-public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperator implements SortedMultiStageOperator {
+public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxMergeReceiveOperator.class);
 
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_MERGE_RECEIVE";
   private static final String MERGE_SCOPE = "SortedMailboxMergeReceiveOperator";
   private final DataSchema _dataSchema;
-  private final List<RelFieldCollation> _collations;
   private final Comparator<Object[]> _comparator;
   private final SenderCursorHeap _readyCursors;
   private final boolean _singleSortedSender;
@@ -98,14 +98,13 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
     Preconditions.checkState(node.isSortedOnSender(), "Sender-side sorting must be enabled");
     Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
     _dataSchema = node.getDataSchema();
-    _collations = List.copyOf(node.getCollations());
-    _comparator = new SortUtils.SortComparator(_collations, false);
+    _comparator = new SortUtils.SortComparator(List.copyOf(node.getCollations()), false);
     List<AsyncStream<ReceivingMailbox.MseBlockWithStats>> streams = _multiConsumer.getLiveStreamsSnapshot();
     _readyCursors = new SenderCursorHeap(streams.size(), _comparator);
     _singleSortedSender = streams.size() == 1;
     if (!_singleSortedSender) {
       for (AsyncStream<ReceivingMailbox.MseBlockWithStats> stream : streams) {
-        SenderCursor cursor = new SenderCursor(stream);
+        SenderCursor cursor = new SenderCursor();
         _cursorsByStream.put(stream, cursor);
         _starvedCursors.add(cursor);
       }
@@ -120,11 +119,6 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  @Override
-  public List<RelFieldCollation> getCollations() {
-    return _collations;
   }
 
   @Override
@@ -325,8 +319,11 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
 
   /// Switches to a full receiver sort when a legacy sender omits the transport confirmation.
   private void fallbackToFullSort(List<Object[]> unconfirmedRows) {
-    Preconditions.checkState(!_mergeOutputStarted,
-        "Sender stopped confirming sorted data after merge output started on stage: %s", _context.getStageId());
+    if (_mergeOutputStarted) {
+      throw QueryErrorCode.INTERNAL.asException(
+          "Sender ordering confirmation changed after merge output started on stage " + _context.getStageId()
+              + "; retry after the rolling upgrade completes or disable windowSortOnSender");
+    }
     _rows = new ArrayList<>();
     for (SenderCursor cursor : _cursorsByStream.values()) {
       cursor.drainTo(_rows);
@@ -433,15 +430,10 @@ public class SortedMailboxMergeReceiveOperator extends BaseMailboxReceiveOperato
   }
 
   private static class SenderCursor {
-    final AsyncStream<ReceivingMailbox.MseBlockWithStats> _stream;
     private boolean _finished;
     private final Deque<List<Object[]>> _pending = new ArrayDeque<>();
     private List<Object[]> _rows = List.of();
     private int _index;
-
-    SenderCursor(AsyncStream<ReceivingMailbox.MseBlockWithStats> stream) {
-      _stream = stream;
-    }
 
     void offer(List<Object[]> rows) {
       if (!rows.isEmpty()) {

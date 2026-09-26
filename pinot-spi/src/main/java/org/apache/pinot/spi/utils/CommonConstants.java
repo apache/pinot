@@ -798,6 +798,11 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
+    /// Whether global ordered windows sort on each sender and merge the ordered streams at the receiver.
+    public static final String CONFIG_OF_WINDOW_SORT_ON_SENDER =
+        "pinot.broker.multistage.window.sort.on.sender";
+    public static final boolean DEFAULT_WINDOW_SORT_ON_SENDER = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1147,6 +1152,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        /// Per-query override of [Broker#CONFIG_OF_WINDOW_SORT_ON_SENDER].
+        public static final String WINDOW_SORT_ON_SENDER = "windowSortOnSender";
 
         // Vector search query options
 
