@@ -21,8 +21,11 @@ package org.apache.pinot.query.runtime.operator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
@@ -57,6 +60,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -169,6 +174,65 @@ public class SortedMailboxMergeReceiveOperatorTest {
     try (SortedMailboxMergeReceiveOperator operator = getOperator(_stageMetadataBoth,
         RelDistribution.Type.HASH_DISTRIBUTED)) {
       assertEquals(drain(operator), List.of(row4, row1, row5, row2, row6, row3));
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void shouldMatchFullSortForRandomizedSenderSchedules() {
+    long seed = 0x19396L;
+    Random random = new Random(seed);
+    Comparator<Object[]> fullSortComparator = Comparator.comparingInt(row -> (Integer) row[0]);
+    Comparator<Object[]> totalComparator = fullSortComparator.thenComparingInt(row -> (Integer) row[1]);
+    for (int scenario = 0; scenario < 50; scenario++) {
+      int numSenders = 2 + random.nextInt(7);
+      int numDistinctKeys = 1 << random.nextInt(6);
+      List<Integer> senderIds = new ArrayList<>(numSenders);
+      for (int senderId = 0; senderId < numSenders; senderId++) {
+        senderIds.add(senderId);
+      }
+      MailboxInfos mailboxInfos = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, senderIds));
+      StageMetadata stageMetadata = new StageMetadata(0,
+          senderIds.stream().map(senderId -> new WorkerMetadata(senderId, Map.of(1, mailboxInfos), Map.of()))
+              .collect(Collectors.toList()), Map.of());
+
+      MailboxService mailboxService = mock(MailboxService.class);
+      when(mailboxService.getHostname()).thenReturn("localhost");
+      when(mailboxService.getPort()).thenReturn(1234);
+      List<Object[]> expected = new ArrayList<>();
+      int nextRowId = 0;
+      for (int senderId : senderIds) {
+        String mailboxId = MailboxIdUtils.toMailboxId(0, 1, senderId, 0, 0);
+        ReceivingMailbox mailbox = mock(ReceivingMailbox.class);
+        when(mailbox.getId()).thenReturn(mailboxId);
+        when(mailbox.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+        when(mailboxService.getReceivingMailbox(eq(mailboxId))).thenReturn(mailbox);
+
+        int numRows = random.nextInt(81);
+        List<Object[]> senderRows = new ArrayList<>(numRows);
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          int key = random.nextInt(numDistinctKeys);
+          senderRows.add(new Object[]{key, nextRowId++});
+        }
+        senderRows.sort(fullSortComparator);
+        expected.addAll(senderRows);
+        scriptMailbox(mailbox, senderRows, random);
+      }
+      expected.sort(fullSortComparator);
+
+      try (SortedMailboxMergeReceiveOperator operator = getOperator(mailboxService, stageMetadata,
+          RelDistribution.Type.HASH_DISTRIBUTED)) {
+        List<Object[]> actual = drain(operator);
+        String message =
+            "seed=" + seed + ", scenario=" + scenario + ", senders=" + numSenders + ", keys=" + numDistinctKeys;
+        // Inter-sender order within a comparator-equal tie is unspecified. Compare the exact sort-key sequence with
+        // the full sort, then canonicalize only the ties to verify that no uniquely tagged row was lost or repeated.
+        assertEquals(sortKeys(actual), sortKeys(expected), message);
+        List<Object[]> canonicalActual = new ArrayList<>(actual);
+        List<Object[]> canonicalExpected = new ArrayList<>(expected);
+        canonicalActual.sort(totalComparator);
+        canonicalExpected.sort(totalComparator);
+        assertEquals(rowValues(canonicalActual), rowValues(canonicalExpected), message);
+      }
     }
   }
 
@@ -369,8 +433,10 @@ public class SortedMailboxMergeReceiveOperatorTest {
 
       MseBlock block = operator.nextBlock();
       assertTrue(block.isError());
-      assertTrue(((ErrorMseBlock) block).getErrorMessages().values().stream()
-          .anyMatch(message -> message.contains("stopped confirming sorted data after merge output started")));
+      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+      assertTrue(errorBlock.getErrorMessages().containsKey(QueryErrorCode.INTERNAL));
+      assertTrue(errorBlock.getErrorMessages().get(QueryErrorCode.INTERNAL)
+          .contains("retry after the rolling upgrade completes or disable windowSortOnSender"));
     }
   }
 
@@ -537,6 +603,48 @@ public class SortedMailboxMergeReceiveOperatorTest {
       rows[i] = new Object[]{start + i, sender};
     }
     return rows;
+  }
+
+  private static void scriptMailbox(ReceivingMailbox mailbox, List<Object[]> rows, Random random) {
+    List<ReceivingMailbox.MseBlockWithStats> responses = new ArrayList<>();
+    int rowIndex = 0;
+    while (rowIndex < rows.size()) {
+      addTemporaryStarvation(responses, random.nextInt(4));
+      int blockSize = 1 + random.nextInt(Math.min(13, rows.size() - rowIndex));
+      Object[][] blockRows = rows.subList(rowIndex, rowIndex + blockSize).toArray(new Object[0][]);
+      responses.add(OperatorTestUtil.sortedBlockWithStats(DATA_SCHEMA, blockRows));
+      rowIndex += blockSize;
+    }
+    addTemporaryStarvation(responses, random.nextInt(4));
+    responses.add(OperatorTestUtil.eosWithEmptyStats());
+
+    AtomicReference<ReceivingMailbox.Reader> reader = new AtomicReference<>();
+    doAnswer(invocation -> {
+      reader.set(invocation.getArgument(0));
+      return null;
+    }).when(mailbox).registeredReader(any());
+    int[] responseIndex = {0};
+    doAnswer(invocation -> {
+      ReceivingMailbox.MseBlockWithStats response = responses.get(responseIndex[0]++);
+      if (response == null) {
+        reader.get().blockReadyToRead();
+      }
+      return response;
+    }).when(mailbox).poll();
+  }
+
+  private static void addTemporaryStarvation(List<ReceivingMailbox.MseBlockWithStats> responses, int count) {
+    for (int i = 0; i < count; i++) {
+      responses.add(null);
+    }
+  }
+
+  private static List<List<Object>> rowValues(List<Object[]> rows) {
+    return rows.stream().map(Arrays::asList).collect(Collectors.toList());
+  }
+
+  private static List<Integer> sortKeys(List<Object[]> rows) {
+    return rows.stream().map(row -> (Integer) row[0]).collect(Collectors.toList());
   }
 
   private static MultiStageQueryStats leafStats(long emittedRows) {
