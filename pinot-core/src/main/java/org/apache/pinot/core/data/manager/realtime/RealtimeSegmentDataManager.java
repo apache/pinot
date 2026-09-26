@@ -1489,6 +1489,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  @VisibleForTesting
+  void setEndOfPartitionGroup(boolean endOfPartitionGroup) {
+    _endOfPartitionGroup = endOfPartitionGroup;
+  }
+
   /// Cleans up the metrics that reflects the state of the realtime segment.
   /// This step is essential as the instance may not be the target location for some of the partitions.
   /// E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
@@ -1746,6 +1751,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Utils.rethrowException(e);
     } finally {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    }
+    // Reached only on a successful CONSUMING -> ONLINE transition (any failure above is rethrown and skips
+    // this). If the segment stopped because the stream partition group ended -- e.g. a Kinesis shard was
+    // split/merged and fully consumed -- no successor consuming segment is created for this partition (the
+    // controller drops the ended partition from the stream partition list), so the gauge set to 0 above
+    // would otherwise linger at 0 forever and raise a false ingestion-stopped alert. Remove it. On a failed
+    // transition we never reach here, so the gauge stays at 0 and a genuine stall remains visible.
+    if (_endOfPartitionGroup) {
+      _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     }
   }
 
