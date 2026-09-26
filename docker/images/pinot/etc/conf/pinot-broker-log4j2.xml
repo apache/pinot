@@ -61,7 +61,7 @@
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
     <RollingFile
-        name="querylog"
+        name="queryLog"
         fileName="${env:LOG_DIR}/querylog.log"
         filePattern="${env:LOG_DIR}/querylog.%d{yyyy-MM-dd}.%i.log.gz"
         immediateFlush="false">
@@ -89,7 +89,7 @@
     </Logger>
     <!-- Output querylogs to its own file -->
     <Logger name="org.apache.pinot.broker.querylog.QueryLogger" level="info" additivity="false">
-      <AppenderRef ref="querylog"/>
+      <AppenderRef ref="queryLog"/>
     </Logger>
     <!-- Output broker starter logs to the console -->
     <Logger name="org.apache.pinot.broker.broker.helix.HelixBrokerStarter" level="info" additivity="false">
