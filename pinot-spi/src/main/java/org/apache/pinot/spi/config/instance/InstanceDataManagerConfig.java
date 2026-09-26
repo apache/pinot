@@ -59,6 +59,10 @@ public interface InstanceDataManagerConfig {
 
   int getMaxSegmentPreloadThreads();
 
+  /// Max amount of mmap'ed segment data to proactively fault into memory on segment load, in bytes.
+  /// Zero disables prefetching. Only applies when [#getReadMode()] is [ReadMode#mmap].
+  long getMaxMmapPrefetchBytes();
+
   int getMaxParallelSegmentBuilds();
 
   int getMaxParallelSegmentDownloads();

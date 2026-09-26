@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
@@ -94,6 +95,7 @@ public class IndexLoadingConfig {
     private final String _segmentStoreURI;
     @Nullable
     private final String _segmentDirectoryLoader;
+    private final long _maxMmapPrefetchBytes;
     @Nullable
     private final Map<String, Map<String, String>> _instanceTierConfigs;
     private final List<String> _sortedColumns;
@@ -114,6 +116,7 @@ public class IndexLoadingConfig {
       SegmentVersion segmentVersion = null;
       String segmentStoreURI = null;
       String segmentDirectoryLoader = null;
+      long maxMmapPrefetchBytes = CommonConstants.Server.DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES;
       Map<String, Map<String, String>> instanceTierConfigs = null;
       if (instanceDataManagerConfig != null) {
         ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
@@ -133,6 +136,7 @@ public class IndexLoadingConfig {
         }
         segmentStoreURI = instanceDataManagerConfig.getSegmentStoreUri();
         segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
+        maxMmapPrefetchBytes = instanceDataManagerConfig.getMaxMmapPrefetchBytes();
         Map<String, Map<String, String>> tierConfigs = instanceDataManagerConfig.getTierConfigs();
         instanceTierConfigs = tierConfigs != null ? tierConfigs : Map.of();
       }
@@ -177,6 +181,7 @@ public class IndexLoadingConfig {
       _realtimeAvgMultiValueCount = realtimeAvgMultiValueCount;
       _segmentStoreURI = segmentStoreURI;
       _segmentDirectoryLoader = segmentDirectoryLoader;
+      _maxMmapPrefetchBytes = maxMmapPrefetchBytes;
       _instanceTierConfigs = instanceTierConfigs;
       _sortedColumns = sortedColumns;
       _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
@@ -376,6 +381,10 @@ public class IndexLoadingConfig {
   public String getSegmentDirectoryLoader() {
     return StringUtils.isNotBlank(_immutableState._segmentDirectoryLoader) ? _immutableState._segmentDirectoryLoader
         : SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME;
+  }
+
+  public long getMaxMmapPrefetchBytes() {
+    return _immutableState._maxMmapPrefetchBytes;
   }
 
   public String getInstanceId() {

@@ -1461,6 +1461,14 @@ public class CommonConstants {
     public static final String READ_MODE = "readMode";
     public static final String CONFIG_OF_READ_MODE = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + READ_MODE;
     public static final String DEFAULT_READ_MODE = "mmap";
+    // Upper bound on how much mmap'ed segment data a server proactively faults into memory on load, to reduce the
+    // major page faults (and thus latency variance) seen right after startup. Accepts human readable data sizes
+    // (e.g. '100G'). Set to '0' to disable prefetching entirely. Only applies when readMode is 'mmap'.
+    public static final String MMAP_PREFETCH_MAX_SIZE = "mmap.prefetch.max.size";
+    public static final String CONFIG_OF_MMAP_PREFETCH_MAX_SIZE =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + MMAP_PREFETCH_MAX_SIZE;
+    // 100GB, matching the limit that used to be hard-coded in SegmentLocalFSDirectory
+    public static final long DEFAULT_MMAP_PREFETCH_MAX_SIZE_BYTES = 100L * 1024 * 1024 * 1024;
     public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_FORMAT_VERSION;
