@@ -29,6 +29,7 @@ import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -36,6 +37,7 @@ import static org.testng.Assert.assertTrue;
 public class ForyJsonLinkageFallbackTest {
   private static final String FALLBACK_ARGUMENT = "verifyFallback";
   private static final String TOKEN_LIMIT_ARGUMENT = "verifyTokenLimit";
+  private static final String STRING_LIMIT_ARGUMENT = "verifyStringLimit";
 
   /// Child-process entry point used by the missing-Fory fallback tests.
   public static void main(String[] arguments) {
@@ -44,6 +46,10 @@ public class ForyJsonLinkageFallbackTest {
     }
     if (TOKEN_LIMIT_ARGUMENT.equals(arguments[0])) {
       verifyConfiguredTokenLimit();
+      return;
+    }
+    if (STRING_LIMIT_ARGUMENT.equals(arguments[0])) {
+      verifyConfiguredStringLimit();
       return;
     }
     if (!FALLBACK_ARGUMENT.equals(arguments[0])) {
@@ -79,6 +85,37 @@ public class ForyJsonLinkageFallbackTest {
   public void testConfiguredJacksonTokenLimit()
       throws Exception {
     runChild(false, false, TOKEN_LIMIT_ARGUMENT);
+  }
+
+  @Test
+  public void testConfiguredJacksonStringLimit()
+      throws Exception {
+    runChild(false, false, STRING_LIMIT_ARGUMENT);
+  }
+
+  private static void verifyConfiguredStringLimit() {
+    int maxLength = 64;
+    StreamReadConstraints.overrideDefaultStreamReadConstraints(
+        StreamReadConstraints.builder().maxStringLength(maxLength).build());
+    SimpleJsonPath path = SimpleJsonPath.compile("$.v");
+    assertTrue(path != null);
+    assertTrue(ForyJsonPathExtractor.isAvailable());
+    // Escaped text may exceed the raw length limit while its decoded UTF-16 length is still valid.
+    for (String unit : new String[]{"x", "é", "中", "\\u0061", "\\n"}) {
+      String value = unit.repeat(maxLength);
+      assertEquals(ForyJsonPathExtractor.extract("{\"ignored\":\"" + value + "\",\"v\":7}", path), 7L);
+      assertThrows(IllegalArgumentException.class,
+          () -> ForyJsonPathExtractor.extract("{\"v\":7,\"ignored\":\"" + value + "x\"}", path));
+      assertEquals(ForyJsonPathExtractor.extract("{\"ignored\":\"ok\",\"v\":8}", path), 8L);
+    }
+    for (String unit : new String[]{"😀", "\\uD83D\\uDE00"}) {
+      String value = unit.repeat(maxLength / 2);
+      assertEquals(ForyJsonPathExtractor.extract("{\"ignored\":[\"" + value + "\"],\"v\":7}", path), 7L);
+      assertThrows(IllegalArgumentException.class,
+          () -> ForyJsonPathExtractor.extract("{\"ignored\":[\"" + value + "x\"],\"v\":7}", path));
+    }
+    String fields = "\"ignored\":\"small\",".repeat(maxLength);
+    assertEquals(ForyJsonPathExtractor.extract("{" + fields + "\"v\":7}", path), 7L);
   }
 
   private static void verifyConfiguredTokenLimit() {
