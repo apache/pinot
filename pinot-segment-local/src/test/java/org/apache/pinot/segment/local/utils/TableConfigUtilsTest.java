@@ -1798,145 +1798,6 @@ public class TableConfigUtilsTest {
     }
   }
 
-  /// Semantic table-config-time validation of `codecSpec` (via `ForwardIndexType.validate`):
-  /// well-formed specs on supported column shapes are accepted, and malformed or type-incompatible
-  /// specs fail with precise errors.
-  @Test
-  public void testCodecSpecValidation() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("intCol", DataType.INT)
-        .addSingleValueDimension("longCol", DataType.LONG)
-        .addSingleValueDimension("stringCol", DataType.STRING)
-        .addMultiValueDimension("mvIntCol", DataType.INT)
-        .build();
-
-    // An unknown codec name inside indexes.forward.codecSpec fails with a precise error.
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "LZ4,UNKNOWN")));
-    TableConfig unknownCodecTableConfig = tableConfig;
-    Exception exception = expectThrows(Exception.class,
-        () -> TableConfigUtils.validate(unknownCodecTableConfig, schema));
-    assertTrue(exception.getMessage().contains("Unknown codec"), "Unexpected error: " + exception.getMessage());
-
-    // A multi-stage codecSpec requires the V7 codec-pipeline writer, which only supports
-    // single-value columns, so it is rejected on a multi-value column.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("mvIntCol", "LZ4,SNAPPY")));
-    TableConfig mvChainTableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(mvChainTableConfig, schema));
-    assertTrue(exception.getMessage().contains("only supports single-value columns")
-        && exception.getMessage().contains("mvIntCol"), "Unexpected error: " + exception.getMessage());
-
-    // A transform codecSpec likewise requires the V7 writer, so DELTA on a multi-value column is
-    // rejected even though the column's stored type (INT) is supported.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("mvIntCol", "DELTA,LZ4")));
-    TableConfig mvTransformTableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(mvTransformTableConfig, schema));
-    assertTrue(exception.getMessage().contains("only supports single-value columns")
-        && exception.getMessage().contains("mvIntCol"), "Unexpected error: " + exception.getMessage());
-
-    // A V7-requiring spec on a single-value column of an unsupported stored type (STRING) is
-    // rejected with the INT/LONG-only error. ZSTD(5) is compression-only but its non-default level
-    // cannot be represented by a legacy ChunkCompressionType, so it needs the V7 writer.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("stringCol", "ZSTD(5)")));
-    TableConfig stringV7TableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(stringV7TableConfig, schema));
-    assertTrue(exception.getMessage().contains("only supports INT and LONG columns")
-        && exception.getMessage().contains("stringCol"), "Unexpected error: " + exception.getMessage());
-
-    // A transform after a packing transform must be rejected (T64 output is not a typed value
-    // array, so DELTA cannot consume it).
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "T64,DELTA,LZ4")));
-    TableConfig misorderedTableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(misorderedTableConfig, schema));
-    assertTrue(exception.getMessage().contains("must operate on column values"),
-        "Unexpected error: " + exception.getMessage());
-
-    // A disabled modern forward-index config cannot retain an ignored codecSpec. This must be rejected even
-    // without the legacy FieldConfig.forwardIndexDisabled property.
-    ObjectNode disabledForward = JsonUtils.newObjectNode();
-    disabledForward.put("disabled", true);
-    disabledForward.put("codecSpec", "DELTA,LZ4");
-    ObjectNode disabledIndexes = JsonUtils.newObjectNode();
-    disabledIndexes.set("forward", disabledForward);
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(disabledIndexes)
-        .build()));
-    TableConfig disabledCodecSpecTableConfig = tableConfig;
-    exception = expectThrows(Exception.class,
-        () -> TableConfigUtils.validate(disabledCodecSpecTableConfig, schema));
-    assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled")
-        && exception.getMessage().contains("intCol"), "Unexpected error: " + exception.getMessage());
-
-    // A well-formed compression-only RAW codecSpec passes table-config validation.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "ZSTD(3)")));
-    TableConfigUtils.validate(tableConfig, schema);
-
-    // A transform + compression chain on a RAW single-value INT column passes validation.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "DELTA,ZSTD(3)")));
-    TableConfigUtils.validate(tableConfig, schema);
-
-    // A transform pipeline on a LONG column passes validation.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("longCol", "DELTADELTA,LZ4")));
-    TableConfigUtils.validate(tableConfig, schema);
-
-    // Every non-null codecSpec routes through the V7 writer, including a single compression stage. Reject
-    // unsupported stored types and multi-value columns consistently with transform pipelines.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("stringCol", "SNAPPY")));
-    TableConfig stringCompressionTableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(stringCompressionTableConfig, schema));
-    assertTrue(exception.getMessage().contains("only supports INT and LONG columns")
-        && exception.getMessage().contains("stringCol"), "Unexpected error: " + exception.getMessage());
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("mvIntCol", "LZ4")));
-    TableConfig mvCompressionTableConfig = tableConfig;
-    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(mvCompressionTableConfig, schema));
-    assertTrue(exception.getMessage().contains("only supports single-value columns")
-        && exception.getMessage().contains("mvIntCol"), "Unexpected error: " + exception.getMessage());
-
-    // Regression: codecSpec validation runs via `IndexType.validate(...)` after
-    // `FieldIndexConfigsUtil` resolves overrides — not by an early raw-FieldConfig pre-pass.
-    // A column whose RAW encoding is resolved from `noDictionaryColumns`, with codecSpec set under
-    // `indexes.forward`, must pass validation.
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("intCol"));
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "DELTA,LZ4")));
-    TableConfigUtils.validate(tableConfig, schema);
-
-    // Chained value-transforms + compression are valid ("DELTA,DELTADELTA,LZ4").
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "DELTA,DELTADELTA,LZ4")));
-    TableConfigUtils.validate(tableConfig, schema);
-
-    // A value-transform → packing transform → compression chain is valid ("DELTA,T64,LZ4").
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "DELTA,T64,LZ4")));
-    TableConfigUtils.validate(tableConfig, schema);
-  }
-
-  /// Builds a RAW FieldConfig whose codecSpec is configured via the modern `indexes.forward` block
-  /// (the only supported path; there is no top-level FieldConfig.codecSpec field).
-  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
-    ObjectNode forward = JsonUtils.newObjectNode();
-    forward.put("codecSpec", codecSpec);
-    ObjectNode indexes = JsonUtils.newObjectNode();
-    indexes.set("forward", forward);
-    return new FieldConfig.Builder(column)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(indexes)
-        .build();
-  }
-
   @Test
   public void testCodecSpecTableConfigValidation() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -1951,11 +1812,23 @@ public class TableConfigUtilsTest {
         fieldConfigWithCodecSpec("intCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4"),
         fieldConfigWithCodecSpec("longCol", FieldConfig.EncodingType.RAW, "ZSTD(3)")));
     TableConfigUtils.validate(tableConfig, schema);
+    // Chained value transforms, a value transform feeding a packing transform, and transform chains on LONG.
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,ZSTD(3)");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,DELTADELTA,LZ4");
+    assertCodecSpecValidationPasses(schema, "intCol", "DELTA,T64,LZ4");
+    assertCodecSpecValidationPasses(schema, "longCol", "DELTADELTA,LZ4");
 
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,UNKNOWN", "Unknown codec");
     assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "LZ4,DELTA",
         "all transforms must precede any compression stage");
+    // T64 output is not a typed value array, so a value transform cannot follow it.
+    assertCodecSpecValidationFails(schema, "intCol", FieldConfig.EncodingType.RAW, "T64,DELTA,LZ4",
+        "must operate on column values");
+    // Every codecSpec, compression-only or transform, uses the V7 writer, which only supports single-value
+    // INT/LONG columns.
     assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "LZ4",
+        "only supports single-value columns");
+    assertCodecSpecValidationFails(schema, "mvIntCol", FieldConfig.EncodingType.RAW, "DELTA,LZ4",
         "only supports single-value columns");
     assertCodecSpecValidationFails(schema, "stringCol", FieldConfig.EncodingType.RAW, "SNAPPY",
         "only supports INT and LONG columns");
@@ -1999,6 +1872,12 @@ public class TableConfigUtilsTest {
     assertTrue(Throwables.getRootCause(exception).getMessage()
             .contains("codecSpec cannot be configured when the forward index is disabled"),
         exception.getMessage());
+  }
+
+  private static void assertCodecSpecValidationPasses(Schema schema, String column, String codecSpec) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(fieldConfigWithCodecSpec(column, FieldConfig.EncodingType.RAW, codecSpec)));
+    TableConfigUtils.validate(tableConfig, schema);
   }
 
   private static void assertCodecSpecValidationFails(Schema schema, String column,

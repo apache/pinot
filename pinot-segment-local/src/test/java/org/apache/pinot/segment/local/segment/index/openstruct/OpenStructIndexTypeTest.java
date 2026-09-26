@@ -50,12 +50,11 @@ public class OpenStructIndexTypeTest {
 
   @DataProvider(name = "codecSpecOpenStructConfigs")
   public Object[][] codecSpecOpenStructConfigs() {
-    FieldConfig valueFieldConfig = rawCodecSpecFieldConfig("clicks");
-    FieldConfig defaultValueFieldConfig = rawCodecSpecFieldConfig("default");
-    return new Object[][]{
-        {new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(valueFieldConfig), null), "clicks"},
-        {new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5, null, null), "default"}
-    };
+    OpenStructIndexConfig valueConfig = new OpenStructIndexConfig(false, null, -1, null, 0.5,
+        List.of(rawCodecSpecFieldConfig("clicks")), null, null, null);
+    OpenStructIndexConfig defaultConfig = new OpenStructIndexConfig(false, rawCodecSpecFieldConfig("default"), -1,
+        null, 0.5, null, null, null, null);
+    return new Object[][]{{valueConfig, "key 'clicks'"}, {defaultConfig, "defaultValueFieldConfig"}};
   }
 
   @Test
@@ -205,7 +204,7 @@ public class OpenStructIndexTypeTest {
 
   @Test(dataProvider = "codecSpecOpenStructConfigs")
   public void testTableValidationRejectsCodecSpecForMaterializedChildren(OpenStructIndexConfig openStructConfig,
-      String configuredKey) {
+      String expectedTarget) {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set(StandardIndexes.openStruct().getPrettyName(), JsonUtils.objectToJsonNode(openStructConfig));
     FieldConfig parentFieldConfig = new FieldConfig.Builder("payload").withIndexes(indexes).build();
@@ -220,8 +219,8 @@ public class OpenStructIndexTypeTest {
 
     IllegalStateException exception = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validate(tableConfig, schema));
-    assertEquals(exception.getMessage(),
-        "codecSpec is not supported for OPEN_STRUCT key: " + configuredKey);
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': codecSpec is not supported for "
+        + expectedTarget + "; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
   }
 
   private static FieldConfig rawCodecSpecFieldConfig(String name) {

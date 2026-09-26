@@ -413,7 +413,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // below discards any per-key codecSpec, so refuse to silently drop one that slipped past validation.
     ForwardIndexConfig configuredForwardIndex = configsForDecision.getConfig(StandardIndexes.forward());
     Preconditions.checkState(configuredForwardIndex.getCodecSpec() == null,
-        "codecSpec is not supported for OPEN_STRUCT key: %s", key);
+        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; materialized keys always use a "
+            + "dictionary-encoded or LZ4 raw forward index", _columnName, key);
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec

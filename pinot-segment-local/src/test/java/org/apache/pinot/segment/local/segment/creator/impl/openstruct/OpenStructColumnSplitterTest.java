@@ -105,8 +105,8 @@ public class OpenStructColumnSplitterTest {
     FieldConfig valueFieldConfig = rawCodecSpecFieldConfig("clicks");
     FieldConfig defaultValueFieldConfig = rawCodecSpecFieldConfig("default");
     return new Object[][]{
-        {new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(valueFieldConfig), null)},
-        {new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5, null, null)}
+        {new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(valueFieldConfig), null, null, null)},
+        {new OpenStructIndexConfig(false, defaultValueFieldConfig, -1, null, 0.5, null, null, null, null)}
     };
   }
 
@@ -433,7 +433,8 @@ public class OpenStructColumnSplitterTest {
     }
 
     IllegalStateException exception = expectThrows(IllegalStateException.class, splitter::seal);
-    assertEquals(exception.getMessage(), "codecSpec is not supported for OPEN_STRUCT key: clicks");
+    assertEquals(exception.getMessage(), "OPEN_STRUCT column 'metrics': codecSpec is not supported for key 'clicks'; "
+        + "materialized keys always use a dictionary-encoded or LZ4 raw forward index");
   }
 
   private static FieldConfig rawCodecSpecFieldConfig(String name) {

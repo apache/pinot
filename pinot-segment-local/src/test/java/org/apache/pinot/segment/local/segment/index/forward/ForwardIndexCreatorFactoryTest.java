@@ -139,7 +139,7 @@ public class ForwardIndexCreatorFactoryTest {
           ? new long[]{11, 13, 21}
           : new long[]{Long.MIN_VALUE, (long) Integer.MAX_VALUE + 1, Long.MAX_VALUE};
       // Compression stats are opted in here on purpose: a V7 codecSpec column reports its uncompressed
-      // value size (totalDocs * storedType.size()) even though it has no legacy ChunkCompressionType.
+      // value size (values written * storedType.size()) even though it has no legacy ChunkCompressionType.
       File indexFile = roundTripCodecSpecIndex(indexDir, codecSpec, storedType, 2, values, true, 0);
       try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
         assertEquals(buffer.getInt(0), FixedByteChunkSVForwardIndexReaderV7.VERSION);
@@ -189,7 +189,7 @@ public class ForwardIndexCreatorFactoryTest {
   /// Writes `values` through a `codecSpec` forward-index creator and reads every one of them back, then
   /// returns the index file so the caller can assert on its header. Covers the parts both codecSpec round
   /// trips share: the creator contract that holds for any codecSpec column (not dictionary encoded, no
-  /// legacy chunk compression type, and an uncompressed value size of `totalDocs * storedType.size()` when
+  /// legacy chunk compression type, and an uncompressed value size of `values.length * storedType.size()` when
   /// the table opts into compression stats and UNAVAILABLE when it does not), that the pipeline routed the
   /// file to the V7 reader, and a sequential read of every value. `randomReads` further reads land on
   /// random doc ids through a second, random-access context.

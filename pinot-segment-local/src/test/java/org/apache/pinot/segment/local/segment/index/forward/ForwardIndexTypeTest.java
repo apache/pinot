@@ -36,13 +36,14 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
@@ -509,17 +510,16 @@ public class ForwardIndexTypeTest {
   @Test
   public void testCodecSpecBuildsStandardMutableIndexForRealtime()
       throws Exception {
-    MutableIndexContext context = Mockito.mock(MutableIndexContext.class);
-    Mockito.when(context.getFieldSpec()).thenReturn(
-        new DimensionFieldSpec("dimInt", FieldSpec.DataType.INT, true));
-    Mockito.when(context.getSegmentName()).thenReturn("testSegment");
-    Mockito.when(context.getCapacity()).thenReturn(16);
+    MutableIndexContext context = mock(MutableIndexContext.class);
+    when(context.getFieldSpec()).thenReturn(new DimensionFieldSpec("dimInt", DataType.INT, true));
+    when(context.getSegmentName()).thenReturn("testSegment");
+    when(context.getCapacity()).thenReturn(16);
     ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
         .withCodecSpec("DELTA,LZ4")
         .build();
 
     try (DirectMemoryManager memoryManager = new DirectMemoryManager("testSegment")) {
-      Mockito.when(context.getMemoryManager()).thenReturn(memoryManager);
+      when(context.getMemoryManager()).thenReturn(memoryManager);
       MutableIndex mutableIndex = StandardIndexes.forward().createMutableIndex(context, config);
       assertNotNull(mutableIndex);
       try {

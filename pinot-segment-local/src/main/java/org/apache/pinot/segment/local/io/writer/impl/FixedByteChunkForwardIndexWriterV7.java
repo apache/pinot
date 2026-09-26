@@ -255,6 +255,12 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteChunkWriter 
     throw new UnsupportedOperationException("V7 codec-pipeline writer does not support DOUBLE");
   }
 
+  /// Returns the value bytes written so far (`docsWritten * sizeOfEntry`), including values in the chunk that has
+  /// not been flushed yet. These are the bytes presented to the codec pipeline before any transform or compression.
+  public long getUncompressedValueSizeInBytes() {
+    return (long) _docsWritten * _sizeOfEntry;
+  }
+
   /// Fail fast at write time if the caller would exceed the declared `totalDocs`. Without this
   /// guard the writer keeps producing chunks past the declared length and only `close()` catches
   /// the mismatch, leaving a semantically-invalid partial file behind.

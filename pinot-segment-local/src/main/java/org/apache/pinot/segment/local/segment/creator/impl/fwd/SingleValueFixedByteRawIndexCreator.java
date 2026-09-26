@@ -43,9 +43,6 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
   private final DataType _valueType;
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
-  // Number of documents the writer will be fed. Used to compute the uncompressed value size for the
-  // V7 codec-pipeline writer, whose fixed-byte layout stores exactly totalDocs * valueType.size() bytes.
-  private final int _totalDocs;
   // Whether compression-statistics tracking was requested. Mirrors the legacy writer's contract of
   // reporting an uncompressed value size only when tracking is enabled.
   private boolean _trackUncompressedValueSize;
@@ -83,7 +80,6 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
             writerVersion);
     _valueType = valueType;
     _chunkCompressionType = compressionType;
-    _totalDocs = totalDocs;
   }
 
   /// Creates a raw fixed-byte creator backed by the V7 codec-pipeline writer.
@@ -102,7 +98,6 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
         valueType.size());
     _valueType = valueType;
     _chunkCompressionType = null;
-    _totalDocs = totalDocs;
   }
 
   @Override
@@ -151,11 +146,10 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
     if (_indexWriter instanceof FixedByteChunkForwardIndexWriter legacyWriter) {
       return legacyWriter.getRawForwardIndexUncompressedValueSizeInBytes();
     }
-    // V7 codec-pipeline writer: the fixed-byte layout stores exactly one value per doc, so the
-    // uncompressed size is totalDocs * valueType.size(). Report it only when tracking was requested,
-    // matching the legacy writer's contract of returning -1 otherwise.
-    if (_trackUncompressedValueSize) {
-      return (long) _totalDocs * _valueType.size();
+    // V7 codec-pipeline writer: like the legacy writer, report the value bytes actually written, or -1 unless
+    // tracking was requested.
+    if (_trackUncompressedValueSize && _indexWriter instanceof FixedByteChunkForwardIndexWriterV7 v7Writer) {
+      return v7Writer.getUncompressedValueSizeInBytes();
     }
     return -1;
   }

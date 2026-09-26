@@ -152,17 +152,21 @@ public class FieldConfig extends BaseJsonConfig {
     /// the DSL has no identity codec and rejects a blank spec, so this remains the only way to state
     /// "uncompressed" explicitly.
     PASS_THROUGH(true, false),
-    /// Snappy compression for raw forward indexes. Prefer `codecSpec="SNAPPY"` in new configs;
-    /// existing `compressionCodec` uses remain supported.
+    /// Snappy compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="SNAPPY"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     SNAPPY(true, false),
-    /// Zstandard compression for raw forward indexes. Prefer `codecSpec="ZSTD(3)"` in new configs;
-    /// existing `compressionCodec` uses remain supported.
+    /// Zstandard compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="ZSTD(3)"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     ZSTANDARD(true, false),
-    /// LZ4 compression for raw forward indexes. Prefer `codecSpec="LZ4"` in new configs;
-    /// existing `compressionCodec` uses remain supported.
+    /// LZ4 compression for raw forward indexes. For single-value INT/LONG raw columns on a cluster
+    /// where every server reads the V7 format, `codecSpec="LZ4"` is the codec-pipeline equivalent;
+    /// other column shapes keep using this value.
     LZ4(true, false),
-    /// GZIP (DEFLATE) compression for raw forward indexes. Prefer `codecSpec="GZIP"` in new configs;
-    /// existing `compressionCodec` uses remain supported.
+    /// GZIP (DEFLATE) compression for raw forward indexes. For single-value INT/LONG raw columns on a
+    /// cluster where every server reads the V7 format, `codecSpec="GZIP"` is the codec-pipeline
+    /// equivalent; other column shapes keep using this value.
     GZIP(true, false),
 
     /// Second-level dictionary encoding of the multi-value entries of a dictionary-encoded MV forward
@@ -180,10 +184,10 @@ public class FieldConfig extends BaseJsonConfig {
     CLPV2_ZSTD(false, false),
     CLPV2_LZ4(false, false),
 
-    /// Delta encoding for raw forward indexes. Rejected by table-config validation: it is applicable to
-    /// neither raw nor dictionary-encoded columns, so a config that sets it fails validation for every
-    /// column shape. Use `codecSpec="DELTA,LZ4"` on SV INT/LONG raw columns instead, which writes the
-    /// codec-pipeline format rather than the legacy chunk format.
+    /// Delta encoding for raw forward indexes. Rejected by table-config validation on every column with a
+    /// forward index: it is applicable to neither raw nor dictionary-encoded forward indexes. Use
+    /// `codecSpec="DELTA,LZ4"` on SV INT/LONG raw columns instead, which writes the codec-pipeline format
+    /// rather than the legacy chunk format.
     DELTA(false, false),
     /// Second-order delta encoding for raw forward indexes. Rejected by table-config validation for the
     /// same reason as [#DELTA]; use `codecSpec="DELTADELTA,LZ4"` on SV INT/LONG raw columns instead.
