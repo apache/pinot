@@ -130,6 +130,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
   private AndRestrictionPushdownMode _andRestrictionPushdownMode =
       Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE;
+  // Server-wide defaults for the streaming selection ORDER BY merge; the query options override them
+  private double _sortedSelectionMergeAutoMinSortedRatio = Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+  private int _sortedSelectionMergeBlockSize = Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -163,11 +166,24 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE.name()));
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
+    _sortedSelectionMergeAutoMinSortedRatio =
+        queryExecutorConfig.getProperty(Server.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO,
+            Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO);
+    Preconditions.checkState(
+        _sortedSelectionMergeAutoMinSortedRatio >= 0 && _sortedSelectionMergeAutoMinSortedRatio <= 1,
+        "Invalid configuration: sortedSelectionMergeAutoMinSortedRatio: %s must be in [0, 1]",
+        _sortedSelectionMergeAutoMinSortedRatio);
+    _sortedSelectionMergeBlockSize = queryExecutorConfig.getProperty(Server.SORTED_SELECTION_MERGE_BLOCK_SIZE,
+        Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    Preconditions.checkState(_sortedSelectionMergeBlockSize > 0,
+        "Invalid configuration: sortedSelectionMergeBlockSize: %s must be positive", _sortedSelectionMergeBlockSize);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
             + "maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, minSegmentGroupTrimSize: {}, "
-            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}",
+            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}, sortedSelectionMergeAutoMinSortedRatio: {}, "
+            + "sortedSelectionMergeBlockSize: {}",
         _maxExecutionThreads, _defaultExecutionThreads, _maxInitialResultHolderCapacity, _numGroupsLimit,
-        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold);
+        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold,
+        _sortedSelectionMergeAutoMinSortedRatio, _sortedSelectionMergeBlockSize);
   }
 
   @VisibleForTesting
@@ -344,14 +360,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
       Double sortedSelectionMergeAutoMinSortedRatio =
           QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(queryOptions);
-      if (sortedSelectionMergeAutoMinSortedRatio != null) {
-        queryContext.setSortedSelectionMergeAutoMinSortedRatio(sortedSelectionMergeAutoMinSortedRatio);
-      }
+      queryContext.setSortedSelectionMergeAutoMinSortedRatio(sortedSelectionMergeAutoMinSortedRatio != null
+          ? sortedSelectionMergeAutoMinSortedRatio
+          : _sortedSelectionMergeAutoMinSortedRatio);
       Integer sortedSelectionMergeBlockSize =
           QueryOptionsUtils.getSortedSelectionMergeBlockSize(queryOptions);
-      if (sortedSelectionMergeBlockSize != null) {
-        queryContext.setSortedSelectionMergeBlockSize(sortedSelectionMergeBlockSize);
-      }
+      queryContext.setSortedSelectionMergeBlockSize(sortedSelectionMergeBlockSize != null
+          ? sortedSelectionMergeBlockSize
+          : _sortedSelectionMergeBlockSize);
     }
 
     // Set group-by query options
